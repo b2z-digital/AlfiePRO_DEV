@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen as Edit2, Check, TriangleAlert as AlertTriangle, Sailboat, Eye } from 'lucide-react';
+import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen as Edit2, Check, TriangleAlert as AlertTriangle, Sailboat, Eye, Grid3x2 as Grid3X3, ClipboardCheck } from 'lucide-react';
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
-import { seedInitialHeats, validateHeatConfig, validateHeatAssignments, HMSConfig, calculateOptimalHeats } from '../utils/hmsHeatSystem';
+import { seedInitialHeats, validateHeatConfig, validateHeatAssignments, HMSConfig, calculateOptimalHeats, calculateHMSHeatSizes } from '../utils/hmsHeatSystem';
 import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig, generatePreSetQualifyingAssignments, seedSHRSHeatsByIndex } from '../utils/shrsHeatSystem';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
@@ -29,13 +29,15 @@ interface RaceSettingsModalProps {
     observerSettings?: {
       enable_observers?: boolean;
       observers_per_heat?: number;
+      enable_roll_call?: boolean;
+      auto_complete_sail?: boolean;
     };
   }) => void;
   onManageSkippers?: () => void;
   addNotification?: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
   hasRaceResults?: boolean;
   onClearAllRaceResults?: () => void;
-  onScoringModeChange?: (mode: 'pro' | 'touch') => void;
+  onScoringModeChange?: (mode: 'pro' | 'touch' | 'spreadsheet') => void;
   currentEvent?: any;
   autoEnableHeatRacing?: boolean;
 }
@@ -79,12 +81,14 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     initialHeatManagement?.configuration.enabled || false
   );
   const [currentHeatManagement, setCurrentHeatManagement] = useState<HeatManagement | null>(initialHeatManagement);
-  const [scoringMode, setScoringMode] = useState<'pro' | 'touch'>('pro');
+  const [scoringMode, setScoringMode] = useState<'pro' | 'touch' | 'spreadsheet'>('pro');
   const [nationalAssociationId, setNationalAssociationId] = useState<string | undefined>(undefined);
 
   // Observer settings
   const [enableObservers, setEnableObservers] = useState(currentEvent?.enable_observers ?? true);
   const [observersPerHeat, setObserversPerHeat] = useState(currentEvent?.observers_per_heat ?? 2);
+  const [enableRollCall, setEnableRollCall] = useState(currentEvent?.enable_roll_call ?? true);
+  const [autoCompleteSail, setAutoCompleteSail] = useState(currentEvent?.auto_complete_sail ?? true);
 
   // Start system
 
@@ -169,7 +173,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           .single();
 
         if (profileData?.scoring_mode_preference) {
-          setScoringMode(profileData.scoring_mode_preference as 'pro' | 'touch');
+          setScoringMode(profileData.scoring_mode_preference as 'pro' | 'touch' | 'spreadsheet');
         }
       }
     };
@@ -193,9 +197,6 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   // Allow manual override of promotion count
   const [isEditingPromotion, setIsEditingPromotion] = useState(false);
   const [manualPromotionCount, setManualPromotionCount] = useState<number | null>(null);
-
-  // Confirmation modal for clearing all results
-  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
 
   // Confirmation modal for clearing all heat results and resetting to Round 1
   const [showHeatClearConfirmation, setShowHeatClearConfirmation] = useState(false);
@@ -288,22 +289,18 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     ? validateSHRSPractical(skippers.length, numHeats)
     : validatePromotionRelegationPractical(skippers.length, numHeats, promotionCount);
 
-  // Calculate heat sizes based on actual heat count (manual or auto)
   const calculateHeatSizes = (totalSkippers: number, heats: number): number[] => {
     if (heats === 0) return [];
-    const baseSize = Math.floor(totalSkippers / heats);
-    const remainder = totalSkippers % heats;
-    const sizes = new Array(heats).fill(baseSize);
     if (isSHRS) {
+      const baseSize = Math.floor(totalSkippers / heats);
+      const remainder = totalSkippers % heats;
+      const sizes = new Array(heats).fill(baseSize);
       for (let i = 0; i < remainder; i++) {
         sizes[i]++;
       }
-    } else {
-      if (remainder > 0) {
-        sizes[0] += remainder;
-      }
+      return sizes;
     }
-    return sizes;
+    return calculateHMSHeatSizes(totalSkippers, heats);
   };
 
   const heatSizes = numHeats > 0 ? calculateHeatSizes(skippers.length, numHeats) : [];
@@ -594,10 +591,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     setShowHMSSeedingModal(false);
   };
 
-  const handleScoringModeChange = async (mode: 'pro' | 'touch') => {
+  const handleScoringModeChange = async (mode: 'pro' | 'touch' | 'spreadsheet') => {
     setScoringMode(mode);
 
-    // Save to database
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       await supabase
@@ -605,12 +601,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         .update({ scoring_mode_preference: mode })
         .eq('id', user.id);
 
-      // Notify parent component
       onScoringModeChange?.(mode);
 
-      // Show notification
       if (addNotification) {
-        addNotification('success', `Scoring mode changed to ${mode === 'pro' ? 'Pro Mode' : 'Touch Mode'}`);
+        const labels: Record<string, string> = { pro: 'Pro Mode', touch: 'Touch Mode', spreadsheet: 'Spreadsheet Mode' };
+        addNotification('success', `Scoring mode changed to ${labels[mode]}`);
       }
     }
   };
@@ -944,7 +939,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       },
       observerSettings: {
         enable_observers: enableObservers,
-        observers_per_heat: observersPerHeat
+        observers_per_heat: observersPerHeat,
+        enable_roll_call: enableRollCall,
+        auto_complete_sail: autoCompleteSail
       }
     });
 
@@ -1120,6 +1117,39 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                     </div>
                   </div>
                   {scoringMode === 'touch' && (
+                    <div className="flex-shrink-0 ml-3">
+                      <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
+                        <Check size={14} className="text-white" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleScoringModeChange('spreadsheet')}
+                className={`
+                  w-full p-4 rounded-lg transition-all border-2 text-left
+                  ${scoringMode === 'spreadsheet'
+                    ? darkMode
+                      ? 'bg-blue-900/30 border-blue-600'
+                      : 'bg-blue-50 border-blue-600'
+                    : darkMode
+                      ? 'bg-slate-700 border-slate-600 hover:bg-slate-600'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}
+                `}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      Spreadsheet Mode
+                    </div>
+                    <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Traditional spreadsheet entry - type sail numbers into finishing positions
+                    </div>
+                  </div>
+                  {scoringMode === 'spreadsheet' && (
                     <div className="flex-shrink-0 ml-3">
                       <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
                         <Check size={14} className="text-white" />
@@ -1340,15 +1370,13 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               <div className="space-y-6 pl-6 border-l-2 border-purple-400/30">
                 {/* Warning if scores exist */}
                 {hasHeatScores && (
-                  <div className={`p-3 rounded-lg flex items-start gap-3 ${
-                    darkMode ? 'bg-amber-900/30 border border-amber-700/50' : 'bg-amber-50 border border-amber-200'
-                  }`}>
-                    <AlertTriangle className={`flex-shrink-0 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} size={20} />
+                  <div className="p-3 rounded-lg flex items-start gap-3 bg-red-600">
+                    <AlertTriangle className="flex-shrink-0 text-white" size={20} />
                     <div className="flex-1">
-                      <p className={`text-sm font-medium ${darkMode ? 'text-amber-300' : 'text-amber-900'}`}>
+                      <p className="text-sm font-bold text-white">
                         Heat Settings Locked
                       </p>
-                      <p className={`text-xs mt-1 ${darkMode ? 'text-amber-400' : 'text-amber-700'}`}>
+                      <p className="text-xs mt-1 text-white/80">
                         Heat configuration cannot be changed after scoring has begun. Clear all round scores to modify settings.
                       </p>
                     </div>
@@ -1356,7 +1384,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 )}
 
                 {/* Heat Racing Scoring System */}
-                <div className="space-y-3">
+                <div className={`space-y-3 ${hasHeatScores ? 'pointer-events-none opacity-60' : ''}`}>
                   <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <Award size={16} />
@@ -1375,6 +1403,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                           <button
                             key={index}
                             type="button"
+                            disabled={hasHeatScores}
                             onClick={() => handleDropRuleChange(option.value)}
                             className={`
                               group relative w-full text-left p-4 rounded-xl transition-all border-2
@@ -1826,6 +1855,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
                 {/* Observer Settings */}
                 <div className={`p-5 rounded-xl border-2 space-y-4 ${
+                  hasHeatScores ? 'opacity-60 pointer-events-none' : ''
+                } ${
                   darkMode ? 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-600' : 'bg-gradient-to-br from-purple-50 to-slate-50 border-purple-200'
                 }`}>
                   <div className="flex items-center justify-between">
@@ -1836,8 +1867,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                       </label>
                     </div>
                     <button
-                      onClick={() => setEnableObservers(!enableObservers)}
+                      onClick={() => !hasHeatScores && setEnableObservers(!enableObservers)}
                       type="button"
+                      disabled={hasHeatScores}
                       className={`relative w-14 h-7 rounded-full transition-colors duration-200 shadow-sm ${
                         enableObservers ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                       }`}
@@ -1910,6 +1942,64 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   )}
                 </div>
 
+                {/* Roll Call & Spreadsheet Settings */}
+                <div className={`p-5 rounded-xl border-2 space-y-4 ${
+                  darkMode ? 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-600' : 'bg-gradient-to-br from-blue-50 to-slate-50 border-blue-200'
+                }`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <ClipboardCheck size={20} className={darkMode ? 'text-blue-400' : 'text-blue-600'} />
+                    <label className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      Scoring Options
+                    </label>
+                  </div>
+
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <div className={`text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                        Roll Call Before Scoring
+                      </div>
+                      <div className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Show roll call screen to mark skippers present/absent before each heat
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEnableRollCall(!enableRollCall)}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                        enableRollCall ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        enableRollCall ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </label>
+
+                  {scoringMode === 'spreadsheet' && (
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <div>
+                        <div className={`text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                          Auto-Complete Sail Numbers
+                        </div>
+                        <div className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Automatically match and advance when a unique sail number is detected
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAutoCompleteSail(!autoCompleteSail)}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                          autoCompleteSail ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          autoCompleteSail ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </label>
+                  )}
+                </div>
+
                 {/* Initial Assignment */}
                 <div className={`space-y-3 ${hasHeatScores ? 'pointer-events-none' : ''}`}>
                   <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -1977,28 +2067,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   </div>
                 </div>
 
-                {/* Clear All Results - only show if heat scores exist */}
-                {hasHeatScores && (
-                  <div className="space-y-3 pt-4 border-t border-slate-700">
-                    <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Danger Zone
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowHeatClearConfirmation(true)}
-                      className={`
-                        w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all
-                        bg-red-600 text-white hover:bg-red-700
-                      `}
-                    >
-                      <X size={16} />
-                      Clear All Heat Results
-                    </button>
-                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      This will delete all heat race results and return to Round 1 with original heat assignments. This action cannot be undone.
-                    </p>
-                  </div>
-                )}
+
+
               </div>
             )}
 
@@ -2085,17 +2155,15 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             >
               Cancel
             </button>
-            {hasRaceResults && onClearAllRaceResults && (
+            {hasHeatScores && onClearAllRaceResults && (
               <button
                 type="button"
-                onClick={() => setShowClearConfirmation(true)}
+                onClick={() => setShowHeatClearConfirmation(true)}
                 className={`
                   px-4 py-2 rounded-lg font-medium transition-colors
-                  ${darkMode
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-red-600 text-white hover:bg-red-700'}
+                  bg-red-600 text-white hover:bg-red-700
                 `}
-                title="Clear all race results and start fresh"
+                title="Clear all heat results and reset to Round 1"
               >
                 Clear All Results
               </button>
@@ -2148,29 +2216,6 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         currentEvent={currentEvent}
         nationalAssociationId={nationalAssociationId}
         yachtClassName={currentEvent?.raceClass}
-      />
-
-      {/* Clear All Results Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showClearConfirmation}
-        onClose={() => setShowClearConfirmation(false)}
-        onConfirm={async () => {
-          if (onClearAllRaceResults) {
-            await onClearAllRaceResults();
-            if (addNotification) {
-              addNotification('success', 'All race results have been cleared');
-            }
-            setShowClearConfirmation(false);
-            // Close the settings panel after clearing
-            onClose();
-          }
-        }}
-        title="Clear All Results"
-        message="Are you sure you want to clear ALL race results? This action cannot be undone."
-        confirmText="Clear All Results"
-        cancelText="Cancel"
-        darkMode={darkMode}
-        variant="danger"
       />
 
       {/* Clear All Heat Results Confirmation Modal */}

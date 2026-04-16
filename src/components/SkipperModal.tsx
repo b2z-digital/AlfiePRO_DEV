@@ -14,6 +14,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { User } from '../types/auth';
 import { getCountryFlag, getCountryName, SAILING_NATIONS } from '../utils/countryFlags';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useAuth } from '../contexts/AuthContext';
+import { bulkAddRaceOfficerContacts } from '../utils/raceOfficerContactsStorage';
 
 interface SkipperModalProps {
   isOpen: boolean;
@@ -47,6 +49,8 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   currentEvent
 }) => {
   const { addNotification } = useNotifications();
+  const { isRaceOfficer } = useAuth();
+  const [saveToContacts, setSaveToContacts] = useState(false);
   const [view, setView] = useState<'initial' | 'members' | 'manual' | 'import' | 'edit'>('initial');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importData, setImportData] = useState<any[]>([]);
@@ -478,6 +482,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     }
 
     const autoSelections: Record<string, MemberBoat> = {};
+    const autoSelectedSailNos = new Set(skippers.map(s => s.sailNo));
 
     members.forEach(member => {
       if (member.user_id && attendingMembers.includes(member.user_id)) {
@@ -489,9 +494,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
         if (validBoat) {
           const key = `${member.id}-${validBoat.id}`;
-          const sailNoInUse = skippers.some(s => s.sailNo === validBoat.sail_number);
-          if (!sailNoInUse) {
+          if (!autoSelectedSailNos.has(validBoat.sail_number)) {
             autoSelections[key] = validBoat;
+            autoSelectedSailNos.add(validBoat.sail_number);
           }
         }
       }
@@ -526,10 +531,21 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
     const key = `${member.id}-${boat.id}`;
 
-    // Check if sail number is already used by any skipper
     const existingSkipperWithSailNo = skippers.find(s => s.sailNo === boat.sail_number);
     if (existingSkipperWithSailNo) {
       setError(`Sail number ${boat.sail_number} is already used by ${existingSkipperWithSailNo.name}`);
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    const otherSelectedWithSailNo = Object.entries(selectedMemberBoats).find(([k, b]) =>
+      !k.startsWith(`${member.id}-`) && b.sail_number === boat.sail_number
+    );
+    if (otherSelectedWithSailNo) {
+      const otherMemberId = otherSelectedWithSailNo[0].split('-')[0];
+      const otherMember = members.find(m => m.id === otherMemberId) || otherClubMembers.find(m => m.id === otherMemberId);
+      const otherName = otherMember ? `${otherMember.first_name} ${otherMember.last_name}` : 'another member';
+      setError(`Sail number ${boat.sail_number} is already selected by ${otherName}`);
       setTimeout(() => setError(null), 3000);
       return;
     }
@@ -569,23 +585,19 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
   const handleSelectAll = () => {
     const newSelections: Record<string, MemberBoat> = {};
+    const usedSailNumbers = new Set(skippers.map(s => s.sailNo));
 
     membersWithMatchingBoats.forEach(member => {
       const matchingBoats = getMatchingBoats(member);
 
-      // Only select the first valid boat for each member
       const firstValidBoat = matchingBoats.find(boat => {
-        const isValid = boat.isValid;
-        const isAlreadyAdded = skippers.some(s =>
-          s.name === `${member.first_name} ${member.last_name}` &&
-          s.sailNo === boat.sail_number
-        );
-        return isValid && !isAlreadyAdded;
+        return boat.isValid && !usedSailNumbers.has(boat.sail_number);
       });
 
       if (firstValidBoat) {
         const key = `${member.id}-${firstValidBoat.id}`;
         newSelections[key] = firstValidBoat;
+        usedSailNumbers.add(firstValidBoat.sail_number);
       }
     });
 
@@ -804,48 +816,51 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
   const handleAddSelectedMembers = () => {
     const updatedSkippers = [...skippers];
-    const newSkippers = [];
-    
+    const newSkippers: any[] = [];
+    const skippedDuplicates: string[] = [];
+    const usedSailNumbers = new Set(skippers.map(s => s.sailNo));
+
     for (const boat of Object.values(selectedMemberBoats)) {
       const member = members.find(m => m.id === boat.member_id) || otherClubMembers.find(m => m.id === boat.member_id);
       if (member && boat.boat_type === currentEvent?.raceClass) {
-        // Check if this member is already in the skippers list
-        const existingSkipper = skippers.find(s => 
-          s.name === `${member.first_name} ${member.last_name}` && 
-          s.sailNo === boat.sail_number
-        );
-        
-        if (!existingSkipper) {
-          // Ensure all required data is present
-          if (!boat.sail_number || !boat.hull || !member.club) {
-            setError(`Cannot add ${member.first_name} ${member.last_name} - missing required information`);
-            continue;
-          }
-          
-          const newSkipper = {
-            name: `${member.first_name} ${member.last_name}`,
-            sailNo: boat.sail_number || '',
-            hull: boat.hull || '', // Store hull information
-            club: member.club || '',
-            boatModel: boat.hull || boat.boat_type, // Use hull (boat model name) instead of boat_type
-            startHcap: boat.handicap || 0,
-            avatarUrl: (memberAvatars[member.id] || otherClubAvatars[member.id]) || undefined,
-            memberId: member.id,
-            boatId: boat.id,
-            country_code: member.country_code,
-            country: member.country,
-            category: member.category,
-            state: member.state
-          };
-          newSkippers.push(newSkipper);
+        if (!boat.sail_number || !boat.hull || !member.club) {
+          setError(`Cannot add ${member.first_name} ${member.last_name} - missing required information`);
+          continue;
         }
+
+        if (usedSailNumbers.has(boat.sail_number)) {
+          skippedDuplicates.push(`${member.first_name} ${member.last_name} (${boat.sail_number})`);
+          continue;
+        }
+
+        const newSkipper = {
+          name: `${member.first_name} ${member.last_name}`,
+          sailNo: boat.sail_number || '',
+          hull: boat.hull || '',
+          club: member.club || '',
+          boatModel: boat.hull || boat.boat_type,
+          startHcap: boat.handicap || 0,
+          avatarUrl: (memberAvatars[member.id] || otherClubAvatars[member.id]) || undefined,
+          memberId: member.id,
+          boatId: boat.id,
+          country_code: member.country_code,
+          country: member.country,
+          category: member.category,
+          state: member.state
+        };
+        newSkippers.push(newSkipper);
+        usedSailNumbers.add(boat.sail_number);
       }
     }
-    
+
+    if (skippedDuplicates.length > 0) {
+      setError(`Skipped ${skippedDuplicates.length} member${skippedDuplicates.length !== 1 ? 's' : ''} with duplicate sail numbers: ${skippedDuplicates.join(', ')}`);
+    }
+
     if (newSkippers.length > 0) {
       onUpdateSkippers([...updatedSkippers, ...newSkippers]);
-      setView('initial'); // Return to initial view
-      setSelectedMemberBoats({}); // Reset selections
+      setView('initial');
+      setSelectedMemberBoats({});
     }
   };
 
@@ -950,6 +965,14 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
   const handleUpdateSkipper = () => {
     if (editingSkipperIndex === null) return;
+
+    const duplicateSailNo = skippers.find((s, i) =>
+      i !== editingSkipperIndex && s.sailNo === manualSkipper.sailNo
+    );
+    if (duplicateSailNo) {
+      setError(`Sail number ${manualSkipper.sailNo} is already used by ${duplicateSailNo.name}`);
+      return;
+    }
 
     const existingSkipper = skippers[editingSkipperIndex];
     const matchedBoat = editMemberBoats.find(
@@ -2137,14 +2160,15 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   // Import view
   if (view === 'import') {
     const SKIPPER_FIELDS: Array<{ key: string; label: string; required: boolean; aliases: string[] }> = [
-      { key: 'first_name', label: 'First Name', required: true, aliases: ['first name', 'first_name', 'firstname', 'fname', 'given name', 'given_name'] },
-      { key: 'last_name', label: 'Last Name', required: true, aliases: ['last name', 'last_name', 'lastname', 'lname', 'surname', 'family name', 'family_name'] },
-      { key: 'sail_number', label: 'Sail Number', required: true, aliases: ['sail no', 'sail_no', 'sail number', 'sail_number', 'sailno', 'sail'] },
+      { key: 'full_name', label: 'Full Name (combined)', required: false, aliases: ['name', 'skipper', 'competitor', 'full name', 'full_name', 'fullname', 'skipper name', 'skipper_name', 'competitor name', 'helm', 'helmsman'] },
+      { key: 'first_name', label: 'First Name', required: false, aliases: ['first name', 'first_name', 'firstname', 'fname', 'given name', 'given_name'] },
+      { key: 'last_name', label: 'Last Name', required: false, aliases: ['last name', 'last_name', 'lastname', 'lname', 'surname', 'family name', 'family_name'] },
+      { key: 'sail_number', label: 'Sail Number', required: true, aliases: ['sail no', 'sail_no', 'sail number', 'sail_number', 'sailno', 'sail', 'sail no.'] },
       { key: 'club', label: 'Club', required: false, aliases: ['club', 'club name', 'club_name', 'organisation', 'organization', 'yacht club'] },
       { key: 'boat_type', label: 'Boat Type / Design', required: false, aliases: ['boat design', 'boat_design', 'boat type', 'boat_type', 'class', 'boat class', 'boat_class', 'design'] },
       { key: 'country_code', label: 'Country Code (IOC)', required: false, aliases: ['nat', 'nationality', 'nation', 'ioc', 'country code', 'country_code', 'nat.'] },
       { key: 'country', label: 'Country', required: false, aliases: ['country', 'country name', 'country_name'] },
-      { key: 'state', label: 'State', required: false, aliases: ['state', 'province', 'region'] },
+      { key: 'state', label: 'State', required: false, aliases: ['state', 'province', 'region', 'state country', 'state\ncountry'] },
       { key: 'category', label: 'Category', required: false, aliases: ['category', 'age', 'age group', 'division', 'cat', 'cat.'] },
       { key: 'email', label: 'Email', required: false, aliases: ['email', 'e-mail', 'email address', 'contact email'] },
       { key: 'hull_number', label: 'Hull / Reg No', required: false, aliases: ['hull', 'hull reg no', 'hull_reg_no', 'hull number', 'hull_number', 'registration', 'reg no', 'reg_no'] },
@@ -2179,12 +2203,13 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       const fuzzyRules: Array<{ field: string; match: (h: string) => boolean }> = [
         { field: 'first_name', match: h => (h.includes('first') && h.includes('name')) || h === 'fname' },
         { field: 'last_name', match: h => (h.includes('last') && h.includes('name')) || h.includes('surname') || h === 'lname' },
+        { field: 'full_name', match: h => h === 'name' || h === 'skipper' || h === 'competitor' || h === 'helm' || h === 'helmsman' || (h.includes('skipper') && h.includes('name')) },
         { field: 'sail_number', match: h => h.includes('sail') },
         { field: 'club', match: h => h.includes('club') },
         { field: 'boat_type', match: h => (h.includes('boat') && (h.includes('design') || h.includes('type') || h.includes('class'))) || (h === 'class') || (h === 'design') },
         { field: 'country_code', match: h => h === 'nat' || h === 'nat.' || h === 'nationality' || h === 'ioc' || (h.includes('country') && h.includes('code')) },
         { field: 'country', match: h => h === 'country' || h === 'country name' },
-        { field: 'state', match: h => h === 'state' || h === 'province' },
+        { field: 'state', match: h => h === 'state' || h === 'province' || (h.includes('state') && h.includes('country')) },
         { field: 'category', match: h => h === 'category' || h === 'cat' || h === 'cat.' || h.includes('age group') },
         { field: 'email', match: h => h.includes('email') || h.includes('e-mail') },
         { field: 'hull_number', match: h => h.includes('hull') || (h.includes('reg') && h.includes('no')) },
@@ -2218,13 +2243,14 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           const headerKeywords = [
             'first name', 'first_name', 'firstname', 'fname',
             'last name', 'last_name', 'lastname', 'lname', 'surname',
-            'sail no', 'sail number', 'sail_no', 'sail_number', 'sailno',
+            'name', 'skipper', 'competitor', 'full name', 'helm', 'helmsman',
+            'sail no', 'sail number', 'sail_no', 'sail_number', 'sailno', 'sail no.',
             'club name', 'club_name', 'club',
-            'boat design', 'boat type', 'boat_type', 'boat class', 'class', 'design',
+            'boat design', 'boat_design', 'boat type', 'boat_type', 'boat class', 'class', 'design',
             'nat', 'nationality', 'country code', 'country_code', 'ioc',
-            'country', 'state', 'email', 'phone',
+            'country', 'state', 'state country', 'email', 'phone',
             'category', 'hull', 'hull reg no', 'hull_reg_no', 'hull number',
-            'competitor id', 'entry date', 'rank', 'pn',
+            'competitor id', 'entry date', 'rank', 'pn', 'payment', '2.4 ghz',
           ];
 
           let bestRowIndex = 0;
@@ -2314,32 +2340,72 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     const handleImport = async () => {
       setImportStep('importing');
       const newSkippers: Skipper[] = [];
+      const duplicateSailNumbers: string[] = [];
 
       const fieldToColumn: Record<string, string> = {};
       Object.entries(importMappings).forEach(([csvColumn, field]) => {
         fieldToColumn[field] = csvColumn;
       });
 
+      const titleCase = (s: string) => {
+        if (!s) return s;
+        return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+      };
+
       for (const row of importData) {
-        const firstName = (row[fieldToColumn['first_name']] || '').trim();
-        const lastName = (row[fieldToColumn['last_name']] || '').trim();
+        let firstName = (row[fieldToColumn['first_name']] || '').trim();
+        let lastName = (row[fieldToColumn['last_name']] || '').trim();
+        const fullName = (row[fieldToColumn['full_name']] || '').trim();
         const club = (row[fieldToColumn['club']] || '').trim();
         const boatType = (row[fieldToColumn['boat_type']] || currentEvent?.raceClass || '').trim();
-        const sailNo = (row[fieldToColumn['sail_number']] || '').trim();
+        let sailNo = (row[fieldToColumn['sail_number']] || '').trim();
         const countryCode = (row[fieldToColumn['country_code']] || '').trim();
         const country = (row[fieldToColumn['country']] || '').trim();
         const category = (row[fieldToColumn['category']] || '').trim();
         const state = (row[fieldToColumn['state']] || '').trim();
         const hullNumber = (row[fieldToColumn['hull_number']] || '').trim();
 
-        if (firstName && lastName && sailNo) {
-          const isDuplicate = skippers.some(s =>
-            s.name.toLowerCase() === `${firstName} ${lastName}`.toLowerCase().trim() &&
-            s.sailNo === sailNo
-          );
-          if (!isDuplicate) {
+        if (!firstName && !lastName && fullName) {
+          if (fullName.includes(',')) {
+            const parts = fullName.split(',').map(p => p.trim());
+            lastName = parts[0];
+            firstName = parts.slice(1).join(' ');
+          } else {
+            const parts = fullName.split(/\s+/);
+            if (parts.length === 1) {
+              firstName = parts[0];
+              lastName = '';
+            } else {
+              const firstIsAllCaps = parts[0] === parts[0].toUpperCase() && parts[0].length > 1;
+              const restAreNotAllCaps = parts.slice(1).some(p => p !== p.toUpperCase());
+              if (firstIsAllCaps && restAreNotAllCaps) {
+                lastName = parts[0];
+                firstName = parts.slice(1).join(' ');
+              } else {
+                firstName = parts.slice(0, -1).join(' ');
+                lastName = parts[parts.length - 1];
+              }
+            }
+          }
+          firstName = titleCase(firstName);
+          lastName = titleCase(lastName);
+        }
+
+        if (sailNo && !/[a-zA-Z]/.test(sailNo)) {
+          sailNo = `AUS ${sailNo}`;
+        }
+
+        const skipperName = `${firstName} ${lastName}`.trim();
+        if (skipperName && sailNo) {
+          const isDuplicateExisting = skippers.some(s => s.sailNo === sailNo);
+          const isDuplicateNew = newSkippers.some(s => s.sailNo === sailNo);
+          if (isDuplicateExisting) {
+            duplicateSailNumbers.push(sailNo);
+          } else if (isDuplicateNew) {
+            duplicateSailNumbers.push(sailNo);
+          } else {
             newSkippers.push({
-              name: `${firstName} ${lastName}`.trim(),
+              name: skipperName,
               sailNo,
               club,
               boatModel: boatType,
@@ -2357,15 +2423,44 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       onUpdateSkippers([...skippers, ...newSkippers]);
       setError(null);
       const count = newSkippers.length;
-      addNotification('success', `${count} skipper${count !== 1 ? 's' : ''} imported successfully`);
+      const dupCount = duplicateSailNumbers.length;
+
+      const dupWarning = dupCount > 0
+        ? `. ${dupCount} skipped due to duplicate sail number${dupCount !== 1 ? 's' : ''}: ${[...new Set(duplicateSailNumbers)].join(', ')}`
+        : '';
+
+      if (saveToContacts && isRaceOfficer && newSkippers.length > 0) {
+        try {
+          const contactRows = newSkippers.map(s => ({
+            name: s.name,
+            sail_number: s.sailNo || '',
+            boat_class: s.hull || s.boatModel || '',
+            boat_name: '',
+            club_name: s.club || '',
+            email: '',
+            country: s.country_code || s.country || '',
+            state: s.clubState || '',
+          }));
+          const saved = await bulkAddRaceOfficerContacts(contactRows);
+          addNotification(dupCount > 0 ? 'warning' : 'success', `${count} skipper${count !== 1 ? 's' : ''} imported and ${saved.length} saved to contacts${dupWarning}`);
+        } catch {
+          addNotification(dupCount > 0 ? 'warning' : 'success', `${count} skipper${count !== 1 ? 's' : ''} imported (contacts save failed)${dupWarning}`);
+        }
+      } else {
+        addNotification(dupCount > 0 ? 'warning' : 'success', `${count} skipper${count !== 1 ? 's' : ''} imported successfully${dupWarning}`);
+      }
+
       onClose();
     };
 
     const importFieldsList = SKIPPER_FIELDS;
-    const mappedCount = importFieldsList.filter(f => Object.values(importMappings).includes(f.key)).length;
-    const requiredMapped = importFieldsList.filter(f => f.required && Object.values(importMappings).includes(f.key)).length;
-    const requiredTotal = importFieldsList.filter(f => f.required).length;
-    const canImport = requiredMapped === requiredTotal;
+    const mappedFields = new Set(Object.values(importMappings));
+    const mappedCount = importFieldsList.filter(f => mappedFields.has(f.key)).length;
+    const hasSailNumber = mappedFields.has('sail_number');
+    const hasFullName = mappedFields.has('full_name');
+    const hasFirstAndLast = mappedFields.has('first_name') && mappedFields.has('last_name');
+    const hasNameField = hasFullName || hasFirstAndLast;
+    const canImport = hasSailNumber && hasNameField;
     const autoDetectedCount = importAutoDetected.size;
 
     return (
@@ -2484,9 +2579,19 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-slate-200">{label}</span>
-                            {required && (
+                            {key === 'sail_number' && (
                               <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
                                 Required
+                              </span>
+                            )}
+                            {key === 'full_name' && !hasFirstAndLast && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                                Required*
+                              </span>
+                            )}
+                            {(key === 'first_name' || key === 'last_name') && !hasFullName && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                                Required*
                               </span>
                             )}
                           </div>
@@ -2516,19 +2621,30 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                             ))}
                           </select>
                           <div className="flex justify-center">
-                            {isMapped ? (
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isAutoDetected ? 'bg-emerald-500/20' : 'bg-blue-500/20'}`}>
-                                <CheckCircle size={14} className={isAutoDetected ? 'text-emerald-400' : 'text-blue-400'} />
-                              </div>
-                            ) : required ? (
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center bg-red-500/20">
-                                <AlertCircle size={14} className="text-red-400" />
-                              </div>
-                            ) : (
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center bg-slate-700/50">
-                                <span className="text-slate-600 text-xs">-</span>
-                              </div>
-                            )}
+                            {(() => {
+                              const isContextRequired = key === 'sail_number' ||
+                                (key === 'full_name' && !hasFirstAndLast) ||
+                                ((key === 'first_name' || key === 'last_name') && !hasFullName);
+                              if (isMapped) {
+                                return (
+                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isAutoDetected ? 'bg-emerald-500/20' : 'bg-blue-500/20'}`}>
+                                    <CheckCircle size={14} className={isAutoDetected ? 'text-emerald-400' : 'text-blue-400'} />
+                                  </div>
+                                );
+                              }
+                              if (isContextRequired) {
+                                return (
+                                  <div className="w-6 h-6 rounded-full flex items-center justify-center bg-red-500/20">
+                                    <AlertCircle size={14} className="text-red-400" />
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center bg-slate-700/50">
+                                  <span className="text-slate-600 text-xs">-</span>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       );
@@ -2546,7 +2662,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                       <div>
                         <span className="text-slate-400">Required: </span>
                         <span className={`font-medium ${canImport ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {requiredMapped}/{requiredTotal}
+                          {canImport ? 'OK' : 'Missing'}
                         </span>
                       </div>
                     </div>
@@ -2558,8 +2674,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
                     <div className="flex items-center gap-2 text-sm text-red-300">
                       <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
-                      Please map all required fields. Missing:{' '}
-                      {importFieldsList.filter(f => f.required && !Object.values(importMappings).includes(f.key)).map(f => f.label).join(', ')}
+                      Please map required fields: Sail Number + (Full Name OR First Name & Last Name).
+                      {!hasSailNumber && ' Missing: Sail Number.'}
+                      {!hasNameField && ' Missing: a name field (Full Name, or First Name + Last Name).'}
                     </div>
                   </div>
                 )}
@@ -2632,6 +2749,17 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             >
               {importStep === 'complete' ? 'Close' : importStep === 'mapping' ? 'Upload Different Data' : 'Back'}
             </button>
+            {importStep === 'mapping' && isRaceOfficer && (
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={saveToContacts}
+                  onChange={e => setSaveToContacts(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-600 text-blue-500 focus:ring-blue-500 bg-slate-700"
+                />
+                <span className="text-sm text-slate-300">Save to My Contacts</span>
+              </label>
+            )}
             {importStep === 'mapping' && (
               <button
                 onClick={handleImport}

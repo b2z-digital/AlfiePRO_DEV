@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Timer, Settings, Music } from 'lucide-react';
 import type { StartSequence, StartBoxState } from '../../types/startBox';
 import type { TimerTickData } from '../../utils/startBoxAudio';
 import { getStartBoxEngine, destroyStartBoxEngine } from '../../utils/startBoxAudio';
-import { getSequence, getSequences } from '../../utils/startBoxStorage';
+import { getSequence, getSequences, getSoundById } from '../../utils/startBoxStorage';
 import { StartBoxCountdown } from './StartBoxCountdown';
 import { StartBoxControls } from './StartBoxControls';
 
@@ -46,9 +46,19 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
   const cleanupRef = useRef<(() => void)[]>([]);
   const botwPhaseRef = useRef(false);
   const startSequenceRef = useRef<StartSequence | null>(null);
+  const whistleSoundUrlRef = useRef<string | null>(null);
+  const bellSoundUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     loadSequences();
+    (async () => {
+      const [whistle, bell] = await Promise.all([
+        getSoundById(WHISTLE_SOUND_ID),
+        getSoundById(BELL_SOUND_ID),
+      ]);
+      whistleSoundUrlRef.current = whistle?.file_url || null;
+      bellSoundUrlRef.current = bell?.file_url || null;
+    })();
   }, [clubId]);
 
   useEffect(() => {
@@ -150,24 +160,24 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
   const handleWhistle = useCallback(async () => {
     const engine = engineRef.current;
     await engine.initialize();
-    const whistleSound = currentSequence?.sounds?.find(s => s.sound_id === WHISTLE_SOUND_ID)?.sound;
-    if (whistleSound?.file_url) {
-      engine.playSound(whistleSound.file_url);
+    const url = whistleSoundUrlRef.current;
+    if (url) {
+      engine.playSound(url);
     } else {
       engine.playSynthBeep(1200, 300);
     }
-  }, [currentSequence]);
+  }, []);
 
   const handleBell = useCallback(async () => {
     const engine = engineRef.current;
     await engine.initialize();
-    const bellSound = currentSequence?.sounds?.find(s => s.sound_id === BELL_SOUND_ID)?.sound;
-    if (bellSound?.file_url) {
-      engine.playSound(bellSound.file_url);
+    const url = bellSoundUrlRef.current;
+    if (url) {
+      engine.playSound(url);
     } else {
       engine.playSynthBeep(660, 500);
     }
-  }, [currentSequence]);
+  }, []);
 
   const handleVolumeChange = useCallback((vol: number) => {
     setVolume(vol);

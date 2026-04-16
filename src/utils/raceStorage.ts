@@ -13,18 +13,44 @@ const CURRENT_EVENT_KEY = 'current-event';
 // Note: We rely on the global 15s timeout in supabase.ts and the retryQuery helper
 // No additional timeout wrappers needed here - they just slow things down
 
+interface RaceScope {
+  mode: 'club' | 'race_officer';
+  clubId?: string;
+  userId?: string;
+}
+
+async function getRaceScope(): Promise<RaceScope | null> {
+  const currentClubId = localStorage.getItem('currentClubId');
+  if (currentClubId) {
+    return { mode: 'club', clubId: currentClubId };
+  }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_race_officer')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (profile?.is_race_officer) {
+      return { mode: 'race_officer', userId: user.id };
+    }
+  }
+  return null;
+}
+
 // Get stored race events - OFFLINE-FIRST with timeout protection
 export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
   try {
-    // Get current club from localStorage
-    const currentClubId = localStorage.getItem('currentClubId');
-    if (!currentClubId) {
-      console.warn('No club selected, returning empty events list');
+    const scope = await getRaceScope();
+    if (!scope) {
+      console.warn('No club or race officer scope, returning empty events list');
       return [];
     }
 
+    const currentClubId = scope.clubId;
+
     // ALWAYS get cached data first for instant display
-    const cachedEvents = await offlineStorage.getEvents(currentClubId);
+    const cachedEvents = currentClubId ? await offlineStorage.getEvents(currentClubId) : [];
     console.log('📦 Loaded', cachedEvents.length, 'cached events');
 
     // Check if we're online
@@ -33,13 +59,20 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
     if (isOnline) {
       // Try to fetch from Supabase - global timeout handles this
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('quick_races')
           .select('*')
-          .eq('club_id', currentClubId)
           .eq('archived', false)
-          .is('public_event_id', null) // Exclude quick_races linked to public events
+          .is('public_event_id', null)
           .order('created_at', { ascending: false });
+
+        if (scope.mode === 'club') {
+          query = query.eq('club_id', scope.clubId!);
+        } else {
+          query = query.eq('user_id', scope.userId!).is('club_id', null);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           console.error('Error fetching quick races from Supabase:', error);
@@ -201,15 +234,17 @@ export const storeRaceEvents = async (events: RaceEvent[]): Promise<void> => {
 // Store a single race event - OFFLINE-FIRST
 export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
   try {
-    // Get current club from localStorage
-    const currentClubId = localStorage.getItem('currentClubId');
-    if (!currentClubId) {
-      console.warn('No club selected, cannot store event');
+    const scope = await getRaceScope();
+    if (!scope) {
+      console.warn('No club or race officer scope, cannot store event');
       return;
     }
 
-    // Ensure the event has the club ID
-    event.clubId = event.clubId || currentClubId;
+    const currentClubId = scope.clubId;
+
+    if (scope.mode === 'club') {
+      event.clubId = event.clubId || currentClubId;
+    }
 
     // Always save to IndexedDB first (offline-first)
     await offlineStorage.saveEvent(event);
@@ -258,7 +293,8 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
           heat_management: event.heatManagement,
           num_races: event.numRaces,
           drop_rules: Array.isArray(event.dropRules) ? event.dropRules : [4, 8, 16, 24, 32, 40], // Default to RRS - Appendix A
-          club_id: event.clubId,
+          club_id: scope.mode === 'club' ? event.clubId : null,
+          user_id: scope.mode === 'race_officer' ? scope.userId : null,
           // Display settings for results table
           show_flag: (event as any).showFlag ?? (event as any).show_flag ?? true,
           show_country: (event as any).showCountry ?? (event as any).show_country ?? true,
@@ -463,16 +499,19 @@ export const deleteRaceEvent = async (id: string): Promise<boolean> => {
 // Get stored race series - OFFLINE-FIRST with timeout protection
 export const getStoredRaceSeries = async (): Promise<RaceSeries[]> => {
   try {
-    // Get current club from localStorage
-    const currentClubId = localStorage.getItem('currentClubId');
-    if (!currentClubId) {
-      console.warn('No club selected, returning empty series list');
+    const scope = await getRaceScope();
+    if (!scope) {
+      console.warn('No club or race officer scope, returning empty series list');
       return [];
     }
 
+    const currentClubId = scope.clubId;
+
     // ALWAYS get cached data first from localStorage
     const stored = localStorage.getItem(RACE_SERIES_KEY);
-    const cachedSeries: RaceSeries[] = stored ? JSON.parse(stored).filter((s: RaceSeries) => s.clubId === currentClubId) : [];
+    const cachedSeries: RaceSeries[] = stored ? JSON.parse(stored).filter((s: RaceSeries) =>
+      scope.mode === 'club' ? s.clubId === currentClubId : !s.clubId
+    ) : [];
     console.log('📦 Loaded', cachedSeries.length, 'cached series');
 
     // Check if online
@@ -481,12 +520,19 @@ export const getStoredRaceSeries = async (): Promise<RaceSeries[]> => {
     if (isOnline) {
       // Try to fetch from Supabase with retry logic
       try {
+        let seriesQuery = supabase
+          .from('race_series')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (scope.mode === 'club') {
+          seriesQuery = seriesQuery.eq('club_id', scope.clubId!);
+        } else {
+          seriesQuery = seriesQuery.eq('user_id', scope.userId!).is('club_id', null);
+        }
+
         const { data, error } = await protectedQuery(
-          () => supabase
-            .from('race_series')
-            .select('*')
-            .eq('club_id', currentClubId)
-            .order('created_at', { ascending: false }),
+          () => seriesQuery,
           { timeout: QUERY_TIMEOUTS.SLOW, queryName: 'fetch race series' }
         );
 
@@ -495,13 +541,25 @@ export const getStoredRaceSeries = async (): Promise<RaceSeries[]> => {
           throw error;
         }
 
+        let roundsQuery = supabase
+          .from('race_series_rounds')
+          .select('*')
+          .order('round_index', { ascending: true });
+
+        if (scope.mode === 'club') {
+          roundsQuery = roundsQuery.eq('club_id', scope.clubId!);
+        } else {
+          const seriesIds = (data || []).map((s: any) => s.id);
+          if (seriesIds.length > 0) {
+            roundsQuery = roundsQuery.in('series_id', seriesIds);
+          } else {
+            roundsQuery = roundsQuery.eq('series_id', 'none');
+          }
+        }
+
         // Fetch all rounds from race_series_rounds table with retry
         const { data: roundsData, error: roundsError } = await protectedQuery(
-          () => supabase
-            .from('race_series_rounds')
-            .select('*')
-            .eq('club_id', currentClubId)
-            .order('round_index', { ascending: true }),
+          () => roundsQuery,
           { timeout: QUERY_TIMEOUTS.SLOW, queryName: 'fetch series rounds' }
         );
 
@@ -649,15 +707,17 @@ export const storeRaceSeriesArray = async (series: RaceSeries[]): Promise<void> 
 // Store a single race series
 export const storeRaceSeries = async (series: RaceSeries): Promise<void> => {
   try {
-    // Get current club from localStorage
-    const currentClubId = localStorage.getItem('currentClubId');
-    if (!currentClubId) {
-      console.warn('No club selected, cannot store series');
+    const scope = await getRaceScope();
+    if (!scope) {
+      console.warn('No club or race officer scope, cannot store series');
       return;
     }
-    
-    // Ensure the series has the club ID
-    series.clubId = series.clubId || currentClubId;
+
+    const currentClubId = scope.clubId;
+
+    if (scope.mode === 'club') {
+      series.clubId = series.clubId || currentClubId;
+    }
 
     console.log('=== STORING RACE SERIES ===');
     console.log('Current Club ID:', currentClubId);
@@ -699,7 +759,8 @@ export const storeRaceSeries = async (series: RaceSeries): Promise<void> => {
         sailing_instructions_url: series.sailingInstructionsUrl,
         is_paid: series.isPaid || false,
         entry_fee: series.entryFee,
-        club_id: series.clubId,
+        club_id: scope.mode === 'club' ? series.clubId : null,
+        user_id: scope.mode === 'race_officer' ? scope.userId : null,
         enable_live_tracking: series.enableLiveTracking || false,
         enable_livestream: series.enableLiveStream || false
       };
@@ -737,7 +798,7 @@ export const storeRaceSeries = async (series: RaceSeries): Promise<void> => {
         const roundsToUpsert = series.rounds.map((round, index) => {
           const roundData: any = {
             series_id: series.id,
-            club_id: series.clubId,
+            club_id: scope.mode === 'club' ? series.clubId : null,
             round_name: round.name || `Round ${index + 1}`,
             round_index: index,
             date: round.date,
@@ -1103,12 +1164,13 @@ export const updateEventResults = async (
   });
   
   try {
-    // Get current club from localStorage
-    const currentClubId = localStorage.getItem('currentClubId');
-    if (!currentClubId) {
-      console.error('❌ No club selected, cannot update event results');
-      throw new Error('No club selected');
+    const scope = await getRaceScope();
+    if (!scope) {
+      console.error('❌ No club or race officer scope, cannot update event results');
+      throw new Error('No scope available');
     }
+
+    const currentClubId = scope.clubId;
 
     // Get the current event
     const currentEvent = getCurrentEvent();

@@ -1,10 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import {
-  Users, Shield, Trash2, Search, Building, MapPin,
-  Globe, CheckCircle, XCircle,
-  Mail, UserPlus, Eye, Lock, Crown, X, AlertCircle,
-  RefreshCw, Download, ChevronRight, ChevronDown, ArrowLeft
-} from 'lucide-react';
+import { Users, Shield, Trash2, Search, Building, MapPin, Globe, CircleCheck as CheckCircle, Circle as XCircle, Mail, UserPlus, Eye, Lock, Crown, X, CircleAlert as AlertCircle, RefreshCw, Download, ChevronRight, ChevronDown, ArrowLeft, Flag } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -66,7 +61,16 @@ interface OrgItem {
   name: string;
 }
 
-type ViewMode = 'platform_admins' | 'associations' | 'clubs';
+interface RaceOfficerUser {
+  user_id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string;
+  is_race_officer: boolean;
+  created_at: string;
+}
+
+type ViewMode = 'platform_admins' | 'associations' | 'clubs' | 'race_officers';
 
 function UserAvatar({ name, email, avatarUrl, size = 'sm' }: { name: string; email: string; avatarUrl?: string; size?: 'sm' | 'md' | 'lg' }) {
   const dims = size === 'lg' ? 'w-14 h-14 text-lg' : size === 'md' ? 'w-10 h-10 text-sm' : 'w-9 h-9 text-xs';
@@ -109,20 +113,28 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
   const [addUserRole, setAddUserRole] = useState('member');
   const [editingRole, setEditingRole] = useState<string | null>(null);
   const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
+  const [raceOfficers, setRaceOfficers] = useState<RaceOfficerUser[]>([]);
+  const [roSearchTerm, setRoSearchTerm] = useState('');
+  const [roSearchResults, setRoSearchResults] = useState<PlatformUser[]>([]);
+  const [searchingRoUsers, setSearchingRoUsers] = useState(false);
+  const [showAddRaceOfficer, setShowAddRaceOfficer] = useState(false);
+  const [togglingRo, setTogglingRo] = useState<string | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const roSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     setError(null);
     try {
-      const [adminsRes, clubUsersRes, assocUsersRes, clubsRes, stateRes, nationalRes] = await Promise.all([
+      const [adminsRes, clubUsersRes, assocUsersRes, clubsRes, stateRes, nationalRes, roRes] = await Promise.all([
         supabase.from('platform_super_admins').select('*').order('created_at'),
         supabase.rpc('get_all_club_users_for_super_admin'),
         supabase.rpc('get_all_association_users_for_super_admin'),
         supabase.from('clubs').select('id, name').order('name'),
         supabase.from('state_associations').select('id, name').order('name'),
         supabase.from('national_associations').select('id, name').order('name'),
+        supabase.rpc('get_race_officers_for_super_admin'),
       ]);
       setSuperAdmins(adminsRes.data || []);
       setClubUsers(clubUsersRes.data || []);
@@ -130,6 +142,7 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
       setClubs(clubsRes.data || []);
       setStateAssociations(stateRes.data || []);
       setNationalAssociations(nationalRes.data || []);
+      setRaceOfficers(roRes.data || []);
       if (clubUsersRes.error) setError('Failed to load club users: ' + clubUsersRes.error.message);
       if (assocUsersRes.error) setError('Failed to load association users: ' + assocUsersRes.error.message);
     } catch (err) {
@@ -205,6 +218,54 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
     setSelectedPlatformUser(null);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => searchPlatformUsers(term), 300);
+  };
+
+  const searchRoUsers = useCallback(async (term: string) => {
+    if (!term.trim()) { setRoSearchResults([]); return; }
+    setSearchingRoUsers(true);
+    const { data, error: err } = await supabase.rpc('search_platform_users_for_super_admin', { p_search_term: term.trim() });
+    if (!err && data) setRoSearchResults(data);
+    setSearchingRoUsers(false);
+  }, []);
+
+  const handleRoSearchChange = (term: string) => {
+    setRoSearchTerm(term);
+    if (roSearchTimerRef.current) clearTimeout(roSearchTimerRef.current);
+    roSearchTimerRef.current = setTimeout(() => searchRoUsers(term), 300);
+  };
+
+  const toggleRaceOfficer = async (userId: string, currentValue: boolean) => {
+    setTogglingRo(userId);
+    const { error: err } = await supabase
+      .from('profiles')
+      .update({ is_race_officer: !currentValue })
+      .eq('id', userId);
+    if (err) {
+      alert('Error: ' + err.message);
+    } else {
+      loadData();
+      setShowAddRaceOfficer(false);
+      setRoSearchTerm('');
+      setRoSearchResults([]);
+    }
+    setTogglingRo(null);
+  };
+
+  const addRaceOfficer = async (pu: PlatformUser) => {
+    setTogglingRo(pu.user_id);
+    const { error: err } = await supabase
+      .from('profiles')
+      .update({ is_race_officer: true })
+      .eq('id', pu.user_id);
+    if (err) {
+      alert('Error: ' + err.message);
+    } else {
+      loadData();
+      setShowAddRaceOfficer(false);
+      setRoSearchTerm('');
+      setRoSearchResults([]);
+    }
+    setTogglingRo(null);
   };
 
   const addUserToOrgConfirm = async () => {
@@ -396,6 +457,7 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
     { id: 'platform_admins', label: 'Platform Admins', icon: Shield, count: superAdmins.length },
     { id: 'associations', label: 'All Associations', icon: Globe, count: totalAssocs },
     { id: 'clubs', label: 'Clubs', icon: Building, count: clubs.length },
+    { id: 'race_officers', label: 'Race Officers', icon: Flag, count: raceOfficers.length },
   ];
 
   return (
@@ -468,6 +530,24 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
           getRoleOptions={getRoleOptions}
           exportUsers={() => exportUsers(clubUsers, 'club-users')}
           hasExportData={clubUsers.length > 0}
+        />
+      )}
+
+      {viewMode === 'race_officers' && (
+        <RaceOfficersView
+          raceOfficers={raceOfficers}
+          showAddRaceOfficer={showAddRaceOfficer}
+          setShowAddRaceOfficer={setShowAddRaceOfficer}
+          roSearchTerm={roSearchTerm}
+          handleRoSearchChange={handleRoSearchChange}
+          roSearchResults={roSearchResults}
+          searchingRoUsers={searchingRoUsers}
+          addRaceOfficer={addRaceOfficer}
+          toggleRaceOfficer={toggleRaceOfficer}
+          togglingRo={togglingRo}
+          removeConfirm={removeConfirm}
+          setRemoveConfirm={setRemoveConfirm}
+          existingRoUserIds={raceOfficers.map(ro => ro.user_id)}
         />
       )}
 
@@ -913,6 +993,133 @@ function OrgDetailView({ org, users, onBack, onRemoveUser, onUpdateRole, removeC
               </div>
             ))}
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RaceOfficersView({ raceOfficers, showAddRaceOfficer, setShowAddRaceOfficer, roSearchTerm, handleRoSearchChange,
+  roSearchResults, searchingRoUsers, addRaceOfficer, toggleRaceOfficer, togglingRo, removeConfirm, setRemoveConfirm, existingRoUserIds }: any) {
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Race Officers</h3>
+          <p className="text-sm text-slate-400 mt-1">Users who can run race management independently without a club membership</p>
+        </div>
+        <button onClick={() => setShowAddRaceOfficer(true)} className="flex items-center gap-2 px-5 py-2.5 bg-sky-500 text-white rounded-xl text-sm font-medium hover:bg-sky-600 transition-colors">
+          <UserPlus size={16} /> Add Race Officer
+        </button>
+      </div>
+
+      {showAddRaceOfficer && (
+        <div className="rounded-2xl border p-6 bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-5">
+            <h4 className="font-semibold text-white">Search Users to Add as Race Officer</h4>
+            <button onClick={() => { setShowAddRaceOfficer(false); handleRoSearchChange(''); }}><X size={16} className="text-slate-400 hover:text-slate-200 transition-colors" /></button>
+          </div>
+          <div className="relative mb-4">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={roSearchTerm}
+              onChange={(e: any) => handleRoSearchChange(e.target.value)}
+              placeholder="Search by name or email..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm bg-slate-800 border-slate-600 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
+            />
+          </div>
+          <p className="text-xs text-slate-500 mb-4 flex items-center gap-1.5"><AlertCircle size={12} /> User must already have an account. Search by name or email to find them.</p>
+          {searchingRoUsers && <p className="text-sm text-slate-400 py-4 text-center">Searching...</p>}
+          {!searchingRoUsers && roSearchTerm && roSearchResults.length === 0 && (
+            <p className="text-sm text-slate-500 py-4 text-center">No users found matching "{roSearchTerm}"</p>
+          )}
+          {roSearchResults.length > 0 && (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {roSearchResults.map((u: any) => {
+                const alreadyRo = existingRoUserIds.includes(u.user_id);
+                return (
+                  <div key={u.user_id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700/30">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center bg-slate-700 flex-shrink-0">
+                        {u.avatar_url ? (
+                          <img src={u.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" />
+                        ) : (
+                          <span className="text-slate-300 text-xs font-bold">{(u.full_name || u.email || '?').charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white">{u.full_name || 'No name'}</p>
+                        <p className="text-xs text-slate-400">{u.email}</p>
+                      </div>
+                    </div>
+                    {alreadyRo ? (
+                      <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Already RO</span>
+                    ) : (
+                      <button
+                        onClick={() => addRaceOfficer(u)}
+                        disabled={togglingRo === u.user_id}
+                        className="px-4 py-1.5 bg-sky-500 text-white rounded-lg text-xs font-medium hover:bg-sky-600 transition-colors disabled:opacity-50"
+                      >
+                        {togglingRo === u.user_id ? 'Adding...' : 'Add as RO'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {raceOfficers.length === 0 ? (
+          <div className="rounded-2xl border p-16 text-center bg-slate-800/30 border-slate-700/50">
+            <Flag size={40} className="mx-auto mb-3 text-slate-600" />
+            <p className="text-slate-400 font-medium">No race officers configured</p>
+            <p className="text-slate-500 text-sm mt-1">Add users as race officers to allow independent race management</p>
+          </div>
+        ) : (
+          raceOfficers.map((ro: RaceOfficerUser) => (
+            <div key={ro.user_id} className="flex items-center justify-between p-5 rounded-2xl border backdrop-blur-sm transition-all bg-slate-800/30 border-slate-700/50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-sky-500/20 flex-shrink-0">
+                  {ro.avatar_url ? (
+                    <img src={ro.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover" />
+                  ) : (
+                    <span className="text-sky-400 font-bold text-sm">{(ro.full_name || ro.email || '?').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}</span>
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-white">{ro.full_name || 'No name'}</p>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                      <Flag size={10} /> Race Officer
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-400 mt-0.5">{ro.email}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Added {new Date(ro.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (removeConfirm === ro.user_id) {
+                    toggleRaceOfficer(ro.user_id, true);
+                    setRemoveConfirm(null);
+                  } else {
+                    setRemoveConfirm(ro.user_id);
+                  }
+                }}
+                disabled={togglingRo === ro.user_id}
+                className={`p-2.5 rounded-xl transition-colors ${
+                  removeConfirm === ro.user_id ? 'bg-red-500/20 text-red-400' : 'hover:bg-red-500/20 text-red-400'
+                } disabled:opacity-50`}
+                title={removeConfirm === ro.user_id ? 'Click again to confirm removal' : 'Remove race officer status'}
+              >
+                {togglingRo === ro.user_id ? <RefreshCw size={16} className="animate-spin" /> : removeConfirm === ro.user_id ? <XCircle size={16} /> : <Trash2 size={16} />}
+              </button>
+            </div>
+          ))
         )}
       </div>
     </div>

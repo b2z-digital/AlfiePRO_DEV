@@ -96,7 +96,7 @@ function App() {
   }, []);
   const [showScoring, setShowScoring] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
-  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, hasPendingClubApplication, userClubs, hasCancelledMembership, cancelledMemberships, hasUnfinancialMember, unfinancialMemberData } = useAuth();
+  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, hasPendingClubApplication, userClubs, hasCancelledMembership, cancelledMemberships, hasUnfinancialMember, unfinancialMemberData, isRaceOfficer } = useAuth();
   const { notifications, removeNotification } = useNotifications();
 
   const isMobilePhone = useIsMobilePhone();
@@ -183,11 +183,6 @@ function App() {
   if (showScoring) {
     return (
       <ModalProvider>
-        <NotificationSystem
-          notifications={notifications}
-          onRemove={removeNotification}
-          darkMode={darkMode}
-        />
         <YachtRaceManager onExitScoring={handleExitScoring} darkMode={darkMode} />
       </ModalProvider>
     );
@@ -367,7 +362,7 @@ function App() {
                   <div className="text-white text-xl">Loading...</div>
                 </div>
               </div>
-            ) : userClubs.length === 0 && !onboardingCompleted ? (
+            ) : userClubs.length === 0 && !onboardingCompleted && !isRaceOfficer ? (
               <Navigate to="/onboarding" />
             ) : hasUnfinancialMember && unfinancialMemberData ? (
               <UnfinancialMemberScreen memberData={unfinancialMemberData} darkMode={darkMode} />

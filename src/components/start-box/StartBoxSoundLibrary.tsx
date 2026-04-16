@@ -29,9 +29,10 @@ export const StartBoxSoundLibrary: React.FC<StartBoxSoundLibraryProps> = ({
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [replacingFileFor, setReplacingFileFor] = useState<string | null>(null);
+  const [replaceFileName, setReplaceFileName] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const replaceFileInputRef = useRef<HTMLInputElement>(null);
+  const replaceFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     loadSounds();
@@ -88,42 +89,115 @@ export const StartBoxSoundLibrary: React.FC<StartBoxSoundLibraryProps> = ({
 
   const handleSaveEdit = async (soundId: string) => {
     if (!editName.trim()) return;
-    const { error } = await supabase
-      .from('start_box_sounds')
-      .update({ name: editName.trim(), description: editDescription.trim() || null })
-      .eq('id', soundId);
-    if (!error) {
-      setEditingId(null);
-      await loadSounds();
+    const { data: rpcResult, error } = await supabase.rpc('update_start_box_sound_metadata', {
+      p_sound_id: soundId,
+      p_name: editName.trim(),
+      p_description: editDescription.trim() || null,
+    });
+    if (error) {
+      console.error('Failed to update sound:', error);
+      alert('Failed to save changes: ' + error.message);
+      return;
     }
+    const result = rpcResult as { success: boolean; error?: string } | null;
+    if (result && !result.success) {
+      alert(result.error || 'Failed to save changes.');
+      return;
+    }
+    setEditingId(null);
+    await loadSounds();
+    onSoundsChange?.();
   };
 
   const handleReplaceFile = async (soundId: string, file: File) => {
     setReplacingFileFor(soundId);
+    setReplaceFileName(file.name);
     const sound = sounds.find(s => s.id === soundId);
-    if (!sound) return;
+    if (!sound) {
+      setReplacingFileFor(null);
+      setReplaceFileName(null);
+      return;
+    }
 
-    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'mp3';
-    const prefix = sound.is_system_default ? 'system' : (clubId || 'global');
-    const fileName = `${prefix}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    try {
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'mp3';
+      const prefix = sound.is_system_default ? 'system' : (clubId || 'global');
+      const storagePath = `${prefix}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('start-box-sounds')
-      .upload(fileName, file, { contentType: file.type || 'audio/mpeg', upsert: false });
+      const { error: uploadError } = await supabase.storage
+        .from('start-box-sounds')
+        .upload(storagePath, file, { contentType: file.type || 'audio/mpeg', upsert: false });
 
-    if (!uploadError) {
+      if (uploadError) {
+        console.error('Failed to upload audio file:', uploadError);
+        alert('Failed to upload audio file: ' + uploadError.message);
+        setReplacingFileFor(null);
+        setReplaceFileName(null);
+        return;
+      }
+
       if (sound.file_path) {
         await supabase.storage.from('start-box-sounds').remove([sound.file_path]);
       }
-      const { data: { publicUrl } } = supabase.storage.from('start-box-sounds').getPublicUrl(fileName);
-      await supabase
-        .from('start_box_sounds')
-        .update({ file_path: fileName, file_url: publicUrl, file_size: file.size, mime_type: file.type || 'audio/mpeg' })
-        .eq('id', soundId);
+
+      const { data: { publicUrl } } = supabase.storage.from('start-box-sounds').getPublicUrl(storagePath);
+
+      const duration = await getAudioDuration(file);
+
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('replace_start_box_sound_file', {
+        p_sound_id: soundId,
+        p_file_path: storagePath,
+        p_file_url: publicUrl,
+        p_file_size: file.size,
+        p_mime_type: file.type || 'audio/mpeg',
+        p_duration_ms: duration ? Math.round(duration * 1000) : null,
+      });
+
+      if (rpcError) {
+        console.error('Failed to update sound record:', rpcError);
+        alert('File uploaded but failed to update the sound record: ' + rpcError.message);
+        setReplacingFileFor(null);
+        setReplaceFileName(null);
+        return;
+      }
+
+      const result = rpcResult as { success: boolean; error?: string } | null;
+      if (result && !result.success) {
+        console.error('Failed to update sound record:', result.error);
+        alert(result.error || 'Failed to update the sound record.');
+        setReplacingFileFor(null);
+        setReplaceFileName(null);
+        return;
+      }
+
       await loadSounds();
       onSoundsChange?.();
+    } catch (err) {
+      console.error('Replace file error:', err);
+      alert('An unexpected error occurred while replacing the audio file.');
     }
     setReplacingFileFor(null);
+    setReplaceFileName(null);
+  };
+
+  const getAudioDuration = (file: File): Promise<number | null> => {
+    return new Promise((resolve) => {
+      try {
+        const url = URL.createObjectURL(file);
+        const audio = new Audio(url);
+        audio.addEventListener('loadedmetadata', () => {
+          resolve(audio.duration);
+          URL.revokeObjectURL(url);
+        });
+        audio.addEventListener('error', () => {
+          resolve(null);
+          URL.revokeObjectURL(url);
+        });
+        setTimeout(() => resolve(null), 5000);
+      } catch {
+        resolve(null);
+      }
+    });
   };
 
   const togglePlay = (sound: StartBoxSound) => {
@@ -378,23 +452,43 @@ export const StartBoxSoundLibrary: React.FC<StartBoxSoundLibraryProps> = ({
                       </div>
                     </div>
                     <div className="flex items-center gap-3 mt-3">
-                      <label className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-                        darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}>
+                      <input
+                        key={`replace-file-${sound.id}`}
+                        ref={el => { replaceFileInputRefs.current[sound.id] = el; }}
+                        type="file"
+                        accept="audio/mpeg,audio/wav,audio/ogg,audio/mp3,audio/x-wav,audio/webm,.mp3,.wav,.ogg"
+                        style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)' }}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleReplaceFile(sound.id, file);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={replacingFileFor === sound.id}
+                        onClick={() => {
+                          const input = replaceFileInputRefs.current[sound.id];
+                          if (input) {
+                            input.value = '';
+                            input.click();
+                          }
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                          replacingFileFor === sound.id
+                            ? 'opacity-50 cursor-wait'
+                            : 'cursor-pointer'
+                        } ${
+                          darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
                         <Upload size={12} />
-                        {replacingFileFor === sound.id ? 'Replacing...' : 'Replace Audio File'}
-                        <input
-                          ref={replaceFileInputRef}
-                          type="file"
-                          accept="audio/mpeg,audio/wav,audio/ogg,audio/mp3,audio/x-wav,audio/webm"
-                          className="hidden"
-                          onChange={e => {
-                            const file = e.target.files?.[0];
-                            if (file) handleReplaceFile(sound.id, file);
-                            e.target.value = '';
-                          }}
-                        />
-                      </label>
+                        {replacingFileFor === sound.id
+                          ? `Uploading ${replaceFileName || 'file'}...`
+                          : 'Replace Audio File'
+                        }
+                      </button>
                     </div>
                     <div className="flex gap-2 mt-3">
                       <button

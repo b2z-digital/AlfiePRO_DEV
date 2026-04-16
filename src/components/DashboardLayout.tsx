@@ -5,6 +5,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 're
 import { RaceManagementPage } from './pages/RaceManagementPage';
 import { ClubSettings } from './pages/ClubSettings';
 import { VenuesPage } from './pages/VenuesPage';
+import { RaceOfficerContactsPage } from './pages/RaceOfficerContactsPage';
 import { MembersPage } from './pages/MembersPage';
 import { RaceCalendar } from './RaceCalendar';
 import { DashboardHome } from './DashboardHome';
@@ -99,6 +100,7 @@ import { FeatureAccessTab } from './super-admin/FeatureAccessTab';
 import { AccessLevelDefaultsTab } from './super-admin/AccessLevelDefaultsTab';
 import { BackupManagementTab } from './super-admin/BackupManagementTab';
 import { UserManagementTab } from './super-admin/UserManagementTab';
+import { RaceOfficersManagementTab } from './super-admin/RaceOfficersManagementTab';
 import { PlatformIntegrationsTab } from './super-admin/PlatformIntegrationsTab';
 import { EngagementAnalyticsTab } from './super-admin/EngagementAnalyticsTab';
 import { ResourceCostsTab } from './super-admin/ResourceCostsTab';
@@ -198,7 +200,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     clubMembers: 0,
     upcomingEvents: 0
   });
-  const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin, isSwitchingClub } = useAuth();
+  const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin, isSwitchingClub, isRaceOfficer } = useAuth();
   const { can, isMember, isAssociationViewer, isAssociationEditor } = usePermissions();
   const { isFeatureEnabled } = useFeatureAccess();
   const { canView: canViewFeature } = useCapabilities();
@@ -1058,7 +1060,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           description: 'Manage racing venues',
           path: '/venues',
           featureKey: 'venues'
-        }
+        },
+        ...(isRaceOfficer ? [{
+          id: 'ro-contacts',
+          label: 'My Contacts',
+          icon: Users,
+          description: 'Manage skipper contacts for events',
+          path: '/ro-contacts'
+        }] : [])
       ]
     },
     {
@@ -1112,6 +1121,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'access-level-defaults', label: 'Access Level Defaults', icon: Shield, description: 'Role permission defaults', path: '/access-level-defaults' },
           { id: 'backups', label: 'Backup & Recovery', icon: Database, description: 'Database & app backups', path: '/backups' },
           { id: 'user-management', label: 'User Management', icon: Users, description: 'Manage users', path: '/user-management' },
+          { id: 'race-officers-mgmt', label: 'Race Officers', icon: Flag, description: 'Manage race officer access', path: '/race-officers-mgmt' },
           { id: 'bug-reports', label: 'Feedback Hub', icon: Bug, description: 'Bug reports & feature requests', path: '/bug-reports' },
           { id: 'impersonation-log', label: 'Impersonation Log', icon: Eye, description: 'Admin audit trail', path: '/impersonation-log' },
           { id: 'ask-alfie-management', label: 'Ask Alfie', icon: Bot, description: 'AI knowledge management', path: '/ask-alfie-management' },
@@ -1125,6 +1135,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     : allNavigationSections.map(section => ({
         ...section,
         items: section.items.filter((item: any) => {
+          const raceOfficerItems = ['race-management', 'race-calendar', 'results', 'ro-contacts'];
+          if (isRaceOfficer && !currentClub && raceOfficerItems.includes(item.id)) return true;
           if (item.permission && !can(item.permission as any)) return false;
           if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
           if (item.featureKey && !canViewFeature(item.featureKey)) return false;
@@ -1872,6 +1884,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <UserManagementTab darkMode={true} />
                 </div></div>
               } />
+              <Route path="/race-officers-mgmt" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <RaceOfficersManagementTab darkMode={true} />
+                </div></div>
+              } />
               <Route path="/bug-reports" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <BugReportDashboard darkMode={true} />
@@ -1990,6 +2007,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               } />
               <Route path="/weather" element={<WeatherPage />} />
               <Route path="/venues" element={<VenuesPage darkMode={darkMode} />} />
+              <Route path="/ro-contacts" element={<RaceOfficerContactsPage darkMode={darkMode} />} />
               <Route path="/my-garage" element={<MyGaragePage darkMode={darkMode} />} />
               <Route path="/members" element={<MembersPage darkMode={darkMode} />} />
               <Route path="/calendar" element={

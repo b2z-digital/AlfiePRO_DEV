@@ -28,6 +28,7 @@ export type Permission =
   | 'settings.documents'
   | 'settings.import'
   | 'settings.membership'
+  | 'settings.startbox'
   | 'dashboard.edit'
   | 'users.manage'
   | 'state.manage'
@@ -42,10 +43,14 @@ export function usePermissions() {
   const hasPermission = (permission: Permission): boolean => {
     if (isSuperAdmin) return true;
 
-    if (userRole === 'national_admin') return true;
+    if (userRole === 'national_admin') {
+      if (permission === 'settings.startbox') return false;
+      return true;
+    }
 
     if (userRole === 'state_admin') {
       if (permission === 'platform.manage') return false;
+      if (permission === 'settings.startbox') return false;
       return true;
     }
 
@@ -90,6 +95,7 @@ export function usePermissions() {
       if (permission === 'state.manage') return false;
       if (permission === 'national.manage') return false;
       if (permission === 'platform.manage') return false;
+      if (permission === 'settings.startbox') return false;
       return true;
     }
 

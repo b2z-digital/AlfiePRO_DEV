@@ -52,6 +52,7 @@ interface AuthContextType {
   isLoggingOut: boolean;
   isSwitchingClub: boolean;
   isSuperAdmin: boolean;
+  isRaceOfficer: boolean;
   isNationalOrgAdmin: boolean;
   isStateOrgAdmin: boolean;
   userSubscription: UserSubscription | null;
@@ -88,6 +89,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSwitchingClub] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isRaceOfficer, setIsRaceOfficer] = useState(false);
   const [isNationalOrgAdmin, setIsNationalOrgAdmin] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
@@ -116,6 +118,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!effectiveUserId) {
       setUserClubs([]);
       setIsSuperAdmin(false);
+      setIsRaceOfficer(false);
       setIsNationalOrgAdmin(false);
       setIsStateOrgAdmin(false);
       return [];
@@ -312,6 +315,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Error in refreshUserClubs:', error);
       setUserClubs([]);
       setIsSuperAdmin(false);
+      setIsRaceOfficer(false);
       setIsNationalOrgAdmin(false);
       setIsStateOrgAdmin(false);
       setUserSubscription(null);
@@ -463,11 +467,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           const { data: profileData } = await supabase
             .from('profiles')
-            .select('onboarding_completed')
+            .select('onboarding_completed, is_race_officer')
             .eq('id', validatedUser.id)
             .maybeSingle();
 
           setOnboardingCompleted(profileData?.onboarding_completed || false);
+          setIsRaceOfficer(profileData?.is_race_officer || false);
 
           const { data: pendingApp } = await supabase
             .from('membership_applications')
@@ -580,6 +585,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           currentUserIdRef.current = null;
           setUser(null);
           setOnboardingCompleted(false);
+          setIsRaceOfficer(false);
           setHasCancelledMembership(false);
           setCancelledMemberships([]);
           setHasUnfinancialMember(false);
@@ -614,6 +620,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setUserClubs([]);
                 setCurrentClub(null);
                 setIsSuperAdmin(false);
+                setIsRaceOfficer(false);
                 setIsNationalOrgAdmin(false);
                 setIsStateOrgAdmin(false);
                 setUserSubscription(null);
@@ -652,11 +659,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
                 const { data: profileData } = await supabase
                   .from('profiles')
-                  .select('onboarding_completed')
+                  .select('onboarding_completed, is_race_officer')
                   .eq('id', session.user.id)
                   .maybeSingle();
 
                 setOnboardingCompleted(profileData?.onboarding_completed || false);
+                setIsRaceOfficer(profileData?.is_race_officer || false);
 
                 const { data: pendingApp } = await supabase
                   .from('membership_applications')
@@ -755,6 +763,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setUserClubs([]);
                 setCurrentClub(null);
                 setIsSuperAdmin(false);
+                setIsRaceOfficer(false);
                 setIsNationalOrgAdmin(false);
                 setIsStateOrgAdmin(false);
                 setUserSubscription(null);
@@ -917,6 +926,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     isLoggingOut,
     isSwitchingClub,
     isSuperAdmin: impersonationOverrides?.isSuperAdmin ?? isSuperAdmin,
+    isRaceOfficer,
     isNationalOrgAdmin: impersonationOverrides?.isNationalOrgAdmin ?? isNationalOrgAdmin,
     isStateOrgAdmin: impersonationOverrides?.isStateOrgAdmin ?? isStateOrgAdmin,
     userSubscription,

@@ -65,7 +65,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const { addNotification } = useNotifications();
   const { userClubs, refreshUserClubs } = useAuth();
   const [defaultClubId, setDefaultClubId] = useState<string>('');
-  const [scoringMode, setScoringMode] = useState<'pro' | 'touch'>('pro');
+  const [scoringMode, setScoringMode] = useState<'pro' | 'touch' | 'spreadsheet'>('pro');
 
   // PWA Install state
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -182,7 +182,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
         setFirstName(profileData.first_name || user?.user_metadata?.first_name || '');
         setLastName(profileData.last_name || user?.user_metadata?.last_name || '');
         setDefaultClubId(profileData.default_club_id || '');
-        setScoringMode((profileData.scoring_mode_preference as 'pro' | 'touch') || 'pro');
+        setScoringMode((profileData.scoring_mode_preference as 'pro' | 'touch' | 'spreadsheet') || 'pro');
       }
     } catch (err) {
       console.error('Error fetching user profile:', err);
@@ -810,8 +810,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </button>
                 )}
 
-                {/* Start System Card */}
-                {can('settings.club') && (
+                {/* Start System Card - Super Admin Only */}
+                {can('settings.startbox') && (
                   <button
                     onClick={() => setActiveTab('start-system')}
                     className={`
@@ -1693,11 +1693,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                       id="scoring-mode"
                       name="scoring-mode"
                       value={scoringMode}
-                      onChange={(e) => setScoringMode(e.target.value as 'pro' | 'touch')}
+                      onChange={(e) => setScoringMode(e.target.value as 'pro' | 'touch' | 'spreadsheet')}
                       className="block w-full pl-10 pr-3 py-2 border border-slate-600 rounded-lg shadow-sm bg-slate-700 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer"
                     >
                       <option value="pro">Pro Mode - Full table with all details</option>
                       <option value="touch">Touch Mode - Simplified tablet-optimized scoring</option>
+                      <option value="spreadsheet">Spreadsheet Mode - Type sail numbers into positions</option>
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
                       <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -1708,7 +1709,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   <p className="mt-1 text-xs text-slate-400">
                     {scoringMode === 'pro'
                       ? 'Pro Mode: Best for desktop scoring with full table view and all race details'
-                      : 'Touch Mode: Optimized for tablets with large sail numbers and drag-and-drop interface'}
+                      : scoringMode === 'touch'
+                      ? 'Touch Mode: Optimized for tablets with large sail numbers and drag-and-drop interface'
+                      : 'Spreadsheet Mode: Traditional entry - type sail numbers into finishing positions'}
                   </p>
                 </div>
 
@@ -1819,7 +1822,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
             <RaceDocumentsPage darkMode={darkMode} />
           )}
 
-          {activeTab === 'start-system' && (
+          {activeTab === 'start-system' && can('settings.startbox') && (
             <StartBoxBuilder darkMode={darkMode} onBack={() => setActiveTab(null)} />
           )}
 

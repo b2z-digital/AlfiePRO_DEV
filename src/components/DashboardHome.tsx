@@ -435,7 +435,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       const roundsPromise = Promise.race([
         supabase
           .from('race_series_rounds')
-          .select('series_id, round_name, skippers, race_results, last_completed_race, completed')
+          .select('series_id, round_name, skippers, race_results, last_completed_race, completed, enable_observers, observers_per_heat')
           .eq('club_id', currentClub.clubId)
           .in('series_id', seriesIds),
         new Promise<any>((_, reject) =>
@@ -491,7 +491,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               skippers: roundData.skippers || round.skippers || [],
               raceResults: roundData.race_results || round.raceResults || [],
               lastCompletedRace: roundData.last_completed_race || round.lastCompletedRace || 0,
-              completed: roundData.completed !== undefined ? roundData.completed : round.completed
+              completed: roundData.completed !== undefined ? roundData.completed : round.completed,
+              enable_observers: roundData.enable_observers ?? round.enable_observers ?? false,
+              observers_per_heat: roundData.observers_per_heat ?? round.observers_per_heat ?? 2
             };
           }
           return round;

@@ -41,7 +41,7 @@ export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
   onGoToRound,
   getRoundLabel: getRoundLabelProp
 }) => {
-  const getRoundLabel = getRoundLabelProp || ((n: number) => `Round ${n}`);
+  const getRoundLabel = getRoundLabelProp || ((n: number) => `Race ${n}`);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showQuickSelect, setShowQuickSelect] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);

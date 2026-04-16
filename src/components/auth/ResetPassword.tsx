@@ -329,7 +329,13 @@ export const ResetPassword: React.FC = () => {
                           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                       </div>
-                      <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${password.length >= 6 ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                        <p className={`text-xs ${password.length >= 6 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          Minimum 6 characters {password.length > 0 && `(${password.length}/6)`}
+                        </p>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">No special characters required - just pick something memorable</p>
                     </div>
 
                     <div>
@@ -355,6 +361,14 @@ export const ResetPassword: React.FC = () => {
                           {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                       </div>
+                      {confirmPassword.length > 0 && (
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${password === confirmPassword ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                          <p className={`text-xs ${password === confirmPassword ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     <button

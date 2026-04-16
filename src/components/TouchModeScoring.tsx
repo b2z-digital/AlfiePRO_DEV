@@ -14,7 +14,7 @@ import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import type { ObserverAssignment } from '../utils/observerUtils';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
-import { LiveStatusControl } from './LiveStatusControl';
+
 
 interface TouchModeScoringProps {
   skippers: Skipper[];
@@ -179,15 +179,6 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       sailNo: s.sailNumber || s.sailNo
     })));
 
-    // Warn if observers don't match expected pattern
-    if (heatObservers.length > 0 && skippers.length > 0) {
-      const observerSailNumbers = new Set(heatObservers.map(o => String(o.skipper_sail_number)));
-      const skipperSailNumbers = skippers.map(s => String(s.sailNumber || s.sailNo));
-      const observersInSkipperList = skipperSailNumbers.filter(sn => observerSailNumbers.has(sn));
-      if (observersInSkipperList.length > 0) {
-        console.warn('⚠️ Some observers are in the skipper list!', observersInSkipperList);
-      }
-    }
   }, [heatObservers, skippers, currentRace]);
 
   const prevRaceRef = useRef(currentRace);
@@ -205,7 +196,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         if (isShrsScoring && shrsQR > 0) {
           return currentRace <= shrsQR ? `Qualifying Rd ${currentRace}` : `Final ${currentRace - shrsQR}`;
         }
-        return `Round ${currentRace}`;
+        return `Race ${currentRace}`;
       })();
 
       const raceJustAdvanced = currentRace > prevRaceRef.current;
@@ -220,7 +211,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           if (isShrsScoring && shrsQR > 0) {
             return prev <= shrsQR ? `Qualifying Rd ${prev} complete` : `Final ${prev - shrsQR} complete`;
           }
-          return `Round ${prev} complete`;
+          return `Race ${prev} complete`;
         })();
 
         await updateRaceStatus(
@@ -390,17 +381,6 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     setFinishOrder(entries);
   }, [currentRace, raceResults, skippers]);
 
-  // Debug logging for button visibility
-  useEffect(() => {
-    const shouldShowButton = finishOrder.length === skippers.length && !isConfirmed;
-    console.log('🔘 Confirm button visibility:', shouldShowButton, {
-      finishOrderLength: finishOrder.length,
-      skippersLength: skippers.length,
-      observersLength: heatObservers.length,
-      isConfirmed,
-      currentRace
-    });
-  }, [finishOrder.length, skippers.length, heatObservers.length, isConfirmed, currentRace]);
 
   const handleSailNumberClick = (skipperIndex: number) => {
     console.log('👆 Sail number clicked:', skipperIndex, 'Sail:', skippers[skipperIndex]?.sailNumber);
@@ -550,8 +530,6 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       console.log('➕ Added result:', newResult);
     });
 
-    // Check if all racing skippers now have results
-    // Note: skippers array is already filtered to racing skippers only (observers are in OTHER heats)
     const allSkippersScored = entries.length === skippers.length;
     console.log('📊 All racing skippers scored?', allSkippersScored, `(${entries.length}/${skippers.length}, ${heatObservers.length} observers watching)`);
     if (allSkippersScored) {
@@ -965,9 +943,6 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             <Timer size={16} />
             Starter Console
           </button>
-          {currentEvent?.id && currentEvent?.enableLiveTracking && !currentEvent?.completed && (
-            <LiveStatusControl eventId={currentEvent.id} darkMode={darkMode} />
-          )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -989,7 +964,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                       ? `Qualifying Rd ${currentRace}`
                       : `Final ${currentRace - shrsQR}`;
                   }
-                  return `Round ${currentRace}`;
+                  return `Race ${currentRace}`;
                 })()
               : `Race ${currentRace}`)}
           </div>
@@ -1223,7 +1198,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                 } transition-colors flex items-center justify-center gap-2 shadow-lg active:scale-98`}
               >
                 <Check size={20} />
-                {isScoringLastHeat ? 'Confirm Results & Complete Round' : 'Confirm & Apply Results'}
+                {isScoringLastHeat ? 'Verify Results & Complete Round' : 'Verify & Apply Results'}
               </button>
             </div>
           )}
@@ -1270,15 +1245,6 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             <div className={`grid ${gridCols} gap-6 sm:gap-8`}>
               {skippers.map((skipper, index) => {
                 const isFinished = usedSkipperIndices.has(index);
-                const skipperSailNo = skipper.sailNumber || skipper.sailNo;
-                // Match observers by sail number, handling both string and number types
-                const isObserver = heatObservers.some(obs => {
-                  const match = String(obs.skipper_sail_number) === String(skipperSailNo);
-                  return match;
-                });
-
-                // Don't show observers in the racing grid
-                if (isObserver) return null;
 
                 return (
                   <button
