@@ -238,9 +238,18 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     for (const heat of availableHeats) {
       const heatSkips = getHeatSkippers(heat);
       const racingSkips = getRacingSkippersForHeat(heat);
-      const totalPos = racingSkips.length;
+      let totalPos = racingSkips.length;
       const heatResults = getHeatRaceResults(heat);
       const existingResults = heatResults.filter(r => r.race === currentRound);
+
+      if (completedRounds.length > 0) {
+        for (const r of completedRounds) {
+          const prevAssignment = r.heatAssignments?.find((a: any) => a.heatDesignation === heat);
+          const prevAssignmentCount = prevAssignment?.skipperIndices?.length || 0;
+          const prevResultCount = (r.results || []).filter((res: any) => res.heatDesignation === heat).length;
+          totalPos = Math.max(totalPos, prevAssignmentCount, prevResultCount);
+        }
+      }
 
       const savedCells = verifiedCellsRef.current[heat];
       if (savedCells && savedCells.length > 0) {
@@ -290,7 +299,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
     setCells(newAllCells as any);
     setLocalVerifiedHeats(alreadyVerified);
-  }, [isMultiHeatMode, availableHeats, currentRound, skippers, initialRace, raceResults, heatResultsKey, heatAssignmentKey]);
+  }, [isMultiHeatMode, availableHeats, currentRound, skippers, initialRace, raceResults, heatResultsKey, heatAssignmentKey, completedRounds]);
 
   useEffect(() => {
     if (!isMultiHeatMode || !currentScoringHeat) return;
