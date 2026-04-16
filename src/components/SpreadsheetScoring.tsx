@@ -568,10 +568,10 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                           <col style={{ width: '32px' }} />
                         </React.Fragment>
                       ))}
-                      <col style={{ width: isVerified ? '64px' : '88px' }} />
-                      {!isVerified && <col style={{ width: '140px' }} />}
-                      <col style={{ width: '40px' }} />
+                      <col style={{ width: '56px' }} />
+                      <col style={{ width: '48px' }} />
                       <col style={{ width: '32px' }} />
+                      {!isVerified && <col style={{ width: '140px' }} />}
                       {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && <col style={{ width: '32px' }} />}
                     </colgroup>
                     <thead>
@@ -621,22 +621,22 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                             </th>
                           </React.Fragment>
                         ))}
-                        <th className={`px-1 py-1 text-left font-bold uppercase tracking-wider ${completedRounds.length > 0 ? 'border-l ' : ''}${
+                        <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${completedRounds.length > 0 ? 'border-l ' : ''}${
                           darkMode ? 'text-blue-400 border-blue-500/30' : 'text-blue-600 border-blue-300'
                         }`}>
                           <span className="text-[10px]">Sail No.</span>
                         </th>
-                        {!isVerified && (
-                          <th className={`px-1 py-1 text-left font-bold uppercase tracking-wider ${
-                            darkMode ? 'text-slate-400' : 'text-slate-500'
-                          }`}><span className="text-[10px]">Skipper</span></th>
-                        )}
                         <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                           darkMode ? 'text-blue-400' : 'text-blue-600'
                         }`}><span className="text-[10px]">Comment</span></th>
                         <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                           darkMode ? 'text-blue-400' : 'text-blue-600'
                         }`}><span className="text-[10px]">Pts</span></th>
+                        {!isVerified && (
+                          <th className={`px-1 py-1 text-left font-bold uppercase tracking-wider ${
+                            darkMode ? 'text-slate-400' : 'text-slate-500'
+                          }`}><span className="text-[10px]">Skipper</span></th>
+                        )}
                         {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && (
                           <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                             darkMode ? 'text-slate-400' : 'text-slate-500'
@@ -739,69 +739,78 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                   {cell.sailNumber || (isHistoricalRow ? '' : '-')}
                                 </span>
                               ) : (
-                                <div className="flex items-center gap-0.5">
-                                  {cell.letterScore ? (
-                                    <>
-                                      <input
-                                        ref={el => { inputRefs.current[`${heat}-${idx}`] = el; }}
-                                        type="text"
-                                        value={cell.sailNumber}
-                                        onChange={e => handleCellChange(heat, position, e.target.value)}
-                                        onKeyDown={e => handleKeyDown(e, heat, position, totalPositions)}
-                                        className={`w-12 h-7 px-1 rounded text-xs font-mono font-bold border text-center ${
-                                          darkMode
-                                            ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
-                                            : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
-                                        } focus:outline-none focus:ring-1 focus:ring-blue-500/20`}
-                                      />
-                                      <button
-                                        onClick={() => handleLetterScore(heat, position)}
-                                        className={`ml-1 h-7 rounded-full px-2 text-[9px] font-bold flex-shrink-0 flex items-center justify-center ${
-                                          darkMode
-                                            ? 'bg-amber-600/30 text-amber-400 border border-amber-500/30'
-                                            : 'bg-amber-100 text-amber-700 border border-amber-300'
-                                        }`}
-                                        title={`${cell.letterScore}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
-                                      >
-                                        {cell.letterScore?.slice(0, 3)}
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <input
-                                        ref={el => { inputRefs.current[`${heat}-${idx}`] = el; }}
-                                        type="text"
-                                        value={cell.sailNumber}
-                                        onChange={e => handleCellChange(heat, position, e.target.value)}
-                                        onKeyDown={e => handleKeyDown(e, heat, position, totalPositions)}
-                                        className={`w-12 h-7 px-1 rounded text-xs font-mono font-bold border text-center ${
-                                          !cell.isValid && cell.sailNumber.trim()
-                                            ? 'border-red-500 bg-red-50/80 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:border-red-500'
-                                            : cell.isDuplicate
-                                              ? 'border-amber-500 bg-amber-50/80 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-500'
-                                              : darkMode
-                                                ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
-                                                : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
-                                        } focus:outline-none focus:ring-1 focus:ring-blue-500/20`}
-                                      />
-                                      <button
-                                        onClick={() => handleLetterScore(heat, position)}
-                                        className={`ml-1 h-7 w-7 rounded-full flex-shrink-0 flex items-center justify-center transition-colors ${
-                                          darkMode
-                                            ? 'bg-slate-700/60 text-slate-400 hover:bg-slate-600 hover:text-white border border-slate-600/70'
-                                            : 'bg-slate-100/70 text-slate-400 hover:bg-slate-200 hover:text-slate-700 border border-slate-200'
-                                        }`}
-                                        title="Assign letter score (DNS, DNF, DSQ, etc.)"
-                                      >
-                                        <Type size={12} />
-                                      </button>
-                                    </>
-                                  )}
+                                <div className="flex items-center justify-center gap-0.5">
+                                  <input
+                                    ref={el => { inputRefs.current[`${heat}-${idx}`] = el; }}
+                                    type="text"
+                                    value={cell.sailNumber}
+                                    onChange={e => handleCellChange(heat, position, e.target.value)}
+                                    onKeyDown={e => handleKeyDown(e, heat, position, totalPositions)}
+                                    className={`w-12 h-7 px-1 rounded text-xs font-mono font-bold border text-center ${
+                                      cell.letterScore
+                                        ? darkMode
+                                          ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
+                                          : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
+                                        : !cell.isValid && cell.sailNumber.trim()
+                                          ? 'border-red-500 bg-red-50/80 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:border-red-500'
+                                          : cell.isDuplicate
+                                            ? 'border-amber-500 bg-amber-50/80 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-500'
+                                            : darkMode
+                                              ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
+                                              : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
+                                    } focus:outline-none focus:ring-1 focus:ring-blue-500/20`}
+                                  />
                                   {!cell.isValid && cell.sailNumber.trim() && !cell.letterScore && (
                                     <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
                                   )}
                                 </div>
                               )}
+                            </td>
+
+                            <td className={`px-1 py-1 text-center ${
+                              darkMode ? 'text-slate-400' : 'text-slate-500'
+                            }`}>
+                              {isVerified || isHistoricalRow ? (
+                                cell.letterScore
+                                  ? <span className="text-amber-500 font-semibold text-[11px]">{cell.letterScore}</span>
+                                  : hasValue && cell.isValid
+                                    ? <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>OK</span>
+                                    : ''
+                              ) : cell.letterScore ? (
+                                <button
+                                  onClick={() => handleLetterScore(heat, position)}
+                                  className={`h-7 rounded-full px-2 text-[9px] font-bold flex-shrink-0 inline-flex items-center justify-center ${
+                                    darkMode
+                                      ? 'bg-amber-600/30 text-amber-400 border border-amber-500/30'
+                                      : 'bg-amber-100 text-amber-700 border border-amber-300'
+                                  }`}
+                                  title={`${cell.letterScore}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
+                                >
+                                  {cell.letterScore?.slice(0, 3)}
+                                </button>
+                              ) : hasValue && cell.isValid ? (
+                                <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>OK</span>
+                              ) : (
+                                <button
+                                  onClick={() => handleLetterScore(heat, position)}
+                                  className={`h-7 w-7 rounded-full flex-shrink-0 inline-flex items-center justify-center transition-colors ${
+                                    darkMode
+                                      ? 'bg-slate-700/60 text-slate-400 hover:bg-slate-600 hover:text-white border border-slate-600/70'
+                                      : 'bg-slate-100/70 text-slate-400 hover:bg-slate-200 hover:text-slate-700 border border-slate-200'
+                                  }`}
+                                  title="Assign letter score (DNS, DNF, DSQ, etc.)"
+                                >
+                                  <Type size={12} />
+                                </button>
+                              )}
+                            </td>
+
+                            <td className={`px-1 py-1 text-center font-mono font-bold ${
+                              points === 'AVG'
+                                ? 'text-green-500'
+                                : darkMode ? 'text-slate-200' : 'text-slate-800'
+                            }`}>
+                              {points !== null ? points : ''}
                             </td>
 
                             {!isVerified && (
@@ -829,24 +838,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                 )}
                               </td>
                             )}
-
-                            <td className={`px-1 py-1 text-center ${
-                              darkMode ? 'text-slate-400' : 'text-slate-500'
-                            }`}>
-                              {hasValue && cell.isValid ? (
-                                cell.letterScore
-                                  ? <span className="text-amber-500 font-semibold text-[11px]">{cell.letterScore}</span>
-                                  : <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>OK</span>
-                              ) : ''}
-                            </td>
-
-                            <td className={`px-1 py-1 text-center font-mono font-bold ${
-                              points === 'AVG'
-                                ? 'text-green-500'
-                                : darkMode ? 'text-slate-200' : 'text-slate-800'
-                            }`}>
-                              {points !== null ? points : ''}
-                            </td>
 
                             {!isSeedingRound && promotionCount > 0 && !isTopHeat && (
                               <td className="px-1 py-0.5 text-center">
