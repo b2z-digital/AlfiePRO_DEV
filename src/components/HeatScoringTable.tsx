@@ -1825,7 +1825,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (selectedHeat) {
             const progress = getHeatProgress(selectedHeat);
             const isComplete = progress.scored >= progress.total && progress.total > 0;
-            if (!isComplete && currentEvent?.enable_roll_call !== false) {
+            if (!isComplete && currentEvent?.enable_roll_call === true) {
               setRollCallActive(true);
               setRollCallReady(new Set());
               setRollCallAbsent(new Set());

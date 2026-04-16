@@ -539,11 +539,9 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
               <div
                 key={heat}
                 ref={el => { heatSectionRefs.current[heat] = el; }}
-                className={`rounded-lg border overflow-hidden transition-opacity ${
+                className={`rounded-lg border overflow-hidden ${
                   darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
-                } ${isCurrent && !isVerified ? 'ring-2 ring-blue-500/40' : ''}${
-                  !isCurrent ? ' opacity-40' : ''
-                }`}
+                } ${isCurrent && !isVerified ? 'ring-2 ring-blue-500/40' : ''}`}
               >
                 <div
                   onClick={() => {
@@ -567,7 +565,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                   </div>
                 </div>
 
-                <div className={`overflow-x-auto${!isCurrent ? ' pointer-events-none' : ''}`}>
+                <div className="overflow-x-auto">
                   <table className="text-[13px] border-collapse">
                     <colgroup>
                       <col style={{ width: '40px' }} />
@@ -601,7 +599,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                           colSpan={3}
                           className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${completedRounds.length > 0 ? 'border-l ' : ''}${
                             darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
-                          }`}
+                          }${!isCurrent ? ' opacity-30' : ''}`}
                         >
                           Race {currentRound}
                         </th>
@@ -630,15 +628,15 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                         ))}
                         <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${completedRounds.length > 0 ? 'border-l ' : ''}${
                           darkMode ? 'text-blue-400 border-blue-500/30' : 'text-blue-600 border-blue-300'
-                        }`}>
+                        }${!isCurrent ? ' opacity-30' : ''}`}>
                           <span className="text-[10px]">Sail No.</span>
                         </th>
                         <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                           darkMode ? 'text-blue-400' : 'text-blue-600'
-                        }`}><span className="text-[10px]">Comment</span></th>
+                        }${!isCurrent ? ' opacity-30' : ''}`}><span className="text-[10px]">Comment</span></th>
                         <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                           darkMode ? 'text-blue-400' : 'text-blue-600'
-                        }`}><span className="text-[10px]">Pts</span></th>
+                        }${!isCurrent ? ' opacity-30' : ''}`}><span className="text-[10px]">Pts</span></th>
                         {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && (
                           <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                             darkMode ? 'text-slate-400' : 'text-slate-500'
@@ -729,7 +727,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
                             <td className={`px-1 py-0.5${completedRounds.length > 0 ? ' border-l' : ''} ${
                               darkMode ? 'border-blue-500/20' : 'border-blue-200'
-                            }`}>
+                            }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
                               {isVerified || isHistoricalRow ? (
                                 <span className={`font-mono font-bold ${
                                   cell.letterScore
@@ -746,6 +744,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                     value={cell.sailNumber}
                                     onChange={e => handleCellChange(heat, position, e.target.value)}
                                     onKeyDown={e => handleKeyDown(e, heat, position, totalPositions)}
+                                    tabIndex={!isCurrent ? -1 : undefined}
                                     className={`w-12 h-7 px-1 rounded text-xs font-mono font-bold border text-center ${
                                       cell.letterScore
                                         ? darkMode
@@ -769,7 +768,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
                             <td className={`px-1 py-1 text-center ${
                               darkMode ? 'text-slate-400' : 'text-slate-500'
-                            }`}>
+                            }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
                               {isVerified || isHistoricalRow ? (
                                 cell.letterScore
                                   ? <span className="text-amber-500 font-semibold text-[11px]">{cell.letterScore}</span>
@@ -807,7 +806,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                               points === 'AVG'
                                 ? 'text-green-500'
                                 : darkMode ? 'text-slate-200' : 'text-slate-800'
-                            }`}>
+                            }${!isCurrent ? ' opacity-30' : ''}`}>
                               {points !== null ? points : ''}
                             </td>
 

@@ -960,6 +960,13 @@ export const getCurrentEvent = (): RaceEvent | null => {
       event.dayResults = fixedDayResults;
     }
 
+    if (event.enable_roll_call === undefined) {
+      event.enable_roll_call = true;
+    }
+    if (event.auto_complete_sail === undefined) {
+      event.auto_complete_sail = true;
+    }
+
     console.log('📖 [getCurrentEvent] Returning event:', {
       eventName: event.eventName,
       skippersCount: event.skippers?.length || 0,
