@@ -347,8 +347,13 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     const updated = [...heatCells];
     updated[idx] = { ...updated[idx], sailNumber: value, letterScore: null, customPoints: undefined };
 
+    const regularFinishers = updated.filter(c => !c.letterScore && (c.sailNumber.trim() || c.skipperIndex !== null));
+    const letterScoreEntries = updated.filter(c => c.letterScore);
+    const emptyEntries = updated.filter(c => !c.letterScore && !c.sailNumber.trim() && c.skipperIndex === null);
+    const reordered = [...regularFinishers, ...letterScoreEntries, ...emptyEntries];
+
     const heatSkips = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
-    const validated = validateCells(updated, heatSkips);
+    const validated = validateCells(reordered, heatSkips);
     setCells(prev => ({ ...prev, [heat]: validated }));
 
     if (autoCompleteTimerRef.current) {
