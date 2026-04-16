@@ -367,11 +367,11 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       if (exactMatch) {
         const delay = possibleLongerMatch ? 1500 : 800;
         autoCompleteCellRef.current = { heat, position, value: lower };
-        const totalPos = heatCells.length;
+        const currentSkipperCount = isMultiHeatMode ? getRacingSkippersForHeat(heat).length : skippers.length;
         autoCompleteTimerRef.current = setTimeout(() => {
           const pending = autoCompleteCellRef.current;
           if (pending && pending.heat === heat && pending.position === position && pending.value === lower) {
-            if (position < totalPos) {
+            if (position < currentSkipperCount) {
               const nextRef = inputRefs.current[`${heat}-${position}`];
               if (nextRef) {
                 nextRef.focus();
@@ -634,7 +634,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                     <tbody>
                       {heatCells.map((cell, idx) => {
                         const position = idx + 1;
-                        const isPromotion = isPromotionPosition(position);
+                        const isHistoricalRow = position > totalPositions;
+                        const isPromotion = !isHistoricalRow && isPromotionPosition(position);
                         const skipperName = getSkipperName(heat, cell);
                         const matchedSkipper = getMatchedSkipper(heat, cell);
                         const hasValue = cell.sailNumber.trim() || cell.letterScore;
@@ -646,9 +647,11 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                           <tr
                             key={`${heat}-${position}`}
                             className={`border-t transition-colors ${
-                              isPromotion
-                                ? darkMode ? 'bg-green-900/25 border-green-800/30' : 'bg-green-100/70 border-green-200/50'
-                                : darkMode ? 'border-slate-700/30 hover:bg-slate-700/20' : 'border-slate-100 hover:bg-slate-50/80'
+                              isHistoricalRow
+                                ? darkMode ? 'border-slate-700/20 opacity-40' : 'border-slate-100 opacity-40'
+                                : isPromotion
+                                  ? darkMode ? 'bg-green-900/25 border-green-800/30' : 'bg-green-100/70 border-green-200/50'
+                                  : darkMode ? 'border-slate-700/30 hover:bg-slate-700/20' : 'border-slate-100 hover:bg-slate-50/80'
                             } ${cell.isDuplicate ? (darkMode ? 'bg-red-900/15' : 'bg-red-50/60') : ''}`}
                           >
                             <td className={`px-1.5 py-1 font-bold whitespace-nowrap ${
@@ -709,13 +712,13 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                             <td className={`px-1 py-0.5${completedRounds.length > 0 ? ' border-l' : ''} ${
                               darkMode ? 'border-blue-500/20' : 'border-blue-200'
                             }`}>
-                              {isVerified ? (
+                              {isVerified || isHistoricalRow ? (
                                 <span className={`font-mono font-bold ${
                                   cell.letterScore
                                     ? 'text-amber-500'
                                     : darkMode ? 'text-slate-200' : 'text-slate-800'
                                 }`}>
-                                  {cell.sailNumber || '-'}
+                                  {cell.sailNumber || (isHistoricalRow ? '' : '-')}
                                 </span>
                               ) : (
                                 <div className="flex items-center gap-0.5">
