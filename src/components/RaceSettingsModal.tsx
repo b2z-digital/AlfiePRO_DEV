@@ -90,6 +90,16 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   const [enableRollCall, setEnableRollCall] = useState(currentEvent?.enable_roll_call ?? true);
   const [autoCompleteSail, setAutoCompleteSail] = useState(currentEvent?.auto_complete_sail ?? true);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (currentEvent?.enable_observers !== undefined) setEnableObservers(currentEvent.enable_observers);
+    if (currentEvent?.observers_per_heat !== undefined) setObserversPerHeat(currentEvent.observers_per_heat);
+    if (currentEvent?.enable_roll_call !== undefined) setEnableRollCall(currentEvent.enable_roll_call);
+    if (currentEvent?.auto_complete_sail !== undefined) setAutoCompleteSail(currentEvent.auto_complete_sail);
+    if (currentEvent?.show_flag !== undefined) setShowFlag(currentEvent.show_flag);
+    if (currentEvent?.show_country !== undefined) setShowCountry(currentEvent.show_country);
+  }, [isOpen, currentEvent?.id, currentEvent?.enable_roll_call, currentEvent?.auto_complete_sail, currentEvent?.enable_observers, currentEvent?.observers_per_heat, currentEvent?.show_flag, currentEvent?.show_country]);
+
   // Start system
 
   // SHRS qualifying/finals structure
