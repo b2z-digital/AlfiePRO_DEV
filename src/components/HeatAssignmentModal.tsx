@@ -939,10 +939,14 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 if (lowerAssignment) {
                   const lowerSkippers = lowerAssignment.skipperIndices;
                   const lowerResults = results.filter(r => r.heatDesignation === lowerLetter);
-                  lowerCompleted = lowerSkippers.length > 0 && lowerSkippers.every(si => {
+                  const allAssignedHaveResults = lowerSkippers.length > 0 && lowerSkippers.every(si => {
                     const res = lowerResults.find(r => r.skipperIndex === si);
                     return res && (res.position !== null || res.letterScore || res.markedAsUP);
                   });
+                  const allExistingResultsScored = lowerResults.length > 0 &&
+                    lowerResults.length >= lowerSkippers.length &&
+                    lowerResults.every(r => r.position !== null || r.letterScore || r.markedAsUP);
+                  lowerCompleted = allAssignedHaveResults || allExistingResultsScored;
                 }
               }
               const scoringSys = heatManagement.configuration.scoringSystem;

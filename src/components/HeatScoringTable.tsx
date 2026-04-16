@@ -10,7 +10,9 @@ import { HeatAssignmentModal } from './HeatAssignmentModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
-import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 as Grid3X3, Check } from 'lucide-react';
+import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 as Grid3X3, Check, Timer } from 'lucide-react';
+import { StartBoxModal } from './start-box/StartBoxModal';
+import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
 import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
@@ -161,6 +163,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [rollCallActive, setRollCallActive] = useState(false);
   const [rollCallReady, setRollCallReady] = useState<Set<number>>(new Set());
   const [rollCallAbsent, setRollCallAbsent] = useState<Set<number>>(new Set());
+  const [showStartBoxModal, setShowStartBoxModal] = useState(false);
+  const [raceTimerRunning, setRaceTimerRunning] = useState(false);
 
   // Track the round number to detect actual round changes (not just object reference changes)
   const lastRoundNumber = React.useRef<number | null>(null);
@@ -1036,6 +1040,31 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-wrap">
+              {/* Start Box Button */}
+              <button
+                onClick={() => setShowStartBoxModal(true)}
+                className={`inline-flex items-center justify-center rounded-lg transition-all active:scale-95 ${
+                  raceTimerRunning
+                    ? darkMode
+                      ? 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
+                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    : darkMode
+                      ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
+                      : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
+                } px-3 py-2`}
+                title="Starter Console"
+              >
+                <Timer size={22} />
+              </button>
+
+              {raceTimerRunning && (
+                <RaceElapsedTimer
+                  isRunning={raceTimerRunning}
+                  onStop={() => setRaceTimerRunning(false)}
+                  darkMode={darkMode}
+                />
+              )}
+
               {/* Race Status Control */}
               {currentEvent?.id && currentEvent?.enableLiveTracking && !currentEvent?.completed && (
                 <LiveStatusControl eventId={currentEvent.id} darkMode={darkMode} />
@@ -1880,6 +1909,15 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         skippers={skippers}
         heatManagement={heatManagement}
         dropRules={[4, 8, 16, 24, 32, 40]}
+        darkMode={darkMode}
+      />
+
+      {/* Start Box Modal */}
+      <StartBoxModal
+        isOpen={showStartBoxModal}
+        onClose={() => setShowStartBoxModal(false)}
+        onSequenceComplete={() => setRaceTimerRunning(true)}
+        clubId={currentEvent?.clubId || null}
         darkMode={darkMode}
       />
     </div>
