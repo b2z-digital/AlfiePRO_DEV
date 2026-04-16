@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { HeatManagement, HeatDesignation, HeatAssignment } from '../types/heat';
-import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye } from 'lucide-react';
+import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type } from 'lucide-react';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { HeatOverallResultsModal } from './HeatOverallResultsModal';
 
@@ -524,6 +524,29 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       darkMode ? 'bg-slate-900' : 'bg-slate-50'
     }`}>
       <div className={`${isFullscreen ? 'max-h-[calc(100vh-80px)]' : 'max-h-[75vh]'} overflow-auto`} ref={scrollContainerRef}>
+        {completedRounds.length > 0 && (
+          <div className={`sticky top-0 z-10 flex items-center px-2 py-1.5 gap-0.5 ${
+            darkMode ? 'bg-slate-700 border-b border-slate-600/50' : 'bg-slate-200 border-b border-slate-300'
+          }`}>
+            <div className="w-10 flex-shrink-0" />
+            {completedRounds.map(r => (
+              <div
+                key={`master-race-${r.round}`}
+                className={`flex-1 text-center font-bold text-[11px] uppercase tracking-widest py-0.5 rounded ${
+                  darkMode ? 'text-slate-300 bg-slate-600/50' : 'text-slate-600 bg-slate-300/60'
+                }`}
+              >
+                Race {r.round}
+              </div>
+            ))}
+            <div className={`flex-1 text-center font-bold text-[11px] uppercase tracking-widest py-0.5 rounded ${
+              darkMode ? 'text-blue-300 bg-blue-900/40' : 'text-blue-700 bg-blue-100/80'
+            }`}>
+              Race {currentRound}
+            </div>
+            {!isSeedingRound && promotionCount > 0 && <div className="w-8 flex-shrink-0" />}
+          </div>
+        )}
         <div className="space-y-2 p-2 pb-4">
           {heatsToRender.map(heat => {
             const heatCells = cells[heat] || [];
@@ -560,33 +583,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                 <div className="overflow-x-auto">
                   <table className="text-[13px] border-collapse">
                     <thead>
-                      {(completedRounds.length > 0 || true) && (
-                        <tr className={darkMode ? 'bg-slate-600/80' : 'bg-slate-300/70'}>
-                          <th className="px-1.5 py-1.5" />
-                          {completedRounds.map(r => (
-                            <th
-                              key={`race-hdr-${r.round}`}
-                              colSpan={3}
-                              className={`px-1 py-1.5 text-center font-bold text-[11px] uppercase tracking-widest border-l ${
-                                darkMode ? 'text-slate-300 border-slate-500/50' : 'text-slate-600 border-slate-400/50'
-                              }`}
-                            >
-                              Race {r.round}
-                            </th>
-                          ))}
-                          <th
-                            colSpan={isVerified ? 3 : 4}
-                            className={`px-1 py-1.5 text-center font-bold text-[11px] uppercase tracking-widest border-l ${
-                              darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
-                            }`}
-                          >
-                            Race {currentRound}
-                          </th>
-                          {!isSeedingRound && promotionCount > 0 && (
-                            <th className="px-1 py-1.5" />
-                          )}
-                        </tr>
-                      )}
                       <tr className={darkMode ? 'bg-slate-700/40' : 'bg-slate-100/60'}>
                         <th className="px-1.5 py-1 w-10" />
                         {completedRounds.map(r => (
@@ -639,16 +635,17 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                         const skipperName = getSkipperName(heat, cell);
                         const matchedSkipper = getMatchedSkipper(heat, cell);
                         const hasValue = cell.sailNumber.trim() || cell.letterScore;
-                        const points = cell.letterScore
+                        const rawPoints = cell.letterScore
                           ? (cell.customPoints !== undefined ? cell.customPoints : totalPositions + 1)
                           : (hasValue && cell.isValid ? position : null);
+                        const points = rawPoints === -1 ? 'AVG' : rawPoints;
 
                         return (
                           <tr
                             key={`${heat}-${position}`}
                             className={`border-t transition-colors ${
                               isHistoricalRow
-                                ? darkMode ? 'border-slate-700/20 opacity-40' : 'border-slate-100 opacity-40'
+                                ? darkMode ? 'border-slate-700/20' : 'border-slate-100'
                                 : isPromotion
                                   ? darkMode ? 'bg-green-900/25 border-green-800/30' : 'bg-green-100/70 border-green-200/50'
                                   : darkMode ? 'border-slate-700/30 hover:bg-slate-700/20' : 'border-slate-100 hover:bg-slate-50/80'
@@ -674,16 +671,17 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                               const prevSkipper = displayResult ? skippers[displayResult.skipperIndex] : null;
                               const prevSailNo = prevSkipper ? String(prevSkipper.sailNumber || prevSkipper.sailNo || '') : '';
                               const prevHeatSize = r.heatAssignments.find(a => a.heatDesignation === heat)?.skipperIndices.length || 0;
-                              const prevPts = displayResult
+                              const prevPtsRaw = displayResult
                                 ? displayResult.letterScore
                                   ? (displayResult.customPoints !== undefined ? displayResult.customPoints : prevHeatSize + 1)
                                   : displayResult.position
                                 : null;
+                              const prevPts = prevPtsRaw === -1 ? -1 : prevPtsRaw;
 
                               return (
                                 <React.Fragment key={`prev-r${r.round}-${position}`}>
-                                  <td className={`px-1 py-1 text-center font-mono border-l ${
-                                    darkMode ? 'text-slate-500 border-slate-600/40' : 'text-slate-400 border-slate-200'
+                                  <td className={`px-1 py-1 text-center font-mono font-semibold border-l ${
+                                    darkMode ? 'text-slate-400 border-slate-600/40' : 'text-slate-600 border-slate-200'
                                   }`}>
                                     {displayResult ? (
                                       displayResult.letterScore
@@ -697,13 +695,15 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                     {displayResult ? (
                                       displayResult.letterScore
                                         ? <span className="text-amber-500 font-semibold text-[11px]">{displayResult.letterScore}</span>
-                                        : <span className={darkMode ? 'text-green-500' : 'text-green-600'}>OK</span>
+                                        : <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>OK</span>
                                     ) : ''}
                                   </td>
-                                  <td className={`px-1 py-1 text-center font-mono ${
-                                    darkMode ? 'text-slate-500' : 'text-slate-400'
+                                  <td className={`px-1 py-1 text-center font-mono font-semibold ${
+                                    prevPts === -1
+                                      ? 'text-green-500'
+                                      : darkMode ? 'text-slate-400' : 'text-slate-600'
                                   }`}>
-                                    {prevPts !== null ? prevPts : ''}
+                                    {prevPts !== null ? (prevPts === -1 ? 'AVG' : prevPts) : ''}
                                   </td>
                                 </React.Fragment>
                               );
@@ -738,12 +738,12 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                       />
                                       <button
                                         onClick={() => handleLetterScore(heat, position)}
-                                        className={`ml-1 h-7 w-7 rounded text-[9px] font-bold flex-shrink-0 flex items-center justify-center ${
+                                        className={`ml-1 h-7 rounded-full px-2 text-[9px] font-bold flex-shrink-0 flex items-center justify-center ${
                                           darkMode
                                             ? 'bg-amber-600/30 text-amber-400 border border-amber-500/30'
                                             : 'bg-amber-100 text-amber-700 border border-amber-300'
                                         }`}
-                                        title={`${cell.letterScore}${cell.customPoints !== undefined ? ` (${cell.customPoints})` : ''}`}
+                                        title={`${cell.letterScore}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
                                       >
                                         {cell.letterScore?.slice(0, 3)}
                                       </button>
@@ -768,14 +768,14 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                       />
                                       <button
                                         onClick={() => handleLetterScore(heat, position)}
-                                        className={`ml-1 h-7 w-7 rounded text-[9px] font-bold flex-shrink-0 flex items-center justify-center transition-colors ${
+                                        className={`ml-1 h-7 w-7 rounded-full flex-shrink-0 flex items-center justify-center transition-colors ${
                                           darkMode
                                             ? 'bg-slate-700/60 text-slate-400 hover:bg-slate-600 hover:text-white border border-slate-600/70'
                                             : 'bg-slate-100/70 text-slate-400 hover:bg-slate-200 hover:text-slate-700 border border-slate-200'
                                         }`}
                                         title="Assign letter score (DNS, DNF, DSQ, etc.)"
                                       >
-                                        LS
+                                        <Type size={12} />
                                       </button>
                                     </>
                                   )}
@@ -818,12 +818,14 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                               {hasValue && cell.isValid ? (
                                 cell.letterScore
                                   ? <span className="text-amber-500 font-semibold text-[11px]">{cell.letterScore}</span>
-                                  : <span className={darkMode ? 'text-green-500' : 'text-green-600'}>OK</span>
+                                  : <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>OK</span>
                               ) : ''}
                             </td>
 
                             <td className={`px-1 py-1 text-center font-mono font-bold ${
-                              darkMode ? 'text-slate-300' : 'text-slate-700'
+                              points === 'AVG'
+                                ? 'text-green-500'
+                                : darkMode ? 'text-slate-200' : 'text-slate-800'
                             }`}>
                               {points !== null ? points : ''}
                             </td>
@@ -986,20 +988,60 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
         />
       )}
 
-      {showLetterScoreModal && (
-        <LetterScoreSelector
-          isOpen={showLetterScoreModal}
-          onClose={() => {
-            setShowLetterScoreModal(false);
-            setLetterScorePosition(null);
-            setLetterScoreHeat(null);
-          }}
-          onSelect={(score, customPoints) => applyLetterScore(score as LetterScore, customPoints)}
-          darkMode={darkMode}
-          numFinishers={letterScoreHeat ? getHeatCellStats(letterScoreHeat).filledCount : 0}
-          totalCompetitors={letterScoreHeat ? getHeatCellStats(letterScoreHeat).totalPositions : 0}
-        />
-      )}
+      {showLetterScoreModal && (() => {
+        const lsHeat = letterScoreHeat || 'A' as HeatDesignation;
+        const lsPos = letterScorePosition || 1;
+        const lsCells = cells[lsHeat] || [];
+        const lsCell = lsCells[lsPos - 1];
+        const lsSkipperName = lsCell ? getSkipperName(lsHeat, lsCell) || `Position ${lsPos}` : `Position ${lsPos}`;
+        const lsHeatSkips = isMultiHeatMode ? getHeatSkippers(lsHeat) : skippers;
+        const lsHeatResults = getHeatRaceResults(lsHeat);
+        const prevResults = lsCell?.skipperIndex !== null && lsCell?.skipperIndex !== undefined
+          ? lsHeatResults
+              .filter(r => r.race !== currentRound && r.skipperIndex === lsCell.skipperIndex)
+              .map(r => ({
+                position: r.position,
+                letterScore: r.letterScore,
+                customPoints: r.customPoints,
+                points: r.letterScore
+                  ? (r.customPoints !== undefined && r.customPoints !== -1 ? r.customPoints : lsHeatSkips.length + 1)
+                  : (r.position || lsHeatSkips.length + 1)
+              }))
+          : [];
+        return (
+          <LetterScoreSelector
+            isOpen={showLetterScoreModal}
+            onClose={() => {
+              setShowLetterScoreModal(false);
+              setLetterScorePosition(null);
+              setLetterScoreHeat(null);
+            }}
+            onSelect={(score, customPoints) => {
+              if (score === null) {
+                if (letterScorePosition !== null && letterScoreHeat) {
+                  const idx = letterScorePosition - 1;
+                  const heat = letterScoreHeat;
+                  const heatCells = cells[heat] || [];
+                  const updated = [...heatCells];
+                  updated[idx] = { ...updated[idx], letterScore: null, customPoints: undefined };
+                  const heatSkips = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
+                  const validated = validateCells(updated, heatSkips);
+                  setCells(prev => ({ ...prev, [heat]: validated }));
+                }
+                setShowLetterScoreModal(false);
+                setLetterScorePosition(null);
+                setLetterScoreHeat(null);
+              } else {
+                applyLetterScore(score as LetterScore, customPoints);
+              }
+            }}
+            darkMode={darkMode}
+            skipperName={lsSkipperName}
+            raceNumber={currentRound}
+            skipperPreviousResults={prevResults}
+          />
+        );
+      })()}
     </div>
   );
 };
