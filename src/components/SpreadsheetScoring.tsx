@@ -525,26 +525,51 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     }`}>
       <div className={`${isFullscreen ? 'max-h-[calc(100vh-80px)]' : 'max-h-[75vh]'} overflow-auto`} ref={scrollContainerRef}>
         {completedRounds.length > 0 && (
-          <div className={`sticky top-0 z-10 flex items-center px-2 py-1.5 gap-0.5 ${
+          <div className={`sticky top-0 z-10 ${
             darkMode ? 'bg-slate-700 border-b border-slate-600/50' : 'bg-slate-200 border-b border-slate-300'
           }`}>
-            <div className="w-10 flex-shrink-0" />
-            {completedRounds.map(r => (
-              <div
-                key={`master-race-${r.round}`}
-                className={`flex-1 text-center font-bold text-[11px] uppercase tracking-widest py-0.5 rounded ${
-                  darkMode ? 'text-slate-300 bg-slate-600/50' : 'text-slate-600 bg-slate-300/60'
-                }`}
-              >
-                Race {r.round}
-              </div>
-            ))}
-            <div className={`flex-1 text-center font-bold text-[11px] uppercase tracking-widest py-0.5 rounded ${
-              darkMode ? 'text-blue-300 bg-blue-900/40' : 'text-blue-700 bg-blue-100/80'
-            }`}>
-              Race {currentRound}
-            </div>
-            {!isSeedingRound && promotionCount > 0 && <div className="w-8 flex-shrink-0" />}
+            <table className="text-[13px] border-collapse mx-2">
+              <colgroup>
+                <col style={{ width: '40px' }} />
+                {completedRounds.map(r => (
+                  <React.Fragment key={`cg-${r.round}`}>
+                    <col style={{ width: '48px' }} />
+                    <col style={{ width: '40px' }} />
+                    <col style={{ width: '32px' }} />
+                  </React.Fragment>
+                ))}
+                <col style={{ width: '88px' }} />
+                <col style={{ width: '140px' }} />
+                <col style={{ width: '40px' }} />
+                <col style={{ width: '32px' }} />
+                {!isSeedingRound && promotionCount > 0 && <col style={{ width: '32px' }} />}
+              </colgroup>
+              <tbody>
+                <tr>
+                  <td className="px-1.5 py-1.5" />
+                  {completedRounds.map(r => (
+                    <td
+                      key={`master-race-${r.round}`}
+                      colSpan={3}
+                      className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l ${
+                        darkMode ? 'text-slate-300 border-slate-500/50' : 'text-slate-600 border-slate-400/50'
+                      }`}
+                    >
+                      Race {r.round}
+                    </td>
+                  ))}
+                  <td
+                    colSpan={4}
+                    className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l ${
+                      darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
+                    }`}
+                  >
+                    Race {currentRound}
+                  </td>
+                  {!isSeedingRound && promotionCount > 0 && <td />}
+                </tr>
+              </tbody>
+            </table>
           </div>
         )}
         <div className="space-y-2 p-2 pb-4">
@@ -582,46 +607,61 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
                 <div className="overflow-x-auto">
                   <table className="text-[13px] border-collapse">
+                    <colgroup>
+                      <col style={{ width: '40px' }} />
+                      {completedRounds.map(r => (
+                        <React.Fragment key={`tcg-${r.round}`}>
+                          <col style={{ width: '48px' }} />
+                          <col style={{ width: '40px' }} />
+                          <col style={{ width: '32px' }} />
+                        </React.Fragment>
+                      ))}
+                      <col style={{ width: isVerified ? '64px' : '88px' }} />
+                      {!isVerified && <col style={{ width: '140px' }} />}
+                      <col style={{ width: '40px' }} />
+                      <col style={{ width: '32px' }} />
+                      {!isSeedingRound && promotionCount > 0 && <col style={{ width: '32px' }} />}
+                    </colgroup>
                     <thead>
                       <tr className={darkMode ? 'bg-slate-700/40' : 'bg-slate-100/60'}>
-                        <th className="px-1.5 py-1 w-10" />
+                        <th className="px-1.5 py-1" />
                         {completedRounds.map(r => (
                           <React.Fragment key={`hdr-r${r.round}`}>
-                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider w-12 border-l ${
+                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider border-l ${
                               darkMode ? 'text-slate-500 border-slate-600/40' : 'text-slate-400 border-slate-200'
                             }`}>
                               <span className="text-[10px]">Sail No.</span>
                             </th>
-                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider w-10 ${
+                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                               darkMode ? 'text-slate-500' : 'text-slate-400'
                             }`}>
                               <span className="text-[10px]">Comment</span>
                             </th>
-                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider w-8 ${
+                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                               darkMode ? 'text-slate-500' : 'text-slate-400'
                             }`}>
                               <span className="text-[10px]">Pts</span>
                             </th>
                           </React.Fragment>
                         ))}
-                        <th className={`px-1 py-1 text-left font-bold uppercase tracking-wider ${isVerified ? 'w-16' : 'w-[88px]'} ${completedRounds.length > 0 ? 'border-l ' : ''}${
+                        <th className={`px-1 py-1 text-left font-bold uppercase tracking-wider ${completedRounds.length > 0 ? 'border-l ' : ''}${
                           darkMode ? 'text-blue-400 border-blue-500/30' : 'text-blue-600 border-blue-300'
                         }`}>
                           <span className="text-[10px]">Sail No.</span>
                         </th>
                         {!isVerified && (
-                          <th className={`px-1 py-1 text-left font-bold uppercase tracking-wider w-[140px] ${
+                          <th className={`px-1 py-1 text-left font-bold uppercase tracking-wider ${
                             darkMode ? 'text-slate-400' : 'text-slate-500'
                           }`}><span className="text-[10px]">Skipper</span></th>
                         )}
-                        <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider w-10 ${
+                        <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                           darkMode ? 'text-blue-400' : 'text-blue-600'
                         }`}><span className="text-[10px]">Comment</span></th>
-                        <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider w-8 ${
+                        <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                           darkMode ? 'text-blue-400' : 'text-blue-600'
                         }`}><span className="text-[10px]">Pts</span></th>
                         {!isSeedingRound && promotionCount > 0 && (
-                          <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider w-8 ${
+                          <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                             darkMode ? 'text-slate-400' : 'text-slate-500'
                           }`}><ArrowUp size={10} className="inline" /></th>
                         )}
