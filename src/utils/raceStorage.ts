@@ -162,6 +162,8 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
             showCategory: race.show_category ?? false,
             enable_observers: race.enable_observers ?? false,
             observers_per_heat: race.observers_per_heat ?? undefined,
+            enable_roll_call: race.enable_roll_call,
+            auto_complete_sail: race.auto_complete_sail,
             enableLiveTracking: race.enable_live_tracking || false,
             enableLiveStream: race.enable_livestream || false
           } as any;
@@ -306,7 +308,9 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
           enable_livestream: (event as any).enableLiveStream || false,
           // Observer settings
           enable_observers: (event as any).enable_observers ?? false,
-          observers_per_heat: (event as any).observers_per_heat ?? undefined
+          observers_per_heat: (event as any).observers_per_heat ?? undefined,
+          enable_roll_call: (event as any).enable_roll_call,
+          auto_complete_sail: (event as any).auto_complete_sail
         });
 
       if (error) {
@@ -602,7 +606,9 @@ export const getStoredRaceSeries = async (): Promise<RaceSeries[]> => {
             manualScoreOverrides: round.manual_score_overrides || {},
             enableLiveStream: round.enable_livestream || false,
             enable_observers: round.enable_observers || false,
-            observers_per_heat: round.observers_per_heat || 2
+            observers_per_heat: round.observers_per_heat || 2,
+            enable_roll_call: round.enable_roll_call,
+            auto_complete_sail: round.auto_complete_sail
           });
         });
       }
@@ -1105,6 +1111,8 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
       show_country: data.show_country,
       enable_observers: data.enable_observers,
       observers_per_heat: data.observers_per_heat,
+      enable_roll_call: data.enable_roll_call,
+      auto_complete_sail: data.auto_complete_sail,
       enable_livestream: data.enable_livestream
     };
 
@@ -1354,7 +1362,9 @@ export const updateEventResults = async (
           number_of_days: updatedEvent.numberOfDays || 1,
           current_day: currentDay,
           enable_observers: updatedEvent.enable_observers || false,
-          observers_per_heat: updatedEvent.observers_per_heat || 2
+          observers_per_heat: updatedEvent.observers_per_heat || 2,
+          enable_roll_call: updatedEvent.enable_roll_call,
+          auto_complete_sail: updatedEvent.auto_complete_sail
         };
 
         // For multi-day series rounds, store results in day_results ONLY

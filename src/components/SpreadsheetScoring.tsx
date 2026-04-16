@@ -415,10 +415,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
   useEffect(() => {
     if (!currentScoringHeat || verifiedHeats.has(currentScoringHeat)) return;
-    const heatCells = cells[currentScoringHeat] || [];
-    const filledCount = heatCells.filter(c => c.sailNumber.trim() || c.letterScore).length;
-    const hasErrors = heatCells.some(c => (c.sailNumber.trim() && !c.isValid) || c.isDuplicate);
-    const isReady = filledCount >= heatCells.length && !hasErrors && heatCells.length > 0;
+    const stats = getHeatCellStats(currentScoringHeat);
+    const isReady = stats.filledCount >= stats.totalPositions && !stats.hasErrors && stats.totalPositions > 0;
     if (isReady && verifyButtonRef.current) {
       setTimeout(() => {
         verifyButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -447,7 +445,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     const heatCells = cells[heat] || [];
     const filledCount = heatCells.filter(c => c.sailNumber.trim() || c.letterScore).length;
     const hasErrors = heatCells.some(c => (c.sailNumber.trim() && !c.isValid) || c.isDuplicate);
-    const totalPositions = heatCells.length;
+    const currentSkipperCount = isMultiHeatMode ? getRacingSkippersForHeat(heat).length : skippers.length;
+    const totalPositions = currentSkipperCount;
     return { filledCount, hasErrors, totalPositions };
   };
 
