@@ -563,7 +563,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="text-[13px] border-collapse">
+                  <table className="w-full text-[13px] border-collapse">
                     <colgroup>
                       <col style={{ width: '40px' }} />
                       {completedRounds.map(r => (
@@ -580,31 +580,29 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                       {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && <col style={{ width: '32px' }} />}
                     </colgroup>
                     <thead>
-                      {completedRounds.length > 0 && (
-                        <tr className={darkMode ? 'bg-slate-700' : 'bg-slate-200'}>
-                          <th className="px-1.5 py-1.5" />
-                          {completedRounds.map(r => (
-                            <th
-                              key={`race-lbl-${r.round}`}
-                              colSpan={3}
-                              className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l ${
-                                darkMode ? 'text-slate-300 border-slate-500/50' : 'text-slate-600 border-slate-400/50'
-                              }`}
-                            >
-                              Race {r.round}
-                            </th>
-                          ))}
+                      <tr className={darkMode ? 'bg-slate-700' : 'bg-slate-200'}>
+                        <th className="px-1.5 py-1.5" />
+                        {completedRounds.map(r => (
                           <th
-                            colSpan={isVerified ? 3 : 4}
+                            key={`race-lbl-${r.round}`}
+                            colSpan={3}
                             className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l ${
-                              darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
+                              darkMode ? 'text-slate-300 border-slate-500/50' : 'text-slate-600 border-slate-400/50'
                             }`}
                           >
-                            Race {currentRound}
+                            Race {r.round}
                           </th>
-                          {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && <th />}
-                        </tr>
-                      )}
+                        ))}
+                        <th
+                          colSpan={isVerified ? 3 : 4}
+                          className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${completedRounds.length > 0 ? 'border-l ' : ''}${
+                            darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
+                          }`}
+                        >
+                          Race {currentRound}
+                        </th>
+                        {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && <th />}
+                      </tr>
                       <tr className={darkMode ? 'bg-slate-700/40' : 'bg-slate-100/60'}>
                         <th className="px-1.5 py-1" />
                         {completedRounds.map(r => (
