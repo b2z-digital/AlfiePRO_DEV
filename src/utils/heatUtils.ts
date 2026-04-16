@@ -106,10 +106,49 @@ export const completeHeat = (
     console.log(`  ⚡ Per-race promotion override: ${effectivePromotionCount} (default: ${configuration.promotionCount})`);
   }
 
-  // HMS: No mid-round roster changes. Each heat races with its assigned roster for the round.
-  // Promotion/relegation swaps happen BETWEEN rounds via generateNextRoundAssignments.
-  if (isHms && currentRound >= 2) {
-    console.log(`\n📋 HMS Round ${currentRound}: Heat ${heat} complete. Roster stays fixed for this round.`);
+  if (isHms && currentRound >= 2 && higherHeat) {
+    const higherHeatAssignmentIdx = updatedRounds[roundIndex].heatAssignments.findIndex(
+      a => a.heatDesignation === higherHeat
+    );
+    const currentHeatResults = updatedRounds[roundIndex].results.filter(
+      r => r.heatDesignation === heat && r.round === currentRound
+    );
+    const topFinishers = currentHeatResults
+      .filter(r => r.position !== null && r.position <= effectivePromotionCount && !r.letterScore)
+      .sort((a, b) => (a.position || 999) - (b.position || 999))
+      .map(r => r.skipperIndex);
+
+    if (topFinishers.length > 0 && higherHeatAssignmentIdx >= 0) {
+      const higherAssignment = updatedRounds[roundIndex].heatAssignments[higherHeatAssignmentIdx];
+      const higherHeatHasResults = updatedRounds[roundIndex].results.some(
+        r => r.heatDesignation === higherHeat && r.round === currentRound &&
+             (r.position !== null || r.letterScore)
+      );
+
+      if (!higherHeatHasResults) {
+        const existingSet = new Set(higherAssignment.skipperIndices);
+        const newPromoted = topFinishers.filter(idx => !existingSet.has(idx));
+        if (newPromoted.length > 0) {
+          updatedRounds[roundIndex] = {
+            ...updatedRounds[roundIndex],
+            heatAssignments: updatedRounds[roundIndex].heatAssignments.map((a, i) =>
+              i === higherHeatAssignmentIdx
+                ? { ...a, skipperIndices: [...a.skipperIndices, ...newPromoted] }
+                : a
+            )
+          };
+          promotionsOccurred = true;
+          promotedSkipperIndices = newPromoted;
+          promotionTargetHeat = higherHeat;
+          console.log(`\n🔼 HMS Round ${currentRound}: Promoted ${newPromoted.length} skippers from Heat ${heat} → Heat ${higherHeat}`);
+          console.log(`   Heat ${higherHeat} now has ${higherAssignment.skipperIndices.length + newPromoted.length} skippers`);
+        }
+      } else {
+        console.log(`\n📋 HMS Round ${currentRound}: Heat ${heat} complete. Heat ${higherHeat} already has results - no mid-round promotion.`);
+      }
+    }
+  } else if (isHms && currentRound >= 2) {
+    console.log(`\n📋 HMS Round ${currentRound}: Heat ${heat} complete (top heat - no promotions needed).`);
   }
 
   console.log(`completeHeat: checking allHeatsComplete. availableHeats=${JSON.stringify(availableHeats)}, roundIndex=${roundIndex}, totalResults=${updatedRounds[roundIndex].results.length}`);

@@ -189,6 +189,14 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     }).join('|');
   }, [isMultiHeatMode, allHeatRaceResults, availableHeats, currentRound]);
 
+  const heatAssignmentKey = useMemo(() => {
+    if (!isMultiHeatMode || !heatSkipperIndicesMap) return '';
+    return availableHeats.map(h => {
+      const indices = heatSkipperIndicesMap[h] || [];
+      return `${h}:${indices.length}`;
+    }).join('|');
+  }, [isMultiHeatMode, heatSkipperIndicesMap, availableHeats]);
+
   useEffect(() => {
     if (prevRoundRef.current !== null && prevRoundRef.current !== currentRound) {
       verifiedCellsRef.current = {} as any;
@@ -238,7 +246,16 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       if (savedCells && savedCells.length > 0) {
         const hasData = savedCells.some(c => c.sailNumber.trim() || c.letterScore);
         if (hasData) {
-          newAllCells[heat] = savedCells;
+          if (savedCells.length < totalPos) {
+            const expanded = [...savedCells];
+            for (let i = savedCells.length; i < totalPos; i++) {
+              expanded.push({ sailNumber: '', skipperIndex: null, letterScore: null, isValid: true, isDuplicate: false });
+            }
+            newAllCells[heat] = expanded;
+            verifiedCellsRef.current[heat] = expanded;
+          } else {
+            newAllCells[heat] = savedCells;
+          }
           alreadyVerified.add(heat);
           continue;
         }
@@ -273,7 +290,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
     setCells(newAllCells as any);
     setLocalVerifiedHeats(alreadyVerified);
-  }, [isMultiHeatMode, availableHeats, currentRound, skippers, initialRace, raceResults, heatResultsKey]);
+  }, [isMultiHeatMode, availableHeats, currentRound, skippers, initialRace, raceResults, heatResultsKey, heatAssignmentKey]);
 
   useEffect(() => {
     if (!isMultiHeatMode || !currentScoringHeat) return;
