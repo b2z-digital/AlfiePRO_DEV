@@ -534,13 +534,30 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return validIndices.map(idx => skippers[idx]).filter(Boolean);
   }, [heatSkipperIndices, skippers, selectedHeat]);
 
+  const skippersInOtherHeatsCurrentRound = useMemo(() => {
+    if (!currentRound || !selectedHeat) return new Set<number>();
+    const otherHeatSkippers = new Set<number>();
+    currentRound.results.forEach(r => {
+      if (r.round === heatManagement.currentRound && r.heatDesignation !== selectedHeat &&
+          (r.position !== null || r.letterScore)) {
+        otherHeatSkippers.add(r.skipperIndex);
+      }
+    });
+    return otherHeatSkippers;
+  }, [currentRound, selectedHeat, heatManagement.currentRound]);
+
   // Filter race results for current heat's skippers
   const heatRaceResults = useMemo(() => {
     const heatSkipperIndicesSet = new Set(heatSkipperIndices);
-    return raceResults.filter(result =>
-      heatSkipperIndicesSet.has(result.skipperIndex)
-    );
-  }, [raceResults, heatSkipperIndices]);
+    const currentRoundNum = heatManagement.currentRound;
+    return raceResults.filter(result => {
+      if (!heatSkipperIndicesSet.has(result.skipperIndex)) return false;
+      if (result.race === currentRoundNum && skippersInOtherHeatsCurrentRound.has(result.skipperIndex)) {
+        return false;
+      }
+      return true;
+    });
+  }, [raceResults, heatSkipperIndices, heatManagement.currentRound, skippersInOtherHeatsCurrentRound]);
 
   // Wrapper functions to map filtered indices to original indices
   const wrappedUpdateRaceResults = (race: number, filteredSkipperIndex: number, position: number | null, letterScore?: any, customPoints?: number) => {
@@ -659,19 +676,39 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   const allHeatMappedResults = useMemo(() => {
     if (!currentRound) return {} as Record<HeatDesignation, any[]>;
+    const currentRoundNum = heatManagement.currentRound;
+
+    const otherHeatSkippersByHeat: Record<string, Set<number>> = {};
+    for (const assignment of currentRound.heatAssignments) {
+      const heat = assignment.heatDesignation;
+      const others = new Set<number>();
+      currentRound.results.forEach(r => {
+        if (r.round === currentRoundNum && r.heatDesignation !== heat &&
+            (r.position !== null || r.letterScore)) {
+          others.add(r.skipperIndex);
+        }
+      });
+      otherHeatSkippersByHeat[heat] = others;
+    }
+
     const map: Record<string, any[]> = {};
     for (const assignment of currentRound.heatAssignments) {
       const heat = assignment.heatDesignation;
       const indices = assignment.skipperIndices.filter(idx => idx >= 0 && idx < skippers.length);
       const indicesSet = new Set(indices);
-      const heatResults = raceResults.filter(r => indicesSet.has(r.skipperIndex));
+      const othersSet = otherHeatSkippersByHeat[heat] || new Set();
+      const heatResults = raceResults.filter(r => {
+        if (!indicesSet.has(r.skipperIndex)) return false;
+        if (r.race === currentRoundNum && othersSet.has(r.skipperIndex)) return false;
+        return true;
+      });
       map[heat] = heatResults.map(result => ({
         ...result,
         skipperIndex: indices.indexOf(result.skipperIndex)
       }));
     }
     return map as Record<HeatDesignation, any[]>;
-  }, [currentRound, raceResults, skippers.length]);
+  }, [currentRound, raceResults, skippers.length, heatManagement.currentRound]);
 
   // Calculate heat-specific lastCompletedRace
   // In heat racing mode, we need to track which races are complete for THIS heat only
