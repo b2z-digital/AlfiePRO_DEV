@@ -788,19 +788,17 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                 >
                                   {cell.letterScore?.slice(0, 3)}
                                 </button>
-                              ) : hasValue && cell.isValid ? (
-                                <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>OK</span>
                               ) : (
                                 <button
                                   onClick={() => handleLetterScore(heat, position)}
-                                  className={`h-7 w-7 rounded-full flex-shrink-0 inline-flex items-center justify-center transition-colors ${
+                                  className={`h-7 rounded-full px-2 text-[11px] font-medium flex-shrink-0 inline-flex items-center justify-center transition-colors ${
                                     darkMode
-                                      ? 'bg-slate-700/60 text-slate-400 hover:bg-slate-600 hover:text-white border border-slate-600/70'
-                                      : 'bg-slate-100/70 text-slate-400 hover:bg-slate-200 hover:text-slate-700 border border-slate-200'
+                                      ? 'text-slate-400 hover:bg-slate-700/60 hover:text-white border border-transparent hover:border-slate-600/70'
+                                      : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700 border border-transparent hover:border-slate-200'
                                   }`}
                                   title="Assign letter score (DNS, DNF, DSQ, etc.)"
                                 >
-                                  <Type size={12} />
+                                  OK
                                 </button>
                               )}
                             </td>
