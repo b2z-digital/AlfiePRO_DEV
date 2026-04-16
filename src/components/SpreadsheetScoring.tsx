@@ -524,33 +524,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       darkMode ? 'bg-slate-900' : 'bg-slate-50'
     }`}>
       <div className={`${isFullscreen ? 'max-h-[calc(100vh-80px)]' : 'max-h-[75vh]'} overflow-auto`} ref={scrollContainerRef}>
-        {completedRounds.length > 0 && (
-          <div className={`sticky top-0 z-10 flex items-center py-1.5 px-2 ${
-            darkMode ? 'bg-slate-700 border-b border-slate-600/50' : 'bg-slate-200 border-b border-slate-300'
-          }`}>
-            <div style={{ width: '40px' }} className="flex-shrink-0" />
-            {completedRounds.map(r => (
-              <div
-                key={`master-race-${r.round}`}
-                style={{ width: '120px' }}
-                className={`flex-shrink-0 text-center font-bold text-[11px] uppercase tracking-widest py-0.5 border-l ${
-                  darkMode ? 'text-slate-300 border-slate-500/50' : 'text-slate-600 border-slate-400/50'
-                }`}
-              >
-                Race {r.round}
-              </div>
-            ))}
-            <div
-              style={{ width: '300px' }}
-              className={`flex-shrink-0 text-center font-bold text-[11px] uppercase tracking-widest py-0.5 border-l ${
-                darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
-              }`}
-            >
-              Race {currentRound}
-            </div>
-            {!isSeedingRound && promotionCount > 0 && <div style={{ width: '32px' }} className="flex-shrink-0" />}
-          </div>
-        )}
         <div className="space-y-2 p-2 pb-4">
           {heatsToRender.map(heat => {
             const heatCells = cells[heat] || [];
@@ -599,9 +572,34 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                       {!isVerified && <col style={{ width: '140px' }} />}
                       <col style={{ width: '40px' }} />
                       <col style={{ width: '32px' }} />
-                      {!isSeedingRound && promotionCount > 0 && <col style={{ width: '32px' }} />}
+                      {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && <col style={{ width: '32px' }} />}
                     </colgroup>
                     <thead>
+                      {completedRounds.length > 0 && (
+                        <tr className={darkMode ? 'bg-slate-700' : 'bg-slate-200'}>
+                          <th className="px-1.5 py-1.5" />
+                          {completedRounds.map(r => (
+                            <th
+                              key={`race-lbl-${r.round}`}
+                              colSpan={3}
+                              className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l ${
+                                darkMode ? 'text-slate-300 border-slate-500/50' : 'text-slate-600 border-slate-400/50'
+                              }`}
+                            >
+                              Race {r.round}
+                            </th>
+                          ))}
+                          <th
+                            colSpan={isVerified ? 3 : 4}
+                            className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l ${
+                              darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
+                            }`}
+                          >
+                            Race {currentRound}
+                          </th>
+                          {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && <th />}
+                        </tr>
+                      )}
                       <tr className={darkMode ? 'bg-slate-700/40' : 'bg-slate-100/60'}>
                         <th className="px-1.5 py-1" />
                         {completedRounds.map(r => (
@@ -639,7 +637,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                         <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                           darkMode ? 'text-blue-400' : 'text-blue-600'
                         }`}><span className="text-[10px]">Pts</span></th>
-                        {!isSeedingRound && promotionCount > 0 && (
+                        {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && (
                           <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                             darkMode ? 'text-slate-400' : 'text-slate-500'
                           }`}><ArrowUp size={10} className="inline" /></th>
@@ -650,7 +648,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                       {heatCells.map((cell, idx) => {
                         const position = idx + 1;
                         const isHistoricalRow = position > totalPositions;
-                        const isPromotion = !isHistoricalRow && isPromotionPosition(position);
+                        const isTopHeat = heat === heatsToRender[0];
+                        const isPromotion = !isTopHeat && !isHistoricalRow && isPromotionPosition(position);
                         const skipperName = getSkipperName(heat, cell);
                         const matchedSkipper = getMatchedSkipper(heat, cell);
                         const hasValue = cell.sailNumber.trim() || cell.letterScore;
@@ -849,7 +848,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                               {points !== null ? points : ''}
                             </td>
 
-                            {!isSeedingRound && promotionCount > 0 && (
+                            {!isSeedingRound && promotionCount > 0 && !isTopHeat && (
                               <td className="px-1 py-0.5 text-center">
                                 {isPromotion && hasValue && cell.isValid && (
                                   <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[9px] font-bold ${
