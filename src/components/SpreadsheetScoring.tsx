@@ -171,7 +171,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     return map;
   }, []);
 
-  const currentScoringHeat = useMemo(() => {
+  const autoScoringHeat = useMemo(() => {
     if (!isMultiHeatMode) return 'A' as HeatDesignation;
     const reversed = [...availableHeats].reverse();
     for (const heat of reversed) {
@@ -179,6 +179,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     }
     return reversed[reversed.length - 1] || 'A' as HeatDesignation;
   }, [isMultiHeatMode, availableHeats, verifiedHeats]);
+
+  const currentScoringHeat = selectedHeat || autoScoringHeat;
 
   const heatResultsKey = useMemo(() => {
     if (!isMultiHeatMode || !allHeatRaceResults) return '';
@@ -512,12 +514,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     return heatSkips[cell.skipperIndex]?.name || null;
   };
 
-  const getMatchedSkipper = (heat: HeatDesignation, cell: CellEntry): Skipper | null => {
-    if (cell.skipperIndex === null) return null;
-    const heatSkips = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
-    return heatSkips[cell.skipperIndex] || null;
-  };
-
   const isPromotionPosition = (pos: number): boolean => {
     return isHeatScoring && !isSeedingRound && promotionCount > 0 && pos <= promotionCount;
   };
@@ -543,12 +539,21 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
               <div
                 key={heat}
                 ref={el => { heatSectionRefs.current[heat] = el; }}
-                className={`rounded-lg border overflow-hidden ${
+                className={`rounded-lg border overflow-hidden transition-opacity ${
                   darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
-                } ${isCurrent && !isVerified ? 'ring-2 ring-blue-500/40' : ''}`}
+                } ${isCurrent && !isVerified ? 'ring-2 ring-blue-500/40' : ''}${
+                  !isCurrent ? ' opacity-40' : ''
+                }`}
               >
                 <div
-                  className={`flex items-center justify-between px-3 py-1.5 ${HEAT_HEADER_COLORS[heat] || 'bg-slate-600'} text-white`}
+                  onClick={() => {
+                    if (!isCurrent && onSelectHeat) {
+                      onSelectHeat(heat);
+                    }
+                  }}
+                  className={`flex items-center justify-between px-3 py-1.5 ${HEAT_HEADER_COLORS[heat] || 'bg-slate-600'} text-white${
+                    !isCurrent ? ' cursor-pointer hover:brightness-110' : ''
+                  }`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-sm">Heat {heat}</span>
@@ -562,7 +567,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className={`overflow-x-auto${!isCurrent ? ' pointer-events-none' : ''}`}>
                   <table className="text-[13px] border-collapse">
                     <colgroup>
                       <col style={{ width: '40px' }} />
@@ -576,7 +581,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                       <col style={{ width: '56px' }} />
                       <col style={{ width: '48px' }} />
                       <col style={{ width: '32px' }} />
-                      {!isVerified && <col style={{ width: '140px' }} />}
                       {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && <col style={{ width: '32px' }} />}
                     </colgroup>
                     <thead>
@@ -594,7 +598,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                           </th>
                         ))}
                         <th
-                          colSpan={isVerified ? 3 : 4}
+                          colSpan={3}
                           className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${completedRounds.length > 0 ? 'border-l ' : ''}${
                             darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
                           }`}
@@ -635,11 +639,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                         <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                           darkMode ? 'text-blue-400' : 'text-blue-600'
                         }`}><span className="text-[10px]">Pts</span></th>
-                        {!isVerified && (
-                          <th className={`px-1 py-1 text-left font-bold uppercase tracking-wider ${
-                            darkMode ? 'text-slate-400' : 'text-slate-500'
-                          }`}><span className="text-[10px]">Skipper</span></th>
-                        )}
                         {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && (
                           <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                             darkMode ? 'text-slate-400' : 'text-slate-500'
@@ -653,8 +652,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                         const isHistoricalRow = position > totalPositions;
                         const isTopHeat = heat === heatsToRender[0];
                         const isPromotion = !isTopHeat && !isHistoricalRow && isPromotionPosition(position);
-                        const skipperName = getSkipperName(heat, cell);
-                        const matchedSkipper = getMatchedSkipper(heat, cell);
                         const hasValue = cell.sailNumber.trim() || cell.letterScore;
                         const rawPoints = cell.letterScore
                           ? (cell.customPoints !== undefined ? cell.customPoints : totalPositions + 1)
@@ -813,32 +810,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                             }`}>
                               {points !== null ? points : ''}
                             </td>
-
-                            {!isVerified && (
-                              <td className={`px-1 py-1 truncate w-[140px] max-w-[140px] ${
-                                hasValue && skipperName
-                                  ? darkMode ? 'text-slate-200' : 'text-slate-800'
-                                  : darkMode ? 'text-slate-600' : 'text-slate-300'
-                              }`}>
-                                {hasValue && skipperName ? (
-                                  <div className="flex items-center gap-1">
-                                    {currentEvent?.show_flag && matchedSkipper?.country_code && (
-                                      <span className="text-xs leading-none">{(() => {
-                                        try {
-                                          const { getCountryFlag } = require('../utils/countryFlags');
-                                          return getCountryFlag(matchedSkipper.country_code);
-                                        } catch { return ''; }
-                                      })()}</span>
-                                    )}
-                                    <span className="font-medium truncate">{skipperName}</span>
-                                  </div>
-                                ) : hasValue ? (
-                                  <span className="text-red-400 text-[10px]">Unknown</span>
-                                ) : (
-                                  <span className="italic text-[10px]">---</span>
-                                )}
-                              </td>
-                            )}
 
                             {!isSeedingRound && promotionCount > 0 && !isTopHeat && (
                               <td className="px-1 py-0.5 text-center">
