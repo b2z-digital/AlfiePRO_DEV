@@ -2,9 +2,11 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { HeatManagement, HeatDesignation, HeatAssignment } from '../types/heat';
-import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type } from 'lucide-react';
+import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type, ChevronLeft, ChevronRight, Timer, Flag } from 'lucide-react';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { HeatOverallResultsModal } from './HeatOverallResultsModal';
+import { StartBoxModal } from './start-box/StartBoxModal';
+import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 
 interface SpreadsheetScoringProps {
@@ -99,12 +101,21 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   const autoCompleteCellRef = useRef<{ heat: HeatDesignation; position: number; value: string } | null>(null);
   const verifiedCellsRef = useRef<Record<HeatDesignation, CellEntry[]>>({} as any);
   const prevRoundRef = useRef<number | null>(null);
+  const [showStartBoxModal, setShowStartBoxModal] = useState(false);
+  const [raceTimerRunning, setRaceTimerRunning] = useState(false);
+  const [singleFleetRace, setSingleFleetRace] = useState(initialRace);
 
   useEffect(() => {
     return () => {
       if (autoCompleteTimerRef.current) clearTimeout(autoCompleteTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isMultiHeatMode) {
+      setSingleFleetRace(initialRace);
+    }
+  }, [initialRace, isMultiHeatMode]);
 
   const isMultiHeatMode = !!(heatManagement && propAvailableHeats && heatSkipperIndicesMap && allHeatRaceResults);
 
@@ -134,6 +145,16 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     if (!heatManagement || !isMultiHeatMode) return [];
     return heatManagement.rounds.filter(r => r.completed && r.round < currentRound);
   }, [heatManagement, isMultiHeatMode, currentRound]);
+
+  const singleFleetCompletedRaces = useMemo(() => {
+    if (isMultiHeatMode) return [];
+    const completed: number[] = [];
+    for (let r = 1; r < singleFleetRace; r++) {
+      const raceHasResults = raceResults.some(res => res.race === r && (res.position !== null || res.letterScore));
+      if (raceHasResults) completed.push(r);
+    }
+    return completed;
+  }, [isMultiHeatMode, singleFleetRace, raceResults]);
 
   const promotionCount = useMemo(() => {
     if (!isHeatScoring || !heatManagement) return 0;
@@ -563,6 +584,482 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   };
 
   const heatsToRender = isMultiHeatMode ? availableHeats : ['A' as HeatDesignation];
+
+  const navigateSingleFleetRace = (direction: 'prev' | 'next') => {
+    const newRace = direction === 'prev' ? singleFleetRace - 1 : singleFleetRace + 1;
+    if (newRace >= 1 && newRace <= numRaces) {
+      setSingleFleetRace(newRace);
+      onRaceChange?.(newRace);
+    }
+  };
+
+  if (!isMultiHeatMode) {
+    const sfCells = cells['A' as HeatDesignation] || [];
+    const sfTotalPositions = skippers.length;
+    const sfStats = getHeatCellStats('A' as HeatDesignation);
+    const sfIsVerified = verifiedHeats.has('A' as HeatDesignation);
+    const sfReady = isHeatReady('A' as HeatDesignation);
+    const sfHeat = 'A' as HeatDesignation;
+
+    return (
+      <div className={`flex flex-col rounded-b-xl ${darkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
+        <div className={`border-b px-4 py-2.5 flex items-center justify-between flex-shrink-0 ${
+          darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowStartBoxModal(true)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all active:scale-95 ${
+                raceTimerRunning
+                  ? darkMode
+                    ? 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  : darkMode
+                    ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
+                    : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
+              }`}
+            >
+              <Timer size={16} />
+              <span className="hidden sm:inline">Starter Console</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigateSingleFleetRace('prev')}
+              disabled={singleFleetRace <= 1}
+              className={`p-1.5 rounded-lg ${singleFleetRace <= 1 ? 'opacity-30 cursor-not-allowed' : darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <span className="text-lg font-bold">Race {singleFleetRace}</span>
+            <button
+              onClick={() => navigateSingleFleetRace('next')}
+              disabled={singleFleetRace >= numRaces}
+              className={`p-1.5 rounded-lg ${singleFleetRace >= numRaces ? 'opacity-30 cursor-not-allowed' : darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
+          <div className="w-[140px] flex items-center justify-end">
+            {raceTimerRunning && (
+              <RaceElapsedTimer
+                isRunning={raceTimerRunning}
+                onStop={() => setRaceTimerRunning(false)}
+                darkMode={darkMode}
+              />
+            )}
+            {!raceTimerRunning && (
+              <div className="flex items-center gap-1.5">
+                <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {sfStats.filledCount}/{sfStats.totalPositions}
+                </span>
+                {sfIsVerified && <Check size={14} className="text-green-500" />}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className={`${isFullscreen ? 'max-h-[calc(100vh-120px)]' : 'max-h-[70vh]'} overflow-auto`} ref={scrollContainerRef}>
+          <div className="p-2 pb-4">
+            <div className={`rounded-lg border overflow-hidden ${
+              darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
+            }`}>
+              <div className={`flex items-center justify-between px-3 py-1.5 ${
+                darkMode ? 'bg-blue-600/80' : 'bg-blue-600'
+              } text-white`}>
+                <div className="flex items-center gap-2">
+                  <Flag size={14} />
+                  <span className="font-bold text-sm">Race {singleFleetRace}</span>
+                  <span className="text-xs opacity-80">{sfTotalPositions} skippers</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {sfIsVerified ? (
+                    <span className="flex items-center gap-1 text-xs">
+                      <Check size={14} />
+                      Verified
+                    </span>
+                  ) : (
+                    <span className="text-xs opacity-80">
+                      {sfStats.filledCount}/{sfStats.totalPositions}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="text-[13px] border-collapse w-full">
+                  <colgroup>
+                    <col style={{ width: '40px' }} />
+                    {singleFleetCompletedRaces.map(r => (
+                      <React.Fragment key={`tcg-sf-${r}`}>
+                        <col style={{ width: '48px' }} />
+                        <col style={{ width: '40px' }} />
+                        <col style={{ width: '32px' }} />
+                      </React.Fragment>
+                    ))}
+                    <col style={{ width: '56px' }} />
+                    <col style={{ width: '48px' }} />
+                    <col style={{ width: '32px' }} />
+                  </colgroup>
+                  <thead>
+                    <tr className={darkMode ? 'bg-slate-700' : 'bg-slate-200'}>
+                      <th className="px-1.5 py-1.5" />
+                      {singleFleetCompletedRaces.map(r => (
+                        <th
+                          key={`sf-race-lbl-${r}`}
+                          colSpan={3}
+                          className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l ${
+                            darkMode ? 'text-slate-300 border-slate-500/50' : 'text-slate-500 border-slate-400/50'
+                          }`}
+                        >
+                          Race {r}
+                        </th>
+                      ))}
+                      <th
+                        colSpan={3}
+                        className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${singleFleetCompletedRaces.length > 0 ? 'border-l ' : ''}${
+                          darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
+                        }`}
+                      >
+                        Race {singleFleetRace}
+                      </th>
+                    </tr>
+                    <tr className={darkMode ? 'bg-slate-700/40' : 'bg-slate-100/60'}>
+                      <th className="px-1.5 py-1" />
+                      {singleFleetCompletedRaces.map(r => (
+                        <React.Fragment key={`sf-hdr-r${r}`}>
+                          <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider border-l ${
+                            darkMode ? 'text-slate-500 border-slate-600/40' : 'text-slate-500 border-slate-200'
+                          }`}>
+                            <span className="text-[10px]">Sail No.</span>
+                          </th>
+                          <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                            darkMode ? 'text-slate-500' : 'text-slate-500'
+                          }`}>
+                            <span className="text-[10px]">Comment</span>
+                          </th>
+                          <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                            darkMode ? 'text-slate-500' : 'text-slate-500'
+                          }`}>
+                            <span className="text-[10px]">Pts</span>
+                          </th>
+                        </React.Fragment>
+                      ))}
+                      <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${singleFleetCompletedRaces.length > 0 ? 'border-l ' : ''}${
+                        darkMode ? 'text-blue-400 border-blue-500/30' : 'text-blue-600 border-blue-300'
+                      }`}>
+                        <span className="text-[10px]">Sail No.</span>
+                      </th>
+                      <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                        darkMode ? 'text-blue-400' : 'text-blue-600'
+                      }`}><span className="text-[10px]">Comment</span></th>
+                      <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                        darkMode ? 'text-blue-400' : 'text-blue-600'
+                      }`}><span className="text-[10px]">Pts</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sfCells.map((cell, idx) => {
+                      const position = idx + 1;
+                      const hasValue = cell.sailNumber.trim() || cell.letterScore;
+                      const rawPoints = cell.letterScore
+                        ? (cell.customPoints !== undefined ? cell.customPoints : sfTotalPositions + 1)
+                        : (hasValue && cell.isValid ? position : null);
+                      const points = rawPoints === -1 ? 'AVG' : rawPoints;
+
+                      return (
+                        <tr
+                          key={`sf-${position}`}
+                          className={`border-t transition-colors ${
+                            darkMode ? 'border-slate-700/30 hover:bg-slate-700/20' : 'border-slate-100 hover:bg-slate-50/80'
+                          } ${cell.isDuplicate ? (darkMode ? 'bg-red-900/15' : 'bg-red-50/60') : ''}`}
+                        >
+                          <td className={`px-1.5 py-1 font-bold whitespace-nowrap ${
+                            darkMode ? 'text-slate-400' : 'text-slate-500'
+                          }`}>{getOrdinal(position)}</td>
+
+                          {singleFleetCompletedRaces.map(r => {
+                            const raceResultsForRace = raceResults
+                              .filter(res => res.race === r)
+                              .sort((a, b) => {
+                                if (a.position === null && !a.letterScore) return 1;
+                                if (b.position === null && !b.letterScore) return -1;
+                                if (a.letterScore && !b.letterScore) return 1;
+                                if (!a.letterScore && b.letterScore) return -1;
+                                if (a.letterScore && b.letterScore) return 0;
+                                if (a.position === null) return 1;
+                                if (b.position === null) return -1;
+                                return a.position - b.position;
+                              });
+                            const displayResult = raceResultsForRace[idx] || null;
+                            const prevSkipper = displayResult ? skippers[displayResult.skipperIndex] : null;
+                            const prevSailNo = prevSkipper ? String(prevSkipper.sailNumber || prevSkipper.sailNo || '') : '';
+                            const raceStarters = raceResultsForRace.length;
+                            const prevPtsRaw = displayResult
+                              ? displayResult.letterScore
+                                ? (displayResult.customPoints !== undefined ? displayResult.customPoints : raceStarters + 1)
+                                : displayResult.position
+                              : null;
+                            const prevPts = prevPtsRaw === -1 ? -1 : prevPtsRaw;
+
+                            return (
+                              <React.Fragment key={`sf-prev-r${r}-${position}`}>
+                                <td className={`px-1 py-1 font-mono font-semibold border-l ${
+                                  (currentEvent?.show_flag || currentEvent?.show_country) ? 'text-left' : 'text-center'
+                                } ${darkMode ? 'text-slate-400 border-slate-600/40' : 'text-slate-600 border-slate-200'}`}>
+                                  {displayResult ? (
+                                    <span className={`flex items-center gap-1 ${(currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'}`}>
+                                      {(currentEvent?.show_flag || currentEvent?.show_country) && prevSkipper?.country_code && (
+                                        <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                          {currentEvent?.show_flag && getCountryFlag(prevSkipper.country_code)}
+                                          {currentEvent?.show_country && getIOCCode(prevSkipper.country_code)}
+                                        </span>
+                                      )}
+                                      <span>{prevSailNo}</span>
+                                    </span>
+                                  ) : ''}
+                                </td>
+                                <td className={`px-1 py-1 text-center ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  {displayResult ? (
+                                    displayResult.letterScore
+                                      ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{displayResult.letterScore}</span>
+                                      : <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
+                                  ) : ''}
+                                </td>
+                                <td className={`px-1 py-1 text-center font-mono font-semibold ${
+                                  prevPts === -1 ? 'text-green-500' : darkMode ? 'text-slate-400' : 'text-slate-600'
+                                }`}>
+                                  {prevPts !== null ? (prevPts === -1 ? 'AVG' : prevPts) : ''}
+                                </td>
+                              </React.Fragment>
+                            );
+                          })}
+
+                          <td className={`px-1 py-0.5${singleFleetCompletedRaces.length > 0 ? ' border-l' : ''} ${
+                            darkMode ? 'border-blue-500/20' : 'border-blue-200'
+                          }`}>
+                            {sfIsVerified ? (
+                              <span className={`font-mono font-bold flex items-center gap-1 ${
+                                (currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'
+                              } ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                {(() => {
+                                  const cellSkipper = cell.skipperIndex !== null ? skippers[cell.skipperIndex] : null;
+                                  return (
+                                    <>
+                                      {(currentEvent?.show_flag || currentEvent?.show_country) && cellSkipper?.country_code && (
+                                        <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                          {currentEvent?.show_flag && getCountryFlag(cellSkipper.country_code)}
+                                          {currentEvent?.show_country && getIOCCode(cellSkipper.country_code)}
+                                        </span>
+                                      )}
+                                      <span>{cell.sailNumber || '-'}</span>
+                                    </>
+                                  );
+                                })()}
+                              </span>
+                            ) : (
+                              <div className="flex items-center justify-center gap-0.5">
+                                <input
+                                  ref={el => { inputRefs.current[`A-${idx}`] = el; }}
+                                  type="text"
+                                  value={cell.sailNumber}
+                                  onChange={e => handleCellChange(sfHeat, position, e.target.value)}
+                                  onKeyDown={e => handleKeyDown(e, sfHeat, position, sfTotalPositions)}
+                                  className={`w-12 h-7 px-1 rounded text-xs font-mono font-bold border text-center ${
+                                    cell.letterScore
+                                      ? darkMode
+                                        ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
+                                        : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
+                                      : !cell.isValid && cell.sailNumber.trim()
+                                        ? 'border-red-500 bg-red-50/80 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:border-red-500'
+                                        : cell.isDuplicate
+                                          ? 'border-amber-500 bg-amber-50/80 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-500'
+                                          : darkMode
+                                            ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
+                                            : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
+                                  } focus:outline-none focus:ring-1 focus:ring-blue-500/20`}
+                                />
+                                {!cell.isValid && cell.sailNumber.trim() && !cell.letterScore && (
+                                  <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
+                                )}
+                              </div>
+                            )}
+                          </td>
+
+                          <td className={`px-1 py-1 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {sfIsVerified ? (
+                              cell.letterScore
+                                ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{cell.letterScore}</span>
+                                : hasValue && cell.isValid
+                                  ? <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
+                                  : ''
+                            ) : cell.letterScore ? (
+                              <button
+                                onClick={() => handleLetterScore(sfHeat, position)}
+                                className={`h-7 rounded-full px-2 text-[9px] font-bold flex-shrink-0 inline-flex items-center justify-center ${
+                                  darkMode
+                                    ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
+                                    : 'bg-slate-100 text-slate-700 border border-slate-300'
+                                }`}
+                                title={`${cell.letterScore}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
+                              >
+                                {cell.letterScore?.slice(0, 3)}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleLetterScore(sfHeat, position)}
+                                className={`h-7 rounded-full px-2 text-[11px] font-medium flex-shrink-0 inline-flex items-center justify-center transition-colors ${
+                                  darkMode
+                                    ? 'text-slate-400 hover:bg-slate-700/60 hover:text-white border border-transparent hover:border-slate-600/70'
+                                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 border border-transparent hover:border-slate-200'
+                                }`}
+                                title="Assign letter score (DNS, DNF, DSQ, etc.)"
+                              >
+                                OK
+                              </button>
+                            )}
+                          </td>
+
+                          <td className={`px-1 py-1 text-center font-mono font-bold ${
+                            points === 'AVG' ? 'text-green-500' : darkMode ? 'text-slate-200' : 'text-slate-800'
+                          }`}>
+                            {points !== null ? points : ''}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {!sfIsVerified && (() => {
+                if (skippers.length === 0) return null;
+                const activeCells = cells[sfHeat] || [];
+                return (
+                  <div className={`px-3 py-2 border-t ${
+                    darkMode ? 'bg-slate-800/80 border-slate-700/50' : 'bg-slate-50/80 border-slate-200'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Sail Numbers
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {skippers.map((s, sIdx) => {
+                        const sailNo = String(s.sailNumber || s.sailNo);
+                        const sailLower = sailNo.trim().toLowerCase();
+                        const isUsed = activeCells.some(c => c.sailNumber.trim().toLowerCase() === sailLower);
+                        return (
+                          <div
+                            key={sIdx}
+                            className={`px-2.5 py-1 rounded text-sm font-bold transition-colors cursor-default ${
+                              isUsed
+                                ? darkMode
+                                  ? 'bg-green-800/30 text-green-400 border border-green-700/30 line-through opacity-50'
+                                  : 'bg-green-100 text-green-600 border border-green-200 line-through opacity-50'
+                                : darkMode
+                                  ? 'bg-slate-700 text-slate-200 border border-slate-600'
+                                  : 'bg-white text-slate-800 border border-slate-300'
+                            }`}
+                            title={s.name}
+                          >
+                            <span className="flex items-center gap-1">
+                              {currentEvent?.show_flag && s.country_code && (
+                                <span className="text-[11px]">{getCountryFlag(s.country_code)}</span>
+                              )}
+                              {currentEvent?.show_country && s.country_code && (
+                                <span className="text-[10px] font-medium opacity-70">{getIOCCode(s.country_code)}</span>
+                              )}
+                              <span>{sailNo}</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {!sfIsVerified && sfReady && (
+                <div
+                  ref={verifyButtonRef}
+                  className={`px-3 py-2 border-t ${
+                    darkMode ? 'bg-slate-800 border-slate-700/40' : 'bg-white border-slate-200'
+                  }`}
+                >
+                  <button
+                    onClick={() => handleConfirmHeat(sfHeat)}
+                    className="w-full py-2.5 rounded-lg text-white font-bold text-sm bg-green-600 hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md active:scale-[0.98]"
+                  >
+                    <Check size={18} />
+                    Verify Race {singleFleetRace} Results
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {showLetterScoreModal && (() => {
+          const lsPos = letterScorePosition || 1;
+          const lsCells = cells[sfHeat] || [];
+          const lsCell = lsCells[lsPos - 1];
+          const lsSkipperName = lsCell ? getSkipperName(sfHeat, lsCell) || `Position ${lsPos}` : `Position ${lsPos}`;
+          const prevResults = lsCell?.skipperIndex !== null && lsCell?.skipperIndex !== undefined
+            ? raceResults
+                .filter(r => r.race !== singleFleetRace && r.skipperIndex === lsCell.skipperIndex)
+                .map(r => ({
+                  position: r.position,
+                  letterScore: r.letterScore,
+                  customPoints: r.customPoints,
+                  points: r.letterScore
+                    ? (r.customPoints !== undefined && r.customPoints !== -1 ? r.customPoints : skippers.length + 1)
+                    : (r.position || skippers.length + 1)
+                }))
+            : [];
+          return (
+            <LetterScoreSelector
+              isOpen={showLetterScoreModal}
+              onClose={() => {
+                setShowLetterScoreModal(false);
+                setLetterScorePosition(null);
+                setLetterScoreHeat(null);
+              }}
+              onSelect={(score, customPoints) => {
+                if (score === null) {
+                  if (letterScorePosition !== null) {
+                    const idx = letterScorePosition - 1;
+                    const updated = [...(cells[sfHeat] || [])];
+                    updated[idx] = { ...updated[idx], letterScore: null, customPoints: undefined };
+                    const validated = validateCells(updated, skippers);
+                    setCells(prev => ({ ...prev, [sfHeat]: validated }));
+                  }
+                  setShowLetterScoreModal(false);
+                  setLetterScorePosition(null);
+                  setLetterScoreHeat(null);
+                } else {
+                  applyLetterScore(score as LetterScore, customPoints);
+                }
+              }}
+              darkMode={darkMode}
+              skipperName={lsSkipperName}
+              raceNumber={singleFleetRace}
+              skipperPreviousResults={prevResults}
+            />
+          );
+        })()}
+
+        <StartBoxModal
+          isOpen={showStartBoxModal}
+          onClose={() => setShowStartBoxModal(false)}
+          darkMode={darkMode}
+          onSequenceComplete={() => setRaceTimerRunning(true)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={`flex flex-col rounded-b-xl ${
