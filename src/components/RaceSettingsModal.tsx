@@ -75,8 +75,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   const [currentDropRules, setCurrentDropRules] = useState<number[] | string>(initialDropRules);
   const [customDropRules, setCustomDropRules] = useState('');
   const [isCustomDropRules, setIsCustomDropRules] = useState(false);
-  const [showFlag, setShowFlag] = useState(currentEvent?.show_flag ?? true);
-  const [showCountry, setShowCountry] = useState(currentEvent?.show_country ?? true);
+  const [showFlag, setShowFlag] = useState(currentEvent?.show_flag ?? false);
+  const [showCountry, setShowCountry] = useState(currentEvent?.show_country ?? false);
   const [isHeatRacingEnabled, setIsHeatRacingEnabled] = useState(
     initialHeatManagement?.configuration.enabled || false
   );
@@ -87,7 +87,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   // Observer settings
   const [enableObservers, setEnableObservers] = useState(currentEvent?.enable_observers ?? true);
   const [observersPerHeat, setObserversPerHeat] = useState(currentEvent?.observers_per_heat ?? 2);
-  const [enableRollCall, setEnableRollCall] = useState(currentEvent?.enable_roll_call ?? true);
+  const [enableRollCall, setEnableRollCall] = useState(currentEvent?.enable_roll_call ?? false);
   const [autoCompleteSail, setAutoCompleteSail] = useState(currentEvent?.auto_complete_sail ?? true);
 
   useEffect(() => {

@@ -740,16 +740,16 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
                               return (
                                 <React.Fragment key={`prev-r${r.round}-${position}`}>
-                                  <td className={`px-1 py-1 text-center font-mono font-semibold border-l ${
+                                  <td className={`px-1 py-1 text-left font-mono font-semibold border-l ${
                                     darkMode ? 'text-slate-400 border-slate-600/40' : 'text-slate-600 border-slate-200'
                                   }`}>
                                     {displayResult ? (
-                                      <span className="flex items-center justify-center gap-0.5">
-                                        {currentEvent?.show_flag && prevSkipper?.country_code && (
-                                          <span className="text-[10px] not-italic">{getCountryFlag(prevSkipper.country_code)}</span>
-                                        )}
-                                        {currentEvent?.show_country && prevSkipper?.country_code && (
-                                          <span className={`text-[9px] font-medium ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{getIOCCode(prevSkipper.country_code)}</span>
+                                      <span className="flex items-center gap-1">
+                                        {(currentEvent?.show_flag || currentEvent?.show_country) && prevSkipper?.country_code && (
+                                          <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                            {currentEvent?.show_flag && getCountryFlag(prevSkipper.country_code)}
+                                            {currentEvent?.show_country && getIOCCode(prevSkipper.country_code)}
+                                          </span>
                                         )}
                                         <span>{prevSailNo}</span>
                                       </span>
@@ -779,18 +779,18 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                               darkMode ? 'border-blue-500/20' : 'border-blue-200'
                             }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
                               {isVerified || isHistoricalRow ? (
-                                <span className={`font-mono font-bold flex items-center justify-center gap-0.5 ${
+                                <span className={`font-mono font-bold flex items-center gap-1 ${
                                   darkMode ? 'text-slate-200' : 'text-slate-800'
                                 }`}>
                                   {(() => {
                                     const cellSkipper = cell.skipperIndex !== null ? (isMultiHeatMode ? getHeatSkippers(heat)[cell.skipperIndex] : skippers[cell.skipperIndex]) : null;
                                     return (
                                       <>
-                                        {currentEvent?.show_flag && cellSkipper?.country_code && (
-                                          <span className="text-[10px] not-italic">{getCountryFlag(cellSkipper.country_code)}</span>
-                                        )}
-                                        {currentEvent?.show_country && cellSkipper?.country_code && (
-                                          <span className={`text-[9px] font-medium ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{getIOCCode(cellSkipper.country_code)}</span>
+                                        {(currentEvent?.show_flag || currentEvent?.show_country) && cellSkipper?.country_code && (
+                                          <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                            {currentEvent?.show_flag && getCountryFlag(cellSkipper.country_code)}
+                                            {currentEvent?.show_country && getIOCCode(cellSkipper.country_code)}
+                                          </span>
                                         )}
                                         <span>{cell.sailNumber || (isHistoricalRow ? '' : '-')}</span>
                                       </>
