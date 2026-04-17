@@ -2359,7 +2359,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
         const club = (row[fieldToColumn['club']] || '').trim();
         const boatType = (row[fieldToColumn['boat_type']] || currentEvent?.raceClass || '').trim();
         let sailNo = (row[fieldToColumn['sail_number']] || '').trim();
-        const countryCode = (row[fieldToColumn['country_code']] || '').trim();
+        let countryCode = (row[fieldToColumn['country_code']] || '').trim();
         const country = (row[fieldToColumn['country']] || '').trim();
         const category = (row[fieldToColumn['category']] || '').trim();
         const state = (row[fieldToColumn['state']] || '').trim();
@@ -2391,8 +2391,12 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           lastName = titleCase(lastName);
         }
 
-        if (sailNo && !/[a-zA-Z]/.test(sailNo)) {
-          sailNo = `AUS ${sailNo}`;
+        const countryPrefixMatch = sailNo.match(/^([A-Za-z]{2,3})\s+(\d+.*)$/);
+        if (countryPrefixMatch) {
+          if (!countryCode) {
+            countryCode = countryPrefixMatch[1].toUpperCase();
+          }
+          sailNo = countryPrefixMatch[2].trim();
         }
 
         const skipperName = `${firstName} ${lastName}`.trim();
