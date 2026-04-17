@@ -1486,8 +1486,7 @@ export const RaceTable: React.FC<RaceTableProps> = ({
       {showLetterScoreSelector && (() => {
         const { race, skipperIndex } = showLetterScoreSelector;
 
-        // Get previous race results for average points calculation
-        const skipperPreviousResults: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number }> = [];
+        const skipperPreviousResults: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number; raceNumber?: number }> = [];
 
         for (let r = 1; r < race; r++) {
           const result = currentEvent.raceResults?.[r]?.[skipperIndex];
@@ -1496,16 +1495,12 @@ export const RaceTable: React.FC<RaceTableProps> = ({
             const letterScore = result.letterScore;
             const customPoints = result.customPoints;
 
-            // Get the points for this race
             let points = 0;
             if (letterScore === 'RDG' || letterScore === 'DPI') {
-              points = customPoints || 0;
+              points = (customPoints && customPoints > 0) ? customPoints : 0;
             } else if (position !== null && position > 0) {
               points = position;
             } else if (letterScore) {
-              // Calculate letter score points
-              const numFinishers = currentEvent.raceResults?.[r]?.filter((res: any) => res.position).length || 0;
-              const totalCompetitors = skippers.length;
               points = getLetterScorePoints(letterScore as LetterScore, r);
             }
 
@@ -1513,10 +1508,13 @@ export const RaceTable: React.FC<RaceTableProps> = ({
               position,
               letterScore,
               customPoints,
-              points
+              points,
+              raceNumber: r
             });
           }
         }
+
+        const rtHasCompleted = skipperPreviousResults.some(r => r.position !== null && r.position > 0);
 
         return (
           <LetterScoreSelector
@@ -1528,6 +1526,10 @@ export const RaceTable: React.FC<RaceTableProps> = ({
             raceNumber={race}
             darkMode={darkMode}
             skipperPreviousResults={skipperPreviousResults}
+            hasCompletedRaces={rtHasCompleted}
+            isMultiDay={currentEvent?.multiDay}
+            numberOfDays={currentEvent?.numberOfDays}
+            currentDay={currentEvent?.currentDay}
           />
         );
       })()}

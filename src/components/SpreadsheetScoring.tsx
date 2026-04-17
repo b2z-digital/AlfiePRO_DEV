@@ -1015,10 +1015,12 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                   letterScore: r.letterScore,
                   customPoints: r.customPoints,
                   points: r.letterScore
-                    ? (r.customPoints !== undefined && r.customPoints !== -1 ? r.customPoints : skippers.length + 1)
-                    : (r.position || skippers.length + 1)
+                    ? (r.customPoints !== undefined && r.customPoints > 0 ? r.customPoints : skippers.length + 1)
+                    : (r.position || skippers.length + 1),
+                  raceNumber: r.race
                 }))
             : [];
+          const ssHasCompleted = prevResults.some(r => r.position !== null && r.position > 0);
           return (
             <LetterScoreSelector
               isOpen={showLetterScoreModal}
@@ -1047,6 +1049,10 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
               skipperName={lsSkipperName}
               raceNumber={singleFleetRace}
               skipperPreviousResults={prevResults}
+              hasCompletedRaces={ssHasCompleted}
+              isMultiDay={currentEvent?.multiDay}
+              numberOfDays={currentEvent?.numberOfDays}
+              currentDay={currentEvent?.currentDay}
             />
           );
         })()}
@@ -1550,10 +1556,12 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                 letterScore: r.letterScore,
                 customPoints: r.customPoints,
                 points: r.letterScore
-                  ? (r.customPoints !== undefined && r.customPoints !== -1 ? r.customPoints : lsHeatSkips.length + 1)
-                  : (r.position || lsHeatSkips.length + 1)
+                  ? (r.customPoints !== undefined && r.customPoints > 0 ? r.customPoints : lsHeatSkips.length + 1)
+                  : (r.position || lsHeatSkips.length + 1),
+                raceNumber: r.race
               }))
           : [];
+        const ssHeatHasCompleted = prevResults.some(r => r.position !== null && r.position > 0);
         return (
           <LetterScoreSelector
             isOpen={showLetterScoreModal}
@@ -1585,6 +1593,11 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
             skipperName={lsSkipperName}
             raceNumber={currentRound}
             skipperPreviousResults={prevResults}
+            isHeatRacing={true}
+            hasCompletedRaces={ssHeatHasCompleted}
+            isMultiDay={currentEvent?.multiDay}
+            numberOfDays={currentEvent?.numberOfDays}
+            currentDay={currentEvent?.currentDay}
           />
         );
       })()}

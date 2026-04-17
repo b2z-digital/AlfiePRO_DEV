@@ -733,16 +733,12 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
         const skipperIndex = parseInt(skipperIndexStr);
         const skipper = skippers[skipperIndex];
 
-        // Get previous heat results for average points calculation
-        const skipperPreviousResults: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number }> = [];
+        const skipperPreviousResults: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number; raceNumber?: number }> = [];
 
-        // Collect all previous results from all previous rounds and current round (up to current heat)
         heatManagement.rounds.forEach(round => {
-          // Only include previous rounds or results from earlier heats in the current round
           if (round.round < currentRound || (round.round === currentRound)) {
             round.results.forEach(result => {
               if (result.skipperIndex === skipperIndex) {
-                // Skip the current heat if this is from the current round
                 if (round.round === currentRound && result.heatDesignation === heat) {
                   return;
                 }
@@ -751,14 +747,12 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
                 const letterScore = result.letterScore;
                 const customPoints = result.customPoints;
 
-                // Get the points for this heat result
                 let points = 0;
                 if (letterScore === 'RDG' || letterScore === 'DPI') {
-                  points = customPoints || 0;
+                  points = (customPoints && customPoints > 0) ? customPoints : 0;
                 } else if (position !== null && position > 0) {
                   points = position;
                 } else if (letterScore) {
-                  // Letter scores - get heat size for that heat
                   const heatSkippersCount = round.results.filter(r =>
                     r.heatDesignation === result.heatDesignation && r.race === result.race
                   ).length;
@@ -769,12 +763,15 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
                   position,
                   letterScore,
                   customPoints,
-                  points
+                  points,
+                  raceNumber: round.round
                 });
               }
             });
           }
         });
+
+        const hrtHasCompleted = skipperPreviousResults.some(r => r.position !== null && r.position > 0 && r.raceNumber !== 1);
 
         return (
           <LetterScoreSelector
@@ -788,6 +785,8 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
             skipperName={skipper?.name || ''}
             raceNumber={currentRound}
             skipperPreviousResults={skipperPreviousResults}
+            isHeatRacing={true}
+            hasCompletedRaces={hrtHasCompleted}
           />
         );
       })()}
