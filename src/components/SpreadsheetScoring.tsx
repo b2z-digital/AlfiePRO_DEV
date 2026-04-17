@@ -349,13 +349,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     const updated = [...heatCells];
     updated[idx] = { ...updated[idx], sailNumber: value, letterScore: null, customPoints: undefined };
 
-    const regularFinishers = updated.filter(c => !c.letterScore && (c.sailNumber.trim() || c.skipperIndex !== null));
-    const letterScoreEntries = updated.filter(c => c.letterScore);
-    const emptyEntries = updated.filter(c => !c.letterScore && !c.sailNumber.trim() && c.skipperIndex === null);
-    const reordered = [...regularFinishers, ...letterScoreEntries, ...emptyEntries];
-
     const heatSkips = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
-    const validated = validateCells(reordered, heatSkips);
+    const validated = validateCells(updated, heatSkips);
     setCells(prev => ({ ...prev, [heat]: validated }));
 
     if (autoCompleteTimerRef.current) {
@@ -415,9 +410,22 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     const heatSkips = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
     const validated = validateCells(reordered, heatSkips);
     setCells(prev => ({ ...prev, [heat]: validated }));
+
+    const firstEmptyIdx = reordered.findIndex(c => !c.letterScore && !c.sailNumber.trim() && c.skipperIndex === null);
+    const focusHeat = heat;
     setShowLetterScoreModal(false);
     setLetterScorePosition(null);
     setLetterScoreHeat(null);
+
+    if (firstEmptyIdx >= 0) {
+      setTimeout(() => {
+        const ref = inputRefs.current[`${focusHeat}-${firstEmptyIdx}`];
+        if (ref) {
+          ref.focus();
+          ref.select();
+        }
+      }, 50);
+    }
   };
 
   useEffect(() => {
