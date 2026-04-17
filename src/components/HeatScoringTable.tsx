@@ -536,14 +536,24 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   const skippersInOtherHeatsCurrentRound = useMemo(() => {
     if (!currentRound || !selectedHeat) return new Set<number>();
-    const otherHeatSkippers = new Set<number>();
+    const skippersWithOtherHeatResults = new Set<number>();
+    const skippersWithCurrentHeatResults = new Set<number>();
     currentRound.results.forEach(r => {
-      if (r.round === heatManagement.currentRound && r.heatDesignation !== selectedHeat &&
-          (r.position !== null || r.letterScore)) {
-        otherHeatSkippers.add(r.skipperIndex);
+      if (r.round === heatManagement.currentRound && (r.position !== null || r.letterScore)) {
+        if (r.heatDesignation === selectedHeat) {
+          skippersWithCurrentHeatResults.add(r.skipperIndex);
+        } else {
+          skippersWithOtherHeatResults.add(r.skipperIndex);
+        }
       }
     });
-    return otherHeatSkippers;
+    const result = new Set<number>();
+    skippersWithOtherHeatResults.forEach(idx => {
+      if (!skippersWithCurrentHeatResults.has(idx)) {
+        result.add(idx);
+      }
+    });
+    return result;
   }, [currentRound, selectedHeat, heatManagement.currentRound]);
 
   // Filter race results for current heat's skippers
@@ -681,14 +691,24 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     const otherHeatSkippersByHeat: Record<string, Set<number>> = {};
     for (const assignment of currentRound.heatAssignments) {
       const heat = assignment.heatDesignation;
-      const others = new Set<number>();
+      const withOther = new Set<number>();
+      const withCurrent = new Set<number>();
       currentRound.results.forEach(r => {
-        if (r.round === currentRoundNum && r.heatDesignation !== heat &&
-            (r.position !== null || r.letterScore)) {
-          others.add(r.skipperIndex);
+        if (r.round === currentRoundNum && (r.position !== null || r.letterScore)) {
+          if (r.heatDesignation === heat) {
+            withCurrent.add(r.skipperIndex);
+          } else {
+            withOther.add(r.skipperIndex);
+          }
         }
       });
-      otherHeatSkippersByHeat[heat] = others;
+      const onlyOthers = new Set<number>();
+      withOther.forEach(idx => {
+        if (!withCurrent.has(idx)) {
+          onlyOthers.add(idx);
+        }
+      });
+      otherHeatSkippersByHeat[heat] = onlyOthers;
     }
 
     const map: Record<string, any[]> = {};
