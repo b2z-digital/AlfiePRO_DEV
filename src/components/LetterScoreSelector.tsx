@@ -306,44 +306,35 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                   </button>
 
                   <button
-                    onClick={() => canUseRdgAvg && setRdgMode('avg_penultimate')}
-                    disabled={!canUseRdgAvg}
+                    onClick={() => setRdgMode('avg_penultimate')}
                     className={`
                       w-full p-4 rounded-lg border-2 text-left transition-all mb-3
-                      ${!canUseRdgAvg
-                        ? darkMode
-                          ? 'border-slate-700 bg-slate-800/30 opacity-50 cursor-not-allowed'
-                          : 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
-                        : rdgMode === 'avg_penultimate'
-                          ? 'border-amber-500 bg-amber-500/10'
-                          : darkMode
-                            ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
-                            : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
+                      ${rdgMode === 'avg_penultimate'
+                        ? 'border-amber-500 bg-amber-500/10'
+                        : darkMode
+                          ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                          : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
                     `}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            !canUseRdgAvg
-                              ? darkMode ? 'border-slate-600' : 'border-slate-300'
-                              : rdgMode === 'avg_penultimate'
-                                ? 'border-amber-500 bg-amber-500'
-                                : darkMode ? 'border-slate-500' : 'border-slate-400'
+                            rdgMode === 'avg_penultimate'
+                              ? 'border-amber-500 bg-amber-500'
+                              : darkMode ? 'border-slate-500' : 'border-slate-400'
                           }`}>
-                            {rdgMode === 'avg_penultimate' && canUseRdgAvg && <div className="w-2 h-2 bg-white rounded-full" />}
+                            {rdgMode === 'avg_penultimate' && <div className="w-2 h-2 bg-white rounded-full" />}
                           </div>
-                          <span className={`font-semibold ${!canUseRdgAvg ? (darkMode ? 'text-slate-500' : 'text-slate-400') : darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             RDG REG - Average to Penultimate Day
                           </span>
                         </div>
                         <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          {!canUseRdgAvg
-                            ? 'Requires at least 1 completed race before average can be calculated.'
-                            : `Average of all races excluding the final day${isHeatRacing ? ' (R1 excluded per HMS rules)' : ''}. Used for multi-day events.`}
+                          {`Average of all races excluding the final day${isHeatRacing ? ' (R1 excluded per HMS rules)' : ''}. Used for multi-day events.`}
                         </p>
                       </div>
-                      {canUseRdgAvg && penultimateDayAverage !== null && (
+                      {penultimateDayAverage !== null && (
                         <div className="text-right ml-3">
                           <div className={`text-lg font-bold ${rdgMode === 'avg_penultimate' ? 'text-amber-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                             ~{penultimateDayAverage}
