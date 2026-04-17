@@ -4,7 +4,7 @@ import { HeatDesignation, HeatManagement } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { LetterScore } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
-import { Settings, RotateCcw, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ChevronDown, Anchor, ShieldCheck, Sparkles, X, Search } from 'lucide-react';
+import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search } from 'lucide-react';
 
 const LETTER_SCORE_CODES: LetterScore[] = [
   'DNS', 'DNF', 'DSQ', 'OCS', 'BFD', 'UFD', 'RDG', 'DPI',
@@ -29,81 +29,12 @@ const LETTER_SCORE_COLORS: Record<string, { bg: string; text: string; darkBg: st
   SCP: { bg: 'bg-cyan-100', text: 'text-cyan-700', darkBg: 'bg-cyan-900/40', darkText: 'text-cyan-300' },
 };
 
-interface HeatTheme {
-  gradient: string;
-  gradientDark: string;
-  accent: string;
-  accentLight: string;
-  accentDark: string;
-  badge: string;
-  badgeDark: string;
-  ring: string;
-}
-
-const HEAT_THEMES: Record<HeatDesignation, HeatTheme> = {
-  'A': {
-    gradient: 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500',
-    gradientDark: 'bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600',
-    accent: 'border-amber-400',
-    accentLight: 'bg-amber-50',
-    accentDark: 'bg-amber-950/30',
-    badge: 'bg-amber-100 text-amber-800',
-    badgeDark: 'bg-amber-900/40 text-amber-200',
-    ring: 'ring-amber-400/50',
-  },
-  'B': {
-    gradient: 'bg-gradient-to-r from-rose-600 via-red-500 to-rose-600',
-    gradientDark: 'bg-gradient-to-r from-rose-700 via-red-600 to-rose-700',
-    accent: 'border-rose-400',
-    accentLight: 'bg-rose-50',
-    accentDark: 'bg-rose-950/30',
-    badge: 'bg-rose-100 text-rose-800',
-    badgeDark: 'bg-rose-900/40 text-rose-200',
-    ring: 'ring-rose-400/50',
-  },
-  'C': {
-    gradient: 'bg-gradient-to-r from-emerald-600 via-green-500 to-emerald-600',
-    gradientDark: 'bg-gradient-to-r from-emerald-700 via-green-600 to-emerald-700',
-    accent: 'border-emerald-400',
-    accentLight: 'bg-emerald-50',
-    accentDark: 'bg-emerald-950/30',
-    badge: 'bg-emerald-100 text-emerald-800',
-    badgeDark: 'bg-emerald-900/40 text-emerald-200',
-    ring: 'ring-emerald-400/50',
-  },
-  'D': {
-    gradient: 'bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600',
-    gradientDark: 'bg-gradient-to-r from-blue-700 via-blue-600 to-blue-700',
-    accent: 'border-blue-400',
-    accentLight: 'bg-blue-50',
-    accentDark: 'bg-blue-950/30',
-    badge: 'bg-blue-100 text-blue-800',
-    badgeDark: 'bg-blue-900/40 text-blue-200',
-    ring: 'ring-blue-400/50',
-  },
-  'E': {
-    gradient: 'bg-gradient-to-r from-sky-600 via-cyan-500 to-sky-600',
-    gradientDark: 'bg-gradient-to-r from-sky-700 via-cyan-600 to-sky-700',
-    accent: 'border-sky-400',
-    accentLight: 'bg-sky-50',
-    accentDark: 'bg-sky-950/30',
-    badge: 'bg-sky-100 text-sky-800',
-    badgeDark: 'bg-sky-900/40 text-sky-200',
-    ring: 'ring-sky-400/50',
-  },
-  'F': {
-    gradient: 'bg-gradient-to-r from-teal-600 via-teal-500 to-teal-600',
-    gradientDark: 'bg-gradient-to-r from-teal-700 via-teal-600 to-teal-700',
-    accent: 'border-teal-400',
-    accentLight: 'bg-teal-50',
-    accentDark: 'bg-teal-950/30',
-    badge: 'bg-teal-100 text-teal-800',
-    badgeDark: 'bg-teal-900/40 text-teal-200',
-    ring: 'ring-teal-400/50',
-  },
+const HEAT_HEADER_COLORS: Record<HeatDesignation, string> = {
+  'A': 'bg-yellow-600', 'B': 'bg-orange-600', 'C': 'bg-red-600',
+  'D': 'bg-green-600', 'E': 'bg-blue-600', 'F': 'bg-teal-600'
 };
 
-const HEAT_LABELS: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'];
+const HEAT_LABELS: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E'];
 const TOTAL_RACES = 41;
 
 const getOrdinal = (n: number): string => {
@@ -167,7 +98,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 }) => {
   const numberOfHeats = heatManagement.configuration.numberOfHeats;
   const promotionCount = heatManagement.configuration.promotionCount;
-  const heats = HEAT_LABELS.slice(0, numberOfHeats);
+  const heats = HEAT_LABELS.slice(0, Math.max(numberOfHeats, 5));
   const maxPositions = Math.max(24, Math.ceil(skippers.length / numberOfHeats) + 4);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -282,6 +213,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         isDuplicate: false,
       }
     }));
+
+    if (sailNumber.trim()) {
+      setDropdownFilter(sailNumber);
+    }
   }, [sailNumberMap]);
 
   const handleSailNumberBlur = useCallback((heat: HeatDesignation, position: number, race: number) => {
@@ -429,13 +364,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
   }, [verifyRace]);
 
-  const handleResetAll = useCallback(() => {
-    if (!confirm('Reset all entries in the spreadsheet? This cannot be undone.')) return;
-    setCells({});
-    setVerifiedRaces(new Set());
-  }, []);
-
-  const isPromotionRow = (position: number, race: number) => {
+  const isPromotionRow = (heat: HeatDesignation, position: number, race: number) => {
+    if (heat === 'A') return false;
     return race > 1 && position <= promotionCount;
   };
 
@@ -455,27 +385,37 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const { heat, position, race } = dropdownTarget;
     const currentKey = getCellKey(heat, position, race);
     const usedSails = getUsedSailNumbersForRace(race, currentKey);
+    const currentCell = cells[currentKey];
+    const currentValue = currentCell?.sailNumber?.trim().toLowerCase() || '';
 
     return skippers
       .map((s, idx) => ({ skipper: s, index: idx }))
       .filter(({ skipper }) => {
         const sailNo = String(skipper.sailNumber || '').trim();
         if (!sailNo) return false;
-        const isUsed = usedSails.has(sailNo.toLowerCase());
+        if (usedSails.has(sailNo.toLowerCase())) return false;
+        if (currentValue) {
+          return (
+            sailNo.toLowerCase().includes(currentValue) ||
+            skipper.name.toLowerCase().includes(currentValue)
+          );
+        }
         if (dropdownFilter) {
           const filter = dropdownFilter.toLowerCase();
           return (
             sailNo.toLowerCase().includes(filter) ||
             skipper.name.toLowerCase().includes(filter)
-          ) && !isUsed;
+          );
         }
-        return !isUsed;
+        return true;
       });
-  }, [dropdownTarget, skippers, getUsedSailNumbersForRace, dropdownFilter]);
+  }, [dropdownTarget, skippers, getUsedSailNumbersForRace, dropdownFilter, cells]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent, heat: HeatDesignation, position: number, race: number) => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
+      setDropdownTarget(null);
+      setDropdownFilter('');
       handleSailNumberBlur(heat, position, race);
       const nextKey = getCellKey(heat, position + 1, race);
       const ref = inputRefs.current[`${nextKey}-sail`];
@@ -494,91 +434,33 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
   }, [handleSailNumberBlur]);
 
+  const borderColor = darkMode ? 'border-slate-700/50' : 'border-slate-200';
+  const headerBg = darkMode ? 'bg-slate-800' : 'bg-slate-100';
+  const subHeaderBg = darkMode ? 'bg-slate-800/60' : 'bg-slate-50';
+  const cellBg = darkMode ? 'bg-slate-900' : 'bg-white';
+  const positionBg = darkMode ? 'bg-slate-900' : 'bg-white';
+
   return (
     <div className={`flex flex-col h-full ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-      {/* Toolbar */}
-      <div className={`flex items-center justify-between px-5 py-3 border-b ${
-        darkMode
-          ? 'bg-gradient-to-r from-slate-800 via-slate-800 to-slate-900 border-slate-700'
-          : 'bg-gradient-to-r from-white via-slate-50 to-white border-slate-200'
-      }`}>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-amber-900/30' : 'bg-amber-100'}`}>
-              <Anchor size={16} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
-            </div>
-            <div>
-              <h3 className={`text-sm font-bold tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                HMS Scoring
-              </h3>
-              <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                Heat Management System
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 ml-2">
-            <span className={`text-[10px] px-2 py-1 rounded-md font-semibold ${
-              darkMode ? 'bg-amber-900/30 text-amber-300 border border-amber-800/50' : 'bg-amber-50 text-amber-700 border border-amber-200'
-            }`}>
-              {numberOfHeats} Heats
-            </span>
-            <span className={`text-[10px] px-2 py-1 rounded-md font-semibold ${
-              darkMode ? 'bg-emerald-900/30 text-emerald-300 border border-emerald-800/50' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-            }`}>
-              {promotionCount} Promotion
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleResetAll}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              darkMode
-                ? 'bg-red-900/20 text-red-400 hover:bg-red-900/40 border border-red-800/30'
-                : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
-            }`}
-          >
-            <RotateCcw size={12} />
-            Reset
-          </button>
-          <button
-            onClick={onConfigureHeats}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              darkMode
-                ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 border border-slate-600/50'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-            }`}
-          >
-            <Settings size={12} />
-            Settings
-          </button>
-        </div>
-      </div>
-
-      {/* Spreadsheet Grid */}
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-auto relative"
       >
-        <table className={`border-collapse text-xs ${darkMode ? 'bg-slate-950' : 'bg-slate-50'}`} style={{ tableLayout: 'fixed' }}>
+        <table className={`border-collapse text-xs ${cellBg}`} style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: 56 }} />
+            <col style={{ width: 48 }} />
             {Array.from({ length: TOTAL_RACES }).map((_, i) => (
               <React.Fragment key={i}>
-                <col style={{ width: 56 }} />
-                <col style={{ width: 44 }} />
-                <col style={{ width: 36 }} />
+                <col style={{ width: 52 }} />
+                <col style={{ width: 40 }} />
+                <col style={{ width: 32 }} />
               </React.Fragment>
             ))}
           </colgroup>
 
           <thead className="sticky top-0 z-20">
-            {/* Race Number Row */}
             <tr>
-              <th className={`sticky left-0 z-30 px-1 py-2 border-b border-r ${
-                darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'
-              }`}>
-              </th>
+              <th className={`sticky left-0 z-30 px-1 py-1.5 border-b border-r ${borderColor} ${headerBg}`} />
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
                 const entryCount = getRaceEntryCount(race);
                 const isVerified = verifiedRaces.has(race);
@@ -588,19 +470,14 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                   <th
                     key={race}
                     colSpan={3}
-                    className={`px-0.5 py-1 text-center border-b border-r ${
-                      darkMode ? 'border-slate-700' : 'border-slate-300'
-                    } ${isSeeding
-                      ? darkMode ? 'bg-blue-950/50' : 'bg-blue-50'
-                      : darkMode ? 'bg-slate-900' : 'bg-white'
-                    }`}
+                    className={`px-0.5 py-1 text-center border-b border-r ${borderColor} ${headerBg}`}
                   >
                     <div className="flex flex-col items-center gap-0.5">
                       <div className="flex items-center gap-1">
-                        <span className={`font-bold text-[11px] ${
+                        <span className={`font-bold text-[11px] uppercase tracking-widest ${
                           isSeeding
                             ? darkMode ? 'text-blue-300' : 'text-blue-700'
-                            : darkMode ? 'text-slate-200' : 'text-slate-800'
+                            : darkMode ? 'text-slate-300' : 'text-slate-600'
                         }`}>
                           R{race}
                         </span>
@@ -633,33 +510,26 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
               })}
             </tr>
 
-            {/* Sub-header Row */}
             <tr>
-              <th className={`sticky left-0 z-30 px-1 py-1 border-b border-r text-[9px] font-semibold uppercase tracking-wider ${
-                darkMode ? 'bg-slate-900 border-slate-700 text-slate-500' : 'bg-white border-slate-300 text-slate-400'
+              <th className={`sticky left-0 z-30 px-1 py-1 border-b border-r text-[9px] font-bold uppercase tracking-wider ${borderColor} ${subHeaderBg} ${
+                darkMode ? 'text-slate-500' : 'text-slate-400'
               }`}>
                 Pos
               </th>
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => (
                 <React.Fragment key={race}>
-                  <th className={`px-0.5 py-1 text-center text-[9px] font-medium border-b border-r tracking-wide uppercase ${
-                    darkMode
-                      ? 'bg-slate-900/80 border-slate-700 text-slate-500'
-                      : 'bg-slate-50 border-slate-300 text-slate-400'
+                  <th className={`px-0.5 py-1 text-center text-[9px] font-bold border-b border-r tracking-wider uppercase ${borderColor} ${subHeaderBg} ${
+                    darkMode ? 'text-slate-500' : 'text-slate-400'
                   }`}>
                     Sail
                   </th>
-                  <th className={`px-0.5 py-1 text-center text-[9px] font-medium border-b border-r tracking-wide uppercase ${
-                    darkMode
-                      ? 'bg-slate-900/80 border-slate-700 text-slate-500'
-                      : 'bg-slate-50 border-slate-300 text-slate-400'
+                  <th className={`px-0.5 py-1 text-center text-[9px] font-bold border-b border-r tracking-wider uppercase ${borderColor} ${subHeaderBg} ${
+                    darkMode ? 'text-slate-500' : 'text-slate-400'
                   }`}>
                     Cmt
                   </th>
-                  <th className={`px-0.5 py-1 text-center text-[9px] font-medium border-b border-r tracking-wide uppercase ${
-                    darkMode
-                      ? 'bg-slate-900/80 border-slate-700 text-slate-500'
-                      : 'bg-slate-50 border-slate-300 text-slate-400'
+                  <th className={`px-0.5 py-1 text-center text-[9px] font-bold border-b border-r tracking-wider uppercase ${borderColor} ${subHeaderBg} ${
+                    darkMode ? 'text-slate-500' : 'text-slate-400'
                   }`}>
                     Pts
                   </th>
@@ -670,70 +540,56 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
           <tbody>
             {heats.map((heat) => {
-              const theme = HEAT_THEMES[heat];
+              const heatColor = HEAT_HEADER_COLORS[heat] || 'bg-slate-600';
+              const isTopHeat = heat === heats[0];
+
               return (
                 <React.Fragment key={heat}>
-                  {/* Heat Header */}
                   <tr>
                     <td
-                      className={`sticky left-0 z-10 px-2 py-2 border-b border-r font-bold text-xs text-white tracking-wide ${
-                        darkMode ? theme.gradientDark : theme.gradient
-                      }`}
+                      className={`sticky left-0 z-10 px-2 py-1.5 border-b border-r font-bold text-xs text-white tracking-wide ${heatColor}`}
                     >
-                      <div className="flex items-center gap-1.5">
-                        <Sparkles size={12} className="opacity-60" />
-                        Heat {heat}
-                      </div>
+                      <span className="font-bold text-sm">Heat {heat}</span>
                     </td>
                     {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => (
                       <td
                         key={race}
                         colSpan={3}
-                        className={`px-1 py-1.5 border-b border-r text-center font-bold text-white text-[10px] ${
-                          darkMode ? theme.gradientDark : theme.gradient
-                        }`}
-                      >
-                      </td>
+                        className={`px-1 py-1.5 border-b border-r text-white ${heatColor}`}
+                      />
                     ))}
                   </tr>
 
-                  {/* Position Rows */}
                   {Array.from({ length: maxPositions }, (_, posIdx) => posIdx + 1).map(position => {
-                    const showPromotion = isPromotionRow(position, 2);
+                    const showPromotion = !isTopHeat && isPromotionRow(heat, position, 2);
 
                     return (
                       <tr
                         key={`${heat}-${position}`}
                         className={`group transition-colors ${
-                          showPromotion
-                            ? darkMode ? 'hover:bg-emerald-950/20' : 'hover:bg-emerald-50/50'
-                            : darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-100/50'
+                          darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'
                         }`}
                       >
-                        {/* Position Cell */}
-                        <td className={`sticky left-0 z-10 px-2 py-0 text-[10px] font-semibold border-b border-r whitespace-nowrap ${
+                        <td className={`sticky left-0 z-10 px-2 py-0 text-[10px] font-bold border-b border-r whitespace-nowrap ${borderColor} ${
                           showPromotion
                             ? darkMode
-                              ? 'bg-emerald-950/40 border-emerald-900/50 text-emerald-300'
-                              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                              ? 'bg-green-950/30 text-green-400'
+                              : 'bg-green-50 text-green-700'
                             : darkMode
-                              ? 'bg-slate-900 border-slate-800 text-slate-400'
-                              : 'bg-white border-slate-200 text-slate-500'
+                              ? 'bg-slate-900 text-slate-400'
+                              : 'bg-white text-slate-500'
                         }`}>
                           <div className="flex items-center gap-1">
                             {showPromotion && (
-                              <div className={`w-1 h-3 rounded-full ${darkMode ? 'bg-emerald-500' : 'bg-emerald-400'}`} />
+                              <div className={`w-1 h-3 rounded-full ${darkMode ? 'bg-green-500' : 'bg-green-400'}`} />
                             )}
                             {getOrdinal(position)}
                           </div>
                         </td>
 
-                        {/* Race Cells */}
                         {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
                           const key = getCellKey(heat, position, race);
                           const cell = cells[key];
-                          const isPromo = isPromotionRow(position, race);
-                          const isSeeding = race === 1;
                           const isDropdownOpen = dropdownTarget?.heat === heat && dropdownTarget?.position === position && dropdownTarget?.race === race;
                           const hasSail = !!cell?.sailNumber?.trim();
                           const isInvalid = hasSail && cell?.isValid === false;
@@ -741,47 +597,42 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                           const ls = cell?.letterScore;
                           const lsColor = ls ? LETTER_SCORE_COLORS[ls] : null;
 
-                          const promoBg = isPromo
-                            ? darkMode ? 'bg-emerald-950/30' : 'bg-emerald-50/80'
-                            : '';
-                          const seedBg = isSeeding && !isPromo
-                            ? darkMode ? 'bg-blue-950/20' : 'bg-blue-50/30'
-                            : '';
-                          const baseBg = promoBg || seedBg || (darkMode ? 'bg-slate-950' : 'bg-white');
-                          const borderColor = darkMode ? 'border-slate-800' : 'border-slate-200';
-
                           return (
                             <React.Fragment key={race}>
-                              {/* Sail Number Cell */}
-                              <td className={`px-0 py-0 border-b border-r ${borderColor} ${baseBg} relative`}>
+                              <td className={`px-0 py-0 border-b border-r ${borderColor} ${cellBg} relative`}>
                                 <input
                                   ref={el => { inputRefs.current[`${key}-sail`] = el; }}
                                   type="text"
                                   value={cell?.sailNumber || ''}
                                   onChange={e => handleSailNumberInput(heat, position, race, e.target.value)}
-                                  onBlur={() => handleSailNumberBlur(heat, position, race)}
+                                  onBlur={() => {
+                                    setTimeout(() => {
+                                      if (!dropdownRef.current?.contains(document.activeElement)) {
+                                        handleSailNumberBlur(heat, position, race);
+                                      }
+                                    }, 150);
+                                  }}
                                   onFocus={() => {
                                     setDropdownTarget({ heat, position, race });
                                     setDropdownFilter('');
                                   }}
                                   onKeyDown={e => handleKeyDown(e, heat, position, race)}
                                   className={`w-full px-1 py-[3px] text-[11px] text-center border-0 outline-none transition-all
-                                    ${baseBg}
+                                    ${cellBg}
                                     ${isInvalid
-                                      ? 'text-red-500 bg-red-50 dark:bg-red-950/30'
+                                      ? darkMode ? 'text-red-400 bg-red-950/30' : 'text-red-500 bg-red-50'
                                       : isDup
-                                        ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/30'
+                                        ? darkMode ? 'text-amber-400 bg-amber-950/30' : 'text-amber-500 bg-amber-50'
                                         : hasSail
                                           ? darkMode ? 'text-white font-medium' : 'text-slate-900 font-medium'
-                                          : darkMode ? 'text-slate-500' : 'text-slate-300'
+                                          : darkMode ? 'text-slate-600' : 'text-slate-300'
                                     }
                                     focus:ring-1 focus:ring-inset ${darkMode ? 'focus:ring-blue-500/50' : 'focus:ring-blue-400/50'}
                                     placeholder:text-transparent
                                   `}
                                   placeholder=""
                                 />
-                                {/* Dropdown */}
-                                {isDropdownOpen && !cell?.sailNumber?.trim() && (
+                                {isDropdownOpen && availableSkippersForDropdown.length > 0 && (
                                   <div
                                     ref={dropdownRef}
                                     className={`absolute top-full left-0 z-50 w-48 max-h-48 overflow-auto rounded-lg shadow-2xl border ${
@@ -807,42 +658,35 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                         />
                                       </div>
                                     </div>
-                                    {availableSkippersForDropdown.length === 0 ? (
-                                      <div className={`px-3 py-2 text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                        No available skippers
-                                      </div>
-                                    ) : (
-                                      availableSkippersForDropdown.map(({ skipper, index }) => (
-                                        <button
-                                          key={index}
-                                          onMouseDown={e => {
-                                            e.preventDefault();
-                                            handleDropdownSelect(heat, position, race, skipper, index);
-                                          }}
-                                          className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors ${
-                                            darkMode
-                                              ? 'hover:bg-slate-700 text-slate-200'
-                                              : 'hover:bg-slate-50 text-slate-700'
-                                          }`}
-                                        >
-                                          <span className={`text-[11px] font-bold min-w-[28px] ${
-                                            darkMode ? 'text-amber-400' : 'text-amber-600'
-                                          }`}>
-                                            {skipper.sailNumber}
-                                          </span>
-                                          <span className="text-[10px] truncate">
-                                            {skipper.name}
-                                          </span>
-                                        </button>
-                                      ))
-                                    )}
+                                    {availableSkippersForDropdown.map(({ skipper, index }) => (
+                                      <button
+                                        key={index}
+                                        onMouseDown={e => {
+                                          e.preventDefault();
+                                          handleDropdownSelect(heat, position, race, skipper, index);
+                                        }}
+                                        className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors ${
+                                          darkMode
+                                            ? 'hover:bg-slate-700 text-slate-200'
+                                            : 'hover:bg-slate-50 text-slate-700'
+                                        }`}
+                                      >
+                                        <span className={`text-[11px] font-bold min-w-[28px] ${
+                                          darkMode ? 'text-blue-400' : 'text-blue-600'
+                                        }`}>
+                                          {skipper.sailNumber}
+                                        </span>
+                                        <span className="text-[10px] truncate">
+                                          {skipper.name}
+                                        </span>
+                                      </button>
+                                    ))}
                                   </div>
                                 )}
                               </td>
 
-                              {/* Comments Cell */}
                               <td
-                                className={`px-0 py-0 border-b border-r ${borderColor} ${baseBg} cursor-pointer`}
+                                className={`px-0 py-0 border-b border-r ${borderColor} ${cellBg} cursor-pointer`}
                                 onClick={() => handleCommentClick(heat, position, race)}
                               >
                                 {ls && lsColor ? (
@@ -853,15 +697,14 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                   </div>
                                 ) : hasSail ? (
                                   <div className={`px-1 py-[3px] text-[10px] text-center font-medium ${
-                                    darkMode ? 'text-emerald-500' : 'text-emerald-600'
+                                    darkMode ? 'text-green-500' : 'text-green-600'
                                   }`}>
                                     OK
                                   </div>
                                 ) : null}
                               </td>
 
-                              {/* Points Cell */}
-                              <td className={`px-0 py-0 border-b border-r ${borderColor} ${baseBg}`}>
+                              <td className={`px-0 py-0 border-b border-r ${borderColor} ${cellBg}`}>
                                 <div className={`px-1 py-[3px] text-[10px] text-center font-medium tabular-nums ${
                                   ls
                                     ? darkMode ? 'text-slate-500' : 'text-slate-400'
@@ -888,7 +731,6 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         </table>
       </div>
 
-      {/* Verify Results Modal */}
       {verifyTarget !== null && verifyResult && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className={`w-full max-w-md rounded-xl shadow-2xl overflow-hidden ${
@@ -960,7 +802,6 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         </div>
       )}
 
-      {/* Letter Score Modal */}
       {showLetterScoreModal && letterScoreTarget && (
         <LetterScoreSelector
           isOpen={showLetterScoreModal}
