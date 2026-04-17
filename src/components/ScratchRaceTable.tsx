@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Users, TrendingUp, Hop as Home, X, Settings, Flag, Timer, Award, Moon, Sun, RefreshCw, Trophy, Maximize2, Minimize2 } from 'lucide-react';
+import { Users, TrendingUp, X, Settings, Flag, Timer, Award, Moon, Sun, RefreshCw, Trophy, Maximize2, Minimize2 } from 'lucide-react';
+import { Logo } from './Logo';
 import { SettingsDropdown } from './Controls';
 import { Skipper, LetterScore } from '../types';
 import { isEntrantsPlusOne } from '../types/letterScores';
@@ -828,7 +829,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
             `}
             title="Return to Dashboard"
           >
-            <Home size={18} />
+            <Logo className="w-5 h-5" />
           </button>
           <button
             type="button"

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SquarePen as Edit2, Trophy, Medal, X, ChevronRight, Trash2, Users, TrendingUp, Flag, Hop as Home, ChevronDown, ChevronUp, Settings, Zap, FileText, MoveHorizontal as MoreHorizontal, SquarePen as Edit, RotateCcw, Calendar, CalendarRange, Check } from 'lucide-react';
+import { SquarePen as Edit2, Trophy, Medal, X, ChevronRight, Trash2, Users, TrendingUp, Flag, ChevronDown, ChevronUp, Settings, Zap, FileText, MoveHorizontal as MoreHorizontal, SquarePen as Edit, RotateCcw, Calendar, CalendarRange, Check } from 'lucide-react';
+import { Logo } from './Logo';
 import { HeatRaceInput } from './HeatRaceInput';
 import { HeatDesignation, HeatManagement, HeatResult, getHeatColorClasses, calculateOverallPositions } from '../types/heat';
 import { useNavigate } from 'react-router-dom';
@@ -100,7 +101,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
                 : 'text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200'
             }`}
           >
-            <Home size={18} />
+            <Logo className="w-5 h-5" />
             <span className="text-sm font-medium">Dashboard</span>
           </button>
         </div>
@@ -629,7 +630,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
               : 'text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200'
           }`}
         >
-          <Home size={18} />
+          <Logo className="w-5 h-5" />
           <span className="text-sm font-medium">Dashboard</span>
         </button>
         

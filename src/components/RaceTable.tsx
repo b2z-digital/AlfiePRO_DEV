@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, MoveHorizontal as MoreHorizontal, Trophy, TrendingUp, Settings, Hop as Home, Users, Sailboat, Flag, X, Award, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
+import { Plus, MoveHorizontal as MoreHorizontal, Trophy, TrendingUp, Settings, Users, Sailboat, Flag, X, Award, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
+import { Logo } from './Logo';
 import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { RaceInput } from './RaceInput';
@@ -873,7 +874,7 @@ export const RaceTable: React.FC<RaceTableProps> = ({
             `}
             title="Return to Dashboard"
           >
-            <Home size={18} />
+            <Logo className="w-5 h-5" />
           </button>
           <button
             type="button"
