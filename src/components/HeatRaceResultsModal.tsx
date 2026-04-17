@@ -4,6 +4,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation } from '../types/heat';
+import { isEntrantsPlusOne } from '../types/letterScores';
 import { getObserverAssignments, resolveObserverEventId, ObserverAssignment } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
 import type { RaceEvent } from '../types/race';
@@ -314,7 +315,11 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
               const csvHeatAssignment = round.heatAssignments.find(a => a.heatDesignation === heat);
               const csvHeatCompetitorCount = csvHeatAssignment?.skipperIndices.length || heatResults.length;
               if (result.letterScore) {
-                points = String(csvHeatCompetitorCount + 1);
+                if (isEntrantsPlusOne(result.letterScore as any)) {
+                  points = String(skippers.length + 1);
+                } else {
+                  points = String(csvHeatCompetitorCount + 1);
+                }
               } else if (result.position !== null) {
                 if (round.round === 1) {
                   points = String(result.position);
@@ -671,7 +676,11 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                                 const heatAssignment = round.heatAssignments.find(a => a.heatDesignation === heat);
                                 const heatCompetitorCount = heatAssignment?.skipperIndices.length || heatResults.length;
                                 if (result.letterScore) {
-                                  points = String(heatCompetitorCount + 1);
+                                  if (isEntrantsPlusOne(result.letterScore as any)) {
+                                    points = String(skippers.length + 1);
+                                  } else {
+                                    points = String(heatCompetitorCount + 1);
+                                  }
                                 } else if (result.position !== null) {
                                   if (round.round === 1) {
                                     points = String(result.position);

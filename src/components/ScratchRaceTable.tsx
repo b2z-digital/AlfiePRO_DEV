@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Users, TrendingUp, Hop as Home, X, Settings, Flag, Timer, Award, Moon, Sun, RefreshCw, Trophy, Maximize2, Minimize2 } from 'lucide-react';
 import { SettingsDropdown } from './Controls';
 import { Skipper, LetterScore } from '../types';
+import { isEntrantsPlusOne } from '../types/letterScores';
 import { calculateScratchResults, applyDropRules } from '../utils/scratchCalculations';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { RaceEvent } from '../types/race';
@@ -450,17 +451,28 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
   const getLetterScoreColor = (letterScore: LetterScore) => {
     switch (letterScore) {
       case 'DNS': return 'bg-red-600 text-white';
+      case 'DNC': return 'bg-red-700 text-white';
       case 'DNF': return 'bg-orange-600 text-white';
-      case 'DSQ': return 'bg-purple-600 text-white';
-      case 'RDG': return 'bg-yellow-600 text-black';
-      case 'OCS': return 'bg-pink-600 text-white';
-      case 'WDN': return 'bg-blue-600 text-white'; // Same as regular position scores
+      case 'NSC': return 'bg-orange-500 text-white';
+      case 'RET': return 'bg-amber-600 text-white';
+      case 'OCS': return 'bg-yellow-600 text-black';
+      case 'DSQ': return 'bg-red-800 text-white';
+      case 'DNE': return 'bg-red-900 text-white';
+      case 'BFD': return 'bg-gray-800 text-white';
+      case 'UFD': return 'bg-rose-700 text-white';
+      case 'RDG': return 'bg-green-600 text-white';
+      case 'DPI': return 'bg-pink-600 text-white';
+      case 'ZFP': return 'bg-teal-600 text-white';
+      case 'SCP': return 'bg-cyan-700 text-white';
+      case 'WDN': return 'bg-slate-600 text-white';
       default: return 'bg-slate-600 text-white';
     }
   };
 
   const getLetterScorePoints = (letterScore: LetterScore, numStarters: number): number => {
-    // Standard letter score points = number of starters + 1
+    if (isEntrantsPlusOne(letterScore)) {
+      return skippers.length + 1;
+    }
     return numStarters + 1;
   };
 
@@ -560,14 +572,11 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
       if (result.position && result.position > 0) {
         starterCount++;
       }
-      // Count boats with letter scores that indicate they started but didn't finish
       else if (result.letterScore) {
-        // These codes mean the boat started but didn't finish properly
-        const startedCodes = ['DNF', 'DSQ', 'RAF', 'RET', 'UFD'];
+        const startedCodes = ['DNF', 'DSQ', 'RET', 'NSC', 'DNE', 'RDG', 'DPI', 'ZFP', 'SCP'];
         if (startedCodes.includes(result.letterScore)) {
           starterCount++;
         }
-        // DNS, BFD, OCS mean the boat didn't start - don't count these
       }
     });
     

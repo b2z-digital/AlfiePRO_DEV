@@ -39,7 +39,7 @@ export interface RaceColumnInfo {
 }
 
 const VALID_LETTER_SCORES: LetterScore[] = [
-  'DNS', 'DNF', 'DSQ', 'OCS', 'BFD', 'RDG', 'DPI', 'RET', 'DNC', 'DNE', 'NSC', 'WDN'
+  'DNS', 'DNF', 'DSQ', 'OCS', 'BFD', 'UFD', 'RDG', 'DPI', 'ZFP', 'SCP', 'RET', 'DNC', 'DNE', 'NSC', 'WDN'
 ];
 
 export function parseCSVData(text: string): ParsedResults {
