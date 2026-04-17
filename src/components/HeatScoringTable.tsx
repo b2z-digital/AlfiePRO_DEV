@@ -14,6 +14,7 @@ import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
+import { HmsManualSpreadsheet } from './HmsManualSpreadsheet';
 import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
@@ -1042,27 +1043,18 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   if (!fleetManagementEnabled) {
     return (
-      <div className={`space-y-6 ${isFullscreen ? 'p-2' : 'p-8'} no-select`}>
-        <div className={`rounded-xl overflow-hidden border ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white'} shadow-lg`}>
-          <SpreadsheetScoring
-            skippers={skippers}
-            currentRace={lastCompletedRace + 1}
-            numRaces={12}
-            isHeatScoring={false}
-            isFullscreen={isFullscreen}
-            raceResults={raceResults}
-            updateRaceResults={(updatedResults) => {
-              const race = lastCompletedRace + 1;
-              const currentRaceResults = updatedResults.filter(r => r.race === race);
-              currentRaceResults.forEach(result => {
-                updateRaceResults(result.race, result.skipperIndex, result.position, result.letterScore, result.customPoints);
-              });
-            }}
-            onConfirmResults={onCompleteScoring}
-            darkMode={darkMode}
-            currentEvent={currentEvent}
-          />
-        </div>
+      <div className={`flex flex-col ${isFullscreen ? 'h-full' : 'h-[calc(100vh-200px)]'} no-select`}>
+        <HmsManualSpreadsheet
+          skippers={skippers}
+          heatManagement={heatManagement}
+          darkMode={darkMode}
+          raceResults={raceResults}
+          currentEvent={currentEvent}
+          onConfigureHeats={onConfigureHeats}
+          updateRaceResults={updateRaceResults}
+          deleteRaceResult={deleteRaceResult}
+          isFullscreen={isFullscreen}
+        />
       </div>
     );
   }
