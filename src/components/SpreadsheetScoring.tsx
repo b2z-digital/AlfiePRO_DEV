@@ -208,25 +208,41 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     if (!isMultiHeatMode) {
       const racingSkips = skippers;
       const totalPos = racingSkips.length;
-      const newCells: CellEntry[] = [];
       const existingResults = raceResults.filter(r => r.race === initialRace);
 
-      for (let pos = 1; pos <= totalPos; pos++) {
-        const result = existingResults.find(r => r.position === pos);
-        if (result) {
-          const skipper = skippers[result.skipperIndex];
-          const sailNo = String(skipper?.sailNumber || skipper?.sailNo || '');
-          newCells.push({
-            sailNumber: sailNo,
-            skipperIndex: result.skipperIndex,
-            letterScore: result.letterScore || null,
-            customPoints: result.customPoints,
-            isValid: true,
-            isDuplicate: false
-          });
-        } else {
-          newCells.push({ sailNumber: '', skipperIndex: null, letterScore: null, isValid: true, isDuplicate: false });
-        }
+      const positionedResults = existingResults
+        .filter(r => r.position !== null && r.position !== undefined)
+        .sort((a, b) => (a.position || 0) - (b.position || 0));
+      const letterScoreResults = existingResults
+        .filter(r => (r.position === null || r.position === undefined) && r.letterScore);
+
+      const newCells: CellEntry[] = [];
+      for (const result of positionedResults) {
+        const skipper = skippers[result.skipperIndex];
+        const sailNo = String(skipper?.sailNumber || skipper?.sailNo || '');
+        newCells.push({
+          sailNumber: sailNo,
+          skipperIndex: result.skipperIndex,
+          letterScore: result.letterScore || null,
+          customPoints: result.customPoints,
+          isValid: true,
+          isDuplicate: false
+        });
+      }
+      for (const result of letterScoreResults) {
+        const skipper = skippers[result.skipperIndex];
+        const sailNo = String(skipper?.sailNumber || skipper?.sailNo || '');
+        newCells.push({
+          sailNumber: sailNo,
+          skipperIndex: result.skipperIndex,
+          letterScore: result.letterScore || null,
+          customPoints: result.customPoints,
+          isValid: true,
+          isDuplicate: false
+        });
+      }
+      while (newCells.length < totalPos) {
+        newCells.push({ sailNumber: '', skipperIndex: null, letterScore: null, isValid: true, isDuplicate: false });
       }
 
       setCells({ A: newCells } as any);
@@ -272,24 +288,41 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
         }
       }
 
+      const positionedResults = existingResults
+        .filter(r => r.position !== null && r.position !== undefined)
+        .sort((a, b) => (a.position || 0) - (b.position || 0));
+      const letterScoreResults = existingResults
+        .filter(r => (r.position === null || r.position === undefined) && r.letterScore);
+
       const newCells: CellEntry[] = [];
-      for (let pos = 1; pos <= totalPos; pos++) {
-        const result = existingResults.find(r => r.position === pos);
-        if (result) {
-          const skipperIdx = result.skipperIndex;
-          const skipper = heatSkips[skipperIdx];
-          const sailNo = String(skipper?.sailNumber || skipper?.sailNo || '');
-          newCells.push({
-            sailNumber: sailNo,
-            skipperIndex: skipperIdx,
-            letterScore: result.letterScore || null,
-            customPoints: result.customPoints,
-            isValid: true,
-            isDuplicate: false
-          });
-        } else {
-          newCells.push({ sailNumber: '', skipperIndex: null, letterScore: null, isValid: true, isDuplicate: false });
-        }
+      for (const result of positionedResults) {
+        const skipperIdx = result.skipperIndex;
+        const skipper = heatSkips[skipperIdx];
+        const sailNo = String(skipper?.sailNumber || skipper?.sailNo || '');
+        newCells.push({
+          sailNumber: sailNo,
+          skipperIndex: skipperIdx,
+          letterScore: result.letterScore || null,
+          customPoints: result.customPoints,
+          isValid: true,
+          isDuplicate: false
+        });
+      }
+      for (const result of letterScoreResults) {
+        const skipperIdx = result.skipperIndex;
+        const skipper = heatSkips[skipperIdx];
+        const sailNo = String(skipper?.sailNumber || skipper?.sailNo || '');
+        newCells.push({
+          sailNumber: sailNo,
+          skipperIndex: skipperIdx,
+          letterScore: result.letterScore || null,
+          customPoints: result.customPoints,
+          isValid: true,
+          isDuplicate: false
+        });
+      }
+      while (newCells.length < totalPos) {
+        newCells.push({ sailNumber: '', skipperIndex: null, letterScore: null, isValid: true, isDuplicate: false });
       }
       newAllCells[heat] = newCells;
 
@@ -478,12 +511,13 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     if (isMultiHeatMode && onUpdateHeatResults) {
       const heatResults = getHeatRaceResults(heat);
       const newResults = heatResults.filter(r => r.race !== currentRound);
-      heatCells.forEach((cell, idx) => {
+      let posCounter = 1;
+      heatCells.forEach((cell) => {
         if (cell.skipperIndex !== null && (cell.sailNumber.trim() || cell.letterScore)) {
           newResults.push({
             race: currentRound,
             skipperIndex: cell.skipperIndex,
-            position: cell.letterScore ? null : idx + 1,
+            position: cell.letterScore ? null : posCounter++,
             letterScore: cell.letterScore || undefined,
             customPoints: cell.customPoints
           });
@@ -492,12 +526,13 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       onUpdateHeatResults(heat, newResults);
     } else {
       const newResults = raceResults.filter(r => r.race !== initialRace);
-      heatCells.forEach((cell, idx) => {
+      let posCounter = 1;
+      heatCells.forEach((cell) => {
         if (cell.skipperIndex !== null && (cell.sailNumber.trim() || cell.letterScore)) {
           newResults.push({
             race: initialRace,
             skipperIndex: cell.skipperIndex,
-            position: cell.letterScore ? null : idx + 1,
+            position: cell.letterScore ? null : posCounter++,
             letterScore: cell.letterScore || undefined,
             customPoints: cell.customPoints
           });
