@@ -185,14 +185,52 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
 
   const hasFinalRounds = isShrs && completedRounds.some(r => r.round > shrsQualifyingRounds);
 
-  // Export functions
+  const prepareForCapture = (el: HTMLElement) => {
+    const parent = el.parentElement;
+    const savedStyles = {
+      elOverflow: el.style.overflow,
+      elWidth: el.style.width,
+      parentOverflow: parent?.style.overflow || '',
+      parentMaxHeight: parent?.style.maxHeight || '',
+      parentHeight: parent?.style.height || '',
+    };
+    el.style.overflow = 'visible';
+    el.style.width = `${el.scrollWidth}px`;
+    if (parent) {
+      parent.style.overflow = 'visible';
+      parent.style.maxHeight = 'none';
+      parent.style.height = 'auto';
+    }
+    el.querySelectorAll('[class*="sticky"]').forEach((stickyEl) => {
+      (stickyEl as HTMLElement).style.position = 'relative';
+    });
+    return savedStyles;
+  };
+
+  const restoreAfterCapture = (el: HTMLElement, saved: ReturnType<typeof prepareForCapture>) => {
+    const parent = el.parentElement;
+    el.style.overflow = saved.elOverflow;
+    el.style.width = saved.elWidth;
+    if (parent) {
+      parent.style.overflow = saved.parentOverflow;
+      parent.style.maxHeight = saved.parentMaxHeight;
+      parent.style.height = saved.parentHeight;
+    }
+    el.querySelectorAll('[class*="sticky"]').forEach((stickyEl) => {
+      (stickyEl as HTMLElement).style.position = '';
+    });
+  };
+
   const exportAsJPG = async () => {
     if (!tableRef.current) return;
 
+    const saved = prepareForCapture(tableRef.current);
     try {
       const canvas = await html2canvas(tableRef.current, {
         backgroundColor: darkMode ? '#1e293b' : '#ffffff',
-        scale: 2
+        scale: 2,
+        windowWidth: tableRef.current.scrollWidth,
+        windowHeight: tableRef.current.scrollHeight,
       });
 
       const link = document.createElement('a');
@@ -201,16 +239,21 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
       link.click();
     } catch (error) {
       console.error('Error exporting as JPG:', error);
+    } finally {
+      restoreAfterCapture(tableRef.current, saved);
     }
   };
 
   const exportAsPDF = async () => {
     if (!tableRef.current) return;
 
+    const saved = prepareForCapture(tableRef.current);
     try {
       const canvas = await html2canvas(tableRef.current, {
         backgroundColor: darkMode ? '#1e293b' : '#ffffff',
-        scale: 2
+        scale: 2,
+        windowWidth: tableRef.current.scrollWidth,
+        windowHeight: tableRef.current.scrollHeight,
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -224,6 +267,8 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
       pdf.save(`heat-race-results-${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error('Error exporting as PDF:', error);
+    } finally {
+      restoreAfterCapture(tableRef.current, saved);
     }
   };
 
@@ -294,9 +339,10 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                 points = String(result.position);
               }
             } else {
-              const totalCompetitorsInRound = round.results.length;
+              const csvHeatAssignment = round.heatAssignments.find(a => a.heatDesignation === heat);
+              const csvHeatCompetitorCount = csvHeatAssignment?.skipperIndices.length || heatResults.length;
               if (result.letterScore) {
-                points = String(totalCompetitorsInRound + 1);
+                points = String(csvHeatCompetitorCount + 1);
               } else if (result.position !== null) {
                 if (round.round === 1) {
                   points = String(result.position);
@@ -650,9 +696,10 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                                   points = String(result.position);
                                 }
                               } else {
-                                const totalCompetitorsInRound = round.results.length;
+                                const heatAssignment = round.heatAssignments.find(a => a.heatDesignation === heat);
+                                const heatCompetitorCount = heatAssignment?.skipperIndices.length || heatResults.length;
                                 if (result.letterScore) {
-                                  points = String(totalCompetitorsInRound + 1);
+                                  points = String(heatCompetitorCount + 1);
                                 } else if (result.position !== null) {
                                   if (round.round === 1) {
                                     points = String(result.position);

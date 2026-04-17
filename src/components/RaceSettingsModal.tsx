@@ -1668,6 +1668,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                           </div>
                         </div>
 
+                        {isSHRS && (
                         <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
                           <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-3`}>
                             Number of Races
@@ -1706,6 +1707,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                             />
                           </div>
                         </div>
+                        )}
 
                         {isSHRS && (
                           <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm space-y-4`}>

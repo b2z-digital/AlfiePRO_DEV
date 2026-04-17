@@ -1012,7 +1012,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       )}
 
 
-      {isHeatScoring && heatManagement && (
+      {isHeatScoring && heatManagement && heatManagement.configuration?.scoringSystem !== 'hms' && (
         <button
           onClick={() => setShowOverallResults(true)}
           className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-colors ${
@@ -1026,7 +1026,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
         </button>
       )}
 
-      {isHeatScoring && heatManagement && (
+      {isHeatScoring && heatManagement && heatManagement.configuration?.scoringSystem !== 'hms' && (
         <HeatOverallResultsModal
           isOpen={showOverallResults}
           onClose={() => setShowOverallResults(false)}

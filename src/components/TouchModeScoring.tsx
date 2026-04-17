@@ -1417,8 +1417,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         );
       })()}
 
-      {/* Floating Handicap/Rankings Viewer */}
-      <FloatingHandicapViewer
+      {/* Floating Handicap/Rankings Viewer - hidden in HMS heat scoring mode */}
+      {currentEvent?.heatManagement?.configuration?.scoringSystem !== 'hms' && <FloatingHandicapViewer
         skippers={skippers}
         raceResults={raceResults}
         currentRace={currentRace}
@@ -1435,7 +1435,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         onScratchStart={handleTouchScratchStart}
         storedHandicaps={storedHandicaps}
         onUsePreviousHandicaps={handleUsePreviousHandicaps}
-      />
+      />}
 
       {/* Post-Race Handicap Modal */}
       {isHandicapEvent && (
