@@ -4,8 +4,10 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation } from '../types/heat';
-import { getObserverAssignments, ObserverAssignment } from '../utils/observerUtils';
+import { isEntrantsPlusOne } from '../types/letterScores';
+import { getObserverAssignments, resolveObserverEventId, ObserverAssignment } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
+import type { RaceEvent } from '../types/race';
 
 interface HeatRaceResultsModalProps {
   isOpen: boolean;
@@ -13,7 +15,7 @@ interface HeatRaceResultsModalProps {
   skippers: Skipper[];
   heatManagement: HeatManagement;
   darkMode: boolean;
-  currentEvent?: { id: string } | null;
+  currentEvent?: RaceEvent | null;
 }
 
 export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
@@ -42,66 +44,37 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showExportMenu]);
 
-  // Fetch observers for all heats and rounds
   useEffect(() => {
     const fetchObservers = async () => {
-      if (!isOpen || !currentEvent?.id) {
-        console.log('[HeatRaceResultsModal] NOT fetching observers - isOpen:', isOpen, 'currentEvent:', currentEvent?.id);
-        return;
-      }
+      if (!isOpen || !currentEvent?.id) return;
 
-      console.log('[HeatRaceResultsModal] Starting observer fetch for event:', currentEvent.id);
+      const resolvedEventId = await resolveObserverEventId(currentEvent as RaceEvent) || currentEvent.id;
       const observersMap = new Map<string, ObserverAssignment[]>();
 
-      // Debug: Check what's in the database for this event
-      const { data: allObservers, error: dbError } = await supabase
-        .from('heat_observers')
-        .select('*')
-        .eq('event_id', currentEvent.id);
-
-      console.log('[HeatRaceResultsModal] ALL observers in database for this event:', allObservers, 'Error:', dbError);
-
-      // Get all completed rounds
       const completedRounds = heatManagement.rounds.filter(r => r.completed);
-      console.log('[HeatRaceResultsModal] Completed rounds:', completedRounds.map(r => ({
-        round: r.round,
-        heatAssignments: r.heatAssignments.map(a => a.heatDesignation)
-      })));
 
-      // For each completed round, fetch observers for each heat
       for (const round of completedRounds) {
-        console.log(`[HeatRaceResultsModal] Processing Round ${round.round} with ${round.heatAssignments.length} heat assignments`);
-
         for (const assignment of round.heatAssignments) {
           const heat = assignment.heatDesignation;
-          // Heat numbers: A=1, B=2, C=3, etc.
           const heatNumber = heat.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
-
-          console.log(`[HeatRaceResultsModal] Fetching observers for Heat ${heat} (${heatNumber}), Round ${round.round}`);
 
           try {
             const observers = await getObserverAssignments(
-              currentEvent.id,
+              resolvedEventId,
               heatNumber,
               round.round
             );
 
-            console.log(`[HeatRaceResultsModal] Heat ${heat} Round ${round.round} observers:`, observers);
-
             if (observers && observers.length > 0) {
               const key = `${heat}-${round.round}`;
               observersMap.set(key, observers);
-              console.log(`[HeatRaceResultsModal] Stored ${observers.length} observers for key: ${key}`);
-            } else {
-              console.log(`[HeatRaceResultsModal] No observers found for Heat ${heat} Round ${round.round}`);
             }
           } catch (error) {
-            console.error(`[HeatRaceResultsModal] Error fetching observers for heat ${heat}, round ${round.round}:`, error);
+            console.error(`Error fetching observers for heat ${heat}, round ${round.round}:`, error);
           }
         }
       }
 
-      console.log('[HeatRaceResultsModal] Final observers map:', Array.from(observersMap.entries()));
       setObserversByHeatRound(observersMap);
     };
 
@@ -185,14 +158,52 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
 
   const hasFinalRounds = isShrs && completedRounds.some(r => r.round > shrsQualifyingRounds);
 
-  // Export functions
+  const prepareForCapture = (el: HTMLElement) => {
+    const parent = el.parentElement;
+    const savedStyles = {
+      elOverflow: el.style.overflow,
+      elWidth: el.style.width,
+      parentOverflow: parent?.style.overflow || '',
+      parentMaxHeight: parent?.style.maxHeight || '',
+      parentHeight: parent?.style.height || '',
+    };
+    el.style.overflow = 'visible';
+    el.style.width = `${el.scrollWidth}px`;
+    if (parent) {
+      parent.style.overflow = 'visible';
+      parent.style.maxHeight = 'none';
+      parent.style.height = 'auto';
+    }
+    el.querySelectorAll('[class*="sticky"]').forEach((stickyEl) => {
+      (stickyEl as HTMLElement).style.position = 'relative';
+    });
+    return savedStyles;
+  };
+
+  const restoreAfterCapture = (el: HTMLElement, saved: ReturnType<typeof prepareForCapture>) => {
+    const parent = el.parentElement;
+    el.style.overflow = saved.elOverflow;
+    el.style.width = saved.elWidth;
+    if (parent) {
+      parent.style.overflow = saved.parentOverflow;
+      parent.style.maxHeight = saved.parentMaxHeight;
+      parent.style.height = saved.parentHeight;
+    }
+    el.querySelectorAll('[class*="sticky"]').forEach((stickyEl) => {
+      (stickyEl as HTMLElement).style.position = '';
+    });
+  };
+
   const exportAsJPG = async () => {
     if (!tableRef.current) return;
 
+    const saved = prepareForCapture(tableRef.current);
     try {
       const canvas = await html2canvas(tableRef.current, {
         backgroundColor: darkMode ? '#1e293b' : '#ffffff',
-        scale: 2
+        scale: 2,
+        windowWidth: tableRef.current.scrollWidth,
+        windowHeight: tableRef.current.scrollHeight,
       });
 
       const link = document.createElement('a');
@@ -201,16 +212,21 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
       link.click();
     } catch (error) {
       console.error('Error exporting as JPG:', error);
+    } finally {
+      restoreAfterCapture(tableRef.current, saved);
     }
   };
 
   const exportAsPDF = async () => {
     if (!tableRef.current) return;
 
+    const saved = prepareForCapture(tableRef.current);
     try {
       const canvas = await html2canvas(tableRef.current, {
         backgroundColor: darkMode ? '#1e293b' : '#ffffff',
-        scale: 2
+        scale: 2,
+        windowWidth: tableRef.current.scrollWidth,
+        windowHeight: tableRef.current.scrollHeight,
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -224,6 +240,8 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
       pdf.save(`heat-race-results-${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error('Error exporting as PDF:', error);
+    } finally {
+      restoreAfterCapture(tableRef.current, saved);
     }
   };
 
@@ -294,9 +312,14 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                 points = String(result.position);
               }
             } else {
-              const totalCompetitorsInRound = round.results.length;
+              const csvHeatAssignment = round.heatAssignments.find(a => a.heatDesignation === heat);
+              const csvHeatCompetitorCount = csvHeatAssignment?.skipperIndices.length || heatResults.length;
               if (result.letterScore) {
-                points = String(totalCompetitorsInRound + 1);
+                if (isEntrantsPlusOne(result.letterScore as any)) {
+                  points = String(skippers.length + 1);
+                } else {
+                  points = String(csvHeatCompetitorCount + 1);
+                }
               } else if (result.position !== null) {
                 if (round.round === 1) {
                   points = String(result.position);
@@ -650,9 +673,14 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                                   points = String(result.position);
                                 }
                               } else {
-                                const totalCompetitorsInRound = round.results.length;
+                                const heatAssignment = round.heatAssignments.find(a => a.heatDesignation === heat);
+                                const heatCompetitorCount = heatAssignment?.skipperIndices.length || heatResults.length;
                                 if (result.letterScore) {
-                                  points = String(totalCompetitorsInRound + 1);
+                                  if (isEntrantsPlusOne(result.letterScore as any)) {
+                                    points = String(skippers.length + 1);
+                                  } else {
+                                    points = String(heatCompetitorCount + 1);
+                                  }
                                 } else if (result.position !== null) {
                                   if (round.round === 1) {
                                     points = String(result.position);
@@ -756,8 +784,6 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                         {completedRounds.map(round => {
                           const key = `${heat}-${round.round}`;
                           const observers = observersByHeatRound.get(key) || [];
-
-                          console.log(`[HeatRaceResultsModal RENDER] Heat ${heat}, Round ${round.round}, Key: ${key}, Observers:`, observers, 'Map has key:', observersByHeatRound.has(key));
 
                           return (
                             <td

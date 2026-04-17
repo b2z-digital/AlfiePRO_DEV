@@ -309,6 +309,9 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         lastCompletedHeats.current.add(heatKey);
         onCompleteHeat(heat);
 
+        const roundKey = `${heatManagement.currentRound}-${heat}`;
+        setSpreadsheetVerifiedHeats(prev => new Set(prev).add(roundKey));
+
         if (heatManagement.currentRound >= 2) {
           pendingModalShow.current = true;
         }
@@ -531,13 +534,40 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return validIndices.map(idx => skippers[idx]).filter(Boolean);
   }, [heatSkipperIndices, skippers, selectedHeat]);
 
+  const skippersInOtherHeatsCurrentRound = useMemo(() => {
+    if (!currentRound || !selectedHeat) return new Set<number>();
+    const skippersWithOtherHeatResults = new Set<number>();
+    const skippersWithCurrentHeatResults = new Set<number>();
+    currentRound.results.forEach(r => {
+      if (r.round === heatManagement.currentRound && (r.position !== null || r.letterScore)) {
+        if (r.heatDesignation === selectedHeat) {
+          skippersWithCurrentHeatResults.add(r.skipperIndex);
+        } else {
+          skippersWithOtherHeatResults.add(r.skipperIndex);
+        }
+      }
+    });
+    const result = new Set<number>();
+    skippersWithOtherHeatResults.forEach(idx => {
+      if (!skippersWithCurrentHeatResults.has(idx)) {
+        result.add(idx);
+      }
+    });
+    return result;
+  }, [currentRound, selectedHeat, heatManagement.currentRound]);
+
   // Filter race results for current heat's skippers
   const heatRaceResults = useMemo(() => {
     const heatSkipperIndicesSet = new Set(heatSkipperIndices);
-    return raceResults.filter(result =>
-      heatSkipperIndicesSet.has(result.skipperIndex)
-    );
-  }, [raceResults, heatSkipperIndices]);
+    const currentRoundNum = heatManagement.currentRound;
+    return raceResults.filter(result => {
+      if (!heatSkipperIndicesSet.has(result.skipperIndex)) return false;
+      if (result.race === currentRoundNum && skippersInOtherHeatsCurrentRound.has(result.skipperIndex)) {
+        return false;
+      }
+      return true;
+    });
+  }, [raceResults, heatSkipperIndices, heatManagement.currentRound, skippersInOtherHeatsCurrentRound]);
 
   // Wrapper functions to map filtered indices to original indices
   const wrappedUpdateRaceResults = (race: number, filteredSkipperIndex: number, position: number | null, letterScore?: any, customPoints?: number) => {
@@ -656,19 +686,49 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   const allHeatMappedResults = useMemo(() => {
     if (!currentRound) return {} as Record<HeatDesignation, any[]>;
+    const currentRoundNum = heatManagement.currentRound;
+
+    const otherHeatSkippersByHeat: Record<string, Set<number>> = {};
+    for (const assignment of currentRound.heatAssignments) {
+      const heat = assignment.heatDesignation;
+      const withOther = new Set<number>();
+      const withCurrent = new Set<number>();
+      currentRound.results.forEach(r => {
+        if (r.round === currentRoundNum && (r.position !== null || r.letterScore)) {
+          if (r.heatDesignation === heat) {
+            withCurrent.add(r.skipperIndex);
+          } else {
+            withOther.add(r.skipperIndex);
+          }
+        }
+      });
+      const onlyOthers = new Set<number>();
+      withOther.forEach(idx => {
+        if (!withCurrent.has(idx)) {
+          onlyOthers.add(idx);
+        }
+      });
+      otherHeatSkippersByHeat[heat] = onlyOthers;
+    }
+
     const map: Record<string, any[]> = {};
     for (const assignment of currentRound.heatAssignments) {
       const heat = assignment.heatDesignation;
       const indices = assignment.skipperIndices.filter(idx => idx >= 0 && idx < skippers.length);
       const indicesSet = new Set(indices);
-      const heatResults = raceResults.filter(r => indicesSet.has(r.skipperIndex));
+      const othersSet = otherHeatSkippersByHeat[heat] || new Set();
+      const heatResults = raceResults.filter(r => {
+        if (!indicesSet.has(r.skipperIndex)) return false;
+        if (r.race === currentRoundNum && othersSet.has(r.skipperIndex)) return false;
+        return true;
+      });
       map[heat] = heatResults.map(result => ({
         ...result,
         skipperIndex: indices.indexOf(result.skipperIndex)
       }));
     }
     return map as Record<HeatDesignation, any[]>;
-  }, [currentRound, raceResults, skippers.length]);
+  }, [currentRound, raceResults, skippers.length, heatManagement.currentRound]);
 
   // Calculate heat-specific lastCompletedRace
   // In heat racing mode, we need to track which races are complete for THIS heat only
@@ -1593,7 +1653,11 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               console.log('✅ Touch mode results confirmed for heat', selectedHeat);
               setTouchModeResultsConfirmed(true);
 
-              // If this is the last heat being scored, complete it now
+              if (selectedHeat) {
+                const roundKey = `${heatManagement.currentRound}-${selectedHeat}`;
+                setSpreadsheetVerifiedHeats(prev => new Set(prev).add(roundKey));
+              }
+
               if (selectedHeat && isScoringLastHeat()) {
                 console.log('🏁 Last heat confirmed - completing heat', selectedHeat);
                 onCompleteHeat(selectedHeat);
@@ -1786,6 +1850,10 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               <button
                 onClick={() => {
                   setTouchModeResultsConfirmed(true);
+                  if (selectedHeat) {
+                    const roundKey = `${heatManagement.currentRound}-${selectedHeat}`;
+                    setSpreadsheetVerifiedHeats(prev => new Set(prev).add(roundKey));
+                  }
                   if (selectedHeat && isScoringLastHeat()) {
                     onCompleteHeat(selectedHeat);
                   }
@@ -1814,7 +1882,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (selectedHeat) {
             const progress = getHeatProgress(selectedHeat);
             const isComplete = progress.scored >= progress.total && progress.total > 0;
-            if (!isComplete && currentEvent?.enable_roll_call !== false) {
+            if (!isComplete && currentEvent?.enable_roll_call === true) {
               setRollCallActive(true);
               setRollCallReady(new Set());
               setRollCallAbsent(new Set());

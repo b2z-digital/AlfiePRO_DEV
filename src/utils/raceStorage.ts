@@ -960,6 +960,13 @@ export const getCurrentEvent = (): RaceEvent | null => {
       event.dayResults = fixedDayResults;
     }
 
+    if (event.enable_roll_call === undefined || event.enable_roll_call === null) {
+      event.enable_roll_call = false;
+    }
+    if (event.auto_complete_sail === undefined || event.auto_complete_sail === null) {
+      event.auto_complete_sail = true;
+    }
+
     console.log('📖 [getCurrentEvent] Returning event:', {
       eventName: event.eventName,
       skippersCount: event.skippers?.length || 0,
@@ -1508,7 +1515,13 @@ export const updateEventResults = async (
               completed: false,
               heat_management: heatManagement,
               num_races: numRaces,
-              drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40] // Default to RRS - Appendix A
+              drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40],
+              enable_roll_call: updatedEvent.enable_roll_call ?? false,
+              auto_complete_sail: updatedEvent.auto_complete_sail ?? true,
+              enable_observers: updatedEvent.enable_observers ?? false,
+              observers_per_heat: updatedEvent.observers_per_heat ?? 2,
+              show_flag: updatedEvent.show_flag ?? false,
+              show_country: updatedEvent.show_country ?? false
             });
 
           if (insertError) {
@@ -1537,7 +1550,13 @@ export const updateEventResults = async (
           completed: updatedEvent.completed,
           heat_management: heatManagement,
           num_races: numRaces,
-          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40]
+          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40],
+          enable_roll_call: updatedEvent.enable_roll_call ?? false,
+          auto_complete_sail: updatedEvent.auto_complete_sail ?? true,
+          enable_observers: updatedEvent.enable_observers ?? false,
+          observers_per_heat: updatedEvent.observers_per_heat ?? 2,
+          show_flag: updatedEvent.show_flag ?? false,
+          show_country: updatedEvent.show_country ?? false
         };
 
         console.log('📤 Updating multi-day event in database:', {
@@ -1571,7 +1590,13 @@ export const updateEventResults = async (
           completed,
           heat_management: heatManagement,
           num_races: numRaces,
-          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40]
+          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40],
+          enable_roll_call: updatedEvent.enable_roll_call ?? false,
+          auto_complete_sail: updatedEvent.auto_complete_sail ?? true,
+          enable_observers: updatedEvent.enable_observers ?? false,
+          observers_per_heat: updatedEvent.observers_per_heat ?? 2,
+          show_flag: updatedEvent.show_flag ?? false,
+          show_country: updatedEvent.show_country ?? false
         };
 
         console.log('📤 Updating single-day event in database:', {

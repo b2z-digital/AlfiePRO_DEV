@@ -1,4 +1,4 @@
-import { LetterScore } from '../types/letterScores';
+import { LetterScore, isEntrantsPlusOne } from '../types/letterScores';
 
 export const calculateScratchResults = (
   skippers: any[],
@@ -92,24 +92,24 @@ export const calculateScratchResults = (
 };
 
 export const getLetterScorePointsForRace = (letterScore: string, race: number, raceResults: any[], skippers: any[], skipperIndex?: number): number => {
-  // For RDG and DPI, check if there's a custom points value
-  if ((letterScore === 'RDG' || letterScore === 'DPI') && skipperIndex !== undefined) {
+  const customCodes = ['RDG', 'DPI', 'ZFP', 'SCP'];
+  if (customCodes.includes(letterScore) && skipperIndex !== undefined) {
     const result = raceResults.find(r => r.race === race && r.skipperIndex === skipperIndex);
     if (result && result.customPoints !== undefined && result.customPoints !== null) {
       return result.customPoints;
     }
   }
 
-  // Calculate the number of starters for this specific race
+  if (isEntrantsPlusOne(letterScore as LetterScore)) {
+    return skippers.length + 1;
+  }
+
   const raceStarters = raceResults.filter(result =>
     result.race === race &&
     (result.position !== null || result.letterScore)
   ).length;
 
-  // If no starters data available, fall back to total skippers
   const numStarters = raceStarters > 0 ? raceStarters : skippers.length;
-
-  // For scratch racing, letter scores typically get points equal to number of starters + 1
   return numStarters + 1;
 };
 

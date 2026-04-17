@@ -75,8 +75,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   const [currentDropRules, setCurrentDropRules] = useState<number[] | string>(initialDropRules);
   const [customDropRules, setCustomDropRules] = useState('');
   const [isCustomDropRules, setIsCustomDropRules] = useState(false);
-  const [showFlag, setShowFlag] = useState(currentEvent?.show_flag ?? true);
-  const [showCountry, setShowCountry] = useState(currentEvent?.show_country ?? true);
+  const [showFlag, setShowFlag] = useState(currentEvent?.show_flag ?? false);
+  const [showCountry, setShowCountry] = useState(currentEvent?.show_country ?? false);
   const [isHeatRacingEnabled, setIsHeatRacingEnabled] = useState(
     initialHeatManagement?.configuration.enabled || false
   );
@@ -87,8 +87,18 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   // Observer settings
   const [enableObservers, setEnableObservers] = useState(currentEvent?.enable_observers ?? true);
   const [observersPerHeat, setObserversPerHeat] = useState(currentEvent?.observers_per_heat ?? 2);
-  const [enableRollCall, setEnableRollCall] = useState(currentEvent?.enable_roll_call ?? true);
+  const [enableRollCall, setEnableRollCall] = useState(currentEvent?.enable_roll_call ?? false);
   const [autoCompleteSail, setAutoCompleteSail] = useState(currentEvent?.auto_complete_sail ?? true);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (currentEvent?.enable_observers !== undefined) setEnableObservers(currentEvent.enable_observers);
+    if (currentEvent?.observers_per_heat !== undefined) setObserversPerHeat(currentEvent.observers_per_heat);
+    if (currentEvent?.enable_roll_call !== undefined) setEnableRollCall(currentEvent.enable_roll_call);
+    if (currentEvent?.auto_complete_sail !== undefined) setAutoCompleteSail(currentEvent.auto_complete_sail);
+    if (currentEvent?.show_flag !== undefined) setShowFlag(currentEvent.show_flag);
+    if (currentEvent?.show_country !== undefined) setShowCountry(currentEvent.show_country);
+  }, [isOpen, currentEvent?.id, currentEvent?.enable_roll_call, currentEvent?.auto_complete_sail, currentEvent?.enable_observers, currentEvent?.observers_per_heat, currentEvent?.show_flag, currentEvent?.show_country]);
 
   // Start system
 
@@ -520,7 +530,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       },
       observerSettings: {
         enable_observers: enableObservers,
-        observers_per_heat: observersPerHeat
+        observers_per_heat: observersPerHeat,
+        enable_roll_call: enableRollCall,
+        auto_complete_sail: autoCompleteSail
       }
     });
 
@@ -584,7 +596,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       },
       observerSettings: {
         enable_observers: enableObservers,
-        observers_per_heat: observersPerHeat
+        observers_per_heat: observersPerHeat,
+        enable_roll_call: enableRollCall,
+        auto_complete_sail: autoCompleteSail
       }
     });
 
@@ -1654,6 +1668,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                           </div>
                         </div>
 
+                        {isSHRS && (
                         <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
                           <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-3`}>
                             Number of Races
@@ -1692,6 +1707,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                             />
                           </div>
                         </div>
+                        )}
 
                         {isSHRS && (
                           <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm space-y-4`}>
@@ -2250,7 +2266,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             },
             observerSettings: {
               enable_observers: enableObservers,
-              observers_per_heat: observersPerHeat
+              observers_per_heat: observersPerHeat,
+              enable_roll_call: enableRollCall,
+              auto_complete_sail: autoCompleteSail
             }
           });
 

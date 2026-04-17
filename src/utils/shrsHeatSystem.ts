@@ -27,7 +27,7 @@ export interface SHRSConfig {
  * Rule 5.3 also adds WTH (withdrawn from series) between DNC and UFD.
  */
 export const SHRS_NON_FINISHER_ORDER: LetterScore[] = [
-  'DNF', 'RET', 'NSC', 'OCS', 'DNS', 'DNC', 'WDN', 'BFD', 'DSQ', 'DNE'
+  'DNF', 'RET', 'NSC', 'OCS', 'DNS', 'DNC', 'WDN', 'UFD', 'BFD', 'DSQ', 'ZFP', 'SCP', 'DPI', 'DNE'
 ];
 
 export function getNonFinisherPriority(letterScore: LetterScore): number {

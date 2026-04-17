@@ -16,19 +16,26 @@ interface LetterScoreSelectorProps {
 }
 
 const letterScores: { code: LetterScore; name: string; description: string; color: string; scoring: string }[] = [
-  { code: 'DNS', name: 'Did Not Start', description: 'Did not start the race', color: 'bg-red-600', scoring: 'Starter +1' },
-  { code: 'DNF', name: 'Did Not Finish', description: 'Started but did not finish', color: 'bg-orange-600', scoring: 'Starter +1' },
-  { code: 'DSQ', name: 'Disqualified', description: 'DSQ for rule violation', color: 'bg-purple-600', scoring: 'Starter +1' },
-  { code: 'OCS', name: 'On Course Side', description: 'Started early, didn\'t return', color: 'bg-yellow-600', scoring: 'Starter +1' },
-  { code: 'BFD', name: 'Black Flag', description: 'DSQ under black flag rule', color: 'bg-gray-800', scoring: 'Starter +1' },
+  { code: 'DNF', name: 'Did Not Finish', description: 'Started but did not finish', color: 'bg-orange-600', scoring: 'Heat +1' },
+  { code: 'NSC', name: 'Not Sailed Course', description: 'Finished but course error', color: 'bg-orange-500', scoring: 'Heat +1' },
+  { code: 'RET', name: 'Retired', description: 'Retired voluntarily', color: 'bg-amber-600', scoring: 'Heat +1' },
+  { code: 'OCS', name: 'On Course Side', description: 'Started early, didn\'t return', color: 'bg-yellow-600', scoring: 'Heat +1' },
+  { code: 'DNS', name: 'Did Not Start', description: 'Did not start the race', color: 'bg-red-600', scoring: 'Heat +1' },
+  { code: 'DNC', name: 'Did Not Compete', description: 'Never present in race area', color: 'bg-red-700', scoring: 'Heat +1' },
+  { code: 'UFD', name: 'U Flag DSQ', description: 'DSQ under rule 30.3 (U flag)', color: 'bg-rose-700', scoring: 'Entrant +1' },
+  { code: 'BFD', name: 'Black Flag DSQ', description: 'DSQ under black flag rule 30.4', color: 'bg-gray-800', scoring: 'Entrant +1' },
+  { code: 'DSQ', name: 'Disqualified', description: 'DSQ for rule violation', color: 'bg-red-800', scoring: 'Entrant +1' },
+  { code: 'DNE', name: 'Non-Excludable DSQ', description: 'DSQ that cannot be dropped', color: 'bg-red-900', scoring: 'Entrant +1' },
+  { code: 'WDN', name: 'Withdrawn', description: 'Formally withdrew from event', color: 'bg-slate-600', scoring: 'Entrant +1' },
   { code: 'RDG', name: 'Redress Given', description: 'Given redress by committee', color: 'bg-green-600', scoring: 'Custom' },
-  { code: 'DPI', name: 'Discretionary Penalty', description: 'Received discretionary penalty', color: 'bg-pink-600', scoring: 'Custom' },
-  { code: 'RET', name: 'Retired', description: 'Retired voluntarily', color: 'bg-amber-600', scoring: 'Starter +1' },
-  { code: 'DNC', name: 'Did Not Compete', description: 'Never present in race area', color: 'bg-red-700', scoring: 'Entrant +1' },
-  { code: 'DNE', name: 'Non-Excludable DSQ', description: 'DSQ that cannot be dropped', color: 'bg-purple-800', scoring: 'Starter +1' },
-  { code: 'NSC', name: 'Not Sailed Correct Course', description: 'Finished but course error', color: 'bg-orange-500', scoring: 'Starter +1' },
-  { code: 'WDN', name: 'Withdrawn', description: 'Formally withdrew from event', color: 'bg-slate-600', scoring: 'Entrant +1' }
+  { code: 'DPI', name: 'Discretionary Penalty', description: 'Discretionary penalty imposed', color: 'bg-pink-600', scoring: 'Custom' },
+  { code: 'ZFP', name: '20% Penalty', description: 'Rule 30.2 penalty (20%)', color: 'bg-teal-600', scoring: 'Custom' },
+  { code: 'SCP', name: 'Scoring Penalty', description: 'Scoring penalty under rule 44.3', color: 'bg-cyan-700', scoring: 'Custom' }
 ];
+
+type RdgMode = 'avg_event' | 'avg_penultimate' | 'manual';
+
+const CUSTOM_POINTS_CODES: LetterScore[] = ['RDG', 'DPI', 'ZFP', 'SCP'];
 
 export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
   isOpen,
@@ -43,7 +50,7 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
   const [selectedLetterScore, setSelectedLetterScore] = useState<LetterScore | null>(null);
   const [showCustomPoints, setShowCustomPoints] = useState(false);
   const [customPoints, setCustomPoints] = useState<string>('');
-  const [rdgMode, setRdgMode] = useState<'avg_event' | 'manual'>('avg_event');
+  const [rdgMode, setRdgMode] = useState<RdgMode>('avg_event');
 
   const calculateAveragePoints = (): number | null => {
     if (!skipperPreviousResults || skipperPreviousResults.length === 0) {
@@ -77,7 +84,7 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
       setSelectedLetterScore(letterScore);
       setShowCustomPoints(true);
       setRdgMode('avg_event');
-    } else if (letterScore === 'DPI') {
+    } else if (CUSTOM_POINTS_CODES.includes(letterScore)) {
       setSelectedLetterScore(letterScore);
       setShowCustomPoints(true);
       setRdgMode('manual');
@@ -89,6 +96,8 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
   const handleCustomPointsSubmit = () => {
     if (selectedLetterScore === 'RDG' && rdgMode === 'avg_event') {
       onSelect(selectedLetterScore!, -1);
+    } else if (selectedLetterScore === 'RDG' && rdgMode === 'avg_penultimate') {
+      onSelect(selectedLetterScore!, -2);
     } else {
       const points = parseFloat(customPoints);
       if (isNaN(points) || points < 0.1) {
@@ -110,6 +119,26 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
 
   if (!isOpen) return null;
 
+  const getCustomPointsTitle = () => {
+    switch (selectedLetterScore) {
+      case 'RDG': return 'Redress';
+      case 'DPI': return 'Discretionary Penalty';
+      case 'ZFP': return '20% Penalty';
+      case 'SCP': return 'Scoring Penalty';
+      default: return 'Custom Points';
+    }
+  };
+
+  const getCustomPointsColor = () => {
+    switch (selectedLetterScore) {
+      case 'RDG': return 'bg-green-600';
+      case 'DPI': return 'bg-pink-600';
+      case 'ZFP': return 'bg-teal-600';
+      case 'SCP': return 'bg-cyan-700';
+      default: return 'bg-slate-600';
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className={`w-full max-w-4xl rounded-xl shadow-xl overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
@@ -130,41 +159,66 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
 
         <div className="p-6">
           {!showCustomPoints ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {letterScores.map((score) => (
-                <button
-                  key={score.code}
-                  onClick={() => handleLetterScoreSelect(score.code)}
-                  className={`
-                    p-4 rounded-lg text-left transition-all hover:scale-[1.02] text-white relative
-                    ${score.color}
-                  `}
-                >
-                  <div className="mb-2">
-                    <div className="font-bold text-xl">{score.code}</div>
-                    <div className="text-sm opacity-90 leading-tight">{score.name}</div>
-                  </div>
-                  <div className="text-xs opacity-75 mb-2 leading-tight">
-                    {score.description}
-                  </div>
-                  <div className="absolute top-2 right-2">
-                    <span className="bg-black/20 text-white px-2 py-1 rounded-full text-xs font-medium">
-                      {score.scoring}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+            <>
+              <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                HEAT + 1 SCORES
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
+                {letterScores.filter(s => s.scoring === 'Heat +1').map((score) => (
+                  <button
+                    key={score.code}
+                    onClick={() => handleLetterScoreSelect(score.code)}
+                    className={`p-3 rounded-lg text-left transition-all hover:scale-[1.02] text-white relative ${score.color}`}
+                  >
+                    <div className="font-bold text-lg">{score.code}</div>
+                    <div className="text-[11px] opacity-90 leading-tight">{score.name}</div>
+                    <div className="text-[10px] opacity-70 mt-1 leading-tight">{score.description}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                ENTRANT + 1 SCORES
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 mb-4">
+                {letterScores.filter(s => s.scoring === 'Entrant +1').map((score) => (
+                  <button
+                    key={score.code}
+                    onClick={() => handleLetterScoreSelect(score.code)}
+                    className={`p-3 rounded-lg text-left transition-all hover:scale-[1.02] text-white relative ${score.color}`}
+                  >
+                    <div className="font-bold text-lg">{score.code}</div>
+                    <div className="text-[11px] opacity-90 leading-tight">{score.name}</div>
+                    <div className="text-[10px] opacity-70 mt-1 leading-tight">{score.description}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                CUSTOM POINTS
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {letterScores.filter(s => s.scoring === 'Custom').map((score) => (
+                  <button
+                    key={score.code}
+                    onClick={() => handleLetterScoreSelect(score.code)}
+                    className={`p-3 rounded-lg text-left transition-all hover:scale-[1.02] text-white relative ${score.color}`}
+                  >
+                    <div className="font-bold text-lg">{score.code}</div>
+                    <div className="text-[11px] opacity-90 leading-tight">{score.name}</div>
+                    <div className="text-[10px] opacity-70 mt-1 leading-tight">{score.description}</div>
+                  </button>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="space-y-6">
               <div className="text-center">
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                  selectedLetterScore === 'RDG' ? 'bg-green-600' : 'bg-pink-600'
-                }`}>
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${getCustomPointsColor()}`}>
                   <Hash className="text-white" size={32} />
                 </div>
                 <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                  {selectedLetterScore} - {selectedLetterScore === 'RDG' ? 'Redress' : 'Discretionary Penalty'}
+                  {selectedLetterScore} - {getCustomPointsTitle()}
                 </h3>
                 <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   Select points method for {skipperName} in Race {raceNumber}
@@ -199,14 +253,11 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                             {rdgMode === 'avg_event' && <div className="w-2 h-2 bg-white rounded-full" />}
                           </div>
                           <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            Average Points for Event (Default)
+                            RDG AVG - Average All Races (Default)
                           </span>
                         </div>
                         <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Marked as RDG now. Average points calculated at event completion.
-                        </p>
-                        <p className={`text-xs ml-6 mt-1 italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                          HMS Rule: A proper score cannot be awarded until end of event.
+                          Average of all prior race scores. Recalculated at event completion.
                         </p>
                       </div>
                       {averagePoints !== null && (
@@ -220,6 +271,34 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                         </div>
                       )}
                     </div>
+                  </button>
+
+                  <button
+                    onClick={() => setRdgMode('avg_penultimate')}
+                    className={`
+                      w-full p-4 rounded-lg border-2 text-left transition-all mb-3
+                      ${rdgMode === 'avg_penultimate'
+                        ? 'border-amber-500 bg-amber-500/10'
+                        : darkMode
+                          ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                          : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
+                    `}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        rdgMode === 'avg_penultimate'
+                          ? 'border-amber-500 bg-amber-500'
+                          : darkMode ? 'border-slate-500' : 'border-slate-400'
+                      }`}>
+                        {rdgMode === 'avg_penultimate' && <div className="w-2 h-2 bg-white rounded-full" />}
+                      </div>
+                      <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        RDG REG - Average to Penultimate Day
+                      </span>
+                    </div>
+                    <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Average of all races excluding the final day. Used for multi-day events.
+                    </p>
                   </button>
 
                   <button
@@ -242,11 +321,11 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                         {rdgMode === 'manual' && <div className="w-2 h-2 bg-white rounded-full" />}
                       </div>
                       <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        Manual Penalty Points
+                        RDG FIX - Fixed Points (Committee Set)
                       </span>
                     </div>
                     <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Enter specific points awarded by the race committee
+                      Enter specific points determined by the race committee
                     </p>
                   </button>
                 </div>
@@ -344,7 +423,6 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
           <button
             onClick={() => {
               onSelect(null);
-              // Don't call onClose() - parent handles it immediately
             }}
             className={`
               px-4 py-2 rounded-lg font-medium transition-colors

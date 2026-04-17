@@ -2,7 +2,7 @@ export type RaceType = 'handicap' | 'scratch';
 
 export type BoatType = string;
 
-export type LetterScore = 'DNS' | 'DNF' | 'DSQ' | 'OCS' | 'BFD' | 'RDG' | 'DPI' | 'RET' | 'DNC' | 'DNE' | 'NSC' | 'WDN';
+export type LetterScore = 'DNS' | 'DNF' | 'DSQ' | 'OCS' | 'BFD' | 'UFD' | 'RDG' | 'DPI' | 'ZFP' | 'SCP' | 'RET' | 'DNC' | 'DNE' | 'NSC' | 'WDN';
 
 export const letterScoreDescriptions: Record<LetterScore, string> = {
   'DNF': 'Did not finish',
@@ -11,8 +11,11 @@ export const letterScoreDescriptions: Record<LetterScore, string> = {
   'DNC': 'Did not compete',
   'DSQ': 'Disqualified',
   'BFD': 'Black flag disqualification',
+  'UFD': 'U flag disqualification',
   'RDG': 'Redress given',
   'DPI': 'Discretionary penalty',
+  'ZFP': '20% penalty',
+  'SCP': 'Scoring penalty',
   'OCS': 'On course side',
   'DNE': 'Disqualification not excludable',
   'NSC': 'Not sailed - course error',
@@ -28,23 +31,24 @@ export const getLetterScoreValue = (
 
   switch (code) {
     case 'DNF':
+    case 'NSC':
     case 'RET':
-      return numFinishers + 1;
+    case 'OCS':
     case 'DNS':
     case 'DNC':
-      return totalCompetitors + 1;
-    case 'DSQ':
+      return numFinishers + 1;
+    case 'UFD':
     case 'BFD':
-    case 'OCS':
-      return totalCompetitors + 1;
-    case 'DNE':
-      return totalCompetitors + 2;
-    case 'RDG':
-    case 'DPI':
-      return 0; // These are handled separately (manual points)
-    case 'NSC':
+    case 'DSQ':
     case 'WDN':
       return totalCompetitors + 1;
+    case 'DNE':
+      return totalCompetitors + 1;
+    case 'RDG':
+    case 'DPI':
+    case 'ZFP':
+    case 'SCP':
+      return 0;
     default:
       return numFinishers + 1;
   }
