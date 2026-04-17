@@ -1418,7 +1418,9 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                                       e.stopPropagation();
                                       setShowLetterScoreSelector({ race, skipperIndex: index });
                                     }}
-                                    className="btn-primary-green absolute -top-1 -right-1 w-7 h-7 rounded-full bg-slate-700 text-slate-300 transition-colors flex items-center justify-center text-sm shadow-lg border border-slate-500"
+                                    className={`absolute -top-1 -right-1 w-7 h-7 rounded-full hover:bg-green-600 transition-colors flex items-center justify-center text-sm shadow-lg ${
+                                      darkMode ? 'bg-slate-700 text-slate-300 border border-slate-500' : 'bg-slate-600 text-white border border-slate-400'
+                                    }`}
                                     title="Letter Score"
                                   >
                                     +
