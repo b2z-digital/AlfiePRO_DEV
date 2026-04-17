@@ -1038,6 +1038,35 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return () => { cancelled = true; };
   }, [heatScoringMode, observerEventId, availableHeats, heatManagement.currentRound, currentEvent?.enable_observers, observerReloadTrigger]);
 
+  const fleetManagementEnabled = heatManagement.configuration.fleetManagementEnabled !== false;
+
+  if (!fleetManagementEnabled) {
+    return (
+      <div className={`space-y-6 ${isFullscreen ? 'p-2' : 'p-8'} no-select`}>
+        <div className={`rounded-xl overflow-hidden border ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white'} shadow-lg`}>
+          <SpreadsheetScoring
+            skippers={skippers}
+            currentRace={lastCompletedRace + 1}
+            numRaces={12}
+            isHeatScoring={false}
+            isFullscreen={isFullscreen}
+            raceResults={raceResults}
+            updateRaceResults={(updatedResults) => {
+              const race = lastCompletedRace + 1;
+              const currentRaceResults = updatedResults.filter(r => r.race === race);
+              currentRaceResults.forEach(result => {
+                updateRaceResults(result.race, result.skipperIndex, result.position, result.letterScore, result.customPoints);
+              });
+            }}
+            onConfirmResults={onCompleteScoring}
+            darkMode={darkMode}
+            currentEvent={currentEvent}
+          />
+        </div>
+      </div>
+    );
+  }
+
   // Don't render until a heat is selected
   if (!selectedHeat) {
     return (

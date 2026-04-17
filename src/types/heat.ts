@@ -29,10 +29,11 @@ export interface HeatConfiguration {
   allowPromotionCountChange?: boolean; // Allow RO to change promotion count mid-event
   promotionCountOverrides?: Record<number, number>; // Per-race promotion count overrides (race number → count)
   manualTieBreaks?: Record<number, number>; // Manual tie-break values (skipper index → priority, lower wins)
-  scoringSystem?: 'hms' | 'shrs'; // Heat racing scoring system type
-  shrsAssignmentMode?: 'progressive' | 'preset'; // SHR: qualifying assignment method (Progressive or Balanced)
-  shrsQualifyingRounds?: number; // SHR: number of qualifying rounds before finals
-  shrsFinalsStarted?: boolean; // SHR: whether finals have been initiated
+  scoringSystem?: 'hms' | 'shrs';
+  shrsAssignmentMode?: 'progressive' | 'preset';
+  shrsQualifyingRounds?: number;
+  shrsFinalsStarted?: boolean;
+  fleetManagementEnabled?: boolean;
 }
 
 export interface HeatAssignment {
