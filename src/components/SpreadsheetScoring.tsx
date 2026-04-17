@@ -740,11 +740,11 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
                               return (
                                 <React.Fragment key={`prev-r${r.round}-${position}`}>
-                                  <td className={`px-1 py-1 text-left font-mono font-semibold border-l ${
-                                    darkMode ? 'text-slate-400 border-slate-600/40' : 'text-slate-600 border-slate-200'
-                                  }`}>
+                                  <td className={`px-1 py-1 font-mono font-semibold border-l ${
+                                    (currentEvent?.show_flag || currentEvent?.show_country) ? 'text-left' : 'text-center'
+                                  } ${darkMode ? 'text-slate-400 border-slate-600/40' : 'text-slate-600 border-slate-200'}`}>
                                     {displayResult ? (
-                                      <span className="flex items-center gap-1">
+                                      <span className={`flex items-center gap-1 ${(currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'}`}>
                                         {(currentEvent?.show_flag || currentEvent?.show_country) && prevSkipper?.country_code && (
                                           <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                             {currentEvent?.show_flag && getCountryFlag(prevSkipper.country_code)}
@@ -780,8 +780,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                             }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
                               {isVerified || isHistoricalRow ? (
                                 <span className={`font-mono font-bold flex items-center gap-1 ${
-                                  darkMode ? 'text-slate-200' : 'text-slate-800'
-                                }`}>
+                                  (currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'
+                                } ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                                   {(() => {
                                     const cellSkipper = cell.skipperIndex !== null ? (isMultiHeatMode ? getHeatSkippers(heat)[cell.skipperIndex] : skippers[cell.skipperIndex]) : null;
                                     return (
