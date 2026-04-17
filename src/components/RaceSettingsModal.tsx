@@ -530,7 +530,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       },
       observerSettings: {
         enable_observers: enableObservers,
-        observers_per_heat: observersPerHeat
+        observers_per_heat: observersPerHeat,
+        enable_roll_call: enableRollCall,
+        auto_complete_sail: autoCompleteSail
       }
     });
 
@@ -594,7 +596,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       },
       observerSettings: {
         enable_observers: enableObservers,
-        observers_per_heat: observersPerHeat
+        observers_per_heat: observersPerHeat,
+        enable_roll_call: enableRollCall,
+        auto_complete_sail: autoCompleteSail
       }
     });
 
@@ -2260,7 +2264,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             },
             observerSettings: {
               enable_observers: enableObservers,
-              observers_per_heat: observersPerHeat
+              observers_per_heat: observersPerHeat,
+              enable_roll_call: enableRollCall,
+              auto_complete_sail: autoCompleteSail
             }
           });
 

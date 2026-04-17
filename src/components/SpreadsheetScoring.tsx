@@ -5,6 +5,7 @@ import { HeatManagement, HeatDesignation, HeatAssignment } from '../types/heat';
 import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type } from 'lucide-react';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { HeatOverallResultsModal } from './HeatOverallResultsModal';
+import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 
 interface SpreadsheetScoringProps {
   skippers: Skipper[];
@@ -743,9 +744,15 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                     darkMode ? 'text-slate-400 border-slate-600/40' : 'text-slate-600 border-slate-200'
                                   }`}>
                                     {displayResult ? (
-                                      displayResult.letterScore
-                                        ? <span className="text-amber-500">{prevSailNo}</span>
-                                        : prevSailNo
+                                      <span className="flex items-center justify-center gap-0.5">
+                                        {currentEvent?.show_flag && prevSkipper?.country_code && (
+                                          <span className="text-[10px] not-italic">{getCountryFlag(prevSkipper.country_code)}</span>
+                                        )}
+                                        {currentEvent?.show_country && prevSkipper?.country_code && (
+                                          <span className={`text-[9px] font-medium ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{getIOCCode(prevSkipper.country_code)}</span>
+                                        )}
+                                        <span>{prevSailNo}</span>
+                                      </span>
                                     ) : ''}
                                   </td>
                                   <td className={`px-1 py-1 text-center ${
@@ -753,7 +760,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                   }`}>
                                     {displayResult ? (
                                       displayResult.letterScore
-                                        ? <span className="text-amber-500 font-semibold text-[11px]">{displayResult.letterScore}</span>
+                                        ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{displayResult.letterScore}</span>
                                         : <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>OK</span>
                                     ) : ''}
                                   </td>
@@ -772,12 +779,23 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                               darkMode ? 'border-blue-500/20' : 'border-blue-200'
                             }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
                               {isVerified || isHistoricalRow ? (
-                                <span className={`font-mono font-bold ${
-                                  cell.letterScore
-                                    ? 'text-amber-500'
-                                    : darkMode ? 'text-slate-200' : 'text-slate-800'
+                                <span className={`font-mono font-bold flex items-center justify-center gap-0.5 ${
+                                  darkMode ? 'text-slate-200' : 'text-slate-800'
                                 }`}>
-                                  {cell.sailNumber || (isHistoricalRow ? '' : '-')}
+                                  {(() => {
+                                    const cellSkipper = cell.skipperIndex !== null ? (isMultiHeatMode ? getHeatSkippers(heat)[cell.skipperIndex] : skippers[cell.skipperIndex]) : null;
+                                    return (
+                                      <>
+                                        {currentEvent?.show_flag && cellSkipper?.country_code && (
+                                          <span className="text-[10px] not-italic">{getCountryFlag(cellSkipper.country_code)}</span>
+                                        )}
+                                        {currentEvent?.show_country && cellSkipper?.country_code && (
+                                          <span className={`text-[9px] font-medium ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{getIOCCode(cellSkipper.country_code)}</span>
+                                        )}
+                                        <span>{cell.sailNumber || (isHistoricalRow ? '' : '-')}</span>
+                                      </>
+                                    );
+                                  })()}
                                 </span>
                               ) : (
                                 <div className="flex items-center justify-center gap-0.5">
@@ -814,7 +832,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                             }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
                               {isVerified || isHistoricalRow ? (
                                 cell.letterScore
-                                  ? <span className="text-amber-500 font-semibold text-[11px]">{cell.letterScore}</span>
+                                  ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{cell.letterScore}</span>
                                   : hasValue && cell.isValid
                                     ? <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>OK</span>
                                     : ''
@@ -823,8 +841,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                   onClick={() => handleLetterScore(heat, position)}
                                   className={`h-7 rounded-full px-2 text-[9px] font-bold flex-shrink-0 inline-flex items-center justify-center ${
                                     darkMode
-                                      ? 'bg-amber-600/30 text-amber-400 border border-amber-500/30'
-                                      : 'bg-amber-100 text-amber-700 border border-amber-300'
+                                      ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
+                                      : 'bg-slate-100 text-slate-700 border border-slate-300'
                                   }`}
                                   title={`${cell.letterScore}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
                                 >
@@ -901,7 +919,15 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                               }`}
                               title={s.name}
                             >
-                              {sailNo}
+                              <span className="flex items-center gap-1">
+                                {currentEvent?.show_flag && s.country_code && (
+                                  <span className="text-[11px]">{getCountryFlag(s.country_code)}</span>
+                                )}
+                                {currentEvent?.show_country && s.country_code && (
+                                  <span className="text-[10px] font-medium opacity-70">{getIOCCode(s.country_code)}</span>
+                                )}
+                                <span>{sailNo}</span>
+                              </span>
                             </div>
                           );
                         })}
