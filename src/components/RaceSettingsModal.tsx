@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen as Edit2, Check, TriangleAlert as AlertTriangle, Sailboat, Eye, Grid3x2 as Grid3X3, ClipboardCheck } from 'lucide-react';
+import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen as Edit2, Check, TriangleAlert as AlertTriangle, Sailboat, Eye, Grid3x2 as Grid3X3, ClipboardCheck, Table2, Hand } from 'lucide-react';
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
 import { seedInitialHeats, validateHeatConfig, validateHeatAssignments, HMSConfig, calculateOptimalHeats, calculateHMSHeatSizes } from '../utils/hmsHeatSystem';
@@ -1073,105 +1073,53 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               </h3>
             </div>
 
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => handleScoringModeChange('pro')}
-                className={`
-                  w-full p-4 rounded-lg transition-all border-2 text-left
-                  ${scoringMode === 'pro'
-                    ? darkMode
-                      ? 'bg-blue-900/30 border-blue-600'
-                      : 'bg-blue-50 border-blue-600'
-                    : darkMode
-                      ? 'bg-slate-700 border-slate-600 hover:bg-slate-600'
-                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}
-                `}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      Pro Mode
-                    </div>
-                    <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Full table with all race details, handicaps, and scoring (Desktop)
-                    </div>
-                  </div>
-                  {scoringMode === 'pro' && (
-                    <div className="flex-shrink-0 ml-3">
+            <div className="grid grid-cols-3 gap-3">
+              {([
+                { mode: 'pro' as const, label: 'Pro Mode', desc: 'Desktop', Icon: Table2 },
+                { mode: 'touch' as const, label: 'Touch Mode', desc: 'Tablet', Icon: Hand },
+                { mode: 'spreadsheet' as const, label: 'Spreadsheet', desc: 'Traditional', Icon: Grid3X3 },
+              ]).map(({ mode, label, desc, Icon }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => handleScoringModeChange(mode)}
+                  className={`
+                    relative flex flex-col items-center gap-2 p-4 rounded-xl transition-all border-2 text-center
+                    ${scoringMode === mode
+                      ? darkMode
+                        ? 'bg-blue-900/30 border-blue-500 ring-1 ring-blue-500/30'
+                        : 'bg-blue-50 border-blue-500 ring-1 ring-blue-200'
+                      : darkMode
+                        ? 'bg-slate-700/60 border-slate-600 hover:bg-slate-600/80 hover:border-slate-500'
+                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300'}
+                  `}
+                >
+                  {scoringMode === mode && (
+                    <div className="absolute top-2 right-2">
                       <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
-                        <Check size={14} className="text-white" />
+                        <Check size={12} className="text-white" />
                       </div>
                     </div>
                   )}
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleScoringModeChange('touch')}
-                className={`
-                  w-full p-4 rounded-lg transition-all border-2 text-left
-                  ${scoringMode === 'touch'
-                    ? darkMode
-                      ? 'bg-blue-900/30 border-blue-600'
-                      : 'bg-blue-50 border-blue-600'
-                    : darkMode
-                      ? 'bg-slate-700 border-slate-600 hover:bg-slate-600'
-                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}
-                `}
-              >
-                <div className="flex items-center justify-between">
+                  <div className={`p-2.5 rounded-lg ${
+                    scoringMode === mode
+                      ? 'bg-blue-600/20 text-blue-400'
+                      : darkMode
+                        ? 'bg-slate-600/50 text-slate-400'
+                        : 'bg-slate-200/80 text-slate-500'
+                  }`}>
+                    <Icon size={24} />
+                  </div>
                   <div>
-                    <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      Touch Mode
+                    <div className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      {label}
                     </div>
-                    <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Simplified tablet interface with large sail numbers (Tablet)
+                    <div className={`text-[11px] mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {desc}
                     </div>
                   </div>
-                  {scoringMode === 'touch' && (
-                    <div className="flex-shrink-0 ml-3">
-                      <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
-                        <Check size={14} className="text-white" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleScoringModeChange('spreadsheet')}
-                className={`
-                  w-full p-4 rounded-lg transition-all border-2 text-left
-                  ${scoringMode === 'spreadsheet'
-                    ? darkMode
-                      ? 'bg-blue-900/30 border-blue-600'
-                      : 'bg-blue-50 border-blue-600'
-                    : darkMode
-                      ? 'bg-slate-700 border-slate-600 hover:bg-slate-600'
-                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}
-                `}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      Spreadsheet Mode
-                    </div>
-                    <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Traditional spreadsheet entry - type sail numbers into finishing positions
-                    </div>
-                  </div>
-                  {scoringMode === 'spreadsheet' && (
-                    <div className="flex-shrink-0 ml-3">
-                      <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
-                        <Check size={14} className="text-white" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </button>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1228,50 +1176,6 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               </h3>
             </div>
 
-            {/* Number of Races - only in General section when heat racing is off */}
-            {!isHeatRacingEnabled && (
-              <div className="space-y-3">
-                <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Hash size={16} />
-                    Number of Races
-                  </div>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {NUM_RACES_OPTIONS.map(num => (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => setCurrentNumRaces(num)}
-                      className={`
-                        px-4 py-2 rounded-lg text-sm font-medium transition-all
-                        ${currentNumRaces === num
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : darkMode
-                            ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }
-                      `}
-                    >
-                      {num} Races
-                    </button>
-                  ))}
-                  <input
-                    type="number"
-                    value={currentNumRaces}
-                    onChange={(e) => setCurrentNumRaces(parseInt(e.target.value) || 12)}
-                    min="1"
-                    max="50"
-                    className={`
-                      w-20 px-3 py-2 rounded-lg text-sm text-center border
-                      ${darkMode
-                        ? 'bg-slate-700 border-slate-600 text-white'
-                        : 'bg-white border-slate-300 text-slate-900'}
-                    `}
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Scoring System - Only show when heat racing is disabled */}
             {!isHeatRacingEnabled && (
