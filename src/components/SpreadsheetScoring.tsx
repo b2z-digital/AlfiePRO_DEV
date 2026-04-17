@@ -111,13 +111,13 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     };
   }, []);
 
+  const isMultiHeatMode = !!(heatManagement && propAvailableHeats && heatSkipperIndicesMap && allHeatRaceResults);
+
   useEffect(() => {
     if (!isMultiHeatMode) {
       setSingleFleetRace(initialRace);
     }
   }, [initialRace, isMultiHeatMode]);
-
-  const isMultiHeatMode = !!(heatManagement && propAvailableHeats && heatSkipperIndicesMap && allHeatRaceResults);
 
   const availableHeats = useMemo(() => {
     if (isMultiHeatMode && propAvailableHeats) {
