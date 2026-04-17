@@ -4,8 +4,9 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation } from '../types/heat';
-import { getObserverAssignments, ObserverAssignment } from '../utils/observerUtils';
+import { getObserverAssignments, resolveObserverEventId, ObserverAssignment } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
+import type { RaceEvent } from '../types/race';
 
 interface HeatRaceResultsModalProps {
   isOpen: boolean;
@@ -13,7 +14,7 @@ interface HeatRaceResultsModalProps {
   skippers: Skipper[];
   heatManagement: HeatManagement;
   darkMode: boolean;
-  currentEvent?: { id: string } | null;
+  currentEvent?: RaceEvent | null;
 }
 
 export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
@@ -42,66 +43,37 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showExportMenu]);
 
-  // Fetch observers for all heats and rounds
   useEffect(() => {
     const fetchObservers = async () => {
-      if (!isOpen || !currentEvent?.id) {
-        console.log('[HeatRaceResultsModal] NOT fetching observers - isOpen:', isOpen, 'currentEvent:', currentEvent?.id);
-        return;
-      }
+      if (!isOpen || !currentEvent?.id) return;
 
-      console.log('[HeatRaceResultsModal] Starting observer fetch for event:', currentEvent.id);
+      const resolvedEventId = await resolveObserverEventId(currentEvent as RaceEvent) || currentEvent.id;
       const observersMap = new Map<string, ObserverAssignment[]>();
 
-      // Debug: Check what's in the database for this event
-      const { data: allObservers, error: dbError } = await supabase
-        .from('heat_observers')
-        .select('*')
-        .eq('event_id', currentEvent.id);
-
-      console.log('[HeatRaceResultsModal] ALL observers in database for this event:', allObservers, 'Error:', dbError);
-
-      // Get all completed rounds
       const completedRounds = heatManagement.rounds.filter(r => r.completed);
-      console.log('[HeatRaceResultsModal] Completed rounds:', completedRounds.map(r => ({
-        round: r.round,
-        heatAssignments: r.heatAssignments.map(a => a.heatDesignation)
-      })));
 
-      // For each completed round, fetch observers for each heat
       for (const round of completedRounds) {
-        console.log(`[HeatRaceResultsModal] Processing Round ${round.round} with ${round.heatAssignments.length} heat assignments`);
-
         for (const assignment of round.heatAssignments) {
           const heat = assignment.heatDesignation;
-          // Heat numbers: A=1, B=2, C=3, etc.
           const heatNumber = heat.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
-
-          console.log(`[HeatRaceResultsModal] Fetching observers for Heat ${heat} (${heatNumber}), Round ${round.round}`);
 
           try {
             const observers = await getObserverAssignments(
-              currentEvent.id,
+              resolvedEventId,
               heatNumber,
               round.round
             );
 
-            console.log(`[HeatRaceResultsModal] Heat ${heat} Round ${round.round} observers:`, observers);
-
             if (observers && observers.length > 0) {
               const key = `${heat}-${round.round}`;
               observersMap.set(key, observers);
-              console.log(`[HeatRaceResultsModal] Stored ${observers.length} observers for key: ${key}`);
-            } else {
-              console.log(`[HeatRaceResultsModal] No observers found for Heat ${heat} Round ${round.round}`);
             }
           } catch (error) {
-            console.error(`[HeatRaceResultsModal] Error fetching observers for heat ${heat}, round ${round.round}:`, error);
+            console.error(`Error fetching observers for heat ${heat}, round ${round.round}:`, error);
           }
         }
       }
 
-      console.log('[HeatRaceResultsModal] Final observers map:', Array.from(observersMap.entries()));
       setObserversByHeatRound(observersMap);
     };
 
@@ -803,8 +775,6 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                         {completedRounds.map(round => {
                           const key = `${heat}-${round.round}`;
                           const observers = observersByHeatRound.get(key) || [];
-
-                          console.log(`[HeatRaceResultsModal RENDER] Heat ${heat}, Round ${round.round}, Key: ${key}, Observers:`, observers, 'Map has key:', observersByHeatRound.has(key));
 
                           return (
                             <td

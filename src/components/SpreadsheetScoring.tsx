@@ -633,7 +633,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                             key={`race-lbl-${r.round}`}
                             colSpan={3}
                             className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l ${
-                              darkMode ? 'text-slate-300 border-slate-500/50' : 'text-slate-600 border-slate-400/50'
+                              darkMode ? 'text-slate-300 border-slate-500/50' : 'text-slate-500 border-slate-400/50'
                             }`}
                           >
                             Race {r.round}
@@ -654,17 +654,17 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                         {completedRounds.map(r => (
                           <React.Fragment key={`hdr-r${r.round}`}>
                             <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider border-l ${
-                              darkMode ? 'text-slate-500 border-slate-600/40' : 'text-slate-400 border-slate-200'
+                              darkMode ? 'text-slate-500 border-slate-600/40' : 'text-slate-500 border-slate-200'
                             }`}>
                               <span className="text-[10px]">Sail No.</span>
                             </th>
                             <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
-                              darkMode ? 'text-slate-500' : 'text-slate-400'
+                              darkMode ? 'text-slate-500' : 'text-slate-500'
                             }`}>
                               <span className="text-[10px]">Comment</span>
                             </th>
                             <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
-                              darkMode ? 'text-slate-500' : 'text-slate-400'
+                              darkMode ? 'text-slate-500' : 'text-slate-500'
                             }`}>
                               <span className="text-[10px]">Pts</span>
                             </th>
@@ -761,7 +761,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                     {displayResult ? (
                                       displayResult.letterScore
                                         ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{displayResult.letterScore}</span>
-                                        : <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>OK</span>
+                                        : <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
                                     ) : ''}
                                   </td>
                                   <td className={`px-1 py-1 text-center font-mono font-semibold ${
@@ -834,7 +834,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                 cell.letterScore
                                   ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{cell.letterScore}</span>
                                   : hasValue && cell.isValid
-                                    ? <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>OK</span>
+                                    ? <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
                                     : ''
                               ) : cell.letterScore ? (
                                 <button
@@ -854,7 +854,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                   className={`h-7 rounded-full px-2 text-[11px] font-medium flex-shrink-0 inline-flex items-center justify-center transition-colors ${
                                     darkMode
                                       ? 'text-slate-400 hover:bg-slate-700/60 hover:text-white border border-transparent hover:border-slate-600/70'
-                                      : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700 border border-transparent hover:border-slate-200'
+                                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 border border-transparent hover:border-slate-200'
                                   }`}
                                   title="Assign letter score (DNS, DNF, DSQ, etc.)"
                                 >
