@@ -35,7 +35,7 @@ interface HeatScoringTableProps {
   onShowCharts: () => void;
   onConfigureHeats: () => void;
   onRaceSettingsChange: (settings: { numRaces: number; dropRules: number[] }) => void;
-  updateRaceResults: (race: number, skipperIndex: number, position: number | null, letterScore?: any, customPoints?: number) => void;
+  updateRaceResults: (race: number, skipperIndex: number, position: number | null, letterScore?: any, customPoints?: number, hmsHeat?: string, hmsPosition?: number) => void;
   raceResults: any[];
   enableRaceEditing: (raceNum: number | null) => void;
   lastCompletedRace: number;

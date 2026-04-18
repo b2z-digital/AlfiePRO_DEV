@@ -12,24 +12,6 @@ const LETTER_SCORE_CODES: LetterScore[] = [
   'ZFP', 'SCP', 'RET', 'DNC', 'DNE', 'NSC', 'WDN'
 ];
 
-const LETTER_SCORE_COLORS: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {
-  DNF: { bg: 'bg-orange-100', text: 'text-orange-700', darkBg: 'bg-orange-900/40', darkText: 'text-orange-300' },
-  NSC: { bg: 'bg-orange-100', text: 'text-orange-700', darkBg: 'bg-orange-900/40', darkText: 'text-orange-300' },
-  RET: { bg: 'bg-amber-100', text: 'text-amber-700', darkBg: 'bg-amber-900/40', darkText: 'text-amber-300' },
-  OCS: { bg: 'bg-yellow-100', text: 'text-yellow-700', darkBg: 'bg-yellow-900/40', darkText: 'text-yellow-300' },
-  DNS: { bg: 'bg-red-100', text: 'text-red-700', darkBg: 'bg-red-900/40', darkText: 'text-red-300' },
-  DNC: { bg: 'bg-red-100', text: 'text-red-700', darkBg: 'bg-red-900/40', darkText: 'text-red-300' },
-  UFD: { bg: 'bg-rose-100', text: 'text-rose-700', darkBg: 'bg-rose-900/40', darkText: 'text-rose-300' },
-  BFD: { bg: 'bg-slate-200', text: 'text-slate-800', darkBg: 'bg-slate-700', darkText: 'text-slate-200' },
-  DSQ: { bg: 'bg-red-200', text: 'text-red-800', darkBg: 'bg-red-900/50', darkText: 'text-red-200' },
-  DNE: { bg: 'bg-red-200', text: 'text-red-800', darkBg: 'bg-red-900/50', darkText: 'text-red-200' },
-  WDN: { bg: 'bg-slate-200', text: 'text-slate-700', darkBg: 'bg-slate-700', darkText: 'text-slate-300' },
-  RDG: { bg: 'bg-green-100', text: 'text-green-700', darkBg: 'bg-green-900/40', darkText: 'text-green-300' },
-  DPI: { bg: 'bg-pink-100', text: 'text-pink-700', darkBg: 'bg-pink-900/40', darkText: 'text-pink-300' },
-  ZFP: { bg: 'bg-teal-100', text: 'text-teal-700', darkBg: 'bg-teal-900/40', darkText: 'text-teal-300' },
-  SCP: { bg: 'bg-cyan-100', text: 'text-cyan-700', darkBg: 'bg-cyan-900/40', darkText: 'text-cyan-300' },
-};
-
 const HEAT_LABELS: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E'];
 const TOTAL_RACES = 41;
 
@@ -63,7 +45,7 @@ interface HmsManualSpreadsheetProps {
   raceResults: any[];
   currentEvent: RaceEvent | null;
   onConfigureHeats: () => void;
-  updateRaceResults: (race: number, skipperIndex: number, position: number | null, letterScore?: any, customPoints?: number) => void;
+  updateRaceResults: (race: number, skipperIndex: number, position: number | null, letterScore?: any, customPoints?: number, hmsHeat?: string, hmsPosition?: number) => void;
   deleteRaceResult: (race: number, skipperIndex: number) => void;
   isFullscreen?: boolean;
   onOpenStartBox?: () => void;
@@ -261,9 +243,9 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const finalIdx = skipperIdx ?? cell.skipperIndex;
     if (finalIdx !== undefined && finalIdx !== null) {
       if (parsedScore) {
-        updateRaceResults(race, finalIdx, null, parsedScore, cell.customPoints);
+        updateRaceResults(race, finalIdx, null, parsedScore, cell.customPoints, heat, position);
       } else {
-        updateRaceResults(race, finalIdx, position, undefined, undefined);
+        updateRaceResults(race, finalIdx, position, undefined, undefined, heat, position);
       }
     } else {
       setNoSuchBoatTarget({ heat, position, race, sailNumber: parsedSail });
@@ -287,7 +269,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       }
     }));
 
-    updateRaceResults(race, skipperIdx, position, undefined, undefined);
+    updateRaceResults(race, skipperIdx, position, undefined, undefined, heat, position);
     setDropdownTarget(null);
     setDropdownFilter('');
 
@@ -325,7 +307,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       }));
       if (cell?.skipperIndex != null) {
         deleteRaceResult(race, cell.skipperIndex);
-        updateRaceResults(race, cell.skipperIndex, position, undefined, undefined);
+        updateRaceResults(race, cell.skipperIndex, position, undefined, undefined, heat, position);
       }
     } else {
       setCells(prev => ({
@@ -339,7 +321,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         }
       }));
       if (cell?.skipperIndex != null) {
-        updateRaceResults(race, cell.skipperIndex, null, score, customPoints);
+        updateRaceResults(race, cell.skipperIndex, null, score, customPoints, heat, position);
       }
     }
 
@@ -490,6 +472,19 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return count;
   }, [cells, maxPositions, promotionCount]);
 
+  const getOkCountAbovePosition = useCallback((h: HeatDesignation, position: number, race: number): number => {
+    let count = 0;
+    for (let p = 1; p < position; p++) {
+      const k = getCellKey(h, p, race);
+      const c = cells[k];
+      if (!c?.sailNumber?.trim()) continue;
+      const isProm = h !== 'A' && race > 1 && p <= promotionCount;
+      if (isProm) continue;
+      if (!c.letterScore) count++;
+    }
+    return count;
+  }, [cells, promotionCount]);
+
   const getHeatOffset = useCallback((heat: HeatDesignation, race: number): number => {
     if (race === 1) return 0;
     const heatIdx = HEAT_LABELS.indexOf(heat);
@@ -583,11 +578,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     if (cell?.letterScore) {
       if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
       if (cell.customPoints === -1) return 'AVG';
-      if (race === 1) {
-        return getHeatEntryCount(heat, race) + 1;
-      }
-      const totalFleet = getTotalNonPromotedFleet(race);
-      return totalFleet + 1;
+      return getHeatEntryCount(heat, race) + 1;
     }
 
     if (race === 1 || heat === 'A') return position;
@@ -595,7 +586,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const offset = getHeatOffset(heat, race);
     const effectivePos = position - promotionCount;
     return offset + effectivePos;
-  }, [promotionCount, getHeatOffset, getEmptyRowScore, getTotalNonPromotedFleet, getHeatEntryCount]);
+  }, [promotionCount, getHeatOffset, getEmptyRowScore, getHeatEntryCount]);
 
   const getExpForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();
@@ -608,12 +599,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
     if (hasSail) {
       if (cell?.letterScore) {
-        if (race === 1) {
-          return getHeatEntryCount(heat, race);
-        }
+        const okAbove = getOkCountAbovePosition(heat, position, race);
+        if (race === 1 || heat === 'A') return okAbove;
         const offset = getHeatOffset(heat, race);
-        const regularCount = getHeatNonLetterNonPromotedCount(heat, race);
-        return offset + regularCount;
+        return offset + okAbove;
       }
       if (race === 1 || heat === 'A') return position;
       const offset = getHeatOffset(heat, race);
@@ -622,7 +611,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
 
     return getEmptyRowScore(heat, race);
-  }, [getHeatOffset, getHeatEntryCount, getHeatNonLetterNonPromotedCount, getEmptyRowScore, promotionCount]);
+  }, [getHeatOffset, getHeatEntryCount, getOkCountAbovePosition, getEmptyRowScore, promotionCount]);
 
   const availableSkippersForDropdown = useMemo(() => {
     if (!dropdownTarget) return [];
@@ -793,7 +782,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
               return (
                 <React.Fragment key={heat}>
-                  <tr style={{ height: 20 }}>
+                  <tr style={{ height: 16 }}>
                     <td
                       className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[11px] text-black whitespace-nowrap text-center"
                       style={{ backgroundColor: '#FF00FF' }}
@@ -842,7 +831,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                         className="hover:bg-slate-50"
                       >
                         <td
-                          className="sticky left-0 z-10 px-2 py-0 text-[12px] font-extrabold border-r border-slate-300 whitespace-nowrap text-black text-center"
+                          className="sticky left-0 z-10 px-2 py-0 text-[12px] font-extrabold border-r border-slate-300 whitespace-nowrap text-black text-center leading-tight"
                           style={{ backgroundColor: '#FFFF00' }}
                         >
                           {getOrdinal(position)}
@@ -856,7 +845,6 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                           const isInvalid = hasSail && cell?.isValid === false;
                           const isDup = hasSail && cell?.isDuplicate;
                           const ls = cell?.letterScore;
-                          const lsColor = ls ? LETTER_SCORE_COLORS[ls] : null;
                           const isPromotedSlot = showPromotion && race > 1;
                           const pts = getPointsForCell(heat, position, race, cell);
                           const exp = getExpForCell(heat, position, race, cell);
@@ -892,7 +880,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                     setDropdownFilter('');
                                   }}
                                   onKeyDown={e => handleKeyDown(e, heat, position, race)}
-                                  className={`w-full px-0.5 py-[1px] text-[12px] text-center border-0 outline-none bg-transparent
+                                  className={`w-full px-0.5 py-0 text-[12px] text-center border-0 outline-none bg-transparent leading-tight
                                     ${isInvalid
                                       ? 'text-red-500 font-bold'
                                       : isDup
@@ -948,15 +936,15 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 onClick={() => handleCommentClick(heat, position, race)}
                               >
                                 {isPromotedEntry ? (
-                                  <div className="px-1 py-[1px] text-[11px] text-center font-bold text-black">
+                                  <div className="px-1 py-0 text-[11px] text-center font-bold text-black">
                                     UP
                                   </div>
-                                ) : ls && lsColor ? (
-                                  <div className={`px-0.5 py-[1px] text-[11px] text-center font-bold rounded-sm mx-0.5 ${lsColor.bg} ${lsColor.text}`}>
+                                ) : ls ? (
+                                  <div className="px-1 py-0 text-[11px] text-center font-medium text-black">
                                     {ls}
                                   </div>
                                 ) : hasSail ? (
-                                  <div className="px-1 py-[1px] text-[11px] text-center font-medium text-black">
+                                  <div className="px-1 py-0 text-[11px] text-center font-medium text-black">
                                     OK
                                   </div>
                                 ) : null}
@@ -966,7 +954,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 className={`px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
-                                <div className={`px-1 py-[1px] text-[11px] text-center font-medium tabular-nums ${
+                                <div className={`px-1 py-0 text-[11px] text-center font-medium tabular-nums leading-tight ${
                                   hasSail ? 'text-black' : ''
                                 }`}>
                                   {pts !== '' ? pts : ''}
@@ -977,7 +965,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 className={`px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
-                                <div className="px-1 py-[1px] text-[11px] text-center font-medium tabular-nums text-black">
+                                <div className="px-1 py-0 text-[11px] text-center font-medium tabular-nums leading-tight text-black">
                                   {exp !== '' ? exp : ''}
                                 </div>
                               </td>

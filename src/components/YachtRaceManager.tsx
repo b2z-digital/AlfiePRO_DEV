@@ -1220,7 +1220,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     }
   };
 
-  const updateRaceResults = (race: number, skipperIndex: number, position: number | null, letterScore?: LetterScore, customPoints?: number) => {
+  const updateRaceResults = (race: number, skipperIndex: number, position: number | null, letterScore?: LetterScore, customPoints?: number, hmsHeat?: string, hmsPosition?: number) => {
     console.log('Updating race results:', {
       race,
       skipperIndex,
@@ -1306,9 +1306,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         ...newResults[resultIndex],
         position,
         letterScore,
-        customPoints, // Store custom points for RDG/DPI
+        customPoints,
         handicap: currentHandicap,
-        adjustedHcap: currentHandicap // Will be recalculated by calculateHandicaps
+        adjustedHcap: currentHandicap,
+        ...(hmsHeat !== undefined && { hmsHeat }),
+        ...(hmsPosition !== undefined && { hmsPosition }),
       };
     } else {
       newResults.push({
@@ -1316,9 +1318,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         skipperIndex,
         position,
         letterScore,
-        customPoints, // Store custom points for RDG/DPI
+        customPoints,
         handicap: currentHandicap,
-        adjustedHcap: currentHandicap // Will be recalculated by calculateHandicaps
+        adjustedHcap: currentHandicap,
+        ...(hmsHeat !== undefined && { hmsHeat }),
+        ...(hmsPosition !== undefined && { hmsPosition }),
       });
     }
 
