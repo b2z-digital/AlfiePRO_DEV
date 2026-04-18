@@ -107,7 +107,9 @@ export const calculateHandicaps = (
       result.handicap = currentHcaps[idx];
 
       if (result.letterScore && result.letterScore !== 'RDGfix') {
-        const letterAdj = scratchBoatBonus > 0 ? scratchBoatBonus : 0;
+        const withdrawnCodes = ['WDN'];
+        const isWithdrawn = withdrawnCodes.includes(result.letterScore);
+        const letterAdj = !isWithdrawn && scratchBoatBonus > 0 ? scratchBoatBonus : 0;
         result.adjustedHcap = Math.max(0, Math.min(capLimit, currentHcaps[idx] + letterAdj));
         const resultIndex = updatedResults.findIndex(
           r => r.race === race && r.skipperIndex === idx
