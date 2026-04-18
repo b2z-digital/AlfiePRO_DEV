@@ -550,12 +550,12 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           style={{ tableLayout: 'fixed' }}
         >
           <colgroup>
-            <col style={{ width: 324 }} />
+            <col style={{ width: 389 }} />
             {Array.from({ length: TOTAL_RACES }).map((_, i) => (
               <React.Fragment key={i}>
-                <col style={{ width: 40 }} />
                 <col style={{ width: 80 }} />
-                <col style={{ width: 40 }} />
+                <col style={{ width: 80 }} />
+                <col style={{ width: 56 }} />
                 <col style={{ width: 32 }} />
               </React.Fragment>
             ))}
@@ -632,13 +632,13 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => (
                 <React.Fragment key={race}>
                   <th className={`px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 ${raceSeparator} text-black`} style={{ backgroundColor: '#00FFFF' }}>
-                    Sail
+                    Sail No
                   </th>
                   <th className="px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black" style={{ backgroundColor: '#00FFFF' }}>
                     Comments
                   </th>
                   <th className="px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black" style={{ backgroundColor: '#00FFFF' }}>
-                    Pts
+                    Points
                   </th>
                   <th className="px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black" style={{ backgroundColor: '#00FFFF' }}>
                     Exp.
@@ -656,7 +656,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                 <React.Fragment key={heat}>
                   <tr style={{ height: 24 }}>
                     <td
-                      className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[10px] text-black whitespace-nowrap"
+                      className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[10px] text-black whitespace-nowrap text-center"
                       style={{ backgroundColor: '#FF00FF' }}
                     >
                       Heat {heat}
@@ -690,7 +690,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                         className="hover:bg-slate-50"
                       >
                         <td
-                          className="sticky left-0 z-10 px-2 py-0 text-[11px] font-bold border-r border-slate-300 whitespace-nowrap text-black"
+                          className="sticky left-0 z-10 px-2 py-0 text-[11px] font-bold border-r border-slate-300 whitespace-nowrap text-black text-center"
                           style={{ backgroundColor: '#FFFF00' }}
                         >
                           {getOrdinal(position)}
@@ -776,7 +776,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                         }}
                                         className="w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors hover:bg-slate-50 text-slate-700"
                                       >
-                                        <span className="text-[11px] font-bold min-w-[28px] text-blue-600">
+                                        <span className="text-[11px] font-bold min-w-[28px] text-black">
                                           {skipper.sailNumber || skipper.sailNo || skipper.boat_sail_number}
                                         </span>
                                         <span className="text-[10px] truncate">
