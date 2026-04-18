@@ -550,13 +550,13 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           style={{ tableLayout: 'fixed' }}
         >
           <colgroup>
-            <col style={{ width: 60 }} />
+            <col style={{ width: 500 }} />
             {Array.from({ length: TOTAL_RACES }).map((_, i) => (
               <React.Fragment key={i}>
-                <col style={{ width: 160 }} />
-                <col style={{ width: 80 }} />
-                <col style={{ width: 56 }} />
-                <col style={{ width: 32 }} />
+                <col style={{ width: 100 }} />
+                <col style={{ width: 90 }} />
+                <col style={{ width: 60 }} />
+                <col style={{ width: 40 }} />
               </React.Fragment>
             ))}
           </colgroup>
@@ -631,16 +631,16 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
               </th>
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => (
                 <React.Fragment key={race}>
-                  <th className={`px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 ${raceSeparator} text-black`} style={{ backgroundColor: '#00FFFF' }}>
+                  <th className={`px-1 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 ${raceSeparator} text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
                     Sail No
                   </th>
-                  <th className="px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Comments
                   </th>
-                  <th className="px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Points
                   </th>
-                  <th className="px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Exp.
                   </th>
                 </React.Fragment>
