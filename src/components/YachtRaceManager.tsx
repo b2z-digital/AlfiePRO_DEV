@@ -1273,9 +1273,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     updateCurrentDay();
 
     const newResults = [...raceResults];
-    const resultIndex = newResults.findIndex(
-      r => r.race === race && r.skipperIndex === skipperIndex
-    );
+    const resultIndex = hmsHeat !== undefined
+      ? newResults.findIndex(
+          r => r.race === race && r.skipperIndex === skipperIndex && r.hmsHeat === hmsHeat
+        )
+      : newResults.findIndex(
+          r => r.race === race && r.skipperIndex === skipperIndex
+        );
 
     // Get the handicap for this race - use previous race's adjusted handicap or starting handicap
     const getCurrentHandicapForRace = (raceNum: number, skipIdx: number): number => {

@@ -160,54 +160,6 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         }
       }
     });
-
-    const activeHeats = HEAT_LABELS.slice(0, Math.max(numberOfHeats, 5));
-    for (let race = 2; race <= TOTAL_RACES; race++) {
-      for (let hIdx = 0; hIdx < activeHeats.length; hIdx++) {
-        const heat = activeHeats[hIdx];
-        if (heat === 'A') continue;
-
-        const prevRace = race - 1;
-        const prevHeatResults: Array<{ skipperIndex: number; position: number; sailNo: string }> = [];
-
-        raceResults.forEach((result: any) => {
-          if (result.hmsHeat === heat && result.race === prevRace && result.hmsPosition) {
-            const isPromotedInPrev = heat !== 'A' && prevRace > 1 && result.hmsPosition <= promotionCount;
-            if (isPromotedInPrev) return;
-            if (result.letterScore) return;
-            const skipper = skippers[result.skipperIndex];
-            const sailNo = skipper?.sailNumber || skipper?.sailNo || skipper?.boat_sail_number || result.hmsSailNumber || '';
-            if (sailNo && result.position) {
-              prevHeatResults.push({
-                skipperIndex: result.skipperIndex,
-                position: result.hmsPosition,
-                sailNo: String(sailNo),
-              });
-            }
-          }
-        });
-
-        prevHeatResults.sort((a, b) => a.position - b.position);
-
-        const topFinishers = prevHeatResults.slice(0, promotionCount);
-        topFinishers.forEach((finisher, idx) => {
-          const promoPos = idx + 1;
-          const key = getCellKey(heat, promoPos, race);
-          if (!newCells[key]) {
-            newCells[key] = {
-              sailNumber: finisher.sailNo,
-              comment: 'UP',
-              points: '',
-              letterScore: null,
-              skipperIndex: finisher.skipperIndex,
-              isValid: true,
-              isDuplicate: false,
-            };
-          }
-        });
-      }
-    }
-
     if (Object.keys(newCells).length > 0) {
       if (!loadedRef.current) {
         setCells(prev => ({ ...prev, ...newCells }));
@@ -224,7 +176,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         });
       }
     }
-  }, [raceResults, skippers, numberOfHeats, promotionCount]);
+  }, [raceResults, skippers]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -365,7 +317,6 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         }
       }));
       if (cell?.skipperIndex != null) {
-        deleteRaceResult(race, cell.skipperIndex);
         updateRaceResults(race, cell.skipperIndex, position, undefined, undefined, heat, position);
       }
     } else {
