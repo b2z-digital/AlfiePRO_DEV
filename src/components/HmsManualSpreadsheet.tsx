@@ -137,34 +137,45 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   const getCellKey = (heat: HeatDesignation, position: number, race: number) =>
     `${heat}-${position}-${race}`;
 
+  const loadedRef = useRef(false);
+
   useEffect(() => {
     const newCells: Record<string, CellData> = {};
     raceResults.forEach((result: any) => {
       if (result.hmsHeat && result.hmsPosition && result.race) {
         const key = getCellKey(result.hmsHeat, result.hmsPosition, result.race);
         const skipper = skippers[result.skipperIndex];
-        const sailNo = skipper?.sailNumber || skipper?.sailNo || skipper?.boat_sail_number || '';
-        newCells[key] = {
-          sailNumber: sailNo,
-          comment: result.letterScore || (sailNo ? 'OK' : ''),
-          points: result.letterScore ? '' : (result.position?.toString() || ''),
-          letterScore: result.letterScore || null,
-          customPoints: result.customPoints,
-          skipperIndex: result.skipperIndex,
-          isValid: true,
-          isDuplicate: false,
-        };
+        const sailNo = skipper?.sailNumber || skipper?.sailNo || skipper?.boat_sail_number || result.hmsSailNumber || '';
+        if (sailNo) {
+          newCells[key] = {
+            sailNumber: String(sailNo),
+            comment: result.letterScore || 'OK',
+            points: result.letterScore ? '' : (result.position?.toString() || ''),
+            letterScore: result.letterScore || null,
+            customPoints: result.customPoints,
+            skipperIndex: result.skipperIndex,
+            isValid: true,
+            isDuplicate: false,
+          };
+        }
       }
     });
-    setCells(prev => {
-      const merged = { ...prev };
-      Object.entries(newCells).forEach(([k, v]) => {
-        if (!merged[k] || !merged[k].sailNumber) {
-          merged[k] = v;
-        }
-      });
-      return merged;
-    });
+    if (Object.keys(newCells).length > 0) {
+      if (!loadedRef.current) {
+        setCells(prev => ({ ...prev, ...newCells }));
+        loadedRef.current = true;
+      } else {
+        setCells(prev => {
+          const merged = { ...prev };
+          Object.entries(newCells).forEach(([k, v]) => {
+            if (!merged[k] || !merged[k].sailNumber) {
+              merged[k] = v;
+            }
+          });
+          return merged;
+        });
+      }
+    }
   }, [raceResults, skippers]);
 
   useEffect(() => {
@@ -558,10 +569,9 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   const getEmptyRowScore = useCallback((heat: HeatDesignation, race: number): number | string => {
     const entryCount = getHeatEntryCount(heat, race);
     if (entryCount === 0) return '';
-    if (race === 1) return entryCount;
-    const offset = getHeatOffset(heat, race);
     const regularCount = getHeatNonLetterNonPromotedCount(heat, race);
-    if (heat === 'A') return regularCount;
+    if (race === 1 || heat === 'A') return regularCount;
+    const offset = getHeatOffset(heat, race);
     return offset + regularCount;
   }, [getHeatOffset, getHeatEntryCount, getHeatNonLetterNonPromotedCount]);
 
@@ -569,7 +579,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const hasSail = !!cell?.sailNumber?.trim();
 
     if (!hasSail) {
-      return getEmptyRowScore(heat, race);
+      return '';
     }
 
     const isPromoted = heat !== 'A' && race > 1 && position <= promotionCount;
@@ -586,7 +596,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const offset = getHeatOffset(heat, race);
     const effectivePos = position - promotionCount;
     return offset + effectivePos;
-  }, [promotionCount, getHeatOffset, getEmptyRowScore, getHeatEntryCount]);
+  }, [promotionCount, getHeatOffset, getHeatEntryCount]);
 
   const getExpForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();

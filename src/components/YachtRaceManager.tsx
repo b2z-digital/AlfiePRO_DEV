@@ -1301,6 +1301,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
     const currentHandicap = getCurrentHandicapForRace(race, skipperIndex);
 
+    const skipperSailNo = (() => {
+      const s = skippers[skipperIndex];
+      return s ? String(s.sailNumber || s.sailNo || s.boat_sail_number || '').trim() : '';
+    })();
+
     if (resultIndex >= 0) {
       newResults[resultIndex] = {
         ...newResults[resultIndex],
@@ -1311,6 +1316,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         adjustedHcap: currentHandicap,
         ...(hmsHeat !== undefined && { hmsHeat }),
         ...(hmsPosition !== undefined && { hmsPosition }),
+        ...(hmsHeat !== undefined && skipperSailNo && { hmsSailNumber: skipperSailNo }),
       };
     } else {
       newResults.push({
@@ -1323,6 +1329,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         adjustedHcap: currentHandicap,
         ...(hmsHeat !== undefined && { hmsHeat }),
         ...(hmsPosition !== undefined && { hmsPosition }),
+        ...(hmsHeat !== undefined && skipperSailNo && { hmsSailNumber: skipperSailNo }),
       });
     }
 
