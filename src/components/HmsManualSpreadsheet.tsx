@@ -477,6 +477,19 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return count;
   }, [cells, maxPositions]);
 
+  const getHeatNonLetterNonPromotedCount = useCallback((h: HeatDesignation, race: number): number => {
+    let count = 0;
+    for (let p = 1; p <= maxPositions; p++) {
+      const k = getCellKey(h, p, race);
+      const c = cells[k];
+      if (!c?.sailNumber?.trim()) continue;
+      const isProm = h !== 'A' && race > 1 && p <= promotionCount;
+      if (isProm) continue;
+      if (!c.letterScore) count++;
+    }
+    return count;
+  }, [cells, maxPositions, promotionCount]);
+
   const getHeatOffset = useCallback((heat: HeatDesignation, race: number): number => {
     if (race === 1) return 0;
     const heatIdx = HEAT_LABELS.indexOf(heat);
@@ -491,12 +504,38 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return offset;
   }, [getHeatEntryCount, promotionCount]);
 
+  const getTotalNonPromotedFleet = useCallback((race: number): number => {
+    let total = 0;
+    for (const h of heats) {
+      const entries = getHeatEntryCount(h, race);
+      const promoted = h !== 'A' && race > 1 ? promotionCount : 0;
+      total += Math.max(0, entries - promoted);
+    }
+    return total;
+  }, [heats, getHeatEntryCount, promotionCount]);
+
+  const getMaxExpForHeat = useCallback((heat: HeatDesignation, race: number): number => {
+    const entries = getHeatEntryCount(heat, race);
+    if (race === 1) {
+      return entries;
+    }
+    if (entries === 0) {
+      const totalFleet = getTotalNonPromotedFleet(race);
+      return totalFleet > 0 ? totalFleet + 1 : 0;
+    }
+    const offset = getHeatOffset(heat, race);
+    if (heat === 'A') {
+      return entries + 1;
+    }
+    const nonPromoted = Math.max(0, entries - promotionCount);
+    return offset + nonPromoted + 1;
+  }, [getHeatOffset, getHeatEntryCount, promotionCount, getTotalNonPromotedFleet]);
+
   const getHeatRaceStats = useCallback((heat: HeatDesignation, race: number) => {
     let scoreCount = 0;
     let letterCount = 0;
     let totalPoints = 0;
     let entryCount = 0;
-    const offset = getHeatOffset(heat, race);
 
     for (let pos = 1; pos <= maxPositions; pos++) {
       const key = getCellKey(heat, pos, race);
@@ -510,84 +549,80 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       if (!isPromoted) {
         if (cell.letterScore) {
           letterCount++;
-          const pts = cell.customPoints !== undefined && cell.customPoints > 0
-            ? cell.customPoints
-            : offset + (race === 1 || heat === 'A' ? entryCount : entryCount - promotionCount) + 1;
-          totalPoints += pts;
         } else {
           scoreCount++;
-          if (race === 1 || heat === 'A') {
-            totalPoints += pos;
-          } else {
-            totalPoints += offset + (pos - promotionCount);
-          }
         }
       }
     }
 
-    return { scoreCount, letterCount, totalPoints, entryCount };
-  }, [cells, maxPositions, promotionCount, getHeatOffset]);
+    const maxExp = getMaxExpForHeat(heat, race);
+
+    return { scoreCount, letterCount, totalPoints, entryCount, maxExp };
+  }, [cells, maxPositions, promotionCount, getMaxExpForHeat]);
+
+  const getEmptyRowScore = useCallback((heat: HeatDesignation, race: number): number | string => {
+    const entryCount = getHeatEntryCount(heat, race);
+    if (entryCount === 0) return '';
+    if (race === 1) return entryCount;
+    const offset = getHeatOffset(heat, race);
+    const regularCount = getHeatNonLetterNonPromotedCount(heat, race);
+    if (heat === 'A') return regularCount;
+    return offset + regularCount;
+  }, [getHeatOffset, getHeatEntryCount, getHeatNonLetterNonPromotedCount]);
 
   const getPointsForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();
 
     if (!hasSail) {
-      const entryCount = getHeatEntryCount(heat, race);
-      if (entryCount === 0) return '';
-      const offset = getHeatOffset(heat, race);
-      if (race === 1) return entryCount;
-      if (heat === 'A') return entryCount;
-      const nonPromoted = Math.max(0, entryCount - promotionCount);
-      return offset + nonPromoted;
+      return getEmptyRowScore(heat, race);
     }
 
     const isPromoted = heat !== 'A' && race > 1 && position <= promotionCount;
     if (isPromoted) return '#N/A';
 
-    const offset = getHeatOffset(heat, race);
-
     if (cell?.letterScore) {
       if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
       if (cell.customPoints === -1) return 'AVG';
-      const entryCount = getHeatEntryCount(heat, race);
-      const nonPromoted = race > 1 && heat !== 'A' ? Math.max(0, entryCount - promotionCount) : entryCount;
-      return offset + nonPromoted + 1;
+      if (race === 1) {
+        return getHeatEntryCount(heat, race) + 1;
+      }
+      const totalFleet = getTotalNonPromotedFleet(race);
+      return totalFleet + 1;
     }
 
-    if (race === 1) return position;
+    if (race === 1 || heat === 'A') return position;
 
-    if (heat === 'A') return position;
-
+    const offset = getHeatOffset(heat, race);
     const effectivePos = position - promotionCount;
     return offset + effectivePos;
-  }, [cells, maxPositions, promotionCount, getHeatOffset, getHeatEntryCount]);
+  }, [promotionCount, getHeatOffset, getEmptyRowScore, getTotalNonPromotedFleet, getHeatEntryCount]);
 
   const getExpForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();
     const isPromoted = heat !== 'A' && race > 1 && position <= promotionCount;
-    const offset = getHeatOffset(heat, race);
 
     if (hasSail && isPromoted) {
+      const offset = getHeatOffset(heat, race);
       return offset > 0 ? offset : getHeatEntryCount('A', race);
     }
 
     if (hasSail) {
-      if (race === 1) return position;
-      if (heat === 'A') return position;
+      if (cell?.letterScore) {
+        if (race === 1) {
+          return getHeatEntryCount(heat, race);
+        }
+        const offset = getHeatOffset(heat, race);
+        const regularCount = getHeatNonLetterNonPromotedCount(heat, race);
+        return offset + regularCount;
+      }
+      if (race === 1 || heat === 'A') return position;
+      const offset = getHeatOffset(heat, race);
       const effectivePos = position - promotionCount;
       return offset + effectivePos;
     }
 
-    const entryCount = getHeatEntryCount(heat, race);
-    if (entryCount === 0) return '';
-
-    if (race === 1) return entryCount;
-
-    if (heat === 'A') return entryCount;
-
-    const nonPromoted = Math.max(0, entryCount - promotionCount);
-    return offset + nonPromoted;
-  }, [getHeatOffset, getHeatEntryCount, promotionCount]);
+    return getEmptyRowScore(heat, race);
+  }, [getHeatOffset, getHeatEntryCount, getHeatNonLetterNonPromotedCount, getEmptyRowScore, promotionCount]);
 
   const availableSkippersForDropdown = useMemo(() => {
     if (!dropdownTarget) return [];
@@ -758,7 +793,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
               return (
                 <React.Fragment key={heat}>
-                  <tr style={{ height: 24 }}>
+                  <tr style={{ height: 20 }}>
                     <td
                       className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[11px] text-black whitespace-nowrap text-center"
                       style={{ backgroundColor: '#FF00FF' }}
@@ -773,7 +808,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                             className={`px-0 py-0 border-b border-slate-400 ${raceSeparator} text-black text-[10px] font-bold text-center`}
                             style={{ backgroundColor: '#FF0000' }}
                           >
-                            {stats.scoreCount > 0 || stats.letterCount > 0 ? String(stats.scoreCount).padStart(2, '0') : '00'}
+                            {String(stats.entryCount).padStart(2, '0')}
                           </td>
                           <td
                             className="px-0 py-0 border-b border-slate-400 text-black text-[10px] font-bold text-center"
@@ -785,13 +820,13 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                             className="px-0 py-0 border-b border-slate-400 text-black text-[10px] font-bold text-center"
                             style={{ backgroundColor: '#FF0000' }}
                           >
-                            {stats.totalPoints}
+                            0
                           </td>
                           <td
                             className="px-0 py-0 border-b border-slate-400 text-black text-[10px] font-bold text-center"
                             style={{ backgroundColor: '#FF0000' }}
                           >
-                            {String(stats.entryCount).padStart(2, '0')}
+                            {String(stats.maxExp).padStart(2, '0')}
                           </td>
                         </React.Fragment>
                       );
@@ -857,7 +892,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                     setDropdownFilter('');
                                   }}
                                   onKeyDown={e => handleKeyDown(e, heat, position, race)}
-                                  className={`w-full px-0.5 py-[2px] text-[12px] text-center border-0 outline-none bg-transparent
+                                  className={`w-full px-0.5 py-[1px] text-[12px] text-center border-0 outline-none bg-transparent
                                     ${isInvalid
                                       ? 'text-red-500 font-bold'
                                       : isDup
@@ -913,15 +948,15 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 onClick={() => handleCommentClick(heat, position, race)}
                               >
                                 {isPromotedEntry ? (
-                                  <div className="px-1 py-[2px] text-[11px] text-center font-bold text-black">
+                                  <div className="px-1 py-[1px] text-[11px] text-center font-bold text-black">
                                     UP
                                   </div>
                                 ) : ls && lsColor ? (
-                                  <div className={`px-0.5 py-[2px] text-[11px] text-center font-bold rounded-sm mx-0.5 ${lsColor.bg} ${lsColor.text}`}>
+                                  <div className={`px-0.5 py-[1px] text-[11px] text-center font-bold rounded-sm mx-0.5 ${lsColor.bg} ${lsColor.text}`}>
                                     {ls}
                                   </div>
                                 ) : hasSail ? (
-                                  <div className="px-1 py-[2px] text-[11px] text-center font-medium text-black">
+                                  <div className="px-1 py-[1px] text-[11px] text-center font-medium text-black">
                                     OK
                                   </div>
                                 ) : null}
@@ -931,7 +966,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 className={`px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
-                                <div className={`px-1 py-[2px] text-[11px] text-center font-medium tabular-nums ${
+                                <div className={`px-1 py-[1px] text-[11px] text-center font-medium tabular-nums ${
                                   hasSail ? 'text-black' : ''
                                 }`}>
                                   {pts !== '' ? pts : ''}
@@ -942,7 +977,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 className={`px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
-                                <div className="px-1 py-[2px] text-[11px] text-center font-medium tabular-nums text-black">
+                                <div className="px-1 py-[1px] text-[11px] text-center font-medium tabular-nums text-black">
                                   {exp !== '' ? exp : ''}
                                 </div>
                               </td>
