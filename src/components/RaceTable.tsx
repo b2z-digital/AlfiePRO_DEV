@@ -1241,7 +1241,28 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                                 className={`${isCompactView ? 'w-10 h-10 text-xs' : 'w-12 h-12 text-sm'} flex items-center justify-center font-medium rounded mx-auto relative overflow-hidden cursor-default`}
                                 title="Race completed (click Clear Race to edit)"
                               >
-                                {result?.letterScore && result?.letterScore !== 'WDN' ? (
+                                {(isManualHandicaps || hasDeterminedInitialHcaps) ? (
+                                  <>
+                                    <div
+                                      className="absolute inset-0 pointer-events-none"
+                                      style={{
+                                        background: `linear-gradient(to top right, transparent calc(50% - 0.5px), ${darkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)'} calc(50% - 0.5px), ${darkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)'} calc(50% + 0.5px), transparent calc(50% + 0.5px))`
+                                      }}
+                                    />
+                                    <span
+                                      className={`absolute top-0.5 right-1 text-[10px] text-slate-400 font-semibold ${isDropped ? 'opacity-30' : 'opacity-70'}`}
+                                    >
+                                      {raceHandicap !== null ? `${raceHandicap}s` : ''}
+                                    </span>
+                                    <span className={`absolute bottom-0.5 left-1 text-white font-bold ${isDropped ? 'line-through opacity-50' : ''}`}>
+                                      {result?.letterScore
+                                        ? (result?.customPoints !== undefined && result?.customPoints !== null
+                                            ? result.customPoints
+                                            : getLetterScorePoints(result?.letterScore, race))
+                                        : (result?.position || '–')}
+                                    </span>
+                                  </>
+                                ) : result?.letterScore && result?.letterScore !== 'WDN' ? (
                                   <span className={`text-white font-bold ${isDropped ? 'line-through opacity-50' : ''}`}>
                                     {result?.customPoints !== undefined && result?.customPoints !== null
                                       ? result.customPoints
@@ -1249,20 +1270,17 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                                   </span>
                                 ) : (
                                   <>
-                                    {/* Diagonal line from bottom-left to top-right */}
                                     <div
                                       className="absolute inset-0 pointer-events-none"
                                       style={{
                                         background: `linear-gradient(to top right, transparent calc(50% - 0.5px), ${darkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)'} calc(50% - 0.5px), ${darkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)'} calc(50% + 0.5px), transparent calc(50% + 0.5px))`
                                       }}
                                     />
-                                    {/* Handicap in top-right */}
                                     <span
                                       className={`absolute top-0.5 right-1 text-[10px] text-slate-400 font-semibold ${isDropped ? 'opacity-30' : 'opacity-70'}`}
                                     >
                                       {raceHandicap !== null ? `${raceHandicap}s` : ''}
                                     </span>
-                                    {/* Points in bottom-left (show points for WDN too) */}
                                     <span className={`absolute bottom-0.5 left-1 text-white font-bold ${isDropped ? 'line-through opacity-50' : ''}`}>
                                       {result?.letterScore === 'WDN'
                                         ? (result?.customPoints !== undefined && result?.customPoints !== null

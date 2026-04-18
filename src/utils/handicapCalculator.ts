@@ -106,9 +106,22 @@ export const calculateHandicaps = (
       // Set initial handicap for the race
       result.handicap = currentHcaps[idx];
 
-      // Skip letter scores except RDGfix
       if (result.letterScore && result.letterScore !== 'RDGfix') {
-        result.adjustedHcap = currentHcaps[idx];
+        if (result.letterScore === 'DNS' || result.letterScore === 'DNC') {
+          const dnsAdj = Math.max(0, Math.min(capLimit, currentHcaps[idx] + 10));
+          result.adjustedHcap = dnsAdj;
+        } else {
+          result.adjustedHcap = currentHcaps[idx];
+        }
+        const resultIndex = updatedResults.findIndex(
+          r => r.race === race && r.skipperIndex === idx
+        );
+        if (resultIndex !== -1) {
+          updatedResults[resultIndex] = {
+            ...result,
+            adjustedHcap: result.adjustedHcap
+          };
+        }
         return;
       }
 
