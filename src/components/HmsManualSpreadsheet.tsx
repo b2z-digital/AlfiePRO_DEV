@@ -4,8 +4,9 @@ import { HeatDesignation, HeatManagement } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { LetterScore } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
-import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer } from 'lucide-react';
+import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer, Trophy } from 'lucide-react';
 import { useNotification } from '../contexts/NotificationContext';
+import { HeatOverallResultsModal } from './HeatOverallResultsModal';
 
 const LETTER_SCORE_CODES: LetterScore[] = [
   'DNS', 'DNF', 'DSQ', 'OCS', 'BFD', 'UFD', 'RDG', 'DPI',
@@ -101,6 +102,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [resetConfirmRace, setResetConfirmRace] = useState<number | null>(null);
 
+  const [showOverallResults, setShowOverallResults] = useState(false);
   const [showLetterScoreModal, setShowLetterScoreModal] = useState(false);
   const [letterScoreTarget, setLetterScoreTarget] = useState<{
     heat: HeatDesignation;
@@ -701,6 +703,15 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
   return (
     <div className={`flex flex-col h-full text-slate-900`}>
+      <div className="flex justify-end px-2 py-1 bg-slate-900">
+        <button
+          onClick={() => setShowOverallResults(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+        >
+          <Trophy size={14} />
+          Overall Results
+        </button>
+      </div>
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-auto relative"
@@ -729,9 +740,9 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                 onClick={onOpenStartBox}
                 title="Open StartBox"
               >
-                <div className="flex items-center justify-center gap-1">
-                  <Timer size={14} className="text-white" />
-                  <span className="text-[9px] font-semibold text-white">StartBox</span>
+                <div className="flex items-center justify-center gap-1.5">
+                  <Timer size={18} className="text-white" />
+                  <span className="text-xs font-semibold text-white">StartBox</span>
                 </div>
               </th>
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
@@ -1155,6 +1166,15 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           isHeatRacing={true}
         />
       )}
+
+      <HeatOverallResultsModal
+        isOpen={showOverallResults}
+        onClose={() => setShowOverallResults(false)}
+        skippers={skippers}
+        heatManagement={heatManagement}
+        dropRules={currentEvent?.dropRules || [4, 8, 16, 24, 32, 40]}
+        darkMode={darkMode}
+      />
     </div>
   );
 };
