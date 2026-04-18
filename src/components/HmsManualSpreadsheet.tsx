@@ -547,10 +547,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       >
         <table
           className="border-collapse text-xs bg-white"
-          style={{ tableLayout: 'fixed' }}
+          style={{ tableLayout: 'fixed', minWidth: 500 + TOTAL_RACES * 290 }}
         >
           <colgroup>
-            <col style={{ width: 500 }} />
+            <col style={{ width: 500, minWidth: 500 }} />
             {Array.from({ length: TOTAL_RACES }).map((_, i) => (
               <React.Fragment key={i}>
                 <col style={{ width: 100 }} />
