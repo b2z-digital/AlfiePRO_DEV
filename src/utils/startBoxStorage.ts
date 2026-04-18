@@ -129,8 +129,7 @@ export async function getSequences(clubId: string | null): Promise<StartSequence
         sounds:start_sequence_sounds(
           *,
           sound:start_box_sounds(*)
-        ),
-        minute_callout_sound:start_box_sounds!minute_callout_sound_id(*)
+        )
       `)
       .eq('is_active', true)
       .order('sort_order')
@@ -166,8 +165,7 @@ export async function getSequence(sequenceId: string): Promise<StartSequence | n
         sounds:start_sequence_sounds(
           *,
           sound:start_box_sounds(*)
-        ),
-        minute_callout_sound:start_box_sounds!minute_callout_sound_id(*)
+        )
       `)
       .eq('id', sequenceId)
       .maybeSingle();
@@ -210,10 +208,9 @@ export async function updateSequence(
   updates: Partial<Omit<StartSequence, 'id' | 'created_at' | 'sounds'>>
 ): Promise<StartSequence | null> {
   try {
-    const { minute_callout_sound, ...dbUpdates } = updates as any;
     const { data, error } = await supabase
       .from('start_sequences')
-      .update({ ...dbUpdates, updated_at: new Date().toISOString() })
+      .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', sequenceId)
       .select()
       .single();

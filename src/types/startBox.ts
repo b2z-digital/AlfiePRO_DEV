@@ -34,8 +34,6 @@ export interface StartSequence {
   use_audio_only?: boolean;
   countdown_start_seconds?: number | null;
   enable_countdown_beep?: boolean;
-  minute_callout_sound_id?: string | null;
-  minute_callout_sound?: StartBoxSound;
   created_by?: string;
   created_at: string;
   updated_at: string;
