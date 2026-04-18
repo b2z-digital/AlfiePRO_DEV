@@ -520,6 +520,15 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return total;
   }, [heats, getHeatEntryCount, promotionCount]);
 
+  const getLargestHeatEntryCount = useCallback((race: number): number => {
+    let max = 0;
+    for (const h of heats) {
+      const entries = getHeatEntryCount(h, race);
+      if (entries > max) max = entries;
+    }
+    return max;
+  }, [heats, getHeatEntryCount]);
+
   const getMaxExpForHeat = useCallback((heat: HeatDesignation, race: number): number => {
     const entries = getHeatEntryCount(heat, race);
     if (race === 1) {
@@ -575,6 +584,18 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return offset + regularCount;
   }, [getHeatOffset, getHeatEntryCount, getHeatNonLetterNonPromotedCount]);
 
+  const SEVERE_LETTER_SCORES: LetterScore[] = ['UFD', 'BFD', 'DSQ', 'DNE', 'WDN'];
+
+  const getLetterScorePoints = useCallback((heat: HeatDesignation, race: number, ls: LetterScore): number => {
+    if (race === 1) {
+      return getLargestHeatEntryCount(race) + 1;
+    }
+    if (SEVERE_LETTER_SCORES.includes(ls)) {
+      return getTotalNonPromotedFleet(race) + 1;
+    }
+    return getMaxExpForHeat(heat, race);
+  }, [getLargestHeatEntryCount, getTotalNonPromotedFleet, getMaxExpForHeat]);
+
   const getPointsForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();
 
@@ -588,7 +609,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     if (cell?.letterScore) {
       if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
       if (cell.customPoints === -1) return 'AVG';
-      return getHeatEntryCount(heat, race) + 1;
+      return getLetterScorePoints(heat, race, cell.letterScore);
     }
 
     if (race === 1 || heat === 'A') return position;
@@ -596,7 +617,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const offset = getHeatOffset(heat, race);
     const effectivePos = position - promotionCount;
     return offset + effectivePos;
-  }, [promotionCount, getHeatOffset, getHeatEntryCount]);
+  }, [promotionCount, getHeatOffset, getLetterScorePoints]);
 
   const getExpForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();
@@ -609,10 +630,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
     if (hasSail) {
       if (cell?.letterScore) {
-        const okAbove = getOkCountAbovePosition(heat, position, race);
-        if (race === 1 || heat === 'A') return okAbove;
-        const offset = getHeatOffset(heat, race);
-        return offset + okAbove;
+        return getEmptyRowScore(heat, race);
       }
       if (race === 1 || heat === 'A') return position;
       const offset = getHeatOffset(heat, race);
@@ -621,7 +639,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
 
     return getEmptyRowScore(heat, race);
-  }, [getHeatOffset, getHeatEntryCount, getOkCountAbovePosition, getEmptyRowScore, promotionCount]);
+  }, [getHeatOffset, getHeatEntryCount, getEmptyRowScore, promotionCount]);
 
   const availableSkippersForDropdown = useMemo(() => {
     if (!dropdownTarget) return [];
@@ -792,7 +810,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
               return (
                 <React.Fragment key={heat}>
-                  <tr style={{ height: 16 }}>
+                  <tr style={{ height: 15 }}>
                     <td
                       className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[11px] text-black whitespace-nowrap text-center"
                       style={{ backgroundColor: '#FF00FF' }}
@@ -839,9 +857,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                       <tr
                         key={`${heat}-${position}`}
                         className="hover:bg-slate-50"
+                        style={{ height: 18 }}
                       >
                         <td
-                          className="sticky left-0 z-10 px-2 py-0 text-[12px] font-extrabold border-r border-slate-300 whitespace-nowrap text-black text-center leading-tight"
+                          className="sticky left-0 z-10 px-1 py-0 text-[11px] font-extrabold border-r border-slate-300 whitespace-nowrap text-black text-center leading-none"
                           style={{ backgroundColor: '#FFFF00' }}
                         >
                           {getOrdinal(position)}
@@ -890,7 +909,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                     setDropdownFilter('');
                                   }}
                                   onKeyDown={e => handleKeyDown(e, heat, position, race)}
-                                  className={`w-full px-0.5 py-0 text-[12px] text-center border-0 outline-none bg-transparent leading-tight
+                                  className={`w-full px-0.5 py-0 text-[11px] text-center border-0 outline-none bg-transparent leading-none
                                     ${isInvalid
                                       ? 'text-red-500 font-bold'
                                       : isDup
@@ -946,15 +965,15 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 onClick={() => handleCommentClick(heat, position, race)}
                               >
                                 {isPromotedEntry ? (
-                                  <div className="px-1 py-0 text-[11px] text-center font-bold text-black">
+                                  <div className="px-1 py-0 text-[10px] text-center font-bold text-black leading-none">
                                     UP
                                   </div>
                                 ) : ls ? (
-                                  <div className="px-1 py-0 text-[11px] text-center font-medium text-black">
+                                  <div className="px-1 py-0 text-[10px] text-center font-medium text-black leading-none">
                                     {ls}
                                   </div>
                                 ) : hasSail ? (
-                                  <div className="px-1 py-0 text-[11px] text-center font-medium text-black">
+                                  <div className="px-1 py-0 text-[10px] text-center font-medium text-black leading-none">
                                     OK
                                   </div>
                                 ) : null}
@@ -964,7 +983,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 className={`px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
-                                <div className={`px-1 py-0 text-[11px] text-center font-medium tabular-nums leading-tight ${
+                                <div className={`px-1 py-0 text-[10px] text-center font-medium tabular-nums leading-none ${
                                   hasSail ? 'text-black' : ''
                                 }`}>
                                   {pts !== '' ? pts : ''}
@@ -975,7 +994,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 className={`px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
-                                <div className="px-1 py-0 text-[11px] text-center font-medium tabular-nums leading-tight text-black">
+                                <div className="px-1 py-0 text-[10px] text-center font-medium tabular-nums leading-none text-black">
                                   {exp !== '' ? exp : ''}
                                 </div>
                               </td>
