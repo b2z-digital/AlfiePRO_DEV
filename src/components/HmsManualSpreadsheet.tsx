@@ -29,11 +29,6 @@ const LETTER_SCORE_COLORS: Record<string, { bg: string; text: string; darkBg: st
   SCP: { bg: 'bg-cyan-100', text: 'text-cyan-700', darkBg: 'bg-cyan-900/40', darkText: 'text-cyan-300' },
 };
 
-const HEAT_HEADER_COLORS: Record<HeatDesignation, string> = {
-  'A': 'bg-yellow-600', 'B': 'bg-orange-600', 'C': 'bg-red-600',
-  'D': 'bg-green-600', 'E': 'bg-blue-600', 'F': 'bg-teal-600'
-};
-
 const HEAT_LABELS: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E'];
 const TOTAL_RACES = 41;
 
@@ -364,21 +359,62 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
   }, [verifyRace]);
 
-  const isPromotionRow = (heat: HeatDesignation, position: number, race: number) => {
+  const isPromotionRow = (heat: HeatDesignation, position: number) => {
     if (heat === 'A') return false;
-    return race > 1 && position <= promotionCount;
+    return position <= promotionCount;
   };
 
-  const getRaceEntryCount = useCallback((race: number) => {
-    let count = 0;
-    heats.forEach(heat => {
-      for (let pos = 1; pos <= maxPositions; pos++) {
-        const key = getCellKey(heat, pos, race);
-        if (cells[key]?.sailNumber?.trim()) count++;
+  const getHeatRaceStats = useCallback((heat: HeatDesignation, race: number) => {
+    let scoreCount = 0;
+    let letterCount = 0;
+    let totalPoints = 0;
+    let entryCount = 0;
+
+    for (let pos = 1; pos <= maxPositions; pos++) {
+      const key = getCellKey(heat, pos, race);
+      const cell = cells[key];
+      if (!cell?.sailNumber?.trim()) continue;
+
+      entryCount++;
+
+      const isPromoted = heat !== 'A' && race > 1 && pos <= promotionCount;
+
+      if (!isPromoted) {
+        if (cell.letterScore) {
+          letterCount++;
+          const pts = cell.customPoints !== undefined && cell.customPoints > 0
+            ? cell.customPoints
+            : entryCount + 1;
+          totalPoints += pts;
+        } else {
+          scoreCount++;
+          totalPoints += pos;
+        }
       }
-    });
-    return count;
-  }, [cells, heats, maxPositions]);
+    }
+
+    return { scoreCount, letterCount, totalPoints, entryCount };
+  }, [cells, maxPositions, promotionCount]);
+
+  const getPointsForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
+    if (!cell?.sailNumber?.trim()) return '';
+
+    const isPromoted = heat !== 'A' && race > 1 && position <= promotionCount;
+    if (isPromoted) return 0;
+
+    if (cell.letterScore) {
+      if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
+      if (cell.customPoints === -1) return 'AVG';
+      let entryCount = 0;
+      for (let p = 1; p <= maxPositions; p++) {
+        const k = getCellKey(heat, p, race);
+        if (cells[k]?.sailNumber?.trim()) entryCount++;
+      }
+      return entryCount + 1;
+    }
+
+    return position;
+  }, [cells, maxPositions, promotionCount]);
 
   const availableSkippersForDropdown = useMemo(() => {
     if (!dropdownTarget) return [];
@@ -434,11 +470,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
   }, [handleSailNumberBlur]);
 
-  const borderColor = darkMode ? 'border-slate-700/50' : 'border-slate-200';
-  const headerBg = darkMode ? 'bg-slate-800' : 'bg-slate-100';
-  const subHeaderBg = darkMode ? 'bg-slate-800/60' : 'bg-slate-50';
-  const cellBg = darkMode ? 'bg-slate-900' : 'bg-white';
-  const positionBg = darkMode ? 'bg-slate-900' : 'bg-white';
+  const borderColor = darkMode ? 'border-slate-600' : 'border-slate-300';
 
   return (
     <div className={`flex flex-col h-full ${darkMode ? 'text-white' : 'text-slate-900'}`}>
@@ -446,12 +478,13 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         ref={scrollContainerRef}
         className="flex-1 overflow-auto relative"
       >
-        <table className={`border-collapse text-xs ${cellBg}`} style={{ tableLayout: 'fixed' }}>
+        <table className={`border-collapse text-xs ${darkMode ? 'bg-slate-900' : 'bg-white'}`} style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 48 }} />
             {Array.from({ length: TOTAL_RACES }).map((_, i) => (
               <React.Fragment key={i}>
-                <col style={{ width: 52 }} />
+                <col style={{ width: 56 }} />
+                <col style={{ width: 80 }} />
                 <col style={{ width: 40 }} />
                 <col style={{ width: 32 }} />
               </React.Fragment>
@@ -460,49 +493,33 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
           <thead className="sticky top-0 z-20">
             <tr>
-              <th className={`sticky left-0 z-30 px-1 py-1.5 border-b border-r ${borderColor} ${headerBg}`} />
+              <th className={`sticky left-0 z-30 px-1 py-1.5 border-b border-r ${borderColor} ${darkMode ? 'bg-cyan-800' : 'bg-cyan-400'} text-white`}>
+                <span className="text-[9px] font-bold">Reset ALL Races</span>
+              </th>
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
-                const entryCount = getRaceEntryCount(race);
                 const isVerified = verifiedRaces.has(race);
                 const isSeeding = race === 1;
 
                 return (
                   <th
                     key={race}
-                    colSpan={3}
-                    className={`px-0.5 py-1 text-center border-b border-r ${borderColor} ${headerBg}`}
+                    colSpan={4}
+                    className={`px-0.5 py-1 text-center border-b border-r ${borderColor} ${darkMode ? 'bg-cyan-800' : 'bg-cyan-400'} text-white`}
                   >
-                    <div className="flex flex-col items-center gap-0.5">
-                      <div className="flex items-center gap-1">
-                        <span className={`font-bold text-[11px] uppercase tracking-widest ${
-                          isSeeding
-                            ? darkMode ? 'text-blue-300' : 'text-blue-700'
-                            : darkMode ? 'text-slate-300' : 'text-slate-600'
-                        }`}>
-                          R{race}
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => handleVerifyRace(race)}
+                        className="text-[9px] font-bold hover:underline"
+                      >
+                        {isSeeding ? 'Verify Race 1 Seeding' : `Verify R${race.toString().padStart(2, '0')}`}
+                      </button>
+                      {isVerified && (
+                        <CheckCircle2 size={10} className="text-white" />
+                      )}
+                      {!isSeeding && (
+                        <span className="text-[8px] opacity-80">
+                          Promote= {promotionCount}
                         </span>
-                        {isSeeding && (
-                          <span className={`text-[8px] px-1 py-0.5 rounded font-bold uppercase tracking-wider ${
-                            darkMode ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-600'
-                          }`}>
-                            Seed
-                          </span>
-                        )}
-                        {isVerified && (
-                          <CheckCircle2 size={10} className="text-emerald-500" />
-                        )}
-                      </div>
-                      {entryCount > 0 && (
-                        <button
-                          onClick={() => handleVerifyRace(race)}
-                          className={`text-[8px] px-1.5 py-0.5 rounded font-medium transition-all ${
-                            isVerified
-                              ? darkMode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
-                              : darkMode ? 'bg-amber-900/30 text-amber-300 hover:bg-amber-900/50' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'
-                          }`}
-                        >
-                          {isVerified ? 'Verified' : 'Verify'}
-                        </button>
                       )}
                     </div>
                   </th>
@@ -511,27 +528,22 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             </tr>
 
             <tr>
-              <th className={`sticky left-0 z-30 px-1 py-1 border-b border-r text-[9px] font-bold uppercase tracking-wider ${borderColor} ${subHeaderBg} ${
-                darkMode ? 'text-slate-500' : 'text-slate-400'
-              }`}>
+              <th className={`sticky left-0 z-30 px-1 py-0.5 border-b border-r text-[9px] font-bold ${borderColor} ${darkMode ? 'bg-cyan-700' : 'bg-cyan-300'} ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                 Pos
               </th>
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => (
                 <React.Fragment key={race}>
-                  <th className={`px-0.5 py-1 text-center text-[9px] font-bold border-b border-r tracking-wider uppercase ${borderColor} ${subHeaderBg} ${
-                    darkMode ? 'text-slate-500' : 'text-slate-400'
-                  }`}>
-                    Sail
+                  <th className={`px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-r ${borderColor} ${darkMode ? 'bg-cyan-700' : 'bg-cyan-300'} ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                    Sail No
                   </th>
-                  <th className={`px-0.5 py-1 text-center text-[9px] font-bold border-b border-r tracking-wider uppercase ${borderColor} ${subHeaderBg} ${
-                    darkMode ? 'text-slate-500' : 'text-slate-400'
-                  }`}>
-                    Cmt
+                  <th className={`px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-r ${borderColor} ${darkMode ? 'bg-cyan-700' : 'bg-cyan-300'} ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                    Comments
                   </th>
-                  <th className={`px-0.5 py-1 text-center text-[9px] font-bold border-b border-r tracking-wider uppercase ${borderColor} ${subHeaderBg} ${
-                    darkMode ? 'text-slate-500' : 'text-slate-400'
-                  }`}>
-                    Pts
+                  <th className={`px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-r ${borderColor} ${darkMode ? 'bg-cyan-700' : 'bg-cyan-300'} ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                    Points
+                  </th>
+                  <th className={`px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-r ${borderColor} ${darkMode ? 'bg-cyan-700' : 'bg-cyan-300'} ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                    Exp.
                   </th>
                 </React.Fragment>
               ))}
@@ -540,51 +552,49 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
           <tbody>
             {heats.map((heat) => {
-              const heatColor = HEAT_HEADER_COLORS[heat] || 'bg-slate-600';
-              const isTopHeat = heat === heats[0];
+              const isTopHeat = heat === 'A';
 
               return (
                 <React.Fragment key={heat}>
-                  <tr>
+                  <tr style={{ height: 20 }}>
                     <td
-                      className={`sticky left-0 z-10 px-2 py-1.5 border-b border-r font-bold text-xs text-white tracking-wide ${heatColor}`}
+                      className={`sticky left-0 z-10 px-1 py-0 border-b border-r font-bold text-[10px] text-yellow-300 bg-red-600 whitespace-nowrap`}
                     >
-                      <span className="font-bold text-sm">Heat {heat}</span>
+                      Heat {heat}
                     </td>
-                    {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => (
-                      <td
-                        key={race}
-                        colSpan={3}
-                        className={`px-1 py-1.5 border-b border-r text-white ${heatColor}`}
-                      />
-                    ))}
+                    {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
+                      const stats = getHeatRaceStats(heat, race);
+                      return (
+                        <React.Fragment key={race}>
+                          <td className={`px-0 py-0 border-b border-r ${borderColor} bg-red-600 text-yellow-300 text-[9px] font-bold text-center`}>
+                            {stats.scoreCount > 0 || stats.letterCount > 0 ? String(stats.scoreCount).padStart(2, '0') : '00'}
+                          </td>
+                          <td className={`px-0 py-0 border-b border-r ${borderColor} bg-red-600 text-yellow-300 text-[9px] font-bold text-center`}>
+                            {stats.letterCount > 0 ? 'L' : ''}
+                          </td>
+                          <td className={`px-0 py-0 border-b border-r ${borderColor} bg-red-600 text-yellow-300 text-[9px] font-bold text-center`}>
+                            {stats.totalPoints}
+                          </td>
+                          <td className={`px-0 py-0 border-b border-r ${borderColor} bg-red-600 text-yellow-300 text-[9px] font-bold text-center`}>
+                            {String(stats.entryCount).padStart(2, '0')}
+                          </td>
+                        </React.Fragment>
+                      );
+                    })}
                   </tr>
 
                   {Array.from({ length: maxPositions }, (_, posIdx) => posIdx + 1).map(position => {
-                    const showPromotion = !isTopHeat && isPromotionRow(heat, position, 2);
+                    const showPromotion = !isTopHeat && isPromotionRow(heat, position);
 
                     return (
                       <tr
                         key={`${heat}-${position}`}
-                        className={`group transition-colors ${
-                          darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'
-                        }`}
+                        className={darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}
                       >
                         <td className={`sticky left-0 z-10 px-2 py-0 text-[10px] font-bold border-b border-r whitespace-nowrap ${borderColor} ${
-                          showPromotion
-                            ? darkMode
-                              ? 'bg-green-950/30 text-green-400'
-                              : 'bg-green-50 text-green-700'
-                            : darkMode
-                              ? 'bg-slate-900 text-slate-400'
-                              : 'bg-white text-slate-500'
+                          darkMode ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-600'
                         }`}>
-                          <div className="flex items-center gap-1">
-                            {showPromotion && (
-                              <div className={`w-1 h-3 rounded-full ${darkMode ? 'bg-green-500' : 'bg-green-400'}`} />
-                            )}
-                            {getOrdinal(position)}
-                          </div>
+                          {getOrdinal(position)}
                         </td>
 
                         {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
@@ -596,10 +606,16 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                           const isDup = hasSail && cell?.isDuplicate;
                           const ls = cell?.letterScore;
                           const lsColor = ls ? LETTER_SCORE_COLORS[ls] : null;
+                          const isPromotedSlot = showPromotion && race > 1;
+                          const pts = getPointsForCell(heat, position, race, cell);
+
+                          const promotionBg = isPromotedSlot
+                            ? darkMode ? 'bg-green-900/40' : 'bg-green-400/40'
+                            : darkMode ? 'bg-slate-900' : 'bg-white';
 
                           return (
                             <React.Fragment key={race}>
-                              <td className={`px-0 py-0 border-b border-r ${borderColor} ${cellBg} relative`}>
+                              <td className={`px-0 py-0 border-b border-r ${borderColor} ${promotionBg} relative`}>
                                 <input
                                   ref={el => { inputRefs.current[`${key}-sail`] = el; }}
                                   type="text"
@@ -617,18 +633,16 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                     setDropdownFilter('');
                                   }}
                                   onKeyDown={e => handleKeyDown(e, heat, position, race)}
-                                  className={`w-full px-1 py-[3px] text-[11px] text-center border-0 outline-none transition-all
-                                    ${cellBg}
+                                  className={`w-full px-1 py-[2px] text-[11px] text-center border-0 outline-none bg-transparent
                                     ${isInvalid
-                                      ? darkMode ? 'text-red-400 bg-red-950/30' : 'text-red-500 bg-red-50'
+                                      ? 'text-red-500 font-bold'
                                       : isDup
-                                        ? darkMode ? 'text-amber-400 bg-amber-950/30' : 'text-amber-500 bg-amber-50'
+                                        ? 'text-amber-500 font-bold'
                                         : hasSail
                                           ? darkMode ? 'text-white font-medium' : 'text-slate-900 font-medium'
                                           : darkMode ? 'text-slate-600' : 'text-slate-300'
                                     }
                                     focus:ring-1 focus:ring-inset ${darkMode ? 'focus:ring-blue-500/50' : 'focus:ring-blue-400/50'}
-                                    placeholder:text-transparent
                                   `}
                                   placeholder=""
                                 />
@@ -686,17 +700,17 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                               </td>
 
                               <td
-                                className={`px-0 py-0 border-b border-r ${borderColor} ${cellBg} cursor-pointer`}
+                                className={`px-0 py-0 border-b border-r ${borderColor} ${promotionBg} cursor-pointer`}
                                 onClick={() => handleCommentClick(heat, position, race)}
                               >
                                 {ls && lsColor ? (
-                                  <div className={`px-0.5 py-[3px] text-[10px] text-center font-bold rounded-sm mx-0.5 ${
+                                  <div className={`px-0.5 py-[2px] text-[10px] text-center font-bold rounded-sm mx-0.5 ${
                                     darkMode ? lsColor.darkBg + ' ' + lsColor.darkText : lsColor.bg + ' ' + lsColor.text
                                   }`}>
                                     {ls}
                                   </div>
                                 ) : hasSail ? (
-                                  <div className={`px-1 py-[3px] text-[10px] text-center font-medium ${
+                                  <div className={`px-1 py-[2px] text-[10px] text-center font-medium ${
                                     darkMode ? 'text-green-500' : 'text-green-600'
                                   }`}>
                                     OK
@@ -704,18 +718,23 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 ) : null}
                               </td>
 
-                              <td className={`px-0 py-0 border-b border-r ${borderColor} ${cellBg}`}>
-                                <div className={`px-1 py-[3px] text-[10px] text-center font-medium tabular-nums ${
-                                  ls
-                                    ? darkMode ? 'text-slate-500' : 'text-slate-400'
+                              <td className={`px-0 py-0 border-b border-r ${borderColor} ${promotionBg}`}>
+                                <div className={`px-1 py-[2px] text-[10px] text-center font-medium tabular-nums ${
+                                  pts === 'AVG'
+                                    ? 'text-green-500'
                                     : hasSail
                                       ? darkMode ? 'text-slate-300' : 'text-slate-700'
                                       : ''
                                 }`}>
-                                  {ls
-                                    ? (cell?.customPoints && cell.customPoints > 0 ? cell.customPoints : '')
-                                    : hasSail ? position : ''
-                                  }
+                                  {pts !== '' ? pts : ''}
+                                </div>
+                              </td>
+
+                              <td className={`px-0 py-0 border-b border-r ${borderColor} ${promotionBg}`}>
+                                <div className={`px-1 py-[2px] text-[10px] text-center font-medium tabular-nums ${
+                                  darkMode ? 'text-slate-500' : 'text-slate-400'
+                                }`}>
+                                  {hasSail ? position : ''}
                                 </div>
                               </td>
                             </React.Fragment>
