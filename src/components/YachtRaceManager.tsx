@@ -469,6 +469,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         if (currentEvent.isManualHandicaps !== undefined) {
           setIsManualHandicaps(currentEvent.isManualHandicaps);
         }
+        if (!currentEvent.isManualHandicaps && !currentEvent.hasDeterminedInitialHcaps &&
+            currentEvent.skippers?.some((s: any) => s.startHcap > 0)) {
+          setIsManualHandicaps(true);
+          setHasDeterminedInitialHcaps(true);
+        }
         if (currentEvent.heatManagement && currentEvent.heatManagement.configuration.enabled) {
           const storedSkipperCount = currentEvent.heatManagement.rounds[0]?.heatAssignments
             ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
@@ -1386,7 +1391,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     });
 
     if (race === 1 && race1Complete && raceType === 'handicap') {
-      if (!isManualHandicaps && !hasDeterminedInitialHcaps) {
+      const hasPresetHandicaps = skippers.some(s => s.startHcap > 0);
+      if (!isManualHandicaps && !hasDeterminedInitialHcaps && !hasPresetHandicaps) {
         const step = 10;
         const ranking = skippers.map((_, idx) => ({
           idx,
@@ -1398,8 +1404,10 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           const handicap = rank * step;
           updatedSkippers[r.idx] = { ...updatedSkippers[r.idx], startHcap: handicap };
         });
-        
+
         setSkippers(updatedSkippers);
+      } else if (hasPresetHandicaps && !isManualHandicaps) {
+        setIsManualHandicaps(true);
       }
       setHasDeterminedInitialHcaps(true);
       setLastCompletedRace(1);
@@ -1531,7 +1539,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     
     const remainingRace1Results = newResults.filter(r => r.race === 1);
     
-    if (race === 1 && !isManualHandicaps && raceType === 'handicap') {
+    const hasPresetHandicapsOnDelete = originalHandicaps && Object.keys(originalHandicaps).length > 0;
+    if (race === 1 && !isManualHandicaps && !hasPresetHandicapsOnDelete && raceType === 'handicap') {
       if (remainingRace1Results.length === 0) {
         const resetSkippers = skippers.map(skipper => ({
           ...skipper,
@@ -1544,16 +1553,16 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         const ranking = remainingRace1Results
           .sort((a, b) => (a.position || 0) - (b.position || 0))
           .map(r => r.skipperIndex);
-        
+
         const updatedSkippers = skippers.map(skipper => ({
           ...skipper,
           startHcap: 0
         }));
-        
+
         ranking.forEach((skipperIdx, rank) => {
           updatedSkippers[skipperIdx].startHcap = rank * step;
         });
-        
+
         setSkippers(updatedSkippers);
       }
     }
@@ -1566,7 +1575,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       console.log('Setting last completed race to previous race:', prevRace);
       setLastCompletedRace(prevRace);
 
-      if (race === 1 && !isManualHandicaps && raceType === 'handicap') {
+      if (race === 1 && !isManualHandicaps && !hasPresetHandicapsOnDelete && raceType === 'handicap') {
         const resetSkippers = skippers.map(skipper => ({
           ...skipper,
           startHcap: 0
@@ -2157,9 +2166,14 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           // For multi-day events, preserve handicap determination from previous days
           setHasDeterminedInitialHcaps(selectedEvent.hasDeterminedInitialHcaps || false);
           setIsManualHandicaps(selectedEvent.isManualHandicaps || false);
+          if (!selectedEvent.isManualHandicaps && !selectedEvent.hasDeterminedInitialHcaps &&
+              skippers.some(s => s.startHcap > 0)) {
+            setIsManualHandicaps(true);
+            setHasDeterminedInitialHcaps(true);
+          }
           setHeatManagement(null);
         }
-        
+
         // Don't auto-open skipper modal for multi-day events since skippers should already be set
         setIsSkipperModalOpen(false);
       } else {
@@ -2185,7 +2199,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         if (selectedEvent.isManualHandicaps !== undefined) {
           setIsManualHandicaps(selectedEvent.isManualHandicaps);
         }
-        
+        if (!selectedEvent.isManualHandicaps && !selectedEvent.hasDeterminedInitialHcaps &&
+            selectedEvent.skippers?.some((s: any) => s.startHcap > 0)) {
+          setIsManualHandicaps(true);
+          setHasDeterminedInitialHcaps(true);
+        }
+
         if (selectedEvent.heatManagement && selectedEvent.heatManagement.configuration.enabled) {
           const storedSkipperCount = selectedEvent.heatManagement.rounds[0]?.heatAssignments
             ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
@@ -3218,19 +3237,24 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                         });
 
                         if (race1Complete && !isManualHandicaps && !hasDeterminedInitialHcaps) {
-                          const step = 10;
-                          const ranking = skippers.map((_, idx) => ({
-                            idx,
-                            pos: latestResults.find(r => r.race === 1 && r.skipperIndex === idx)?.position || 0
-                          })).sort((a, b) => a.pos - b.pos);
+                          const hasPresetHandicaps = skippers.some(s => s.startHcap > 0);
+                          if (!hasPresetHandicaps) {
+                            const step = 10;
+                            const ranking = skippers.map((_, idx) => ({
+                              idx,
+                              pos: latestResults.find(r => r.race === 1 && r.skipperIndex === idx)?.position || 0
+                            })).sort((a, b) => a.pos - b.pos);
 
-                          const updatedSkippers = [...skippers];
-                          ranking.forEach((r, rank) => {
-                            const handicap = rank * step;
-                            updatedSkippers[r.idx] = { ...updatedSkippers[r.idx], startHcap: handicap };
-                          });
+                            const updatedSkippers = [...skippers];
+                            ranking.forEach((r, rank) => {
+                              const handicap = rank * step;
+                              updatedSkippers[r.idx] = { ...updatedSkippers[r.idx], startHcap: handicap };
+                            });
 
-                          setSkippers(updatedSkippers);
+                            setSkippers(updatedSkippers);
+                          } else {
+                            setIsManualHandicaps(true);
+                          }
                           setHasDeterminedInitialHcaps(true);
                         }
 
