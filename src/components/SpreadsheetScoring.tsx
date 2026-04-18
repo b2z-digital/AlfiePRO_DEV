@@ -2,10 +2,9 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { HeatManagement, HeatDesignation, HeatAssignment } from '../types/heat';
-import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type, ChevronLeft, ChevronRight, Timer, Flag, ChartBar as BarChart3 } from 'lucide-react';
+import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type, ChevronLeft, ChevronRight, Timer, Flag } from 'lucide-react';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { HeatOverallResultsModal } from './HeatOverallResultsModal';
-import { FullResultsModal } from './FullResultsModal';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
@@ -69,7 +68,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   updateRaceResults,
   darkMode,
   onRaceChange,
-  dropRules,
   currentEvent,
   isHeatScoring = false,
   isScoringLastHeat = false,
@@ -105,7 +103,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   const prevRoundRef = useRef<number | null>(null);
   const [showStartBoxModal, setShowStartBoxModal] = useState(false);
   const [raceTimerRunning, setRaceTimerRunning] = useState(false);
-  const [showFullResults, setShowFullResults] = useState(false);
   const [singleFleetRace, setSingleFleetRace] = useState(initialRace);
 
   useEffect(() => {
@@ -612,7 +609,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowStartBoxModal(true)}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-base font-semibold transition-all active:scale-95 ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all active:scale-95 ${
                 raceTimerRunning
                   ? darkMode
                     ? 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
@@ -622,8 +619,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                     : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
               }`}
             >
-              <Timer size={22} />
-              StartBox
+              <Timer size={16} />
+              <span className="hidden sm:inline">Starter Console</span>
             </button>
           </div>
 
@@ -645,20 +642,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center gap-3 justify-end">
-            {singleFleetCompletedRaces.length > 0 && (
-              <button
-                onClick={() => setShowFullResults(true)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all active:scale-95 ${
-                  darkMode
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                <Trophy size={16} />
-                <span className="hidden sm:inline">Full Results</span>
-              </button>
-            )}
+          <div className="w-[140px] flex items-center justify-end">
             {raceTimerRunning && (
               <RaceElapsedTimer
                 isRunning={raceTimerRunning}
@@ -1078,17 +1062,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
           onClose={() => setShowStartBoxModal(false)}
           darkMode={darkMode}
           onSequenceComplete={() => setRaceTimerRunning(true)}
-        />
-
-        <FullResultsModal
-          isOpen={showFullResults}
-          onClose={() => setShowFullResults(false)}
-          skippers={skippers}
-          raceResults={raceResults}
-          dropRules={dropRules}
-          numRaces={numRaces}
-          darkMode={darkMode}
-          raceType={currentEvent?.raceFormat}
         />
       </div>
     );

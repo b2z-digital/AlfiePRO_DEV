@@ -32,6 +32,7 @@ class StartBoxAudioEngine {
   private timerHandle: ReturnType<typeof setInterval> | null = null;
   private firedSoundIds: Set<string> = new Set();
   private lastBeepSecond = -1;
+  private firedMinuteCallouts: Set<number> = new Set();
 
   private countdownAudioSource: AudioBufferSourceNode | null = null;
   private countdownAudioStartCtxTime = 0;
@@ -71,6 +72,10 @@ class StartBoxAudioEngine {
 
     if (sequence.audio_file_url && !this.audioBuffers.has(sequence.audio_file_url)) {
       urls.add(sequence.audio_file_url);
+    }
+
+    if (sequence.minute_callout_sound?.file_url && !this.audioBuffers.has(sequence.minute_callout_sound.file_url)) {
+      urls.add(sequence.minute_callout_sound.file_url);
     }
 
     await Promise.allSettled(
@@ -152,6 +157,7 @@ class StartBoxAudioEngine {
     }
     this.firedSoundIds.clear();
     this.lastBeepSecond = -1;
+    this.firedMinuteCallouts.clear();
     this.pausedElapsedMs = 0;
     this.setState('armed');
     this.emitTick();
@@ -360,6 +366,7 @@ class StartBoxAudioEngine {
 
     this.checkSoundTriggers(remainingSeconds);
     this.checkCountdownBeep(remainingSeconds);
+    this.checkMinuteCallout(remainingSeconds);
     this.emitTick();
 
     if (remainingMs <= 0) {
@@ -394,6 +401,24 @@ class StartBoxAudioEngine {
     if (remainingSeconds <= currentSecond && remainingSeconds > currentSecond - 0.15) {
       this.lastBeepSecond = currentSecond;
       this.playSynthBeep(1000, 80).catch(() => {});
+    }
+  }
+
+  private checkMinuteCallout(remainingSeconds: number): void {
+    if (!this.currentSequence?.minute_callout_sound?.file_url) return;
+    if (this.currentSequence.use_audio_only) return;
+
+    const currentMinute = Math.ceil(remainingSeconds / 60);
+    const exactMinuteSeconds = currentMinute * 60;
+
+    if (exactMinuteSeconds > 0 &&
+        exactMinuteSeconds < this.currentSequence.total_duration_seconds &&
+        !this.firedMinuteCallouts.has(exactMinuteSeconds) &&
+        remainingSeconds <= exactMinuteSeconds &&
+        remainingSeconds > exactMinuteSeconds - 0.5) {
+      this.firedMinuteCallouts.add(exactMinuteSeconds);
+      const url = this.currentSequence.minute_callout_sound.file_url;
+      this.playSound(url).catch(() => {});
     }
   }
 

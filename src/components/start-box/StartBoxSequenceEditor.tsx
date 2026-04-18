@@ -425,6 +425,34 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                         Play a beep every second during the LED countdown
                       </span>
                     </label>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <ListMusic size={16} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                        <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          Minute Callout Sound
+                        </span>
+                      </div>
+                      <select
+                        value={seq.minute_callout_sound_id || ''}
+                        onChange={async (e) => {
+                          const val = e.target.value || null;
+                          await updateSequence(seq.id, { minute_callout_sound_id: val });
+                          await loadData();
+                        }}
+                        className={`flex-1 max-w-xs px-2 py-1.5 rounded text-xs border ${
+                          darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      >
+                        <option value="">None</option>
+                        {sounds.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Plays at each minute mark
+                      </span>
+                    </div>
                   </div>
                 )}
 
