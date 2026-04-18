@@ -468,11 +468,35 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return position <= promotionCount;
   };
 
+  const getHeatEntryCount = useCallback((h: HeatDesignation, race: number): number => {
+    let count = 0;
+    for (let p = 1; p <= maxPositions; p++) {
+      const k = getCellKey(h, p, race);
+      if (cells[k]?.sailNumber?.trim()) count++;
+    }
+    return count;
+  }, [cells, maxPositions]);
+
+  const getHeatOffset = useCallback((heat: HeatDesignation, race: number): number => {
+    if (race === 1) return 0;
+    const heatIdx = HEAT_LABELS.indexOf(heat);
+    if (heatIdx <= 0) return 0;
+    let offset = 0;
+    for (let i = 0; i < heatIdx; i++) {
+      const h = HEAT_LABELS[i];
+      const entries = getHeatEntryCount(h, race);
+      const promoted = i === 0 ? 0 : promotionCount;
+      offset += Math.max(0, entries - promoted);
+    }
+    return offset;
+  }, [getHeatEntryCount, promotionCount]);
+
   const getHeatRaceStats = useCallback((heat: HeatDesignation, race: number) => {
     let scoreCount = 0;
     let letterCount = 0;
     let totalPoints = 0;
     let entryCount = 0;
+    const offset = getHeatOffset(heat, race);
 
     for (let pos = 1; pos <= maxPositions; pos++) {
       const key = getCellKey(heat, pos, race);
@@ -488,37 +512,82 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           letterCount++;
           const pts = cell.customPoints !== undefined && cell.customPoints > 0
             ? cell.customPoints
-            : entryCount + 1;
+            : offset + (race === 1 || heat === 'A' ? entryCount : entryCount - promotionCount) + 1;
           totalPoints += pts;
         } else {
           scoreCount++;
-          totalPoints += pos;
+          if (race === 1 || heat === 'A') {
+            totalPoints += pos;
+          } else {
+            totalPoints += offset + (pos - promotionCount);
+          }
         }
       }
     }
 
     return { scoreCount, letterCount, totalPoints, entryCount };
-  }, [cells, maxPositions, promotionCount]);
+  }, [cells, maxPositions, promotionCount, getHeatOffset]);
 
   const getPointsForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
-    if (!cell?.sailNumber?.trim()) return '';
+    const hasSail = !!cell?.sailNumber?.trim();
 
-    const isPromoted = heat !== 'A' && race > 1 && position <= promotionCount;
-    if (isPromoted) return 0;
-
-    if (cell.letterScore) {
-      if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
-      if (cell.customPoints === -1) return 'AVG';
-      let entryCount = 0;
-      for (let p = 1; p <= maxPositions; p++) {
-        const k = getCellKey(heat, p, race);
-        if (cells[k]?.sailNumber?.trim()) entryCount++;
-      }
-      return entryCount + 1;
+    if (!hasSail) {
+      const entryCount = getHeatEntryCount(heat, race);
+      if (entryCount === 0) return '';
+      const offset = getHeatOffset(heat, race);
+      if (race === 1) return entryCount;
+      if (heat === 'A') return entryCount;
+      const nonPromoted = Math.max(0, entryCount - promotionCount);
+      return offset + nonPromoted;
     }
 
-    return position;
-  }, [cells, maxPositions, promotionCount]);
+    const isPromoted = heat !== 'A' && race > 1 && position <= promotionCount;
+    if (isPromoted) return '#N/A';
+
+    const offset = getHeatOffset(heat, race);
+
+    if (cell?.letterScore) {
+      if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
+      if (cell.customPoints === -1) return 'AVG';
+      const entryCount = getHeatEntryCount(heat, race);
+      const nonPromoted = race > 1 && heat !== 'A' ? Math.max(0, entryCount - promotionCount) : entryCount;
+      return offset + nonPromoted + 1;
+    }
+
+    if (race === 1) return position;
+
+    if (heat === 'A') return position;
+
+    const effectivePos = position - promotionCount;
+    return offset + effectivePos;
+  }, [cells, maxPositions, promotionCount, getHeatOffset, getHeatEntryCount]);
+
+  const getExpForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
+    const hasSail = !!cell?.sailNumber?.trim();
+    const isPromoted = heat !== 'A' && race > 1 && position <= promotionCount;
+    const offset = getHeatOffset(heat, race);
+
+    if (hasSail && isPromoted) {
+      return offset > 0 ? offset : getHeatEntryCount('A', race);
+    }
+
+    if (hasSail) {
+      if (race === 1) return position;
+      if (heat === 'A') return position;
+      const effectivePos = position - promotionCount;
+      return offset + effectivePos;
+    }
+
+    const entryCount = getHeatEntryCount(heat, race);
+    if (entryCount === 0) return '';
+
+    if (race === 1) return entryCount;
+
+    if (heat === 'A') return entryCount;
+
+    const nonPromoted = Math.max(0, entryCount - promotionCount);
+    return offset + nonPromoted;
+  }, [getHeatOffset, getHeatEntryCount, promotionCount]);
 
   const availableSkippersForDropdown = useMemo(() => {
     if (!dropdownTarget) return [];
@@ -624,7 +693,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                   >
                     <div className="flex flex-col items-center gap-0.5">
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-extrabold text-black">
+                        <span className="text-[11px] font-extrabold text-black">
                           Race {race}
                         </span>
                         {isSeeding && (
@@ -666,16 +735,16 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             <tr>
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => (
                 <React.Fragment key={race}>
-                  <th className={`px-1 py-0.5 text-center text-[9px] font-extrabold border-b border-slate-300 ${raceSeparator} text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
+                  <th className={`px-1 py-0.5 text-center text-[10px] font-extrabold border-b border-slate-300 ${raceSeparator} text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
                     Sail No
                   </th>
-                  <th className="px-1 py-0.5 text-center text-[9px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0.5 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Comments
                   </th>
-                  <th className="px-1 py-0.5 text-center text-[9px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0.5 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Points
                   </th>
-                  <th className="px-1 py-0.5 text-center text-[9px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0.5 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Exp.
                   </th>
                 </React.Fragment>
@@ -691,7 +760,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                 <React.Fragment key={heat}>
                   <tr style={{ height: 24 }}>
                     <td
-                      className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[10px] text-black whitespace-nowrap text-center"
+                      className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[11px] text-black whitespace-nowrap text-center"
                       style={{ backgroundColor: '#FF00FF' }}
                     >
                       Heat {heat}
@@ -701,25 +770,25 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                       return (
                         <React.Fragment key={race}>
                           <td
-                            className={`px-0 py-0 border-b border-slate-400 ${raceSeparator} text-black text-[9px] font-bold text-center`}
+                            className={`px-0 py-0 border-b border-slate-400 ${raceSeparator} text-black text-[10px] font-bold text-center`}
                             style={{ backgroundColor: '#FF0000' }}
                           >
                             {stats.scoreCount > 0 || stats.letterCount > 0 ? String(stats.scoreCount).padStart(2, '0') : '00'}
                           </td>
                           <td
-                            className="px-0 py-0 border-b border-slate-400 text-black text-[9px] font-bold text-center"
+                            className="px-0 py-0 border-b border-slate-400 text-black text-[10px] font-bold text-center"
                             style={{ backgroundColor: '#FF0000' }}
                           >
                             {stats.letterCount > 0 ? stats.letterCount : '0'}
                           </td>
                           <td
-                            className="px-0 py-0 border-b border-slate-400 text-black text-[9px] font-bold text-center"
+                            className="px-0 py-0 border-b border-slate-400 text-black text-[10px] font-bold text-center"
                             style={{ backgroundColor: '#FF0000' }}
                           >
                             {stats.totalPoints}
                           </td>
                           <td
-                            className="px-0 py-0 border-b border-slate-400 text-black text-[9px] font-bold text-center"
+                            className="px-0 py-0 border-b border-slate-400 text-black text-[10px] font-bold text-center"
                             style={{ backgroundColor: '#FF0000' }}
                           >
                             {String(stats.entryCount).padStart(2, '0')}
@@ -738,7 +807,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                         className="hover:bg-slate-50"
                       >
                         <td
-                          className="sticky left-0 z-10 px-2 py-0 text-[11px] font-bold border-r border-slate-300 whitespace-nowrap text-black text-center"
+                          className="sticky left-0 z-10 px-2 py-0 text-[12px] font-extrabold border-r border-slate-300 whitespace-nowrap text-black text-center"
                           style={{ backgroundColor: '#FFFF00' }}
                         >
                           {getOrdinal(position)}
@@ -755,6 +824,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                           const lsColor = ls ? LETTER_SCORE_COLORS[ls] : null;
                           const isPromotedSlot = showPromotion && race > 1;
                           const pts = getPointsForCell(heat, position, race, cell);
+                          const exp = getExpForCell(heat, position, race, cell);
+                          const isPromotedEntry = hasSail && isPromotedSlot;
 
                           const promotionStyle = isPromotedSlot
                             ? { backgroundColor: '#00FF00' }
@@ -786,7 +857,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                     setDropdownFilter('');
                                   }}
                                   onKeyDown={e => handleKeyDown(e, heat, position, race)}
-                                  className={`w-full px-0.5 py-[2px] text-[11px] text-center border-0 outline-none bg-transparent
+                                  className={`w-full px-0.5 py-[2px] text-[12px] text-center border-0 outline-none bg-transparent
                                     ${isInvalid
                                       ? 'text-red-500 font-bold'
                                       : isDup
@@ -824,10 +895,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                         }}
                                         className="w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors hover:bg-slate-50 text-slate-700"
                                       >
-                                        <span className="text-[11px] font-bold min-w-[28px] text-black">
+                                        <span className="text-[12px] font-bold min-w-[28px] text-black">
                                           {skipper.sailNumber || skipper.sailNo || skipper.boat_sail_number}
                                         </span>
-                                        <span className="text-[10px] truncate">
+                                        <span className="text-[11px] truncate">
                                           {skipper.name}
                                         </span>
                                       </button>
@@ -841,12 +912,16 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 style={promotionStyle}
                                 onClick={() => handleCommentClick(heat, position, race)}
                               >
-                                {ls && lsColor ? (
-                                  <div className={`px-0.5 py-[2px] text-[10px] text-center font-bold rounded-sm mx-0.5 ${lsColor.bg} ${lsColor.text}`}>
+                                {isPromotedEntry ? (
+                                  <div className="px-1 py-[2px] text-[11px] text-center font-bold text-black">
+                                    UP
+                                  </div>
+                                ) : ls && lsColor ? (
+                                  <div className={`px-0.5 py-[2px] text-[11px] text-center font-bold rounded-sm mx-0.5 ${lsColor.bg} ${lsColor.text}`}>
                                     {ls}
                                   </div>
                                 ) : hasSail ? (
-                                  <div className="px-1 py-[2px] text-[10px] text-center font-medium text-black">
+                                  <div className="px-1 py-[2px] text-[11px] text-center font-medium text-black">
                                     OK
                                   </div>
                                 ) : null}
@@ -856,7 +931,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 className={`px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
-                                <div className={`px-1 py-[2px] text-[10px] text-center font-medium tabular-nums ${
+                                <div className={`px-1 py-[2px] text-[11px] text-center font-medium tabular-nums ${
                                   hasSail ? 'text-black' : ''
                                 }`}>
                                   {pts !== '' ? pts : ''}
@@ -867,8 +942,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 className={`px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
-                                <div className="px-1 py-[2px] text-[10px] text-center font-medium tabular-nums text-black">
-                                  {hasSail ? position : ''}
+                                <div className="px-1 py-[2px] text-[11px] text-center font-medium tabular-nums text-black">
+                                  {exp !== '' ? exp : ''}
                                 </div>
                               </td>
                             </React.Fragment>
