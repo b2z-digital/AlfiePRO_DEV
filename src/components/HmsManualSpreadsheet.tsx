@@ -4,7 +4,7 @@ import { HeatDesignation, HeatManagement } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { LetterScore } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
-import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle } from 'lucide-react';
+import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer } from 'lucide-react';
 
 const LETTER_SCORE_CODES: LetterScore[] = [
   'DNS', 'DNF', 'DSQ', 'OCS', 'BFD', 'UFD', 'RDG', 'DPI',
@@ -65,6 +65,7 @@ interface HmsManualSpreadsheetProps {
   updateRaceResults: (race: number, skipperIndex: number, position: number | null, letterScore?: any, customPoints?: number) => void;
   deleteRaceResult: (race: number, skipperIndex: number) => void;
   isFullscreen?: boolean;
+  onOpenStartBox?: () => void;
 }
 
 const parseSmartInput = (raw: string): { sailNumber: string; letterScore: LetterScore | null } => {
@@ -90,6 +91,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   updateRaceResults,
   deleteRaceResult,
   isFullscreen = false,
+  onOpenStartBox,
 }) => {
   const numberOfHeats = heatManagement.configuration.numberOfHeats;
   const promotionCount = heatManagement.configuration.promotionCount;
@@ -548,7 +550,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           style={{ tableLayout: 'fixed' }}
         >
           <colgroup>
-            <col style={{ width: 108 }} />
+            <col style={{ width: 324 }} />
             {Array.from({ length: TOTAL_RACES }).map((_, i) => (
               <React.Fragment key={i}>
                 <col style={{ width: 40 }} />
@@ -561,8 +563,15 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
           <thead className="sticky top-0 z-20">
             <tr>
-              <th className="sticky left-0 z-30 px-1 py-1 border-b border-r border-slate-300" style={{ backgroundColor: '#00FFFF' }}>
-                <span className="text-[9px] font-semibold text-black">HMS</span>
+              <th
+                className="sticky left-0 z-30 px-1 py-1 border-b border-r border-slate-300 bg-black cursor-pointer"
+                onClick={onOpenStartBox}
+                title="Open StartBox"
+              >
+                <div className="flex items-center justify-center gap-1">
+                  <Timer size={14} className="text-white" />
+                  <span className="text-[9px] font-semibold text-white">StartBox</span>
+                </div>
               </th>
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
                 const isVerified = verifiedRaces.has(race);
@@ -604,7 +613,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                         </button>
                         <button
                           onClick={() => setResetConfirmRace(race)}
-                          className="text-[8px] font-bold px-1.5 py-0 rounded text-white transition-colors bg-red-600 hover:bg-red-700"
+                          className="text-[8px] font-bold px-1.5 py-0 rounded text-white transition-colors hover:opacity-80"
+                          style={{ backgroundColor: '#FF0000' }}
                         >
                           Reset
                         </button>
@@ -657,7 +667,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                         <td
                           key={race}
                           colSpan={4}
-                          className={`px-0 py-0 border-b border-slate-400 ${raceSeparator} bg-red-600 text-black text-[9px] font-bold text-center`}
+                          className={`px-0 py-0 border-b border-slate-400 ${raceSeparator} text-black text-[9px] font-bold text-center`}
+                          style={{ backgroundColor: '#FF0000' }}
                         >
                           <div className="flex items-center justify-around px-1">
                             <span>{stats.scoreCount > 0 || stats.letterCount > 0 ? String(stats.scoreCount).padStart(2, '0') : '00'}</span>
@@ -679,7 +690,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                         className="hover:bg-slate-50"
                       >
                         <td
-                          className="sticky left-0 z-10 px-2 py-0 text-[11px] font-bold border-b border-r border-slate-300 whitespace-nowrap text-black"
+                          className="sticky left-0 z-10 px-2 py-0 text-[11px] font-bold border-r border-slate-300 whitespace-nowrap text-black"
                           style={{ backgroundColor: '#FFFF00' }}
                         >
                           {getOrdinal(position)}
@@ -732,9 +743,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                       ? 'text-red-500 font-bold'
                                       : isDup
                                         ? 'text-amber-500 font-bold'
-                                        : hasSail
-                                          ? 'text-slate-900 font-medium'
-                                          : 'text-slate-300'
+                                        : 'text-black font-medium'
                                     }
                                     focus:ring-1 focus:ring-inset focus:ring-blue-400/40
                                   `}
@@ -789,7 +798,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                     {ls}
                                   </div>
                                 ) : hasSail ? (
-                                  <div className="px-1 py-[2px] text-[10px] text-center font-medium text-green-600">
+                                  <div className="px-1 py-[2px] text-[10px] text-center font-medium text-black">
                                     OK
                                   </div>
                                 ) : null}
@@ -800,7 +809,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 style={promotionStyle}
                               >
                                 <div className={`px-1 py-[2px] text-[10px] text-center font-medium tabular-nums ${
-                                  pts === 'AVG' ? 'text-green-500' : hasSail ? 'text-slate-700' : ''
+                                  hasSail ? 'text-black' : ''
                                 }`}>
                                   {pts !== '' ? pts : ''}
                                 </div>
@@ -810,7 +819,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 className={`px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
-                                <div className="px-1 py-[2px] text-[10px] text-center font-medium tabular-nums text-slate-400">
+                                <div className="px-1 py-[2px] text-[10px] text-center font-medium tabular-nums text-black">
                                   {hasSail ? position : ''}
                                 </div>
                               </td>
@@ -850,7 +859,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
               </button>
               <button
                 onClick={() => handleResetRace(resetConfirmRace)}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors hover:opacity-80"
+                style={{ backgroundColor: '#FF0000' }}
               >
                 Reset
               </button>

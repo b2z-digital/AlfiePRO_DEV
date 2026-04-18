@@ -1054,6 +1054,14 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           updateRaceResults={updateRaceResults}
           deleteRaceResult={deleteRaceResult}
           isFullscreen={isFullscreen}
+          onOpenStartBox={() => setShowStartBoxModal(true)}
+        />
+        <StartBoxModal
+          isOpen={showStartBoxModal}
+          onClose={() => setShowStartBoxModal(false)}
+          onSequenceComplete={() => setRaceTimerRunning(true)}
+          clubId={currentEvent?.clubId || null}
+          darkMode={darkMode}
         />
       </div>
     );
