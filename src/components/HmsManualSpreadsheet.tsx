@@ -5,6 +5,7 @@ import { RaceEvent } from '../types/race';
 import { LetterScore } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer } from 'lucide-react';
+import { useNotification } from '../contexts/NotificationContext';
 
 const LETTER_SCORE_CODES: LetterScore[] = [
   'DNS', 'DNF', 'DSQ', 'OCS', 'BFD', 'UFD', 'RDG', 'DPI',
@@ -68,14 +69,24 @@ interface HmsManualSpreadsheetProps {
   onOpenStartBox?: () => void;
 }
 
+const LETTER_SCORES_PATTERN = 'DNS|DNF|DSQ|OCS|BFD|UFD|RDG|DPI|ZFP|SCP|RET|DNC|DNE|NSC|WDN';
+
 const parseSmartInput = (raw: string): { sailNumber: string; letterScore: LetterScore | null } => {
   const trimmed = raw.trim();
-  const regex = /^(\S+)\s+(DNS|DNF|DSQ|OCS|BFD|UFD|RDG|DPI|ZFP|SCP|RET|DNC|DNE|NSC|WDN)$/i;
-  const match = trimmed.match(regex);
-  if (match) {
+  const withSpace = new RegExp(`^(\\S+)\\s+(${LETTER_SCORES_PATTERN})$`, 'i');
+  const matchSpace = trimmed.match(withSpace);
+  if (matchSpace) {
     return {
-      sailNumber: match[1],
-      letterScore: match[2].toUpperCase() as LetterScore,
+      sailNumber: matchSpace[1],
+      letterScore: matchSpace[2].toUpperCase() as LetterScore,
+    };
+  }
+  const noSpace = new RegExp(`^(\\d+)(${LETTER_SCORES_PATTERN})$`, 'i');
+  const matchNoSpace = trimmed.match(noSpace);
+  if (matchNoSpace) {
+    return {
+      sailNumber: matchNoSpace[1],
+      letterScore: matchNoSpace[2].toUpperCase() as LetterScore,
     };
   }
   return { sailNumber: trimmed, letterScore: null };
@@ -93,6 +104,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   isFullscreen = false,
   onOpenStartBox,
 }) => {
+  const { addNotification } = useNotification();
   const numberOfHeats = heatManagement.configuration.numberOfHeats;
   const promotionCount = heatManagement.configuration.promotionCount;
   const heats = HEAT_LABELS.slice(0, Math.max(numberOfHeats, 5));
@@ -200,27 +212,26 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   }, [cells, heats, maxPositions]);
 
   const handleSailNumberInput = useCallback((heat: HeatDesignation, position: number, race: number, rawValue: string) => {
-    const { sailNumber, letterScore } = parseSmartInput(rawValue);
     const key = getCellKey(heat, position, race);
-    const sailLower = sailNumber.toLowerCase();
-    const skipperIdx = sailNumberMap[sailLower] ?? null;
+    const numericPart = rawValue.replace(/[^0-9]/g, '');
+    const skipperIdx = numericPart ? (sailNumberMap[numericPart.toLowerCase()] ?? null) : null;
 
     setCells(prev => ({
       ...prev,
       [key]: {
         ...prev[key],
-        sailNumber: sailNumber,
-        comment: letterScore ? letterScore : (sailNumber.trim() ? 'OK' : ''),
-        points: letterScore ? '' : (prev[key]?.points || ''),
-        letterScore: letterScore,
+        sailNumber: rawValue,
+        comment: prev[key]?.comment || '',
+        points: prev[key]?.points || '',
+        letterScore: prev[key]?.letterScore || null,
         skipperIndex: skipperIdx,
-        isValid: !sailNumber.trim() || skipperIdx !== null,
+        isValid: !rawValue.trim() || skipperIdx !== null,
         isDuplicate: false,
       }
     }));
 
-    if (sailNumber.trim()) {
-      setDropdownFilter(sailNumber);
+    if (numericPart) {
+      setDropdownFilter(numericPart);
     }
   }, [sailNumberMap]);
 
@@ -229,15 +240,33 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const cell = cells[key];
     if (!cell?.sailNumber?.trim()) return;
 
-    const skipperIdx = cell.skipperIndex ?? sailNumberMap[cell.sailNumber.toLowerCase()];
-    if (skipperIdx !== undefined && skipperIdx !== null) {
-      if (cell.letterScore) {
-        updateRaceResults(race, skipperIdx, null, cell.letterScore, cell.customPoints);
+    const { sailNumber: parsedSail, letterScore: parsedScore } = parseSmartInput(cell.sailNumber);
+    const sailLower = parsedSail.toLowerCase();
+    const skipperIdx = sailNumberMap[sailLower] ?? null;
+
+    if (parsedScore) {
+      setCells(prev => ({
+        ...prev,
+        [key]: {
+          ...prev[key],
+          sailNumber: parsedSail,
+          comment: parsedScore,
+          letterScore: parsedScore,
+          skipperIndex: skipperIdx,
+          isValid: !parsedSail.trim() || skipperIdx !== null,
+        }
+      }));
+    }
+
+    const finalIdx = skipperIdx ?? cell.skipperIndex;
+    if (finalIdx !== undefined && finalIdx !== null) {
+      if (parsedScore) {
+        updateRaceResults(race, finalIdx, null, parsedScore, cell.customPoints);
       } else {
-        updateRaceResults(race, skipperIdx, position, undefined, undefined);
+        updateRaceResults(race, finalIdx, position, undefined, undefined);
       }
     } else {
-      setNoSuchBoatTarget({ heat, position, race, sailNumber: cell.sailNumber });
+      setNoSuchBoatTarget({ heat, position, race, sailNumber: parsedSail });
     }
   }, [cells, sailNumberMap, updateRaceResults]);
 
@@ -423,8 +452,16 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     setVerifyTarget(race);
     if (result.valid) {
       setVerifiedRaces(prev => new Set(prev).add(race));
+      const raceLabel = `R${race.toString().padStart(2, '0')}`;
+      if (result.warnings.length === 0) {
+        addNotification('success', `Race ${raceLabel} verified - all boats accounted for, no duplicate entries, all promotions correct.`, 5000);
+      } else {
+        addNotification('warning', `Race ${raceLabel} verified with warnings: ${result.warnings.join('; ')}`, 5000);
+      }
+    } else {
+      addNotification('error', `Race R${race.toString().padStart(2, '0')} verification failed - ${result.errors.length} error(s) found.`, 5000);
     }
-  }, [verifyRace]);
+  }, [verifyRace, addNotification]);
 
   const isPromotionRow = (heat: HeatDesignation, position: number) => {
     if (heat === 'A') return false;
@@ -547,13 +584,13 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       >
         <table
           className="border-collapse text-xs bg-white"
-          style={{ tableLayout: 'fixed', minWidth: 500 + TOTAL_RACES * 290 }}
+          style={{ tableLayout: 'fixed', minWidth: 200 + TOTAL_RACES * 240 }}
         >
           <colgroup>
-            <col style={{ width: 500, minWidth: 500 }} />
+            <col style={{ width: 200, minWidth: 200 }} />
             {Array.from({ length: TOTAL_RACES }).map((_, i) => (
               <React.Fragment key={i}>
-                <col style={{ width: 100 }} />
+                <col style={{ width: 50 }} />
                 <col style={{ width: 90 }} />
                 <col style={{ width: 60 }} />
                 <col style={{ width: 40 }} />
