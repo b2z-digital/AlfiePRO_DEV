@@ -629,7 +629,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
     if (hasSail) {
       if (cell?.letterScore) {
-        return getEmptyRowScore(heat, race);
+        const okAbove = getOkCountAbovePosition(heat, position, race);
+        if (race === 1 || heat === 'A') return okAbove;
+        const offset = getHeatOffset(heat, race);
+        return offset + okAbove;
       }
       if (race === 1 || heat === 'A') return position;
       const offset = getHeatOffset(heat, race);
@@ -638,7 +641,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
 
     return getEmptyRowScore(heat, race);
-  }, [getHeatOffset, getHeatEntryCount, getEmptyRowScore, promotionCount]);
+  }, [getHeatOffset, getHeatEntryCount, getEmptyRowScore, getOkCountAbovePosition, promotionCount]);
 
   const availableSkippersForDropdown = useMemo(() => {
     if (!dropdownTarget) return [];
@@ -722,7 +725,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             <tr>
               <th
                 rowSpan={2}
-                className="sticky left-0 z-30 px-1 py-1 border-b border-r border-slate-300 bg-black cursor-pointer"
+                className="sticky left-0 z-30 px-1 py-0 border-b border-r border-slate-300 bg-black cursor-pointer"
                 onClick={onOpenStartBox}
                 title="Open StartBox"
               >
@@ -739,7 +742,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                   <th
                     key={race}
                     colSpan={4}
-                    className={`px-0.5 py-1 text-center border-b border-slate-300 ${raceSeparator}`}
+                    className={`px-0.5 py-0 text-center border-b border-slate-300 ${raceSeparator}`}
                     style={{ backgroundColor: '#00FFFF' }}
                   >
                     <div className="flex flex-col items-center gap-0.5">
@@ -786,16 +789,16 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             <tr>
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => (
                 <React.Fragment key={race}>
-                  <th className={`px-1 py-0.5 text-center text-[10px] font-extrabold border-b border-slate-300 ${raceSeparator} text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
+                  <th className={`px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 ${raceSeparator} text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
                     Sail No
                   </th>
-                  <th className="px-1 py-0.5 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Comments
                   </th>
-                  <th className="px-1 py-0.5 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Points
                   </th>
-                  <th className="px-1 py-0.5 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Exp.
                   </th>
                 </React.Fragment>
@@ -809,7 +812,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
               return (
                 <React.Fragment key={heat}>
-                  <tr style={{ height: 15 }}>
+                  <tr style={{ height: 14 }}>
                     <td
                       className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[11px] text-black whitespace-nowrap text-center"
                       style={{ backgroundColor: '#FF00FF' }}
@@ -856,7 +859,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                       <tr
                         key={`${heat}-${position}`}
                         className="hover:bg-slate-50"
-                        style={{ height: 18 }}
+                        style={{ height: 16 }}
                       >
                         <td
                           className="sticky left-0 z-10 px-1 py-0 text-[11px] font-extrabold border-r border-slate-300 whitespace-nowrap text-black text-center leading-none"
