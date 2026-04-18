@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2 } from 'lucide-react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -32,6 +32,7 @@ import { TouchModeScoring } from './TouchModeScoring';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
 import { calculateHandicaps } from '../utils/handicapCalculator';
 import { RaceSettingsModal } from './RaceSettingsModal';
+import { StartBoxModal } from './start-box/StartBoxModal';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
 import { updateRaceStatus } from '../utils/liveTrackingStorage';
@@ -77,6 +78,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [showChartsModal, setShowChartsModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showStartBoxModal, setShowStartBoxModal] = useState(false);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
   const [showRaceSettingsModal, setShowRaceSettingsModal] = useState(false);
@@ -3013,7 +3015,22 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             {/* Scoring Mode Buttons - Only show for non-heat races */}
             {!heatManagement?.configuration.enabled && (
               <div className="flex justify-end mb-4 gap-2">
-                {(['pro', 'touch', 'spreadsheet'] as const).filter(m => m !== scoringMode).map(mode => (
+                {scoringMode === 'pro' && (
+                  <button
+                    onClick={() => setShowStartBoxModal(true)}
+                    className={`
+                      flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+                      ${darkMode
+                        ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
+                        : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'}
+                    `}
+                    title="Open StartBox"
+                  >
+                    <Timer size={18} />
+                    <span className="text-sm font-medium">StartBox</span>
+                  </button>
+                )}
+                {(['pro', 'touch', 'spreadsheet'] as const).filter(m => m !== scoringMode).filter(m => !(raceType === 'handicap' && m === 'spreadsheet')).map(mode => (
                   <button
                     key={mode}
                     onClick={async () => {
@@ -3610,6 +3627,14 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           }
           confirmText={currentEvent?.multiDay && currentEvent.numberOfDays && currentDay < currentEvent.numberOfDays ? "Complete Day" : "Publish Results"}
           cancelText="Cancel"
+          darkMode={darkMode}
+        />
+
+        <StartBoxModal
+          isOpen={showStartBoxModal}
+          onClose={() => setShowStartBoxModal(false)}
+          onSequenceComplete={() => {}}
+          clubId={getCurrentEvent()?.clubId || null}
           darkMode={darkMode}
         />
       </div>
