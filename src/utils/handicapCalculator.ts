@@ -107,12 +107,8 @@ export const calculateHandicaps = (
       result.handicap = currentHcaps[idx];
 
       if (result.letterScore && result.letterScore !== 'RDGfix') {
-        if (result.letterScore === 'DNS' || result.letterScore === 'DNC') {
-          const dnsAdj = Math.max(0, Math.min(capLimit, currentHcaps[idx] + 10));
-          result.adjustedHcap = dnsAdj;
-        } else {
-          result.adjustedHcap = currentHcaps[idx];
-        }
+        const letterAdj = scratchBoatBonus > 0 ? scratchBoatBonus : 0;
+        result.adjustedHcap = Math.max(0, Math.min(capLimit, currentHcaps[idx] + letterAdj));
         const resultIndex = updatedResults.findIndex(
           r => r.race === race && r.skipperIndex === idx
         );
