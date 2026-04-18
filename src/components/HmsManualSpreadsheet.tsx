@@ -584,10 +584,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       >
         <table
           className="border-collapse text-xs bg-white"
-          style={{ tableLayout: 'fixed', minWidth: 200 + TOTAL_RACES * 240 }}
+          style={{ tableLayout: 'fixed', minWidth: 140 + TOTAL_RACES * 240 }}
         >
           <colgroup>
-            <col style={{ width: 200, minWidth: 200 }} />
+            <col style={{ width: 140, minWidth: 140 }} />
             {Array.from({ length: TOTAL_RACES }).map((_, i) => (
               <React.Fragment key={i}>
                 <col style={{ width: 50 }} />
@@ -601,6 +601,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           <thead className="sticky top-0 z-20">
             <tr>
               <th
+                rowSpan={2}
                 className="sticky left-0 z-30 px-1 py-1 border-b border-r border-slate-300 bg-black cursor-pointer"
                 onClick={onOpenStartBox}
                 title="Open StartBox"
@@ -623,7 +624,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                   >
                     <div className="flex flex-col items-center gap-0.5">
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-bold text-black">
+                        <span className="text-[10px] font-extrabold text-black">
                           Race {race}
                         </span>
                         {isSeeding && (
@@ -663,21 +664,18 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             </tr>
 
             <tr>
-              <th className="sticky left-0 z-30 px-1 py-0.5 border-b border-slate-300 text-[9px] font-bold text-black" style={{ backgroundColor: '#00FFFF' }}>
-                Pos
-              </th>
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => (
                 <React.Fragment key={race}>
-                  <th className={`px-1 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 ${raceSeparator} text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
+                  <th className={`px-1 py-0.5 text-center text-[9px] font-extrabold border-b border-slate-300 ${raceSeparator} text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
                     Sail No
                   </th>
-                  <th className="px-1 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0.5 text-center text-[9px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Comments
                   </th>
-                  <th className="px-1 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0.5 text-center text-[9px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Points
                   </th>
-                  <th className="px-1 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className="px-1 py-0.5 text-center text-[9px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
                     Exp.
                   </th>
                 </React.Fragment>
@@ -701,19 +699,32 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                     {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
                       const stats = getHeatRaceStats(heat, race);
                       return (
-                        <td
-                          key={race}
-                          colSpan={4}
-                          className={`px-0 py-0 border-b border-slate-400 ${raceSeparator} text-black text-[9px] font-bold text-center`}
-                          style={{ backgroundColor: '#FF0000' }}
-                        >
-                          <div className="flex items-center justify-around px-1">
-                            <span>{stats.scoreCount > 0 || stats.letterCount > 0 ? String(stats.scoreCount).padStart(2, '0') : '00'}</span>
-                            <span>{stats.letterCount > 0 ? 'L' : ''}</span>
-                            <span>{stats.totalPoints}</span>
-                            <span>{String(stats.entryCount).padStart(2, '0')}</span>
-                          </div>
-                        </td>
+                        <React.Fragment key={race}>
+                          <td
+                            className={`px-0 py-0 border-b border-slate-400 ${raceSeparator} text-black text-[9px] font-bold text-center`}
+                            style={{ backgroundColor: '#FF0000' }}
+                          >
+                            {stats.scoreCount > 0 || stats.letterCount > 0 ? String(stats.scoreCount).padStart(2, '0') : '00'}
+                          </td>
+                          <td
+                            className="px-0 py-0 border-b border-slate-400 text-black text-[9px] font-bold text-center"
+                            style={{ backgroundColor: '#FF0000' }}
+                          >
+                            {stats.letterCount > 0 ? stats.letterCount : '0'}
+                          </td>
+                          <td
+                            className="px-0 py-0 border-b border-slate-400 text-black text-[9px] font-bold text-center"
+                            style={{ backgroundColor: '#FF0000' }}
+                          >
+                            {stats.totalPoints}
+                          </td>
+                          <td
+                            className="px-0 py-0 border-b border-slate-400 text-black text-[9px] font-bold text-center"
+                            style={{ backgroundColor: '#FF0000' }}
+                          >
+                            {String(stats.entryCount).padStart(2, '0')}
+                          </td>
+                        </React.Fragment>
                       );
                     })}
                   </tr>
