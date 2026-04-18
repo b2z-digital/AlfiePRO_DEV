@@ -13,6 +13,7 @@ interface HeatOverallResultsModalProps {
   heatManagement: HeatManagement;
   dropRules: number[];
   darkMode: boolean;
+  externalRaceResults?: any[];
 }
 
 const FLEET_NAMES: Record<string, string> = {
@@ -39,14 +40,16 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
   skippers,
   heatManagement,
   dropRules,
-  darkMode
+  darkMode,
+  externalRaceResults
 }) => {
   const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
   const shrsQualifyingRounds = heatManagement.configuration.shrsQualifyingRounds || 0;
 
   const raceResults = useMemo(() => {
+    if (externalRaceResults) return externalRaceResults;
     return convertHeatResultsToRaceResults(heatManagement, skippers);
-  }, [heatManagement, skippers]);
+  }, [heatManagement, skippers, externalRaceResults]);
 
   const completedRaces = useMemo(() => {
     const races = new Set(raceResults.map(r => r.race));

@@ -699,6 +699,39 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
   }, [handleSailNumberBlur]);
 
+  const overallRaceResults = useMemo(() => {
+    const results: any[] = [];
+    const seenSkipperRaces = new Set<string>();
+
+    for (let race = 1; race <= TOTAL_RACES; race++) {
+      for (const heat of heats) {
+        for (let position = 1; position <= maxPositions; position++) {
+          const key = getCellKey(heat, position, race);
+          const cell = cells[key];
+          if (!cell?.sailNumber?.trim() || cell.skipperIndex == null) continue;
+
+          const isPromoted = heat !== 'A' && race > 1 && position <= promotionCount;
+          if (isPromoted) continue;
+
+          const skipperRaceKey = `${cell.skipperIndex}-${race}`;
+          if (seenSkipperRaces.has(skipperRaceKey)) continue;
+          seenSkipperRaces.add(skipperRaceKey);
+
+          const pts = getPointsForCell(heat, position, race, cell);
+          if (pts === '' || pts === '#N/A') continue;
+
+          results.push({
+            race,
+            skipperIndex: cell.skipperIndex,
+            position: typeof pts === 'number' ? pts : parseInt(String(pts), 10) || 999,
+            letterScore: cell.letterScore || undefined,
+          });
+        }
+      }
+    }
+    return results;
+  }, [cells, heats, maxPositions, promotionCount, getPointsForCell]);
+
   const raceSeparator = 'border-l-2 border-l-slate-400';
 
   return (
@@ -1174,6 +1207,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         heatManagement={heatManagement}
         dropRules={currentEvent?.dropRules || [4, 8, 16, 24, 32, 40]}
         darkMode={darkMode}
+        externalRaceResults={overallRaceResults}
       />
     </div>
   );
