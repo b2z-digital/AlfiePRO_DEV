@@ -59,12 +59,13 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
   const skipperFleetMap = useMemo(() => {
     if (!isShrs) return new Map<number, HeatDesignation>();
     const map = new Map<number, HeatDesignation>();
-    const finalsRounds = heatManagement.rounds
+    const rounds = heatManagement.rounds || [];
+    const finalsRounds = rounds
       .filter(r => r.round > shrsQualifyingRounds && r.completed);
     if (finalsRounds.length === 0) return map;
     const firstFinalsRound = finalsRounds[0];
-    firstFinalsRound.heatAssignments.forEach(assignment => {
-      assignment.skipperIndices.forEach(idx => {
+    (firstFinalsRound.heatAssignments || []).forEach(assignment => {
+      (assignment.skipperIndices || []).forEach(idx => {
         map.set(idx, assignment.heatDesignation);
       });
     });
@@ -74,94 +75,105 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
   const hasFinals = isShrs && skipperFleetMap.size > 0;
 
   const standings = useMemo(() => {
-    const baseStandings = skippers.map((skipper, skipperIndex) => {
-      const skipperRaceResults = raceResults
-        .filter(r => r.skipperIndex === skipperIndex)
-        .sort((a, b) => a.race - b.race);
+    try {
+      const allStandings = skippers.map((skipper, skipperIndex) => {
+        const skipperRaceResults = raceResults
+          .filter(r => r.skipperIndex === skipperIndex)
+          .sort((a, b) => a.race - b.race);
 
-      const points = skipperRaceResults.map(r => r.position || 999);
-      const total = points.reduce((sum, p) => sum + p, 0);
+        const points = skipperRaceResults.map(r => r.position || 999);
+        const total = points.reduce((sum, p) => sum + p, 0);
 
-      const sortedPoints = [...points].sort((a, b) => a - b);
-      let drops = 0;
-      for (const rule of dropRules) {
-        if (points.length >= rule) {
-          drops++;
+        const sortedPoints = [...points].sort((a, b) => a - b);
+        let drops = 0;
+        for (const rule of dropRules) {
+          if (points.length >= rule) {
+            drops++;
+          }
         }
-      }
 
-      let net = total;
-      const droppedScores: number[] = [];
-      if (drops > 0) {
-        const pointsToDrop = sortedPoints.slice(-drops);
-        droppedScores.push(...pointsToDrop);
-        net = total - pointsToDrop.reduce((sum, p) => sum + p, 0);
-      }
-
-      const droppedRaceIndices = new Set<number>();
-      if (drops > 0) {
-        const indexedScores = points.map((score, idx) => ({ score, idx }));
-        indexedScores.sort((a, b) => b.score - a.score);
-        for (let i = 0; i < drops; i++) {
-          droppedRaceIndices.add(indexedScores[i].idx);
+        let net = total;
+        const droppedScores: number[] = [];
+        if (drops > 0) {
+          const pointsToDrop = sortedPoints.slice(-drops);
+          droppedScores.push(...pointsToDrop);
+          net = total - pointsToDrop.reduce((sum, p) => sum + p, 0);
         }
-      }
 
-      return {
-        skipperIndex,
-        skipper,
-        raceResults: skipperRaceResults,
-        points,
-        total,
-        drops,
-        droppedScores,
-        droppedRaceIndices,
-        net,
-        fleet: skipperFleetMap.get(skipperIndex) || ('Z' as HeatDesignation),
+        const droppedRaceIndices = new Set<number>();
+        if (drops > 0) {
+          const indexedScores = points.map((score, idx) => ({ score, idx }));
+          indexedScores.sort((a, b) => b.score - a.score);
+          for (let i = 0; i < drops; i++) {
+            droppedRaceIndices.add(indexedScores[i].idx);
+          }
+        }
+
+        return {
+          skipperIndex,
+          skipper,
+          raceResults: skipperRaceResults,
+          points,
+          total,
+          drops,
+          droppedScores,
+          droppedRaceIndices,
+          net,
+          fleet: skipperFleetMap.get(skipperIndex) || ('Z' as HeatDesignation),
+        };
+      });
+
+      const baseStandings = allStandings.filter(s => s.raceResults.length > 0);
+
+      const isHms = !isShrs;
+      const numberOfHeats = heatManagement.configuration?.numberOfHeats || 2;
+      const useHMSTieBreak = isHms && numberOfHeats > 1;
+
+      const hmsBreakTieCompare = (a: typeof baseStandings[0], b: typeof baseStandings[0]): number => {
+        try {
+          const allRaceResults = raceResults.map(r => ({
+            ...r,
+            race: r.race,
+            skipperIndex: r.skipperIndex,
+            position: r.position || null,
+          }));
+          const tieResult = breakTie(
+            [a.skipperIndex, b.skipperIndex],
+            allRaceResults,
+            new Map(),
+            useHMSTieBreak
+          );
+          return tieResult.indexOf(a.skipperIndex) - tieResult.indexOf(b.skipperIndex);
+        } catch {
+          return 0;
+        }
       };
-    });
 
-    const isHms = !isShrs;
-    const numberOfHeats = heatManagement.configuration.numberOfHeats || 2;
-    const useHMSTieBreak = isHms && numberOfHeats > 1;
+      if (hasFinals) {
+        return baseStandings.sort((a, b) => {
+          if (a.fleet !== b.fleet) {
+            return a.fleet.localeCompare(b.fleet);
+          }
+          if (a.net !== b.net) {
+            return a.net - b.net;
+          }
+          return compareWithCountback(a.points, b.points, a.drops, b.drops);
+        });
+      }
 
-    const hmsBreakTieCompare = (a: typeof baseStandings[0], b: typeof baseStandings[0]): number => {
-      const allRaceResults = raceResults.map(r => ({
-        ...r,
-        race: r.race,
-        skipperIndex: r.skipperIndex,
-        position: r.position || null,
-      }));
-      const tieResult = breakTie(
-        [a.skipperIndex, b.skipperIndex],
-        allRaceResults,
-        new Map(),
-        useHMSTieBreak
-      );
-      return tieResult.indexOf(a.skipperIndex) - tieResult.indexOf(b.skipperIndex);
-    };
-
-    if (hasFinals) {
       return baseStandings.sort((a, b) => {
-        if (a.fleet !== b.fleet) {
-          return a.fleet.localeCompare(b.fleet);
-        }
         if (a.net !== b.net) {
           return a.net - b.net;
         }
+        if (isHms) {
+          return hmsBreakTieCompare(a, b);
+        }
         return compareWithCountback(a.points, b.points, a.drops, b.drops);
       });
+    } catch (e) {
+      console.error('Error computing standings:', e);
+      return [];
     }
-
-    return baseStandings.sort((a, b) => {
-      if (a.net !== b.net) {
-        return a.net - b.net;
-      }
-      if (isHms) {
-        return hmsBreakTieCompare(a, b);
-      }
-      return compareWithCountback(a.points, b.points, a.drops, b.drops);
-    });
   }, [skippers, raceResults, dropRules, skipperFleetMap, hasFinals, isShrs, heatManagement]);
 
   const getRaceLabel = (raceNum: number): string => {

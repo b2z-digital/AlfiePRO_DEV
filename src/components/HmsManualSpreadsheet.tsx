@@ -735,8 +735,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   const raceSeparator = 'border-l-2 border-l-slate-400';
 
   return (
-    <div className={`flex flex-col h-full text-slate-900`}>
-      <div className="flex justify-end px-2 py-1 bg-slate-900">
+    <div className={`flex flex-col h-full text-slate-900 relative`}>
+      <div className="absolute top-[-44px] right-0 z-30">
         <button
           onClick={() => setShowOverallResults(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
