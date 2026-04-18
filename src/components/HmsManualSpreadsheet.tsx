@@ -4,7 +4,7 @@ import { HeatDesignation, HeatManagement } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { LetterScore } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
-import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw } from 'lucide-react';
+import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle } from 'lucide-react';
 
 const LETTER_SCORE_CODES: LetterScore[] = [
   'DNS', 'DNF', 'DSQ', 'OCS', 'BFD', 'UFD', 'RDG', 'DPI',
@@ -120,10 +120,17 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   const [dropdownFilter, setDropdownFilter] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const [noSuchBoatTarget, setNoSuchBoatTarget] = useState<{
+    heat: HeatDesignation;
+    position: number;
+    race: number;
+    sailNumber: string;
+  } | null>(null);
+
   const sailNumberMap = useMemo(() => {
     const map: Record<string, number> = {};
     skippers.forEach((s, idx) => {
-      const sailNo = String(s.sailNumber || '').trim();
+      const sailNo = String(s.sailNumber || s.sailNo || s.boat_sail_number || '').trim();
       if (sailNo) {
         map[sailNo.toLowerCase()] = idx;
       }
@@ -140,7 +147,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       if (result.hmsHeat && result.hmsPosition && result.race) {
         const key = getCellKey(result.hmsHeat, result.hmsPosition, result.race);
         const skipper = skippers[result.skipperIndex];
-        const sailNo = skipper?.sailNumber || '';
+        const sailNo = skipper?.sailNumber || skipper?.sailNo || skipper?.boat_sail_number || '';
         newCells[key] = {
           sailNumber: sailNo,
           comment: result.letterScore || (sailNo ? 'OK' : ''),
@@ -227,12 +234,14 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       } else {
         updateRaceResults(race, skipperIdx, position, undefined, undefined);
       }
+    } else {
+      setNoSuchBoatTarget({ heat, position, race, sailNumber: cell.sailNumber });
     }
   }, [cells, sailNumberMap, updateRaceResults]);
 
   const handleDropdownSelect = useCallback((heat: HeatDesignation, position: number, race: number, skipper: Skipper, skipperIdx: number) => {
     const key = getCellKey(heat, position, race);
-    const sailNo = String(skipper.sailNumber || '').trim();
+    const sailNo = String(skipper.sailNumber || skipper.sailNo || skipper.boat_sail_number || '').trim();
 
     setCells(prev => ({
       ...prev,
@@ -336,6 +345,31 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     });
     setResetConfirmRace(null);
   }, [cells, heats, maxPositions, deleteRaceResult]);
+
+  const handleNoSuchBoatCancel = useCallback(() => {
+    if (!noSuchBoatTarget) return;
+    const key = getCellKey(noSuchBoatTarget.heat, noSuchBoatTarget.position, noSuchBoatTarget.race);
+    setCells(prev => {
+      const updated = { ...prev };
+      delete updated[key];
+      return updated;
+    });
+    setNoSuchBoatTarget(null);
+  }, [noSuchBoatTarget]);
+
+  const handleNoSuchBoatRetry = useCallback(() => {
+    if (!noSuchBoatTarget) return;
+    const key = getCellKey(noSuchBoatTarget.heat, noSuchBoatTarget.position, noSuchBoatTarget.race);
+    setCells(prev => ({
+      ...prev,
+      [key]: { ...prev[key], sailNumber: '', comment: '', points: '', letterScore: null, skipperIndex: null, isValid: true, isDuplicate: false }
+    }));
+    setNoSuchBoatTarget(null);
+    setTimeout(() => {
+      const ref = inputRefs.current[`${key}-sail`];
+      ref?.focus();
+    }, 50);
+  }, [noSuchBoatTarget]);
 
   const verifyRace = useCallback((race: number): VerifyResult => {
     const errors: string[] = [];
@@ -458,7 +492,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return skippers
       .map((s, idx) => ({ skipper: s, index: idx }))
       .filter(({ skipper }) => {
-        const sailNo = String(skipper.sailNumber || '').trim();
+        const sailNo = String(skipper.sailNumber || skipper.sailNo || skipper.boat_sail_number || '').trim();
         if (!sailNo) return false;
         if (usedSails.has(sailNo.toLowerCase())) return false;
         if (currentValue) {
@@ -501,7 +535,6 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
   }, [handleSailNumberBlur]);
 
-  const cellBorder = 'border-slate-200';
   const raceSeparator = 'border-l-2 border-l-slate-400';
 
   return (
@@ -515,7 +548,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           style={{ tableLayout: 'fixed' }}
         >
           <colgroup>
-            <col style={{ width: 54 }} />
+            <col style={{ width: 108 }} />
             {Array.from({ length: TOTAL_RACES }).map((_, i) => (
               <React.Fragment key={i}>
                 <col style={{ width: 40 }} />
@@ -528,8 +561,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
           <thead className="sticky top-0 z-20">
             <tr>
-              <th className={`sticky left-0 z-30 px-1 py-1 border-b border-r ${cellBorder} bg-slate-100`}>
-                <span className="text-[9px] font-semibold text-slate-500">HMS</span>
+              <th className="sticky left-0 z-30 px-1 py-1 border-b border-r border-slate-300" style={{ backgroundColor: '#00FFFF' }}>
+                <span className="text-[9px] font-semibold text-black">HMS</span>
               </th>
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
                 const isVerified = verifiedRaces.has(race);
@@ -539,23 +572,24 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                   <th
                     key={race}
                     colSpan={4}
-                    className={`px-0.5 py-1 text-center border-b ${cellBorder} ${raceSeparator} bg-slate-100`}
+                    className={`px-0.5 py-1 text-center border-b border-slate-300 ${raceSeparator}`}
+                    style={{ backgroundColor: '#00FFFF' }}
                   >
                     <div className="flex flex-col items-center gap-0.5">
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-bold text-slate-800">
+                        <span className="text-[10px] font-bold text-black">
                           Race {race}
                         </span>
                         {isSeeding && (
-                          <span className="text-[8px] font-medium px-1 py-0 rounded bg-blue-100 text-blue-600">
+                          <span className="text-[8px] font-medium px-1 py-0 rounded bg-blue-200 text-blue-800">
                             Seeding
                           </span>
                         )}
                         {isVerified && (
-                          <CheckCircle2 size={10} className="text-emerald-500" />
+                          <CheckCircle2 size={10} className="text-emerald-600" />
                         )}
                         {!isSeeding && (
-                          <span className="text-[7px] text-slate-400">
+                          <span className="text-[7px] text-slate-600 font-medium">
                             P={promotionCount}
                           </span>
                         )}
@@ -563,15 +597,16 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleVerifyRace(race)}
-                          className="text-[8px] font-medium px-1.5 py-0 rounded border transition-colors border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-600"
+                          className="text-[8px] font-bold px-1.5 py-0 rounded border transition-colors border-black/20 text-black hover:opacity-80"
+                          style={{ backgroundColor: '#FFFF00' }}
                         >
                           Verify R{race.toString().padStart(2, '0')}
                         </button>
                         <button
                           onClick={() => setResetConfirmRace(race)}
-                          className="text-[8px] font-medium px-1 py-0 rounded border border-red-400/50 text-red-400 hover:border-red-400 hover:bg-red-500/10 transition-colors"
+                          className="text-[8px] font-bold px-1.5 py-0 rounded text-white transition-colors bg-red-600 hover:bg-red-700"
                         >
-                          <RotateCcw size={8} />
+                          Reset
                         </button>
                       </div>
                     </div>
@@ -581,21 +616,21 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             </tr>
 
             <tr>
-              <th className={`sticky left-0 z-30 px-1 py-0.5 border-b border-r text-[9px] font-bold ${cellBorder} bg-yellow-400 text-black`}>
+              <th className="sticky left-0 z-30 px-1 py-0.5 border-b border-slate-300 text-[9px] font-bold text-black" style={{ backgroundColor: '#00FFFF' }}>
                 Pos
               </th>
               {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => (
                 <React.Fragment key={race}>
-                  <th className={`px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-r ${cellBorder} ${raceSeparator} bg-slate-50 text-slate-700`}>
+                  <th className={`px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 ${raceSeparator} text-black`} style={{ backgroundColor: '#00FFFF' }}>
                     Sail
                   </th>
-                  <th className={`px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-r ${cellBorder} bg-slate-50 text-slate-700`}>
+                  <th className="px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black" style={{ backgroundColor: '#00FFFF' }}>
                     Comments
                   </th>
-                  <th className={`px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-r ${cellBorder} bg-slate-50 text-slate-700`}>
+                  <th className="px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black" style={{ backgroundColor: '#00FFFF' }}>
                     Pts
                   </th>
-                  <th className={`px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-r ${cellBorder} bg-slate-50 text-slate-700`}>
+                  <th className="px-0.5 py-0.5 text-center text-[9px] font-bold border-b border-slate-300 text-black" style={{ backgroundColor: '#00FFFF' }}>
                     Exp.
                   </th>
                 </React.Fragment>
@@ -622,7 +657,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                         <td
                           key={race}
                           colSpan={4}
-                          className={`px-0 py-0 border-b border-slate-400 ${raceSeparator} bg-red-600 text-yellow-300 text-[9px] font-bold text-center`}
+                          className={`px-0 py-0 border-b border-slate-400 ${raceSeparator} bg-red-600 text-black text-[9px] font-bold text-center`}
                         >
                           <div className="flex items-center justify-around px-1">
                             <span>{stats.scoreCount > 0 || stats.letterCount > 0 ? String(stats.scoreCount).padStart(2, '0') : '00'}</span>
@@ -644,7 +679,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                         className="hover:bg-slate-50"
                       >
                         <td
-                          className="sticky left-0 z-10 px-2 py-0 text-[10px] font-bold border-r border-slate-300 whitespace-nowrap text-black"
+                          className="sticky left-0 z-10 px-2 py-0 text-[11px] font-bold border-b border-r border-slate-300 whitespace-nowrap text-black"
                           style={{ backgroundColor: '#FFFF00' }}
                         >
                           {getOrdinal(position)}
@@ -665,11 +700,14 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                           const promotionStyle = isPromotedSlot
                             ? { backgroundColor: '#00FF00' }
                             : undefined;
+                          const cellBorderClass = isPromotedSlot
+                            ? ''
+                            : 'border-b border-r border-slate-300';
 
                           return (
                             <React.Fragment key={race}>
                               <td
-                                className={`px-0 py-0 border-r border-slate-100 ${raceSeparator} relative`}
+                                className={`px-0 py-0 ${cellBorderClass} ${raceSeparator} relative`}
                                 style={promotionStyle}
                               >
                                 <input
@@ -730,7 +768,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                         className="w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors hover:bg-slate-50 text-slate-700"
                                       >
                                         <span className="text-[11px] font-bold min-w-[28px] text-blue-600">
-                                          {skipper.sailNumber}
+                                          {skipper.sailNumber || skipper.sailNo || skipper.boat_sail_number}
                                         </span>
                                         <span className="text-[10px] truncate">
                                           {skipper.name}
@@ -742,7 +780,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                               </td>
 
                               <td
-                                className="px-0 py-0 border-r border-slate-100 cursor-pointer"
+                                className={`px-0 py-0 ${cellBorderClass} cursor-pointer`}
                                 style={promotionStyle}
                                 onClick={() => handleCommentClick(heat, position, race)}
                               >
@@ -758,7 +796,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                               </td>
 
                               <td
-                                className="px-0 py-0 border-r border-slate-100"
+                                className={`px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
                                 <div className={`px-1 py-[2px] text-[10px] text-center font-medium tabular-nums ${
@@ -769,7 +807,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                               </td>
 
                               <td
-                                className="px-0 py-0 border-r border-slate-100"
+                                className={`px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
                                 <div className="px-1 py-[2px] text-[10px] text-center font-medium tabular-nums text-slate-400">
@@ -872,6 +910,36 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                 }`}
               >
                 {verifyResult.valid ? 'Done' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {noSuchBoatTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-sm rounded-xl shadow-2xl overflow-hidden bg-white">
+            <div className="flex items-center gap-3 p-4 border-b border-slate-200">
+              <AlertCircle className="text-red-500" size={24} />
+              <h3 className="font-bold text-slate-900 text-lg">NO SUCH BOAT!</h3>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-slate-700">
+                There is no boat with Sail Number <span className="font-bold">"{noSuchBoatTarget.sailNumber}"</span> in the event.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t border-slate-200">
+              <button
+                onClick={handleNoSuchBoatCancel}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-slate-100 text-slate-700 hover:bg-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleNoSuchBoatRetry}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              >
+                Retry
               </button>
             </div>
           </div>
