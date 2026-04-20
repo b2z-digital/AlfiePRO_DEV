@@ -387,10 +387,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           setIsManualHandicaps(currentDayData.isManualHandicaps || false);
 
           if (currentDayData.heatManagement && currentDayData.heatManagement.configuration.enabled) {
+            const isSpreadsheetMode = currentDayData.heatManagement.configuration.fleetManagementEnabled === false;
             const storedSkipperCount = currentDayData.heatManagement.rounds[0]?.heatAssignments
               ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-            if (storedSkipperCount === eventSkipperCount) {
+            if (isSpreadsheetMode || storedSkipperCount === eventSkipperCount) {
               setHeatManagement(currentDayData.heatManagement);
 
               if (currentDayData.heatManagement.configuration.scoringSystem) {
@@ -414,10 +415,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setIsManualHandicaps(day1Data.isManualHandicaps || false);
 
             if (day1Data.heatManagement && day1Data.heatManagement.configuration.enabled) {
+              const isSpreadsheetMode = day1Data.heatManagement.configuration.fleetManagementEnabled === false;
               const storedSkipperCount = day1Data.heatManagement.rounds[0]?.heatAssignments
                 ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-              if (storedSkipperCount === eventSkipperCount) {
+              if (isSpreadsheetMode || storedSkipperCount === eventSkipperCount) {
                 setHeatManagement(day1Data.heatManagement);
 
                 if (day1Data.heatManagement.configuration.scoringSystem) {
@@ -477,10 +479,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           setHasDeterminedInitialHcaps(true);
         }
         if (currentEvent.heatManagement && currentEvent.heatManagement.configuration.enabled) {
+          const isSpreadsheetMode = currentEvent.heatManagement.configuration.fleetManagementEnabled === false;
           const storedSkipperCount = currentEvent.heatManagement.rounds[0]?.heatAssignments
             ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-          if (storedSkipperCount === eventSkipperCount) {
+          if (isSpreadsheetMode || storedSkipperCount === eventSkipperCount) {
             let loadedHM = currentEvent.heatManagement;
 
             if (loadedHM.configuration.scoringSystem === 'shrs') {
