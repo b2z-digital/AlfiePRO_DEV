@@ -717,13 +717,9 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       return okAbove + 1;
     }
 
-    let offset = 0;
-    const heatIdx = HEAT_LABELS.indexOf(heat);
-    for (let i = 0; i < heatIdx; i++) {
-      offset += getHeatNonLetterNonPromotedCount(HEAT_LABELS[i], race);
-    }
+    const offset = getHeatOffset(heat, race);
     return offset + okAbove + 1;
-  }, [promotionCount, getLetterScorePoints, getOkCountAbovePosition, getHeatNonLetterNonPromotedCount]);
+  }, [promotionCount, getLetterScorePoints, getOkCountAbovePosition, getHeatOffset]);
 
   const overallRaceResults = useMemo(() => {
     const results: any[] = [];
