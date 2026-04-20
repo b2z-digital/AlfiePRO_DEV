@@ -625,12 +625,12 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       return getLetterScorePoints(heat, race, cell.letterScore);
     }
 
-    if (race === 1 || heat === 'A') return position;
+    const okAbove = getOkCountAbovePosition(heat, position, race);
+    if (race === 1 || heat === 'A') return okAbove + 1;
 
     const offset = getHeatOffset(heat, race);
-    const effectivePos = position - promotionCount;
-    return offset + effectivePos;
-  }, [promotionCount, getHeatOffset, getLetterScorePoints]);
+    return offset + okAbove + 1;
+  }, [promotionCount, getHeatOffset, getLetterScorePoints, getOkCountAbovePosition]);
 
   const getExpForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();
@@ -648,10 +648,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         const offset = getHeatOffset(heat, race);
         return offset + okAbove;
       }
-      if (race === 1 || heat === 'A') return position;
+      const okAbove = getOkCountAbovePosition(heat, position, race);
+      if (race === 1 || heat === 'A') return okAbove + 1;
       const offset = getHeatOffset(heat, race);
-      const effectivePos = position - promotionCount;
-      return offset + effectivePos;
+      return offset + okAbove + 1;
     }
 
     return getEmptyRowScore(heat, race);
