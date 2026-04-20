@@ -4,9 +4,9 @@ import { HeatDesignation, HeatManagement } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { LetterScore } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
-import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer, Trophy } from 'lucide-react';
+import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer, Trophy, TableProperties } from 'lucide-react';
 import { useNotification } from '../contexts/NotificationContext';
-import { HeatOverallResultsModal } from './HeatOverallResultsModal';
+import { HmsScoreSheet } from './HmsScoreSheet';
 
 const LETTER_SCORE_CODES: LetterScore[] = [
   'DNS', 'DNF', 'DSQ', 'OCS', 'BFD', 'UFD', 'RDG', 'DPI',
@@ -102,7 +102,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [resetConfirmRace, setResetConfirmRace] = useState<number | null>(null);
 
-  const [showOverallResults, setShowOverallResults] = useState(false);
+  const [activeTab, setActiveTab] = useState<'races' | 'scoresheet'>('races');
   const [showLetterScoreModal, setShowLetterScoreModal] = useState(false);
   const [letterScoreTarget, setLetterScoreTarget] = useState<{
     heat: HeatDesignation;
@@ -770,15 +770,42 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
   return (
     <div className={`flex flex-col h-full text-slate-900 relative`}>
-      <div className="absolute top-[-44px] right-0 z-30">
+      <div className="absolute top-[-44px] right-0 z-30 flex items-center gap-1">
         <button
-          onClick={() => setShowOverallResults(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          onClick={() => setActiveTab('races')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'races'
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+          }`}
+        >
+          <TableProperties size={14} />
+          Race Results
+        </button>
+        <button
+          onClick={() => setActiveTab('scoresheet')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'scoresheet'
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+          }`}
         >
           <Trophy size={14} />
-          Overall Results
+          Score Sheet
         </button>
       </div>
+
+      {activeTab === 'scoresheet' ? (
+        <div className="flex-1 overflow-auto relative">
+          <HmsScoreSheet
+            skippers={skippers}
+            heatManagement={heatManagement}
+            dropRules={currentEvent?.dropRules || [4, 8, 16, 24, 32, 40]}
+            darkMode={darkMode}
+            externalRaceResults={overallRaceResults}
+          />
+        </div>
+      ) : (
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-auto relative"
@@ -1090,6 +1117,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           </tbody>
         </table>
       </div>
+      )}
 
       {resetConfirmRace !== null && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1233,16 +1261,6 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           isHeatRacing={true}
         />
       )}
-
-      <HeatOverallResultsModal
-        isOpen={showOverallResults}
-        onClose={() => setShowOverallResults(false)}
-        skippers={skippers}
-        heatManagement={heatManagement}
-        dropRules={currentEvent?.dropRules || [4, 8, 16, 24, 32, 40]}
-        darkMode={darkMode}
-        externalRaceResults={overallRaceResults}
-      />
     </div>
   );
 };
