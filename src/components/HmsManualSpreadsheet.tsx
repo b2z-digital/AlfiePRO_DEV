@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { Skipper } from '../types';
 import { HeatDesignation, HeatManagement } from '../types/heat';
 import { RaceEvent } from '../types/race';
-import { LetterScore, isEntrantsPlusOne } from '../types/letterScores';
+import { LetterScore, isEntrantsPlusOne, getLetterScoreDisplayCode } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer, Trophy, TableProperties } from 'lucide-react';
 import { useNotification } from '../contexts/NotificationContext';
@@ -153,7 +153,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         if (sailNo) {
           newCells[key] = {
             sailNumber: String(sailNo),
-            comment: result.letterScore || 'OK',
+            comment: result.letterScore ? getLetterScoreDisplayCode(result.letterScore, result.customPoints) : 'OK',
             points: result.letterScore ? '' : (result.position?.toString() || ''),
             letterScore: result.letterScore || null,
             customPoints: result.customPoints,
@@ -329,7 +329,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         ...prev,
         [key]: {
           ...prev[key],
-          comment: score,
+          comment: getLetterScoreDisplayCode(score, customPoints),
           points: '',
           letterScore: score,
           customPoints: customPoints,
@@ -757,6 +757,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             skipperIndex: cell.skipperIndex,
             position: typeof pts === 'number' ? pts : parseInt(String(pts), 10) || 999,
             letterScore: cell.letterScore || undefined,
+            customPoints: cell.customPoints,
             hmsPoints: cell.hmsPoints,
           });
         }
@@ -1077,7 +1078,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                   </div>
                                 ) : ls ? (
                                   <div className="px-1 py-0 text-[10px] text-center font-medium text-black leading-none">
-                                    {ls}
+                                    {getLetterScoreDisplayCode(ls, cell?.customPoints)}
                                   </div>
                                 ) : hasSail ? (
                                   <div className="px-1 py-0 text-[10px] text-center font-medium text-black leading-none">

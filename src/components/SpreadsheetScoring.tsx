@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { HeatManagement, HeatDesignation, HeatAssignment } from '../types/heat';
+import { getLetterScoreDisplayCode } from '../types/letterScores';
 import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type, ChevronLeft, ChevronRight, Timer, Flag } from 'lucide-react';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { HeatOverallResultsModal } from './HeatOverallResultsModal';
@@ -824,7 +825,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                 <td className={`px-1 py-1 text-center ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                   {displayResult ? (
                                     displayResult.letterScore
-                                      ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{displayResult.letterScore}</span>
+                                      ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(displayResult.letterScore, displayResult.customPoints)}</span>
                                       : <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
                                   ) : ''}
                                 </td>
@@ -891,7 +892,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                           <td className={`px-1 py-1 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                             {sfIsVerified ? (
                               cell.letterScore
-                                ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{cell.letterScore}</span>
+                                ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}</span>
                                 : hasValue && cell.isValid
                                   ? <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
                                   : ''
@@ -903,9 +904,9 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                     ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
                                     : 'bg-slate-100 text-slate-700 border border-slate-300'
                                 }`}
-                                title={`${cell.letterScore}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
+                                title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
                               >
-                                {cell.letterScore?.slice(0, 3)}
+                                {getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}
                               </button>
                             ) : (
                               <button
@@ -1263,7 +1264,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                   }`}>
                                     {displayResult ? (
                                       displayResult.letterScore
-                                        ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{displayResult.letterScore}</span>
+                                        ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(displayResult.letterScore, displayResult.customPoints)}</span>
                                         : <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
                                     ) : ''}
                                   </td>
@@ -1335,7 +1336,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                             }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
                               {isVerified || isHistoricalRow ? (
                                 cell.letterScore
-                                  ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{cell.letterScore}</span>
+                                  ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}</span>
                                   : hasValue && cell.isValid
                                     ? <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
                                     : ''
@@ -1347,9 +1348,9 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                       ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
                                       : 'bg-slate-100 text-slate-700 border border-slate-300'
                                   }`}
-                                  title={`${cell.letterScore}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
+                                  title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
                                 >
-                                  {cell.letterScore?.slice(0, 3)}
+                                  {getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}
                                 </button>
                               ) : (
                                 <button

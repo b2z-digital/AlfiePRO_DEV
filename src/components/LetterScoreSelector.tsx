@@ -283,7 +283,7 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                             {rdgMode === 'avg_event' && canUseRdgAvg && <div className="w-2 h-2 bg-white rounded-full" />}
                           </div>
                           <span className={`font-semibold ${!canUseRdgAvg ? (darkMode ? 'text-slate-500' : 'text-slate-400') : darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            RDG AVG - Average All Races {!canUseRdgAvg ? '' : '(Default)'}
+                            RDGave - Average All Races {!canUseRdgAvg ? '' : '(Default)'}
                           </span>
                         </div>
                         <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -327,7 +327,7 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                             {rdgMode === 'avg_penultimate' && <div className="w-2 h-2 bg-white rounded-full" />}
                           </div>
                           <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            RDG REG - Average to Penultimate Day
+                            RDGave - Average to Penultimate Day
                           </span>
                         </div>
                         <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -367,7 +367,7 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                         {rdgMode === 'manual' && <div className="w-2 h-2 bg-white rounded-full" />}
                       </div>
                       <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        RDG FIX - Fixed Points (Committee Set)
+                        RDGfix - Fixed Points (Committee Set)
                       </span>
                     </div>
                     <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>

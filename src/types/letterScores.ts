@@ -188,3 +188,14 @@ export function calculateStarterCount(raceResults: any[]): number {
 export function getLetterScoreDefinition(code: LetterScore): LetterScoreDefinition | undefined {
   return letterScoreDefinitions.find(def => def.code === code);
 }
+
+export function getLetterScoreDisplayCode(letterScore: string | null | undefined, customPoints?: number): string {
+  if (!letterScore) return '';
+  if (letterScore === 'RDG') {
+    if (customPoints !== undefined && customPoints > 0) return 'RDGfix';
+    if (customPoints === -1) return 'RDGave';
+    if (customPoints === -2) return 'RDGave';
+    return 'RDG';
+  }
+  return letterScore;
+}

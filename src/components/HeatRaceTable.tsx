@@ -6,6 +6,7 @@ import { HeatDesignation, HeatManagement, HeatResult, getHeatColorClasses, calcu
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from './ConfirmationModal';
 import { LetterScoreSelector } from './LetterScoreSelector';
+import { getLetterScoreDisplayCode } from '../types/letterScores';
 import { RaceEvent } from '../types/race';
 
 interface HeatRaceTableProps {
@@ -350,7 +351,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
                         const isEditingThisHeat = isCurrentRound && isInCurrentHeat;
                         
                         // Display value
-                        const displayValue = result?.letterScore || result?.position || '';
+                        const displayValue = (result?.letterScore ? getLetterScoreDisplayCode(result.letterScore, result.customPoints) : null) || result?.position || '';
                         
                         return (
                           <td 
@@ -572,7 +573,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
                         p-3 text-center
                         ${darkMode ? 'text-slate-300' : 'text-slate-700'}
                       `}>
-                        {heatResult?.letterScore || heatResult?.position || '-'}
+                        {(heatResult?.letterScore ? getLetterScoreDisplayCode(heatResult.letterScore, heatResult.customPoints) : null) || heatResult?.position || '-'}
                       </td>
                     </tr>
                   );
