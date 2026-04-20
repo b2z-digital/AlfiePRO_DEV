@@ -69,14 +69,29 @@ export async function parseHMSFile(file: File): Promise<ParsedHMSData> {
 function parseSkippersFromScoreSheet(data: any[][]): ParsedHMSSkipper[] {
   const skippers: ParsedHMSSkipper[] = [];
 
-  // Find header row
   let headerRowIndex = -1;
   for (let i = 0; i < Math.min(20, data.length); i++) {
     const row = data[i];
-    const rowStr = row.join('').toLowerCase();
-    if (rowStr.includes('position') || rowStr.includes('skipper') || rowStr.includes('sail')) {
+    if (!row) continue;
+    const rowStr = row.map(c => String(c || '')).join(' ').toLowerCase();
+    const hasPosition = rowStr.includes('position') || rowStr.includes('pos');
+    const hasSkipper = rowStr.includes('skipper') || rowStr.includes('name') || rowStr.includes('helmsman');
+    const hasSail = rowStr.includes('sail');
+    if ((hasPosition && hasSkipper) || (hasPosition && hasSail) || (hasSkipper && hasSail)) {
       headerRowIndex = i;
       break;
+    }
+  }
+
+  if (headerRowIndex === -1) {
+    for (let i = 0; i < Math.min(20, data.length); i++) {
+      const row = data[i];
+      if (!row) continue;
+      const rowStr = row.map(c => String(c || '')).join(' ').toLowerCase();
+      if (rowStr.includes('position') || rowStr.includes('skipper') || rowStr.includes('sail')) {
+        headerRowIndex = i;
+        break;
+      }
     }
   }
 
@@ -85,48 +100,51 @@ function parseSkippersFromScoreSheet(data: any[][]): ParsedHMSSkipper[] {
   }
 
   const headers = data[headerRowIndex].map(h => String(h || '').toLowerCase().trim());
+  console.log('Score Sheet headers:', headers.filter(h => h).slice(0, 15));
 
-  // Find column indices
   const posCol = findColumnIndex(headers, ['position', 'pos', 'place']);
   const skipperCol = findColumnIndex(headers, ['skipper', 'name', 'helmsman']);
-  const sailCol = findColumnIndex(headers, ['sail', 'sail #', 'sail no', 'number']);
+  const sailCol = findColumnIndex(headers, ['sail', 'sail #', 'sail no']);
   const clubCol = findColumnIndex(headers, ['club', 'club/city', 'organization']);
   const hullCol = findColumnIndex(headers, ['hull', 'boat']);
-  const myaCol = findColumnIndex(headers, ['mya', 'mya no', 'member']);
+  const myaCol = findColumnIndex(headers, ['mya', 'mya no', 'mya no.', 'member']);
   const scoreCol = findColumnIndex(headers, ['score', 'total', 'points']);
 
-  // Find race columns (numbers or R1, R2, etc.)
+  console.log(`Score Sheet columns: pos=${posCol} skipper=${skipperCol} sail=${sailCol} club=${clubCol} hull=${hullCol} mya=${myaCol} score=${scoreCol}`);
+
   const raceColumns: { index: number; raceNumber: number }[] = [];
+  const coreMaxCol = Math.max(posCol, skipperCol, sailCol, clubCol, hullCol, myaCol, scoreCol);
   headers.forEach((header, index) => {
-    // Match patterns like "2", "3", "R1", "R2", "Race 1", etc.
+    if (index <= coreMaxCol) return;
     const cleanHeader = header.replace(/[^\d]/g, '');
     const num = parseInt(cleanHeader);
     if (!isNaN(num) && num > 0 && num < 100) {
-      // Make sure it's after the core columns
-      if (index > Math.max(posCol, skipperCol, sailCol, clubCol, hullCol, scoreCol)) {
-        raceColumns.push({ index, raceNumber: num });
-      }
+      raceColumns.push({ index, raceNumber: num });
     }
   });
 
-  // Parse data rows
+  const skipLabels = ['sort', 'filter', 'header', 'total', 'count', 'sum', 'average', 'program', 'options'];
+
   for (let i = headerRowIndex + 1; i < data.length; i++) {
     const row = data[i];
 
-    // Skip empty rows
     if (!row || row.every(cell => !cell || String(cell).trim() === '')) {
       continue;
     }
 
-    const sailNumber = row[sailCol]?.toString().trim();
-    const skipperName = row[skipperCol]?.toString().trim();
+    const rawSail = row[sailCol]?.toString().trim() || '';
+    const rawName = row[skipperCol]?.toString().trim() || '';
 
-    // Skip rows without sail number or name
-    if (!sailNumber || !skipperName) {
-      continue;
-    }
+    if (!rawSail || !rawName) continue;
 
-    // Parse race scores
+    const sailIsNumeric = /^\d+$/.test(rawSail);
+    if (!sailIsNumeric) continue;
+
+    const nameLower = rawName.toLowerCase();
+    if (skipLabels.some(label => nameLower === label)) continue;
+
+    if (!/[a-zA-Z]/.test(rawName)) continue;
+
     const raceScores: { [key: string]: number | string } = {};
     raceColumns.forEach(({ index, raceNumber }) => {
       const cellValue = row[index]?.toString().trim();
@@ -142,8 +160,8 @@ function parseSkippersFromScoreSheet(data: any[][]): ParsedHMSSkipper[] {
 
     const skipper: ParsedHMSSkipper = {
       position: posCol >= 0 ? parseInt(row[posCol]) || skippers.length + 1 : skippers.length + 1,
-      name: skipperName,
-      sailNumber: sailNumber,
+      name: rawName,
+      sailNumber: rawSail,
       club: clubCol >= 0 ? row[clubCol]?.toString().trim() : undefined,
       hull: hullCol >= 0 ? row[hullCol]?.toString().trim() : undefined,
       myaNumber: myaCol >= 0 ? row[myaCol]?.toString().trim() : undefined,
@@ -154,6 +172,7 @@ function parseSkippersFromScoreSheet(data: any[][]): ParsedHMSSkipper[] {
     skippers.push(skipper);
   }
 
+  console.log(`Parsed ${skippers.length} skippers from Score Sheet`);
   return skippers;
 }
 
@@ -229,63 +248,78 @@ function parseRaceResults(workbook: XLSX.WorkBook, worksheetNames: string[], sco
 function parseHeatScoringFromSheet(data: any[][], sheetName: string): ParsedHMSRaceResult[] {
   const results: ParsedHMSRaceResult[] = [];
   let currentHeat: string | null = null;
-  let raceNumber = 0;
 
   console.log(`Parsing sheet "${sheetName}" with ${data.length} rows`);
 
-  // First, try to detect columnar race format (RO1, RO2, etc.)
   const columnarResults = parseColumnarRaceFormat(data, sheetName);
   if (columnarResults.length > 0) {
-    console.log(`✅ Found columnar race format with ${columnarResults.length} results`);
+    console.log(`Found columnar race format with ${columnarResults.length} results`);
     return columnarResults;
   }
 
-  // Otherwise try heat-based format
+  let positionColIndex = -1;
+  for (let i = 0; i < Math.min(30, data.length); i++) {
+    const row = data[i];
+    if (!row) continue;
+    for (let c = 0; c < Math.min(5, row.length); c++) {
+      const cell = String(row[c] || '').trim();
+      if (cell.match(/^(\d+)(?:st|nd|rd|th)$/i)) {
+        positionColIndex = c;
+        break;
+      }
+    }
+    if (positionColIndex >= 0) break;
+  }
+
+  if (positionColIndex === -1) positionColIndex = 0;
+  const dataColStart = positionColIndex + 1;
+  console.log(`Heat format: position column=${positionColIndex}, data starts at col=${dataColStart}`);
+
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     if (!row || row.length === 0) continue;
 
-    const firstCell = String(row[0] || '').trim();
-
-    // Detect heat header (e.g., "Heat A", "Heat B")
-    const heatMatch = firstCell.match(/Heat\s+([A-E])/i);
-    if (heatMatch) {
-      currentHeat = heatMatch[1].toUpperCase();
-      console.log(`Found Heat ${currentHeat} at row ${i}`);
-      continue;
+    for (let c = 0; c < Math.min(5, row.length); c++) {
+      const cellStr = String(row[c] || '').trim();
+      const heatMatch = cellStr.match(/(?:HMS\s+)?Heat\s+([A-E])/i);
+      if (heatMatch) {
+        currentHeat = heatMatch[1].toUpperCase();
+        console.log(`Found Heat ${currentHeat} at row ${i}`);
+        break;
+      }
     }
 
-    // Detect position rows (e.g., "1st", "2nd", "3rd", etc.)
-    const positionMatch = firstCell.match(/^(\d+)(?:st|nd|rd|th)$/i);
-    if (positionMatch) {
-      const position = parseInt(positionMatch[1]);
+    const posCell = String(row[positionColIndex] || '').trim();
+    const positionMatch = posCell.match(/^(\d+)(?:st|nd|rd|th)$/i);
+    if (!positionMatch) continue;
 
-      // Parse results across the row
-      // HMS format: Sail No, Comments, Points, Exp (repeated for each race)
-      for (let colIndex = 1; colIndex < row.length; colIndex += 4) {
-        const sailNumber = String(row[colIndex] || '').trim();
-        const comment = String(row[colIndex + 1] || '').trim();
-        const points = parseFloat(String(row[colIndex + 2] || '0'));
+    const position = parseInt(positionMatch[1]);
 
-        if (sailNumber && sailNumber !== '00' && sailNumber !== '0') {
-          raceNumber = Math.floor(colIndex / 4) + 1;
+    let raceNumber = 0;
+    for (let colIndex = dataColStart; colIndex < row.length; colIndex += 4) {
+      const sailNumber = String(row[colIndex] || '').trim();
+      const comment = String(row[colIndex + 1] || '').trim();
+      const points = parseFloat(String(row[colIndex + 2] || '0'));
 
-          const letterScore = comment && comment !== 'OK' ? comment : undefined;
+      raceNumber++;
 
-          results.push({
-            raceNumber,
-            heat: currentHeat || undefined,
-            sailNumber,
-            position: letterScore ? null : position,
-            points,
-            letterScore
-          });
-        }
+      if (!sailNumber || sailNumber === '00' || sailNumber === '0' || !/^\d+$/.test(sailNumber)) {
+        continue;
       }
+
+      const letterScore = comment && comment.toUpperCase() !== 'OK' && comment.toUpperCase() !== 'L' ? comment.toUpperCase() : undefined;
+
+      results.push({
+        raceNumber,
+        heat: currentHeat || undefined,
+        sailNumber,
+        position: letterScore ? null : position,
+        points,
+        letterScore
+      });
     }
   }
 
-  // If no heat-based results found, try parsing as a simple results table
   if (results.length === 0) {
     console.log(`No heat-based results found, trying simple table format`);
     const simpleResults = parseSimpleResultsTable(data, sheetName);
@@ -303,21 +337,16 @@ function parseHeatScoringFromSheet(data: any[][], sheetName: string): ParsedHMSR
 function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRaceResult[] {
   const results: ParsedHMSRaceResult[] = [];
 
-  console.log(`🔍 Trying columnar race format for "${sheetName}"`);
-  console.log(`📊 First 3 rows of data:`, data.slice(0, 3));
+  console.log(`Trying columnar race format for "${sheetName}"`);
 
-  // Find header row with race identifiers (RO1, RO2, etc. or Verify RO1, etc.)
-  // Search for the row with the MOST race headers (to handle multiple "Race 1" mentions)
   let headerRowIndex = -1;
   let maxRaceCount = 0;
   const raceHeaderPattern = /(?:verify\s+)?r[o0](\d+)|race\s*(\d+)/i;
 
-  console.log(`🔍 Searching first ${Math.min(15, data.length)} rows for race headers...`);
-
   for (let i = 0; i < Math.min(15, data.length); i++) {
     const row = data[i];
+    if (!row) continue;
 
-    // Count how many columns match the race pattern
     let raceCount = 0;
     for (let col = 0; col < row.length; col++) {
       const cellValue = String(row[col] || '').trim();
@@ -326,139 +355,97 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
       }
     }
 
-    if (raceCount > 0) {
-      console.log(`  Row ${i}: Found ${raceCount} race headers`);
-      if (raceCount > maxRaceCount) {
-        maxRaceCount = raceCount;
-        headerRowIndex = i;
-      }
+    if (raceCount > maxRaceCount) {
+      maxRaceCount = raceCount;
+      headerRowIndex = i;
     }
   }
 
   if (headerRowIndex === -1) {
-    console.log('❌ No race header row found in columnar format');
-    console.log('Searched first 15 rows for pattern:', raceHeaderPattern);
     return results;
   }
 
-  console.log(`📍 Using row ${headerRowIndex} with ${maxRaceCount} race headers`);
+  console.log(`Using row ${headerRowIndex} with ${maxRaceCount} race headers`);
 
-  // If we only found 1 race but have 100+ columns, something is wrong
-  if (maxRaceCount === 1 && data[0] && data[0].length > 50) {
-    console.warn(`⚠️  WARNING: Only found 1 race header but data has ${data[0].length} columns!`);
-    console.warn(`⚠️  Make sure you copied the row with "Verify RO1", "Verify RO2", "Verify RO3", etc.`);
-    console.warn(`⚠️  Attempting to parse as single-race with multiple heats...`);
-  }
-
-  // Parse race columns from header
   const headerRow = data[headerRowIndex];
   let raceColumns: { startCol: number; raceNumber: number }[] = [];
 
-  console.log(`🔎 Analyzing header row with ${headerRow.length} columns`);
-  console.log(`🔎 First 5 columns:`, headerRow.slice(0, 5));
-  console.log(`🔎 Columns 4-9:`, headerRow.slice(4, 10));
-
   for (let col = 0; col < headerRow.length; col++) {
     const cellValue = String(headerRow[col] || '').trim();
-
-    // Only log if it looks like a potential race header
     const match = cellValue.match(/(?:verify\s+)?r[o0](\d+)|race\s*(\d+)/i);
-
     if (match) {
       const raceNum = parseInt(match[1] || match[2]);
       raceColumns.push({ startCol: col, raceNumber: raceNum });
-      console.log(`  ✅ Found race ${raceNum} at column ${col}: "${cellValue}"`);
-    } else if (col < 15 && cellValue) {
-      // Log first 15 non-matching columns for debugging
-      console.log(`  ⏭️  Column ${col} (no match): "${cellValue.substring(0, 50)}"`);
     }
   }
 
-  // If only 1 race found but we have many columns (>20), assume columnar race format
-  // where each group of 4 columns is a separate race (Sail No, Comments, Points, Exp)
-  // Column 0 is typically the position column, so skip it
-  if (raceColumns.length === 1 && headerRow.length > 20) {
-    console.log(`🔧 Only found 1 race but ${headerRow.length} columns detected.`);
-    console.log(`🔧 Assuming each 4-column group is a separate race...`);
-
-    raceColumns = [];
-    // Start from column 1 (skip position column at 0)
-    // Each race takes 4 columns: Sail No, Comments, Points, Exp
-    // Use Math.ceil to capture partial races at the end
-    const numRaces = Math.ceil((headerRow.length - 1) / 4);
-
-    for (let i = 0; i < numRaces; i++) {
-      raceColumns.push({ startCol: 1 + (i * 4), raceNumber: i + 1 });
+  let positionColIndex = -1;
+  for (let i = headerRowIndex + 1; i < Math.min(headerRowIndex + 20, data.length); i++) {
+    const row = data[i];
+    if (!row) continue;
+    for (let c = 0; c < Math.min(5, row.length); c++) {
+      const cell = String(row[c] || '').trim();
+      if (cell.match(/^(\d+)(?:st|nd|rd|th)$/i)) {
+        positionColIndex = c;
+        break;
+      }
     }
+    if (positionColIndex >= 0) break;
+  }
 
-    console.log(`🔧 Generated ${raceColumns.length} races from ${headerRow.length} columns (skipping position column)`);
+  if (positionColIndex === -1) positionColIndex = 0;
+  console.log(`Columnar format: position column=${positionColIndex}`);
+
+  if (raceColumns.length <= 1 && headerRow.length > 20) {
+    raceColumns = [];
+    const dataStartCol = positionColIndex + 1;
+    const numRaces = Math.ceil((headerRow.length - dataStartCol) / 4);
+    for (let i = 0; i < numRaces; i++) {
+      raceColumns.push({ startCol: dataStartCol + (i * 4), raceNumber: i + 1 });
+    }
+    console.log(`Generated ${raceColumns.length} races from ${headerRow.length} columns`);
   }
 
   if (raceColumns.length === 0) {
-    console.log('❌ No race columns identified in', headerRow.length, 'columns');
-    console.log('Header row sample (first 10 columns):', headerRow.slice(0, 10));
     return results;
   }
 
-  console.log(`✅ Found ${raceColumns.length} races at columns:`, raceColumns.slice(0, 10).map(r => `RO${r.raceNumber}@col${r.startCol}`).join(', ') + (raceColumns.length > 10 ? '...' : ''));
-
-  // Find where data rows start (look for position indicators)
   let dataStartRow = headerRowIndex + 1;
-  console.log(`🔍 Looking for data start row after header row ${headerRowIndex}...`);
-
-  for (let i = headerRowIndex + 1; i < Math.min(headerRowIndex + 10, data.length); i++) {
-    const firstCell = String(data[i][0] || '').trim().toLowerCase();
-    console.log(`  Row ${i}, first cell: "${firstCell.substring(0, 100)}"`);
-
-    // Skip header rows like "sail no", "comments", "points" and heat rows like "heat a"
-    if (firstCell.includes('sail') || firstCell.includes('comment') || firstCell.includes('point') || firstCell.match(/^heat\s+[a-e]/i)) {
-      console.log(`  ⏭️  Skipping header/heat row`);
-      continue;
+  for (let i = headerRowIndex + 1; i < Math.min(headerRowIndex + 15, data.length); i++) {
+    const row = data[i];
+    if (!row) continue;
+    for (let c = 0; c < Math.min(5, row.length); c++) {
+      const cell = String(row[c] || '').trim();
+      if (cell.match(/^(\d+)(?:st|nd|rd|th)$/i)) {
+        dataStartRow = i;
+        break;
+      }
     }
-
-    if (firstCell.match(/^(\d+)(?:st|nd|rd|th)$/i)) {
-      dataStartRow = i;
-      console.log(`  ✅ Data starts at row ${dataStartRow}`);
-      break;
-    }
+    if (dataStartRow !== headerRowIndex + 1) break;
   }
 
-  // If we didn't find a position row, something is wrong with the data
-  if (dataStartRow === headerRowIndex + 1) {
-    const firstCellAfterHeader = String(data[dataStartRow][0] || '').trim();
-    if (!firstCellAfterHeader.match(/^(\d+)(?:st|nd|rd|th)$/i)) {
-      console.log(`  ⚠️  No position row found after header. First cell after header: "${firstCellAfterHeader}"`);
-    }
-  }
-
-  // Parse data rows
-  let rowsParsed = 0;
-  let resultsCreated = 0;
-
-  console.log(`📊 Parsing data from row ${dataStartRow} to ${data.length}...`);
+  let currentHeat: string | null = null;
 
   for (let rowIdx = dataStartRow; rowIdx < data.length; rowIdx++) {
     const row = data[rowIdx];
     if (!row || row.length === 0) continue;
 
-    const firstCell = String(row[0] || '').trim();
+    for (let c = 0; c < Math.min(5, row.length); c++) {
+      const cellStr = String(row[c] || '').trim();
+      const heatMatch = cellStr.match(/(?:HMS\s+)?Heat\s+([A-E])/i);
+      if (heatMatch) {
+        currentHeat = heatMatch[1].toUpperCase();
+        break;
+      }
+    }
 
-    // Check if this is a position row
-    const positionMatch = firstCell.match(/^(\d+)(?:st|nd|rd|th)$/i);
+    const posCell = String(row[positionColIndex] || '').trim();
+    const positionMatch = posCell.match(/^(\d+)(?:st|nd|rd|th)$/i);
     if (!positionMatch) continue;
 
     const position = parseInt(positionMatch[1]);
-    rowsParsed++;
 
-    if (rowsParsed <= 3) {
-      console.log(`  Position ${position} (row ${rowIdx}):`, row.slice(0, 12));
-    }
-
-    // Parse each race in this row
-    // Handle both simple columnar (4 columns per race) and heat-based (multiple sets of 4 columns)
     raceColumns.forEach(({ startCol, raceNumber }) => {
-      // Look for groups of 4 columns starting from startCol
-      // Each group: Sail No, Comments, Points, Exp
       let col = startCol;
       let heatIndex = 0;
 
@@ -468,11 +455,9 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
         const pointsStr = String(row[col + 2] || '0').trim();
         const points = parseFloat(pointsStr) || 0;
 
-        // Stop if we hit an empty sailNumber or a non-numeric value in what should be a sail number
         if (!sailNumber || sailNumber === '00' || sailNumber === '0') {
           col += 4;
           heatIndex++;
-          // Only process first 30 heats max to avoid infinite loops
           if (heatIndex > 30 || col >= row.length) break;
           continue;
         }
@@ -481,28 +466,22 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
 
         results.push({
           raceNumber,
+          heat: currentHeat || undefined,
           sailNumber,
           position: letterScore ? null : position,
           points,
           letterScore
         });
 
-        resultsCreated++;
-
-        if (resultsCreated <= 10) {
-          console.log(`    Race ${raceNumber}, Heat ${heatIndex + 1}: Sail ${sailNumber}, Pos ${position}, Points ${points}${letterScore ? `, Letter: ${letterScore}` : ''}`);
-        }
-
         col += 4;
         heatIndex++;
 
-        // For single race format, stop after first iteration
         if (raceColumns.length > 1) break;
       }
     });
   }
 
-  console.log(`✅ Columnar format: Parsed ${rowsParsed} position rows, created ${results.length} race results`);
+  console.log(`Columnar format: created ${results.length} race results`);
   return results;
 }
 
@@ -623,21 +602,31 @@ function findColumnIndex(headers: string[], possibleNames: string[]): number {
 function extractEventName(data: any[][]): string | undefined {
   for (let i = 0; i < Math.min(10, data.length); i++) {
     const row = data[i];
-    const rowStr = row.join(' ').trim();
+    if (!row) continue;
+    const firstCell = String(row[0] || '').trim().toLowerCase();
+    if (firstCell === 'event' || firstCell === 'event:') {
+      const val = row.slice(1).map(c => String(c || '').trim()).filter(Boolean).join(' ');
+      if (val) return val;
+    }
+    const rowStr = row.map(c => String(c || '')).join(' ').trim();
     if (rowStr.toLowerCase().includes('event') || rowStr.toLowerCase().includes('championship')) {
-      return rowStr.replace(/^event:?\s*/i, '').trim();
+      const cleaned = rowStr.replace(/^event:?\s*/i, '').trim();
+      if (cleaned && !cleaned.toLowerCase().startsWith('hms')) return cleaned;
     }
   }
   return undefined;
 }
 
-/**
- * Extract event date from data
- */
 function extractEventDate(data: any[][]): string | undefined {
   for (let i = 0; i < Math.min(10, data.length); i++) {
     const row = data[i];
-    const rowStr = row.join(' ').trim();
+    if (!row) continue;
+    const firstCell = String(row[0] || '').trim().toLowerCase();
+    if (firstCell.includes('date')) {
+      const val = row.slice(1).map(c => String(c || '').trim()).filter(Boolean).join(' ');
+      if (val) return val;
+    }
+    const rowStr = row.map(c => String(c || '')).join(' ').trim();
     if (rowStr.toLowerCase().includes('date')) {
       return rowStr.replace(/^date.*?:?\s*/i, '').trim();
     }
@@ -645,13 +634,16 @@ function extractEventDate(data: any[][]): string | undefined {
   return undefined;
 }
 
-/**
- * Extract host club from data
- */
 function extractHostClub(data: any[][]): string | undefined {
   for (let i = 0; i < Math.min(10, data.length); i++) {
     const row = data[i];
-    const rowStr = row.join(' ').trim();
+    if (!row) continue;
+    const firstCell = String(row[0] || '').trim().toLowerCase();
+    if (firstCell.includes('host club') || firstCell.includes('host')) {
+      const val = row.slice(1).map(c => String(c || '').trim()).filter(Boolean).join(' ');
+      if (val) return val;
+    }
+    const rowStr = row.map(c => String(c || '')).join(' ').trim();
     if (rowStr.toLowerCase().includes('host club')) {
       return rowStr.replace(/^host club:?\s*/i, '').trim();
     }
