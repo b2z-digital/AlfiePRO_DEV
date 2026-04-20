@@ -474,6 +474,12 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return count;
   }, [cells, maxPositions]);
 
+  const isPositionOccupying = useCallback((c: CellData | undefined): boolean => {
+    if (!c?.letterScore) return true;
+    if (c.letterScore === 'RDG' && c.customPoints !== undefined && c.customPoints > 0) return true;
+    return false;
+  }, []);
+
   const getHeatNonLetterNonPromotedCount = useCallback((h: HeatDesignation, race: number): number => {
     let count = 0;
     for (let p = 1; p <= maxPositions; p++) {
@@ -482,10 +488,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       if (!c?.sailNumber?.trim()) continue;
       const isProm = h !== 'A' && race > 1 && p <= promotionCount;
       if (isProm) continue;
-      if (!c.letterScore) count++;
+      if (isPositionOccupying(c)) count++;
     }
     return count;
-  }, [cells, maxPositions, promotionCount]);
+  }, [cells, maxPositions, promotionCount, isPositionOccupying]);
 
   const getOkCountAbovePosition = useCallback((h: HeatDesignation, position: number, race: number): number => {
     let count = 0;
@@ -495,10 +501,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       if (!c?.sailNumber?.trim()) continue;
       const isProm = h !== 'A' && race > 1 && p <= promotionCount;
       if (isProm) continue;
-      if (!c.letterScore) count++;
+      if (isPositionOccupying(c)) count++;
     }
     return count;
-  }, [cells, promotionCount]);
+  }, [cells, promotionCount, isPositionOccupying]);
 
   const getHeatOffset = useCallback((heat: HeatDesignation, race: number): number => {
     if (race === 1) return 0;
@@ -566,10 +572,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       const isPromoted = heat !== 'A' && race > 1 && pos <= promotionCount;
 
       if (!isPromoted) {
-        if (cell.letterScore) {
-          letterCount++;
-        } else {
+        if (isPositionOccupying(cell)) {
           scoreCount++;
+        } else {
+          letterCount++;
         }
       }
     }
@@ -577,7 +583,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const maxExp = getMaxExpForHeat(heat, race);
 
     return { scoreCount, letterCount, totalPoints, entryCount, maxExp };
-  }, [cells, maxPositions, promotionCount, getMaxExpForHeat]);
+  }, [cells, maxPositions, promotionCount, getMaxExpForHeat, isPositionOccupying]);
 
   const getEmptyRowScore = useCallback((heat: HeatDesignation, race: number): number | string => {
     const entryCount = getHeatEntryCount(heat, race);
@@ -640,7 +646,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
 
     if (hasSail) {
-      if (cell?.letterScore) {
+      if (cell?.letterScore && !isPositionOccupying(cell)) {
         const okAbove = getOkCountAbovePosition(heat, position, race);
         if (race === 1 || heat === 'A') return okAbove;
         const offset = getHeatOffset(heat, race);
@@ -653,7 +659,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
 
     return getEmptyRowScore(heat, race);
-  }, [getHeatOffset, getHeatEntryCount, getEmptyRowScore, getOkCountAbovePosition, promotionCount]);
+  }, [getHeatOffset, getHeatEntryCount, getEmptyRowScore, getOkCountAbovePosition, promotionCount, isPositionOccupying]);
 
   const availableSkippersForDropdown = useMemo(() => {
     if (!dropdownTarget) return [];
