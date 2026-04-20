@@ -389,11 +389,11 @@ export const ResultsPage: React.FC = () => {
         console.error('Error fetching public events:', err);
       }
 
-      // Combine club events with public events
-      // For state/national associations, only show public events (not club events)
+      const nonSimulatedEvents = events.filter(e => !(e as any).is_simulated);
+
       const allEvents = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
         ? publicEvents
-        : [...events, ...publicEvents];
+        : [...nonSimulatedEvents, ...publicEvents];
 
       // For state/national associations, don't show club series
       const filteredSeries = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
