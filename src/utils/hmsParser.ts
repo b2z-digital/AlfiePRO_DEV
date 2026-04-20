@@ -332,7 +332,10 @@ function parseHeatScoringFromSheet(data: any[][], sheetName: string): ParsedHMSR
 
 /**
  * Parse columnar race format (RO1, RO2, RO3, etc.)
- * This format has position in first column, then groups of 4 columns per race
+ * HMS Race Results tab structure:
+ *   - Race headers row: "Verify RO1", "RO2", "RO3", etc. spaced every 4 columns
+ *   - Heat sections stacked vertically: "HMS Heat A" row, position rows, "HMS Heat B" row, position rows, etc.
+ *   - Each position row has 4-column groups per race: [Sail No, Comments, Points, Exp]
  */
 function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRaceResult[] {
   const results: ParsedHMSRaceResult[] = [];
@@ -379,6 +382,10 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
     }
   }
 
+  if (raceColumns.length === 0) {
+    return results;
+  }
+
   let positionColIndex = -1;
   for (let i = headerRowIndex + 1; i < Math.min(headerRowIndex + 20, data.length); i++) {
     const row = data[i];
@@ -394,21 +401,7 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
   }
 
   if (positionColIndex === -1) positionColIndex = 0;
-  console.log(`Columnar format: position column=${positionColIndex}`);
-
-  if (raceColumns.length <= 1 && headerRow.length > 20) {
-    raceColumns = [];
-    const dataStartCol = positionColIndex + 1;
-    const numRaces = Math.ceil((headerRow.length - dataStartCol) / 4);
-    for (let i = 0; i < numRaces; i++) {
-      raceColumns.push({ startCol: dataStartCol + (i * 4), raceNumber: i + 1 });
-    }
-    console.log(`Generated ${raceColumns.length} races from ${headerRow.length} columns`);
-  }
-
-  if (raceColumns.length === 0) {
-    return results;
-  }
+  console.log(`Columnar format: position column=${positionColIndex}, ${raceColumns.length} race columns detected`);
 
   let dataStartRow = headerRowIndex + 1;
   for (let i = headerRowIndex + 1; i < Math.min(headerRowIndex + 15, data.length); i++) {
@@ -416,7 +409,7 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
     if (!row) continue;
     for (let c = 0; c < Math.min(5, row.length); c++) {
       const cell = String(row[c] || '').trim();
-      if (cell.match(/^(\d+)(?:st|nd|rd|th)$/i)) {
+      if (cell.match(/^(\d+)(?:st|nd|rd|th)$/i) || cell.match(/(?:HMS\s+)?Heat\s+[A-E]/i)) {
         dataStartRow = i;
         break;
       }
@@ -430,11 +423,12 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
     const row = data[rowIdx];
     if (!row || row.length === 0) continue;
 
-    for (let c = 0; c < Math.min(5, row.length); c++) {
+    for (let c = 0; c < Math.min(8, row.length); c++) {
       const cellStr = String(row[c] || '').trim();
-      const heatMatch = cellStr.match(/(?:HMS\s+)?Heat\s+([A-E])/i);
+      const heatMatch = cellStr.match(/(?:HMS\s+)?Heat\s+([A-F])/i);
       if (heatMatch) {
         currentHeat = heatMatch[1].toUpperCase();
+        console.log(`Found Heat ${currentHeat} at row ${rowIdx}`);
         break;
       }
     }
@@ -446,42 +440,33 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
     const position = parseInt(positionMatch[1]);
 
     raceColumns.forEach(({ startCol, raceNumber }) => {
-      let col = startCol;
-      let heatIndex = 0;
+      const sailNumber = String(row[startCol] || '').trim();
+      const comment = String(row[startCol + 1] || '').trim();
+      const pointsStr = String(row[startCol + 2] || '0').trim();
+      const points = parseFloat(pointsStr) || 0;
 
-      while (col < row.length) {
-        const sailNumber = String(row[col] || '').trim();
-        const comment = String(row[col + 1] || '').trim();
-        const pointsStr = String(row[col + 2] || '0').trim();
-        const points = parseFloat(pointsStr) || 0;
-
-        if (!sailNumber || sailNumber === '00' || sailNumber === '0') {
-          col += 4;
-          heatIndex++;
-          if (heatIndex > 30 || col >= row.length) break;
-          continue;
-        }
-
-        const letterScore = comment && comment.toUpperCase() !== 'OK' && comment.toUpperCase() !== 'L' ? comment.toUpperCase() : undefined;
-
-        results.push({
-          raceNumber,
-          heat: currentHeat || undefined,
-          sailNumber,
-          position: letterScore ? null : position,
-          points,
-          letterScore
-        });
-
-        col += 4;
-        heatIndex++;
-
-        if (raceColumns.length > 1) break;
+      if (!sailNumber || sailNumber === '00' || sailNumber === '0' || !/^\d+$/.test(sailNumber)) {
+        return;
       }
+
+      const letterScore = comment && comment.toUpperCase() !== 'OK' && comment.toUpperCase() !== 'L' ? comment.toUpperCase() : undefined;
+
+      results.push({
+        raceNumber,
+        heat: currentHeat || undefined,
+        sailNumber,
+        position: letterScore ? null : position,
+        points,
+        letterScore
+      });
     });
   }
 
-  console.log(`Columnar format: created ${results.length} race results`);
+  console.log(`Columnar format: created ${results.length} race results across ${raceColumns.length} races`);
+  if (currentHeat) {
+    const heatsFound = [...new Set(results.filter(r => r.heat).map(r => r.heat!))];
+    console.log(`Heats detected: ${heatsFound.join(', ')}`);
+  }
   return results;
 }
 
@@ -951,11 +936,21 @@ export function parseHMSTwoStep(skipperText: string, resultsText: string): Parse
 
   console.log('✅ Race result merge complete!');
 
+  const hasHeats = results.some(r => r.heat !== undefined);
+  const heats = hasHeats
+    ? [...new Set(results.filter(r => r.heat).map(r => r.heat!))]
+    : undefined;
+
+  if (hasHeats) {
+    console.log(`Heat racing detected: ${heats!.join(', ')}`);
+  }
+
   return {
     skippers,
     results,
     numRaces,
-    hasHeats: false,
+    hasHeats,
+    heats,
     worksheetNames: ['Skippers', 'Results']
   };
 }
