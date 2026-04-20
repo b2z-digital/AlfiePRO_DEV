@@ -1,8 +1,10 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useRef } from 'react';
+import { Download, Image } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement } from '../types/heat';
 import { convertHeatResultsToRaceResults } from '../utils/heatUtils';
 import { breakTie } from '../utils/hmsHeatSystem';
+import html2canvas from 'html2canvas';
 
 interface HmsScoreSheetProps {
   skippers: Skipper[];
@@ -10,11 +12,11 @@ interface HmsScoreSheetProps {
   dropRules: number[];
   darkMode: boolean;
   externalRaceResults?: any[];
+  eventName?: string;
 }
 
 const ROW_HEIGHT = 18;
 const COL_W = 34;
-const SEP_W = 6;
 
 const COL_WIDTHS = {
   pos: 50,
@@ -38,6 +40,8 @@ const STICKY_OFFSETS = {
   score: COL_WIDTHS.pos + COL_WIDTHS.skipper + COL_WIDTHS.sailNo + COL_WIDTHS.club + COL_WIDTHS.hull + COL_WIDTHS.myaNo + COL_WIDTHS.total,
 };
 
+const SECTION_BORDER = '3px solid #333';
+
 function getOrdinalLabel(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
@@ -54,7 +58,9 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
   heatManagement,
   dropRules,
   externalRaceResults,
+  eventName,
 }) => {
+  const tableRef = useRef<HTMLDivElement>(null);
   const numberOfHeats = heatManagement?.configuration?.numberOfHeats || 2;
   const useHMSTieBreak = numberOfHeats > 1;
 
@@ -173,6 +179,111 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
     return skipper?.sailNo || skipper?.sailNumber || skipper?.boat_sail_number || '-';
   }, []);
 
+  const exportCsv = useCallback(() => {
+    const headers = [
+      'Position', 'Skipper', 'Sail #', 'Club/City', 'Hull', 'MYA No.', 'Total', 'Score',
+      ...completedRaces.map(r => `Race ${r}`),
+      ...Array.from({ length: maxDropCols }, (_, i) => `dis ${i + 1}`),
+      'Total Dis',
+      ...Array.from({ length: maxBestCols }, (_, i) => i === 0 ? 'Best' : getOrdinalLabel(i + 1)),
+      'Avg', 'Races',
+    ];
+
+    const rows = standings.map((s: any, idx: number) => {
+      const sailNo = getSailNo(s.skipper);
+      const boat = s.skipper?.boatModel || s.skipper?.boat_class || '';
+      const club = s.skipper?.club || '';
+      const myaNo = (s.skipper as any)?.myaNumber || (s.skipper as any)?.mya_number || '';
+
+      const raceScores = completedRaces.map((race: number, raceIdx: number) => {
+        const result = s.raceResults?.find((r: any) => r.race === race);
+        const pos = result?.position;
+        const isDropped = s.droppedRaceIndices?.has(raceIdx);
+        if (pos == null) return '';
+        return isDropped ? `(${pos.toFixed(1)})` : pos.toFixed(1);
+      });
+
+      const dropValues = Array.from({ length: maxDropCols }, (_, i) =>
+        s.droppedScoreValues?.[i] != null ? s.droppedScoreValues[i].toFixed(1) : ''
+      );
+
+      const bestValues = Array.from({ length: maxBestCols }, (_, i) =>
+        s.sortedAllScores?.[i] != null ? String(s.sortedAllScores[i]) : ''
+      );
+
+      const avg = s.racesScored > 0 ? (s.net / s.racesScored).toFixed(1) : '';
+
+      return [
+        idx + 1,
+        s.skipper?.name || 'Unknown',
+        sailNo,
+        club,
+        boat,
+        myaNo,
+        s.total.toFixed(1),
+        s.net.toFixed(1),
+        ...raceScores,
+        ...dropValues,
+        s.totalDropped > 0 ? s.totalDropped.toFixed(1) : '',
+        ...bestValues,
+        avg,
+        s.racesScored,
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(v => {
+        const str = String(v);
+        return str.includes(',') ? `"${str}"` : str;
+      }).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${eventName || 'score-sheet'}_results.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [standings, completedRaces, maxDropCols, maxBestCols, getSailNo, eventName]);
+
+  const exportJpg = useCallback(async () => {
+    if (!tableRef.current) return;
+    try {
+      const el = tableRef.current;
+      const scrollLeft = el.scrollLeft;
+      const scrollTop = el.scrollTop;
+      el.scrollLeft = 0;
+      el.scrollTop = 0;
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
+      });
+
+      el.scrollLeft = scrollLeft;
+      el.scrollTop = scrollTop;
+
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${eventName || 'score-sheet'}_results.jpg`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, 'image/jpeg', 0.95);
+    } catch (e) {
+      console.error('Error exporting JPG:', e);
+    }
+  }, [eventName]);
+
   if (completedRaces.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-slate-500 text-sm">
@@ -203,141 +314,173 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
   });
 
   return (
-    <div className="h-full overflow-auto bg-white text-black">
-      <table className="border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
-        <colgroup>
-          <col style={{ width: COL_WIDTHS.pos }} />
-          <col style={{ width: COL_WIDTHS.skipper }} />
-          <col style={{ width: COL_WIDTHS.sailNo }} />
-          <col style={{ width: COL_WIDTHS.club }} />
-          <col style={{ width: COL_WIDTHS.hull }} />
-          <col style={{ width: COL_WIDTHS.myaNo }} />
-          <col style={{ width: COL_WIDTHS.total }} />
-          <col style={{ width: COL_WIDTHS.score }} />
-          {completedRaces.map(r => (
-            <col key={`r${r}`} style={{ width: COL_W }} />
-          ))}
-          <col style={{ width: SEP_W }} />
-          {Array.from({ length: maxDropCols }).map((_, i) => (
-            <col key={`d${i}`} style={{ width: COL_W }} />
-          ))}
-          <col style={{ width: COL_W + 6 }} />
-          <col style={{ width: SEP_W }} />
-          {Array.from({ length: maxBestCols }).map((_, i) => (
-            <col key={`b${i}`} style={{ width: COL_W }} />
-          ))}
-          <col style={{ width: SEP_W }} />
-          <col style={{ width: 48 }} />
-          <col style={{ width: 38 }} />
-        </colgroup>
-        <thead className="sticky top-0 z-20">
-          <tr>
-            <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.pos, '#FFFF00')}>Position</th>
-            <th className={`${th} text-left`} style={frozenHeaderStyle(STICKY_OFFSETS.skipper, '#00FFFF')}>Skipper</th>
-            <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.sailNo, '#00FFFF')}>Sail #</th>
-            <th className={`${th} text-left`} style={frozenHeaderStyle(STICKY_OFFSETS.club, '#00FFFF')}>Club/City</th>
-            <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.hull, '#00FFFF')}>Hull</th>
-            <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.myaNo, '#00FFFF')}>MYA No.</th>
-            <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.total, '#00FFFF')}>Total</th>
-            <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.score, '#90EE90', { borderRight: '3px solid #333' })}>Score</th>
-            {completedRaces.map(race => (
-              <th key={race} className={th} style={{ backgroundColor: '#D3D3D3' }}>{race}</th>
+    <div className="h-full flex flex-col bg-white text-black">
+      <div className="flex items-center gap-2 px-2 py-1 border-b border-slate-200 bg-slate-50 shrink-0">
+        <span className="text-[10px] text-slate-500 mr-auto">
+          {standings.length} skippers &bull; {completedRaces.length} races &bull; {dropScheduleText}
+        </span>
+        <button
+          onClick={exportCsv}
+          className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-100 transition-colors"
+        >
+          <Download size={11} />
+          CSV
+        </button>
+        <button
+          onClick={exportJpg}
+          className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-100 transition-colors"
+        >
+          <Image size={11} />
+          JPG
+        </button>
+      </div>
+      <div ref={tableRef} className="flex-1 overflow-auto">
+        <table className="border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: COL_WIDTHS.pos }} />
+            <col style={{ width: COL_WIDTHS.skipper }} />
+            <col style={{ width: COL_WIDTHS.sailNo }} />
+            <col style={{ width: COL_WIDTHS.club }} />
+            <col style={{ width: COL_WIDTHS.hull }} />
+            <col style={{ width: COL_WIDTHS.myaNo }} />
+            <col style={{ width: COL_WIDTHS.total }} />
+            <col style={{ width: COL_WIDTHS.score }} />
+            {completedRaces.map(r => (
+              <col key={`r${r}`} style={{ width: COL_W }} />
             ))}
-            <th style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></th>
             {Array.from({ length: maxDropCols }).map((_, i) => (
-              <th key={`d${i}`} className={th} style={{ backgroundColor: '#FFB6C1' }}>dis {i + 1}</th>
+              <col key={`d${i}`} style={{ width: COL_W }} />
             ))}
-            <th className={th} style={{ backgroundColor: '#FF9999', fontWeight: 800 }}>Total Dis</th>
-            <th style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></th>
+            <col style={{ width: COL_W + 6 }} />
             {Array.from({ length: maxBestCols }).map((_, i) => (
-              <th key={`b${i}`} className={th} style={{ backgroundColor: '#87CEEB' }}>
-                {i === 0 ? 'Best' : getOrdinalLabel(i + 1)}
-              </th>
+              <col key={`b${i}`} style={{ width: COL_W }} />
             ))}
-            <th style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></th>
-            <th className={th} style={{ backgroundColor: '#FFFACD' }}>Avg</th>
-            <th className={th} style={{ backgroundColor: '#FFFACD' }}>Races</th>
-          </tr>
-        </thead>
-        <tbody>
-          {standings.map((standing: any, index: number) => {
-            const sailNo = getSailNo(standing.skipper);
-            const boat = standing.skipper?.boatModel || standing.skipper?.boat_class || '-';
-            const club = standing.skipper?.club || '-';
-            const myaNo = (standing.skipper as any)?.myaNumber || (standing.skipper as any)?.mya_number || '';
+            <col style={{ width: 48 }} />
+            <col style={{ width: 38 }} />
+          </colgroup>
+          <thead className="sticky top-0 z-20">
+            <tr>
+              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.pos, '#FFFF00')}>Position</th>
+              <th className={`${th} text-left`} style={frozenHeaderStyle(STICKY_OFFSETS.skipper, '#00FFFF')}>Skipper</th>
+              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.sailNo, '#00FFFF')}>Sail #</th>
+              <th className={`${th} text-left`} style={frozenHeaderStyle(STICKY_OFFSETS.club, '#00FFFF')}>Club/City</th>
+              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.hull, '#00FFFF')}>Hull</th>
+              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.myaNo, '#00FFFF')}>MYA No.</th>
+              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.total, '#00FFFF')}>Total</th>
+              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.score, '#90EE90', { borderRight: SECTION_BORDER })}>Score</th>
+              {completedRaces.map((race, i) => (
+                <th
+                  key={race}
+                  className={th}
+                  style={{
+                    backgroundColor: '#D3D3D3',
+                    ...(i === completedRaces.length - 1 ? { borderRight: SECTION_BORDER } : {}),
+                  }}
+                >
+                  {race}
+                </th>
+              ))}
+              {Array.from({ length: maxDropCols }).map((_, i) => (
+                <th key={`d${i}`} className={th} style={{ backgroundColor: '#FFB6C1' }}>dis {i + 1}</th>
+              ))}
+              <th className={th} style={{ backgroundColor: '#FF9999', fontWeight: 800, borderRight: SECTION_BORDER }}>Total Dis</th>
+              {Array.from({ length: maxBestCols }).map((_, i) => (
+                <th
+                  key={`b${i}`}
+                  className={th}
+                  style={{
+                    backgroundColor: '#87CEEB',
+                    ...(i === maxBestCols - 1 ? { borderRight: SECTION_BORDER } : {}),
+                  }}
+                >
+                  {i === 0 ? 'Best' : getOrdinalLabel(i + 1)}
+                </th>
+              ))}
+              <th className={th} style={{ backgroundColor: '#FFFACD' }}>Avg</th>
+              <th className={th} style={{ backgroundColor: '#FFFACD' }}>Races</th>
+            </tr>
+          </thead>
+          <tbody>
+            {standings.map((standing: any, index: number) => {
+              const sailNo = getSailNo(standing.skipper);
+              const boat = standing.skipper?.boatModel || standing.skipper?.boat_class || '-';
+              const club = standing.skipper?.club || '-';
+              const myaNo = (standing.skipper as any)?.myaNumber || (standing.skipper as any)?.mya_number || '';
 
-            return (
-              <tr key={standing.skipperIndex} className="hover:bg-yellow-50" style={{ height: ROW_HEIGHT }}>
-                <td className={td} style={frozenCellStyle(STICKY_OFFSETS.pos, '#FFFF00', { fontWeight: 700 })}>{index + 1}</td>
-                <td className={`${td} text-left truncate`} style={frozenCellStyle(STICKY_OFFSETS.skipper, '#fff', { maxWidth: COL_WIDTHS.skipper })}>
-                  {standing.skipper?.name || 'Unknown'}
-                </td>
-                <td className={td} style={frozenCellStyle(STICKY_OFFSETS.sailNo, '#fff', { fontWeight: 600 })}>{sailNo}</td>
-                <td className={`${td} text-left truncate`} style={frozenCellStyle(STICKY_OFFSETS.club, '#fff', { maxWidth: COL_WIDTHS.club, fontSize: 9 })}>
-                  {club}
-                </td>
-                <td className={`${td} text-left truncate`} style={frozenCellStyle(STICKY_OFFSETS.hull, '#fff', { maxWidth: COL_WIDTHS.hull, fontSize: 9 })}>
-                  {boat}
-                </td>
-                <td className={td} style={frozenCellStyle(STICKY_OFFSETS.myaNo, '#fff')}>
-                  {myaNo}
-                </td>
-                <td className={td} style={frozenCellStyle(STICKY_OFFSETS.total, '#fff')}>
-                  {fmt1(standing.total)}
-                </td>
-                <td className={td} style={frozenCellStyle(STICKY_OFFSETS.score, '#90EE90', { fontWeight: 700, borderRight: '3px solid #333' })}>
-                  {fmt1(standing.net)}
-                </td>
+              return (
+                <tr key={standing.skipperIndex} className="hover:bg-yellow-50" style={{ height: ROW_HEIGHT }}>
+                  <td className={td} style={frozenCellStyle(STICKY_OFFSETS.pos, '#FFFF00', { fontWeight: 700 })}>{index + 1}</td>
+                  <td className={`${td} text-left truncate`} style={frozenCellStyle(STICKY_OFFSETS.skipper, '#fff', { maxWidth: COL_WIDTHS.skipper })}>
+                    {standing.skipper?.name || 'Unknown'}
+                  </td>
+                  <td className={td} style={frozenCellStyle(STICKY_OFFSETS.sailNo, '#fff', { fontWeight: 600 })}>{sailNo}</td>
+                  <td className={`${td} text-left truncate`} style={frozenCellStyle(STICKY_OFFSETS.club, '#fff', { maxWidth: COL_WIDTHS.club, fontSize: 9 })}>
+                    {club}
+                  </td>
+                  <td className={`${td} text-left truncate`} style={frozenCellStyle(STICKY_OFFSETS.hull, '#fff', { maxWidth: COL_WIDTHS.hull, fontSize: 9 })}>
+                    {boat}
+                  </td>
+                  <td className={td} style={frozenCellStyle(STICKY_OFFSETS.myaNo, '#fff')}>
+                    {myaNo}
+                  </td>
+                  <td className={td} style={frozenCellStyle(STICKY_OFFSETS.total, '#fff')}>
+                    {fmt1(standing.total)}
+                  </td>
+                  <td className={td} style={frozenCellStyle(STICKY_OFFSETS.score, '#90EE90', { fontWeight: 700, borderRight: SECTION_BORDER })}>
+                    {fmt1(standing.net)}
+                  </td>
 
-                {completedRaces.map((race: number, raceIdx: number) => {
-                  const result = standing.raceResults?.find((r: any) => r.race === race);
-                  const position = result?.position;
-                  const isDropped = standing.droppedRaceIndices?.has(raceIdx);
-                  return (
-                    <td
-                      key={race}
-                      className={td}
-                      style={isDropped ? { backgroundColor: '#D3D3D3', color: '#666' } : undefined}
-                    >
-                      {position != null ? fmt1(position) : '-'}
+                  {completedRaces.map((race: number, raceIdx: number) => {
+                    const result = standing.raceResults?.find((r: any) => r.race === race);
+                    const position = result?.position;
+                    const isDropped = standing.droppedRaceIndices?.has(raceIdx);
+                    const isLast = raceIdx === completedRaces.length - 1;
+                    return (
+                      <td
+                        key={race}
+                        className={td}
+                        style={{
+                          ...(isDropped ? { backgroundColor: '#D3D3D3', color: '#666' } : {}),
+                          ...(isLast ? { borderRight: SECTION_BORDER } : {}),
+                        }}
+                      >
+                        {position != null ? fmt1(position) : '-'}
+                      </td>
+                    );
+                  })}
+
+                  {Array.from({ length: maxDropCols }).map((_, i) => (
+                    <td key={`d${i}`} className={td} style={{ backgroundColor: '#D3D3D3', color: '#666' }}>
+                      {standing.droppedScoreValues?.[i] != null ? fmt1(standing.droppedScoreValues[i]) : ''}
                     </td>
-                  );
-                })}
+                  ))}
 
-                <td style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></td>
-
-                {Array.from({ length: maxDropCols }).map((_, i) => (
-                  <td key={`d${i}`} className={td} style={{ backgroundColor: '#D3D3D3', color: '#666' }}>
-                    {standing.droppedScoreValues?.[i] != null ? fmt1(standing.droppedScoreValues[i]) : ''}
+                  <td className={td} style={{ backgroundColor: '#BEBEBE', color: '#333', fontWeight: 700, borderRight: SECTION_BORDER }}>
+                    {standing.totalDropped > 0 ? fmt1(standing.totalDropped) : ''}
                   </td>
-                ))}
 
-                <td className={td} style={{ backgroundColor: '#BEBEBE', color: '#333', fontWeight: 700 }}>
-                  {standing.totalDropped > 0 ? fmt1(standing.totalDropped) : ''}
-                </td>
+                  {Array.from({ length: maxBestCols }).map((_, i) => (
+                    <td
+                      key={`b${i}`}
+                      className={td}
+                      style={{
+                        backgroundColor: '#F0F8FF',
+                        ...(i === maxBestCols - 1 ? { borderRight: SECTION_BORDER } : {}),
+                      }}
+                    >
+                      {standing.sortedAllScores?.[i] != null ? standing.sortedAllScores[i] : ''}
+                    </td>
+                  ))}
 
-                <td style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></td>
-
-                {Array.from({ length: maxBestCols }).map((_, i) => (
-                  <td key={`b${i}`} className={td} style={{ backgroundColor: '#F0F8FF' }}>
-                    {standing.sortedAllScores?.[i] != null ? standing.sortedAllScores[i] : ''}
+                  <td className={td} style={{ backgroundColor: '#FFFFF0' }}>
+                    {standing.racesScored > 0 ? (standing.net / standing.racesScored).toFixed(1) : ''}
                   </td>
-                ))}
-
-                <td style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></td>
-
-                <td className={td} style={{ backgroundColor: '#FFFFF0' }}>
-                  {standing.racesScored > 0 ? (standing.net / standing.racesScored).toFixed(1) : ''}
-                </td>
-                <td className={td} style={{ backgroundColor: '#FFFFF0' }}>{standing.racesScored}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      <div className="px-2 py-1 text-[9px] text-slate-500 border-t border-slate-300 bg-white sticky left-0">
-        {standings.length} skippers &bull; {completedRaces.length} races &bull; {dropScheduleText}
+                  <td className={td} style={{ backgroundColor: '#FFFFF0' }}>{standing.racesScored}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

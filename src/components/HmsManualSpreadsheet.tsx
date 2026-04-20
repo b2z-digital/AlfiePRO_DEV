@@ -803,6 +803,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             dropRules={currentEvent?.dropRules || [4, 8, 16, 24, 32, 40]}
             darkMode={darkMode}
             externalRaceResults={overallRaceResults}
+            eventName={currentEvent?.eventName || currentEvent?.clubName}
           />
         </div>
       ) : (
