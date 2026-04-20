@@ -59,10 +59,12 @@ const isUpComment = (comment?: string): boolean => {
 function computeFleetBoardPositionsForRace(
   raceResults: typeof Array.prototype,
   raceNum: number,
-  hasHeats: boolean
+  hasHeats: boolean,
+  totalEntrants: number
 ): Map<string, number> {
   const positionMap = new Map<string, number>();
   const results = raceResults as any[];
+  const penaltyScore = totalEntrants + 1;
 
   if (!hasHeats) {
     const finishers = results
@@ -72,9 +74,6 @@ function computeFleetBoardPositionsForRace(
     finishers.forEach((r: any, idx: number) => {
       positionMap.set(r.sailNumber, idx + 1);
     });
-
-    const totalFinishers = finishers.length;
-    const penaltyScore = totalFinishers + 1;
 
     results.forEach((r: any) => {
       if (!positionMap.has(r.sailNumber)) {
@@ -128,17 +127,10 @@ function computeFleetBoardPositionsForRace(
 
   for (const heat of raceHeats) {
     const heatResults = results.filter((r: any) => r.heat === heat);
-    const heatStartPosition = overallPosition;
 
     const normalFinishers = heatResults
       .filter((r: any) => !r.letterScore && r.position !== null && !isRedressComment(r.comment) && !isUpComment(r.comment))
       .sort((a: any, b: any) => (a.position || 999) - (b.position || 999));
-
-    const upSkippers = heatResults.filter((r: any) => isUpComment(r.comment));
-
-    upSkippers.forEach((r: any) => {
-      positionMap.set(r.sailNumber, heatStartPosition);
-    });
 
     normalFinishers.forEach((r: any) => {
       positionMap.set(r.sailNumber, overallPosition);
@@ -146,7 +138,7 @@ function computeFleetBoardPositionsForRace(
     });
 
     heatResults.forEach((r: any) => {
-      if (!positionMap.has(r.sailNumber)) {
+      if (!positionMap.has(r.sailNumber) && !isUpComment(r.comment)) {
         if (isRedressFixed(r.comment)) {
           positionMap.set(r.sailNumber, r.points);
         } else if (isRedressAverage(r.comment)) {
@@ -156,11 +148,8 @@ function computeFleetBoardPositionsForRace(
     });
   }
 
-  const totalFinishers = overallPosition - 1;
-  const penaltyScore = totalFinishers + 1;
-
   results.forEach((r: any) => {
-    if (!positionMap.has(r.sailNumber)) {
+    if (!positionMap.has(r.sailNumber) && !isUpComment(r.comment)) {
       if (r.letterScore) {
         positionMap.set(r.sailNumber, penaltyScore);
       }
@@ -184,7 +173,7 @@ function computeFleetBoardFromImportedData(
   for (const raceNum of completedRaceNumbers) {
     const raceResults = results.filter(r => r.raceNumber === raceNum);
     if (raceResults.length === 0) continue;
-    raceFleetPositions.set(raceNum, computeFleetBoardPositionsForRace(raceResults, raceNum, hasHeats));
+    raceFleetPositions.set(raceNum, computeFleetBoardPositionsForRace(raceResults, raceNum, hasHeats, totalEntrants));
   }
 
   for (const skipper of skippers) {

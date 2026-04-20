@@ -73,9 +73,11 @@ export const HMSValidatorPage: React.FC = () => {
   const computeFleetBoardPositionsForRace = (
     raceResults: typeof results[number][],
     raceNum: number,
-    hasHeatsFlag: boolean
+    hasHeatsFlag: boolean,
+    entrantCount: number
   ): Map<string, number> => {
     const positionMap = new Map<string, number>();
+    const penaltyScore = entrantCount + 1;
 
     if (!hasHeatsFlag) {
       const finishers = raceResults
@@ -85,9 +87,6 @@ export const HMSValidatorPage: React.FC = () => {
       finishers.forEach((r, idx) => {
         positionMap.set(r.sailNumber, idx + 1);
       });
-
-      const totalFinishers = finishers.length;
-      const penaltyScore = totalFinishers + 1;
 
       raceResults.forEach(r => {
         if (!positionMap.has(r.sailNumber)) {
@@ -141,17 +140,10 @@ export const HMSValidatorPage: React.FC = () => {
 
     for (const heat of raceHeats) {
       const heatResults = raceResults.filter(r => r.heat === heat);
-      const heatStartPosition = overallPosition;
 
       const normalFinishers = heatResults
         .filter(r => !r.letterScore && r.position !== null && !isRedressComment(r.comment) && !isUpComment(r.comment))
         .sort((a, b) => (a.position || 999) - (b.position || 999));
-
-      const upSkippers = heatResults.filter(r => isUpComment(r.comment));
-
-      upSkippers.forEach(r => {
-        positionMap.set(r.sailNumber, heatStartPosition);
-      });
 
       normalFinishers.forEach(r => {
         positionMap.set(r.sailNumber, overallPosition);
@@ -159,7 +151,7 @@ export const HMSValidatorPage: React.FC = () => {
       });
 
       heatResults.forEach(r => {
-        if (!positionMap.has(r.sailNumber)) {
+        if (!positionMap.has(r.sailNumber) && !isUpComment(r.comment)) {
           if (isRedressFixed(r.comment)) {
             positionMap.set(r.sailNumber, r.points);
           } else if (isRedressAverage(r.comment)) {
@@ -169,11 +161,8 @@ export const HMSValidatorPage: React.FC = () => {
       });
     }
 
-    const totalFinishers = overallPosition - 1;
-    const penaltyScore = totalFinishers + 1;
-
     raceResults.forEach(r => {
-      if (!positionMap.has(r.sailNumber)) {
+      if (!positionMap.has(r.sailNumber) && !isUpComment(r.comment)) {
         if (r.letterScore) {
           positionMap.set(r.sailNumber, penaltyScore);
         }
@@ -188,13 +177,14 @@ export const HMSValidatorPage: React.FC = () => {
     const completedRaceNumbers = [...new Set(results.map(r => r.raceNumber))].sort((a, b) => a - b);
     const completedRaces = completedRaceNumbers.length;
     const dropsAllowed = computeDropsAllowed(completedRaces);
+    const totalEntrants = skippers.length;
     const discrepancies: ValidationDiscrepancy[] = [];
 
     const raceFleetPositions: Map<number, Map<string, number>> = new Map();
     for (const raceNum of completedRaceNumbers) {
       const raceResults = results.filter(r => r.raceNumber === raceNum);
       if (raceResults.length === 0) continue;
-      raceFleetPositions.set(raceNum, computeFleetBoardPositionsForRace(raceResults, raceNum, hasHeats));
+      raceFleetPositions.set(raceNum, computeFleetBoardPositionsForRace(raceResults, raceNum, hasHeats, totalEntrants));
     }
 
     const computedEntries: { sailNumber: string; name: string; racePoints: Record<number, number>; totalScore: number; netScore: number; droppedRaces: number[] }[] = [];
