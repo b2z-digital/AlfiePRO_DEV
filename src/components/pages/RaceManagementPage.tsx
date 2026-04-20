@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, Plus, SquarePen as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio } from 'lucide-react';
+import { Trophy, Plus, SquarePen as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio, FlaskConical } from 'lucide-react';
 import { RaceType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
 import { getStoredRaceEvents, getStoredRaceSeries, deleteRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
@@ -10,6 +10,7 @@ import { formatDate } from '../../utils/date';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { boatTypeColors, defaultColorScheme } from '../../constants/colors';
 import { CreateRaceModal } from './CreateRaceModal';
+import { EventSimulationModal } from '../EventSimulationModal';
 import { EventDetails } from '../EventDetails';
 import { VenueDetails } from '../VenueDetails';
 import { SingleEventManagement } from '../SingleEventManagement';
@@ -62,6 +63,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
   const [sortBy, setSortBy] = useState<SortOption>('date-asc');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showSimulationModal, setShowSimulationModal] = useState(false);
   const [pendingEvents, setPendingEvents] = useState<any[]>([]);
   const [createType, setCreateType] = useState<'quick' | 'series' | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -2353,12 +2355,30 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
                   >
-                    <div className="p-2 rounded-lg bg-purple-600/20">
-                      <Calendar className="text-purple-400" size={20} />
+                    <div className="p-2 rounded-lg bg-teal-600/20">
+                      <Calendar className="text-teal-400" size={20} />
                     </div>
                     <div>
                       <div className="text-white font-medium text-sm">Race Series</div>
                       <div className="text-slate-400 text-xs">Create a multi-round race series</div>
+                    </div>
+                  </button>
+
+                  <div className="mx-3 my-1 border-t border-slate-700/50"></div>
+
+                  <button
+                    onClick={() => {
+                      setShowDropdown(false);
+                      setShowSimulationModal(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                  >
+                    <div className="p-2 rounded-lg bg-amber-600/20">
+                      <FlaskConical className="text-amber-400" size={20} />
+                    </div>
+                    <div>
+                      <div className="text-white font-medium text-sm">Event Simulation</div>
+                      <div className="text-slate-400 text-xs">Import HMS data or create a test event</div>
                     </div>
                   </button>
                 </div>
@@ -2885,6 +2905,19 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             await fetchRaces();
           }}
           editingSeries={series.find(s => s.id === editingEvent.seriesId)}
+        />
+      )}
+
+      {showSimulationModal && (
+        <EventSimulationModal
+          darkMode={darkMode}
+          onClose={() => setShowSimulationModal(false)}
+          onSuccess={async (event) => {
+            setShowSimulationModal(false);
+            await new Promise(resolve => setTimeout(resolve, 300));
+            await fetchRaces();
+            handleStartScoring(event);
+          }}
         />
       )}
 
