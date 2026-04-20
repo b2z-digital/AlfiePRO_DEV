@@ -595,18 +595,18 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       return getTotalNonPromotedFleet(race) + 1;
     }
     if (race === 1) {
-      return getLargestHeatEntryCount(race);
+      return getLargestHeatEntryCount(race) + 1;
     }
     const entries = getHeatEntryCount(heat, race);
     if (entries === 0) {
-      return getTotalNonPromotedFleet(race);
+      return getTotalNonPromotedFleet(race) + 1;
     }
     if (heat === 'A') {
-      return entries;
+      return entries + 1;
     }
     const offset = getHeatOffset(heat, race);
     const nonPromoted = Math.max(0, entries - promotionCount);
-    return offset + nonPromoted;
+    return offset + nonPromoted + 1;
   }, [getLargestHeatEntryCount, getTotalNonPromotedFleet, getHeatEntryCount, getHeatOffset, promotionCount]);
 
   const getPointsForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
