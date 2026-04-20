@@ -1227,8 +1227,9 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     const matchesEventType = filterEventType === 'all' || filterEventType === 'single';
     const matchesTime = filterByTime(race);
 
-    // Year filter
-    const matchesYear = new Date(race.date).getFullYear() === selectedYear;
+    // Simulated events bypass year filter since they are imported historical data
+    const isSimulated = (race as any).is_simulated || false;
+    const matchesYear = isSimulated || new Date(race.date).getFullYear() === selectedYear;
 
     return matchesSearch && matchesClass && matchesFormat && matchesEventType && matchesTime && matchesYear;
   });
@@ -2430,7 +2431,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
               { value: 'past', label: 'Past', count: [...quickRaces.filter(r => !r.is_simulated && new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => isDatePast(e.date) && !e.completed).length },
               { value: 'completed', label: 'Completed', count: [...quickRaces.filter(r => !r.is_simulated && new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => e.completed).length },
               { value: 'pending', label: 'Pending', count: pendingEvents.length },
-              { value: 'simulated', label: 'Simulated Events', count: quickRaces.filter(r => r.is_simulated && new Date(r.date).getFullYear() === selectedYear).length },
+              { value: 'simulated', label: 'Simulated Events', count: quickRaces.filter(r => r.is_simulated).length },
             ].map((tab) => (
               <button
                 key={tab.value}
