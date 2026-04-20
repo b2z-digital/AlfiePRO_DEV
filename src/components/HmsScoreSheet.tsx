@@ -1,5 +1,5 @@
-import React, { useMemo, useCallback, useRef } from 'react';
-import { Download, Image } from 'lucide-react';
+import React, { useMemo, useCallback, useRef, useState } from 'react';
+import { Download, Image, ZoomIn, ZoomOut } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement } from '../types/heat';
 import { convertHeatResultsToRaceResults } from '../utils/heatUtils';
@@ -42,6 +42,9 @@ const STICKY_OFFSETS = {
 
 const SECTION_BORDER = '3px solid #333';
 
+const ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.75, 2.0];
+const DEFAULT_ZOOM_INDEX = 5; // 1.0
+
 function getOrdinalLabel(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
@@ -61,6 +64,8 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
   eventName,
 }) => {
   const tableRef = useRef<HTMLDivElement>(null);
+  const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
+  const zoom = ZOOM_LEVELS[zoomIndex];
   const numberOfHeats = heatManagement?.configuration?.numberOfHeats || 2;
   const useHMSTieBreak = numberOfHeats > 1;
 
@@ -284,6 +289,18 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
     }
   }, [eventName]);
 
+  const handleZoomIn = useCallback(() => {
+    setZoomIndex(prev => Math.min(prev + 1, ZOOM_LEVELS.length - 1));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomIndex(prev => Math.max(prev - 1, 0));
+  }, []);
+
+  const handleZoomReset = useCallback(() => {
+    setZoomIndex(DEFAULT_ZOOM_INDEX);
+  }, []);
+
   if (completedRaces.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-slate-500 text-sm">
@@ -296,6 +313,8 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
 
   const th = 'px-0.5 py-0.5 text-[9px] font-extrabold text-center whitespace-nowrap border-b border-r border-slate-400';
   const td = 'px-0.5 py-0 text-[10px] text-center font-medium tabular-nums border-b border-r border-slate-200';
+  const tdNoBorder = 'px-0.5 py-0 text-[10px] text-center font-medium tabular-nums';
+  const thNoBorder = 'px-0.5 py-0.5 text-[9px] font-extrabold text-center whitespace-nowrap border-b border-slate-400';
 
   const frozenHeaderStyle = (left: number, bg: string, extra?: React.CSSProperties): React.CSSProperties => ({
     backgroundColor: bg,
@@ -313,12 +332,47 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
     ...extra,
   });
 
+  const scaledOffsets = Object.fromEntries(
+    Object.entries(STICKY_OFFSETS).map(([k, v]) => [k, v * zoom])
+  ) as typeof STICKY_OFFSETS;
+
+  const scaledColWidths = Object.fromEntries(
+    Object.entries(COL_WIDTHS).map(([k, v]) => [k, v * zoom])
+  ) as typeof COL_WIDTHS;
+
+  const scaledColW = COL_W * zoom;
+
   return (
     <div className="h-full flex flex-col bg-white text-black">
       <div className="flex items-center gap-2 px-2 py-1 border-b border-slate-200 bg-slate-50 shrink-0">
         <span className="text-[10px] text-slate-500 mr-auto">
           {standings.length} skippers &bull; {completedRaces.length} races &bull; {dropScheduleText}
         </span>
+        <div className="flex items-center gap-1 border border-slate-300 rounded bg-white px-1">
+          <button
+            onClick={handleZoomOut}
+            disabled={zoomIndex === 0}
+            className="p-0.5 text-slate-600 hover:text-slate-900 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
+            title="Zoom out"
+          >
+            <ZoomOut size={12} />
+          </button>
+          <button
+            onClick={handleZoomReset}
+            className="px-1 py-0.5 text-[9px] font-semibold text-slate-600 hover:text-slate-900 transition-colors min-w-[32px]"
+            title="Reset zoom"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            onClick={handleZoomIn}
+            disabled={zoomIndex === ZOOM_LEVELS.length - 1}
+            className="p-0.5 text-slate-600 hover:text-slate-900 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
+            title="Zoom in"
+          >
+            <ZoomIn size={12} />
+          </button>
+        </div>
         <button
           onClick={exportCsv}
           className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-100 transition-colors"
@@ -335,39 +389,39 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
         </button>
       </div>
       <div ref={tableRef} className="flex-1 overflow-auto">
-        <table className="border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+        <table className="border-collapse" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: COL_WIDTHS.pos }} />
-            <col style={{ width: COL_WIDTHS.skipper }} />
-            <col style={{ width: COL_WIDTHS.sailNo }} />
-            <col style={{ width: COL_WIDTHS.club }} />
-            <col style={{ width: COL_WIDTHS.hull }} />
-            <col style={{ width: COL_WIDTHS.myaNo }} />
-            <col style={{ width: COL_WIDTHS.total }} />
-            <col style={{ width: COL_WIDTHS.score }} />
+            <col style={{ width: scaledColWidths.pos }} />
+            <col style={{ width: scaledColWidths.skipper }} />
+            <col style={{ width: scaledColWidths.sailNo }} />
+            <col style={{ width: scaledColWidths.club }} />
+            <col style={{ width: scaledColWidths.hull }} />
+            <col style={{ width: scaledColWidths.myaNo }} />
+            <col style={{ width: scaledColWidths.total }} />
+            <col style={{ width: scaledColWidths.score }} />
             {completedRaces.map(r => (
-              <col key={`r${r}`} style={{ width: COL_W }} />
+              <col key={`r${r}`} style={{ width: scaledColW }} />
             ))}
             {Array.from({ length: maxDropCols }).map((_, i) => (
-              <col key={`d${i}`} style={{ width: COL_W }} />
+              <col key={`d${i}`} style={{ width: scaledColW }} />
             ))}
-            <col style={{ width: COL_W + 6 }} />
+            <col style={{ width: (COL_W + 6) * zoom }} />
             {Array.from({ length: maxBestCols }).map((_, i) => (
-              <col key={`b${i}`} style={{ width: COL_W }} />
+              <col key={`b${i}`} style={{ width: scaledColW }} />
             ))}
-            <col style={{ width: 48 }} />
-            <col style={{ width: 38 }} />
+            <col style={{ width: 48 * zoom }} />
+            <col style={{ width: 38 * zoom }} />
           </colgroup>
           <thead className="sticky top-0 z-20">
-            <tr>
-              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.pos, '#FFFF00')}>Position</th>
-              <th className={`${th} text-left`} style={frozenHeaderStyle(STICKY_OFFSETS.skipper, '#00FFFF')}>Skipper</th>
-              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.sailNo, '#00FFFF')}>Sail #</th>
-              <th className={`${th} text-left`} style={frozenHeaderStyle(STICKY_OFFSETS.club, '#00FFFF')}>Club/City</th>
-              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.hull, '#00FFFF')}>Hull</th>
-              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.myaNo, '#00FFFF')}>MYA No.</th>
-              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.total, '#00FFFF')}>Total</th>
-              <th className={th} style={frozenHeaderStyle(STICKY_OFFSETS.score, '#90EE90', { borderRight: SECTION_BORDER })}>Score</th>
+            <tr style={{ fontSize: 9 * zoom }}>
+              <th className={thNoBorder} style={frozenHeaderStyle(scaledOffsets.pos, '#FFFF00')}>Position</th>
+              <th className={`${th} text-left`} style={frozenHeaderStyle(scaledOffsets.skipper, '#00FFFF')}>Skipper</th>
+              <th className={th} style={frozenHeaderStyle(scaledOffsets.sailNo, '#00FFFF')}>Sail #</th>
+              <th className={`${th} text-left`} style={frozenHeaderStyle(scaledOffsets.club, '#00FFFF')}>Club/City</th>
+              <th className={th} style={frozenHeaderStyle(scaledOffsets.hull, '#00FFFF')}>Hull</th>
+              <th className={th} style={frozenHeaderStyle(scaledOffsets.myaNo, '#00FFFF')}>MYA No.</th>
+              <th className={th} style={frozenHeaderStyle(scaledOffsets.total, '#00FFFF')}>Total</th>
+              <th className={thNoBorder} style={frozenHeaderStyle(scaledOffsets.score, '#90EE90', { borderRight: SECTION_BORDER, borderBottom: '1px solid #94a3b8' })}>Score</th>
               {completedRaces.map((race, i) => (
                 <th
                   key={race}
@@ -408,25 +462,31 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
               const myaNo = (standing.skipper as any)?.myaNumber || (standing.skipper as any)?.mya_number || '';
 
               return (
-                <tr key={standing.skipperIndex} className="hover:bg-yellow-50" style={{ height: ROW_HEIGHT }}>
-                  <td className={td} style={frozenCellStyle(STICKY_OFFSETS.pos, '#FFFF00', { fontWeight: 700 })}>{index + 1}</td>
-                  <td className={`${td} text-left truncate`} style={frozenCellStyle(STICKY_OFFSETS.skipper, '#fff', { maxWidth: COL_WIDTHS.skipper })}>
+                <tr
+                  key={standing.skipperIndex}
+                  className="hms-row-hover"
+                  style={{ height: ROW_HEIGHT * zoom }}
+                >
+                  <td className={tdNoBorder} style={frozenCellStyle(scaledOffsets.pos, '#FFFF00', { fontWeight: 700, fontSize: 10 * zoom })}>
+                    {index + 1}
+                  </td>
+                  <td className={`${td} text-left truncate`} style={frozenCellStyle(scaledOffsets.skipper, '#fff', { maxWidth: scaledColWidths.skipper, fontSize: 10 * zoom })}>
                     {standing.skipper?.name || 'Unknown'}
                   </td>
-                  <td className={td} style={frozenCellStyle(STICKY_OFFSETS.sailNo, '#fff', { fontWeight: 600 })}>{sailNo}</td>
-                  <td className={`${td} text-left truncate`} style={frozenCellStyle(STICKY_OFFSETS.club, '#fff', { maxWidth: COL_WIDTHS.club, fontSize: 9 })}>
+                  <td className={td} style={frozenCellStyle(scaledOffsets.sailNo, '#fff', { fontWeight: 600, fontSize: 10 * zoom })}>{sailNo}</td>
+                  <td className={`${td} text-left truncate`} style={frozenCellStyle(scaledOffsets.club, '#fff', { maxWidth: scaledColWidths.club, fontSize: 9 * zoom })}>
                     {club}
                   </td>
-                  <td className={`${td} text-left truncate`} style={frozenCellStyle(STICKY_OFFSETS.hull, '#fff', { maxWidth: COL_WIDTHS.hull, fontSize: 9 })}>
+                  <td className={`${td} text-left truncate`} style={frozenCellStyle(scaledOffsets.hull, '#fff', { maxWidth: scaledColWidths.hull, fontSize: 9 * zoom })}>
                     {boat}
                   </td>
-                  <td className={td} style={frozenCellStyle(STICKY_OFFSETS.myaNo, '#fff')}>
+                  <td className={td} style={frozenCellStyle(scaledOffsets.myaNo, '#fff', { fontSize: 10 * zoom })}>
                     {myaNo}
                   </td>
-                  <td className={td} style={frozenCellStyle(STICKY_OFFSETS.total, '#fff')}>
+                  <td className={td} style={frozenCellStyle(scaledOffsets.total, '#fff', { fontSize: 10 * zoom })}>
                     {fmt1(standing.total)}
                   </td>
-                  <td className={td} style={frozenCellStyle(STICKY_OFFSETS.score, '#90EE90', { fontWeight: 700, borderRight: SECTION_BORDER })}>
+                  <td className={tdNoBorder} style={frozenCellStyle(scaledOffsets.score, '#90EE90', { fontWeight: 700, borderRight: SECTION_BORDER, fontSize: 10 * zoom })}>
                     {fmt1(standing.net)}
                   </td>
 
@@ -440,6 +500,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                         key={race}
                         className={td}
                         style={{
+                          fontSize: 10 * zoom,
                           ...(isDropped ? { backgroundColor: '#D3D3D3', color: '#666' } : {}),
                           ...(isLast ? { borderRight: SECTION_BORDER } : {}),
                         }}
@@ -450,12 +511,12 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                   })}
 
                   {Array.from({ length: maxDropCols }).map((_, i) => (
-                    <td key={`d${i}`} className={td} style={{ backgroundColor: '#D3D3D3', color: '#666' }}>
+                    <td key={`d${i}`} className={td} style={{ backgroundColor: '#D3D3D3', color: '#666', fontSize: 10 * zoom }}>
                       {standing.droppedScoreValues?.[i] != null ? fmt1(standing.droppedScoreValues[i]) : ''}
                     </td>
                   ))}
 
-                  <td className={td} style={{ backgroundColor: '#BEBEBE', color: '#333', fontWeight: 700, borderRight: SECTION_BORDER }}>
+                  <td className={td} style={{ backgroundColor: '#BEBEBE', color: '#333', fontWeight: 700, borderRight: SECTION_BORDER, fontSize: 10 * zoom }}>
                     {standing.totalDropped > 0 ? fmt1(standing.totalDropped) : ''}
                   </td>
 
@@ -465,6 +526,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                       className={td}
                       style={{
                         backgroundColor: '#F0F8FF',
+                        fontSize: 10 * zoom,
                         ...(i === maxBestCols - 1 ? { borderRight: SECTION_BORDER } : {}),
                       }}
                     >
@@ -472,10 +534,10 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                     </td>
                   ))}
 
-                  <td className={td} style={{ backgroundColor: '#FFFFF0' }}>
+                  <td className={td} style={{ backgroundColor: '#FFFFF0', fontSize: 10 * zoom }}>
                     {standing.racesScored > 0 ? (standing.net / standing.racesScored).toFixed(1) : ''}
                   </td>
-                  <td className={td} style={{ backgroundColor: '#FFFFF0' }}>{standing.racesScored}</td>
+                  <td className={td} style={{ backgroundColor: '#FFFFF0', fontSize: 10 * zoom }}>{standing.racesScored}</td>
                 </tr>
               );
             })}
