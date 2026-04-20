@@ -28,6 +28,7 @@ export interface ParsedHMSData {
   numRaces: number;
   hasHeats: boolean;
   heats?: string[]; // ['A', 'B', 'C', 'D', 'E']
+  promotionCount?: number;
   worksheetNames: string[];
   rawData?: any; // For debugging
 }

@@ -352,6 +352,7 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
           skipperName: skipper?.name || 'Unknown',
           hmsPoints: result.points,
           letterScore: result.letterScore,
+          comment: result.comment,
           match: true
         };
       });
@@ -607,7 +608,8 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
                           <tbody className="divide-y divide-slate-700/50">
                             {raceData.map((row, idx) => {
                               const fbEntry = fleetBoard.find(e => e.sailNumber === row.sailNumber);
-                              const fbPoints = fbEntry?.racePoints[group.raceNumber];
+                              const isUp = isUpComment(row.comment);
+                              const fbPoints = isUp ? undefined : fbEntry?.racePoints[group.raceNumber];
 
                               return (
                                 <tr key={idx} className="hover:bg-slate-800/20">

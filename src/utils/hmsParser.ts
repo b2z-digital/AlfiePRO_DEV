@@ -53,12 +53,36 @@ export async function parseHMSFile(file: File): Promise<ParsedHMSData> {
   // Count races
   const numRaces = results.length > 0 ? Math.min(Math.max(...results.map(r => r.raceNumber), 0), HMS_MAX_RACES) : 0;
 
+  let promotionCount: number | undefined;
+  if (hasHeats) {
+    const upCounts: number[] = [];
+    const nonSeedingResults = results.filter(r => r.raceNumber >= 2);
+    const raceNums = [...new Set(nonSeedingResults.map(r => r.raceNumber))];
+    for (const rn of raceNums) {
+      const raceResults = nonSeedingResults.filter(r => r.raceNumber === rn);
+      const raceHeats = [...new Set(raceResults.filter(r => r.heat).map(r => r.heat!))].sort();
+      for (const heat of raceHeats) {
+        if (heat === raceHeats[0]) continue;
+        const heatResults = raceResults.filter(r => r.heat === heat);
+        const upCount = heatResults.filter(r => r.comment?.toUpperCase() === 'UP').length;
+        if (upCount > 0) upCounts.push(upCount);
+      }
+    }
+    if (upCounts.length > 0) {
+      const frequency: Record<number, number> = {};
+      upCounts.forEach(c => { frequency[c] = (frequency[c] || 0) + 1; });
+      promotionCount = Number(Object.entries(frequency).sort((a, b) => b[1] - a[1])[0][0]);
+      console.log(`Detected promotion count: ${promotionCount} (from UP comments across heats)`);
+    }
+  }
+
   return {
     skippers,
     results,
     numRaces,
     hasHeats,
     heats,
+    promotionCount,
     worksheetNames,
     eventName: extractEventName(scoreData),
     eventDate: extractEventDate(scoreData),
