@@ -503,7 +503,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 }
 
                 if (unbalancedR1 || inconsistentAcrossRounds) {
-                  console.log('Auto-correcting SHR heats:', unbalancedR1 ? 'unbalanced R1' : 'inconsistent across rounds');
+                  console.log('Auto-correcting SHRS heats:', unbalancedR1 ? 'unbalanced R1' : 'inconsistent across rounds');
                   const numHeats = loadedHM.configuration.numberOfHeats;
                   const qRounds = loadedHM.configuration.shrsQualifyingRounds || 1;
                   const eventSkippers = currentEvent.skippers || [];
@@ -524,12 +524,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   }
 
                   loadedHM = { ...loadedHM, rounds: newRounds };
-                  console.log('Corrected SHR heats:', newAssignments.map(a => a.skipperIndices.length).join(', '));
+                  console.log('Corrected SHRS heats:', newAssignments.map(a => a.skipperIndices.length).join(', '));
 
                   const eventId = currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id;
                   if (eventId) {
                     supabase.from('quick_races').update({ heat_management: loadedHM }).eq('id', eventId).then(() => {
-                      console.log('Saved corrected SHR heat assignments to database');
+                      console.log('Saved corrected SHRS heat assignments to database');
                     });
                   }
                 }
@@ -2440,7 +2440,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       const qRounds = finalHM.configuration.shrsQualifyingRounds || 1;
       const isPreset = finalHM.configuration.shrsAssignmentMode === 'preset';
       if (isPreset && qRounds > 1 && finalHM.rounds.length < qRounds) {
-        console.log('⚠️ SHR safety net (balanced): rounds.length', finalHM.rounds.length, 'but need', qRounds, '- regenerating');
+        console.log('⚠️ SHRS safety net (balanced): rounds.length', finalHM.rounds.length, 'but need', qRounds, '- regenerating');
         const firstRoundAssignments = finalHM.rounds[0]?.heatAssignments || [];
         const numHeats = finalHM.configuration.numberOfHeats;
         const allQR = generatePreSetQualifyingAssignments(
@@ -2458,7 +2458,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           }))
         };
       } else if (!isPreset && finalHM.rounds.length > 1) {
-        console.log('⚠️ SHR safety net (progressive): trimming to round 1 only');
+        console.log('⚠️ SHRS safety net (progressive): trimming to round 1 only');
         finalHM = {
           ...finalHM,
           rounds: [finalHM.rounds[0]]
@@ -3474,7 +3474,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setShowRaceSettingsModal(true);
           }}
           title="Heat Racing Recommended"
-          message={`With ${skippers.length} skippers competing, AlfiePRO recommends enabling Heat Racing. Skippers will be divided into heats using either the HMS or SHR scoring systems. Would you like to enable Heat Racing?`}
+          message={`With ${skippers.length} skippers competing, AlfiePRO recommends enabling Heat Racing. Skippers will be divided into heats using either the HMS or SHRS scoring systems. Would you like to enable Heat Racing?`}
           confirmText="Yes, Enable Heat Racing"
           cancelText="No Thanks"
           darkMode={darkMode}

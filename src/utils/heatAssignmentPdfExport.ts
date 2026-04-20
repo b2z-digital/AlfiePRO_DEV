@@ -3,15 +3,15 @@ import { HeatManagement, HeatAssignment, HeatConfiguration, getSHRSRoundLabel, g
 
 function getScoringLabel(config: HeatConfiguration): string {
   if (config.scoringSystem === 'shrs') {
-    return `SHR-${config.shrsAssignmentMode === 'preset' ? 'B' : 'P'}`;
+    return `SHRS-${config.shrsAssignmentMode === 'preset' ? 'B' : 'P'}`;
   }
   return config.scoringSystem?.toUpperCase() || 'HMS';
 }
 
 function getScoringFullLabel(config: HeatConfiguration): string {
   if (config.scoringSystem === 'shrs') {
-    const code = config.shrsAssignmentMode === 'preset' ? 'SHR-B' : 'SHR-P';
-    return `${code} | Structured Heat Racing`;
+    const code = config.shrsAssignmentMode === 'preset' ? 'SHRS-B' : 'SHRS-P';
+    return `${code} | Simple Heat Race System`;
   }
   return `${config.scoringSystem?.toUpperCase() || 'HMS'} | Heat Management`;
 }

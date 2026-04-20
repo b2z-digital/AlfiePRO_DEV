@@ -467,7 +467,7 @@ const HeatOverallResultsContent: React.FC<HeatOverallResultsModalProps> = ({
           <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
             {standings.length} skippers
             {Array.isArray(dropRules) && dropRules.length > 0 && ` • Drop rules: ${dropRules.join(', ')} races`}
-            {isShrs && ' • SHR scoring (position within heat)'}
+            {isShrs && ' • SHRS scoring (position within heat)'}
           </div>
           <button
             onClick={onClose}

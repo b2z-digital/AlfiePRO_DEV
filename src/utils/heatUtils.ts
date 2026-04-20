@@ -48,7 +48,7 @@ export const updateHeatResult = (
 
 // Function to complete a heat and automatically move to the next heat
 // HMS: Each heat races with its assigned roster. Promotion/relegation swaps happen between rounds.
-// SHR uses different movement rules based on position
+// SHRS uses different movement rules based on position
 export const completeHeat = (
   heatManagement: HeatManagement,
   heat: HeatDesignation,
@@ -101,7 +101,7 @@ export const completeHeat = (
     ?? configuration.promotionCount;
 
   // SCORING SYSTEM SPECIFIC LOGIC
-  console.log(`\n🔍 Heat ${heat} complete. Scoring System: ${isShrs ? 'SHR' : 'HMS'}, Round ${currentRound}`);
+  console.log(`\n🔍 Heat ${heat} complete. Scoring System: ${isShrs ? 'SHRS' : 'HMS'}, Round ${currentRound}`);
   if (effectivePromotionCount !== configuration.promotionCount) {
     console.log(`  ⚡ Per-race promotion override: ${effectivePromotionCount} (default: ${configuration.promotionCount})`);
   }

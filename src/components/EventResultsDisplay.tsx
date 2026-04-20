@@ -467,7 +467,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
         return 'HMS Heat System';
       } else if (heatScoringSystem === 'shrs') {
         const mode = event.heatManagement.configuration.shrsAssignmentMode;
-        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
+        return `SHRS-${mode === 'preset' ? 'B' : 'P'} - Simple Heat Race System`;
       }
     }
 
@@ -477,7 +477,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
         return 'HMS Heat System';
       } else if (dropRules === 'shrs') {
         const mode = event?.heatManagement?.configuration?.shrsAssignmentMode;
-        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
+        return `SHRS-${mode === 'preset' ? 'B' : 'P'} - Simple Heat Race System`;
       }
     }
 
