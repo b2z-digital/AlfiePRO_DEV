@@ -177,6 +177,7 @@ export interface RaceEvent {
   show_club_state?: boolean;
   show_category?: boolean;
   start_sequence_id?: string;
+  is_simulated?: boolean;
 }
 
 export interface PublicEvent {

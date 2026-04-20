@@ -165,7 +165,8 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
             enable_roll_call: race.enable_roll_call,
             auto_complete_sail: race.auto_complete_sail,
             enableLiveTracking: race.enable_live_tracking || false,
-            enableLiveStream: race.enable_livestream || false
+            enableLiveStream: race.enable_livestream || false,
+            is_simulated: race.is_simulated || false
           } as any;
 
           console.log(`🔍 [raceStorage] Loading event "${race.event_name}":`, {
@@ -310,7 +311,8 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
           enable_observers: (event as any).enable_observers ?? false,
           observers_per_heat: (event as any).observers_per_heat ?? undefined,
           enable_roll_call: (event as any).enable_roll_call,
-          auto_complete_sail: (event as any).auto_complete_sail
+          auto_complete_sail: (event as any).auto_complete_sail,
+          is_simulated: (event as any).is_simulated || false
         });
 
       if (error) {

@@ -243,6 +243,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
         numRaces: 41,
         dropRules: [4, 8, 16, 24, 32, 40],
         scoringSystem: 'hms',
+        is_simulated: true,
       };
 
       await storeRaceEvent(event);

@@ -1,3 +1,6 @@
+Looking at this React component file, I can see it's missing several closing brackets. Here\'s the corrected version with the missing brackets added:
+
+```typescript
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, Plus, SquarePen as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio, FlaskConical } from 'lucide-react';
@@ -30,7 +33,7 @@ interface RaceManagementPageProps {
   onStartScoring: () => void;
 }
 
-type TimeFilter = 'all' | 'upcoming' | 'past' | 'completed' | 'pending';
+type TimeFilter = 'all' | 'upcoming' | 'past' | 'completed' | 'pending' | 'simulated';
 type SortOption = 'date-asc' | 'date-desc' | 'name-asc' | 'name-desc' | 'status';
 
 export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
@@ -1169,9 +1172,16 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
   };
 
   // Filter and sort logic
-  const filterByTime = (event: RaceEvent | { date: string, completed?: boolean }) => {
+  const filterByTime = (event: RaceEvent | { date: string, completed?: boolean, is_simulated?: boolean }) => {
     const isPast = isDatePast(event.date);
     const isCompleted = event.completed || false;
+    const isSimulated = (event as any).is_simulated || false;
+
+    if (timeFilter === 'simulated') {
+      return isSimulated;
+    }
+
+    if (isSimulated) return false;
 
     switch (timeFilter) {
       case 'upcoming':
@@ -2418,11 +2428,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           {/* Time Filter Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             {[
-              { value: 'all', label: 'All Events', count: sortedQuickRaces.length + sortedSeries.length },
-              { value: 'upcoming', label: 'Upcoming', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => !isDatePast(e.date) && !e.completed).length },
-              { value: 'past', label: 'Past', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => isDatePast(e.date) && !e.completed).length },
-              { value: 'completed', label: 'Completed', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => e.completed).length },
+              { value: 'all', label: 'All Events', count: quickRaces.filter(r => !r.is_simulated && new Date(r.date).getFullYear() === selectedYear).length + series.filter(s => s.rounds.some(r => new Date(r.date).getFullYear() === selectedYear)).length },
+              { value: 'upcoming', label: 'Upcoming', count: [...quickRaces.filter(r => !r.is_simulated && new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => !isDatePast(e.date) && !e.completed).length },
+              { value: 'past', label: 'Past', count: [...quickRaces.filter(r => !r.is_simulated && new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => isDatePast(e.date) && !e.completed).length },
+              { value: 'completed', label: 'Completed', count: [...quickRaces.filter(r => !r.is_simulated && new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => e.completed).length },
               { value: 'pending', label: 'Pending', count: pendingEvents.length },
+              { value: 'simulated', label: 'Simulated Events', count: quickRaces.filter(r => r.is_simulated && new Date(r.date).getFullYear() === selectedYear).length },
             ].map((tab) => (
               <button
                 key={tab.value}
@@ -2464,7 +2475,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           `}>
             Loading events...
           </div>
-        ) : filteredQuickRaces.length === 0 && filteredSeries.length === 0 && timeFilter !== 'pending' ? (
+        ) : filteredQuickRaces.length === 0 && filteredSeries.length === 0 && timeFilter !== 'pending' && timeFilter !== 'simulated' ? (
           <div className={`
             text-center py-16 rounded-xl border
             ${darkMode
@@ -2771,8 +2782,51 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
               </div>
             )}
 
+            {/* Simulated Events Section */}
+            {timeFilter === 'simulated' && (
+              <div>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 rounded-lg bg-cyan-600/20">
+                    <FlaskConical className="text-cyan-400" size={24} />
+                  </div>
+                  <div>
+                    <h2 className={`text-2xl font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                      Simulated Events
+                    </h2>
+                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Events created via the HMS Simulation tool
+                    </p>
+                  </div>
+                </div>
+
+                {sortedQuickRaces.length === 0 ? (
+                  <div className={`text-center py-12 rounded-lg ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                    <FlaskConical size={48} className={`mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
+                    <p className={`text-lg ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      No simulated events
+                    </p>
+                    <p className={`text-sm mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                      Use the HMS Simulation tool to create test events
+                    </p>
+                  </div>
+                ) : (
+                  <div className={`grid gap-6 items-start ${
+                    viewMode === 'grid'
+                      ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                      : 'grid-cols-1'
+                  }`}>
+                    {sortedQuickRaces.map((event) => (
+                      <React.Fragment key={event.id}>
+                        {renderEventCard(event)}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Series Section */}
-            {timeFilter !== 'pending' && sortedSeries.length > 0 && (
+            {timeFilter !== 'pending' && timeFilter !== 'simulated' && sortedSeries.length > 0 && (
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 rounded-lg bg-purple-600/20">
@@ -2802,12 +2856,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             )}
 
             {/* Separator between Series and Single Events */}
-            {timeFilter !== 'pending' && sortedSeries.length > 0 && Object.entries(groupedSingleEvents).length > 0 && (
+            {timeFilter !== 'pending' && timeFilter !== 'simulated' && sortedSeries.length > 0 && Object.entries(groupedSingleEvents).length > 0 && (
               <div className={`my-8 border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}></div>
             )}
 
             {/* Single Events Section */}
-            {timeFilter !== 'pending' && Object.entries(groupedSingleEvents).length > 0 && (
+            {timeFilter !== 'pending' && timeFilter !== 'simulated' && Object.entries(groupedSingleEvents).length > 0 && (
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 rounded-lg bg-blue-600/20">
@@ -3155,3 +3209,4 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     </div>
   );
 };
+```
