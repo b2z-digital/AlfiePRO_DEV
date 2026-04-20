@@ -113,8 +113,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
 
         const net = total - totalDropped;
 
-        const nonDroppedScores = points.filter((_: number, idx: number) => !droppedRaceIndices.has(idx));
-        const sortedNonDropped = [...nonDroppedScores].sort((a, b) => a - b);
+        const sortedAllScores = [...points].sort((a, b) => a - b);
 
         const droppedScoreValues = points
           .map((score: number, idx: number) => ({ score, idx }))
@@ -132,7 +131,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
           droppedRaceIndices,
           totalDropped,
           net,
-          sortedNonDropped,
+          sortedAllScores,
           droppedScoreValues,
           racesScored: points.length,
         };
@@ -166,7 +165,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
 
   const maxBestCols = useMemo(() => {
     if (standings.length === 0) return 0;
-    const maxActual = Math.max(...standings.map((s: any) => s.sortedNonDropped?.length || 0));
+    const maxActual = Math.max(...standings.map((s: any) => s.sortedAllScores?.length || 0));
     return Math.min(Math.max(maxActual, 1), 10);
   }, [standings]);
 
@@ -321,7 +320,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
 
                 {Array.from({ length: maxBestCols }).map((_, i) => (
                   <td key={`b${i}`} className={td} style={{ backgroundColor: '#F0F8FF' }}>
-                    {standing.sortedNonDropped?.[i] != null ? standing.sortedNonDropped[i] : ''}
+                    {standing.sortedAllScores?.[i] != null ? standing.sortedAllScores[i] : ''}
                   </td>
                 ))}
 
