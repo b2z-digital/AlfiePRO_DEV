@@ -33,21 +33,21 @@ export const HMSValidatorPage: React.FC = () => {
     setCurrentStep('results');
   };
 
-  const computeDropsAllowed = (numRaces: number): number => {
-    if (numRaces >= 1 && numRaces <= 3) return 0;
-    if (numRaces >= 4 && numRaces <= 7) return 1;
-    if (numRaces >= 8 && numRaces <= 15) return 2;
-    if (numRaces >= 16 && numRaces <= 23) return 3;
-    if (numRaces >= 24 && numRaces <= 31) return 4;
-    if (numRaces >= 32 && numRaces <= 39) return 5;
-    if (numRaces >= 40 && numRaces <= 47) return 6;
-    if (numRaces >= 48) return Math.floor((numRaces - 24) / 8) + 3;
+  const computeDropsAllowed = (completedRaces: number): number => {
+    if (completedRaces >= 1 && completedRaces <= 3) return 0;
+    if (completedRaces >= 4 && completedRaces <= 7) return 1;
+    if (completedRaces >= 8 && completedRaces <= 15) return 2;
+    if (completedRaces >= 16 && completedRaces <= 23) return 3;
+    if (completedRaces >= 24 && completedRaces <= 31) return 4;
+    if (completedRaces >= 32 && completedRaces <= 39) return 5;
+    if (completedRaces >= 40) return 6;
     return 0;
   };
 
   const runValidation = (data: ParsedHMSData): ValidationResult => {
     const { skippers, results, numRaces, hasHeats } = data;
-    const dropsAllowed = computeDropsAllowed(numRaces);
+    const completedRaces = new Set(results.map(r => r.raceNumber)).size;
+    const dropsAllowed = computeDropsAllowed(completedRaces);
     const discrepancies: ValidationDiscrepancy[] = [];
 
     const computedEntries: { sailNumber: string; name: string; racePoints: Record<number, number>; totalScore: number; netScore: number }[] = [];

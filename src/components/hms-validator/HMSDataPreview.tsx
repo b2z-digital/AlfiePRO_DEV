@@ -9,9 +9,11 @@ interface HMSDataPreviewProps {
 }
 
 export const HMSDataPreview: React.FC<HMSDataPreviewProps> = ({ data, onConfirm, onBack }) => {
+  const completedRaceNumbers = [...new Set(data.results.map(r => r.raceNumber))].sort((a, b) => a - b);
+
   const raceHeatBreakdown = data.hasHeats ? (() => {
     const breakdown: { raceNumber: number; heats: string[] }[] = [];
-    for (let r = 1; r <= data.numRaces; r++) {
+    for (const r of completedRaceNumbers) {
       const heatsForRace = [...new Set(
         data.results.filter(res => res.raceNumber === r && res.heat).map(res => res.heat!)
       )].sort();
@@ -45,7 +47,7 @@ export const HMSDataPreview: React.FC<HMSDataPreviewProps> = ({ data, onConfirm,
             <Trophy size={24} className="text-green-400" />
             <h3 className="font-semibold text-green-300">Races</h3>
           </div>
-          <p className="text-3xl font-bold text-green-400">{data.numRaces}</p>
+          <p className="text-3xl font-bold text-green-400">{completedRaceNumbers.length}</p>
           <p className="text-sm text-green-300 mt-1">
             {data.hasHeats ? 'Heat-based scoring' : 'Single fleet'}
           </p>

@@ -37,9 +37,12 @@ export async function parseHMSFile(file: File): Promise<ParsedHMSData> {
   const skippers = parseSkippersFromScoreSheet(scoreData);
   console.log(`Parsed ${skippers.length} skippers from Score Sheet`);
 
+  const HMS_MAX_RACES = 41;
+
   // Parse race results from scoring tabs
-  const results = parseRaceResults(workbook, worksheetNames, scoreSheetName);
-  console.log(`Parsed ${results.length} race results`);
+  const allResults = parseRaceResults(workbook, worksheetNames, scoreSheetName);
+  const results = allResults.filter(r => r.raceNumber <= HMS_MAX_RACES);
+  console.log(`Parsed ${allResults.length} race results, ${results.length} within HMS limit of ${HMS_MAX_RACES}`);
 
   // Detect if heat racing
   const hasHeats = results.some(r => r.heat !== undefined);
@@ -48,7 +51,7 @@ export async function parseHMSFile(file: File): Promise<ParsedHMSData> {
     : undefined;
 
   // Count races
-  const numRaces = results.length > 0 ? Math.max(...results.map(r => r.raceNumber), 0) : 0;
+  const numRaces = results.length > 0 ? Math.min(Math.max(...results.map(r => r.raceNumber), 0), HMS_MAX_RACES) : 0;
 
   return {
     skippers,
@@ -118,7 +121,7 @@ function parseSkippersFromScoreSheet(data: any[][]): ParsedHMSSkipper[] {
     if (index <= coreMaxCol) return;
     const cleanHeader = header.replace(/[^\d]/g, '');
     const num = parseInt(cleanHeader);
-    if (!isNaN(num) && num > 0 && num < 100) {
+    if (!isNaN(num) && num > 0 && num <= 41) {
       candidateRaceColumns.push({ index, raceNumber: num });
     }
   });
@@ -311,11 +314,13 @@ function parseHeatScoringFromSheet(data: any[][], sheetName: string): ParsedHMSR
 
     let raceNumber = 0;
     for (let colIndex = dataColStart; colIndex < row.length; colIndex += 4) {
+      raceNumber++;
+
+      if (raceNumber > 41) break;
+
       const sailNumber = String(row[colIndex] || '').trim();
       const comment = String(row[colIndex + 1] || '').trim();
       const points = parseFloat(String(row[colIndex + 2] || '0'));
-
-      raceNumber++;
 
       if (!sailNumber || sailNumber === '00' || sailNumber === '0' || !/^\d+$/.test(sailNumber)) {
         continue;
@@ -387,39 +392,20 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
   const headerRow = data[headerRowIndex];
   let raceColumns: { startCol: number; raceNumber: number }[] = [];
 
+  const HMS_MAX_RACES = 41;
+
   for (let col = 0; col < headerRow.length; col++) {
     const cellValue = String(headerRow[col] || '').trim();
     const match = cellValue.match(/(?:verify\s+)?r[o0](\d+)|race\s*(\d+)/i);
     if (match) {
       const raceNum = parseInt(match[1] || match[2]);
-      raceColumns.push({ startCol: col, raceNumber: raceNum });
-    }
-  }
-
-  if (raceColumns.length === 0) {
-    return results;
-  }
-
-  const validatedRaceColumns: typeof raceColumns = [];
-  for (const rc of raceColumns) {
-    let hasValidData = false;
-    for (let checkRow = headerRowIndex + 1; checkRow < Math.min(headerRowIndex + 40, data.length); checkRow++) {
-      const row = data[checkRow];
-      if (!row) continue;
-      const cellVal = String(row[rc.startCol] || '').trim();
-      if (cellVal && /^\d+$/.test(cellVal) && parseInt(cellVal) > 0) {
-        hasValidData = true;
-        break;
+      if (raceNum <= HMS_MAX_RACES) {
+        raceColumns.push({ startCol: col, raceNumber: raceNum });
+      } else {
+        console.log(`Ignoring race column RO${raceNum} - exceeds HMS maximum of ${HMS_MAX_RACES} races`);
       }
     }
-    if (hasValidData) {
-      validatedRaceColumns.push(rc);
-    } else {
-      console.log(`Discarding race column RO${rc.raceNumber} at col ${rc.startCol} - no valid sail numbers in data rows`);
-    }
   }
-
-  raceColumns = validatedRaceColumns;
 
   if (raceColumns.length === 0) {
     return results;
@@ -928,10 +914,13 @@ export function parseHMSTwoStep(skipperText: string, resultsText: string): Parse
     throw new Error('Missing race headers in results data. Please include the header row that contains race identifiers (e.g., "Verify RO1", "RO2", "RO3")');
   }
 
-  // Use columnar race format parser
-  const results = parseColumnarRaceFormat(resultsRows, 'Results');
+  const HMS_MAX_RACES = 41;
 
-  console.log(`Parsed ${results.length} race results`);
+  // Use columnar race format parser
+  const allResults = parseColumnarRaceFormat(resultsRows, 'Results');
+  const results = allResults.filter(r => r.raceNumber <= HMS_MAX_RACES);
+
+  console.log(`Parsed ${allResults.length} race results, ${results.length} within HMS limit of ${HMS_MAX_RACES}`);
   console.log('=== TWO-STEP PARSE END ===');
 
   if (results.length === 0) {
@@ -941,7 +930,7 @@ export function parseHMSTwoStep(skipperText: string, resultsText: string): Parse
 
   // Calculate numRaces
   const numRaces = results.length > 0
-    ? Math.max(...results.map(r => r.raceNumber))
+    ? Math.min(Math.max(...results.map(r => r.raceNumber)), HMS_MAX_RACES)
     : 0;
 
   // 🔥 CRITICAL FIX: Merge race results back into skippers

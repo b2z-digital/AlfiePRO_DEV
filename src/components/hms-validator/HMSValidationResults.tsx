@@ -27,17 +27,24 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
   const heats = parsedData?.heats || [];
   const numRaces = parsedData?.numRaces || 0;
 
+  const completedRaceNumbers = useMemo(() => {
+    if (!parsedData?.results) return [];
+    return [...new Set(parsedData.results.map(r => r.raceNumber))].sort((a, b) => a - b);
+  }, [parsedData]);
+
+  const completedRaces = completedRaceNumbers.length;
+
   const dropsAllowed = useMemo(() => {
-    if (numRaces >= 1 && numRaces <= 3) return 0;
-    if (numRaces >= 4 && numRaces <= 7) return 1;
-    if (numRaces >= 8 && numRaces <= 15) return 2;
-    if (numRaces >= 16 && numRaces <= 23) return 3;
-    if (numRaces >= 24 && numRaces <= 31) return 4;
-    if (numRaces >= 32 && numRaces <= 39) return 5;
-    if (numRaces >= 40 && numRaces <= 47) return 6;
-    if (numRaces >= 48) return Math.floor((numRaces - 24) / 8) + 3;
+    const n = completedRaces;
+    if (n >= 1 && n <= 3) return 0;
+    if (n >= 4 && n <= 7) return 1;
+    if (n >= 8 && n <= 15) return 2;
+    if (n >= 16 && n <= 23) return 3;
+    if (n >= 24 && n <= 31) return 4;
+    if (n >= 32 && n <= 39) return 5;
+    if (n >= 40) return 6;
     return 0;
-  }, [numRaces]);
+  }, [completedRaces]);
 
   const fleetBoard = useMemo((): FleetBoardEntry[] => {
     if (!parsedData?.skippers || !parsedData?.results) return [];
@@ -284,7 +291,7 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
             <div className="mt-2 flex gap-4 text-sm">
               <span className="text-slate-300">
                 <span className="text-slate-400">Total Races:</span>{' '}
-                <span className="text-white font-medium">{numRaces}</span>
+                <span className="text-white font-medium">{completedRaces}</span>
               </span>
               <span className="text-slate-300">
                 <span className="text-slate-400">Drops Allowed:</span>{' '}
@@ -309,9 +316,9 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
                   <th className="px-4 py-3 text-center text-xs font-semibold text-blue-400 uppercase">Total</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-green-400 uppercase">Net</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase">Match</th>
-                  {Array.from({ length: numRaces }, (_, i) => (
-                    <th key={i} className="px-3 py-3 text-center text-xs font-semibold text-slate-400 uppercase">
-                      R{i + 1}
+                  {completedRaceNumbers.map(rn => (
+                    <th key={rn} className="px-3 py-3 text-center text-xs font-semibold text-slate-400 uppercase">
+                      R{rn}
                     </th>
                   ))}
                 </tr>
@@ -350,12 +357,11 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
                           <AlertTriangle size={18} className="text-yellow-400 inline" />
                         )}
                       </td>
-                      {Array.from({ length: numRaces }, (_, i) => {
-                        const raceNumber = i + 1;
+                      {completedRaceNumbers.map(raceNumber => {
                         const pts = entry.racePoints[raceNumber];
                         const isDropped = entry.droppedRaces.includes(raceNumber);
                         return (
-                          <td key={i} className="px-3 py-3 text-center text-xs">
+                          <td key={raceNumber} className="px-3 py-3 text-center text-xs">
                             {pts !== undefined ? (
                               <span className={`font-medium ${
                                 isDropped
