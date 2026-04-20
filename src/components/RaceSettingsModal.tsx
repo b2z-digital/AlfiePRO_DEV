@@ -1998,24 +1998,28 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                     </label>
                   </div>
 
-                  <label className="flex items-center justify-between cursor-pointer">
+                  <label className={`flex items-center justify-between ${fleetManagementEnabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}>
                     <div>
                       <div className={`text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                         Roll Call Before Scoring
                       </div>
                       <div className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Show roll call screen to mark skippers present/absent before each heat
+                        {fleetManagementEnabled
+                          ? 'Show roll call screen to mark skippers present/absent before each heat'
+                          : 'Requires Fleet Management to be enabled'}
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setEnableRollCall(!enableRollCall)}
+                      disabled={!fleetManagementEnabled}
+                      onClick={() => { if (fleetManagementEnabled) setEnableRollCall(!enableRollCall); }}
                       className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                        !fleetManagementEnabled ? (darkMode ? 'bg-slate-700' : 'bg-slate-200') :
                         enableRollCall ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                       }`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        enableRollCall ? 'translate-x-6' : 'translate-x-1'
+                        enableRollCall && fleetManagementEnabled ? 'translate-x-6' : 'translate-x-1'
                       }`} />
                     </button>
                   </label>
