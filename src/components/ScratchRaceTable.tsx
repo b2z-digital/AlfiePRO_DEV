@@ -1505,8 +1505,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
       {showLetterScoreSelector && (() => {
         const { race, skipperIndex } = showLetterScoreSelector;
 
-        // Get previous race results for average points calculation
-        const skipperPreviousResults: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number }> = [];
+        const skipperPreviousResults: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number; raceNumber?: number }> = [];
 
         for (let r = 1; r < race; r++) {
           const result = raceResults.find(res => res.race === r && res.skipperIndex === skipperIndex);
@@ -1515,14 +1514,12 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
             const letterScore = result.letterScore;
             const customPoints = result.customPoints;
 
-            // Get the points for this race
             let points = 0;
             if (letterScore === 'RDG' || letterScore === 'DPI') {
-              points = customPoints || 0;
+              points = (customPoints && customPoints > 0) ? customPoints : 0;
             } else if (position !== null && position > 0) {
               points = position;
             } else if (letterScore) {
-              // Letter scores in scratch scoring
               points = skippers.length + 1;
             }
 
@@ -1530,10 +1527,13 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
               position,
               letterScore,
               customPoints,
-              points
+              points,
+              raceNumber: r
             });
           }
         }
+
+        const srtHasCompleted = skipperPreviousResults.some(r => r.position !== null && r.position > 0);
 
         return (
           <LetterScoreSelector
@@ -1545,6 +1545,10 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
             skipperName={skippers[skipperIndex]?.name || ''}
             raceNumber={race}
             skipperPreviousResults={skipperPreviousResults}
+            hasCompletedRaces={srtHasCompleted}
+            isMultiDay={currentEvent?.multiDay}
+            numberOfDays={currentEvent?.numberOfDays}
+            currentDay={currentEvent?.currentDay}
           />
         );
       })()}

@@ -402,6 +402,60 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                   </div>
                 )}
 
+                {(!seq.use_audio_only) && (!seq.is_system_default || isSuperAdmin) && (
+                  <div className={`mt-3 flex flex-col gap-3 p-3 rounded-lg ${darkMode ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={seq.enable_countdown_beep || false}
+                          onChange={async () => {
+                            await updateSequence(seq.id, { enable_countdown_beep: !seq.enable_countdown_beep });
+                            await loadData();
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className={`w-9 h-5 rounded-full transition-colors peer-checked:bg-green-600 ${darkMode ? 'bg-slate-600' : 'bg-slate-300'}`} />
+                        <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
+                      </div>
+                      <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Countdown Beep
+                      </span>
+                      <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Play a beep every second during the LED countdown
+                      </span>
+                    </label>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <ListMusic size={16} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                        <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          Minute Callout Sound
+                        </span>
+                      </div>
+                      <select
+                        value={seq.minute_callout_sound_id || ''}
+                        onChange={async (e) => {
+                          const val = e.target.value || null;
+                          await updateSequence(seq.id, { minute_callout_sound_id: val });
+                          await loadData();
+                        }}
+                        className={`flex-1 max-w-xs px-2 py-1.5 rounded text-xs border ${
+                          darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      >
+                        <option value="">None</option>
+                        {sounds.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Plays at each minute mark
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {(seq.use_audio_only || !seq.is_system_default || isSuperAdmin) && (
                   <div className={`mt-3 p-4 rounded-lg border ${
                     seq.use_audio_only

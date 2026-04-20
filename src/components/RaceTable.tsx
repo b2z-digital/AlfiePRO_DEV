@@ -1241,7 +1241,28 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                                 className={`${isCompactView ? 'w-10 h-10 text-xs' : 'w-12 h-12 text-sm'} flex items-center justify-center font-medium rounded mx-auto relative overflow-hidden cursor-default`}
                                 title="Race completed (click Clear Race to edit)"
                               >
-                                {result?.letterScore && result?.letterScore !== 'WDN' ? (
+                                {(isManualHandicaps || hasDeterminedInitialHcaps) ? (
+                                  <>
+                                    <div
+                                      className="absolute inset-0 pointer-events-none"
+                                      style={{
+                                        background: `linear-gradient(to top right, transparent calc(50% - 0.5px), ${darkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)'} calc(50% - 0.5px), ${darkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)'} calc(50% + 0.5px), transparent calc(50% + 0.5px))`
+                                      }}
+                                    />
+                                    <span
+                                      className={`absolute top-0.5 right-1 text-[10px] text-slate-400 font-semibold ${isDropped ? 'opacity-30' : 'opacity-70'}`}
+                                    >
+                                      {raceHandicap !== null ? `${raceHandicap}s` : ''}
+                                    </span>
+                                    <span className={`absolute bottom-0.5 left-1 text-white font-bold ${isDropped ? 'line-through opacity-50' : ''}`}>
+                                      {result?.letterScore
+                                        ? (result?.customPoints !== undefined && result?.customPoints !== null
+                                            ? result.customPoints
+                                            : getLetterScorePoints(result?.letterScore, race))
+                                        : (result?.position || '–')}
+                                    </span>
+                                  </>
+                                ) : result?.letterScore && result?.letterScore !== 'WDN' ? (
                                   <span className={`text-white font-bold ${isDropped ? 'line-through opacity-50' : ''}`}>
                                     {result?.customPoints !== undefined && result?.customPoints !== null
                                       ? result.customPoints
@@ -1249,20 +1270,17 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                                   </span>
                                 ) : (
                                   <>
-                                    {/* Diagonal line from bottom-left to top-right */}
                                     <div
                                       className="absolute inset-0 pointer-events-none"
                                       style={{
                                         background: `linear-gradient(to top right, transparent calc(50% - 0.5px), ${darkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)'} calc(50% - 0.5px), ${darkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.4)'} calc(50% + 0.5px), transparent calc(50% + 0.5px))`
                                       }}
                                     />
-                                    {/* Handicap in top-right */}
                                     <span
                                       className={`absolute top-0.5 right-1 text-[10px] text-slate-400 font-semibold ${isDropped ? 'opacity-30' : 'opacity-70'}`}
                                     >
                                       {raceHandicap !== null ? `${raceHandicap}s` : ''}
                                     </span>
-                                    {/* Points in bottom-left (show points for WDN too) */}
                                     <span className={`absolute bottom-0.5 left-1 text-white font-bold ${isDropped ? 'line-through opacity-50' : ''}`}>
                                       {result?.letterScore === 'WDN'
                                         ? (result?.customPoints !== undefined && result?.customPoints !== null
@@ -1486,8 +1504,7 @@ export const RaceTable: React.FC<RaceTableProps> = ({
       {showLetterScoreSelector && (() => {
         const { race, skipperIndex } = showLetterScoreSelector;
 
-        // Get previous race results for average points calculation
-        const skipperPreviousResults: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number }> = [];
+        const skipperPreviousResults: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number; raceNumber?: number }> = [];
 
         for (let r = 1; r < race; r++) {
           const result = currentEvent.raceResults?.[r]?.[skipperIndex];
@@ -1496,16 +1513,12 @@ export const RaceTable: React.FC<RaceTableProps> = ({
             const letterScore = result.letterScore;
             const customPoints = result.customPoints;
 
-            // Get the points for this race
             let points = 0;
             if (letterScore === 'RDG' || letterScore === 'DPI') {
-              points = customPoints || 0;
+              points = (customPoints && customPoints > 0) ? customPoints : 0;
             } else if (position !== null && position > 0) {
               points = position;
             } else if (letterScore) {
-              // Calculate letter score points
-              const numFinishers = currentEvent.raceResults?.[r]?.filter((res: any) => res.position).length || 0;
-              const totalCompetitors = skippers.length;
               points = getLetterScorePoints(letterScore as LetterScore, r);
             }
 
@@ -1513,10 +1526,13 @@ export const RaceTable: React.FC<RaceTableProps> = ({
               position,
               letterScore,
               customPoints,
-              points
+              points,
+              raceNumber: r
             });
           }
         }
+
+        const rtHasCompleted = skipperPreviousResults.some(r => r.position !== null && r.position > 0);
 
         return (
           <LetterScoreSelector
@@ -1528,6 +1544,10 @@ export const RaceTable: React.FC<RaceTableProps> = ({
             raceNumber={race}
             darkMode={darkMode}
             skipperPreviousResults={skipperPreviousResults}
+            hasCompletedRaces={rtHasCompleted}
+            isMultiDay={currentEvent?.multiDay}
+            numberOfDays={currentEvent?.numberOfDays}
+            currentDay={currentEvent?.currentDay}
           />
         );
       })()}

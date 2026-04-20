@@ -84,6 +84,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   const [scoringMode, setScoringMode] = useState<'pro' | 'touch' | 'spreadsheet'>('pro');
   const [nationalAssociationId, setNationalAssociationId] = useState<string | undefined>(undefined);
 
+  const [fleetManagementEnabled, setFleetManagementEnabled] = useState(
+    initialHeatManagement?.configuration.fleetManagementEnabled ?? true
+  );
+
   // Observer settings
   const [enableObservers, setEnableObservers] = useState(currentEvent?.enable_observers ?? true);
   const [observersPerHeat, setObserversPerHeat] = useState(currentEvent?.observers_per_heat ?? 2);
@@ -195,6 +199,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   useEffect(() => {
     setCurrentHeatManagement(initialHeatManagement);
     setIsHeatRacingEnabled(initialHeatManagement?.configuration.enabled || false);
+    setFleetManagementEnabled(initialHeatManagement?.configuration.fleetManagementEnabled ?? true);
   }, [initialHeatManagement, isOpen]);
 
   // Calculate optimal heats automatically based on skipper count
@@ -511,7 +516,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         seedingMethod: 'manual' as SeedingMethod,
         autoAssign: false,
         scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
-        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {})
+        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
+        fleetManagementEnabled
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
@@ -577,7 +583,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         autoAssign: false,
         scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
         ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
-        ...(rankedSkipperIndices && rankedSkipperIndices.length > 0 ? { rankedSkipperIndices } : {})
+        ...(rankedSkipperIndices && rankedSkipperIndices.length > 0 ? { rankedSkipperIndices } : {}),
+        fleetManagementEnabled
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
@@ -798,7 +805,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               seedingMethod,
               autoAssign: initialAssignment === 'random',
               scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
-        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {})
+              ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
+              fleetManagementEnabled
             },
             currentRound: 1,
             currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
@@ -813,7 +821,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             seedingMethod,
             autoAssign: initialAssignment === 'random',
             scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
-            ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {})
+            ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
+            fleetManagementEnabled
           };
 
           const hasResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
@@ -914,7 +923,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             seedingMethod,
             autoAssign: initialAssignment === 'random',
             scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
-        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {})
+            ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
+            fleetManagementEnabled
           },
           currentRound: 1,
           currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
@@ -1376,6 +1386,103 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   </div>
                 </div>
 
+                {/* Fleet Management Toggle - HMS only */}
+                {!isSHRS && (
+                  <div className={`p-5 rounded-xl border-2 ${
+                    hasHeatScores
+                      ? 'opacity-60 pointer-events-none'
+                      : ''
+                  } ${
+                    darkMode
+                      ? 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-600'
+                      : 'bg-gradient-to-br from-amber-50 to-slate-50 border-amber-200'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Users size={18} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+                          <label className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            Fleet Management
+                          </label>
+                        </div>
+                        <p className={`text-xs mt-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {fleetManagementEnabled
+                            ? 'Skippers are assigned to heats with automatic promotion/relegation between rounds.'
+                            : 'Manual spreadsheet scoring only. No heat assignments, progression, or observers.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => !hasHeatScores && setFleetManagementEnabled(!fleetManagementEnabled)}
+                        disabled={hasHeatScores}
+                        className={`relative w-14 h-7 rounded-full transition-colors duration-200 shadow-sm flex-shrink-0 ml-4 ${
+                          fleetManagementEnabled ? 'bg-amber-500' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
+                          fleetManagementEnabled ? 'translate-x-8' : 'translate-x-1'
+                        } mt-1`} />
+                      </button>
+                    </div>
+                    {!fleetManagementEnabled && (
+                      <div className="mt-3 space-y-3">
+                        <div className={`text-xs p-3 rounded-lg border ${
+                          darkMode ? 'bg-amber-900/20 text-amber-300 border-amber-700/30' : 'bg-amber-50 text-amber-800 border-amber-200'
+                        }`}>
+                          HMS Spreadsheet mode: All scoring is manual. Enter positions directly into the spreadsheet without heat assignments or skipper progression.
+                        </div>
+                        <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
+                          <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
+                            Promotion / Relegation Count
+                          </div>
+                          <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} mb-3`}>
+                            Number of skippers promoted/relegated between heats each round. Top positions in each heat will be highlighted green.
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setManualPromotionCount(Math.max(1, promotionCount - 1))}
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold transition-colors border-2 ${
+                                promotionCount <= 1
+                                  ? darkMode ? 'bg-slate-800 border-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                  : darkMode ? 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400'
+                              }`}
+                              disabled={promotionCount <= 1}
+                            >
+                              -
+                            </button>
+                            <div className={`flex-1 text-center px-4 py-2 rounded-xl border-2 ${
+                              darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                            }`}>
+                              <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {promotionCount}
+                              </div>
+                              <div className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                boats
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setManualPromotionCount(Math.min(12, promotionCount + 1))}
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold transition-colors border-2 ${
+                                promotionCount >= 12
+                                  ? darkMode ? 'bg-slate-800 border-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                  : darkMode ? 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400'
+                              }`}
+                              disabled={promotionCount >= 12}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Fleet Management sections - hidden when fleet management is disabled for HMS */}
+                {(fleetManagementEnabled || isSHRS) && (
+                <>
                 {/* Automatic Heat Configuration */}
                 <div className={`p-5 rounded-xl border-2 ${
                   hasHeatScores
@@ -1861,6 +1968,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                     </div>
                   )}
                 </div>
+                </>
+                )}
 
                 {/* Roll Call & Spreadsheet Settings */}
                 <div className={`p-5 rounded-xl border-2 space-y-4 ${
@@ -1920,7 +2029,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   )}
                 </div>
 
-                {/* Initial Assignment */}
+                {/* Initial Assignment - only when fleet management is on */}
+                {(fleetManagementEnabled || isSHRS) && (
                 <div className={`space-y-3 ${hasHeatScores ? 'pointer-events-none' : ''}`}>
                   <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     Initial Assignment
@@ -1986,6 +2096,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                     </button>
                   </div>
                 </div>
+                )}
 
 
 

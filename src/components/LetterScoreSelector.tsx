@@ -12,7 +12,13 @@ interface LetterScoreSelectorProps {
   darkMode: boolean;
   skipperName: string;
   raceNumber: number;
-  skipperPreviousResults?: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number }>;
+  skipperPreviousResults?: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number; raceNumber?: number }>;
+  isHeatRacing?: boolean;
+  hasCompletedRaces?: boolean;
+  isMultiDay?: boolean;
+  numberOfDays?: number;
+  currentDay?: number;
+  racesPerDay?: Record<number, number[]>;
 }
 
 const letterScores: { code: LetterScore; name: string; description: string; color: string; scoring: string }[] = [
@@ -45,45 +51,62 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
   darkMode,
   skipperName,
   raceNumber,
-  skipperPreviousResults = []
+  skipperPreviousResults = [],
+  isHeatRacing = false,
+  hasCompletedRaces = false,
+  isMultiDay = false,
+  numberOfDays = 1,
+  currentDay = 1,
+  racesPerDay = {}
 }) => {
   const [selectedLetterScore, setSelectedLetterScore] = useState<LetterScore | null>(null);
   const [showCustomPoints, setShowCustomPoints] = useState(false);
   const [customPoints, setCustomPoints] = useState<string>('');
   const [rdgMode, setRdgMode] = useState<RdgMode>('avg_event');
 
-  const calculateAveragePoints = (): number | null => {
+  const getFilteredResults = (excludeR1ForHeat: boolean, excludeFinalDay: boolean) => {
     if (!skipperPreviousResults || skipperPreviousResults.length === 0) {
-      return null;
+      return [];
     }
 
-    const validResults = skipperPreviousResults.filter(result => {
-      if (result.position !== null && result.position > 0) {
-        return true;
+    let results = [...skipperPreviousResults];
+
+    if (excludeR1ForHeat && isHeatRacing) {
+      results = results.filter(r => r.raceNumber !== 1);
+    }
+
+    if (excludeFinalDay && isMultiDay && numberOfDays > 1) {
+      const finalDayRaces = racesPerDay[numberOfDays] || racesPerDay[currentDay] || [];
+      if (finalDayRaces.length > 0) {
+        results = results.filter(r => !finalDayRaces.includes(r.raceNumber || 0));
       }
-      if ((result.letterScore === 'RDG' || result.letterScore === 'DPI') && result.customPoints) {
-        return true;
-      }
+    }
+
+    return results.filter(result => {
+      if (result.position !== null && result.position > 0) return true;
+      if ((result.letterScore === 'RDG' || result.letterScore === 'DPI') && result.customPoints && result.customPoints > 0) return true;
       return false;
     });
+  };
 
-    if (validResults.length === 0) {
-      return null;
-    }
+  const calculateAveragePoints = (excludeR1ForHeat = false, excludeFinalDay = false): number | null => {
+    const validResults = getFilteredResults(excludeR1ForHeat, excludeFinalDay);
+    if (validResults.length === 0) return null;
 
     const totalPoints = validResults.reduce((sum, result) => sum + result.points, 0);
     const average = totalPoints / validResults.length;
-
     return Math.round(average * 10) / 10;
   };
 
-  const averagePoints = calculateAveragePoints();
+  const averagePoints = calculateAveragePoints(isHeatRacing, false);
+  const penultimateDayAverage = calculateAveragePoints(isHeatRacing, true);
+  const canUseRdgAvg = hasCompletedRaces;
 
   const handleLetterScoreSelect = (letterScore: LetterScore) => {
     if (letterScore === 'RDG') {
       setSelectedLetterScore(letterScore);
       setShowCustomPoints(true);
-      setRdgMode('avg_event');
+      setRdgMode(hasCompletedRaces ? 'avg_event' : 'manual');
     } else if (CUSTOM_POINTS_CODES.includes(letterScore)) {
       setSelectedLetterScore(letterScore);
       setShowCustomPoints(true);
@@ -232,35 +255,44 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                   </label>
 
                   <button
-                    onClick={() => setRdgMode('avg_event')}
+                    onClick={() => canUseRdgAvg && setRdgMode('avg_event')}
+                    disabled={!canUseRdgAvg}
                     className={`
                       w-full p-4 rounded-lg border-2 text-left transition-all mb-3
-                      ${rdgMode === 'avg_event'
-                        ? 'border-green-500 bg-green-500/10'
-                        : darkMode
-                          ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
-                          : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
+                      ${!canUseRdgAvg
+                        ? darkMode
+                          ? 'border-slate-700 bg-slate-800/30 opacity-50 cursor-not-allowed'
+                          : 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
+                        : rdgMode === 'avg_event'
+                          ? 'border-green-500 bg-green-500/10'
+                          : darkMode
+                            ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                            : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
                     `}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            rdgMode === 'avg_event'
-                              ? 'border-green-500 bg-green-500'
-                              : darkMode ? 'border-slate-500' : 'border-slate-400'
+                            !canUseRdgAvg
+                              ? darkMode ? 'border-slate-600' : 'border-slate-300'
+                              : rdgMode === 'avg_event'
+                                ? 'border-green-500 bg-green-500'
+                                : darkMode ? 'border-slate-500' : 'border-slate-400'
                           }`}>
-                            {rdgMode === 'avg_event' && <div className="w-2 h-2 bg-white rounded-full" />}
+                            {rdgMode === 'avg_event' && canUseRdgAvg && <div className="w-2 h-2 bg-white rounded-full" />}
                           </div>
-                          <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            RDG AVG - Average All Races (Default)
+                          <span className={`font-semibold ${!canUseRdgAvg ? (darkMode ? 'text-slate-500' : 'text-slate-400') : darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            RDG AVG - Average All Races {!canUseRdgAvg ? '' : '(Default)'}
                           </span>
                         </div>
                         <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Average of all prior race scores. Recalculated at event completion.
+                          {!canUseRdgAvg
+                            ? `Requires at least 1 completed race${isHeatRacing ? ' (excluding R1)' : ''} before average can be calculated.`
+                            : `Average of all ${isHeatRacing ? 'race scores (excluding R1 per HMS rules)' : 'prior race scores'}. Recalculated at event completion.`}
                         </p>
                       </div>
-                      {averagePoints !== null && (
+                      {canUseRdgAvg && averagePoints !== null && (
                         <div className="text-right ml-3">
                           <div className={`text-lg font-bold ${rdgMode === 'avg_event' ? 'text-green-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                             ~{averagePoints}
@@ -284,21 +316,35 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                           : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
                     `}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        rdgMode === 'avg_penultimate'
-                          ? 'border-amber-500 bg-amber-500'
-                          : darkMode ? 'border-slate-500' : 'border-slate-400'
-                      }`}>
-                        {rdgMode === 'avg_penultimate' && <div className="w-2 h-2 bg-white rounded-full" />}
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            rdgMode === 'avg_penultimate'
+                              ? 'border-amber-500 bg-amber-500'
+                              : darkMode ? 'border-slate-500' : 'border-slate-400'
+                          }`}>
+                            {rdgMode === 'avg_penultimate' && <div className="w-2 h-2 bg-white rounded-full" />}
+                          </div>
+                          <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            RDG REG - Average to Penultimate Day
+                          </span>
+                        </div>
+                        <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          {`Average of all races excluding the final day${isHeatRacing ? ' (R1 excluded per HMS rules)' : ''}. Used for multi-day events.`}
+                        </p>
                       </div>
-                      <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        RDG REG - Average to Penultimate Day
-                      </span>
+                      {penultimateDayAverage !== null && (
+                        <div className="text-right ml-3">
+                          <div className={`text-lg font-bold ${rdgMode === 'avg_penultimate' ? 'text-amber-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            ~{penultimateDayAverage}
+                          </div>
+                          <div className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                            penultimate avg
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Average of all races excluding the final day. Used for multi-day events.
-                    </p>
                   </button>
 
                   <button

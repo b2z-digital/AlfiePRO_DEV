@@ -14,6 +14,7 @@ import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
+import { HmsManualSpreadsheet } from './HmsManualSpreadsheet';
 import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
@@ -34,7 +35,7 @@ interface HeatScoringTableProps {
   onShowCharts: () => void;
   onConfigureHeats: () => void;
   onRaceSettingsChange: (settings: { numRaces: number; dropRules: number[] }) => void;
-  updateRaceResults: (race: number, skipperIndex: number, position: number | null, letterScore?: any, customPoints?: number) => void;
+  updateRaceResults: (race: number, skipperIndex: number, position: number | null, letterScore?: any, customPoints?: number, hmsHeat?: string, hmsPosition?: number) => void;
   raceResults: any[];
   enableRaceEditing: (raceNum: number | null) => void;
   lastCompletedRace: number;
@@ -1037,6 +1038,34 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     loadAllObservers();
     return () => { cancelled = true; };
   }, [heatScoringMode, observerEventId, availableHeats, heatManagement.currentRound, currentEvent?.enable_observers, observerReloadTrigger]);
+
+  const fleetManagementEnabled = heatManagement.configuration.fleetManagementEnabled !== false;
+
+  if (!fleetManagementEnabled) {
+    return (
+      <div className={`flex flex-col ${isFullscreen ? 'h-full' : 'h-[calc(100vh-200px)]'} no-select`}>
+        <HmsManualSpreadsheet
+          skippers={skippers}
+          heatManagement={heatManagement}
+          darkMode={darkMode}
+          raceResults={raceResults}
+          currentEvent={currentEvent}
+          onConfigureHeats={onConfigureHeats}
+          updateRaceResults={updateRaceResults}
+          deleteRaceResult={deleteRaceResult}
+          isFullscreen={isFullscreen}
+          onOpenStartBox={() => setShowStartBoxModal(true)}
+        />
+        <StartBoxModal
+          isOpen={showStartBoxModal}
+          onClose={() => setShowStartBoxModal(false)}
+          onSequenceComplete={() => setRaceTimerRunning(true)}
+          clubId={currentEvent?.clubId || null}
+          darkMode={darkMode}
+        />
+      </div>
+    );
+  }
 
   // Don't render until a heat is selected
   if (!selectedHeat) {

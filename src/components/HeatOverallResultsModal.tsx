@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { X, Trophy } from 'lucide-react';
+import { X, Trophy, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation } from '../types/heat';
 import { convertHeatResultsToRaceResults } from '../utils/heatUtils';
@@ -13,6 +13,7 @@ interface HeatOverallResultsModalProps {
   heatManagement: HeatManagement;
   dropRules: number[];
   darkMode: boolean;
+  externalRaceResults?: any[];
 }
 
 const FLEET_NAMES: Record<string, string> = {
@@ -33,35 +34,102 @@ const FLEET_COLORS: Record<string, { bg: string; text: string; border: string }>
   'F': { bg: 'bg-cyan-500/10', text: 'text-cyan-500', border: 'border-cyan-500' },
 };
 
-export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = ({
-  isOpen,
+class ModalErrorBoundary extends React.Component<
+  { children: React.ReactNode; darkMode: boolean; onClose: () => void },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; darkMode: boolean; onClose: () => void }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('HeatOverallResultsModal error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      const { darkMode, onClose } = this.props;
+      return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-md rounded-xl shadow-xl p-8 text-center ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
+            <AlertTriangle className="mx-auto mb-4 text-amber-500" size={48} />
+            <h2 className={`text-xl font-bold mb-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+              Unable to Display Results
+            </h2>
+            <p className={`text-sm mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              There was an issue calculating the overall results. This can happen when race data is incomplete.
+            </p>
+            {this.state.error && (
+              <p className={`text-xs font-mono mb-4 p-2 rounded ${darkMode ? 'bg-slate-900 text-red-400' : 'bg-slate-100 text-red-600'}`}>
+                {this.state.error.message}
+              </p>
+            )}
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (props) => {
+  if (!props.isOpen) return null;
+
+  return (
+    <ModalErrorBoundary darkMode={props.darkMode} onClose={props.onClose}>
+      <HeatOverallResultsContent {...props} />
+    </ModalErrorBoundary>
+  );
+};
+
+const HeatOverallResultsContent: React.FC<HeatOverallResultsModalProps> = ({
   onClose,
   skippers,
   heatManagement,
   dropRules,
-  darkMode
+  darkMode,
+  externalRaceResults
 }) => {
-  const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
-  const shrsQualifyingRounds = heatManagement.configuration.shrsQualifyingRounds || 0;
+  const isShrs = heatManagement?.configuration?.scoringSystem === 'shrs';
+  const shrsQualifyingRounds = heatManagement?.configuration?.shrsQualifyingRounds || 0;
 
   const raceResults = useMemo(() => {
-    return convertHeatResultsToRaceResults(heatManagement, skippers);
-  }, [heatManagement, skippers]);
+    try {
+      if (externalRaceResults && externalRaceResults.length > 0) return externalRaceResults;
+      if (!heatManagement?.rounds?.length) return [];
+      return convertHeatResultsToRaceResults(heatManagement, skippers);
+    } catch (e) {
+      console.error('Error converting race results:', e);
+      return [];
+    }
+  }, [heatManagement, skippers, externalRaceResults]);
 
   const completedRaces = useMemo(() => {
-    const races = new Set(raceResults.map(r => r.race));
-    return Array.from(races).sort((a, b) => a - b);
+    const races = new Set(raceResults.map((r: any) => r.race));
+    return Array.from(races).sort((a: any, b: any) => a - b) as number[];
   }, [raceResults]);
 
   const skipperFleetMap = useMemo(() => {
     if (!isShrs) return new Map<number, HeatDesignation>();
     const map = new Map<number, HeatDesignation>();
-    const finalsRounds = heatManagement.rounds
+    const rounds = heatManagement?.rounds || [];
+    const finalsRounds = rounds
       .filter(r => r.round > shrsQualifyingRounds && r.completed);
     if (finalsRounds.length === 0) return map;
     const firstFinalsRound = finalsRounds[0];
-    firstFinalsRound.heatAssignments.forEach(assignment => {
-      assignment.skipperIndices.forEach(idx => {
+    (firstFinalsRound.heatAssignments || []).forEach(assignment => {
+      (assignment.skipperIndices || []).forEach(idx => {
         map.set(idx, assignment.heatDesignation);
       });
     });
@@ -71,94 +139,114 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
   const hasFinals = isShrs && skipperFleetMap.size > 0;
 
   const standings = useMemo(() => {
-    const baseStandings = skippers.map((skipper, skipperIndex) => {
-      const skipperRaceResults = raceResults
-        .filter(r => r.skipperIndex === skipperIndex)
-        .sort((a, b) => a.race - b.race);
+    try {
+      if (!skippers || skippers.length === 0 || raceResults.length === 0) return [];
 
-      const points = skipperRaceResults.map(r => r.position || 999);
-      const total = points.reduce((sum, p) => sum + p, 0);
-
-      const sortedPoints = [...points].sort((a, b) => a - b);
-      let drops = 0;
-      for (const rule of dropRules) {
-        if (points.length >= rule) {
-          drops++;
-        }
-      }
-
-      let net = total;
-      const droppedScores: number[] = [];
-      if (drops > 0) {
-        const pointsToDrop = sortedPoints.slice(-drops);
-        droppedScores.push(...pointsToDrop);
-        net = total - pointsToDrop.reduce((sum, p) => sum + p, 0);
-      }
-
-      const droppedRaceIndices = new Set<number>();
-      if (drops > 0) {
-        const indexedScores = points.map((score, idx) => ({ score, idx }));
-        indexedScores.sort((a, b) => b.score - a.score);
-        for (let i = 0; i < drops; i++) {
-          droppedRaceIndices.add(indexedScores[i].idx);
-        }
-      }
-
-      return {
-        skipperIndex,
-        skipper,
-        raceResults: skipperRaceResults,
-        points,
-        total,
-        drops,
-        droppedScores,
-        droppedRaceIndices,
-        net,
-        fleet: skipperFleetMap.get(skipperIndex) || ('Z' as HeatDesignation),
-      };
-    });
-
-    const isHms = !isShrs;
-    const numberOfHeats = heatManagement.configuration.numberOfHeats || 2;
-    const useHMSTieBreak = isHms && numberOfHeats > 1;
-
-    const hmsBreakTieCompare = (a: typeof baseStandings[0], b: typeof baseStandings[0]): number => {
-      const allRaceResults = raceResults.map(r => ({
-        ...r,
-        race: r.race,
-        skipperIndex: r.skipperIndex,
-        position: r.position || null,
-      }));
-      const tieResult = breakTie(
-        [a.skipperIndex, b.skipperIndex],
-        allRaceResults,
-        new Map(),
-        useHMSTieBreak
+      const skipperIndicesWithResults = new Set(
+        raceResults.map((r: any) => r.skipperIndex).filter((idx: any) => idx != null)
       );
-      return tieResult.indexOf(a.skipperIndex) - tieResult.indexOf(b.skipperIndex);
-    };
 
-    if (hasFinals) {
-      return baseStandings.sort((a, b) => {
-        if (a.fleet !== b.fleet) {
-          return a.fleet.localeCompare(b.fleet);
+      const allStandings = Array.from(skipperIndicesWithResults).map((skipperIndex: any) => {
+        const skipper = skippers[skipperIndex];
+        if (!skipper) return null;
+
+        const skipperRaceResults = raceResults
+          .filter((r: any) => r.skipperIndex === skipperIndex)
+          .sort((a: any, b: any) => a.race - b.race);
+
+        const points = skipperRaceResults.map((r: any) => r.position || 999);
+        const total = points.reduce((sum: number, p: number) => sum + p, 0);
+
+        const sortedPoints = [...points].sort((a, b) => a - b);
+        let drops = 0;
+        if (Array.isArray(dropRules)) {
+          for (const rule of dropRules) {
+            if (points.length >= rule) {
+              drops++;
+            }
+          }
         }
-        if (a.net !== b.net) {
-          return a.net - b.net;
+
+        let net = total;
+        const droppedScores: number[] = [];
+        if (drops > 0) {
+          const pointsToDrop = sortedPoints.slice(-drops);
+          droppedScores.push(...pointsToDrop);
+          net = total - pointsToDrop.reduce((sum, p) => sum + p, 0);
         }
-        return compareWithCountback(a.points, b.points, a.drops, b.drops);
+
+        const droppedRaceIndices = new Set<number>();
+        if (drops > 0) {
+          const indexedScores = points.map((score: number, idx: number) => ({ score, idx }));
+          indexedScores.sort((a: any, b: any) => b.score - a.score);
+          for (let i = 0; i < drops && i < indexedScores.length; i++) {
+            droppedRaceIndices.add(indexedScores[i].idx);
+          }
+        }
+
+        return {
+          skipperIndex: skipperIndex as number,
+          skipper,
+          raceResults: skipperRaceResults,
+          points,
+          total,
+          drops,
+          droppedScores,
+          droppedRaceIndices,
+          net,
+          fleet: skipperFleetMap.get(skipperIndex as number) || ('Z' as HeatDesignation),
+        };
+      }).filter(Boolean) as any[];
+
+      const isHms = !isShrs;
+      const numberOfHeats = heatManagement?.configuration?.numberOfHeats || 2;
+      const useHMSTieBreak = isHms && numberOfHeats > 1;
+
+      const hmsBreakTieCompare = (a: any, b: any): number => {
+        try {
+          const allRaceResults = raceResults.map((r: any) => ({
+            ...r,
+            race: r.race,
+            skipperIndex: r.skipperIndex,
+            position: r.position || null,
+          }));
+          const tieResult = breakTie(
+            [a.skipperIndex, b.skipperIndex],
+            allRaceResults,
+            new Map(),
+            useHMSTieBreak
+          );
+          return tieResult.indexOf(a.skipperIndex) - tieResult.indexOf(b.skipperIndex);
+        } catch {
+          return 0;
+        }
+      };
+
+      if (hasFinals) {
+        return allStandings.sort((a: any, b: any) => {
+          if (a.fleet !== b.fleet) return a.fleet.localeCompare(b.fleet);
+          if (a.net !== b.net) return a.net - b.net;
+          try {
+            return compareWithCountback(a.points, b.points, a.drops, b.drops);
+          } catch {
+            return 0;
+          }
+        });
+      }
+
+      return allStandings.sort((a: any, b: any) => {
+        if (a.net !== b.net) return a.net - b.net;
+        if (isHms) return hmsBreakTieCompare(a, b);
+        try {
+          return compareWithCountback(a.points, b.points, a.drops, b.drops);
+        } catch {
+          return 0;
+        }
       });
+    } catch (e) {
+      console.error('Error computing standings:', e);
+      return [];
     }
-
-    return baseStandings.sort((a, b) => {
-      if (a.net !== b.net) {
-        return a.net - b.net;
-      }
-      if (isHms) {
-        return hmsBreakTieCompare(a, b);
-      }
-      return compareWithCountback(a.points, b.points, a.drops, b.drops);
-    });
   }, [skippers, raceResults, dropRules, skipperFleetMap, hasFinals, isShrs, heatManagement]);
 
   const getRaceLabel = (raceNum: number): string => {
@@ -170,8 +258,6 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
   const isFinalsRace = (raceNum: number): boolean => {
     return isShrs && raceNum > shrsQualifyingRounds;
   };
-
-  if (!isOpen) return null;
 
   let currentFleet: HeatDesignation | null = null;
 
@@ -260,9 +346,11 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
                   </tr>
                 </thead>
                 <tbody>
-                  {standings.map((standing, index) => {
+                  {standings.map((standing: any, index: number) => {
+                    if (!standing?.skipper) return null;
+
                     const isTopThree = !hasFinals && index < 3;
-                    const medal = !hasFinals && (index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : null);
+                    const medal = !hasFinals && (index === 0 ? '1st' : index === 1 ? '2nd' : index === 2 ? '3rd' : null);
 
                     let fleetSeparator: React.ReactNode = null;
                     if (hasFinals && standing.fleet !== currentFleet) {
@@ -287,16 +375,16 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
                     }
 
                     const isFleetTopThree = hasFinals && (() => {
-                      const fleetStandings = standings.filter(s => s.fleet === standing.fleet);
+                      const fleetStandings = standings.filter((s: any) => s.fleet === standing.fleet);
                       const posInFleet = fleetStandings.indexOf(standing);
                       return posInFleet < 3;
                     })();
 
                     const fleetMedal = hasFinals && (() => {
-                      const fleetStandings = standings.filter(s => s.fleet === standing.fleet);
+                      const fleetStandings = standings.filter((s: any) => s.fleet === standing.fleet);
                       const posInFleet = fleetStandings.indexOf(standing);
                       if (standing.fleet === 'A') {
-                        return posInFleet === 0 ? '🥇' : posInFleet === 1 ? '🥈' : posInFleet === 2 ? '🥉' : null;
+                        return posInFleet === 0 ? '1st' : posInFleet === 1 ? '2nd' : posInFleet === 2 ? '3rd' : null;
                       }
                       return null;
                     })();
@@ -316,14 +404,7 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
                               ? 'text-yellow-600'
                               : darkMode ? 'text-slate-400' : 'text-slate-600'
                           }`}>
-                            {(medal || fleetMedal) ? (
-                              <span className="flex items-center justify-center gap-1">
-                                {medal || fleetMedal}
-                                <span>{index + 1}</span>
-                              </span>
-                            ) : (
-                              index + 1
-                            )}
+                            {index + 1}
                           </td>
                           {hasFinals && (
                             <td className={`px-3 py-3 text-center text-xs font-semibold ${
@@ -333,18 +414,18 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
                             </td>
                           )}
                           <td className={`px-4 py-3 font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                            {standing.skipper.name}
+                            {standing.skipper?.name || 'Unknown'}
                           </td>
                           <td className={`px-4 py-3 text-center font-mono ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            {standing.skipper.sailNo}
+                            {standing.skipper?.sailNo || standing.skipper?.sailNumber || '-'}
                           </td>
                           <td className={`px-4 py-3 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            {standing.skipper.boatModel}
+                            {standing.skipper?.boatModel || '-'}
                           </td>
-                          {completedRaces.map((race, raceIdx) => {
-                            const result = standing.raceResults.find(r => r.race === race);
+                          {completedRaces.map((race: number, raceIdx: number) => {
+                            const result = standing.raceResults?.find((r: any) => r.race === race);
                             const position = result?.position || '-';
-                            const isDropped = standing.droppedRaceIndices.has(raceIdx);
+                            const isDropped = standing.droppedRaceIndices?.has(raceIdx);
 
                             return (
                               <td
@@ -384,7 +465,8 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
           ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}
         `}>
           <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-            {standings.length} skippers • Drop rules: {dropRules.join(', ')} races
+            {standings.length} skippers
+            {Array.isArray(dropRules) && dropRules.length > 0 && ` • Drop rules: ${dropRules.join(', ')} races`}
             {isShrs && ' • SHR scoring (position within heat)'}
           </div>
           <button

@@ -1369,8 +1369,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
       {/* Letter Score Modal */}
       {selectedSkipperForScore !== null && (() => {
-        // Get previous race results for average points calculation
-        const skipperPreviousResults: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number }> = [];
+        const skipperPreviousResults: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number; raceNumber?: number }> = [];
 
         for (let r = 1; r < currentRace; r++) {
           const result = raceResults.find(res => res.race === r && res.skipperIndex === selectedSkipperForScore);
@@ -1379,14 +1378,12 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             const letterScore = result.letterScore;
             const customPoints = result.customPoints;
 
-            // Get the points for this race
             let points = 0;
             if (letterScore === 'RDG' || letterScore === 'DPI') {
-              points = customPoints || 0;
+              points = (customPoints && customPoints > 0) ? customPoints : 0;
             } else if (position !== null && position > 0) {
               points = position;
             } else if (letterScore) {
-              // Letter scores - use number of starters + 1
               const numStarters = raceResults.filter(res => res.race === r).length;
               points = numStarters + 1;
             }
@@ -1395,10 +1392,13 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
               position,
               letterScore,
               customPoints,
-              points
+              points,
+              raceNumber: r
             });
           }
         }
+
+        const tmHasCompleted = skipperPreviousResults.some(r => r.position !== null && r.position > 0);
 
         return (
           <LetterScoreSelector
@@ -1413,6 +1413,10 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             skipperName={skippers[selectedSkipperForScore]?.name || ''}
             raceNumber={currentRace}
             skipperPreviousResults={skipperPreviousResults}
+            hasCompletedRaces={tmHasCompleted}
+            isMultiDay={currentEvent?.multiDay}
+            numberOfDays={currentEvent?.numberOfDays}
+            currentDay={currentEvent?.currentDay}
           />
         );
       })()}
