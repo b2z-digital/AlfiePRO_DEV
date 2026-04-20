@@ -1387,12 +1387,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 </div>
 
                 {/* Fleet Management Toggle - HMS only */}
-                {!isSHRS && (
+                {!isSHRS && (() => {
+                  const fleetToggleLocked = hasHeatScores || (!fleetManagementEnabled && hasRaceResults);
+                  return (
                   <div className={`p-5 rounded-xl border-2 ${
-                    hasHeatScores
-                      ? 'opacity-60 pointer-events-none'
-                      : ''
-                  } ${
                     darkMode
                       ? 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-600'
                       : 'bg-gradient-to-br from-amber-50 to-slate-50 border-amber-200'
@@ -1404,6 +1402,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                           <label className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             Fleet Management
                           </label>
+                          {fleetToggleLocked && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                              darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-500'
+                            }`}>Locked</span>
+                          )}
                         </div>
                         <p className={`text-xs mt-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           {fleetManagementEnabled
@@ -1413,9 +1416,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                       </div>
                       <button
                         type="button"
-                        onClick={() => !hasHeatScores && setFleetManagementEnabled(!fleetManagementEnabled)}
-                        disabled={hasHeatScores}
+                        onClick={() => !fleetToggleLocked && setFleetManagementEnabled(!fleetManagementEnabled)}
+                        disabled={fleetToggleLocked}
                         className={`relative w-14 h-7 rounded-full transition-colors duration-200 shadow-sm flex-shrink-0 ml-4 ${
+                          fleetToggleLocked ? 'opacity-40 cursor-not-allowed' : ''
+                        } ${
                           fleetManagementEnabled ? 'bg-amber-500' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
@@ -1424,6 +1429,23 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         } mt-1`} />
                       </button>
                     </div>
+                    {!fleetManagementEnabled && hasRaceResults && onClearAllRaceResults && (
+                      <div className={`mt-3 flex items-center gap-3 p-3 rounded-lg border ${
+                        darkMode ? 'bg-red-900/20 border-red-700/30' : 'bg-red-50 border-red-200'
+                      }`}>
+                        <AlertTriangle size={16} className={darkMode ? 'text-red-400' : 'text-red-500'} />
+                        <p className={`text-xs flex-1 ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+                          Scores have been entered. Clear results to re-enable Fleet Management.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowHeatClearConfirmation(true)}
+                          className="px-3 py-1 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors whitespace-nowrap"
+                        >
+                          Clear Results
+                        </button>
+                      </div>
+                    )}
                     {!fleetManagementEnabled && (
                       <div className="mt-3 space-y-3">
                         <div className={`text-xs p-3 rounded-lg border ${
@@ -1478,7 +1500,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                       </div>
                     )}
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Fleet Management sections - hidden when fleet management is disabled for HMS */}
                 {(fleetManagementEnabled || isSHRS) && (
