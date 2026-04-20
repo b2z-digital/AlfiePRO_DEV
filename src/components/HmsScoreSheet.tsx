@@ -14,7 +14,7 @@ interface HmsScoreSheetProps {
 
 const ROW_HEIGHT = 18;
 const COL_W = 34;
-const SEP_W = 3;
+const SEP_W = 6;
 
 const COL_WIDTHS = {
   pos: 50,
@@ -243,18 +243,18 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
             {completedRaces.map(race => (
               <th key={race} className={th} style={{ backgroundColor: '#D3D3D3' }}>{race}</th>
             ))}
-            <th style={{ backgroundColor: '#333', width: SEP_W, padding: 0, borderBottom: '1px solid #9ca3af' }}></th>
+            <th style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></th>
             {Array.from({ length: maxDropCols }).map((_, i) => (
               <th key={`d${i}`} className={th} style={{ backgroundColor: '#FFB6C1' }}>dis {i + 1}</th>
             ))}
-            <th className={th} style={{ backgroundColor: '#FFB6C1' }}>Total Dis</th>
-            <th style={{ backgroundColor: '#333', width: SEP_W, padding: 0, borderBottom: '1px solid #9ca3af' }}></th>
+            <th className={th} style={{ backgroundColor: '#FF9999', fontWeight: 800 }}>Total Dis</th>
+            <th style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></th>
             {Array.from({ length: maxBestCols }).map((_, i) => (
-              <th key={`b${i}`} className={th} style={{ backgroundColor: '#ADD8E6' }}>
+              <th key={`b${i}`} className={th} style={{ backgroundColor: '#87CEEB' }}>
                 {i === 0 ? 'Best' : getOrdinalLabel(i + 1)}
               </th>
             ))}
-            <th style={{ backgroundColor: '#333', width: SEP_W, padding: 0, borderBottom: '1px solid #9ca3af' }}></th>
+            <th style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></th>
             <th className={th} style={{ backgroundColor: '#FFFACD' }}>Avg</th>
             <th className={th} style={{ backgroundColor: '#FFFACD' }}>Races</th>
           </tr>
@@ -304,7 +304,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                   );
                 })}
 
-                <td style={{ backgroundColor: '#333', width: SEP_W, padding: 0, borderBottom: '1px solid #e2e8f0' }}></td>
+                <td style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></td>
 
                 {Array.from({ length: maxDropCols }).map((_, i) => (
                   <td key={`d${i}`} className={td} style={{ backgroundColor: '#D3D3D3', color: '#666' }}>
@@ -312,11 +312,11 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                   </td>
                 ))}
 
-                <td className={td} style={{ backgroundColor: '#D3D3D3', color: '#666', fontWeight: 600 }}>
+                <td className={td} style={{ backgroundColor: '#BEBEBE', color: '#333', fontWeight: 700 }}>
                   {standing.totalDropped > 0 ? fmt1(standing.totalDropped) : ''}
                 </td>
 
-                <td style={{ backgroundColor: '#333', width: SEP_W, padding: 0, borderBottom: '1px solid #e2e8f0' }}></td>
+                <td style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></td>
 
                 {Array.from({ length: maxBestCols }).map((_, i) => (
                   <td key={`b${i}`} className={td} style={{ backgroundColor: '#F0F8FF' }}>
@@ -324,7 +324,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                   </td>
                 ))}
 
-                <td style={{ backgroundColor: '#333', width: SEP_W, padding: 0, borderBottom: '1px solid #e2e8f0' }}></td>
+                <td style={{ backgroundColor: '#222', width: SEP_W, padding: 0, borderBottom: '1px solid #222', borderLeft: '2px solid #222', borderRight: '2px solid #222' }}></td>
 
                 <td className={td} style={{ backgroundColor: '#FFFFF0' }}>
                   {standing.racesScored > 0 ? (standing.net / standing.racesScored).toFixed(1) : ''}
