@@ -51,32 +51,46 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
         for (let race = 1; race <= numRaces; race++) {
           const raceResults = parsedData.results.filter(r => r.raceNumber === race);
           const raceHeats = [...new Set(raceResults.filter(r => r.heat).map(r => r.heat!))].sort();
+          const isSeeding = race === 1 && raceHeats.length > 1;
 
-          let overallPosition = 0;
-          let found = false;
-
-          for (const heat of raceHeats) {
-            const heatResults = raceResults
-              .filter(r => r.heat === heat)
-              .sort((a, b) => (a.position || 999) - (b.position || 999));
-
-            for (const result of heatResults) {
-              if (result.letterScore) continue;
-              overallPosition++;
-              if (result.sailNumber === skipper.sailNumber) {
-                racePoints[race] = overallPosition;
-                found = true;
-                break;
+          if (isSeeding) {
+            const skipperResult = raceResults.find(r => r.sailNumber === skipper.sailNumber);
+            if (skipperResult) {
+              if (skipperResult.letterScore) {
+                const heatResults = raceResults.filter(r => r.heat === skipperResult.heat);
+                const heatFinishers = heatResults.filter(r => !r.letterScore && r.position !== null).length;
+                racePoints[race] = heatFinishers + 1;
+              } else {
+                racePoints[race] = skipperResult.position || 0;
               }
             }
-            if (found) break;
-          }
+          } else {
+            let overallPosition = 0;
+            let found = false;
 
-          if (!found) {
-            const skipperResult = raceResults.find(r => r.sailNumber === skipper.sailNumber);
-            if (skipperResult?.letterScore) {
-              const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null).length;
-              racePoints[race] = totalFinishers + 1;
+            for (const heat of raceHeats) {
+              const heatResults = raceResults
+                .filter(r => r.heat === heat)
+                .sort((a, b) => (a.position || 999) - (b.position || 999));
+
+              for (const result of heatResults) {
+                if (result.letterScore) continue;
+                overallPosition++;
+                if (result.sailNumber === skipper.sailNumber) {
+                  racePoints[race] = overallPosition;
+                  found = true;
+                  break;
+                }
+              }
+              if (found) break;
+            }
+
+            if (!found) {
+              const skipperResult = raceResults.find(r => r.sailNumber === skipper.sailNumber);
+              if (skipperResult?.letterScore) {
+                const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null).length;
+                racePoints[race] = totalFinishers + 1;
+              }
             }
           }
         }

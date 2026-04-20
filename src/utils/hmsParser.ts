@@ -112,15 +112,29 @@ function parseSkippersFromScoreSheet(data: any[][]): ParsedHMSSkipper[] {
 
   console.log(`Score Sheet columns: pos=${posCol} skipper=${skipperCol} sail=${sailCol} club=${clubCol} hull=${hullCol} mya=${myaCol} score=${scoreCol}`);
 
-  const raceColumns: { index: number; raceNumber: number }[] = [];
+  const candidateRaceColumns: { index: number; raceNumber: number }[] = [];
   const coreMaxCol = Math.max(posCol, skipperCol, sailCol, clubCol, hullCol, myaCol, scoreCol);
   headers.forEach((header, index) => {
     if (index <= coreMaxCol) return;
     const cleanHeader = header.replace(/[^\d]/g, '');
     const num = parseInt(cleanHeader);
     if (!isNaN(num) && num > 0 && num < 100) {
-      raceColumns.push({ index, raceNumber: num });
+      candidateRaceColumns.push({ index, raceNumber: num });
     }
+  });
+
+  const raceColumns = candidateRaceColumns.filter(rc => {
+    let hasData = false;
+    for (let checkRow = headerRowIndex + 1; checkRow < Math.min(headerRowIndex + 10, data.length); checkRow++) {
+      const row = data[checkRow];
+      if (!row) continue;
+      const val = String(row[rc.index] || '').trim();
+      if (val && val !== '' && !isNaN(parseFloat(val))) {
+        hasData = true;
+        break;
+      }
+    }
+    return hasData;
   });
 
   const skipLabels = ['sort', 'filter', 'header', 'total', 'count', 'sum', 'average', 'program', 'options'];
@@ -381,6 +395,31 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
       raceColumns.push({ startCol: col, raceNumber: raceNum });
     }
   }
+
+  if (raceColumns.length === 0) {
+    return results;
+  }
+
+  const validatedRaceColumns: typeof raceColumns = [];
+  for (const rc of raceColumns) {
+    let hasValidData = false;
+    for (let checkRow = headerRowIndex + 1; checkRow < Math.min(headerRowIndex + 40, data.length); checkRow++) {
+      const row = data[checkRow];
+      if (!row) continue;
+      const cellVal = String(row[rc.startCol] || '').trim();
+      if (cellVal && /^\d+$/.test(cellVal) && parseInt(cellVal) > 0) {
+        hasValidData = true;
+        break;
+      }
+    }
+    if (hasValidData) {
+      validatedRaceColumns.push(rc);
+    } else {
+      console.log(`Discarding race column RO${rc.raceNumber} at col ${rc.startCol} - no valid sail numbers in data rows`);
+    }
+  }
+
+  raceColumns = validatedRaceColumns;
 
   if (raceColumns.length === 0) {
     return results;
