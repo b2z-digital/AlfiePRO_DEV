@@ -699,6 +699,32 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
   }, [handleSailNumberBlur]);
 
+  const getExpBasedScore = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
+    const hasSail = !!cell?.sailNumber?.trim();
+    if (!hasSail) return '';
+
+    const isPromoted = heat !== 'A' && race > 1 && position <= promotionCount;
+    if (isPromoted) return '#N/A';
+
+    if (cell?.letterScore) {
+      if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
+      if (cell.customPoints === -1) return 'AVG';
+      return getLetterScorePoints(heat, race, cell.letterScore);
+    }
+
+    const okAbove = getOkCountAbovePosition(heat, position, race);
+    if (race === 1 || heat === 'A') {
+      return okAbove + 1;
+    }
+
+    let offset = 0;
+    const heatIdx = HEAT_LABELS.indexOf(heat);
+    for (let i = 0; i < heatIdx; i++) {
+      offset += getHeatNonLetterNonPromotedCount(HEAT_LABELS[i], race);
+    }
+    return offset + okAbove + 1;
+  }, [promotionCount, getLetterScorePoints, getOkCountAbovePosition, getHeatNonLetterNonPromotedCount]);
+
   const overallRaceResults = useMemo(() => {
     const results: any[] = [];
     const seenSkipperRaces = new Set<string>();
@@ -717,7 +743,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           if (seenSkipperRaces.has(skipperRaceKey)) continue;
           seenSkipperRaces.add(skipperRaceKey);
 
-          const pts = getPointsForCell(heat, position, race, cell);
+          const pts = getExpBasedScore(heat, position, race, cell);
           if (pts === '' || pts === '#N/A') continue;
 
           results.push({
@@ -730,7 +756,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       }
     }
     return results;
-  }, [cells, heats, maxPositions, promotionCount, getPointsForCell]);
+  }, [cells, heats, maxPositions, promotionCount, getExpBasedScore]);
 
   const raceSeparator = 'border-l-2 border-l-slate-400';
 
