@@ -588,14 +588,26 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   const SEVERE_LETTER_SCORES: LetterScore[] = ['UFD', 'BFD', 'DSQ', 'DNE', 'WDN'];
 
   const getLetterScorePoints = useCallback((heat: HeatDesignation, race: number, ls: LetterScore): number => {
-    if (race === 1) {
-      return getLargestHeatEntryCount(race) + 1;
-    }
     if (SEVERE_LETTER_SCORES.includes(ls)) {
+      if (race === 1) {
+        return getLargestHeatEntryCount(race) + 1;
+      }
       return getTotalNonPromotedFleet(race) + 1;
     }
-    return getMaxExpForHeat(heat, race);
-  }, [getLargestHeatEntryCount, getTotalNonPromotedFleet, getMaxExpForHeat]);
+    if (race === 1) {
+      return getLargestHeatEntryCount(race);
+    }
+    const entries = getHeatEntryCount(heat, race);
+    if (entries === 0) {
+      return getTotalNonPromotedFleet(race);
+    }
+    if (heat === 'A') {
+      return entries;
+    }
+    const offset = getHeatOffset(heat, race);
+    const nonPromoted = Math.max(0, entries - promotionCount);
+    return offset + nonPromoted;
+  }, [getLargestHeatEntryCount, getTotalNonPromotedFleet, getHeatEntryCount, getHeatOffset, promotionCount]);
 
   const getPointsForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();

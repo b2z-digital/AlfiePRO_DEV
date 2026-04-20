@@ -441,14 +441,14 @@ const HeatOverallResultsContent: React.FC<HeatOverallResultsModalProps> = ({
                             );
                           })}
                           <td className={`px-4 py-3 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            {standing.total}
+                            {Number.isFinite(standing.total) ? Number(standing.total).toFixed(1) : standing.total}
                           </td>
                           <td className={`px-4 py-3 text-center font-bold bg-blue-500/10 ${
                             (isTopThree || isFleetTopThree)
                               ? 'text-yellow-600'
                               : darkMode ? 'text-blue-400' : 'text-blue-700'
                           }`}>
-                            {standing.net}
+                            {Number.isFinite(standing.net) ? Number(standing.net).toFixed(1) : standing.net}
                           </td>
                         </tr>
                       </React.Fragment>
