@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { Skipper } from '../types';
 import { HeatDesignation, HeatManagement } from '../types/heat';
 import { RaceEvent } from '../types/race';
-import { LetterScore } from '../types/letterScores';
+import { LetterScore, isEntrantsPlusOne } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer, Trophy, TableProperties } from 'lucide-react';
 import { useNotification } from '../contexts/NotificationContext';
@@ -585,14 +585,9 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return offset + regularCount;
   }, [getHeatOffset, getHeatEntryCount, getHeatNonLetterNonPromotedCount]);
 
-  const SEVERE_LETTER_SCORES: LetterScore[] = ['UFD', 'BFD', 'DSQ', 'DNE', 'WDN'];
-
   const getLetterScorePoints = useCallback((heat: HeatDesignation, race: number, ls: LetterScore): number => {
-    if (SEVERE_LETTER_SCORES.includes(ls)) {
-      if (race === 1) {
-        return getLargestHeatEntryCount(race) + 1;
-      }
-      return getTotalNonPromotedFleet(race) + 1;
+    if (isEntrantsPlusOne(ls)) {
+      return skippers.length + 1;
     }
     if (race === 1) {
       return getLargestHeatEntryCount(race) + 1;
@@ -607,7 +602,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const offset = getHeatOffset(heat, race);
     const nonPromoted = Math.max(0, entries - promotionCount);
     return offset + nonPromoted + 1;
-  }, [getLargestHeatEntryCount, getTotalNonPromotedFleet, getHeatEntryCount, getHeatOffset, promotionCount]);
+  }, [skippers.length, getLargestHeatEntryCount, getTotalNonPromotedFleet, getHeatEntryCount, getHeatOffset, promotionCount]);
 
   const getPointsForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();
