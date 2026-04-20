@@ -342,6 +342,15 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
 
   const scaledColW = COL_W * zoom;
 
+  const frozenWidth = Object.values(scaledColWidths).reduce((a, b) => a + b, 0);
+  const raceColsWidth = completedRaces.length * scaledColW;
+  const dropColsWidth = maxDropCols * scaledColW;
+  const totalDisWidth = (COL_W + 6) * zoom;
+  const bestColsWidth = maxBestCols * scaledColW;
+  const avgWidth = 48 * zoom;
+  const racesWidth = 38 * zoom;
+  const tableMinWidth = frozenWidth + raceColsWidth + dropColsWidth + totalDisWidth + bestColsWidth + avgWidth + racesWidth;
+
   return (
     <div className="h-full flex flex-col bg-white text-black">
       <div className="flex items-center gap-2 px-2 py-1 border-b border-slate-200 bg-slate-50 shrink-0">
@@ -389,7 +398,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
         </button>
       </div>
       <div ref={tableRef} className="flex-1 overflow-auto">
-        <table className="border-collapse" style={{ tableLayout: 'fixed' }}>
+        <table className="border-collapse" style={{ tableLayout: 'fixed', minWidth: tableMinWidth }}>
           <colgroup>
             <col style={{ width: scaledColWidths.pos }} />
             <col style={{ width: scaledColWidths.skipper }} />
