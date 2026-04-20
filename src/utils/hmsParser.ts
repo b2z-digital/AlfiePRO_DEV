@@ -359,8 +359,7 @@ function parseHeatScoringFromSheet(data: any[][], sheetName: string): ParsedHMSR
       const isNormalFinish = !comment || upperComment === 'OK' || upperComment === 'L' || upperComment === 'UP';
       const isRedressFixed = upperComment === 'RDGFIX' || upperComment === 'RDG FIX' || upperComment === 'RDGF';
       const isRedressAverage = upperComment === 'RDGAVE' || upperComment === 'RDG AVE' || upperComment === 'RDGA';
-      const isRedress = isRedressFixed || isRedressAverage;
-      const letterScore = !isNormalFinish && !isRedress ? upperComment : undefined;
+      const letterScore = !isNormalFinish ? (isRedressFixed || isRedressAverage ? 'RDG' : upperComment) : undefined;
 
       results.push({
         raceNumber,
@@ -369,7 +368,8 @@ function parseHeatScoringFromSheet(data: any[][], sheetName: string): ParsedHMSR
         position: letterScore ? null : position,
         points,
         letterScore,
-        comment: comment || undefined
+        comment: comment || undefined,
+        customPoints: isRedressFixed ? points : (isRedressAverage ? -1 : undefined),
       });
     }
   }
@@ -513,8 +513,7 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
       const isNormalFinish = !comment || upperComment === 'OK' || upperComment === 'L' || upperComment === 'UP';
       const isRedressFixed = upperComment === 'RDGFIX' || upperComment === 'RDG FIX' || upperComment === 'RDGF';
       const isRedressAverage = upperComment === 'RDGAVE' || upperComment === 'RDG AVE' || upperComment === 'RDGA';
-      const isRedress = isRedressFixed || isRedressAverage;
-      const letterScore = !isNormalFinish && !isRedress ? upperComment : undefined;
+      const letterScore = !isNormalFinish ? (isRedressFixed || isRedressAverage ? 'RDG' : upperComment) : undefined;
 
       results.push({
         raceNumber,
@@ -523,7 +522,8 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
         position: letterScore ? null : position,
         points,
         letterScore,
-        comment: comment || undefined
+        comment: comment || undefined,
+        customPoints: isRedressFixed ? points : (isRedressAverage ? -1 : undefined),
       });
     });
   }

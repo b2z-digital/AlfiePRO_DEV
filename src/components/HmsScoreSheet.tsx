@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useRef, useState } from 'react';
-import { Download, Image, ZoomIn, ZoomOut } from 'lucide-react';
+import { Download, Image, ZoomIn, ZoomOut, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ShieldCheck } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement } from '../types/heat';
 import { convertHeatResultsToRaceResults } from '../utils/heatUtils';
@@ -180,6 +180,41 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
     return Math.min(Math.max(maxActual, 1), 10);
   }, [standings]);
 
+  const hmsVerification = useMemo(() => {
+    const hasHmsPoints = raceResults.some((r: any) => r.hmsPoints != null && r.hmsPoints > 0);
+    if (!hasHmsPoints) return null;
+
+    const hmsLookup = new Map<string, number>();
+    raceResults.forEach((r: any) => {
+      if (r.hmsPoints != null && r.hmsPoints > 0) {
+        hmsLookup.set(`${r.skipperIndex}-${r.race}`, r.hmsPoints);
+      }
+    });
+
+    let matched = 0;
+    let mismatched = 0;
+    let total = 0;
+    const mismatches: { skipperIndex: number; race: number; alfie: number; hms: number }[] = [];
+
+    standings.forEach((s: any) => {
+      s.raceResults?.forEach((r: any) => {
+        const key = `${s.skipperIndex}-${r.race}`;
+        const hmsVal = hmsLookup.get(key);
+        if (hmsVal == null) return;
+        total++;
+        const alfieVal = r.position;
+        if (alfieVal != null && Math.abs(alfieVal - hmsVal) < 0.01) {
+          matched++;
+        } else {
+          mismatched++;
+          mismatches.push({ skipperIndex: s.skipperIndex, race: r.race, alfie: alfieVal, hms: hmsVal });
+        }
+      });
+    });
+
+    return { matched, mismatched, total, mismatches, hmsLookup };
+  }, [raceResults, standings]);
+
   const getSailNo = useCallback((skipper: any) => {
     return skipper?.sailNo || skipper?.sailNumber || skipper?.boat_sail_number || '-';
   }, []);
@@ -353,6 +388,31 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-white text-black">
+      {hmsVerification && (
+        <div className={`flex items-center gap-2 px-2 py-1 border-b shrink-0 ${
+          hmsVerification.mismatched === 0
+            ? 'bg-emerald-50 border-emerald-200'
+            : 'bg-amber-50 border-amber-200'
+        }`}>
+          {hmsVerification.mismatched === 0 ? (
+            <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
+          ) : (
+            <AlertCircle size={14} className="text-amber-600 shrink-0" />
+          )}
+          <span className="text-[10px] font-medium">
+            {hmsVerification.mismatched === 0 ? (
+              <span className="text-emerald-700">
+                HMS Verified: All {hmsVerification.total} race scores match the original HMS file
+              </span>
+            ) : (
+              <span className="text-amber-700">
+                HMS Comparison: {hmsVerification.matched}/{hmsVerification.total} scores match
+                {' '}&bull;{' '}{hmsVerification.mismatched} discrepancies
+              </span>
+            )}
+          </span>
+        </div>
+      )}
       <div className="flex items-center gap-2 px-2 py-1 border-b border-slate-200 bg-slate-50 shrink-0">
         <span className="text-[10px] text-slate-500 mr-auto">
           {standings.length} skippers &bull; {completedRaces.length} races &bull; {dropScheduleText}
@@ -504,13 +564,31 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                     const position = result?.position;
                     const isDropped = standing.droppedRaceIndices?.has(raceIdx);
                     const isLast = raceIdx === completedRaces.length - 1;
+
+                    let verifyBg = '';
+                    let verifyTitle = '';
+                    if (hmsVerification && position != null) {
+                      const hmsVal = hmsVerification.hmsLookup.get(`${standing.skipperIndex}-${race}`);
+                      if (hmsVal != null) {
+                        if (Math.abs(position - hmsVal) < 0.01) {
+                          verifyBg = isDropped ? '#b8d4b8' : '#d4edda';
+                          verifyTitle = `HMS: ${hmsVal} = Match`;
+                        } else {
+                          verifyBg = '#f8d7da';
+                          verifyTitle = `HMS: ${hmsVal} vs AlfiePRO: ${fmt1(position)}`;
+                        }
+                      }
+                    }
+
                     return (
                       <td
                         key={race}
                         className={td}
+                        title={verifyTitle || undefined}
                         style={{
                           fontSize: 10 * zoom,
-                          ...(isDropped ? { backgroundColor: '#D3D3D3', color: '#666' } : {}),
+                          backgroundColor: verifyBg || (isDropped ? '#D3D3D3' : undefined),
+                          color: isDropped && !verifyBg ? '#666' : undefined,
                           ...(isLast ? { borderRight: SECTION_BORDER } : {}),
                         }}
                       >

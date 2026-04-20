@@ -117,7 +117,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
           race: raceNum,
           round: raceNum,
           markedAsUP: isUp,
-          customPoints: hr.letterScore ? undefined : undefined,
+          customPoints: hr.customPoints,
         });
       }
 
@@ -182,7 +182,8 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
         hmsHeat: result.heat as HeatDesignation,
         hmsPosition: hmsPosition || result.position,
         hmsSailNumber: result.sailNumber,
-        customPoints: undefined,
+        hmsPoints: result.points,
+        customPoints: result.customPoints,
       });
     }
 

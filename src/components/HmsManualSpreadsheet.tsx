@@ -28,6 +28,7 @@ interface CellData {
   points: string;
   letterScore?: LetterScore | null;
   customPoints?: number;
+  hmsPoints?: number;
   skipperIndex?: number | null;
   isValid?: boolean;
   isDuplicate?: boolean;
@@ -102,7 +103,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [resetConfirmRace, setResetConfirmRace] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'races' | 'scoresheet'>('races');
+  const hasHmsImport = raceResults.some((r: any) => r.hmsPoints != null && r.hmsPoints > 0);
+  const [activeTab, setActiveTab] = useState<'races' | 'scoresheet'>(hasHmsImport ? 'scoresheet' : 'races');
   const [showLetterScoreModal, setShowLetterScoreModal] = useState(false);
   const [letterScoreTarget, setLetterScoreTarget] = useState<{
     heat: HeatDesignation;
@@ -155,6 +157,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             points: result.letterScore ? '' : (result.position?.toString() || ''),
             letterScore: result.letterScore || null,
             customPoints: result.customPoints,
+            hmsPoints: result.hmsPoints,
             skipperIndex: result.skipperIndex,
             isValid: true,
             isDuplicate: false,
@@ -754,6 +757,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             skipperIndex: cell.skipperIndex,
             position: typeof pts === 'number' ? pts : parseInt(String(pts), 10) || 999,
             letterScore: cell.letterScore || undefined,
+            hmsPoints: cell.hmsPoints,
           });
         }
       }
