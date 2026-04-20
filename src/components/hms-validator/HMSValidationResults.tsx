@@ -46,6 +46,68 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
     return 0;
   }, [completedRaces]);
 
+  const isRedressComment = (comment?: string): boolean => {
+    if (!comment) return false;
+    const upper = comment.toUpperCase();
+    return upper === 'RDGFIX' || upper === 'RDG FIX' || upper === 'RDGF' ||
+           upper === 'RDGAVE' || upper === 'RDG AVE' || upper === 'RDGA';
+  };
+
+  const isRedressAverage = (comment?: string): boolean => {
+    if (!comment) return false;
+    const upper = comment.toUpperCase();
+    return upper === 'RDGAVE' || upper === 'RDG AVE' || upper === 'RDGA';
+  };
+
+  const isRedressFixed = (comment?: string): boolean => {
+    if (!comment) return false;
+    const upper = comment.toUpperCase();
+    return upper === 'RDGFIX' || upper === 'RDG FIX' || upper === 'RDGF';
+  };
+
+  const computeFleetBoardPoints = (
+    skipper: { sailNumber: string },
+    race: number,
+    raceResults: typeof parsedData extends { results: infer R } ? (R extends (infer T)[] ? T[] : never) : never,
+    raceHeats: string[],
+    isSeeding: boolean,
+    allRacePoints: { [raceNumber: number]: number }
+  ): number | undefined => {
+    const skipperResult = raceResults.find((r: any) => r.sailNumber === skipper.sailNumber);
+    if (!skipperResult) return undefined;
+
+    if (isRedressFixed(skipperResult.comment)) {
+      return skipperResult.points;
+    }
+
+    if (isRedressAverage(skipperResult.comment)) {
+      const otherScores = Object.entries(allRacePoints)
+        .filter(([rn]) => parseInt(rn) !== race && parseInt(rn) >= 2)
+        .map(([, pts]) => pts);
+      if (otherScores.length > 0) {
+        const avg = otherScores.reduce((s, v) => s + v, 0) / otherScores.length;
+        return Math.round(avg * 10) / 10;
+      }
+      return skipperResult.points;
+    }
+
+    if (skipperResult.letterScore) {
+      if (isSeeding) {
+        const heatResults = raceResults.filter((r: any) => r.heat === skipperResult.heat);
+        const heatFinishers = heatResults.filter((r: any) => !r.letterScore && r.position !== null).length;
+        return heatFinishers + 1;
+      }
+      const totalFinishers = raceResults.filter((r: any) => !r.letterScore && r.position !== null).length;
+      return totalFinishers + 1;
+    }
+
+    if (isSeeding) {
+      return skipperResult.position || 0;
+    }
+
+    return undefined;
+  };
+
   const fleetBoard = useMemo((): FleetBoardEntry[] => {
     if (!parsedData?.skippers || !parsedData?.results) return [];
 
@@ -54,22 +116,34 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
     for (const skipper of parsedData.skippers) {
       const racePoints: { [raceNumber: number]: number } = {};
 
-      if (hasHeats) {
-        for (let race = 1; race <= numRaces; race++) {
-          const raceResults = parsedData.results.filter(r => r.raceNumber === race);
+      for (let race = 1; race <= numRaces; race++) {
+        const raceResults = parsedData.results.filter(r => r.raceNumber === race);
+        if (raceResults.length === 0) continue;
+
+        const skipperResult = raceResults.find(r => r.sailNumber === skipper.sailNumber);
+        if (!skipperResult) continue;
+
+        if (isRedressFixed(skipperResult.comment)) {
+          racePoints[race] = skipperResult.points;
+          continue;
+        }
+
+        if (isRedressAverage(skipperResult.comment)) {
+          racePoints[race] = -1;
+          continue;
+        }
+
+        if (hasHeats) {
           const raceHeats = [...new Set(raceResults.filter(r => r.heat).map(r => r.heat!))].sort();
           const isSeeding = race === 1 && raceHeats.length > 1;
 
           if (isSeeding) {
-            const skipperResult = raceResults.find(r => r.sailNumber === skipper.sailNumber);
-            if (skipperResult) {
-              if (skipperResult.letterScore) {
-                const heatResults = raceResults.filter(r => r.heat === skipperResult.heat);
-                const heatFinishers = heatResults.filter(r => !r.letterScore && r.position !== null).length;
-                racePoints[race] = heatFinishers + 1;
-              } else {
-                racePoints[race] = skipperResult.position || 0;
-              }
+            if (skipperResult.letterScore) {
+              const heatResults = raceResults.filter(r => r.heat === skipperResult.heat);
+              const heatFinishers = heatResults.filter(r => !r.letterScore && r.position !== null).length;
+              racePoints[race] = heatFinishers + 1;
+            } else {
+              racePoints[race] = skipperResult.position || 0;
             }
           } else {
             let overallPosition = 0;
@@ -81,7 +155,7 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
                 .sort((a, b) => (a.position || 999) - (b.position || 999));
 
               for (const result of heatResults) {
-                if (result.letterScore) continue;
+                if (result.letterScore || isRedressComment(result.comment)) continue;
                 overallPosition++;
                 if (result.sailNumber === skipper.sailNumber) {
                   racePoints[race] = overallPosition;
@@ -93,28 +167,36 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
             }
 
             if (!found) {
-              const skipperResult = raceResults.find(r => r.sailNumber === skipper.sailNumber);
-              if (skipperResult?.letterScore) {
+              if (skipperResult.letterScore) {
                 const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null).length;
                 racePoints[race] = totalFinishers + 1;
               }
             }
           }
+        } else {
+          if (skipperResult.letterScore) {
+            const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null).length;
+            racePoints[race] = totalFinishers + 1;
+          } else {
+            racePoints[race] = skipperResult.position || 0;
+          }
         }
-      } else {
-        for (let race = 1; race <= numRaces; race++) {
-          const raceResults = parsedData.results
-            .filter(r => r.raceNumber === race)
-            .sort((a, b) => (a.position || 999) - (b.position || 999));
+      }
 
-          const skipperResult = raceResults.find(r => r.sailNumber === skipper.sailNumber);
-          if (skipperResult) {
-            if (skipperResult.letterScore) {
-              const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null).length;
-              racePoints[race] = totalFinishers + 1;
-            } else {
-              racePoints[race] = skipperResult.position || 0;
-            }
+      for (const [raceStr, pts] of Object.entries(racePoints)) {
+        if (pts === -1) {
+          const raceNum = parseInt(raceStr);
+          const otherScores = Object.entries(racePoints)
+            .filter(([rn, v]) => parseInt(rn) !== raceNum && parseInt(rn) >= 2 && v !== -1)
+            .map(([, v]) => v);
+          if (otherScores.length > 0) {
+            const avg = otherScores.reduce((s, v) => s + v, 0) / otherScores.length;
+            racePoints[raceNum] = Math.round(avg * 10) / 10;
+          } else {
+            const skipperResult = parsedData.results.find(
+              r => r.raceNumber === raceNum && r.sailNumber === skipper.sailNumber
+            );
+            racePoints[raceNum] = skipperResult?.points || 0;
           }
         }
       }

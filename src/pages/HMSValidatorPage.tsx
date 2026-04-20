@@ -44,9 +44,26 @@ export const HMSValidatorPage: React.FC = () => {
     return 0;
   };
 
+  const isRedressFixed = (comment?: string): boolean => {
+    if (!comment) return false;
+    const upper = comment.toUpperCase();
+    return upper === 'RDGFIX' || upper === 'RDG FIX' || upper === 'RDGF';
+  };
+
+  const isRedressAverage = (comment?: string): boolean => {
+    if (!comment) return false;
+    const upper = comment.toUpperCase();
+    return upper === 'RDGAVE' || upper === 'RDG AVE' || upper === 'RDGA';
+  };
+
+  const isRedressComment = (comment?: string): boolean => {
+    return isRedressFixed(comment) || isRedressAverage(comment);
+  };
+
   const runValidation = (data: ParsedHMSData): ValidationResult => {
     const { skippers, results, numRaces, hasHeats } = data;
-    const completedRaces = new Set(results.map(r => r.raceNumber)).size;
+    const completedRaceNumbers = [...new Set(results.map(r => r.raceNumber))].sort((a, b) => a - b);
+    const completedRaces = completedRaceNumbers.length;
     const dropsAllowed = computeDropsAllowed(completedRaces);
     const discrepancies: ValidationDiscrepancy[] = [];
 
@@ -57,21 +74,32 @@ export const HMSValidatorPage: React.FC = () => {
 
       for (let race = 1; race <= numRaces; race++) {
         const raceResults = results.filter(r => r.raceNumber === race);
+        if (raceResults.length === 0) continue;
+
+        const skipperResult = raceResults.find(r => r.sailNumber === skipper.sailNumber);
+        if (!skipperResult) continue;
+
+        if (isRedressFixed(skipperResult.comment)) {
+          racePoints[race] = skipperResult.points;
+          continue;
+        }
+
+        if (isRedressAverage(skipperResult.comment)) {
+          racePoints[race] = -1;
+          continue;
+        }
 
         if (hasHeats) {
           const raceHeats = [...new Set(raceResults.filter(r => r.heat).map(r => r.heat!))].sort();
           const isSeeding = race === 1 && raceHeats.length > 1;
 
           if (isSeeding) {
-            const skipperResult = raceResults.find(r => r.sailNumber === skipper.sailNumber);
-            if (skipperResult) {
-              if (skipperResult.letterScore) {
-                const heatResults = raceResults.filter(r => r.heat === skipperResult.heat);
-                const heatFinishers = heatResults.filter(r => !r.letterScore && r.position !== null).length;
-                racePoints[race] = heatFinishers + 1;
-              } else {
-                racePoints[race] = skipperResult.position || 0;
-              }
+            if (skipperResult.letterScore) {
+              const heatResults = raceResults.filter(r => r.heat === skipperResult.heat);
+              const heatFinishers = heatResults.filter(r => !r.letterScore && r.position !== null).length;
+              racePoints[race] = heatFinishers + 1;
+            } else {
+              racePoints[race] = skipperResult.position || 0;
             }
           } else {
             let overallPosition = 0;
@@ -83,7 +111,7 @@ export const HMSValidatorPage: React.FC = () => {
                 .sort((a, b) => (a.position || 999) - (b.position || 999));
 
               for (const result of heatResults) {
-                if (result.letterScore) continue;
+                if (result.letterScore || isRedressComment(result.comment)) continue;
                 overallPosition++;
                 if (result.sailNumber === skipper.sailNumber) {
                   racePoints[race] = overallPosition;
@@ -95,22 +123,36 @@ export const HMSValidatorPage: React.FC = () => {
             }
 
             if (!found) {
-              const skipperResult = raceResults.find(r => r.sailNumber === skipper.sailNumber);
-              if (skipperResult?.letterScore) {
+              if (skipperResult.letterScore) {
                 const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null).length;
                 racePoints[race] = totalFinishers + 1;
               }
             }
           }
         } else {
-          const skipperResult = raceResults.find(r => r.sailNumber === skipper.sailNumber);
-          if (skipperResult) {
-            if (skipperResult.letterScore) {
-              const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null).length;
-              racePoints[race] = totalFinishers + 1;
-            } else {
-              racePoints[race] = skipperResult.position || 0;
-            }
+          if (skipperResult.letterScore) {
+            const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null).length;
+            racePoints[race] = totalFinishers + 1;
+          } else {
+            racePoints[race] = skipperResult.position || 0;
+          }
+        }
+      }
+
+      for (const [raceStr, pts] of Object.entries(racePoints)) {
+        if (pts === -1) {
+          const raceNum = parseInt(raceStr);
+          const otherScores = Object.entries(racePoints)
+            .filter(([rn, v]) => parseInt(rn) !== raceNum && parseInt(rn) >= 2 && v !== -1)
+            .map(([, v]) => v);
+          if (otherScores.length > 0) {
+            const avg = otherScores.reduce((s, v) => s + v, 0) / otherScores.length;
+            racePoints[raceNum] = Math.round(avg * 10) / 10;
+          } else {
+            const skipperResult = results.find(
+              r => r.raceNumber === raceNum && r.sailNumber === skipper.sailNumber
+            );
+            racePoints[raceNum] = skipperResult?.points || 0;
           }
         }
       }
@@ -131,26 +173,73 @@ export const HMSValidatorPage: React.FC = () => {
 
     for (const entry of computedEntries) {
       const hmsSkipper = skippers.find(s => s.sailNumber === entry.sailNumber);
-      if (!hmsSkipper || hmsSkipper.totalScore === undefined) continue;
+      if (!hmsSkipper) continue;
+
+      if (hmsSkipper.totalScore !== undefined) {
+        totalComparisons++;
+        if (Math.abs(hmsSkipper.totalScore - entry.netScore) < 0.5) {
+          matches++;
+        } else {
+          discrepancies.push({
+            sailNumber: entry.sailNumber,
+            skipperName: entry.name,
+            raceNumber: 0,
+            field: 'Net Score',
+            hmsValue: hmsSkipper.totalScore,
+            alfiePROValue: entry.netScore,
+            reason: `HMS net ${hmsSkipper.totalScore} vs computed net ${entry.netScore.toFixed(1)}`
+          });
+        }
+      }
+
+      for (const raceNum of completedRaceNumbers) {
+        const hmsRaceScore = hmsSkipper.raceScores[raceNum.toString()];
+        const computedPts = entry.racePoints[raceNum];
+
+        if (hmsRaceScore !== undefined && computedPts !== undefined) {
+          const hmsVal = typeof hmsRaceScore === 'number' ? hmsRaceScore : parseFloat(String(hmsRaceScore));
+          if (!isNaN(hmsVal)) {
+            totalComparisons++;
+            if (Math.abs(hmsVal - computedPts) < 0.5) {
+              matches++;
+            } else {
+              discrepancies.push({
+                sailNumber: entry.sailNumber,
+                skipperName: entry.name,
+                raceNumber: raceNum,
+                field: 'Race Points',
+                hmsValue: hmsVal,
+                alfiePROValue: computedPts,
+                reason: `Race ${raceNum}: HMS ${hmsVal} vs computed ${computedPts.toFixed(1)}`
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const computedPositions = computedEntries.map((e, idx) => ({ ...e, computedPosition: idx + 1 }));
+    for (const cp of computedPositions) {
+      const hmsSkipper = skippers.find(s => s.sailNumber === cp.sailNumber);
+      if (!hmsSkipper) continue;
 
       totalComparisons++;
-      if (Math.abs(hmsSkipper.totalScore - entry.netScore) < 0.5) {
+      if (hmsSkipper.position === cp.computedPosition) {
         matches++;
       } else {
         discrepancies.push({
-          sailNumber: entry.sailNumber,
-          skipperName: entry.name,
+          sailNumber: cp.sailNumber,
+          skipperName: cp.name,
           raceNumber: 0,
-          field: 'Net Score',
-          hmsValue: hmsSkipper.totalScore,
-          alfiePROValue: entry.netScore,
-          reason: `HMS total ${hmsSkipper.totalScore} vs computed net ${entry.netScore}`
+          field: 'Overall Position',
+          hmsValue: hmsSkipper.position,
+          alfiePROValue: cp.computedPosition,
+          reason: `HMS pos ${hmsSkipper.position} vs computed pos ${cp.computedPosition}`
         });
       }
     }
 
-    const raceValidations = Array.from({ length: numRaces }, (_, i) => {
-      const raceNumber = i + 1;
+    const raceValidations = completedRaceNumbers.map(raceNumber => {
       const raceDisc = discrepancies.filter(d => d.raceNumber === raceNumber);
       const raceComps = skippers.length;
       const raceMatches = raceComps - raceDisc.length;
@@ -172,7 +261,7 @@ export const HMSValidatorPage: React.FC = () => {
       discrepancies,
       raceValidations,
       skippersValidated: skippers.length,
-      racesValidated: numRaces,
+      racesValidated: completedRaces,
       timestamp: new Date()
     };
   };

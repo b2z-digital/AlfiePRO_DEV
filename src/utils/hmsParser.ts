@@ -326,7 +326,12 @@ function parseHeatScoringFromSheet(data: any[][], sheetName: string): ParsedHMSR
         continue;
       }
 
-      const letterScore = comment && comment.toUpperCase() !== 'OK' && comment.toUpperCase() !== 'L' ? comment.toUpperCase() : undefined;
+      const upperComment = comment.toUpperCase();
+      const isNormalFinish = !comment || upperComment === 'OK' || upperComment === 'L' || upperComment === 'UP';
+      const isRedressFixed = upperComment === 'RDGFIX' || upperComment === 'RDG FIX' || upperComment === 'RDGF';
+      const isRedressAverage = upperComment === 'RDGAVE' || upperComment === 'RDG AVE' || upperComment === 'RDGA';
+      const isRedress = isRedressFixed || isRedressAverage;
+      const letterScore = !isNormalFinish && !isRedress ? upperComment : undefined;
 
       results.push({
         raceNumber,
@@ -334,7 +339,8 @@ function parseHeatScoringFromSheet(data: any[][], sheetName: string): ParsedHMSR
         sailNumber,
         position: letterScore ? null : position,
         points,
-        letterScore
+        letterScore,
+        comment: comment || undefined
       });
     }
   }
@@ -474,7 +480,12 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
         return;
       }
 
-      const letterScore = comment && comment.toUpperCase() !== 'OK' && comment.toUpperCase() !== 'L' ? comment.toUpperCase() : undefined;
+      const upperComment = comment.toUpperCase();
+      const isNormalFinish = !comment || upperComment === 'OK' || upperComment === 'L' || upperComment === 'UP';
+      const isRedressFixed = upperComment === 'RDGFIX' || upperComment === 'RDG FIX' || upperComment === 'RDGF';
+      const isRedressAverage = upperComment === 'RDGAVE' || upperComment === 'RDG AVE' || upperComment === 'RDGA';
+      const isRedress = isRedressFixed || isRedressAverage;
+      const letterScore = !isNormalFinish && !isRedress ? upperComment : undefined;
 
       results.push({
         raceNumber,
@@ -482,7 +493,8 @@ function parseColumnarRaceFormat(data: any[][], sheetName: string): ParsedHMSRac
         sailNumber,
         position: letterScore ? null : position,
         points,
-        letterScore
+        letterScore,
+        comment: comment || undefined
       });
     });
   }
