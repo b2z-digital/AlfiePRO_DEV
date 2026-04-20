@@ -6,6 +6,7 @@ import { HMSDataPreview } from '../components/hms-validator/HMSDataPreview';
 import { HMSFieldMapper } from '../components/hms-validator/HMSFieldMapper';
 import { HMSValidationResults } from '../components/hms-validator/HMSValidationResults';
 import { ParsedHMSData, ValidationResult, ValidationDiscrepancy } from '../types/hmsValidator';
+import { calculateLetterScorePoints, letterScoreDefinitions, LetterScore } from '../types/letterScores';
 
 type ValidationStep = 'upload' | 'preview' | 'mapping' | 'results';
 
@@ -60,19 +61,25 @@ export const HMSValidatorPage: React.FC = () => {
     return isRedressFixed(comment) || isRedressAverage(comment);
   };
 
+  const isValidLetterScore = (code: string): code is LetterScore => {
+    return letterScoreDefinitions.some(def => def.code === code);
+  };
+
   const runValidation = (data: ParsedHMSData): ValidationResult => {
-    const { skippers, results, numRaces, hasHeats } = data;
+    const { skippers, results, hasHeats } = data;
     const completedRaceNumbers = [...new Set(results.map(r => r.raceNumber))].sort((a, b) => a - b);
     const completedRaces = completedRaceNumbers.length;
     const dropsAllowed = computeDropsAllowed(completedRaces);
+    const totalEntrants = skippers.length;
     const discrepancies: ValidationDiscrepancy[] = [];
 
-    const computedEntries: { sailNumber: string; name: string; racePoints: Record<number, number>; totalScore: number; netScore: number }[] = [];
+    const computedEntries: { sailNumber: string; name: string; racePoints: Record<number, number>; totalScore: number; netScore: number; droppedRaces: number[] }[] = [];
 
     for (const skipper of skippers) {
       const racePoints: Record<number, number> = {};
+      const raceIsNonDiscardable: Record<number, boolean> = {};
 
-      for (let race = 1; race <= numRaces; race++) {
+      for (const race of completedRaceNumbers) {
         const raceResults = results.filter(r => r.raceNumber === race);
         if (raceResults.length === 0) continue;
 
@@ -89,18 +96,44 @@ export const HMSValidatorPage: React.FC = () => {
           continue;
         }
 
+        if (skipperResult.letterScore) {
+          const code = skipperResult.letterScore.toUpperCase();
+
+          if (isValidLetterScore(code)) {
+            const def = letterScoreDefinitions.find(d => d.code === code);
+            if (def && !def.isDiscardable) {
+              raceIsNonDiscardable[race] = true;
+            }
+
+            if (hasHeats) {
+              const raceHeats = [...new Set(raceResults.filter(r => r.heat).map(r => r.heat!))].sort();
+              const isSeeding = race === 1 && raceHeats.length > 1;
+
+              if (isSeeding) {
+                const heatResults = raceResults.filter(r => r.heat === skipperResult.heat);
+                const heatFinishers = heatResults.filter(r => !r.letterScore && r.position !== null && !isRedressComment(r.comment)).length;
+                racePoints[race] = calculateLetterScorePoints(code, heatFinishers, skipperResult.points || undefined, totalEntrants);
+              } else {
+                const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null && !isRedressComment(r.comment)).length;
+                racePoints[race] = calculateLetterScorePoints(code, totalFinishers, skipperResult.points || undefined, totalEntrants);
+              }
+            } else {
+              const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null && !isRedressComment(r.comment)).length;
+              racePoints[race] = calculateLetterScorePoints(code, totalFinishers, skipperResult.points || undefined, totalEntrants);
+            }
+          } else {
+            const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null && !isRedressComment(r.comment)).length;
+            racePoints[race] = totalFinishers + 1;
+          }
+          continue;
+        }
+
         if (hasHeats) {
           const raceHeats = [...new Set(raceResults.filter(r => r.heat).map(r => r.heat!))].sort();
           const isSeeding = race === 1 && raceHeats.length > 1;
 
           if (isSeeding) {
-            if (skipperResult.letterScore) {
-              const heatResults = raceResults.filter(r => r.heat === skipperResult.heat);
-              const heatFinishers = heatResults.filter(r => !r.letterScore && r.position !== null).length;
-              racePoints[race] = heatFinishers + 1;
-            } else {
-              racePoints[race] = skipperResult.position || 0;
-            }
+            racePoints[race] = skipperResult.position || 0;
           } else {
             let overallPosition = 0;
             let found = false;
@@ -122,20 +155,12 @@ export const HMSValidatorPage: React.FC = () => {
               if (found) break;
             }
 
-            if (!found) {
-              if (skipperResult.letterScore) {
-                const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null).length;
-                racePoints[race] = totalFinishers + 1;
-              }
+            if (!found && !skipperResult.letterScore) {
+              racePoints[race] = skipperResult.position || 0;
             }
           }
         } else {
-          if (skipperResult.letterScore) {
-            const totalFinishers = raceResults.filter(r => !r.letterScore && r.position !== null).length;
-            racePoints[race] = totalFinishers + 1;
-          } else {
-            racePoints[race] = skipperResult.position || 0;
-          }
+          racePoints[race] = skipperResult.position || 0;
         }
       }
 
@@ -157,16 +182,55 @@ export const HMSValidatorPage: React.FC = () => {
         }
       }
 
-      const scores = Object.values(racePoints);
+      const raceNums = Object.keys(racePoints).map(Number);
+      const scores = raceNums.map(rn => racePoints[rn]);
       const totalScore = scores.reduce((sum, s) => sum + s, 0);
-      const sortedDesc = [...scores].sort((a, b) => b - a);
-      const droppedTotal = sortedDesc.slice(0, dropsAllowed).reduce((sum, s) => sum + s, 0);
-      const netScore = totalScore - droppedTotal;
 
-      computedEntries.push({ sailNumber: skipper.sailNumber, name: skipper.name, racePoints, totalScore, netScore });
+      const discardableRaces = raceNums.filter(rn => !raceIsNonDiscardable[rn]);
+      const discardableScores = discardableRaces
+        .map(rn => ({ raceNum: rn, score: racePoints[rn] }))
+        .sort((a, b) => b.score - a.score);
+
+      const droppedRaces: number[] = [];
+      let droppedTotal = 0;
+      for (let i = 0; i < dropsAllowed && i < discardableScores.length; i++) {
+        droppedRaces.push(discardableScores[i].raceNum);
+        droppedTotal += discardableScores[i].score;
+      }
+
+      computedEntries.push({ sailNumber: skipper.sailNumber, name: skipper.name, racePoints, totalScore, netScore: totalScore - droppedTotal, droppedRaces });
     }
 
-    computedEntries.sort((a, b) => a.netScore - b.netScore);
+    computedEntries.sort((a, b) => {
+      if (Math.abs(a.netScore - b.netScore) >= 0.01) {
+        return a.netScore - b.netScore;
+      }
+
+      const aScores = completedRaceNumbers
+        .map(rn => a.racePoints[rn])
+        .filter(s => s !== undefined)
+        .sort((x, y) => y - x);
+      const bScores = completedRaceNumbers
+        .map(rn => b.racePoints[rn])
+        .filter(s => s !== undefined)
+        .sort((x, y) => y - x);
+
+      const maxLen = Math.max(aScores.length, bScores.length);
+      for (let i = 0; i < maxLen; i++) {
+        const aVal = i < aScores.length ? aScores[i] : 999;
+        const bVal = i < bScores.length ? bScores[i] : 999;
+        if (Math.abs(aVal - bVal) >= 0.01) return aVal - bVal;
+      }
+
+      const reverseRaces = [...completedRaceNumbers].reverse();
+      for (const rn of reverseRaces) {
+        const aPos = a.racePoints[rn] ?? 999;
+        const bPos = b.racePoints[rn] ?? 999;
+        if (Math.abs(aPos - bPos) >= 0.01) return aPos - bPos;
+      }
+
+      return 0;
+    });
 
     let totalComparisons = 0;
     let matches = 0;

@@ -132,7 +132,7 @@ function parseSkippersFromScoreSheet(data: any[][]): ParsedHMSSkipper[] {
       const row = data[checkRow];
       if (!row) continue;
       const val = String(row[rc.index] || '').trim();
-      if (val && val !== '' && !isNaN(parseFloat(val))) {
+      if (val && val !== '') {
         hasData = true;
         break;
       }
