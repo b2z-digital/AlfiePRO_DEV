@@ -439,8 +439,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
       addNotification('success', 'Profile updated successfully');
       setSuccess(true);
+      fetchUserProfile();
 
-      // Hide success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
       console.error('Error in profile update:', err);

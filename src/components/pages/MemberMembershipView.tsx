@@ -146,9 +146,9 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
     }
   }, [memberData, loading]);
 
-  const fetchAllData = async () => {
+  const fetchAllData = async (showLoadingState = true) => {
     try {
-      setLoading(true);
+      if (showLoadingState) setLoading(true);
       setError(null);
 
       let memberQuery = supabase
@@ -398,8 +398,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
 
   const handleEditSuccess = () => {
     setShowEditModal(false);
-    fetchAllData();
-    addNotification('success', 'Details updated successfully');
+    fetchAllData(false);
   };
 
   if (loading) {

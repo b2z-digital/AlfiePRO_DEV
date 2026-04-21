@@ -413,9 +413,9 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     addNotification('Filter saved successfully', 'success');
   };
 
-  const fetchMembers = async () => {
+  const fetchMembers = async (showLoadingState = true) => {
     try {
-      setLoading(true);
+      if (showLoadingState) setLoading(true);
 
       // Build query based on filter status
       let query = supabase
@@ -670,8 +670,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   };
 
   const handleMembershipFormSuccess = () => {
-    // Don't show notification here - the individual modals handle their own notifications
-    fetchMembers();
+    fetchMembers(false);
   };
 
   const handleInviteMemberClick = (member: Member) => {
