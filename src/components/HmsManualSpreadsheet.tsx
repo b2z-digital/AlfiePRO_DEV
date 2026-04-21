@@ -622,6 +622,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const scores: number[] = [];
     for (let r = 2; r <= TOTAL_RACES; r++) {
       if (r === excludeRace) continue;
+      let found = false;
       for (const h of heats) {
         for (let p = 1; p <= maxPositions; p++) {
           const k = getCellKey(h, p, r);
@@ -648,8 +649,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
               scores.push(offset + okAbove + 1);
             }
           }
+          found = true;
           break;
         }
+        if (found) break;
       }
     }
     if (scores.length === 0) return null;
@@ -677,6 +680,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         return 'AVG';
       }
       return getLetterScorePoints(heat, race, cell.letterScore);
+    }
+
+    if (cell?.hmsPoints != null && cell.hmsPoints > 0) {
+      return cell.hmsPoints;
     }
 
     const okAbove = getOkCountAbovePosition(heat, position, race);
@@ -779,6 +786,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         return 'AVG';
       }
       return getLetterScorePoints(heat, race, cell.letterScore);
+    }
+
+    if (cell?.hmsPoints != null && cell.hmsPoints > 0) {
+      return cell.hmsPoints;
     }
 
     const okAbove = getOkCountAbovePosition(heat, position, race);
