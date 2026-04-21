@@ -269,6 +269,36 @@ export const getSimulatedRaceEvents = async (): Promise<RaceEvent[]> => {
   }
 };
 
+// Delete a simulated race event (uses SECURITY DEFINER RPC to bypass RLS)
+export const deleteSimulatedRaceEvent = async (id: string): Promise<boolean> => {
+  try {
+    const clubId = localStorage.getItem('currentClubId');
+    if (!clubId) return false;
+
+    const { data, error } = await supabase.rpc('delete_simulated_race_event', {
+      p_event_id: id,
+      p_club_id: clubId
+    });
+
+    if (error) {
+      console.error('Error deleting simulated event:', error);
+      return false;
+    }
+
+    // Also remove from offline storage
+    try {
+      await offlineStorage.deleteEvent(id, true);
+    } catch (e) {
+      // Ignore offline storage errors
+    }
+
+    return data === true;
+  } catch (error) {
+    console.error('Error deleting simulated event:', error);
+    return false;
+  }
+};
+
 // Store race events
 export const storeRaceEvents = async (events: RaceEvent[]): Promise<void> => {
   try {

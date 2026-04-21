@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, Plus, SquarePen as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio, FlaskConical } from 'lucide-react';
 import { RaceType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
-import { getStoredRaceEvents, getStoredRaceSeries, getSimulatedRaceEvents, deleteRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
+import { getStoredRaceEvents, getStoredRaceSeries, getSimulatedRaceEvents, deleteRaceEvent, deleteSimulatedRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
 import { getStoredVenues } from '../../utils/venueStorage';
 import { Venue } from '../../types/venue';
 import { formatDate } from '../../utils/date';
@@ -1000,8 +1000,8 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     setShowEditModal('quick');
   };
 
-  const handleDeleteClick = (id: string, type: 'quick' | 'series') => {
-    setItemToDelete({ id, type });
+  const handleDeleteClick = (id: string, type: 'quick' | 'series', isSimulated?: boolean) => {
+    setItemToDelete({ id, type, isSimulated });
     setShowDeleteConfirm(true);
   };
 
@@ -1015,7 +1015,11 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
 
     try {
       if (itemToDelete.type === 'quick') {
-        await deleteRaceEvent(itemToDelete.id);
+        if (itemToDelete.isSimulated) {
+          await deleteSimulatedRaceEvent(itemToDelete.id);
+        } else {
+          await deleteRaceEvent(itemToDelete.id);
+        }
       } else {
         await deleteRaceSeries(itemToDelete.id);
       }
@@ -1487,7 +1491,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDeleteClick(race.id, 'quick');
+                  handleDeleteClick(race.id, 'quick', race.is_simulated);
                 }}
                 className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${
                   darkMode
