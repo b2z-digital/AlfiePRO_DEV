@@ -576,7 +576,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
         ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
         ...(rankedSkipperIndices && rankedSkipperIndices.length > 0 ? { rankedSkipperIndices } : {}),
-        fleetManagementEnabled
+        fleetManagementEnabled,
+        heatLabelStyle,
+        heatOrder
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
@@ -798,7 +800,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               autoAssign: initialAssignment === 'random',
               scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
               ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
-              fleetManagementEnabled
+              fleetManagementEnabled,
+              heatLabelStyle,
+              heatOrder
             },
             currentRound: 1,
             currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
@@ -814,7 +818,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             autoAssign: initialAssignment === 'random',
             scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
             ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
-            fleetManagementEnabled
+            fleetManagementEnabled,
+            heatLabelStyle,
+            heatOrder
           };
 
           const hasResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
@@ -916,7 +922,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             autoAssign: initialAssignment === 'random',
             scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
             ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
-            fleetManagementEnabled
+            fleetManagementEnabled,
+            heatLabelStyle,
+            heatOrder
           },
           currentRound: 1,
           currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,

@@ -245,7 +245,7 @@ export const getSimulatedRaceEvents = async (): Promise<RaceEvent[]> => {
       clubId: race.club_id,
       date: race.race_date,
       endDate: race.end_date,
-      venue: race.venue || '',
+      venue: race.race_venue || race.venue || '',
       raceClass: race.race_class || '',
       raceFormat: race.race_format || 'scratch',
       skippers: race.skippers || [],
@@ -262,6 +262,17 @@ export const getSimulatedRaceEvents = async (): Promise<RaceEvent[]> => {
       dayResults: race.day_results || {},
       currentDay: race.current_day || 1,
       is_simulated: true,
+      scoringSystem: race.scoring_system || undefined,
+      show_flag: race.show_flag ?? true,
+      show_country: race.show_country ?? true,
+      show_club_state: race.show_club_state ?? false,
+      show_design: race.show_design ?? false,
+      show_category: race.show_category ?? false,
+      enable_observers: race.enable_observers ?? false,
+      observers_per_heat: race.observers_per_heat ?? 2,
+      enable_roll_call: race.enable_roll_call ?? false,
+      auto_complete_sail: race.auto_complete_sail ?? true,
+      media: race.media || [],
     } as any));
   } catch (error) {
     console.error('Error fetching simulated events:', error);
@@ -357,6 +368,18 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
             day_results: event.dayResults || {},
             current_day: event.currentDay || 1,
             media: event.media || [],
+            scoring_system: (event as any).scoringSystem || null,
+            show_flag: (event as any).showFlag ?? (event as any).show_flag ?? true,
+            show_country: (event as any).showCountry ?? (event as any).show_country ?? true,
+            show_club_state: (event as any).showClubState ?? (event as any).show_club_state ?? false,
+            show_design: (event as any).showDesign ?? (event as any).show_design ?? false,
+            show_category: (event as any).showCategory ?? (event as any).show_category ?? false,
+            enable_observers: (event as any).enable_observers ?? false,
+            observers_per_heat: (event as any).observers_per_heat ?? 2,
+            enable_roll_call: (event as any).enable_roll_call ?? false,
+            auto_complete_sail: (event as any).auto_complete_sail ?? true,
+            enable_live_tracking: (event as any).enableLiveTracking ?? false,
+            enable_livestream: (event as any).enableLiveStream ?? false,
           }
         });
 
@@ -1180,6 +1203,15 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
           };
         }
       }
+    } else if (currentEvent.is_simulated) {
+      const { data: simEvents, error } = await supabase.rpc('get_simulated_race_events', {
+        p_club_id: currentClubId
+      });
+      if (error) {
+        console.error('❌ Error reloading simulated event:', error);
+        return null;
+      }
+      data = (simEvents || []).find((e: any) => e.id === currentEvent.id) || null;
     } else {
       const { data: qrData, error } = await supabase
         .from('quick_races')
@@ -1229,7 +1261,13 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
       observers_per_heat: data.observers_per_heat,
       enable_roll_call: data.enable_roll_call,
       auto_complete_sail: data.auto_complete_sail,
-      enable_livestream: data.enable_livestream
+      enable_livestream: data.enable_livestream,
+      is_simulated: data.is_simulated || currentEvent.is_simulated || false,
+      scoringSystem: data.scoring_system || currentEvent.scoringSystem || null,
+      show_club_state: data.show_club_state,
+      show_design: data.show_design,
+      show_category: data.show_category,
+      media: data.media || currentEvent.media || []
     };
 
     console.log('✅ Event reloaded successfully:', {
@@ -1648,8 +1686,55 @@ export const updateEventResults = async (
         setCurrentEvent(updatedEvent); // Update localStorage with new ID
       }
 
-      // For multi-day events, include dayResults
-      if (updatedEvent.multiDay) {
+      // Simulated events use SECURITY DEFINER RPC to bypass RLS SELECT restrictions
+      if (updatedEvent.is_simulated) {
+        console.log('📤 Updating simulated event via RPC:', actualEventId);
+        const { error } = await supabase.rpc('upsert_simulated_race_event', {
+          p_data: {
+            id: actualEventId,
+            event_name: updatedEvent.eventName,
+            club_name: updatedEvent.clubName,
+            race_date: updatedEvent.date,
+            race_venue: updatedEvent.venue || '',
+            race_class: updatedEvent.raceClass || '',
+            race_format: updatedEvent.raceFormat || 'scratch',
+            skippers: skippers,
+            race_results: updatedEvent.multiDay ? [] : raceResults,
+            last_completed_race: updatedEvent.multiDay ? 0 : lastCompletedRace,
+            has_determined_initial_hcaps: updatedEvent.multiDay ? false : hasDeterminedInitialHcaps,
+            is_manual_handicaps: updatedEvent.multiDay ? false : isManualHandicaps,
+            completed: updatedEvent.completed || false,
+            num_races: numRaces,
+            drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40],
+            club_id: currentClubId,
+            heat_management: heatManagement || null,
+            multi_day: updatedEvent.multiDay || false,
+            number_of_days: updatedEvent.numberOfDays || 1,
+            end_date: updatedEvent.endDate || null,
+            day_results: updatedEvent.dayResults || {},
+            current_day: currentDay,
+            media: updatedEvent.media || [],
+            scoring_system: (updatedEvent as any).scoringSystem || null,
+            show_flag: updatedEvent.show_flag ?? true,
+            show_country: updatedEvent.show_country ?? true,
+            show_club_state: (updatedEvent as any).show_club_state ?? false,
+            show_design: (updatedEvent as any).show_design ?? false,
+            show_category: (updatedEvent as any).show_category ?? false,
+            enable_observers: updatedEvent.enable_observers ?? false,
+            observers_per_heat: updatedEvent.observers_per_heat ?? 2,
+            enable_roll_call: updatedEvent.enable_roll_call ?? false,
+            auto_complete_sail: updatedEvent.auto_complete_sail ?? true,
+            enable_live_tracking: (updatedEvent as any).enableLiveTracking ?? false,
+            enable_livestream: (updatedEvent as any).enableLiveStream ?? false,
+          }
+        });
+
+        if (error) {
+          console.error('❌ Error updating simulated event via RPC:', error);
+          throw error;
+        }
+      } else if (updatedEvent.multiDay) {
+        // For multi-day events, include dayResults
         updateData['day_results'] = updatedEvent.dayResults;
 
         const updatePayload = {
