@@ -4,6 +4,7 @@ import { Skipper } from '../types';
 import { HeatManagement } from '../types/heat';
 import { convertHeatResultsToRaceResults } from '../utils/heatUtils';
 import { breakTie } from '../utils/hmsHeatSystem';
+import { isScoreDiscardable } from '../types/letterScores';
 import html2canvas from 'html2canvas';
 
 interface HmsScoreSheetProps {
@@ -114,7 +115,9 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
         let totalDropped = 0;
         const droppedRaceIndices = new Set<number>();
         if (drops > 0) {
-          const indexedScores = points.map((score: number, idx: number) => ({ score, idx }));
+          const indexedScores = points
+            .map((score: number, idx: number) => ({ score, idx }))
+            .filter(({ idx }: { idx: number }) => isScoreDiscardable(skipperRaceResults[idx]?.letterScore));
           indexedScores.sort((a: any, b: any) => b.score - a.score);
           for (let i = 0; i < drops && i < indexedScores.length; i++) {
             droppedRaceIndices.add(indexedScores[i].idx);

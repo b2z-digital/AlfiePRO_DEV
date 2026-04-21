@@ -189,6 +189,12 @@ export function getLetterScoreDefinition(code: LetterScore): LetterScoreDefiniti
   return letterScoreDefinitions.find(def => def.code === code);
 }
 
+export function isScoreDiscardable(letterScore: LetterScore | string | null | undefined): boolean {
+  if (!letterScore) return true;
+  const definition = letterScoreDefinitions.find(def => def.code === letterScore);
+  return definition?.isDiscardable !== false;
+}
+
 export function getLetterScoreDisplayCode(letterScore: string | null | undefined, customPoints?: number): string {
   if (!letterScore) return '';
   if (letterScore === 'RDG') {

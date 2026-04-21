@@ -620,8 +620,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
   const calculateRdgAverage = useCallback((skipperIndex: number, excludeRace: number): number | null => {
     const scores: number[] = [];
-    for (let r = 2; r <= TOTAL_RACES; r++) {
-      if (r === excludeRace) continue;
+    for (let r = 2; r < excludeRace; r++) {
       let found = false;
       for (const h of heats) {
         for (let p = 1; p <= maxPositions; p++) {
