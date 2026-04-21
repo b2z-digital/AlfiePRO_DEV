@@ -4,7 +4,7 @@ import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound, getHeatDisplayLabel } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
-import { selectObservers, saveObserverAssignments, getObserverAssignments, getAllObserversForEvent, toggleObserver, preAllocateObserversForAllRounds, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
+import { selectObservers, saveObserverAssignments, getObserverAssignments, getObserverAssignmentsForRound, getAllObserversForEvent, toggleObserver, preAllocateObserversForAllRounds, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
 import { exportSingleRoundPdf, exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 import { validateHeatAssignments } from '../utils/hmsHeatSystem';
@@ -419,16 +419,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         );
 
         if (shrsPreAssign) {
+          const batchObservers = await getObserverAssignmentsForRound(resolvedEventId, roundNumberToLoad);
+          if (cancelled) return;
           for (let i = 0; i < sortedHeats.length; i++) {
-            if (cancelled) return;
             const heatNumber = i + 1;
-            const existingObservers = await getObserverAssignments(
-              resolvedEventId,
-              heatNumber,
-              roundNumberToLoad
-            );
-            if (existingObservers && existingObservers.length > 0) {
-              newObserversByHeat.set(heatNumber, existingObservers);
+            const heatObs = batchObservers.get(heatNumber);
+            if (heatObs && heatObs.length > 0) {
+              newObserversByHeat.set(heatNumber, heatObs);
             }
           }
         } else {
@@ -451,6 +448,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           const nextHeatToScore = [...heatCompletionStatus].reverse().find(h => !h.isCompleted);
           const noScoringStarted = roundResults.length === 0;
 
+          const batchObservers = await getObserverAssignmentsForRound(resolvedEventId, roundNumberToLoad);
+          if (cancelled) return;
+
           for (let i = 0; i < sortedHeats.length; i++) {
             if (cancelled) return;
             const heat = sortedHeats[i];
@@ -464,37 +464,32 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               continue;
             }
 
-            const existingObservers = await getObserverAssignments(
-              resolvedEventId,
-              heatNumber,
-              roundNumberToLoad
-            );
+            const existingObservers = batchObservers.get(heatNumber) || [];
 
             if (isCompletedHeat) {
-              if (existingObservers && existingObservers.length > 0) {
+              if (existingObservers.length > 0) {
                 newObserversByHeat.set(heatNumber, existingObservers);
               }
               continue;
             }
 
-            const observersRacingInHeat = existingObservers?.filter(obs =>
+            const observersRacingInHeat = existingObservers.filter(obs =>
               obs.skipper_index !== undefined && obs.skipper_index !== null &&
               heat.skipperIndices.includes(obs.skipper_index)
-            ) || [];
+            );
 
-            const observersInNextHeat = existingObservers?.filter(obs =>
+            const observersInNextHeat = existingObservers.filter(obs =>
               obs.skipper_index !== undefined && obs.skipper_index !== null &&
               nextHeatIndices && nextHeatIndices.includes(obs.skipper_index)
-            ) || [];
+            );
 
             const currentSkippers = skippersRef.current;
-            const observersStillExist = existingObservers?.filter(obs =>
+            const observersStillExist = existingObservers.filter(obs =>
               obs.skipper_index !== undefined && obs.skipper_index !== null &&
               obs.skipper_index >= 0 && obs.skipper_index < currentSkippers.length && currentSkippers[obs.skipper_index]
-            ) || [];
+            );
 
-            const hasValid = existingObservers &&
-              existingObservers.length > 0 &&
+            const hasValid = existingObservers.length > 0 &&
               existingObservers.length === observersPerHeat &&
               observersRacingInHeat.length === 0 &&
               observersInNextHeat.length === 0 &&
@@ -1569,40 +1564,45 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                           </div>
                           <div className="flex flex-col gap-1">
                             {heatObservers.map((observer, idx) => {
-                              const observerSkipper = skippers[observer.skipper_index];
-                              if (!observerSkipper) return null;
+                              const observerSkipper = observer.skipper_index !== undefined && observer.skipper_index !== null
+                                ? skippers[observer.skipper_index]
+                                : null;
+                              const displayName = observerSkipper?.name || observer.skipper_name || 'Observer';
+                              const displaySail = observerSkipper?.sailNo || observer.skipper_sail_number || '';
 
                               if (isPreviousHeatObservers) {
                                 return (
                                   <div
-                                    key={observer.skipper_index}
+                                    key={observer.id || `obs-${idx}`}
                                     className={`flex items-center gap-1 p-1 rounded border ${
                                       darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
                                     }`}
                                   >
                                     <Eye size={10} className={`${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`} />
                                     <span className={`font-medium truncate flex-1 text-[11px] ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                      {observerSkipper.name}
+                                      {displayName}
                                     </span>
-                                    <span className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                      #{observerSkipper.sailNo}
-                                    </span>
+                                    {displaySail && (
+                                      <span className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                        #{displaySail}
+                                      </span>
+                                    )}
                                   </div>
                                 );
                               }
 
                               return (
                                 <button
-                                  key={observer.skipper_index}
+                                  key={observer.id || `obs-${idx}`}
                                   onClick={async () => {
-                                    if (!observerEventId) return;
+                                    if (!observerEventId || observer.skipper_index === undefined || observer.skipper_index === null) return;
                                     const success = await toggleObserver(
                                       observerEventId,
                                       heatNumber,
                                       round,
                                       observer.skipper_index,
-                                      observerSkipper.name,
-                                      observerSkipper.sailNo,
+                                      displayName,
+                                      displaySail,
                                       observer.times_served
                                     );
                                     if (success) {
@@ -1627,11 +1627,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 >
                                   <Eye size={10} className="text-purple-400 flex-shrink-0" />
                                   <span className="font-medium truncate flex-1 text-left">
-                                    {observerSkipper.name}
+                                    {displayName}
                                   </span>
-                                  <span className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    #{observerSkipper.sailNo}
-                                  </span>
+                                  {displaySail && (
+                                    <span className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                      #{displaySail}
+                                    </span>
+                                  )}
                                 </button>
                               );
                             })}
