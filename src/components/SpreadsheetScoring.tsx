@@ -122,10 +122,13 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
   const availableHeats = useMemo(() => {
     if (isMultiHeatMode && propAvailableHeats) {
-      return [...propAvailableHeats].reverse();
+      if (isHMS) {
+        return [...propAvailableHeats].reverse();
+      }
+      return [...propAvailableHeats];
     }
     return [];
-  }, [isMultiHeatMode, propAvailableHeats]);
+  }, [isMultiHeatMode, propAvailableHeats, isHMS]);
 
   const currentRound = heatManagement?.currentRound || initialRace;
 
@@ -157,10 +160,13 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     return completed;
   }, [isMultiHeatMode, singleFleetRace, raceResults]);
 
+  const isSHRS = heatManagement?.configuration?.scoringSystem === 'shrs';
+  const isHMS = heatManagement?.configuration?.scoringSystem === 'hms';
+
   const promotionCount = useMemo(() => {
-    if (!isHeatScoring || !heatManagement) return 0;
+    if (!isHeatScoring || !heatManagement || isSHRS) return 0;
     return heatManagement.configuration?.promotionCount || 0;
-  }, [isHeatScoring, heatManagement]);
+  }, [isHeatScoring, heatManagement, isSHRS]);
 
   const getObserversForHeat = useCallback((heat: HeatDesignation): any[] => {
     return allHeatObserversMap[heat] || [];
@@ -196,12 +202,18 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
   const autoScoringHeat = useMemo(() => {
     if (!isMultiHeatMode) return 'A' as HeatDesignation;
-    const reversed = [...availableHeats].reverse();
-    for (const heat of reversed) {
+    if (isHMS) {
+      const reversed = [...availableHeats].reverse();
+      for (const heat of reversed) {
+        if (!verifiedHeats.has(heat)) return heat;
+      }
+      return reversed[reversed.length - 1] || 'A' as HeatDesignation;
+    }
+    for (const heat of availableHeats) {
       if (!verifiedHeats.has(heat)) return heat;
     }
-    return reversed[reversed.length - 1] || 'A' as HeatDesignation;
-  }, [isMultiHeatMode, availableHeats, verifiedHeats]);
+    return availableHeats[0] || 'A' as HeatDesignation;
+  }, [isMultiHeatMode, availableHeats, verifiedHeats, isHMS]);
 
   const currentScoringHeat = selectedHeat || autoScoringHeat;
 
