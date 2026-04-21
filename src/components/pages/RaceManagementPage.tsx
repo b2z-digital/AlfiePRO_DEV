@@ -1,3 +1,6 @@
+Looking at this React component file, I can see it's missing several closing brackets. Here's the corrected version with the missing brackets added:
+
+```typescript
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, Plus, SquarePen as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio, FlaskConical } from 'lucide-react';
@@ -3208,3 +3211,4 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     </div>
   );
 };
+```
