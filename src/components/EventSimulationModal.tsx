@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { X, FlaskConical, Upload, Plus, Settings, ChevronRight, FileSpreadsheet, Users, Layers, ArrowLeft, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info } from 'lucide-react';
+import { X, FlaskConical, Upload, Plus, ChevronRight, FileSpreadsheet, Users, Layers, ArrowLeft, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, Sailboat, TrendingUp } from 'lucide-react';
 import { parseHMSFile } from '../utils/hmsParser';
 import { ParsedHMSData } from '../types/hmsValidator';
 import { storeRaceEvent, setCurrentEvent } from '../utils/raceStorage';
@@ -15,7 +15,7 @@ interface EventSimulationModalProps {
   onSuccess: (event: RaceEvent) => void;
 }
 
-type SimulationStep = 'choose' | 'hms-config' | 'hms-preview' | 'creating';
+type SimulationStep = 'choose' | 'scratch-config' | 'hms-config' | 'hms-preview' | 'creating';
 
 export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
   darkMode,
@@ -36,6 +36,12 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
     promotionCount: 4,
     fleetManagement: true,
     raceFormat: 'handicap' as RaceType,
+  });
+
+  const [scratchConfig, setScratchConfig] = useState({
+    eventName: '',
+    raceFormat: 'scratch' as RaceType,
+    numRaces: 12,
   });
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +71,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
   }, []);
 
   const handleCreateFromScratch = async () => {
-    if (creating) return;
+    if (creating || !scratchConfig.eventName.trim()) return;
     setCreating(true);
     setError(null);
 
@@ -73,20 +79,20 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
       const eventId = uuidv4();
       const event: RaceEvent = {
         id: eventId,
-        eventName: 'Simulated Event',
+        eventName: scratchConfig.eventName.trim(),
         clubName: currentClub?.club?.name || 'Simulation',
         clubId: currentClub?.clubId,
         date: new Date().toISOString().split('T')[0],
         venue: '',
         raceClass: '' as BoatType,
-        raceFormat: 'scratch' as RaceType,
+        raceFormat: scratchConfig.raceFormat,
         skippers: [],
         raceResults: [],
         lastCompletedRace: 0,
         hasDeterminedInitialHcaps: false,
         isManualHandicaps: false,
         completed: false,
-        numRaces: 12,
+        numRaces: scratchConfig.numRaces,
         dropRules: [4, 8, 16, 24, 32, 40],
         is_simulated: true,
       };
@@ -294,6 +300,14 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
   const totalHeats = parsedData?.heats?.length || 0;
   const totalResults = parsedData?.results.length || 0;
 
+  const stepLabel = {
+    'choose': 'Choose how to create your simulation',
+    'scratch-config': 'Configure your simulated event',
+    'hms-config': 'Configure HMS import settings',
+    'hms-preview': 'Review imported data',
+    'creating': 'Creating event...',
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className={`w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${
@@ -307,10 +321,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
             <div>
               <h2 className="text-2xl font-bold text-white drop-shadow-lg">Event Simulation</h2>
               <p className="text-amber-100 text-sm mt-0.5">
-                {step === 'choose' && 'Choose how to create your simulation'}
-                {step === 'hms-config' && 'Configure HMS import settings'}
-                {step === 'hms-preview' && 'Review imported data'}
-                {step === 'creating' && 'Creating event...'}
+                {stepLabel[step]}
               </p>
             </div>
           </div>
@@ -361,11 +372,8 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                 </button>
 
                 <button
-                  onClick={handleCreateFromScratch}
-                  disabled={creating}
+                  onClick={() => setStep('scratch-config')}
                   className={`group relative p-6 rounded-xl border-2 text-left transition-all hover:scale-[1.02] ${
-                    creating ? 'opacity-60 cursor-wait' : ''
-                  } ${
                     darkMode
                       ? 'border-slate-700 hover:border-blue-500/50 bg-slate-800/50 hover:bg-slate-800'
                       : 'border-slate-200 hover:border-blue-500/50 bg-slate-50 hover:bg-blue-50/30'
@@ -385,7 +393,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                   </p>
                   <div className="flex items-center gap-2 text-sm font-medium text-blue-500">
                     <ChevronRight size={16} />
-                    <span>{creating ? 'Creating event...' : 'Start blank event'}</span>
+                    <span>Configure event</span>
                   </div>
                 </button>
               </div>
@@ -397,6 +405,149 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                 onChange={handleFileSelect}
                 className="hidden"
               />
+            </div>
+          )}
+
+          {step === 'scratch-config' && (
+            <div className="space-y-6">
+              <button
+                onClick={() => { setStep('choose'); setScratchConfig(prev => ({ ...prev, eventName: '' })); }}
+                className={`flex items-center gap-2 text-sm font-medium mb-2 ${
+                  darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ArrowLeft size={16} />
+                Back
+              </button>
+
+              <div className="space-y-5">
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                    Event Name
+                  </label>
+                  <input
+                    type="text"
+                    value={scratchConfig.eventName}
+                    onChange={(e) => setScratchConfig(prev => ({ ...prev, eventName: e.target.value }))}
+                    className={`w-full px-4 py-3 rounded-xl border text-sm ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500'
+                        : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-blue-500'
+                    } outline-none transition-colors`}
+                    placeholder="e.g. 2026 Club Championship Simulation"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                    Scoring Format
+                  </label>
+                  <p className={`text-xs mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Choose the scoring system for this simulated event
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setScratchConfig(prev => ({ ...prev, raceFormat: 'scratch' }))}
+                      className={`p-5 rounded-xl border-2 text-left transition-all ${
+                        scratchConfig.raceFormat === 'scratch'
+                          ? darkMode
+                            ? 'border-blue-500/50 bg-blue-500/10'
+                            : 'border-blue-500 bg-blue-50'
+                          : darkMode
+                            ? 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                            : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          scratchConfig.raceFormat === 'scratch'
+                            ? 'bg-blue-500/20'
+                            : darkMode ? 'bg-slate-700' : 'bg-slate-200'
+                        }`}>
+                          <Sailboat className={scratchConfig.raceFormat === 'scratch' ? 'text-blue-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} size={20} />
+                        </div>
+                        <span className={`font-semibold text-sm ${
+                          scratchConfig.raceFormat === 'scratch'
+                            ? darkMode ? 'text-blue-400' : 'text-blue-700'
+                            : darkMode ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          Scratch
+                        </span>
+                      </div>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Position-based scoring. First across the line wins. No handicap adjustments applied.
+                      </p>
+                    </button>
+
+                    <button
+                      onClick={() => setScratchConfig(prev => ({ ...prev, raceFormat: 'handicap' }))}
+                      className={`p-5 rounded-xl border-2 text-left transition-all ${
+                        scratchConfig.raceFormat === 'handicap'
+                          ? darkMode
+                            ? 'border-emerald-500/50 bg-emerald-500/10'
+                            : 'border-emerald-500 bg-emerald-50'
+                          : darkMode
+                            ? 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                            : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          scratchConfig.raceFormat === 'handicap'
+                            ? 'bg-emerald-500/20'
+                            : darkMode ? 'bg-slate-700' : 'bg-slate-200'
+                        }`}>
+                          <TrendingUp className={scratchConfig.raceFormat === 'handicap' ? 'text-emerald-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} size={20} />
+                        </div>
+                        <span className={`font-semibold text-sm ${
+                          scratchConfig.raceFormat === 'handicap'
+                            ? darkMode ? 'text-emerald-400' : 'text-emerald-700'
+                            : darkMode ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          Handicap
+                        </span>
+                      </div>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Handicap-adjusted scoring. Finishing positions are adjusted based on each skipper's handicap rating.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                    Number of Races
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {[6, 8, 10, 12, 16, 20].map(n => (
+                      <button
+                        key={n}
+                        onClick={() => setScratchConfig(prev => ({ ...prev, numRaces: n }))}
+                        className={`w-12 h-12 rounded-xl font-bold text-lg transition-all ${
+                          scratchConfig.numRaces === n
+                            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
+                            : darkMode
+                              ? 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-blue-500/50'
+                              : 'bg-slate-100 text-slate-600 border border-slate-300 hover:border-blue-500/50'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={`p-4 rounded-xl border flex items-start gap-3 ${
+                  darkMode ? 'bg-blue-900/15 border-blue-500/20' : 'bg-blue-50 border-blue-200'
+                }`}>
+                  <Info className="text-blue-400 shrink-0 mt-0.5" size={16} />
+                  <div className={`text-xs ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                    This will create a simulated event that does not appear in your club's public race calendar, results, or mobile app.
+                    You can add skippers and score races as a test without affecting any real data.
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -633,13 +784,33 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
           darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'
         }`}>
           <button
-            onClick={onClose}
+            onClick={step === 'scratch-config' ? () => setStep('choose') : onClose}
             className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               darkMode ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
             }`}
           >
-            Cancel
+            {step === 'scratch-config' ? 'Back' : 'Cancel'}
           </button>
+
+          {step === 'scratch-config' && (
+            <button
+              onClick={handleCreateFromScratch}
+              disabled={!scratchConfig.eventName.trim() || creating}
+              className="px-6 py-2.5 rounded-xl text-sm font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-blue-500/20"
+            >
+              {creating ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Creating Event...
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={16} />
+                  Create Simulation Event
+                </>
+              )}
+            </button>
+          )}
 
           {step === 'hms-config' && (
             <button

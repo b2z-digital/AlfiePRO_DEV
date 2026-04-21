@@ -330,6 +330,42 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
     // If online, also try to save to Supabase immediately
     if (offlineStorage.getOnlineStatus()) {
       try {
+      // Simulated events use a dedicated RPC to bypass RLS SELECT restrictions
+      if ((event as any).is_simulated) {
+        const { error } = await supabase.rpc('upsert_simulated_race_event', {
+          p_data: {
+            id: event.id,
+            event_name: event.eventName,
+            club_name: event.clubName,
+            race_date: event.date,
+            race_venue: event.venue || '',
+            race_class: event.raceClass || '',
+            race_format: event.raceFormat || 'scratch',
+            skippers: event.skippers || [],
+            race_results: event.raceResults || [],
+            last_completed_race: event.lastCompletedRace || 0,
+            has_determined_initial_hcaps: event.hasDeterminedInitialHcaps || false,
+            is_manual_handicaps: event.isManualHandicaps || false,
+            completed: event.completed || false,
+            num_races: event.numRaces || 12,
+            drop_rules: Array.isArray(event.dropRules) ? event.dropRules : [4, 8, 16, 24, 32, 40],
+            club_id: scope.mode === 'club' ? event.clubId : null,
+            heat_management: event.heatManagement || null,
+            multi_day: event.multiDay || false,
+            number_of_days: event.numberOfDays || 1,
+            end_date: event.endDate || null,
+            day_results: event.dayResults || {},
+            current_day: event.currentDay || 1,
+            media: event.media || [],
+          }
+        });
+
+        if (error) {
+          console.error('Error storing simulated event via RPC:', error);
+          throw error;
+        }
+        console.log('Simulated event stored via RPC successfully');
+      } else {
       // For public events, create a local copy with a new ID
       let eventId = event.id;
       if (event.isPublicEvent) {
@@ -369,24 +405,21 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
           current_day: event.currentDay || 1,
           heat_management: event.heatManagement,
           num_races: event.numRaces,
-          drop_rules: Array.isArray(event.dropRules) ? event.dropRules : [4, 8, 16, 24, 32, 40], // Default to RRS - Appendix A
+          drop_rules: Array.isArray(event.dropRules) ? event.dropRules : [4, 8, 16, 24, 32, 40],
           club_id: scope.mode === 'club' ? event.clubId : null,
           user_id: scope.mode === 'race_officer' ? scope.userId : null,
-          // Display settings for results table
           show_flag: (event as any).showFlag ?? (event as any).show_flag ?? true,
           show_country: (event as any).showCountry ?? (event as any).show_country ?? true,
           show_club_state: (event as any).showClubState ?? (event as any).show_club_state ?? false,
           show_design: (event as any).showDesign ?? (event as any).show_design ?? false,
           show_category: (event as any).showCategory ?? (event as any).show_category ?? false,
-          // Live tracking and streaming
           enable_live_tracking: (event as any).enableLiveTracking || false,
           enable_livestream: (event as any).enableLiveStream || false,
-          // Observer settings
           enable_observers: (event as any).enable_observers ?? false,
           observers_per_heat: (event as any).observers_per_heat ?? undefined,
           enable_roll_call: (event as any).enable_roll_call,
           auto_complete_sail: (event as any).auto_complete_sail,
-          is_simulated: (event as any).is_simulated || false
+          is_simulated: false
         });
 
       if (error) {
@@ -395,9 +428,9 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
       }
 
       console.log('Event stored in Supabase successfully');
+      }
       } catch (supabaseError) {
         console.warn('Supabase save failed, queued for sync:', supabaseError);
-        // Error is logged, but event is already in IndexedDB and sync queue
       }
     }
   } catch (error) {
