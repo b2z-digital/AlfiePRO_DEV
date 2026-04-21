@@ -1,5 +1,5 @@
 import React from 'react';
-import { HeatDesignation, HeatManagement, getHeatColorClasses } from '../types/heat';
+import { HeatDesignation, HeatManagement, getHeatColorClasses, getHeatDisplayLabel } from '../types/heat';
 
 interface HeatSelectorProps {
   heatManagement: HeatManagement;
@@ -90,9 +90,9 @@ export const HeatSelector: React.FC<HeatSelectorProps> = ({
                 w-6 h-6 rounded-full flex items-center justify-center font-bold text-sm
                 ${colorClasses.bg} ${colorClasses.text}
               `}>
-                {heat}
+                {getHeatDisplayLabel(heat, configuration)}
               </div>
-              <span>Heat {heat}</span>
+              <span>Heat {getHeatDisplayLabel(heat, configuration)}</span>
               {isComplete && (
                 <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-green-900/30 text-green-400">
                   Complete

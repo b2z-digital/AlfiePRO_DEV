@@ -144,10 +144,13 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
       .map(assignment => assignment.heatDesignation)
       .sort();
     if (isInQualifyingRound) {
+      if (heatManagement.configuration?.heatOrder === 'descending') {
+        return [...heats].reverse();
+      }
       return heats;
     }
     return heats.reverse();
-  }, [currentRound, isInQualifyingRound]);
+  }, [currentRound, isInQualifyingRound, heatManagement.configuration?.heatOrder]);
 
   // Start with the LOWEST heat (last in the list) by default
   // Initialize to null and let useEffect set the correct heat
@@ -1235,7 +1238,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       }
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-base font-bold">{isInFinals ? (SHRS_FLEET_NAMES[heat] || heat) : heat}</span>
+                        <span className="text-base font-bold">{isInFinals ? (SHRS_FLEET_NAMES[heat] || getHeatDisplayLabel(heat, heatManagement.configuration)) : getHeatDisplayLabel(heat, heatManagement.configuration)}</span>
                         {isComplete && (
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

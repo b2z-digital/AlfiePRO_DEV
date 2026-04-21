@@ -1867,8 +1867,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                           )}
                         </div>
 
-                        {/* Heat Display Settings */}
-                        <div className="space-y-3">
+                        {/* Heat Display Settings - SHRS only */}
+                        {isSHRS && <div className="space-y-3">
                           <div>
                             <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                               Heat Identification
@@ -1949,7 +1949,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                               Sets the display and scoring order of heats
                             </p>
                           </div>
-                        </div>
+                        </div>}
 
                         {/* Show validation warning if configuration is not practical */}
                         {!configValidation.isValid && (

@@ -414,17 +414,17 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         const sailLower = cell.sailNumber.trim().toLowerCase();
 
         if (!cell.isValid && cell.skipperIndex == null) {
-          errors.push(`Heat ${heat}, ${getOrdinal(pos)}: Sail "${cell.sailNumber}" not registered`);
+          errors.push(`Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}, ${getOrdinal(pos)}: Sail "${cell.sailNumber}" not registered`);
         }
 
         if (heatEntries.includes(sailLower)) {
-          errors.push(`Heat ${heat}: Duplicate entry "${cell.sailNumber}"`);
+          errors.push(`Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}: Duplicate entry "${cell.sailNumber}"`);
         }
         heatEntries.push(sailLower);
 
         const existing = allSailsInRace.get(sailLower);
         if (existing) {
-          errors.push(`"${cell.sailNumber}" appears in Heat ${existing.heat} (${getOrdinal(existing.position)}) and Heat ${heat} (${getOrdinal(pos)})`);
+          errors.push(`"${cell.sailNumber}" appears in Heat ${getHeatDisplayLabel(existing.heat, heatManagement.configuration)} (${getOrdinal(existing.position)}) and Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)} (${getOrdinal(pos)})`);
         } else {
           allSailsInRace.set(sailLower, { heat, position: pos });
         }
