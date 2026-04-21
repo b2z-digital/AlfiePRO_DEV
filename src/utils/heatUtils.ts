@@ -1,6 +1,7 @@
 import { HeatManagement, HeatDesignation, HeatResult, HeatRound, generateNextRoundAssignments } from '../types/heat';
 import { Skipper } from '../types';
 import { getNextHeat, getLargestHeatSize, calculateNonFinisherScore } from './shrsHeatSystem';
+import { isEntrantsPlusOne, LetterScore } from '../types/letterScores';
 
 // Function to update a heat result in the heat management object
 export const updateHeatResult = (
@@ -48,7 +49,7 @@ export const updateHeatResult = (
 
 // Function to complete a heat and automatically move to the next heat
 // HMS: Each heat races with its assigned roster. Promotion/relegation swaps happen between rounds.
-// SHR uses different movement rules based on position
+// SHRS uses different movement rules based on position
 export const completeHeat = (
   heatManagement: HeatManagement,
   heat: HeatDesignation,
@@ -101,7 +102,7 @@ export const completeHeat = (
     ?? configuration.promotionCount;
 
   // SCORING SYSTEM SPECIFIC LOGIC
-  console.log(`\n🔍 Heat ${heat} complete. Scoring System: ${isShrs ? 'SHR' : 'HMS'}, Round ${currentRound}`);
+  console.log(`\n🔍 Heat ${heat} complete. Scoring System: ${isShrs ? 'SHRS' : 'HMS'}, Round ${currentRound}`);
   if (effectivePromotionCount !== configuration.promotionCount) {
     console.log(`  ⚡ Per-race promotion override: ${effectivePromotionCount} (default: ${configuration.promotionCount})`);
   }
@@ -304,8 +305,10 @@ export const convertHeatResultsToRaceResults = (
         if (result.position !== null) {
           overallPositions.set(result.skipperIndex, result.position);
         } else if (result.letterScore) {
-          const totalCompetitorsInRound = round.results.length;
-          overallPositions.set(result.skipperIndex, totalCompetitorsInRound + 1);
+          const points = isEntrantsPlusOne(result.letterScore as LetterScore)
+            ? skippers.length + 1
+            : round.results.length + 1;
+          overallPositions.set(result.skipperIndex, points);
         }
       });
     }
@@ -334,8 +337,10 @@ export const convertHeatResultsToRaceResults = (
           const letterScoreResults = resultsByHeat[heat]
             .filter(r => r.letterScore && skipperFinalHeat.get(r.skipperIndex) === heat);
           letterScoreResults.forEach(result => {
-            const totalCompetitorsInRound = round.results.length;
-            overallPositions.set(result.skipperIndex, totalCompetitorsInRound + 1);
+            const points = isEntrantsPlusOne(result.letterScore as LetterScore)
+              ? skippers.length + 1
+              : round.results.length + 1;
+            overallPositions.set(result.skipperIndex, points);
           });
         }
       });

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
-import { HeatManagement, HeatDesignation, HeatAssignment } from '../types/heat';
+import { HeatManagement, HeatDesignation, HeatAssignment, getHeatDisplayLabel } from '../types/heat';
+import { getLetterScoreDisplayCode } from '../types/letterScores';
 import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type, ChevronLeft, ChevronRight, Timer, Flag } from 'lucide-react';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { HeatOverallResultsModal } from './HeatOverallResultsModal';
@@ -121,10 +122,13 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
   const availableHeats = useMemo(() => {
     if (isMultiHeatMode && propAvailableHeats) {
-      return [...propAvailableHeats].reverse();
+      if (isHMS) {
+        return [...propAvailableHeats].reverse();
+      }
+      return [...propAvailableHeats];
     }
     return [];
-  }, [isMultiHeatMode, propAvailableHeats]);
+  }, [isMultiHeatMode, propAvailableHeats, isHMS]);
 
   const currentRound = heatManagement?.currentRound || initialRace;
 
@@ -156,10 +160,13 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     return completed;
   }, [isMultiHeatMode, singleFleetRace, raceResults]);
 
+  const isSHRS = heatManagement?.configuration?.scoringSystem === 'shrs';
+  const isHMS = heatManagement?.configuration?.scoringSystem === 'hms';
+
   const promotionCount = useMemo(() => {
-    if (!isHeatScoring || !heatManagement) return 0;
+    if (!isHeatScoring || !heatManagement || isSHRS) return 0;
     return heatManagement.configuration?.promotionCount || 0;
-  }, [isHeatScoring, heatManagement]);
+  }, [isHeatScoring, heatManagement, isSHRS]);
 
   const getObserversForHeat = useCallback((heat: HeatDesignation): any[] => {
     return allHeatObserversMap[heat] || [];
@@ -195,12 +202,18 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
   const autoScoringHeat = useMemo(() => {
     if (!isMultiHeatMode) return 'A' as HeatDesignation;
-    const reversed = [...availableHeats].reverse();
-    for (const heat of reversed) {
+    if (isHMS) {
+      const reversed = [...availableHeats].reverse();
+      for (const heat of reversed) {
+        if (!verifiedHeats.has(heat)) return heat;
+      }
+      return reversed[reversed.length - 1] || 'A' as HeatDesignation;
+    }
+    for (const heat of availableHeats) {
       if (!verifiedHeats.has(heat)) return heat;
     }
-    return reversed[reversed.length - 1] || 'A' as HeatDesignation;
-  }, [isMultiHeatMode, availableHeats, verifiedHeats]);
+    return availableHeats[0] || 'A' as HeatDesignation;
+  }, [isMultiHeatMode, availableHeats, verifiedHeats, isHMS]);
 
   const currentScoringHeat = selectedHeat || autoScoringHeat;
 
@@ -824,7 +837,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                 <td className={`px-1 py-1 text-center ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                   {displayResult ? (
                                     displayResult.letterScore
-                                      ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{displayResult.letterScore}</span>
+                                      ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(displayResult.letterScore, displayResult.customPoints)}</span>
                                       : <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
                                   ) : ''}
                                 </td>
@@ -891,7 +904,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                           <td className={`px-1 py-1 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                             {sfIsVerified ? (
                               cell.letterScore
-                                ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{cell.letterScore}</span>
+                                ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}</span>
                                 : hasValue && cell.isValid
                                   ? <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
                                   : ''
@@ -903,9 +916,9 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                     ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
                                     : 'bg-slate-100 text-slate-700 border border-slate-300'
                                 }`}
-                                title={`${cell.letterScore}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
+                                title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
                               >
-                                {cell.letterScore?.slice(0, 3)}
+                                {getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}
                               </button>
                             ) : (
                               <button
@@ -1101,7 +1114,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm">Heat {heat}</span>
+                    <span className="font-bold text-sm">Heat {getHeatDisplayLabel(heat, heatManagement?.configuration)}</span>
                     <span className="text-xs opacity-80">{totalPositions} skippers</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1263,7 +1276,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                   }`}>
                                     {displayResult ? (
                                       displayResult.letterScore
-                                        ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{displayResult.letterScore}</span>
+                                        ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(displayResult.letterScore, displayResult.customPoints)}</span>
                                         : <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
                                     ) : ''}
                                   </td>
@@ -1335,7 +1348,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                             }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
                               {isVerified || isHistoricalRow ? (
                                 cell.letterScore
-                                  ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{cell.letterScore}</span>
+                                  ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}</span>
                                   : hasValue && cell.isValid
                                     ? <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
                                     : ''
@@ -1347,9 +1360,9 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                       ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
                                       : 'bg-slate-100 text-slate-700 border border-slate-300'
                                   }`}
-                                  title={`${cell.letterScore}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
+                                  title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
                                 >
-                                  {cell.letterScore?.slice(0, 3)}
+                                  {getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}
                                 </button>
                               ) : (
                                 <button
@@ -1400,7 +1413,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                     }`}>
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Heat {heat} Sail Numbers
+                          Heat {getHeatDisplayLabel(heat, heatManagement?.configuration)} Sail Numbers
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
@@ -1478,7 +1491,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                       className="w-full py-2.5 rounded-lg text-white font-bold text-sm bg-green-600 hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md active:scale-[0.98]"
                     >
                       <Check size={18} />
-                      Verify Heat {heat} Results
+                      Verify Heat {getHeatDisplayLabel(heat, heatManagement?.configuration)} Results
                     </button>
                   </div>
                 )}

@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, Plus, SquarePen as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio } from 'lucide-react';
+import { Trophy, Plus, SquarePen as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio, FlaskConical } from 'lucide-react';
 import { RaceType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
-import { getStoredRaceEvents, getStoredRaceSeries, deleteRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
+import { getStoredRaceEvents, getStoredRaceSeries, getSimulatedRaceEvents, deleteRaceEvent, deleteSimulatedRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
 import { getStoredVenues } from '../../utils/venueStorage';
 import { Venue } from '../../types/venue';
 import { formatDate } from '../../utils/date';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { boatTypeColors, defaultColorScheme } from '../../constants/colors';
 import { CreateRaceModal } from './CreateRaceModal';
+import { EventSimulationModal } from '../EventSimulationModal';
 import { EventDetails } from '../EventDetails';
 import { VenueDetails } from '../VenueDetails';
 import { SingleEventManagement } from '../SingleEventManagement';
@@ -29,7 +30,7 @@ interface RaceManagementPageProps {
   onStartScoring: () => void;
 }
 
-type TimeFilter = 'all' | 'upcoming' | 'past' | 'completed' | 'pending';
+type TimeFilter = 'all' | 'upcoming' | 'past' | 'completed' | 'pending' | 'simulated';
 type SortOption = 'date-asc' | 'date-desc' | 'name-asc' | 'name-desc' | 'status';
 
 export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
@@ -50,6 +51,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
   const initialTimeFilter = (location.state as any)?.activeTab === 'pending' ? 'pending' : 'upcoming';
 
   const [quickRaces, setQuickRaces] = useState<RaceEvent[]>([]);
+  const [simulatedEvents, setSimulatedEvents] = useState<RaceEvent[]>([]);
   const [series, setSeries] = useState<RaceSeries[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +64,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
   const [sortBy, setSortBy] = useState<SortOption>('date-asc');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showSimulationModal, setShowSimulationModal] = useState(false);
   const [pendingEvents, setPendingEvents] = useState<any[]>([]);
   const [createType, setCreateType] = useState<'quick' | 'series' | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -563,7 +566,8 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                 .from('quick_races')
                 .select('id, public_event_id, skippers, race_results, last_completed_race, completed')
                 .eq('club_id', currentClub.clubId)
-                .not('public_event_id', 'is', null);
+                .not('public_event_id', 'is', null)
+                .neq('is_simulated', true);
 
               console.log('📋 [fetchRaces] Found', localCopies?.length || 0, 'local copies of public events');
 
@@ -647,6 +651,15 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
       setQuickRaces(enrichedRaces);
       setSeries(enrichedSeries);
       setVenues(storedVenues);
+
+      // Fetch simulated events separately (they're excluded from getStoredRaceEvents)
+      try {
+        const simEvents = await getSimulatedRaceEvents();
+        setSimulatedEvents(simEvents);
+      } catch (simErr) {
+        console.error('Error fetching simulated events:', simErr);
+        setSimulatedEvents([]);
+      }
     } catch (err: any) {
       console.error(`❌ Error fetching races after ${Date.now() - startTime}ms:`, err);
 
@@ -987,8 +1000,8 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     setShowEditModal('quick');
   };
 
-  const handleDeleteClick = (id: string, type: 'quick' | 'series') => {
-    setItemToDelete({ id, type });
+  const handleDeleteClick = (id: string, type: 'quick' | 'series', isSimulated?: boolean) => {
+    setItemToDelete({ id, type, isSimulated });
     setShowDeleteConfirm(true);
   };
 
@@ -1002,7 +1015,11 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
 
     try {
       if (itemToDelete.type === 'quick') {
-        await deleteRaceEvent(itemToDelete.id);
+        if (itemToDelete.isSimulated) {
+          await deleteSimulatedRaceEvent(itemToDelete.id);
+        } else {
+          await deleteRaceEvent(itemToDelete.id);
+        }
       } else {
         await deleteRaceSeries(itemToDelete.id);
       }
@@ -1167,9 +1184,13 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
   };
 
   // Filter and sort logic
-  const filterByTime = (event: RaceEvent | { date: string, completed?: boolean }) => {
+  const filterByTime = (event: RaceEvent | { date: string, completed?: boolean, is_simulated?: boolean }) => {
     const isPast = isDatePast(event.date);
     const isCompleted = event.completed || false;
+
+    if (timeFilter === 'simulated') {
+      return false;
+    }
 
     switch (timeFilter) {
       case 'upcoming':
@@ -1218,7 +1239,6 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     const matchesEventType = filterEventType === 'all' || filterEventType === 'single';
     const matchesTime = filterByTime(race);
 
-    // Year filter
     const matchesYear = new Date(race.date).getFullYear() === selectedYear;
 
     return matchesSearch && matchesClass && matchesFormat && matchesEventType && matchesTime && matchesYear;
@@ -1471,7 +1491,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDeleteClick(race.id, 'quick');
+                  handleDeleteClick(race.id, 'quick', race.is_simulated);
                 }}
                 className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${
                   darkMode
@@ -2353,12 +2373,30 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
                   >
-                    <div className="p-2 rounded-lg bg-purple-600/20">
-                      <Calendar className="text-purple-400" size={20} />
+                    <div className="p-2 rounded-lg bg-teal-600/20">
+                      <Calendar className="text-teal-400" size={20} />
                     </div>
                     <div>
                       <div className="text-white font-medium text-sm">Race Series</div>
                       <div className="text-slate-400 text-xs">Create a multi-round race series</div>
+                    </div>
+                  </button>
+
+                  <div className="mx-3 my-1 border-t border-slate-700/50"></div>
+
+                  <button
+                    onClick={() => {
+                      setShowDropdown(false);
+                      setShowSimulationModal(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                  >
+                    <div className="p-2 rounded-lg bg-amber-600/20">
+                      <FlaskConical className="text-amber-400" size={20} />
+                    </div>
+                    <div>
+                      <div className="text-white font-medium text-sm">Event Simulation</div>
+                      <div className="text-slate-400 text-xs">Import HMS data or create a test event</div>
                     </div>
                   </button>
                 </div>
@@ -2398,11 +2436,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           {/* Time Filter Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             {[
-              { value: 'all', label: 'All Events', count: sortedQuickRaces.length + sortedSeries.length },
+              { value: 'all', label: 'All Events', count: quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear).length + series.filter(s => s.rounds.some(r => new Date(r.date).getFullYear() === selectedYear)).length },
               { value: 'upcoming', label: 'Upcoming', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => !isDatePast(e.date) && !e.completed).length },
               { value: 'past', label: 'Past', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => isDatePast(e.date) && !e.completed).length },
               { value: 'completed', label: 'Completed', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => e.completed).length },
               { value: 'pending', label: 'Pending', count: pendingEvents.length },
+              { value: 'simulated', label: 'Simulated Events', count: simulatedEvents.length },
             ].map((tab) => (
               <button
                 key={tab.value}
@@ -2444,7 +2483,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           `}>
             Loading events...
           </div>
-        ) : filteredQuickRaces.length === 0 && filteredSeries.length === 0 && timeFilter !== 'pending' ? (
+        ) : filteredQuickRaces.length === 0 && filteredSeries.length === 0 && timeFilter !== 'pending' && timeFilter !== 'simulated' ? (
           <div className={`
             text-center py-16 rounded-xl border
             ${darkMode
@@ -2751,8 +2790,51 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
               </div>
             )}
 
+            {/* Simulated Events Section */}
+            {timeFilter === 'simulated' && (
+              <div>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 rounded-lg bg-cyan-600/20">
+                    <FlaskConical className="text-cyan-400" size={24} />
+                  </div>
+                  <div>
+                    <h2 className={`text-2xl font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                      Simulated Events
+                    </h2>
+                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Events created via the HMS Simulation tool
+                    </p>
+                  </div>
+                </div>
+
+                {simulatedEvents.length === 0 ? (
+                  <div className={`text-center py-12 rounded-lg ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                    <FlaskConical size={48} className={`mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
+                    <p className={`text-lg ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      No simulated events
+                    </p>
+                    <p className={`text-sm mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                      Use the HMS Simulation tool to create test events
+                    </p>
+                  </div>
+                ) : (
+                  <div className={`grid gap-6 items-start ${
+                    viewMode === 'grid'
+                      ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                      : 'grid-cols-1'
+                  }`}>
+                    {simulatedEvents.map((event) => (
+                      <React.Fragment key={event.id}>
+                        {renderEventCard(event)}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Series Section */}
-            {timeFilter !== 'pending' && sortedSeries.length > 0 && (
+            {timeFilter !== 'pending' && timeFilter !== 'simulated' && sortedSeries.length > 0 && (
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 rounded-lg bg-purple-600/20">
@@ -2782,12 +2864,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             )}
 
             {/* Separator between Series and Single Events */}
-            {timeFilter !== 'pending' && sortedSeries.length > 0 && Object.entries(groupedSingleEvents).length > 0 && (
+            {timeFilter !== 'pending' && timeFilter !== 'simulated' && sortedSeries.length > 0 && Object.entries(groupedSingleEvents).length > 0 && (
               <div className={`my-8 border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}></div>
             )}
 
             {/* Single Events Section */}
-            {timeFilter !== 'pending' && Object.entries(groupedSingleEvents).length > 0 && (
+            {timeFilter !== 'pending' && timeFilter !== 'simulated' && Object.entries(groupedSingleEvents).length > 0 && (
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 rounded-lg bg-blue-600/20">
@@ -2885,6 +2967,19 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             await fetchRaces();
           }}
           editingSeries={series.find(s => s.id === editingEvent.seriesId)}
+        />
+      )}
+
+      {showSimulationModal && (
+        <EventSimulationModal
+          darkMode={darkMode}
+          onClose={() => setShowSimulationModal(false)}
+          onSuccess={async (event) => {
+            setShowSimulationModal(false);
+            await new Promise(resolve => setTimeout(resolve, 300));
+            await fetchRaces();
+            handleStartScoring(event);
+          }}
         />
       )}
 

@@ -51,6 +51,7 @@ export const EventCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
           .from('quick_races')
           .select('id, race_date, event_name')
           .eq('club_id', currentClub.clubId)
+          .neq('is_simulated', true)
           .gte('race_date', todayISO)
           .order('race_date', { ascending: true });
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, Youtube, AlertTriangle, CheckCircle, Video, Calendar, Trophy } from 'lucide-react';
+import { X, Upload, Youtube, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Video, Calendar, Trophy } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -99,6 +99,7 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
         .from('quick_races')
         .select('id, event_name, race_class, race_date')
         .eq('club_id', currentClub.clubId)
+        .neq('is_simulated', true)
         .order('race_date', { ascending: false });
 
       if (quickRacesError) throw quickRacesError;

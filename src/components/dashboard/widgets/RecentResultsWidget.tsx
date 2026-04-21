@@ -306,14 +306,15 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
                     });
                   }
 
-                  // Get top 3 from standings
                   if (standings && standings.length > 0) {
                     standings.slice(0, 3).forEach((standing, idx) => {
-                      topThree.push({
-                        name: standing.name,
-                        avatarUrl: memberAvatarMap[standing.name],
-                        position: idx + 1
-                      });
+                      if (standing?.name) {
+                        topThree.push({
+                          name: standing.name,
+                          avatarUrl: memberAvatarMap[standing.name],
+                          position: idx + 1
+                        });
+                      }
                     });
                   }
                 } catch (error) {

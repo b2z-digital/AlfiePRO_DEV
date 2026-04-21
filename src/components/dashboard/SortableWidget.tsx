@@ -2,11 +2,40 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Palette, Check } from 'lucide-react';
+import { GripVertical, Palette, Check, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { WidgetConfig } from '../../types/dashboard';
 import { getWidgetDefinition } from './WidgetRegistry';
 import { WidgetColorTheme } from '../../types/dashboard';
 import { WIDGET_THEME_OPTIONS } from '../../utils/widgetThemes';
+
+class WidgetErrorBoundary extends React.Component<
+  { children: React.ReactNode; widgetType: string },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; widgetType: string }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error) {
+    console.error(`Widget "${this.props.widgetType}" crashed:`, error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-full flex items-center justify-center bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+          <div className="text-center">
+            <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto mb-2" />
+            <p className="text-xs text-slate-400">Widget failed to load</p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface SortableWidgetProps {
   widget: WidgetConfig;
@@ -100,13 +129,15 @@ export const SortableWidget: React.FC<SortableWidgetProps> = ({
       className={`relative h-full ${isEditMode && !isDragging && !isHoveringHandle ? 'animate-wobble' : ''}`}
     >
       <div className="relative">
-        <WidgetComponent
-          widgetId={widget.id}
-          isEditMode={isEditMode}
-          onRemove={onRemove}
-          settings={widget.settings}
-          colorTheme={currentTheme}
-        />
+        <WidgetErrorBoundary widgetType={widget.type}>
+          <WidgetComponent
+            widgetId={widget.id}
+            isEditMode={isEditMode}
+            onRemove={onRemove}
+            settings={widget.settings}
+            colorTheme={currentTheme}
+          />
+        </WidgetErrorBoundary>
       </div>
       {isEditMode && (
         <>

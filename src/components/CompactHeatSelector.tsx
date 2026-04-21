@@ -123,7 +123,7 @@ export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
           <div className="relative z-10 flex items-center gap-3">
             {/* Heat Icon */}
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm">
-              <span className="text-xl font-bold text-white">{selectedHeat}</span>
+              <span className="text-xl font-bold text-white">{getHeatLabel(selectedHeat)}</span>
             </div>
 
             {/* Heat Info */}
@@ -207,7 +207,7 @@ export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
                           ? 'bg-slate-600 text-slate-300'
                           : 'bg-slate-200 text-slate-700'}
                     `}>
-                      {heat}
+                      {getHeatLabel(heat)}
                     </div>
 
                     <div className="flex-1 text-left">
@@ -313,7 +313,7 @@ export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
                               ? 'bg-slate-600'
                               : 'bg-slate-200'}
                         `}>
-                          {heat}
+                          {getHeatLabel(heat)}
                         </div>
 
                         <div className="flex-1 text-left">

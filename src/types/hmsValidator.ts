@@ -15,8 +15,9 @@ export interface ParsedHMSRaceResult {
   sailNumber: string;
   position: number | null;
   points: number;
-  letterScore?: string; // 'DNF', 'DNS', 'DNC', 'DSQ', 'OK', etc.
+  letterScore?: string; // 'DNF', 'DNS', 'DNC', 'DSQ', 'RDG', etc.
   comment?: string;
+  customPoints?: number; // Fixed points for RDGfix, -1 for RDGave
 }
 
 export interface ParsedHMSData {
@@ -28,6 +29,7 @@ export interface ParsedHMSData {
   numRaces: number;
   hasHeats: boolean;
   heats?: string[]; // ['A', 'B', 'C', 'D', 'E']
+  promotionCount?: number;
   worksheetNames: string[];
   rawData?: any; // For debugging
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Trophy, Calendar, MapPin, ChevronRight, Filter } from 'lucide-react';
+import { Trophy, Calendar, MapPin, ChevronRight, ListFilter as Filter } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { Club } from '../../types/club';
 import { formatDate } from '../../utils/date';
@@ -73,6 +73,7 @@ export const PublicResultsListPage: React.FC = () => {
         .select('id, event_name, race_date, race_venue, race_class, race_results, skippers, completed')
         .eq('club_id', clubId)
         .eq('completed', true)
+        .neq('is_simulated', true)
         .order('race_date', { ascending: false });
 
       const { data: seriesRounds } = await supabase

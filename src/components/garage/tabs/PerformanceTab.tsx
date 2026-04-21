@@ -76,6 +76,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({ boatId, sailNumb
         .select('id, race_date, event_name, race_results, skippers')
         .not('race_results', 'is', null)
         .not('skippers', 'is', null)
+        .neq('is_simulated', true)
         .order('race_date', { ascending: false });
 
       if (raceData) {

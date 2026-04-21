@@ -1,12 +1,12 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Skipper } from '../types';
-import { HeatDesignation, HeatManagement } from '../types/heat';
+import { HeatDesignation, HeatManagement, getHeatDisplayLabel } from '../types/heat';
 import { RaceEvent } from '../types/race';
-import { LetterScore } from '../types/letterScores';
+import { LetterScore, isEntrantsPlusOne, getLetterScoreDisplayCode } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
-import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer, Trophy } from 'lucide-react';
+import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer, Trophy, TableProperties } from 'lucide-react';
 import { useNotification } from '../contexts/NotificationContext';
-import { HeatOverallResultsModal } from './HeatOverallResultsModal';
+import { HmsScoreSheet } from './HmsScoreSheet';
 
 const LETTER_SCORE_CODES: LetterScore[] = [
   'DNS', 'DNF', 'DSQ', 'OCS', 'BFD', 'UFD', 'RDG', 'DPI',
@@ -28,6 +28,7 @@ interface CellData {
   points: string;
   letterScore?: LetterScore | null;
   customPoints?: number;
+  hmsPoints?: number;
   skipperIndex?: number | null;
   isValid?: boolean;
   isDuplicate?: boolean;
@@ -102,7 +103,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [resetConfirmRace, setResetConfirmRace] = useState<number | null>(null);
 
-  const [showOverallResults, setShowOverallResults] = useState(false);
+  const hasHmsImport = raceResults.some((r: any) => r.hmsPoints != null && r.hmsPoints > 0);
+  const [activeTab, setActiveTab] = useState<'races' | 'scoresheet'>(hasHmsImport ? 'scoresheet' : 'races');
   const [showLetterScoreModal, setShowLetterScoreModal] = useState(false);
   const [letterScoreTarget, setLetterScoreTarget] = useState<{
     heat: HeatDesignation;
@@ -151,10 +153,11 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         if (sailNo) {
           newCells[key] = {
             sailNumber: String(sailNo),
-            comment: result.letterScore || 'OK',
+            comment: result.letterScore ? getLetterScoreDisplayCode(result.letterScore, result.customPoints) : 'OK',
             points: result.letterScore ? '' : (result.position?.toString() || ''),
             letterScore: result.letterScore || null,
             customPoints: result.customPoints,
+            hmsPoints: result.hmsPoints,
             skipperIndex: result.skipperIndex,
             isValid: true,
             isDuplicate: false,
@@ -326,7 +329,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         ...prev,
         [key]: {
           ...prev[key],
-          comment: score,
+          comment: getLetterScoreDisplayCode(score, customPoints),
           points: '',
           letterScore: score,
           customPoints: customPoints,
@@ -411,17 +414,21 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         const sailLower = cell.sailNumber.trim().toLowerCase();
 
         if (!cell.isValid && cell.skipperIndex == null) {
-          errors.push(`Heat ${heat}, ${getOrdinal(pos)}: Sail "${cell.sailNumber}" not registered`);
+          errors.push(`Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}, ${getOrdinal(pos)}: Sail "${cell.sailNumber}" not registered`);
         }
 
         if (heatEntries.includes(sailLower)) {
-          errors.push(`Heat ${heat}: Duplicate entry "${cell.sailNumber}"`);
+          errors.push(`Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}: Duplicate entry "${cell.sailNumber}"`);
         }
         heatEntries.push(sailLower);
 
         const existing = allSailsInRace.get(sailLower);
         if (existing) {
-          errors.push(`"${cell.sailNumber}" appears in Heat ${existing.heat} (${getOrdinal(existing.position)}) and Heat ${heat} (${getOrdinal(pos)})`);
+          const existingIsPromotion = race > 1 && existing.heat !== 'A' && existing.position <= promotionCount;
+          const currentIsPromotion = race > 1 && heat !== 'A' && pos <= promotionCount;
+          if (!existingIsPromotion && !currentIsPromotion) {
+            errors.push(`"${cell.sailNumber}" appears in Heat ${getHeatDisplayLabel(existing.heat, heatManagement.configuration)} (${getOrdinal(existing.position)}) and Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)} (${getOrdinal(pos)})`);
+          }
         } else {
           allSailsInRace.set(sailLower, { heat, position: pos });
         }
@@ -438,7 +445,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       errors,
       warnings,
     };
-  }, [cells, heats, maxPositions, skippers]);
+  }, [cells, heats, maxPositions, skippers, promotionCount]);
 
   const handleVerifyRace = useCallback((race: number) => {
     const result = verifyRace(race);
@@ -462,6 +469,17 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return position <= promotionCount;
   };
 
+  const totalEntrantsCount = useMemo(() => {
+    const uniqueSkippers = new Set<number>();
+    for (const key of Object.keys(cells)) {
+      const cell = cells[key];
+      if (cell?.sailNumber?.trim() && cell.skipperIndex != null) {
+        uniqueSkippers.add(cell.skipperIndex);
+      }
+    }
+    return uniqueSkippers.size;
+  }, [cells]);
+
   const getHeatEntryCount = useCallback((h: HeatDesignation, race: number): number => {
     let count = 0;
     for (let p = 1; p <= maxPositions; p++) {
@@ -471,6 +489,12 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return count;
   }, [cells, maxPositions]);
 
+  const isPositionOccupying = useCallback((c: CellData | undefined): boolean => {
+    if (!c?.letterScore) return true;
+    if (c.letterScore === 'RDG' && c.customPoints !== undefined && c.customPoints > 0) return true;
+    return false;
+  }, []);
+
   const getHeatNonLetterNonPromotedCount = useCallback((h: HeatDesignation, race: number): number => {
     let count = 0;
     for (let p = 1; p <= maxPositions; p++) {
@@ -479,10 +503,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       if (!c?.sailNumber?.trim()) continue;
       const isProm = h !== 'A' && race > 1 && p <= promotionCount;
       if (isProm) continue;
-      if (!c.letterScore) count++;
+      if (isPositionOccupying(c)) count++;
     }
     return count;
-  }, [cells, maxPositions, promotionCount]);
+  }, [cells, maxPositions, promotionCount, isPositionOccupying]);
 
   const getOkCountAbovePosition = useCallback((h: HeatDesignation, position: number, race: number): number => {
     let count = 0;
@@ -492,10 +516,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       if (!c?.sailNumber?.trim()) continue;
       const isProm = h !== 'A' && race > 1 && p <= promotionCount;
       if (isProm) continue;
-      if (!c.letterScore) count++;
+      if (isPositionOccupying(c)) count++;
     }
     return count;
-  }, [cells, promotionCount]);
+  }, [cells, promotionCount, isPositionOccupying]);
 
   const getHeatOffset = useCallback((heat: HeatDesignation, race: number): number => {
     if (race === 1) return 0;
@@ -563,10 +587,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       const isPromoted = heat !== 'A' && race > 1 && pos <= promotionCount;
 
       if (!isPromoted) {
-        if (cell.letterScore) {
-          letterCount++;
-        } else {
+        if (isPositionOccupying(cell)) {
           scoreCount++;
+        } else {
+          letterCount++;
         }
       }
     }
@@ -574,28 +598,81 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const maxExp = getMaxExpForHeat(heat, race);
 
     return { scoreCount, letterCount, totalPoints, entryCount, maxExp };
-  }, [cells, maxPositions, promotionCount, getMaxExpForHeat]);
+  }, [cells, maxPositions, promotionCount, getMaxExpForHeat, isPositionOccupying]);
 
   const getEmptyRowScore = useCallback((heat: HeatDesignation, race: number): number | string => {
     const entryCount = getHeatEntryCount(heat, race);
     if (entryCount === 0) return '';
-    const regularCount = getHeatNonLetterNonPromotedCount(heat, race);
-    if (race === 1 || heat === 'A') return regularCount;
-    const offset = getHeatOffset(heat, race);
-    return offset + regularCount;
-  }, [getHeatOffset, getHeatEntryCount, getHeatNonLetterNonPromotedCount]);
-
-  const SEVERE_LETTER_SCORES: LetterScore[] = ['UFD', 'BFD', 'DSQ', 'DNE', 'WDN'];
-
-  const getLetterScorePoints = useCallback((heat: HeatDesignation, race: number, ls: LetterScore): number => {
     if (race === 1) {
       return getLargestHeatEntryCount(race) + 1;
     }
-    if (SEVERE_LETTER_SCORES.includes(ls)) {
+    if (heat === 'A') {
+      return entryCount + 1;
+    }
+    const offset = getHeatOffset(heat, race);
+    const nonPromoted = Math.max(0, entryCount - promotionCount);
+    return offset + nonPromoted + 1;
+  }, [getHeatOffset, getHeatEntryCount, getLargestHeatEntryCount, promotionCount]);
+
+  const getLetterScorePoints = useCallback((heat: HeatDesignation, race: number, ls: LetterScore): number => {
+    if (isEntrantsPlusOne(ls)) {
+      return totalEntrantsCount + 1;
+    }
+    if (race === 1) {
+      return getLargestHeatEntryCount(race) + 1;
+    }
+    const entries = getHeatEntryCount(heat, race);
+    if (entries === 0) {
       return getTotalNonPromotedFleet(race) + 1;
     }
-    return getMaxExpForHeat(heat, race);
-  }, [getLargestHeatEntryCount, getTotalNonPromotedFleet, getMaxExpForHeat]);
+    if (heat === 'A') {
+      return entries + 1;
+    }
+    const offset = getHeatOffset(heat, race);
+    const nonPromoted = Math.max(0, entries - promotionCount);
+    return offset + nonPromoted + 1;
+  }, [totalEntrantsCount, getLargestHeatEntryCount, getTotalNonPromotedFleet, getHeatEntryCount, getHeatOffset, promotionCount]);
+
+  const calculateRdgAverage = useCallback((skipperIndex: number, excludeRace: number): number | null => {
+    const scores: number[] = [];
+    for (let r = 2; r < excludeRace; r++) {
+      let found = false;
+      for (const h of heats) {
+        for (let p = 1; p <= maxPositions; p++) {
+          const k = getCellKey(h, p, r);
+          const c = cells[k];
+          if (!c?.sailNumber?.trim() || c.skipperIndex !== skipperIndex) continue;
+          const isProm = h !== 'A' && r > 1 && p <= promotionCount;
+          if (isProm) continue;
+          if (c.letterScore === 'RDG' && (c.customPoints === -1 || c.customPoints === -2)) continue;
+
+          if (c.hmsPoints != null && c.hmsPoints > 0) {
+            scores.push(c.hmsPoints);
+          } else if (c.letterScore) {
+            if (c.customPoints !== undefined && c.customPoints > 0) {
+              scores.push(c.customPoints);
+            } else {
+              scores.push(getLetterScorePoints(h, r, c.letterScore));
+            }
+          } else {
+            const okAbove = getOkCountAbovePosition(h, p, r);
+            if (r === 1 || h === 'A') {
+              scores.push(okAbove + 1);
+            } else {
+              const offset = getHeatOffset(h, r);
+              scores.push(offset + okAbove + 1);
+            }
+          }
+          found = true;
+          break;
+        }
+        if (found) break;
+      }
+    }
+    if (scores.length === 0) return null;
+    const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
+    return Math.round(avg * 10) / 10;
+  }, [cells, heats, maxPositions, promotionCount, getLetterScorePoints, getOkCountAbovePosition, getHeatOffset]);
 
   const getPointsForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();
@@ -609,16 +686,27 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
     if (cell?.letterScore) {
       if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
-      if (cell.customPoints === -1) return 'AVG';
+      if (cell.customPoints === -1 || cell.customPoints === -2) {
+        if (cell.skipperIndex != null) {
+          const avg = calculateRdgAverage(cell.skipperIndex, race);
+          if (avg !== null) return avg;
+        }
+        return 'AVG';
+      }
+      if (cell.hmsPoints != null && cell.hmsPoints > 0) return cell.hmsPoints;
       return getLetterScorePoints(heat, race, cell.letterScore);
     }
 
-    if (race === 1 || heat === 'A') return position;
+    if (cell?.hmsPoints != null && cell.hmsPoints > 0) {
+      return cell.hmsPoints;
+    }
+
+    const okAbove = getOkCountAbovePosition(heat, position, race);
+    if (race === 1 || heat === 'A') return okAbove + 1;
 
     const offset = getHeatOffset(heat, race);
-    const effectivePos = position - promotionCount;
-    return offset + effectivePos;
-  }, [promotionCount, getHeatOffset, getLetterScorePoints]);
+    return offset + okAbove + 1;
+  }, [promotionCount, getHeatOffset, getLetterScorePoints, getOkCountAbovePosition, calculateRdgAverage]);
 
   const getExpForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();
@@ -630,20 +718,17 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
 
     if (hasSail) {
-      if (cell?.letterScore) {
-        const okAbove = getOkCountAbovePosition(heat, position, race);
-        if (race === 1 || heat === 'A') return okAbove;
-        const offset = getHeatOffset(heat, race);
-        return offset + okAbove;
+      if (cell?.letterScore && !isPositionOccupying(cell)) {
+        return getLetterScorePoints(heat, race, cell.letterScore);
       }
-      if (race === 1 || heat === 'A') return position;
+      const okAbove = getOkCountAbovePosition(heat, position, race);
+      if (race === 1 || heat === 'A') return okAbove + 1;
       const offset = getHeatOffset(heat, race);
-      const effectivePos = position - promotionCount;
-      return offset + effectivePos;
+      return offset + okAbove + 1;
     }
 
     return getEmptyRowScore(heat, race);
-  }, [getHeatOffset, getHeatEntryCount, getEmptyRowScore, getOkCountAbovePosition, promotionCount]);
+  }, [getHeatOffset, getHeatEntryCount, getEmptyRowScore, getOkCountAbovePosition, promotionCount, isPositionOccupying, getLetterScorePoints]);
 
   const availableSkippersForDropdown = useMemo(() => {
     if (!dropdownTarget) return [];
@@ -699,6 +784,39 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
   }, [handleSailNumberBlur]);
 
+  const getExpBasedScore = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
+    const hasSail = !!cell?.sailNumber?.trim();
+    if (!hasSail) return '';
+
+    const isPromoted = heat !== 'A' && race > 1 && position <= promotionCount;
+    if (isPromoted) return '#N/A';
+
+    if (cell?.letterScore) {
+      if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
+      if (cell.customPoints === -1 || cell.customPoints === -2) {
+        if (cell.skipperIndex != null) {
+          const avg = calculateRdgAverage(cell.skipperIndex, race);
+          if (avg !== null) return avg;
+        }
+        return 'AVG';
+      }
+      if (cell.hmsPoints != null && cell.hmsPoints > 0) return cell.hmsPoints;
+      return getLetterScorePoints(heat, race, cell.letterScore);
+    }
+
+    if (cell?.hmsPoints != null && cell.hmsPoints > 0) {
+      return cell.hmsPoints;
+    }
+
+    const okAbove = getOkCountAbovePosition(heat, position, race);
+    if (race === 1 || heat === 'A') {
+      return okAbove + 1;
+    }
+
+    const offset = getHeatOffset(heat, race);
+    return offset + okAbove + 1;
+  }, [promotionCount, getLetterScorePoints, getOkCountAbovePosition, getHeatOffset, calculateRdgAverage]);
+
   const overallRaceResults = useMemo(() => {
     const results: any[] = [];
     const seenSkipperRaces = new Set<string>();
@@ -717,7 +835,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           if (seenSkipperRaces.has(skipperRaceKey)) continue;
           seenSkipperRaces.add(skipperRaceKey);
 
-          const pts = getPointsForCell(heat, position, race, cell);
+          const pts = getExpBasedScore(heat, position, race, cell);
           if (pts === '' || pts === '#N/A') continue;
 
           results.push({
@@ -725,26 +843,56 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             skipperIndex: cell.skipperIndex,
             position: typeof pts === 'number' ? pts : parseInt(String(pts), 10) || 999,
             letterScore: cell.letterScore || undefined,
+            customPoints: cell.customPoints,
+            hmsPoints: cell.hmsPoints,
           });
         }
       }
     }
     return results;
-  }, [cells, heats, maxPositions, promotionCount, getPointsForCell]);
+  }, [cells, heats, maxPositions, promotionCount, getExpBasedScore]);
 
   const raceSeparator = 'border-l-2 border-l-slate-400';
 
   return (
     <div className={`flex flex-col h-full text-slate-900 relative`}>
-      <div className="absolute top-[-44px] right-0 z-30">
+      <div className="absolute top-[-44px] right-0 z-30 flex items-center gap-1">
         <button
-          onClick={() => setShowOverallResults(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          onClick={() => setActiveTab('races')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'races'
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+          }`}
+        >
+          <TableProperties size={14} />
+          Race Results
+        </button>
+        <button
+          onClick={() => setActiveTab('scoresheet')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'scoresheet'
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+          }`}
         >
           <Trophy size={14} />
-          Overall Results
+          Score Sheet
         </button>
       </div>
+
+      {activeTab === 'scoresheet' ? (
+        <div className="flex-1 overflow-auto relative">
+          <HmsScoreSheet
+            skippers={skippers}
+            heatManagement={heatManagement}
+            dropRules={currentEvent?.dropRules || [4, 8, 16, 24, 32, 40]}
+            darkMode={darkMode}
+            externalRaceResults={overallRaceResults}
+            eventName={currentEvent?.eventName || currentEvent?.clubName}
+          />
+        </div>
+      ) : (
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-auto relative"
@@ -861,7 +1009,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                       className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[11px] text-black whitespace-nowrap text-center"
                       style={{ backgroundColor: '#FF00FF' }}
                     >
-                      Heat {heat}
+                      Heat {getHeatDisplayLabel(heat, heatManagement.configuration)}
                     </td>
                     {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
                       const stats = getHeatRaceStats(heat, race);
@@ -1016,7 +1164,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                   </div>
                                 ) : ls ? (
                                   <div className="px-1 py-0 text-[10px] text-center font-medium text-black leading-none">
-                                    {ls}
+                                    {getLetterScoreDisplayCode(ls, cell?.customPoints)}
                                   </div>
                                 ) : hasSail ? (
                                   <div className="px-1 py-0 text-[10px] text-center font-medium text-black leading-none">
@@ -1056,6 +1204,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           </tbody>
         </table>
       </div>
+      )}
 
       {resetConfirmRace !== null && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1199,16 +1348,6 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           isHeatRacing={true}
         />
       )}
-
-      <HeatOverallResultsModal
-        isOpen={showOverallResults}
-        onClose={() => setShowOverallResults(false)}
-        skippers={skippers}
-        heatManagement={heatManagement}
-        dropRules={currentEvent?.dropRules || [4, 8, 16, 24, 32, 40]}
-        darkMode={darkMode}
-        externalRaceResults={overallRaceResults}
-      />
     </div>
   );
 };

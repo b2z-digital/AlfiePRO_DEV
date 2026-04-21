@@ -55,7 +55,7 @@ export const useDataPreloader = () => {
       };
 
       const [eventsData, seriesData, membersData, articlesData, meetingsData] = await Promise.allSettled([
-        supabase.from('quick_races').select('*').eq('club_id', currentClub.clubId),
+        supabase.from('quick_races').select('*').eq('club_id', currentClub.clubId).neq('is_simulated', true),
         supabase.from('race_series').select('*').eq('club_id', currentClub.clubId),
         supabase.from('members').select('*').eq('club_id', currentClub.clubId),
         supabase.from('articles').select('*').eq('club_id', currentClub.clubId).order('created_at', { ascending: false }).limit(50),

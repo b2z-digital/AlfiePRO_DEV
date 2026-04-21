@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { X, Trophy, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { Skipper } from '../types';
-import { HeatManagement, HeatDesignation } from '../types/heat';
+import { HeatManagement, HeatDesignation, getHeatDisplayLabel } from '../types/heat';
 import { convertHeatResultsToRaceResults } from '../utils/heatUtils';
 import { compareWithCountback } from '../utils/scratchCalculations';
 import { breakTie } from '../utils/hmsHeatSystem';
@@ -355,7 +355,7 @@ const HeatOverallResultsContent: React.FC<HeatOverallResultsModalProps> = ({
                     let fleetSeparator: React.ReactNode = null;
                     if (hasFinals && standing.fleet !== currentFleet) {
                       currentFleet = standing.fleet;
-                      const fleetName = FLEET_NAMES[standing.fleet] || `Fleet ${standing.fleet}`;
+                      const fleetName = FLEET_NAMES[standing.fleet] || `Fleet ${getHeatDisplayLabel(standing.fleet as HeatDesignation, heatManagement.configuration)}`;
                       const fleetColor = FLEET_COLORS[standing.fleet];
                       const totalCols = 5 + completedRaces.length + 2 + (hasFinals ? 1 : 0);
                       fleetSeparator = (
@@ -410,7 +410,7 @@ const HeatOverallResultsContent: React.FC<HeatOverallResultsModalProps> = ({
                             <td className={`px-3 py-3 text-center text-xs font-semibold ${
                               FLEET_COLORS[standing.fleet]?.text || (darkMode ? 'text-slate-400' : 'text-slate-600')
                             }`}>
-                              {standing.fleet === 'A' ? 'G' : standing.fleet === 'B' ? 'S' : standing.fleet === 'C' ? 'B' : standing.fleet}
+                              {standing.fleet === 'A' ? 'G' : standing.fleet === 'B' ? 'S' : standing.fleet === 'C' ? 'B' : getHeatDisplayLabel(standing.fleet as HeatDesignation, heatManagement.configuration)}
                             </td>
                           )}
                           <td className={`px-4 py-3 font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
@@ -441,14 +441,14 @@ const HeatOverallResultsContent: React.FC<HeatOverallResultsModalProps> = ({
                             );
                           })}
                           <td className={`px-4 py-3 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            {standing.total}
+                            {Number.isFinite(standing.total) ? Number(standing.total).toFixed(1) : standing.total}
                           </td>
                           <td className={`px-4 py-3 text-center font-bold bg-blue-500/10 ${
                             (isTopThree || isFleetTopThree)
                               ? 'text-yellow-600'
                               : darkMode ? 'text-blue-400' : 'text-blue-700'
                           }`}>
-                            {standing.net}
+                            {Number.isFinite(standing.net) ? Number(standing.net).toFixed(1) : standing.net}
                           </td>
                         </tr>
                       </React.Fragment>
@@ -467,7 +467,7 @@ const HeatOverallResultsContent: React.FC<HeatOverallResultsModalProps> = ({
           <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
             {standings.length} skippers
             {Array.isArray(dropRules) && dropRules.length > 0 && ` • Drop rules: ${dropRules.join(', ')} races`}
-            {isShrs && ' • SHR scoring (position within heat)'}
+            {isShrs && ' • SHRS scoring (position within heat)'}
           </div>
           <button
             onClick={onClose}

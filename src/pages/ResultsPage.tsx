@@ -354,7 +354,8 @@ export const ResultsPage: React.FC = () => {
                 .from('quick_races')
                 .select('id, public_event_id, skippers, race_results, last_completed_race, completed')
                 .eq('club_id', currentClub.clubId)
-                .not('public_event_id', 'is', null);
+                .not('public_event_id', 'is', null)
+                .neq('is_simulated', true);
 
               console.log('📋 [ResultsPage] Found', localCopies?.length || 0, 'local copies of public events');
 
@@ -389,11 +390,11 @@ export const ResultsPage: React.FC = () => {
         console.error('Error fetching public events:', err);
       }
 
-      // Combine club events with public events
-      // For state/national associations, only show public events (not club events)
+      const nonSimulatedEvents = events.filter(e => !(e as any).is_simulated);
+
       const allEvents = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
         ? publicEvents
-        : [...events, ...publicEvents];
+        : [...nonSimulatedEvents, ...publicEvents];
 
       // For state/national associations, don't show club series
       const filteredSeries = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')

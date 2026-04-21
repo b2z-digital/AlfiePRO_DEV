@@ -4,6 +4,7 @@ import { Skipper, RaceResult } from '../types';
 import { RaceEvent } from '../types/race';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import type { LetterScore } from '../types/letterScores';
+import { getLetterScoreDisplayCode } from '../types/letterScores';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { PostRaceHandicapModal } from './touch-mode/PostRaceHandicapModal';
@@ -816,7 +817,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         return 'HMS Heat System';
       } else if (heatScoringSystem === 'shrs') {
         const mode = currentEvent.heatManagement.configuration.shrsAssignmentMode;
-        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
+        return `SHRS-${mode === 'preset' ? 'B' : 'P'} - Simple Heat Race System`;
       }
     }
 
@@ -824,7 +825,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     if (typeof dropRules === 'string') {
       if (dropRules === 'shrs') {
         const mode = currentEvent?.heatManagement?.configuration?.shrsAssignmentMode;
-        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
+        return `SHRS-${mode === 'preset' ? 'B' : 'P'} - Simple Heat Race System`;
       }
       if (dropRules === 'hms') return 'HMS Heat System';
       return dropRules;
@@ -1066,7 +1067,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                           : 'bg-blue-600 text-white'
                         }
                       `}>
-                        {entry.letterScore || entry.position}
+                        {entry.letterScore ? getLetterScoreDisplayCode(entry.letterScore, entry.customPoints) : entry.position}
                       </div>
 
                       {/* Flag (if event shows flag) */}

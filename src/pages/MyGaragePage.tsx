@@ -150,6 +150,7 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
         .select('race_date, race_results, skippers')
         .not('race_results', 'is', null)
         .not('skippers', 'is', null)
+        .neq('is_simulated', true)
         .order('race_date', { ascending: false });
 
       const { data: seriesRounds } = await supabase

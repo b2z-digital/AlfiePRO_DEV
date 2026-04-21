@@ -583,7 +583,9 @@ class OfflineStorageManager {
       last_completed_race: event.lastCompletedRace || 0,
       has_determined_initial_hcaps: event.hasDeterminedInitialHcaps || false,
       is_manual_handicaps: event.isManualHandicaps || false,
-      heat_management: event.heatManagement || null
+      heat_management: event.heatManagement || null,
+      completed: event.completed || false,
+      is_simulated: (event as any).is_simulated || false
     };
   }
 

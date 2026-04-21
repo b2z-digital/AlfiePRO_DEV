@@ -234,6 +234,42 @@ export async function getObserverAssignments(
   }
 }
 
+export async function getObserverAssignmentsForRound(
+  eventId: string,
+  raceNumber: number
+): Promise<Map<number, ObserverAssignment[]>> {
+  const result = new Map<number, ObserverAssignment[]>();
+  try {
+    const { data, error } = await supabase
+      .from('heat_observers')
+      .select('*')
+      .eq('event_id', eventId)
+      .eq('race_number', raceNumber);
+
+    if (error) {
+      console.error('[getObserverAssignmentsForRound] Error:', error);
+      return result;
+    }
+
+    for (const observer of data || []) {
+      const heatNum = observer.heat_number;
+      if (!result.has(heatNum)) result.set(heatNum, []);
+      result.get(heatNum)!.push({
+        id: observer.id,
+        skipper_index: observer.skipper_index,
+        skipper_name: observer.skipper_name,
+        skipper_sail_number: observer.skipper_sail_number,
+        times_served: observer.times_served,
+        is_manual_assignment: observer.is_manual_assignment,
+        is_custom_observer: observer.is_custom_observer
+      });
+    }
+  } catch (err) {
+    console.error('[getObserverAssignmentsForRound] Error:', err);
+  }
+  return result;
+}
+
 export async function getAllObserversForEvent(
   eventId: string
 ): Promise<Map<string, { skipperName: string; sailNumber: string }[]>> {

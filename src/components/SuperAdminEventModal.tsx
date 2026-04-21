@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trophy, Calendar, MapPin, Sailboat, FileText, CalendarRange, Upload, DollarSign, Globe, AlertTriangle } from 'lucide-react';
+import { X, Trophy, Calendar, MapPin, Sailboat, FileText, CalendarRange, Upload, DollarSign, Globe, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { RaceType, BoatType } from '../types';
 import { PublicEvent } from '../types/race';
 import { useAuth } from '../contexts/AuthContext';
@@ -265,6 +265,7 @@ export const SuperAdminEventModal: React.FC<SuperAdminEventModalProps> = ({
               .eq('event_name', formData.event_name)
               .eq('race_date', formData.date)
               .is('public_event_id', null)
+              .neq('is_simulated', true)
               .limit(1);
 
             if (matchingRaces && matchingRaces.length > 0) {

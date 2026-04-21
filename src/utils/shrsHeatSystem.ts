@@ -660,6 +660,48 @@ export function seedSHRSHeatsByIndex(
 }
 
 /**
+ * Add new skippers to existing SHRS heat assignments mid-event.
+ * For already-completed rounds, assignments are left untouched (callers give DNS/DNC).
+ * For future uncompleted rounds, each new skipper is placed into the smallest heat
+ * to maintain balance, rotating the target heat across rounds for opponent variety.
+ */
+export function addSkippersToSHRSAssignments(
+  rounds: { round: number; heatAssignments: { heatDesignation: string; skipperIndices: number[] }[]; results: any[]; completed: boolean }[],
+  newSkipperIndices: number[],
+  numberOfHeats: number
+): { round: number; heatAssignments: { heatDesignation: string; skipperIndices: number[] }[]; results: any[]; completed: boolean }[] {
+  if (newSkipperIndices.length === 0) return rounds;
+
+  return rounds.map(round => {
+    if (round.completed || (round.results && round.results.length > 0)) {
+      return round;
+    }
+
+    const updatedAssignments = round.heatAssignments.map(a => ({
+      ...a,
+      skipperIndices: [...a.skipperIndices]
+    }));
+
+    for (const skipperIdx of newSkipperIndices) {
+      const alreadyAssigned = updatedAssignments.some(a => a.skipperIndices.includes(skipperIdx));
+      if (alreadyAssigned) continue;
+
+      let smallestHeatIdx = 0;
+      let smallestSize = updatedAssignments[0].skipperIndices.length;
+      for (let h = 1; h < updatedAssignments.length; h++) {
+        if (updatedAssignments[h].skipperIndices.length < smallestSize) {
+          smallestSize = updatedAssignments[h].skipperIndices.length;
+          smallestHeatIdx = h;
+        }
+      }
+      updatedAssignments[smallestHeatIdx].skipperIndices.push(skipperIdx);
+    }
+
+    return { ...round, heatAssignments: updatedAssignments };
+  });
+}
+
+/**
  * Validate SHR configuration
  */
 export function validateSHRSConfig(config: SHRSConfig, skipperCount: number): {

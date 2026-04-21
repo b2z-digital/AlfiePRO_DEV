@@ -63,6 +63,7 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
           .from('quick_races')
           .select('*')
           .eq('archived', false)
+          .neq('is_simulated', true)
           .is('public_event_id', null)
           .order('created_at', { ascending: false });
 
@@ -165,7 +166,8 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
             enable_roll_call: race.enable_roll_call,
             auto_complete_sail: race.auto_complete_sail,
             enableLiveTracking: race.enable_live_tracking || false,
-            enableLiveStream: race.enable_livestream || false
+            enableLiveStream: race.enable_livestream || false,
+            is_simulated: race.is_simulated || false
           } as any;
 
           console.log(`🔍 [raceStorage] Loading event "${race.event_name}":`, {
@@ -224,6 +226,90 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
   }
 };
 
+// Get simulated race events only (uses SECURITY DEFINER RPC to bypass RLS filtering)
+export const getSimulatedRaceEvents = async (): Promise<RaceEvent[]> => {
+  try {
+    const scope = await getRaceScope();
+    if (!scope || !scope.clubId) return [];
+
+    const { data, error } = await supabase.rpc('get_simulated_race_events', {
+      p_club_id: scope.clubId
+    });
+
+    if (error || !data) return [];
+
+    return (data as any[]).map(race => ({
+      id: race.id,
+      eventName: race.event_name,
+      clubName: race.club_name || '',
+      clubId: race.club_id,
+      date: race.race_date,
+      endDate: race.end_date,
+      venue: race.race_venue || race.venue || '',
+      raceClass: race.race_class || '',
+      raceFormat: race.race_format || 'scratch',
+      skippers: race.skippers || [],
+      raceResults: race.race_results || [],
+      lastCompletedRace: race.last_completed_race || 0,
+      hasDeterminedInitialHcaps: race.has_determined_initial_hcaps || false,
+      isManualHandicaps: race.is_manual_handicaps || false,
+      completed: race.completed || false,
+      numRaces: race.num_races,
+      dropRules: race.drop_rules,
+      heatManagement: race.heat_management,
+      multiDay: race.multi_day || false,
+      numberOfDays: race.number_of_days || 1,
+      dayResults: race.day_results || {},
+      currentDay: race.current_day || 1,
+      is_simulated: true,
+      scoringSystem: race.heat_management?.configuration?.scoringSystem || undefined,
+      show_flag: race.show_flag ?? true,
+      show_country: race.show_country ?? true,
+      show_club_state: race.show_club_state ?? false,
+      show_design: race.show_design ?? false,
+      show_category: race.show_category ?? false,
+      enable_observers: race.enable_observers ?? false,
+      observers_per_heat: race.observers_per_heat ?? 2,
+      enable_roll_call: race.enable_roll_call ?? false,
+      auto_complete_sail: race.auto_complete_sail ?? true,
+      media: race.media || [],
+    } as any));
+  } catch (error) {
+    console.error('Error fetching simulated events:', error);
+    return [];
+  }
+};
+
+// Delete a simulated race event (uses SECURITY DEFINER RPC to bypass RLS)
+export const deleteSimulatedRaceEvent = async (id: string): Promise<boolean> => {
+  try {
+    const clubId = localStorage.getItem('currentClubId');
+    if (!clubId) return false;
+
+    const { data, error } = await supabase.rpc('delete_simulated_race_event', {
+      p_event_id: id,
+      p_club_id: clubId
+    });
+
+    if (error) {
+      console.error('Error deleting simulated event:', error);
+      return false;
+    }
+
+    // Also remove from offline storage
+    try {
+      await offlineStorage.deleteEvent(id, true);
+    } catch (e) {
+      // Ignore offline storage errors
+    }
+
+    return data === true;
+  } catch (error) {
+    console.error('Error deleting simulated event:', error);
+    return false;
+  }
+};
+
 // Store race events
 export const storeRaceEvents = async (events: RaceEvent[]): Promise<void> => {
   try {
@@ -255,6 +341,53 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
     // If online, also try to save to Supabase immediately
     if (offlineStorage.getOnlineStatus()) {
       try {
+      // Simulated events use a dedicated RPC to bypass RLS SELECT restrictions
+      if ((event as any).is_simulated) {
+        const { error } = await supabase.rpc('upsert_simulated_race_event', {
+          p_data: {
+            id: event.id,
+            event_name: event.eventName,
+            club_name: event.clubName,
+            race_date: event.date,
+            race_venue: event.venue || '',
+            race_class: event.raceClass || '',
+            race_format: event.raceFormat || 'scratch',
+            skippers: event.skippers || [],
+            race_results: event.raceResults || [],
+            last_completed_race: event.lastCompletedRace || 0,
+            has_determined_initial_hcaps: event.hasDeterminedInitialHcaps || false,
+            is_manual_handicaps: event.isManualHandicaps || false,
+            completed: event.completed || false,
+            num_races: event.numRaces || 12,
+            drop_rules: Array.isArray(event.dropRules) ? event.dropRules : [4, 8, 16, 24, 32, 40],
+            club_id: scope.mode === 'club' ? event.clubId : null,
+            heat_management: event.heatManagement || null,
+            multi_day: event.multiDay || false,
+            number_of_days: event.numberOfDays || 1,
+            end_date: event.endDate || null,
+            day_results: event.dayResults || {},
+            current_day: event.currentDay || 1,
+            media: event.media || [],
+            show_flag: (event as any).showFlag ?? (event as any).show_flag ?? true,
+            show_country: (event as any).showCountry ?? (event as any).show_country ?? true,
+            show_club_state: (event as any).showClubState ?? (event as any).show_club_state ?? false,
+            show_design: (event as any).showDesign ?? (event as any).show_design ?? false,
+            show_category: (event as any).showCategory ?? (event as any).show_category ?? false,
+            enable_observers: (event as any).enable_observers ?? false,
+            observers_per_heat: (event as any).observers_per_heat ?? 2,
+            enable_roll_call: (event as any).enable_roll_call ?? false,
+            auto_complete_sail: (event as any).auto_complete_sail ?? true,
+            enable_live_tracking: (event as any).enableLiveTracking ?? false,
+            enable_livestream: (event as any).enableLiveStream ?? false,
+          }
+        });
+
+        if (error) {
+          console.error('Error storing simulated event via RPC:', error);
+          throw error;
+        }
+        console.log('Simulated event stored via RPC successfully');
+      } else {
       // For public events, create a local copy with a new ID
       let eventId = event.id;
       if (event.isPublicEvent) {
@@ -294,23 +427,21 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
           current_day: event.currentDay || 1,
           heat_management: event.heatManagement,
           num_races: event.numRaces,
-          drop_rules: Array.isArray(event.dropRules) ? event.dropRules : [4, 8, 16, 24, 32, 40], // Default to RRS - Appendix A
+          drop_rules: Array.isArray(event.dropRules) ? event.dropRules : [4, 8, 16, 24, 32, 40],
           club_id: scope.mode === 'club' ? event.clubId : null,
           user_id: scope.mode === 'race_officer' ? scope.userId : null,
-          // Display settings for results table
           show_flag: (event as any).showFlag ?? (event as any).show_flag ?? true,
           show_country: (event as any).showCountry ?? (event as any).show_country ?? true,
           show_club_state: (event as any).showClubState ?? (event as any).show_club_state ?? false,
           show_design: (event as any).showDesign ?? (event as any).show_design ?? false,
           show_category: (event as any).showCategory ?? (event as any).show_category ?? false,
-          // Live tracking and streaming
           enable_live_tracking: (event as any).enableLiveTracking || false,
           enable_livestream: (event as any).enableLiveStream || false,
-          // Observer settings
           enable_observers: (event as any).enable_observers ?? false,
           observers_per_heat: (event as any).observers_per_heat ?? undefined,
           enable_roll_call: (event as any).enable_roll_call,
-          auto_complete_sail: (event as any).auto_complete_sail
+          auto_complete_sail: (event as any).auto_complete_sail,
+          is_simulated: false
         });
 
       if (error) {
@@ -319,9 +450,9 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
       }
 
       console.log('Event stored in Supabase successfully');
+      }
       } catch (supabaseError) {
         console.warn('Supabase save failed, queued for sync:', supabaseError);
-        // Error is logged, but event is already in IndexedDB and sync queue
       }
     }
   } catch (error) {
@@ -1071,6 +1202,15 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
           };
         }
       }
+    } else if (currentEvent.is_simulated) {
+      const { data: simEvents, error } = await supabase.rpc('get_simulated_race_events', {
+        p_club_id: currentClubId
+      });
+      if (error) {
+        console.error('❌ Error reloading simulated event:', error);
+        return null;
+      }
+      data = (simEvents || []).find((e: any) => e.id === currentEvent.id) || null;
     } else {
       const { data: qrData, error } = await supabase
         .from('quick_races')
@@ -1120,7 +1260,13 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
       observers_per_heat: data.observers_per_heat,
       enable_roll_call: data.enable_roll_call,
       auto_complete_sail: data.auto_complete_sail,
-      enable_livestream: data.enable_livestream
+      enable_livestream: data.enable_livestream,
+      is_simulated: data.is_simulated || currentEvent.is_simulated || false,
+      scoringSystem: data.heat_management?.configuration?.scoringSystem || currentEvent.scoringSystem || null,
+      show_club_state: data.show_club_state,
+      show_design: data.show_design,
+      show_category: data.show_category,
+      media: data.media || currentEvent.media || []
     };
 
     console.log('✅ Event reloaded successfully:', {
@@ -1539,8 +1685,54 @@ export const updateEventResults = async (
         setCurrentEvent(updatedEvent); // Update localStorage with new ID
       }
 
-      // For multi-day events, include dayResults
-      if (updatedEvent.multiDay) {
+      // Simulated events use SECURITY DEFINER RPC to bypass RLS SELECT restrictions
+      if (updatedEvent.is_simulated) {
+        console.log('📤 Updating simulated event via RPC:', actualEventId);
+        const { error } = await supabase.rpc('upsert_simulated_race_event', {
+          p_data: {
+            id: actualEventId,
+            event_name: updatedEvent.eventName,
+            club_name: updatedEvent.clubName,
+            race_date: updatedEvent.date,
+            race_venue: updatedEvent.venue || '',
+            race_class: updatedEvent.raceClass || '',
+            race_format: updatedEvent.raceFormat || 'scratch',
+            skippers: skippers,
+            race_results: updatedEvent.multiDay ? [] : raceResults,
+            last_completed_race: updatedEvent.multiDay ? 0 : lastCompletedRace,
+            has_determined_initial_hcaps: updatedEvent.multiDay ? false : hasDeterminedInitialHcaps,
+            is_manual_handicaps: updatedEvent.multiDay ? false : isManualHandicaps,
+            completed: updatedEvent.completed || false,
+            num_races: numRaces,
+            drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40],
+            club_id: currentClubId,
+            heat_management: heatManagement || null,
+            multi_day: updatedEvent.multiDay || false,
+            number_of_days: updatedEvent.numberOfDays || 1,
+            end_date: updatedEvent.endDate || null,
+            day_results: updatedEvent.dayResults || {},
+            current_day: currentDay,
+            media: updatedEvent.media || [],
+            show_flag: updatedEvent.show_flag ?? true,
+            show_country: updatedEvent.show_country ?? true,
+            show_club_state: (updatedEvent as any).show_club_state ?? false,
+            show_design: (updatedEvent as any).show_design ?? false,
+            show_category: (updatedEvent as any).show_category ?? false,
+            enable_observers: updatedEvent.enable_observers ?? false,
+            observers_per_heat: updatedEvent.observers_per_heat ?? 2,
+            enable_roll_call: updatedEvent.enable_roll_call ?? false,
+            auto_complete_sail: updatedEvent.auto_complete_sail ?? true,
+            enable_live_tracking: (updatedEvent as any).enableLiveTracking ?? false,
+            enable_livestream: (updatedEvent as any).enableLiveStream ?? false,
+          }
+        });
+
+        if (error) {
+          console.error('❌ Error updating simulated event via RPC:', error);
+          throw error;
+        }
+      } else if (updatedEvent.multiDay) {
+        // For multi-day events, include dayResults
         updateData['day_results'] = updatedEvent.dayResults;
 
         const updatePayload = {

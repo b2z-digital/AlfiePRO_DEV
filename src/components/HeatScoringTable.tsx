@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { HeatManagement, HeatDesignation, generateInitialHeatAssignments } from '../types/heat';
+import { HeatManagement, HeatDesignation, generateInitialHeatAssignments, getHeatDisplayLabel } from '../types/heat';
 import { Skipper } from '../types';
 import { ScratchRaceTable } from './ScratchRaceTable';
 import { TouchModeScoring } from './TouchModeScoring';
@@ -95,6 +95,14 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   isFullscreen,
   scoringMode: initialScoringMode = 'touch'
 }) => {
+  if (!heatManagement?.configuration || !heatManagement?.rounds) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Loading heat configuration...</p>
+      </div>
+    );
+  }
+
   const syncObserverEventId = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
   const [resolvedObserverEventId, setResolvedObserverEventId] = React.useState<string | null>(syncObserverEventId);
 
@@ -111,9 +119,10 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   }, [syncObserverEventId, currentEvent?.id, currentEvent?.seriesId, currentEvent?.roundName]);
 
   const observerEventId = resolvedObserverEventId;
-  const currentRound = heatManagement.rounds[heatManagement.currentRound - 1];
-  const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
-  const shrsQualifyingRounds = heatManagement.configuration.shrsQualifyingRounds || 0;
+  const safeCurrentRound = Math.max(1, heatManagement.currentRound || 1);
+  const currentRound = heatManagement.rounds[safeCurrentRound - 1];
+  const isShrs = heatManagement.configuration?.scoringSystem === 'shrs';
+  const shrsQualifyingRounds = heatManagement.configuration?.shrsQualifyingRounds || 0;
 
   const getShrsRoundLabel = (roundNum: number, heat?: HeatDesignation | null): string => {
     if (isShrs && shrsQualifyingRounds > 0) {
@@ -135,10 +144,13 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
       .map(assignment => assignment.heatDesignation)
       .sort();
     if (isInQualifyingRound) {
+      if (heatManagement.configuration?.heatOrder === 'descending') {
+        return [...heats].reverse();
+      }
       return heats;
     }
     return heats.reverse();
-  }, [currentRound, isInQualifyingRound]);
+  }, [currentRound, isInQualifyingRound, heatManagement.configuration?.heatOrder]);
 
   // Start with the LOWEST heat (last in the list) by default
   // Initialize to null and let useEffect set the correct heat
@@ -792,9 +804,9 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   const getHeatLabel = (heat: HeatDesignation): string => {
     if (isInFinals) {
-      return SHRS_FLEET_FULL_NAMES[heat] || `Heat ${heat}`;
+      return SHRS_FLEET_FULL_NAMES[heat] || `Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}`;
     }
-    return `Heat ${heat}`;
+    return `Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}`;
   };
 
   const getHeatProgress = (heat: HeatDesignation) => {
@@ -1039,7 +1051,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return () => { cancelled = true; };
   }, [heatScoringMode, observerEventId, availableHeats, heatManagement.currentRound, currentEvent?.enable_observers, observerReloadTrigger]);
 
-  const fleetManagementEnabled = heatManagement.configuration.fleetManagementEnabled !== false;
+  const fleetManagementEnabled = heatManagement.configuration?.fleetManagementEnabled !== false;
 
   if (!fleetManagementEnabled) {
     return (
@@ -1226,7 +1238,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       }
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-base font-bold">{isInFinals ? (SHRS_FLEET_NAMES[heat] || heat) : heat}</span>
+                        <span className="text-base font-bold">{isInFinals ? (SHRS_FLEET_NAMES[heat] || getHeatDisplayLabel(heat, heatManagement.configuration)) : getHeatDisplayLabel(heat, heatManagement.configuration)}</span>
                         {isComplete && (
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -1355,30 +1367,26 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                   Export All Rounds
                 </button>
               )}
-              {heatManagement.currentRound > 1 && (
-                <>
-                  <button
-                    onClick={() => setShowRaceResults(true)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      darkMode
-                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                        : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                    }`}
-                  >
-                    Race Results
-                  </button>
-                  <button
-                    onClick={() => setShowOverallResults(true)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      darkMode
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                  >
-                    Overall Results
-                  </button>
-                </>
-              )}
+              <button
+                onClick={() => setShowRaceResults(true)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  darkMode
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                }`}
+              >
+                Race Results
+              </button>
+              <button
+                onClick={() => setShowOverallResults(true)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  darkMode
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                Overall Results
+              </button>
             </div>
           </div>
         </div>
@@ -1405,7 +1413,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                     </div>
                     <div>
                       <h3 className={`font-bold text-base ${darkMode ? 'text-teal-200' : 'text-teal-900'}`}>
-                        Heat {selectedHeat} - Roll Call
+                        Heat {getHeatDisplayLabel(selectedHeat, heatManagement.configuration)} - Roll Call
                       </h3>
                       <p className={`text-xs ${darkMode ? 'text-teal-400/60' : 'text-teal-700/60'}`}>
                         Tap to mark ready. Right-click to mark absent.
@@ -1986,6 +1994,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               // Don't close modal - let user continue assigning heats
             }
           }}
+          heatConfiguration={heatManagement.configuration}
         />
       )}
 

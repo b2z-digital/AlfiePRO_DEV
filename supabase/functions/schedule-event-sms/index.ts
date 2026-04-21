@@ -62,7 +62,8 @@ Deno.serve(async (req: Request) => {
           .eq("club_id", clubSettings.club_id)
           .eq("race_date", targetDateStr)
           .eq("completed", false)
-          .eq("archived", false);
+          .eq("archived", false)
+          .neq("is_simulated", true);
 
         const { data: series } = await supabase
           .from("race_series")

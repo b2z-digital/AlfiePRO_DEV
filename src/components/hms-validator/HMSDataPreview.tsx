@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, Users, Trophy, ArrowRight, ArrowLeft } from 'lucide-react';
+import { CircleCheck as CheckCircle, Users, Trophy, ArrowRight, ArrowLeft, Layers } from 'lucide-react';
 import { ParsedHMSData } from '../../types/hmsValidator';
 
 interface HMSDataPreviewProps {
@@ -9,6 +9,19 @@ interface HMSDataPreviewProps {
 }
 
 export const HMSDataPreview: React.FC<HMSDataPreviewProps> = ({ data, onConfirm, onBack }) => {
+  const completedRaceNumbers = [...new Set(data.results.map(r => r.raceNumber))].sort((a, b) => a - b);
+
+  const raceHeatBreakdown = data.hasHeats ? (() => {
+    const breakdown: { raceNumber: number; heats: string[] }[] = [];
+    for (const r of completedRaceNumbers) {
+      const heatsForRace = [...new Set(
+        data.results.filter(res => res.raceNumber === r && res.heat).map(res => res.heat!)
+      )].sort();
+      breakdown.push({ raceNumber: r, heats: heatsForRace });
+    }
+    return breakdown;
+  })() : null;
+
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -19,7 +32,7 @@ export const HMSDataPreview: React.FC<HMSDataPreviewProps> = ({ data, onConfirm,
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 ${data.hasHeats ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
         <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/30 rounded-lg p-6 border border-blue-500/50">
           <div className="flex items-center gap-3 mb-2">
             <Users size={24} className="text-blue-400" />
@@ -34,21 +47,63 @@ export const HMSDataPreview: React.FC<HMSDataPreviewProps> = ({ data, onConfirm,
             <Trophy size={24} className="text-green-400" />
             <h3 className="font-semibold text-green-300">Races</h3>
           </div>
-          <p className="text-3xl font-bold text-green-400">{data.numRaces}</p>
+          <p className="text-3xl font-bold text-green-400">{completedRaceNumbers.length}</p>
           <p className="text-sm text-green-300 mt-1">
-            {data.hasHeats ? `With ${data.heats?.length || 0} heats` : 'Single fleet'}
+            {data.hasHeats ? 'Heat-based scoring' : 'Single fleet'}
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/30 rounded-lg p-6 border border-purple-500/50">
-          <div className="flex items-center gap-3 mb-2">
-            <CheckCircle size={24} className="text-purple-400" />
-            <h3 className="font-semibold text-purple-300">Results</h3>
+        {data.hasHeats && (
+          <div className="bg-gradient-to-br from-amber-900/30 to-amber-800/30 rounded-lg p-6 border border-amber-500/50">
+            <div className="flex items-center gap-3 mb-2">
+              <Layers size={24} className="text-amber-400" />
+              <h3 className="font-semibold text-amber-300">Heats</h3>
+            </div>
+            <p className="text-3xl font-bold text-amber-400">{data.heats?.length || 0}</p>
+            <p className="text-sm text-amber-300 mt-1">
+              {data.heats?.join(', ')}
+            </p>
           </div>
-          <p className="text-3xl font-bold text-purple-400">{data.results.length}</p>
-          <p className="text-sm text-purple-300 mt-1">Individual race results</p>
+        )}
+
+        <div className="bg-gradient-to-br from-cyan-900/30 to-cyan-800/30 rounded-lg p-6 border border-cyan-500/50">
+          <div className="flex items-center gap-3 mb-2">
+            <CheckCircle size={24} className="text-cyan-400" />
+            <h3 className="font-semibold text-cyan-300">Results</h3>
+          </div>
+          <p className="text-3xl font-bold text-cyan-400">{data.results.length}</p>
+          <p className="text-sm text-cyan-300 mt-1">Individual race results</p>
         </div>
       </div>
+
+      {/* Heat Breakdown */}
+      {raceHeatBreakdown && raceHeatBreakdown.length > 0 && (
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden">
+          <div className="bg-slate-900/50 px-6 py-3 border-b border-slate-700/50">
+            <h3 className="font-semibold text-white">Race / Heat Structure</h3>
+          </div>
+          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {raceHeatBreakdown.map(({ raceNumber, heats }) => (
+              <div key={raceNumber} className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
+                <p className="text-sm font-medium text-white mb-1">Race {raceNumber}</p>
+                <div className="flex flex-wrap gap-1">
+                  {heats.map(heat => {
+                    const count = data.results.filter(r => r.raceNumber === raceNumber && r.heat === heat).length;
+                    return (
+                      <span key={heat} className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-900/30 text-amber-400 rounded text-xs font-medium">
+                        Heat {heat} <span className="text-amber-500/70">({count})</span>
+                      </span>
+                    );
+                  })}
+                  {heats.length === 0 && (
+                    <span className="text-xs text-slate-500">No heat data</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Skippers Table Preview */}
       <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden">

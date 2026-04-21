@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Youtube, Link as LinkIcon, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Youtube, Link as LinkIcon, Save, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -73,6 +73,7 @@ export const AddYouTubeUrlModal: React.FC<AddYouTubeUrlModalProps> = ({
         .from('quick_races')
         .select('id, event_name, race_class, race_date')
         .eq('club_id', currentClub.clubId)
+        .neq('is_simulated', true)
         .order('race_date', { ascending: false });
 
       if (quickRacesError) throw quickRacesError;

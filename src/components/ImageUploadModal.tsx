@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { LogOut, Upload, Image as ImageIcon, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
+import { LogOut, Upload, Image as ImageIcon, Trash2, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -73,6 +73,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         .from('quick_races')
         .select('id, event_name, race_class, race_date')
         .eq('club_id', currentClub.clubId)
+        .neq('is_simulated', true)
         .order('race_date', { ascending: false });
 
       if (quickRacesError) throw quickRacesError;

@@ -245,6 +245,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
         .from('quick_races')
         .select('id, event_name, race_date, race_venue, race_class, completed')
         .eq('club_id', clubId)
+        .neq('is_simulated', true)
         .gte('race_date', today)
         .neq('completed', true)
         .order('race_date', { ascending: true });
@@ -373,6 +374,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
         .from('quick_races')
         .select('id, event_name, race_date, race_class, race_results, skippers, completed')
         .eq('club_id', clubId)
+        .neq('is_simulated', true)
         .eq('completed', true)
         .lt('race_date', today)
         .order('race_date', { ascending: false })

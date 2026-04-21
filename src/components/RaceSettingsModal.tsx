@@ -47,7 +47,7 @@ const DROP_RULE_OPTIONS = [
   { label: 'Low Point System (1 after 4, 2 after 8, 3 after 12 and then every 4 races after)', value: [4, 8, 12, 16, 20, 24, 28, 32, 36, 40], forHeatRacing: false },
   { label: 'RRS - Appendix A Scoring System (1 after 4, 2 after 8, 3 after 16 and then every 8 races after)', value: [4, 8, 16, 24, 32, 40], forHeatRacing: false },
   { label: 'HMS Heat System', value: 'hms', forHeatRacing: true },
-  { label: 'SHR - Structured Heat Racing (1 after 4, 2 after 8, +1 per 8 races)', value: 'shrs', forHeatRacing: true },
+  { label: 'SHRS - Simple Heat Race System (1 after 4, 2 after 8, +1 per 8 races)', value: 'shrs', forHeatRacing: true },
   { label: 'Custom', value: 'custom', forHeatRacing: false }
 ];
 
@@ -114,56 +114,42 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     initialHeatManagement?.configuration.shrsAssignmentMode || 'progressive'
   );
 
+  // Heat display settings
+  const [heatLabelStyle, setHeatLabelStyle] = useState<'letters' | 'numbers'>(
+    initialHeatManagement?.configuration.heatLabelStyle || 'letters'
+  );
+  const [heatOrder, setHeatOrder] = useState<'ascending' | 'descending'>(
+    initialHeatManagement?.configuration.heatOrder || 'ascending'
+  );
+
   // Load national association ID from club's state association
   useEffect(() => {
+    let mounted = true;
+
     const loadNationalAssociationId = async () => {
-      console.log('RaceSettingsModal: Attempting to load national association ID', {
-        isOpen,
-        currentEvent,
-        clubId: currentEvent?.clubId,
-        hasCurrentEvent: !!currentEvent
-      });
-
-      if (!isOpen) {
-        console.log('Modal not open, skipping');
-        return;
-      }
-
-      if (!currentEvent?.clubId) {
-        console.warn('No clubId on currentEvent, cannot load national association ID');
-        return;
-      }
+      if (!isOpen || !currentEvent?.clubId) return;
 
       try {
-        console.log('Fetching club data for clubId:', currentEvent.clubId);
-        // Get club's state association
-        const { data: clubData, error: clubError } = await supabase
+        const { data: clubData } = await supabase
           .from('clubs')
           .select('state_association_id')
           .eq('id', currentEvent.clubId)
-          .single();
+          .maybeSingle();
 
-        console.log('Club data result:', { clubData, clubError });
+        if (!mounted) return;
 
         if (clubData?.state_association_id) {
-          console.log('Fetching state association data for:', clubData.state_association_id);
-          // Get state association's national association
-          const { data: stateData, error: stateError } = await supabase
+          const { data: stateData } = await supabase
             .from('state_associations')
             .select('national_association_id')
             .eq('id', clubData.state_association_id)
-            .single();
+            .maybeSingle();
 
-          console.log('State association data result:', { stateData, stateError });
+          if (!mounted) return;
 
           if (stateData?.national_association_id) {
             setNationalAssociationId(stateData.national_association_id);
-            console.log('✓ Successfully loaded national association ID:', stateData.national_association_id);
-          } else {
-            console.warn('State association has no national_association_id');
           }
-        } else {
-          console.warn('Club has no state_association_id');
         }
       } catch (err) {
         console.error('Error loading national association ID:', err);
@@ -171,28 +157,32 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     };
 
     loadNationalAssociationId();
+    return () => { mounted = false; };
   }, [isOpen, currentEvent?.clubId]);
 
   // Load user's scoring mode preference
   useEffect(() => {
+    let mounted = true;
+
     const loadScoringModePreference = async () => {
       if (!isOpen) return;
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('scoring_mode_preference')
-          .eq('id', user.id)
-          .single();
+      if (!mounted || !user) return;
 
-        if (profileData?.scoring_mode_preference) {
-          setScoringMode(profileData.scoring_mode_preference as 'pro' | 'touch' | 'spreadsheet');
-        }
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('scoring_mode_preference')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (mounted && profileData?.scoring_mode_preference) {
+        setScoringMode(profileData.scoring_mode_preference as 'pro' | 'touch' | 'spreadsheet');
       }
     };
 
     loadScoringModePreference();
+    return () => { mounted = false; };
   }, [isOpen]);
 
   // Sync currentHeatManagement with initialHeatManagement when modal opens/updates
@@ -288,14 +278,14 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
   const validateSHRSPractical = (totalSkippers: number, heats: number): { isValid: boolean; message?: string } => {
     if (heats > 5) {
-      return { isValid: false, message: 'SHR allows a maximum of 5 heats.' };
+      return { isValid: false, message: 'SHRS allows a maximum of 5 heats.' };
     }
     const maxPerHeat = Math.ceil(totalSkippers / heats);
     if (maxPerHeat > 20) {
-      return { isValid: false, message: `SHR allows a maximum of 20 boats per heat. With ${totalSkippers} boats and ${heats} heats, the largest heat would have ${maxPerHeat}. Add more heats or reduce entries.` };
+      return { isValid: false, message: `SHRS allows a maximum of 20 boats per heat. With ${totalSkippers} boats and ${heats} heats, the largest heat would have ${maxPerHeat}. Add more heats or reduce entries.` };
     }
     if (totalSkippers > 100) {
-      return { isValid: false, message: `SHR supports a maximum of 100 boats (5 heats x 20 boats). You have ${totalSkippers} entries.` };
+      return { isValid: false, message: `SHRS supports a maximum of 100 boats (5 heats x 20 boats). You have ${totalSkippers} entries.` };
     }
     return { isValid: true };
   };
@@ -517,7 +507,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         autoAssign: false,
         scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
         ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
-        fleetManagementEnabled
+        fleetManagementEnabled,
+        heatLabelStyle,
+        heatOrder
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
@@ -584,7 +576,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
         ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
         ...(rankedSkipperIndices && rankedSkipperIndices.length > 0 ? { rankedSkipperIndices } : {}),
-        fleetManagementEnabled
+        fleetManagementEnabled,
+        heatLabelStyle,
+        heatOrder
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
@@ -806,7 +800,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               autoAssign: initialAssignment === 'random',
               scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
               ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
-              fleetManagementEnabled
+              fleetManagementEnabled,
+              heatLabelStyle,
+              heatOrder
             },
             currentRound: 1,
             currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
@@ -822,7 +818,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             autoAssign: initialAssignment === 'random',
             scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
             ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
-            fleetManagementEnabled
+            fleetManagementEnabled,
+            heatLabelStyle,
+            heatOrder
           };
 
           const hasResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
@@ -924,7 +922,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             autoAssign: initialAssignment === 'random',
             scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
             ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
-            fleetManagementEnabled
+            fleetManagementEnabled,
+            heatLabelStyle,
+            heatOrder
           },
           currentRound: 1,
           currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
@@ -1283,7 +1283,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               }`}>
                 {isHeatRacingEnabled ? (
                   <p>
-                    <span className="font-semibold">{currentDropRules === 'shrs' ? `SHR-${shrsAssignmentMode === 'preset' ? 'B' : 'P'}` : 'HMS'} Heat Racing Active:</span> Skippers will be divided into heats{currentDropRules === 'shrs' ? '' : ' with promotion/relegation between races'}.
+                    <span className="font-semibold">{currentDropRules === 'shrs' ? `SHRS-${shrsAssignmentMode === 'preset' ? 'B' : 'P'}` : 'HMS'} Heat Racing Active:</span> Skippers will be divided into heats{currentDropRules === 'shrs' ? '' : ' with promotion/relegation between races'}.
                     {currentDropRules === 'shrs' ? ` Using ${shrsAssignmentMode === 'preset' ? 'Balanced' : 'Progressive'} assignment.` : ' Heats are scored from lowest to highest (F → A).'} Configure your settings below.
                   </p>
                 ) : (
@@ -1312,7 +1312,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 )}
 
                 {/* Heat Racing Scoring System */}
-                <div className={`space-y-3 ${hasHeatScores ? 'pointer-events-none opacity-60' : ''}`}>
+                <div className={`space-y-3 ${hasAnyScores ? 'pointer-events-none opacity-60' : ''}`}>
                   <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <Award size={16} />
@@ -1331,7 +1331,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                           <button
                             key={index}
                             type="button"
-                            disabled={hasHeatScores}
+                            disabled={hasAnyScores}
                             onClick={() => handleDropRuleChange(option.value)}
                             className={`
                               group relative w-full text-left p-4 rounded-xl transition-all border-2
@@ -1359,12 +1359,12 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                 <div className={`text-2xl font-black mb-1 tracking-tight ${
                                   isSelected ? 'text-white' : darkMode ? 'text-white' : 'text-slate-900'
                                 }`}>
-                                  {isHMS ? 'HMS' : 'SHR'}
+                                  {isHMS ? 'HMS' : 'SHRS'}
                                 </div>
                                 <div className={`text-sm font-medium ${
                                   isSelected ? 'text-white/90' : darkMode ? 'text-slate-300' : 'text-slate-700'
                                 }`}>
-                                  {isHMS ? 'Heat Management System' : 'Structured Heat Racing'}
+                                  {isHMS ? 'Heat Management System' : 'Simple Heat Race System'}
                                 </div>
                                 <div className={`text-xs mt-2 ${
                                   isSelected ? 'text-white/75' : darkMode ? 'text-slate-400' : 'text-slate-500'
@@ -1387,12 +1387,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 </div>
 
                 {/* Fleet Management Toggle - HMS only */}
-                {!isSHRS && (
+                {!isSHRS && (() => {
+                  const fleetToggleLocked = hasHeatScores || (!fleetManagementEnabled && hasRaceResults);
+                  return (
                   <div className={`p-5 rounded-xl border-2 ${
-                    hasHeatScores
-                      ? 'opacity-60 pointer-events-none'
-                      : ''
-                  } ${
                     darkMode
                       ? 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-600'
                       : 'bg-gradient-to-br from-amber-50 to-slate-50 border-amber-200'
@@ -1404,6 +1402,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                           <label className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             Fleet Management
                           </label>
+                          {fleetToggleLocked && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                              darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-500'
+                            }`}>Locked</span>
+                          )}
                         </div>
                         <p className={`text-xs mt-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           {fleetManagementEnabled
@@ -1413,9 +1416,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                       </div>
                       <button
                         type="button"
-                        onClick={() => !hasHeatScores && setFleetManagementEnabled(!fleetManagementEnabled)}
-                        disabled={hasHeatScores}
+                        onClick={() => !fleetToggleLocked && setFleetManagementEnabled(!fleetManagementEnabled)}
+                        disabled={fleetToggleLocked}
                         className={`relative w-14 h-7 rounded-full transition-colors duration-200 shadow-sm flex-shrink-0 ml-4 ${
+                          fleetToggleLocked ? 'opacity-40 cursor-not-allowed' : ''
+                        } ${
                           fleetManagementEnabled ? 'bg-amber-500' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
@@ -1424,6 +1429,16 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         } mt-1`} />
                       </button>
                     </div>
+                    {!fleetManagementEnabled && hasRaceResults && (
+                      <div className={`mt-3 flex items-center gap-2 p-3 rounded-lg border ${
+                        darkMode ? 'bg-red-900/20 border-red-700/30' : 'bg-red-50 border-red-200'
+                      }`}>
+                        <AlertTriangle size={14} className={darkMode ? 'text-red-400' : 'text-red-500'} />
+                        <p className={`text-xs ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+                          Scores have been entered. Clear all results to re-enable this setting.
+                        </p>
+                      </div>
+                    )}
                     {!fleetManagementEnabled && (
                       <div className="mt-3 space-y-3">
                         <div className={`text-xs p-3 rounded-lg border ${
@@ -1478,7 +1493,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                       </div>
                     )}
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Fleet Management sections - hidden when fleet management is disabled for HMS */}
                 {(fleetManagementEnabled || isSHRS) && (
@@ -1523,7 +1539,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                       if (isSHRS) {
                                         const shrsVal = validateSHRSPractical(skippers.length, value);
                                         if (!shrsVal.isValid && addNotification) {
-                                          addNotification('warning', shrsVal.message || 'Invalid SHR configuration');
+                                          addNotification('warning', shrsVal.message || 'Invalid SHRS configuration');
                                         }
                                       } else {
                                         const validation = validatePromotionRelegationPractical(skippers.length, value, promotionCount);
@@ -1749,7 +1765,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                     ? 'text-blue-500'
                                     : darkMode ? 'text-slate-300' : 'text-slate-700'
                                   }`}>
-                                    Progressive (SHR-P)
+                                    Progressive (SHRS-P)
                                   </div>
                                   <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                     Round 1 heats are assigned prior to racing. Subsequent heat movements are determined after each round based on heat results using structured Movement Tables.
@@ -1774,7 +1790,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                     ? 'text-green-600'
                                     : darkMode ? 'text-slate-300' : 'text-slate-700'
                                   }`}>
-                                    Balanced (SHR-B)
+                                    Balanced (SHRS-B)
                                   </div>
                                   <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                     All qualifying heats for the nominated rounds are pre-assigned before racing. The rotation is structured to balance heat sizes and distribute competitor matchups evenly across the fleet.
@@ -1829,7 +1845,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                             <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} space-y-1`}>
                               {shrsAssignmentMode === 'progressive' ? (
                                 <>
-                                  <p>After each race, heat assignments update based on finishing positions using the official SHR Movement Tables.</p>
+                                  <p>After each race, heat assignments update based on finishing positions using the official SHRS Movement Tables.</p>
                                   <p>Finals: Skippers split into Gold/Silver{numHeats > 2 ? '/Bronze' : ''} fleets by qualifying rank.</p>
                                 </>
                               ) : (
@@ -1845,7 +1861,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         <div className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'} p-2 rounded ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                           {isSHRS ? (
                             <>
-                              <strong>SHR-{shrsAssignmentMode === 'preset' ? 'B' : 'P'} Configuration:</strong> {numHeats} heats, {shrsQualifyingRounds} qualifying + {Math.max(0, currentNumRaces - shrsQualifyingRounds)} finals rounds ({shrsAssignmentMode === 'preset' ? 'Balanced' : 'Progressive'}). Sizes: {heatSizes.join(', ')} boats.
+                              <strong>SHRS-{shrsAssignmentMode === 'preset' ? 'B' : 'P'} Configuration:</strong> {numHeats} heats, {shrsQualifyingRounds} qualifying + {Math.max(0, currentNumRaces - shrsQualifyingRounds)} finals rounds ({shrsAssignmentMode === 'preset' ? 'Balanced' : 'Progressive'}). Sizes: {heatSizes.join(', ')} boats.
                             </>
                           ) : manualHeatCount !== null || manualPromotionCount !== null ? (
                             <>
@@ -1858,6 +1874,90 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                             </>
                           )}
                         </div>
+
+                        {/* Heat Display Settings - SHRS only */}
+                        {isSHRS && <div className="space-y-3">
+                          <div>
+                            <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Heat Identification
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => setHeatLabelStyle('letters')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatLabelStyle === 'letters'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                Letters (A, B, C)
+                              </button>
+                              <button
+                                onClick={() => setHeatLabelStyle('numbers')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatLabelStyle === 'numbers'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                Numbers (1, 2, 3)
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Heat Racing Order
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => setHeatOrder('ascending')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatOrder === 'ascending'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {heatLabelStyle === 'numbers'
+                                  ? `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => i + 1).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                  : `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => String.fromCharCode(65 + i)).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                }
+                              </button>
+                              <button
+                                onClick={() => setHeatOrder('descending')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatOrder === 'descending'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {heatLabelStyle === 'numbers'
+                                  ? `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => numHeats - i).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                  : `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => String.fromCharCode(65 + numHeats - 1 - i)).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                }
+                              </button>
+                            </div>
+                            <p className={`text-xs mt-1.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                              Sets the display and scoring order of heats
+                            </p>
+                          </div>
+                        </div>}
 
                         {/* Show validation warning if configuration is not practical */}
                         {!configValidation.isValid && (
@@ -1982,24 +2082,28 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                     </label>
                   </div>
 
-                  <label className="flex items-center justify-between cursor-pointer">
+                  <label className={`flex items-center justify-between ${fleetManagementEnabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}>
                     <div>
                       <div className={`text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                         Roll Call Before Scoring
                       </div>
                       <div className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Show roll call screen to mark skippers present/absent before each heat
+                        {fleetManagementEnabled
+                          ? 'Show roll call screen to mark skippers present/absent before each heat'
+                          : 'Requires Fleet Management to be enabled'}
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setEnableRollCall(!enableRollCall)}
+                      disabled={!fleetManagementEnabled}
+                      onClick={() => { if (fleetManagementEnabled) setEnableRollCall(!enableRollCall); }}
                       className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                        !fleetManagementEnabled ? (darkMode ? 'bg-slate-700' : 'bg-slate-200') :
                         enableRollCall ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                       }`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        enableRollCall ? 'translate-x-6' : 'translate-x-1'
+                        enableRollCall && fleetManagementEnabled ? 'translate-x-6' : 'translate-x-1'
                       }`} />
                     </button>
                   </label>
@@ -2186,7 +2290,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             >
               Cancel
             </button>
-            {hasHeatScores && onClearAllRaceResults && (
+            {hasAnyScores && onClearAllRaceResults && (
               <button
                 type="button"
                 onClick={() => setShowHeatClearConfirmation(true)}
@@ -2224,6 +2328,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         skippers={skippers}
         numHeats={numHeats}
         darkMode={darkMode}
+        heatConfiguration={initialHeatManagement?.configuration}
         onRankingAssignment={() => {
           setShowManualAssignmentModal(false);
           setShowHMSSeedingModal(true);

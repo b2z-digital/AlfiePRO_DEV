@@ -226,6 +226,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           .from('quick_races')
           .select('id, event_name, club_name, race_date, end_date, race_venue, race_class, race_format, club_id, multi_day, number_of_days, is_paid, entry_fee, notice_of_race_url, sailing_instructions_url, is_interclub, other_club_name, completed')
           .eq('completed', false)
+          .neq('is_simulated', true)
           .gte('race_date', today)
           .order('race_date', { ascending: true }),
         supabase

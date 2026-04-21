@@ -36,7 +36,7 @@ export default function SuperAdminDashboard() {
         supabase.from('state_associations').select('id', { count: 'exact', head: true }),
         supabase.from('national_associations').select('id', { count: 'exact', head: true }),
         supabase.from('public_events').select('id', { count: 'exact', head: true }),
-        supabase.from('quick_races').select('id', { count: 'exact', head: true }),
+        supabase.from('quick_races').select('id', { count: 'exact', head: true }).neq('is_simulated', true),
       ]);
 
       setStats({

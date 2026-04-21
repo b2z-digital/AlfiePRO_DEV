@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase';
 import { validateInvitationToken, acceptInvitation } from '../utils/memberInvitations';
 import { Logo } from '../components/Logo';
 import { CircleCheck as CheckCircle, CircleAlert as AlertCircle, Loader } from 'lucide-react';
+import { PasswordInput, validatePassword } from '../components/auth/PasswordInput';
 
 export const InvitationSignup: React.FC = () => {
   const { token } = useParams<{ token: string }>();
@@ -77,9 +78,9 @@ export const InvitationSignup: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    // Validation
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    const { valid } = validatePassword(password);
+    if (!valid) {
+      setError('Please fix the password issues highlighted below');
       return;
     }
 
@@ -252,49 +253,24 @@ export const InvitationSignup: React.FC = () => {
               <p className="text-xs text-slate-500 mt-1">This email is from your club membership</p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Minimum 6 characters"
-                required
-                minLength={6}
-              />
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${password.length >= 6 ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                <p className={`text-xs ${password.length >= 6 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                  Minimum 6 characters {password.length > 0 && `(${password.length}/6)`}
-                </p>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">No special characters required - just pick something memorable</p>
-            </div>
+            <PasswordInput
+              id="password"
+              label="Password"
+              value={password}
+              onChange={setPassword}
+              placeholder="Minimum 6 characters"
+              showRequirements
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Re-enter your password"
-                required
-              />
-              {confirmPassword.length > 0 && (
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${password === confirmPassword ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                  <p className={`text-xs ${password === confirmPassword ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
-                  </p>
-                </div>
-              )}
-            </div>
+            <PasswordInput
+              id="confirmPassword"
+              label="Confirm Password"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              placeholder="Re-enter your password"
+              isConfirmField
+              confirmValue={password}
+            />
 
             <button
               type="submit"

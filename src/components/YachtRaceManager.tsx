@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer } from 'lucide-react';
+import React, { useState, useEffect, useRef, Component } from 'react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -26,7 +26,7 @@ import { HeatManagement, HeatResult, HeatDesignation, generateNextRoundAssignmen
 import { HeatScoringTable } from './HeatScoringTable';
 import { updateHeatResult, completeHeat, convertHeatResultsToRaceResults, clearHeatRaceResults } from '../utils/heatUtils';
 import { HMSConfig } from '../utils/hmsHeatSystem';
-import { seedSHRSHeatsByIndex, generatePreSetQualifyingAssignments } from '../utils/shrsHeatSystem';
+import { seedSHRSHeatsByIndex, generatePreSetQualifyingAssignments, addSkippersToSHRSAssignments } from '../utils/shrsHeatSystem';
 import { SingleEventManagement } from './SingleEventManagement';
 import { TouchModeScoring } from './TouchModeScoring';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
@@ -36,6 +36,44 @@ import { StartBoxModal } from './start-box/StartBoxModal';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
 import { updateRaceStatus } from '../utils/liveTrackingStorage';
+
+class ScoringErrorBoundary extends Component<
+  { children: React.ReactNode; darkMode?: boolean; onRetry?: () => void },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; darkMode?: boolean; onRetry?: () => void }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('ScoringErrorBoundary caught:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <AlertTriangle className="w-10 h-10 text-amber-400" />
+          <p className={`text-sm ${this.props.darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+            Scoring component encountered an error. Please try again.
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              this.props.onRetry?.();
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface YachtRaceManagerProps {
   onExitScoring?: () => void;
@@ -100,9 +138,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const isCalculatingHandicaps = useRef(false);
   const liveSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load user's scoring mode preference
+  // Load user's scoring mode preference (skip for non-HMS simulated events which default to touch)
   useEffect(() => {
     const loadScoringModePreference = async () => {
+      const currentEvent = getCurrentEvent();
+      if (currentEvent?.is_simulated && currentEvent.scoringSystem !== 'hms') {
+        setScoringMode('touch');
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profileData } = await supabase
@@ -161,6 +205,10 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       console.log('🏁 YachtRaceManager: event.multiDay:', currentEvent.multiDay);
       console.log('🏁 YachtRaceManager: event.dayResults:', Object.keys(currentEvent.dayResults || {}));
       setRaceType(currentEvent.raceFormat);
+
+      if (currentEvent.is_simulated && currentEvent.scoringSystem !== 'hms') {
+        setScoringMode('touch');
+      }
 
       // Set currentDay FIRST before loading day-specific data
       if (currentEvent.currentDay) {
@@ -387,10 +435,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           setIsManualHandicaps(currentDayData.isManualHandicaps || false);
 
           if (currentDayData.heatManagement && currentDayData.heatManagement.configuration.enabled) {
+            const isSpreadsheetMode = currentDayData.heatManagement.configuration.fleetManagementEnabled === false;
             const storedSkipperCount = currentDayData.heatManagement.rounds[0]?.heatAssignments
               ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-            if (storedSkipperCount === eventSkipperCount) {
+            if (isSpreadsheetMode || storedSkipperCount === eventSkipperCount) {
               setHeatManagement(currentDayData.heatManagement);
 
               if (currentDayData.heatManagement.configuration.scoringSystem) {
@@ -414,10 +463,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setIsManualHandicaps(day1Data.isManualHandicaps || false);
 
             if (day1Data.heatManagement && day1Data.heatManagement.configuration.enabled) {
+              const isSpreadsheetMode = day1Data.heatManagement.configuration.fleetManagementEnabled === false;
               const storedSkipperCount = day1Data.heatManagement.rounds[0]?.heatAssignments
                 ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-              if (storedSkipperCount === eventSkipperCount) {
+              if (isSpreadsheetMode || storedSkipperCount === eventSkipperCount) {
                 setHeatManagement(day1Data.heatManagement);
 
                 if (day1Data.heatManagement.configuration.scoringSystem) {
@@ -477,10 +527,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           setHasDeterminedInitialHcaps(true);
         }
         if (currentEvent.heatManagement && currentEvent.heatManagement.configuration.enabled) {
+          const isSpreadsheetMode = currentEvent.heatManagement.configuration.fleetManagementEnabled === false;
           const storedSkipperCount = currentEvent.heatManagement.rounds[0]?.heatAssignments
             ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-          if (storedSkipperCount === eventSkipperCount) {
+          if (isSpreadsheetMode || storedSkipperCount === eventSkipperCount) {
             let loadedHM = currentEvent.heatManagement;
 
             if (loadedHM.configuration.scoringSystem === 'shrs') {
@@ -503,7 +554,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 }
 
                 if (unbalancedR1 || inconsistentAcrossRounds) {
-                  console.log('Auto-correcting SHR heats:', unbalancedR1 ? 'unbalanced R1' : 'inconsistent across rounds');
+                  console.log('Auto-correcting SHRS heats:', unbalancedR1 ? 'unbalanced R1' : 'inconsistent across rounds');
                   const numHeats = loadedHM.configuration.numberOfHeats;
                   const qRounds = loadedHM.configuration.shrsQualifyingRounds || 1;
                   const eventSkippers = currentEvent.skippers || [];
@@ -524,12 +575,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   }
 
                   loadedHM = { ...loadedHM, rounds: newRounds };
-                  console.log('Corrected SHR heats:', newAssignments.map(a => a.skipperIndices.length).join(', '));
+                  console.log('Corrected SHRS heats:', newAssignments.map(a => a.skipperIndices.length).join(', '));
 
                   const eventId = currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id;
                   if (eventId) {
                     supabase.from('quick_races').update({ heat_management: loadedHM }).eq('id', eventId).then(() => {
-                      console.log('Saved corrected SHR heat assignments to database');
+                      console.log('Saved corrected SHRS heat assignments to database');
                     });
                   }
                 }
@@ -1153,13 +1204,69 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     }
 
     if (heatManagement?.configuration.enabled && !options?.skipRaceSettingsModal) {
-      // If skippers changed and heat racing is enabled, open settings to reconfigure
-      setShowRaceSettingsModal(true);
-
-      // If skippers were removed, clear heat management data
       if (uniqueSkippers.length < skippers.length) {
+        // Skippers removed - clear heat management, force reconfigure
         setHeatManagement(null);
+        setShowRaceSettingsModal(true);
         addNotification('info', 'Skippers removed. Heat Racing assignments cleared. Please reconfigure in Race Settings.');
+      } else if (
+        newlyAddedSkippers.length > 0 &&
+        heatManagement.configuration.scoringSystem === 'shrs' &&
+        heatManagement.configuration.shrsAssignmentMode === 'preset' &&
+        heatManagement.rounds.some(r => r.completed || (r.results && r.results.length > 0))
+      ) {
+        // SHRS-B mid-event addition: slot new skippers into future rounds
+        const updatedRounds = addSkippersToSHRSAssignments(
+          heatManagement.rounds,
+          newlyAddedSkippers,
+          heatManagement.configuration.numberOfHeats
+        );
+        const updatedHM = { ...heatManagement, rounds: updatedRounds };
+        setHeatManagement(updatedHM);
+
+        // Also add DNC results for completed heat rounds
+        const updatedResults = [...raceResults];
+        for (const round of updatedRounds) {
+          if (!round.completed && !(round.results && round.results.length > 0)) continue;
+          for (const skipperIdx of newlyAddedSkippers) {
+            for (const heat of round.heatAssignments) {
+              const hasResult = round.results?.some(
+                r => r.skipperIndex === skipperIdx && r.round === round.round && r.heatDesignation === heat.heatDesignation
+              );
+              if (!hasResult) {
+                updatedResults.push({
+                  race: round.round,
+                  round: round.round,
+                  skipperIndex: skipperIdx,
+                  position: null,
+                  letterScore: 'DNC' as LetterScore,
+                  heatDesignation: heat.heatDesignation,
+                  points: uniqueSkippers.length + 1
+                });
+              }
+            }
+          }
+        }
+        setRaceResults(updatedResults);
+
+        // Save updated heat management to database
+        const currentEvt = getCurrentEvent();
+        if (currentEvt) {
+          try {
+            await updateEventResults(
+              currentEvt.id, updatedResults, uniqueSkippers,
+              lastCompletedRace, hasDeterminedInitialHcaps, isManualHandicaps,
+              false, currentDay, updatedHM, currentNumRaces, currentDropRules
+            );
+          } catch (e) {
+            console.error('Error saving mid-event skipper addition:', e);
+          }
+        }
+
+        addNotification('success', `${newlyAddedSkippers.length} skipper${newlyAddedSkippers.length > 1 ? 's' : ''} added to future qualifying rounds. Missed rounds scored as DNC.`);
+      } else {
+        // Other heat modes or no scoring started yet - open settings to reconfigure
+        setShowRaceSettingsModal(true);
       }
     } else if (newlyAddedSkippers.length === 0 && uniqueSkippers.length < skippers.length) {
       // Only clear results if skippers were removed and no new ones added
@@ -2440,7 +2547,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       const qRounds = finalHM.configuration.shrsQualifyingRounds || 1;
       const isPreset = finalHM.configuration.shrsAssignmentMode === 'preset';
       if (isPreset && qRounds > 1 && finalHM.rounds.length < qRounds) {
-        console.log('⚠️ SHR safety net (balanced): rounds.length', finalHM.rounds.length, 'but need', qRounds, '- regenerating');
+        console.log('⚠️ SHRS safety net (balanced): rounds.length', finalHM.rounds.length, 'but need', qRounds, '- regenerating');
         const firstRoundAssignments = finalHM.rounds[0]?.heatAssignments || [];
         const numHeats = finalHM.configuration.numberOfHeats;
         const allQR = generatePreSetQualifyingAssignments(
@@ -2458,7 +2565,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           }))
         };
       } else if (!isPreset && finalHM.rounds.length > 1) {
-        console.log('⚠️ SHR safety net (progressive): trimming to round 1 only');
+        console.log('⚠️ SHRS safety net (progressive): trimming to round 1 only');
         finalHM = {
           ...finalHM,
           rounds: [finalHM.rounds[0]]
@@ -3114,7 +3221,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             )}
 
             {/* Render appropriate table based on race type and heat configuration */}
-            {heatManagement?.configuration.enabled ? (
+            {heatManagement?.configuration?.enabled ? (
+              <ScoringErrorBoundary darkMode={darkMode}>
               <HeatScoringTable
                 skippers={skippers}
                 heatManagement={heatManagement}
@@ -3203,6 +3311,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 isFullscreen={isFullscreenScoring}
                 scoringMode={scoringMode}
               />
+              </ScoringErrorBoundary>
             ) : scoringMode === 'touch' ? (
               <TouchModeScoring
                 skippers={skippers}
@@ -3474,7 +3583,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setShowRaceSettingsModal(true);
           }}
           title="Heat Racing Recommended"
-          message={`With ${skippers.length} skippers competing, AlfiePRO recommends enabling Heat Racing. Skippers will be divided into heats using either the HMS or SHR scoring systems. Would you like to enable Heat Racing?`}
+          message={`With ${skippers.length} skippers competing, AlfiePRO recommends enabling Heat Racing. Skippers will be divided into heats using either the HMS or SHRS scoring systems. Would you like to enable Heat Racing?`}
           confirmText="Yes, Enable Heat Racing"
           cancelText="No Thanks"
           darkMode={darkMode}

@@ -105,6 +105,7 @@ export const PublicRaceCalendarPage: React.FC = () => {
         .from('quick_races')
         .select('id, event_name, race_date, race_venue, race_class, race_format, completed, entry_fee')
         .eq('club_id', clubId)
+        .neq('is_simulated', true)
         .gte('race_date', today)
         .order('race_date', { ascending: true });
 
@@ -119,6 +120,7 @@ export const PublicRaceCalendarPage: React.FC = () => {
         .from('quick_races')
         .select('id, event_name, race_date, race_venue, race_class, race_format, completed, entry_fee')
         .eq('club_id', clubId)
+        .neq('is_simulated', true)
         .lt('race_date', today)
         .order('race_date', { ascending: false })
         .limit(20);
