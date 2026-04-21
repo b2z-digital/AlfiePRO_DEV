@@ -268,6 +268,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
         .select('id, race_date')
         .eq('club_id', currentClub?.clubId)
         .eq('completed', true)
+        .neq('is_simulated', true)
         .gte('race_date', startDate.toISOString());
 
       const singleEventsCount = quickRacesData?.length || 0;

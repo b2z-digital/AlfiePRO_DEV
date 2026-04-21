@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  ArrowLeft, Camera, Settings, Clock, TrendingUp, Wrench,
-  Plus, Calendar, Wind, Droplets, Award, Share2, Edit2,
-  Trash2, Upload, Image as ImageIcon, Activity, FileText, ExternalLink, ChevronRight
-} from 'lucide-react';
+import { ArrowLeft, Camera, Settings, Clock, TrendingUp, Wrench, Plus, Calendar, Wind, Droplets, Award, Share2, CreditCard as Edit2, Trash2, Upload, Image as ImageIcon, Activity, FileText, ExternalLink, ChevronRight } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { MaintenanceTab } from './tabs/MaintenanceTab';
@@ -122,6 +118,7 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
         .select('id, race_date, event_name, race_results, skippers')
         .not('race_results', 'is', null)
         .not('skippers', 'is', null)
+        .neq('is_simulated', true)
         .order('race_date', { ascending: false });
 
       if (raceData) {

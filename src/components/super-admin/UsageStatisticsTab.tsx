@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  Globe, Building, Users, MapPin, TrendingUp, Calendar,
-  Trophy, BarChart3, Activity, ArrowUpRight, Filter, UserCheck
-} from 'lucide-react';
+import { Globe, Building, Users, MapPin, TrendingUp, Calendar, Trophy, ChartBar as BarChart3, Activity, ArrowUpRight, ListFilter as Filter, UserCheck } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement, Filler } from 'chart.js';
 import { Doughnut, Bar, Line } from 'react-chartjs-2';
 import { supabase } from '../../utils/supabase';
@@ -63,7 +60,8 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
 
       const { data: racesData } = await supabase
         .from('quick_races')
-        .select('id, club_id');
+        .select('id, club_id')
+        .neq('is_simulated', true);
 
       const membersByClub: Record<string, number> = {};
       const racesByClub: Record<string, number> = {};

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Calendar, Users, Sailboat, MapPin, AlertTriangle, CheckCircle, Loader2, MessageSquare, Coins } from 'lucide-react';
+import { Send, Calendar, Users, Sailboat, MapPin, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Loader as Loader2, MessageSquare, Coins } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 
@@ -60,6 +60,7 @@ export const SmsManualSend: React.FC<SmsManualSendProps> = ({ darkMode = true, c
         .lte('race_date', futureDateStr)
         .eq('completed', false)
         .eq('archived', false)
+        .neq('is_simulated', true)
         .order('race_date');
 
       const upcomingEvents: UpcomingEvent[] = [];

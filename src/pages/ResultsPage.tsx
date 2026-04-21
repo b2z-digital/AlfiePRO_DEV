@@ -354,7 +354,8 @@ export const ResultsPage: React.FC = () => {
                 .from('quick_races')
                 .select('id, public_event_id, skippers, race_results, last_completed_race, completed')
                 .eq('club_id', currentClub.clubId)
-                .not('public_event_id', 'is', null);
+                .not('public_event_id', 'is', null)
+                .neq('is_simulated', true);
 
               console.log('📋 [ResultsPage] Found', localCopies?.length || 0, 'local copies of public events');
 

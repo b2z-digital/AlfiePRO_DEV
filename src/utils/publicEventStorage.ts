@@ -291,6 +291,7 @@ export const checkEventDateClashes = async (
         .from('quick_races')
         .select('id, event_name, race_date, end_date')
         .eq('club_id', clubId)
+        .neq('is_simulated', true)
         .lte('race_date', effectiveEnd);
 
       if (excludeEventId) {

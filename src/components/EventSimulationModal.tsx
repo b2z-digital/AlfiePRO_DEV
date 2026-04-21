@@ -79,7 +79,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
         date: new Date().toISOString().split('T')[0],
         venue: '',
         raceClass: '' as BoatType,
-        raceFormat: 'handicap' as RaceType,
+        raceFormat: 'scratch' as RaceType,
         skippers: [],
         raceResults: [],
         lastCompletedRace: 0,

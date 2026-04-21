@@ -160,6 +160,7 @@ const MediaPage: React.FC<MediaPageProps> = ({ darkMode }) => {
         .from('quick_races')
         .select('id, event_name, race_class, race_date')
         .eq('club_id', currentClub.clubId)
+        .neq('is_simulated', true)
         .order('race_date', { ascending: false });
 
       if (quickRacesError) throw quickRacesError;

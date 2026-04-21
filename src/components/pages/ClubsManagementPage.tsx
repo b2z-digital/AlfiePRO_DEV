@@ -252,6 +252,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
               .select('*', { count: 'exact', head: true })
               .eq('club_id', club.id)
               .eq('archived', false)
+              .neq('is_simulated', true)
               .gte('race_date', new Date().toISOString().split('T')[0]),
 
             // Upcoming series rounds (future rounds from race_series_rounds)
@@ -270,6 +271,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
               .eq('club_id', club.id)
               .eq('completed', true)
               .eq('archived', false)
+              .neq('is_simulated', true)
               .gte('race_date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
 
             // Recent series results (completed rounds in last 3 months from race_series_rounds)

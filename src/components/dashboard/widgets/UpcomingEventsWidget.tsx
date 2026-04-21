@@ -278,7 +278,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         const upcomingQuickRaces = raceEvents.filter(event => {
           const eventDate = new Date(event.date);
           eventDate.setHours(0, 0, 0, 0);
-          return eventDate >= today && !event.cancelled;
+          return eventDate >= today && !event.cancelled && !event.is_simulated;
         }).map(event => ({
           id: event.id,
           eventName: event.eventName,

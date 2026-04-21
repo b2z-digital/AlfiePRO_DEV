@@ -63,6 +63,7 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
           .from('quick_races')
           .select('*')
           .eq('archived', false)
+          .neq('is_simulated', true)
           .is('public_event_id', null)
           .order('created_at', { ascending: false });
 

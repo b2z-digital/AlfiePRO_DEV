@@ -200,6 +200,10 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       console.log('🏁 YachtRaceManager: event.dayResults:', Object.keys(currentEvent.dayResults || {}));
       setRaceType(currentEvent.raceFormat);
 
+      if (currentEvent.is_simulated && currentEvent.scoringSystem !== 'hms') {
+        setScoringMode('touch');
+      }
+
       // Set currentDay FIRST before loading day-specific data
       if (currentEvent.currentDay) {
         console.log('🏁 YachtRaceManager: Setting currentDay state to:', currentEvent.currentDay);
