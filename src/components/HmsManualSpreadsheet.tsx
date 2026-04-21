@@ -424,7 +424,11 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
         const existing = allSailsInRace.get(sailLower);
         if (existing) {
-          errors.push(`"${cell.sailNumber}" appears in Heat ${getHeatDisplayLabel(existing.heat, heatManagement.configuration)} (${getOrdinal(existing.position)}) and Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)} (${getOrdinal(pos)})`);
+          const existingIsPromotion = race > 1 && existing.heat !== 'A' && existing.position <= promotionCount;
+          const currentIsPromotion = race > 1 && heat !== 'A' && pos <= promotionCount;
+          if (!existingIsPromotion && !currentIsPromotion) {
+            errors.push(`"${cell.sailNumber}" appears in Heat ${getHeatDisplayLabel(existing.heat, heatManagement.configuration)} (${getOrdinal(existing.position)}) and Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)} (${getOrdinal(pos)})`);
+          }
         } else {
           allSailsInRace.set(sailLower, { heat, position: pos });
         }
@@ -441,7 +445,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       errors,
       warnings,
     };
-  }, [cells, heats, maxPositions, skippers]);
+  }, [cells, heats, maxPositions, skippers, promotionCount]);
 
   const handleVerifyRace = useCallback((race: number) => {
     const result = verifyRace(race);
