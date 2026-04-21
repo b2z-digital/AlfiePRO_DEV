@@ -135,14 +135,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
 
         const net = total - totalDropped;
 
-        const tieBreakPositions = skipperRaceResults
-          .filter((r: any) => numberOfHeats <= 1 || r.race >= 2)
-          .map((r: any) => r.position || 999);
-
         const sortedAllScores: number[] = [];
-        for (let posN = 1; posN <= 10; posN++) {
-          sortedAllScores.push(tieBreakPositions.filter((p: number) => p <= posN).length);
-        }
 
         const droppedScoreValues = points
           .map((score: number, idx: number) => ({ score, idx }))
@@ -166,6 +159,42 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
         };
       }).filter(Boolean) as any[];
 
+      // Compute per-race rankings by sorting skippers by their points within each race,
+      // then count cumulative finishes at each rank position for tie-resolution columns
+      const allRaceNums = Array.from(new Set(raceResults.map((r: any) => r.race))).sort((a: any, b: any) => a - b) as number[];
+      const racesToCount = numberOfHeats > 1 ? allRaceNums.filter(r => r >= 2) : allRaceNums;
+
+      racesToCount.forEach((race: number) => {
+        const raceEntries = allStandings
+          .map((s: any) => {
+            const result = s.raceResults?.find((r: any) => r.race === race);
+            return result ? { skipperIndex: s.skipperIndex, points: result.position || 999 } : null;
+          })
+          .filter(Boolean) as { skipperIndex: number; points: number }[];
+
+        raceEntries.sort((a, b) => a.points - b.points);
+
+        let rank = 1;
+        for (let i = 0; i < raceEntries.length; i++) {
+          if (i > 0 && raceEntries[i].points > raceEntries[i - 1].points) {
+            rank = i + 1;
+          }
+          const standing = allStandings.find((s: any) => s.skipperIndex === raceEntries[i].skipperIndex);
+          if (standing) {
+            if (!standing._raceRanks) standing._raceRanks = [];
+            standing._raceRanks.push(rank);
+          }
+        }
+      });
+
+      allStandings.forEach((s: any) => {
+        const ranks: number[] = s._raceRanks || [];
+        for (let posN = 1; posN <= 10; posN++) {
+          s.sortedAllScores.push(ranks.filter((r: number) => r <= posN).length);
+        }
+        delete s._raceRanks;
+      });
+
       const hmsBreakTieCompare = (a: any, b: any): number => {
         try {
           const allRR = raceResults.map((r: any) => ({
@@ -184,7 +213,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
       console.error('Error computing standings:', e);
       return [];
     }
-  }, [skippers, raceResults, dropRules, useHMSTieBreak]);
+  }, [skippers, raceResults, dropRules, useHMSTieBreak, numberOfHeats]);
 
   const maxDropCols = useMemo(() => {
     if (standings.length === 0) return 0;
