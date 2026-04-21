@@ -46,12 +46,6 @@ const SECTION_BORDER = '3px solid #333';
 const ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.75, 2.0];
 const DEFAULT_ZOOM_INDEX = 5; // 1.0
 
-function getOrdinalLabel(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
 function fmt1(val: number | undefined | null): string {
   if (val == null || !Number.isFinite(val)) return '-';
   return val.toFixed(1);
@@ -135,65 +129,17 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
 
         const net = total - totalDropped;
 
-        const sortedAllScores: number[] = [];
-
-        const droppedScoreValues = points
-          .map((score: number, idx: number) => ({ score, idx }))
-          .filter(({ idx }: { idx: number }) => droppedRaceIndices.has(idx))
-          .map(({ score }: { score: number }) => score)
-          .sort((a: number, b: number) => b - a);
-
         return {
           skipperIndex: skipperIndex as number,
           skipper,
           raceResults: skipperRaceResults,
           points,
           total,
-          drops,
           droppedRaceIndices,
-          totalDropped,
           net,
-          sortedAllScores,
-          droppedScoreValues,
           racesScored: points.length,
         };
       }).filter(Boolean) as any[];
-
-      // Compute per-race rankings by sorting skippers by their points within each race,
-      // then count cumulative finishes at each rank position for tie-resolution columns
-      const allRaceNums = Array.from(new Set(raceResults.map((r: any) => r.race))).sort((a: any, b: any) => a - b) as number[];
-      const racesToCount = numberOfHeats > 1 ? allRaceNums.filter(r => r >= 2) : allRaceNums;
-
-      racesToCount.forEach((race: number) => {
-        const raceEntries = allStandings
-          .map((s: any) => {
-            const result = s.raceResults?.find((r: any) => r.race === race);
-            return result ? { skipperIndex: s.skipperIndex, points: result.position || 999 } : null;
-          })
-          .filter(Boolean) as { skipperIndex: number; points: number }[];
-
-        raceEntries.sort((a, b) => a.points - b.points);
-
-        let rank = 1;
-        for (let i = 0; i < raceEntries.length; i++) {
-          if (i > 0 && raceEntries[i].points > raceEntries[i - 1].points) {
-            rank = i + 1;
-          }
-          const standing = allStandings.find((s: any) => s.skipperIndex === raceEntries[i].skipperIndex);
-          if (standing) {
-            if (!standing._raceRanks) standing._raceRanks = [];
-            standing._raceRanks.push(rank);
-          }
-        }
-      });
-
-      allStandings.forEach((s: any) => {
-        const ranks: number[] = s._raceRanks || [];
-        for (let posN = 1; posN <= 10; posN++) {
-          s.sortedAllScores.push(ranks.filter((r: number) => r <= posN).length);
-        }
-        delete s._raceRanks;
-      });
 
       const hmsBreakTieCompare = (a: any, b: any): number => {
         try {
@@ -213,19 +159,8 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
       console.error('Error computing standings:', e);
       return [];
     }
-  }, [skippers, raceResults, dropRules, useHMSTieBreak, numberOfHeats]);
+  }, [skippers, raceResults, dropRules, useHMSTieBreak]);
 
-  const maxDropCols = useMemo(() => {
-    if (standings.length === 0) return 0;
-    const maxActual = Math.max(...standings.map((s: any) => s.droppedScoreValues?.length || 0));
-    return Math.max(maxActual, 1);
-  }, [standings]);
-
-  const maxBestCols = useMemo(() => {
-    if (standings.length === 0) return 0;
-    const maxActual = Math.max(...standings.map((s: any) => s.sortedAllScores?.length || 0));
-    return Math.min(Math.max(maxActual, 1), 10);
-  }, [standings]);
 
   const hmsVerification = useMemo(() => {
     const hasHmsPoints = raceResults.some((r: any) => r.hmsPoints != null && r.hmsPoints > 0);
@@ -270,10 +205,6 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
     const headers = [
       'Position', 'Skipper', 'Sail #', 'Club/City', 'Hull', 'MYA No.', 'Total', 'Score',
       ...completedRaces.map(r => `Race ${r}`),
-      ...Array.from({ length: maxDropCols }, (_, i) => `dis ${i + 1}`),
-      'Total Dis',
-      ...Array.from({ length: maxBestCols }, (_, i) => i === 0 ? 'Best' : getOrdinalLabel(i + 1)),
-      'Avg', 'Races',
     ];
 
     const rows = standings.map((s: any, idx: number) => {
@@ -290,16 +221,6 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
         return isDropped ? `(${pos.toFixed(1)})` : pos.toFixed(1);
       });
 
-      const dropValues = Array.from({ length: maxDropCols }, (_, i) =>
-        s.droppedScoreValues?.[i] != null ? s.droppedScoreValues[i].toFixed(1) : ''
-      );
-
-      const bestValues = Array.from({ length: maxBestCols }, (_, i) =>
-        s.sortedAllScores?.[i] != null ? String(s.sortedAllScores[i]) : ''
-      );
-
-      const avg = s.racesScored > 0 ? (s.net / s.racesScored).toFixed(1) : '';
-
       return [
         idx + 1,
         s.skipper?.name || 'Unknown',
@@ -310,11 +231,6 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
         s.total.toFixed(1),
         s.net.toFixed(1),
         ...raceScores,
-        ...dropValues,
-        s.totalDropped > 0 ? s.totalDropped.toFixed(1) : '',
-        ...bestValues,
-        avg,
-        s.racesScored,
       ];
     });
 
@@ -333,7 +249,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
     a.download = `${eventName || 'score-sheet'}_results.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [standings, completedRaces, maxDropCols, maxBestCols, getSailNo, eventName]);
+  }, [standings, completedRaces, getSailNo, eventName]);
 
   const exportJpg = useCallback(async () => {
     if (!tableRef.current) return;
@@ -426,12 +342,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
 
   const frozenWidth = Object.values(scaledColWidths).reduce((a, b) => a + b, 0);
   const raceColsWidth = completedRaces.length * scaledColW;
-  const dropColsWidth = maxDropCols * scaledColW;
-  const totalDisWidth = (COL_W + 6) * zoom;
-  const bestColsWidth = maxBestCols * scaledColW;
-  const avgWidth = 48 * zoom;
-  const racesWidth = 38 * zoom;
-  const tableMinWidth = frozenWidth + raceColsWidth + dropColsWidth + totalDisWidth + bestColsWidth + avgWidth + racesWidth;
+  const tableMinWidth = frozenWidth + raceColsWidth;
 
   return (
     <div className="h-full flex flex-col bg-white text-black">
@@ -518,15 +429,6 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
             {completedRaces.map(r => (
               <col key={`r${r}`} style={{ width: scaledColW }} />
             ))}
-            {Array.from({ length: maxDropCols }).map((_, i) => (
-              <col key={`d${i}`} style={{ width: scaledColW }} />
-            ))}
-            <col style={{ width: (COL_W + 6) * zoom }} />
-            {Array.from({ length: maxBestCols }).map((_, i) => (
-              <col key={`b${i}`} style={{ width: scaledColW }} />
-            ))}
-            <col style={{ width: 48 * zoom }} />
-            <col style={{ width: 38 * zoom }} />
           </colgroup>
           <thead className="sticky top-0 z-20">
             <tr style={{ fontSize: 9 * zoom }}>
@@ -550,24 +452,6 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                   {race}
                 </th>
               ))}
-              {Array.from({ length: maxDropCols }).map((_, i) => (
-                <th key={`d${i}`} className={th} style={{ backgroundColor: '#FFB6C1' }}>dis {i + 1}</th>
-              ))}
-              <th className={th} style={{ backgroundColor: '#FF9999', fontWeight: 800, borderRight: SECTION_BORDER }}>Total Dis</th>
-              {Array.from({ length: maxBestCols }).map((_, i) => (
-                <th
-                  key={`b${i}`}
-                  className={th}
-                  style={{
-                    backgroundColor: '#87CEEB',
-                    ...(i === maxBestCols - 1 ? { borderRight: SECTION_BORDER } : {}),
-                  }}
-                >
-                  {i === 0 ? 'Best' : getOrdinalLabel(i + 1)}
-                </th>
-              ))}
-              <th className={th} style={{ backgroundColor: '#FFFACD' }}>Avg</th>
-              <th className={th} style={{ backgroundColor: '#FFFACD' }}>Races</th>
             </tr>
           </thead>
           <tbody>
@@ -644,34 +528,6 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                     );
                   })}
 
-                  {Array.from({ length: maxDropCols }).map((_, i) => (
-                    <td key={`d${i}`} className={td} style={{ backgroundColor: '#D3D3D3', color: '#666', fontSize: 10 * zoom }}>
-                      {standing.droppedScoreValues?.[i] != null ? fmt1(standing.droppedScoreValues[i]) : ''}
-                    </td>
-                  ))}
-
-                  <td className={td} style={{ backgroundColor: '#BEBEBE', color: '#333', fontWeight: 700, borderRight: SECTION_BORDER, fontSize: 10 * zoom }}>
-                    {standing.totalDropped > 0 ? fmt1(standing.totalDropped) : ''}
-                  </td>
-
-                  {Array.from({ length: maxBestCols }).map((_, i) => (
-                    <td
-                      key={`b${i}`}
-                      className={td}
-                      style={{
-                        backgroundColor: '#F0F8FF',
-                        fontSize: 10 * zoom,
-                        ...(i === maxBestCols - 1 ? { borderRight: SECTION_BORDER } : {}),
-                      }}
-                    >
-                      {standing.sortedAllScores?.[i] != null ? standing.sortedAllScores[i] : ''}
-                    </td>
-                  ))}
-
-                  <td className={td} style={{ backgroundColor: '#FFFFF0', fontSize: 10 * zoom }}>
-                    {standing.racesScored > 0 ? (standing.net / standing.racesScored).toFixed(1) : ''}
-                  </td>
-                  <td className={td} style={{ backgroundColor: '#FFFFF0', fontSize: 10 * zoom }}>{standing.racesScored}</td>
                 </tr>
               );
             })}
