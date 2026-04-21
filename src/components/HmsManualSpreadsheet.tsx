@@ -629,10 +629,11 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           if (!c?.sailNumber?.trim() || c.skipperIndex !== skipperIndex) continue;
           const isProm = h !== 'A' && r > 1 && p <= promotionCount;
           if (isProm) continue;
-          if (c.letterScore === 'RDG' && c.customPoints === -1) continue;
-          if (c.letterScore === 'RDG' && c.customPoints === -2) continue;
+          if (c.letterScore === 'RDG' && (c.customPoints === -1 || c.customPoints === -2)) continue;
 
-          if (c.letterScore) {
+          if (c.hmsPoints != null && c.hmsPoints > 0) {
+            scores.push(c.hmsPoints);
+          } else if (c.letterScore) {
             if (c.customPoints !== undefined && c.customPoints > 0) {
               scores.push(c.customPoints);
             } else {
