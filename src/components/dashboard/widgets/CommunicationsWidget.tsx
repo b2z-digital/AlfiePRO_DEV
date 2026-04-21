@@ -72,7 +72,7 @@ export const CommunicationsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
   };
 
   return (
-    <div className={`relative rounded-2xl p-6 w-full h-full flex flex-col ${darkMode ? 'border backdrop-blur-sm ${themeColors.background}' : 'bg-white shadow-xl'} ${isEditMode ? 'animate-wiggle cursor-move' : ''}`}>
+    <div className={`relative rounded-2xl p-6 w-full h-full flex flex-col ${darkMode ? `border backdrop-blur-sm ${themeColors.background}` : 'bg-white shadow-xl'} ${isEditMode ? 'animate-wiggle cursor-move' : ''}`}>
       {isEditMode && onRemove && (
         <button
           onClick={(e) => {

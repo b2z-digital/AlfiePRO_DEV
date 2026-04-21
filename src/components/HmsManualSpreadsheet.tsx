@@ -588,11 +588,16 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   const getEmptyRowScore = useCallback((heat: HeatDesignation, race: number): number | string => {
     const entryCount = getHeatEntryCount(heat, race);
     if (entryCount === 0) return '';
-    const regularCount = getHeatNonLetterNonPromotedCount(heat, race);
-    if (race === 1 || heat === 'A') return regularCount;
+    if (race === 1) {
+      return getLargestHeatEntryCount(race) + 1;
+    }
+    if (heat === 'A') {
+      return entryCount + 1;
+    }
     const offset = getHeatOffset(heat, race);
-    return offset + regularCount;
-  }, [getHeatOffset, getHeatEntryCount, getHeatNonLetterNonPromotedCount]);
+    const nonPromoted = Math.max(0, entryCount - promotionCount);
+    return offset + nonPromoted + 1;
+  }, [getHeatOffset, getHeatEntryCount, getLargestHeatEntryCount, promotionCount]);
 
   const getLetterScorePoints = useCallback((heat: HeatDesignation, race: number, ls: LetterScore): number => {
     if (isEntrantsPlusOne(ls)) {
@@ -613,6 +618,44 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return offset + nonPromoted + 1;
   }, [skippers.length, getLargestHeatEntryCount, getTotalNonPromotedFleet, getHeatEntryCount, getHeatOffset, promotionCount]);
 
+  const calculateRdgAverage = useCallback((skipperIndex: number, excludeRace: number): number | null => {
+    const scores: number[] = [];
+    for (let r = 2; r <= TOTAL_RACES; r++) {
+      if (r === excludeRace) continue;
+      for (const h of heats) {
+        for (let p = 1; p <= maxPositions; p++) {
+          const k = getCellKey(h, p, r);
+          const c = cells[k];
+          if (!c?.sailNumber?.trim() || c.skipperIndex !== skipperIndex) continue;
+          const isProm = h !== 'A' && r > 1 && p <= promotionCount;
+          if (isProm) continue;
+          if (c.letterScore === 'RDG' && c.customPoints === -1) continue;
+          if (c.letterScore === 'RDG' && c.customPoints === -2) continue;
+
+          if (c.letterScore) {
+            if (c.customPoints !== undefined && c.customPoints > 0) {
+              scores.push(c.customPoints);
+            } else {
+              scores.push(getLetterScorePoints(h, r, c.letterScore));
+            }
+          } else {
+            const okAbove = getOkCountAbovePosition(h, p, r);
+            if (r === 1 || h === 'A') {
+              scores.push(okAbove + 1);
+            } else {
+              const offset = getHeatOffset(h, r);
+              scores.push(offset + okAbove + 1);
+            }
+          }
+          break;
+        }
+      }
+    }
+    if (scores.length === 0) return null;
+    const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
+    return Math.round(avg * 10) / 10;
+  }, [cells, heats, maxPositions, promotionCount, getLetterScorePoints, getOkCountAbovePosition, getHeatOffset]);
+
   const getPointsForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();
 
@@ -625,7 +668,13 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
     if (cell?.letterScore) {
       if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
-      if (cell.customPoints === -1) return 'AVG';
+      if (cell.customPoints === -1 || cell.customPoints === -2) {
+        if (cell.skipperIndex != null) {
+          const avg = calculateRdgAverage(cell.skipperIndex, race);
+          if (avg !== null) return avg;
+        }
+        return 'AVG';
+      }
       return getLetterScorePoints(heat, race, cell.letterScore);
     }
 
@@ -634,7 +683,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
     const offset = getHeatOffset(heat, race);
     return offset + okAbove + 1;
-  }, [promotionCount, getHeatOffset, getLetterScorePoints, getOkCountAbovePosition]);
+  }, [promotionCount, getHeatOffset, getLetterScorePoints, getOkCountAbovePosition, calculateRdgAverage]);
 
   const getExpForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();
@@ -647,10 +696,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
     if (hasSail) {
       if (cell?.letterScore && !isPositionOccupying(cell)) {
-        const okAbove = getOkCountAbovePosition(heat, position, race);
-        if (race === 1 || heat === 'A') return okAbove;
-        const offset = getHeatOffset(heat, race);
-        return offset + okAbove;
+        return getLetterScorePoints(heat, race, cell.letterScore);
       }
       const okAbove = getOkCountAbovePosition(heat, position, race);
       if (race === 1 || heat === 'A') return okAbove + 1;
@@ -659,7 +705,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
 
     return getEmptyRowScore(heat, race);
-  }, [getHeatOffset, getHeatEntryCount, getEmptyRowScore, getOkCountAbovePosition, promotionCount, isPositionOccupying]);
+  }, [getHeatOffset, getHeatEntryCount, getEmptyRowScore, getOkCountAbovePosition, promotionCount, isPositionOccupying, getLetterScorePoints]);
 
   const availableSkippersForDropdown = useMemo(() => {
     if (!dropdownTarget) return [];
@@ -724,7 +770,13 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
     if (cell?.letterScore) {
       if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
-      if (cell.customPoints === -1) return 'AVG';
+      if (cell.customPoints === -1 || cell.customPoints === -2) {
+        if (cell.skipperIndex != null) {
+          const avg = calculateRdgAverage(cell.skipperIndex, race);
+          if (avg !== null) return avg;
+        }
+        return 'AVG';
+      }
       return getLetterScorePoints(heat, race, cell.letterScore);
     }
 
@@ -735,7 +787,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
     const offset = getHeatOffset(heat, race);
     return offset + okAbove + 1;
-  }, [promotionCount, getLetterScorePoints, getOkCountAbovePosition, getHeatOffset]);
+  }, [promotionCount, getLetterScorePoints, getOkCountAbovePosition, getHeatOffset, calculateRdgAverage]);
 
   const overallRaceResults = useMemo(() => {
     const results: any[] = [];

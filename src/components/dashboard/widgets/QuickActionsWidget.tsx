@@ -14,7 +14,7 @@ export const QuickActionsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode
       className={`
         relative rounded-2xl p-6 w-full h-full
         ${darkMode
-          ? 'border backdrop-blur-sm ${themeColors.background}'
+          ? `border backdrop-blur-sm ${themeColors.background}`
           : 'bg-white shadow-xl'}
         ${isEditMode ? 'animate-wiggle cursor-move' : ''}
       `}

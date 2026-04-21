@@ -11,7 +11,7 @@ export const ActivityFeedWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode
     <div
       className={`
         relative rounded-2xl p-6 w-full h-full
-        ${darkMode ? 'border backdrop-blur-sm ${themeColors.background}' : 'bg-white shadow-xl'}
+        ${darkMode ? `border backdrop-blur-sm ${themeColors.background}` : 'bg-white shadow-xl'}
         ${isEditMode ? 'animate-wiggle cursor-move' : ''}
       `}
     >
