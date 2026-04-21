@@ -135,7 +135,14 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
 
         const net = total - totalDropped;
 
-        const sortedAllScores = [...points].sort((a, b) => a - b);
+        const tieBreakPositions = skipperRaceResults
+          .filter((r: any) => numberOfHeats <= 1 || r.race >= 2)
+          .map((r: any) => r.position || 999);
+
+        const sortedAllScores: number[] = [];
+        for (let posN = 1; posN <= 10; posN++) {
+          sortedAllScores.push(tieBreakPositions.filter((p: number) => p <= posN).length);
+        }
 
         const droppedScoreValues = points
           .map((score: number, idx: number) => ({ score, idx }))
