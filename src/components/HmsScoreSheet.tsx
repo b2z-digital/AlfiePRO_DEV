@@ -60,10 +60,18 @@ function fmt1(val: number | undefined | null): string {
 export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
   skippers,
   heatManagement,
-  dropRules,
+  dropRules: rawDropRules,
   externalRaceResults,
   eventName,
 }) => {
+  const dropRules = useMemo(() => {
+    if (Array.isArray(rawDropRules)) return rawDropRules;
+    if (typeof rawDropRules === 'string') {
+      try { const p = JSON.parse(rawDropRules); if (Array.isArray(p)) return p; } catch {}
+    }
+    return [];
+  }, [rawDropRules]);
+
   const tableRef = useRef<HTMLDivElement>(null);
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
   const zoom = ZOOM_LEVELS[zoomIndex];
