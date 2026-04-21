@@ -465,6 +465,17 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     return position <= promotionCount;
   };
 
+  const totalEntrantsCount = useMemo(() => {
+    const uniqueSkippers = new Set<number>();
+    for (const key of Object.keys(cells)) {
+      const cell = cells[key];
+      if (cell?.sailNumber?.trim() && cell.skipperIndex != null) {
+        uniqueSkippers.add(cell.skipperIndex);
+      }
+    }
+    return uniqueSkippers.size;
+  }, [cells]);
+
   const getHeatEntryCount = useCallback((h: HeatDesignation, race: number): number => {
     let count = 0;
     for (let p = 1; p <= maxPositions; p++) {
@@ -601,7 +612,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
   const getLetterScorePoints = useCallback((heat: HeatDesignation, race: number, ls: LetterScore): number => {
     if (isEntrantsPlusOne(ls)) {
-      return skippers.length + 1;
+      return totalEntrantsCount + 1;
     }
     if (race === 1) {
       return getLargestHeatEntryCount(race) + 1;
@@ -616,7 +627,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const offset = getHeatOffset(heat, race);
     const nonPromoted = Math.max(0, entries - promotionCount);
     return offset + nonPromoted + 1;
-  }, [skippers.length, getLargestHeatEntryCount, getTotalNonPromotedFleet, getHeatEntryCount, getHeatOffset, promotionCount]);
+  }, [totalEntrantsCount, getLargestHeatEntryCount, getTotalNonPromotedFleet, getHeatEntryCount, getHeatOffset, promotionCount]);
 
   const calculateRdgAverage = useCallback((skipperIndex: number, excludeRace: number): number | null => {
     const scores: number[] = [];
@@ -678,6 +689,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         }
         return 'AVG';
       }
+      if (cell.hmsPoints != null && cell.hmsPoints > 0) return cell.hmsPoints;
       return getLetterScorePoints(heat, race, cell.letterScore);
     }
 
@@ -784,6 +796,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         }
         return 'AVG';
       }
+      if (cell.hmsPoints != null && cell.hmsPoints > 0) return cell.hmsPoints;
       return getLetterScorePoints(heat, race, cell.letterScore);
     }
 
