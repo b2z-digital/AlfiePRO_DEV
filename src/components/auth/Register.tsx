@@ -4,6 +4,7 @@ import { supabase } from '../../utils/supabase';
 import { Logo } from '../Logo';
 import { GoogleIcon } from './GoogleIcon';
 import { ArrowLeft, User, Building, Smartphone, Monitor, ExternalLink } from 'lucide-react';
+import { PasswordInput, validatePassword } from './PasswordInput';
 
 const AppleIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg viewBox="0 0 384 512" fill="currentColor" className={className}>
@@ -82,8 +83,9 @@ export const Register: React.FC = () => {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    const { valid } = validatePassword(password);
+    if (!valid) {
+      setError('Please fix the password issues highlighted below');
       setLoading(false);
       return;
     }
@@ -390,49 +392,26 @@ export const Register: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
-                    Password
-                  </label>
-                  <input
+                  <PasswordInput
                     id="password"
-                    type="password"
+                    label="Password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    onChange={setPassword}
                     placeholder="Minimum 6 characters"
+                    showRequirements
                   />
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${password.length >= 6 ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                    <p className={`text-xs ${password.length >= 6 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                      Minimum 6 characters {password.length > 0 && `(${password.length}/6)`}
-                    </p>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">No special characters required - just pick something memorable</p>
                 </div>
 
                 <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-2">
-                    Confirm Password
-                  </label>
-                  <input
+                  <PasswordInput
                     id="confirmPassword"
-                    type="password"
+                    label="Confirm Password"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    onChange={setConfirmPassword}
                     placeholder="Re-enter your password"
+                    isConfirmField
+                    confirmValue={password}
                   />
-                  {confirmPassword.length > 0 && (
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${password === confirmPassword ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                      <p className={`text-xs ${password === confirmPassword ? 'text-emerald-400' : 'text-amber-400'}`}>
-                        {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 <button

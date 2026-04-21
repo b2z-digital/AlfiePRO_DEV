@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { Logo } from '../Logo';
-import { CircleCheck as CheckCircle, Lock, Eye, EyeOff, TriangleAlert as AlertTriangle, UserPlus } from 'lucide-react';
+import { CircleCheck as CheckCircle, Lock, TriangleAlert as AlertTriangle, UserPlus } from 'lucide-react';
+import { PasswordInput, validatePassword } from './PasswordInput';
 
 type FlowType = 'activation' | 'reset' | 'legacy';
 
@@ -12,8 +13,6 @@ export const ResetPassword: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [expired, setExpired] = useState(false);
   const navigate = useNavigate();
@@ -114,8 +113,9 @@ export const ResetPassword: React.FC = () => {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    const { valid } = validatePassword(password);
+    if (!valid) {
+      setError('Please fix the password issues highlighted below');
       setLoading(false);
       return;
     }
@@ -305,71 +305,25 @@ export const ResetPassword: React.FC = () => {
                   )}
 
                   <form onSubmit={handleSubmit} className="space-y-5">
-                    <div>
-                      <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
-                        {isActivation ? 'Password' : 'New password'}
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="password"
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          required
-                          minLength={6}
-                          autoFocus
-                          className="w-full px-4 py-3 pr-12 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                          placeholder="Minimum 6 characters"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors"
-                        >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${password.length >= 6 ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                        <p className={`text-xs ${password.length >= 6 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                          Minimum 6 characters {password.length > 0 && `(${password.length}/6)`}
-                        </p>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">No special characters required - just pick something memorable</p>
-                    </div>
+                    <PasswordInput
+                      id="password"
+                      label={isActivation ? 'Password' : 'New password'}
+                      value={password}
+                      onChange={setPassword}
+                      placeholder="Minimum 6 characters"
+                      autoFocus
+                      showRequirements
+                    />
 
-                    <div>
-                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-2">
-                        Confirm password
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          required
-                          minLength={6}
-                          className="w-full px-4 py-3 pr-12 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                          placeholder="Confirm your password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors"
-                        >
-                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                      {confirmPassword.length > 0 && (
-                        <div className="flex items-center gap-1.5 mt-1.5">
-                          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${password === confirmPassword ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                          <p className={`text-xs ${password === confirmPassword ? 'text-emerald-400' : 'text-amber-400'}`}>
-                            {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <PasswordInput
+                      id="confirmPassword"
+                      label="Confirm password"
+                      value={confirmPassword}
+                      onChange={setConfirmPassword}
+                      placeholder="Confirm your password"
+                      isConfirmField
+                      confirmValue={password}
+                    />
 
                     <button
                       type="submit"
