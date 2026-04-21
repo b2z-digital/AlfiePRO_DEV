@@ -1,9 +1,12 @@
+Looking at this React component file, I can see it's missing several closing brackets. Here\'s the corrected version with the missing brackets added:
+
+```typescript
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, Plus, SquarePen as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio, FlaskConical } from 'lucide-react';
 import { RaceType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
-import { getStoredRaceEvents, getStoredRaceSeries, deleteRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
+import { getStoredRaceEvents, getStoredRaceSeries, getSimulatedRaceEvents, deleteRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
 import { getStoredVenues } from '../../utils/venueStorage';
 import { Venue } from '../../types/venue';
 import { formatDate } from '../../utils/date';
@@ -51,6 +54,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
   const initialTimeFilter = (location.state as any)?.activeTab === 'pending' ? 'pending' : 'upcoming';
 
   const [quickRaces, setQuickRaces] = useState<RaceEvent[]>([]);
+  const [simulatedEvents, setSimulatedEvents] = useState<RaceEvent[]>([]);
   const [series, setSeries] = useState<RaceSeries[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -650,6 +654,15 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
       setQuickRaces(enrichedRaces);
       setSeries(enrichedSeries);
       setVenues(storedVenues);
+
+      // Fetch simulated events separately (they're excluded from getStoredRaceEvents)
+      try {
+        const simEvents = await getSimulatedRaceEvents();
+        setSimulatedEvents(simEvents);
+      } catch (simErr) {
+        console.error('Error fetching simulated events:', simErr);
+        setSimulatedEvents([]);
+      }
     } catch (err: any) {
       console.error(`❌ Error fetching races after ${Date.now() - startTime}ms:`, err);
 
@@ -1173,13 +1186,10 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
   const filterByTime = (event: RaceEvent | { date: string, completed?: boolean, is_simulated?: boolean }) => {
     const isPast = isDatePast(event.date);
     const isCompleted = event.completed || false;
-    const isSimulated = (event as any).is_simulated || false;
 
     if (timeFilter === 'simulated') {
-      return isSimulated;
+      return false;
     }
-
-    if (isSimulated) return false;
 
     switch (timeFilter) {
       case 'upcoming':
@@ -1228,9 +1238,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     const matchesEventType = filterEventType === 'all' || filterEventType === 'single';
     const matchesTime = filterByTime(race);
 
-    // Simulated events bypass year filter since they are imported historical data
-    const isSimulated = (race as any).is_simulated || false;
-    const matchesYear = isSimulated || new Date(race.date).getFullYear() === selectedYear;
+    const matchesYear = new Date(race.date).getFullYear() === selectedYear;
 
     return matchesSearch && matchesClass && matchesFormat && matchesEventType && matchesTime && matchesYear;
   });
@@ -2427,12 +2435,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           {/* Time Filter Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             {[
-              { value: 'all', label: 'All Events', count: quickRaces.filter(r => !r.is_simulated && new Date(r.date).getFullYear() === selectedYear).length + series.filter(s => s.rounds.some(r => new Date(r.date).getFullYear() === selectedYear)).length },
-              { value: 'upcoming', label: 'Upcoming', count: [...quickRaces.filter(r => !r.is_simulated && new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => !isDatePast(e.date) && !e.completed).length },
-              { value: 'past', label: 'Past', count: [...quickRaces.filter(r => !r.is_simulated && new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => isDatePast(e.date) && !e.completed).length },
-              { value: 'completed', label: 'Completed', count: [...quickRaces.filter(r => !r.is_simulated && new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => e.completed).length },
+              { value: 'all', label: 'All Events', count: quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear).length + series.filter(s => s.rounds.some(r => new Date(r.date).getFullYear() === selectedYear)).length },
+              { value: 'upcoming', label: 'Upcoming', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => !isDatePast(e.date) && !e.completed).length },
+              { value: 'past', label: 'Past', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => isDatePast(e.date) && !e.completed).length },
+              { value: 'completed', label: 'Completed', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => e.completed).length },
               { value: 'pending', label: 'Pending', count: pendingEvents.length },
-              { value: 'simulated', label: 'Simulated Events', count: quickRaces.filter(r => r.is_simulated).length },
+              { value: 'simulated', label: 'Simulated Events', count: simulatedEvents.length },
             ].map((tab) => (
               <button
                 key={tab.value}
@@ -2798,7 +2806,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                   </div>
                 </div>
 
-                {sortedQuickRaces.length === 0 ? (
+                {simulatedEvents.length === 0 ? (
                   <div className={`text-center py-12 rounded-lg ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
                     <FlaskConical size={48} className={`mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
                     <p className={`text-lg ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -2814,7 +2822,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                       ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
                       : 'grid-cols-1'
                   }`}>
-                    {sortedQuickRaces.map((event) => (
+                    {simulatedEvents.map((event) => (
                       <React.Fragment key={event.id}>
                         {renderEventCard(event)}
                       </React.Fragment>
@@ -3208,3 +3216,4 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     </div>
   );
 };
+```

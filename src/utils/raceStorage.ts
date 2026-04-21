@@ -226,6 +226,49 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
   }
 };
 
+// Get simulated race events only (uses SECURITY DEFINER RPC to bypass RLS filtering)
+export const getSimulatedRaceEvents = async (): Promise<RaceEvent[]> => {
+  try {
+    const scope = await getRaceScope();
+    if (!scope || !scope.clubId) return [];
+
+    const { data, error } = await supabase.rpc('get_simulated_race_events', {
+      p_club_id: scope.clubId
+    });
+
+    if (error || !data) return [];
+
+    return (data as any[]).map(race => ({
+      id: race.id,
+      eventName: race.event_name,
+      clubName: race.club_name || '',
+      clubId: race.club_id,
+      date: race.race_date,
+      endDate: race.end_date,
+      venue: race.venue || '',
+      raceClass: race.race_class || '',
+      raceFormat: race.race_format || 'scratch',
+      skippers: race.skippers || [],
+      raceResults: race.race_results || [],
+      lastCompletedRace: race.last_completed_race || 0,
+      hasDeterminedInitialHcaps: race.has_determined_initial_hcaps || false,
+      isManualHandicaps: race.is_manual_handicaps || false,
+      completed: race.completed || false,
+      numRaces: race.num_races,
+      dropRules: race.drop_rules,
+      heatManagement: race.heat_management,
+      multiDay: race.multi_day || false,
+      numberOfDays: race.number_of_days || 1,
+      dayResults: race.day_results || {},
+      currentDay: race.current_day || 1,
+      is_simulated: true,
+    } as any));
+  } catch (error) {
+    console.error('Error fetching simulated events:', error);
+    return [];
+  }
+};
+
 // Store race events
 export const storeRaceEvents = async (events: RaceEvent[]): Promise<void> => {
   try {
