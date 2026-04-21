@@ -138,9 +138,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const isCalculatingHandicaps = useRef(false);
   const liveSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load user's scoring mode preference
+  // Load user's scoring mode preference (skip for non-HMS simulated events which default to touch)
   useEffect(() => {
     const loadScoringModePreference = async () => {
+      const currentEvent = getCurrentEvent();
+      if (currentEvent?.is_simulated && currentEvent.scoringSystem !== 'hms') {
+        setScoringMode('touch');
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profileData } = await supabase

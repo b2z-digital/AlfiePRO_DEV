@@ -1364,30 +1364,26 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                   Export All Rounds
                 </button>
               )}
-              {heatManagement.currentRound > 1 && (
-                <>
-                  <button
-                    onClick={() => setShowRaceResults(true)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      darkMode
-                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                        : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                    }`}
-                  >
-                    Race Results
-                  </button>
-                  <button
-                    onClick={() => setShowOverallResults(true)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      darkMode
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                  >
-                    Overall Results
-                  </button>
-                </>
-              )}
+              <button
+                onClick={() => setShowRaceResults(true)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  darkMode
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                }`}
+              >
+                Race Results
+              </button>
+              <button
+                onClick={() => setShowOverallResults(true)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  darkMode
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                Overall Results
+              </button>
             </div>
           </div>
         </div>
