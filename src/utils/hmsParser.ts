@@ -55,7 +55,6 @@ export async function parseHMSFile(file: File): Promise<ParsedHMSData> {
 
   let promotionCount: number | undefined;
   if (hasHeats) {
-    const numHeats = heats ? heats.length : 0;
     const upCounts: number[] = [];
     const nonSeedingResults = results.filter(r => r.raceNumber >= 2);
     const raceNums = [...new Set(nonSeedingResults.map(r => r.raceNumber))];
@@ -70,14 +69,11 @@ export async function parseHMSFile(file: File): Promise<ParsedHMSData> {
       }
     }
     if (upCounts.length > 0) {
-      const frequency: Record<number, number> = {};
-      upCounts.forEach(c => { frequency[c] = (frequency[c] || 0) + 1; });
-      let detected = Number(Object.entries(frequency).sort((a, b) => b[1] - a[1])[0][0]);
-      if (numHeats > 0 && detected > numHeats) {
-        detected = numHeats;
-      }
-      promotionCount = detected;
-      console.log(`Detected promotion count: ${promotionCount} (from UP comments across heats, capped to ${numHeats} heats)`);
+      promotionCount = Math.max(...upCounts);
+      console.log(`Detected promotion count: ${promotionCount} (max UP count across heats, values: ${upCounts.join(',')})`);
+    } else {
+      promotionCount = 4;
+      console.log('No UP comments found, defaulting promotion count to 4');
     }
   }
 

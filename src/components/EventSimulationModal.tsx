@@ -64,8 +64,41 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
     }
   }, []);
 
-  const handleCreateFromScratch = () => {
-    onClose();
+  const handleCreateFromScratch = async () => {
+    if (creating) return;
+    setCreating(true);
+    setError(null);
+
+    try {
+      const eventId = uuidv4();
+      const event: RaceEvent = {
+        id: eventId,
+        eventName: 'Simulated Event',
+        clubName: currentClub?.club?.name || 'Simulation',
+        clubId: currentClub?.clubId,
+        date: new Date().toISOString().split('T')[0],
+        venue: '',
+        raceClass: '' as BoatType,
+        raceFormat: 'handicap' as RaceType,
+        skippers: [],
+        raceResults: [],
+        lastCompletedRace: 0,
+        hasDeterminedInitialHcaps: false,
+        isManualHandicaps: false,
+        completed: false,
+        numRaces: 12,
+        dropRules: [4, 8, 16, 24, 32, 40],
+        is_simulated: true,
+      };
+
+      await storeRaceEvent(event);
+      setCurrentEvent(event);
+      onSuccess(event);
+    } catch (err: any) {
+      console.error('Failed to create simulated event:', err);
+      setError(err.message || 'Failed to create event');
+      setCreating(false);
+    }
   };
 
   const buildHeatManagement = useCallback((): HeatManagement | undefined => {
@@ -329,7 +362,10 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
 
                 <button
                   onClick={handleCreateFromScratch}
+                  disabled={creating}
                   className={`group relative p-6 rounded-xl border-2 text-left transition-all hover:scale-[1.02] ${
+                    creating ? 'opacity-60 cursor-wait' : ''
+                  } ${
                     darkMode
                       ? 'border-slate-700 hover:border-blue-500/50 bg-slate-800/50 hover:bg-slate-800'
                       : 'border-slate-200 hover:border-blue-500/50 bg-slate-50 hover:bg-blue-50/30'
@@ -349,7 +385,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                   </p>
                   <div className="flex items-center gap-2 text-sm font-medium text-blue-500">
                     <ChevronRight size={16} />
-                    <span>Start blank event</span>
+                    <span>{creating ? 'Creating event...' : 'Start blank event'}</span>
                   </div>
                 </button>
               </div>

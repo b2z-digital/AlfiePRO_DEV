@@ -116,54 +116,32 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
   // Load national association ID from club's state association
   useEffect(() => {
+    let mounted = true;
+
     const loadNationalAssociationId = async () => {
-      console.log('RaceSettingsModal: Attempting to load national association ID', {
-        isOpen,
-        currentEvent,
-        clubId: currentEvent?.clubId,
-        hasCurrentEvent: !!currentEvent
-      });
-
-      if (!isOpen) {
-        console.log('Modal not open, skipping');
-        return;
-      }
-
-      if (!currentEvent?.clubId) {
-        console.warn('No clubId on currentEvent, cannot load national association ID');
-        return;
-      }
+      if (!isOpen || !currentEvent?.clubId) return;
 
       try {
-        console.log('Fetching club data for clubId:', currentEvent.clubId);
-        // Get club's state association
-        const { data: clubData, error: clubError } = await supabase
+        const { data: clubData } = await supabase
           .from('clubs')
           .select('state_association_id')
           .eq('id', currentEvent.clubId)
-          .single();
+          .maybeSingle();
 
-        console.log('Club data result:', { clubData, clubError });
+        if (!mounted) return;
 
         if (clubData?.state_association_id) {
-          console.log('Fetching state association data for:', clubData.state_association_id);
-          // Get state association's national association
-          const { data: stateData, error: stateError } = await supabase
+          const { data: stateData } = await supabase
             .from('state_associations')
             .select('national_association_id')
             .eq('id', clubData.state_association_id)
-            .single();
+            .maybeSingle();
 
-          console.log('State association data result:', { stateData, stateError });
+          if (!mounted) return;
 
           if (stateData?.national_association_id) {
             setNationalAssociationId(stateData.national_association_id);
-            console.log('✓ Successfully loaded national association ID:', stateData.national_association_id);
-          } else {
-            console.warn('State association has no national_association_id');
           }
-        } else {
-          console.warn('Club has no state_association_id');
         }
       } catch (err) {
         console.error('Error loading national association ID:', err);
@@ -171,28 +149,32 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     };
 
     loadNationalAssociationId();
+    return () => { mounted = false; };
   }, [isOpen, currentEvent?.clubId]);
 
   // Load user's scoring mode preference
   useEffect(() => {
+    let mounted = true;
+
     const loadScoringModePreference = async () => {
       if (!isOpen) return;
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('scoring_mode_preference')
-          .eq('id', user.id)
-          .single();
+      if (!mounted || !user) return;
 
-        if (profileData?.scoring_mode_preference) {
-          setScoringMode(profileData.scoring_mode_preference as 'pro' | 'touch' | 'spreadsheet');
-        }
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('scoring_mode_preference')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (mounted && profileData?.scoring_mode_preference) {
+        setScoringMode(profileData.scoring_mode_preference as 'pro' | 'touch' | 'spreadsheet');
       }
     };
 
     loadScoringModePreference();
+    return () => { mounted = false; };
   }, [isOpen]);
 
   // Sync currentHeatManagement with initialHeatManagement when modal opens/updates

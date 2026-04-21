@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer } from 'lucide-react';
+import React, { useState, useEffect, useRef, Component } from 'react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -36,6 +36,44 @@ import { StartBoxModal } from './start-box/StartBoxModal';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
 import { updateRaceStatus } from '../utils/liveTrackingStorage';
+
+class ScoringErrorBoundary extends Component<
+  { children: React.ReactNode; darkMode?: boolean; onRetry?: () => void },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; darkMode?: boolean; onRetry?: () => void }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('ScoringErrorBoundary caught:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <AlertTriangle className="w-10 h-10 text-amber-400" />
+          <p className={`text-sm ${this.props.darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+            Scoring component encountered an error. Please try again.
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              this.props.onRetry?.();
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface YachtRaceManagerProps {
   onExitScoring?: () => void;
@@ -3117,7 +3155,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             )}
 
             {/* Render appropriate table based on race type and heat configuration */}
-            {heatManagement?.configuration.enabled ? (
+            {heatManagement?.configuration?.enabled ? (
+              <ScoringErrorBoundary darkMode={darkMode}>
               <HeatScoringTable
                 skippers={skippers}
                 heatManagement={heatManagement}
@@ -3206,6 +3245,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 isFullscreen={isFullscreenScoring}
                 scoringMode={scoringMode}
               />
+              </ScoringErrorBoundary>
             ) : scoringMode === 'touch' ? (
               <TouchModeScoring
                 skippers={skippers}

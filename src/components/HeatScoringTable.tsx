@@ -95,6 +95,14 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   isFullscreen,
   scoringMode: initialScoringMode = 'touch'
 }) => {
+  if (!heatManagement?.configuration || !heatManagement?.rounds) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Loading heat configuration...</p>
+      </div>
+    );
+  }
+
   const syncObserverEventId = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
   const [resolvedObserverEventId, setResolvedObserverEventId] = React.useState<string | null>(syncObserverEventId);
 
@@ -111,9 +119,10 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   }, [syncObserverEventId, currentEvent?.id, currentEvent?.seriesId, currentEvent?.roundName]);
 
   const observerEventId = resolvedObserverEventId;
-  const currentRound = heatManagement.rounds[heatManagement.currentRound - 1];
-  const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
-  const shrsQualifyingRounds = heatManagement.configuration.shrsQualifyingRounds || 0;
+  const safeCurrentRound = Math.max(1, heatManagement.currentRound || 1);
+  const currentRound = heatManagement.rounds[safeCurrentRound - 1];
+  const isShrs = heatManagement.configuration?.scoringSystem === 'shrs';
+  const shrsQualifyingRounds = heatManagement.configuration?.shrsQualifyingRounds || 0;
 
   const getShrsRoundLabel = (roundNum: number, heat?: HeatDesignation | null): string => {
     if (isShrs && shrsQualifyingRounds > 0) {
@@ -1039,7 +1048,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return () => { cancelled = true; };
   }, [heatScoringMode, observerEventId, availableHeats, heatManagement.currentRound, currentEvent?.enable_observers, observerReloadTrigger]);
 
-  const fleetManagementEnabled = heatManagement.configuration.fleetManagementEnabled !== false;
+  const fleetManagementEnabled = heatManagement.configuration?.fleetManagementEnabled !== false;
 
   if (!fleetManagementEnabled) {
     return (
