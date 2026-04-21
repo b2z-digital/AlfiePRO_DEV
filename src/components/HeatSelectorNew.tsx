@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { HeatDesignation, HeatConfiguration, HeatManagement, getHeatColorClasses } from '../types/heat';
+import { HeatDesignation, HeatConfiguration, HeatManagement, getHeatColorClasses, getHeatDisplayLabel, getOrderedHeats } from '../types/heat';
 import { Flag, ChevronDown, Users, Info, Grid2x2 as Grid } from 'lucide-react';
 
 interface HeatSelectorProps {
@@ -114,12 +114,12 @@ export const HeatSelector: React.FC<HeatSelectorProps> = ({
                     ${darkMode ? colors.darkText : colors.text}
                     font-bold text-lg
                   `}>
-                    {status.heat}
+                    {getHeatDisplayLabel(status.heat, configuration)}
                   </div>
 
                   {/* Heat Name */}
                   <div className={`text-sm font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Heat {status.heat}
+                    Heat {getHeatDisplayLabel(status.heat, configuration)}
                     {status.heat === 'A' && ' (Top)'}
                   </div>
 
@@ -191,7 +191,7 @@ export const HeatSelector: React.FC<HeatSelectorProps> = ({
               <div>
                 <p className="font-medium mb-1">HMS Heat Racing Active</p>
                 <p>
-                  Score heats from lowest to highest (F → A).
+                  Score heats from lowest to highest ({getHeatDisplayLabel('F' as HeatDesignation, configuration)} → {getHeatDisplayLabel('A' as HeatDesignation, configuration)}).
                   Top {configuration.promotionCount} from each heat will be promoted,
                   bottom {configuration.promotionCount} relegated.
                   Promoted skippers are marked "UP" in lower heats.

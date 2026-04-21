@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Users, Shuffle, Trash2, UserPlus, SquarePen as Edit2, Trophy } from 'lucide-react';
 import { Skipper } from '../types';
-import { HeatDesignation } from '../types/heat';
+import { HeatDesignation, HeatConfiguration, getHeatDisplayLabel } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { ConfirmationModal } from './ConfirmationModal';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
@@ -25,6 +25,7 @@ interface ManualHeatAssignmentModalProps {
   onEditSkipper?: (skipperIndex: number) => void;
   onSaveSkipper?: (skipperIndex: number, updatedSkipper: Skipper) => void;
   onRankingAssignment?: () => void;
+  heatConfiguration?: HeatConfiguration;
 }
 
 const adjustIndicesAfterDeletion = (indices: number[], deletedIndex: number): number[] => {
@@ -46,7 +47,8 @@ export const ManualHeatAssignmentModal: React.FC<ManualHeatAssignmentModalProps>
   onAddSkipper,
   onEditSkipper,
   onSaveSkipper,
-  onRankingAssignment
+  onRankingAssignment,
+  heatConfiguration
 }) => {
   const [draggedSkipperIndex, setDraggedSkipperIndex] = useState<number | null>(null);
   const [assignments, setAssignments] = useState<HeatAssignment[]>([]);
@@ -406,7 +408,7 @@ export const ManualHeatAssignmentModal: React.FC<ManualHeatAssignmentModalProps>
                     <div key={heatDesignation} className="space-y-2">
                       <div className="flex items-center gap-2">
                         <div className={`px-3 py-1 rounded-lg ${getHeatColor(heatDesignation)} text-white font-bold text-sm shadow-md`}>
-                          Heat {heatDesignation}
+                          Heat {getHeatDisplayLabel(heatDesignation, heatConfiguration)}
                         </div>
                         <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                           {skipperIndices.length} skipper(s)

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { SquarePen as Edit2, Trophy, Medal, X, ChevronRight, Trash2, Users, TrendingUp, Flag, ChevronDown, ChevronUp, Settings, Zap, FileText, MoveHorizontal as MoreHorizontal, SquarePen as Edit, RotateCcw, Calendar, CalendarRange, Check } from 'lucide-react';
 import { Logo } from './Logo';
 import { HeatRaceInput } from './HeatRaceInput';
-import { HeatDesignation, HeatManagement, HeatResult, getHeatColorClasses, calculateOverallPositions } from '../types/heat';
+import { HeatDesignation, HeatManagement, HeatResult, getHeatColorClasses, calculateOverallPositions, getHeatDisplayLabel, getOrderedHeats } from '../types/heat';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmationModal } from './ConfirmationModal';
 import { LetterScoreSelector } from './LetterScoreSelector';
@@ -236,9 +236,9 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
               w-8 h-8 rounded-full flex items-center justify-center font-bold
               ${colorClasses.bg} ${colorClasses.text}
             `}>
-              {heat}
+              {getHeatDisplayLabel(heat, configuration)}
             </div>
-            <h4 className="font-medium">Heat {heat}</h4>
+            <h4 className="font-medium">Heat {getHeatDisplayLabel(heat, configuration)}</h4>
             {isComplete && !isCurrentHeat && (
               <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-900/30 text-green-400">
                 Completed
@@ -255,7 +255,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
                 className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
               >
                 <Check size={18} />
-                Complete Heat {heat}
+                Complete Heat {getHeatDisplayLabel(heat, configuration)}
               </button>
             )}
           </div>
@@ -566,7 +566,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
                           inline-flex items-center justify-center w-8 h-8 rounded-full font-bold
                           ${colorClasses.bg} ${colorClasses.text}
                         `}>
-                          {heat}
+                          {getHeatDisplayLabel(heat, configuration)}
                         </span>
                       </td>
                       <td className={`
@@ -676,14 +676,19 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
       {/* Round selector */}
       {rounds.length > 1 && renderRoundSelector()}
       
-      {/* Heat tables - display in reverse order (F, E, D, C, B, A) */}
+      {/* Heat tables - display in configured order */}
       <div className="space-y-4">
-        {displayRoundData.heatAssignments
-          .slice()
-          .sort((a, b) => a.heatDesignation.localeCompare(b.heatDesignation))
-          .reverse()
-          .map(assignment => renderHeatTable(assignment.heatDesignation))
-        }
+        {(() => {
+          const orderedHeats = getOrderedHeats(configuration.numberOfHeats, configuration);
+          return displayRoundData.heatAssignments
+            .slice()
+            .sort((a, b) => {
+              const aIdx = orderedHeats.indexOf(a.heatDesignation);
+              const bIdx = orderedHeats.indexOf(b.heatDesignation);
+              return aIdx - bIdx;
+            })
+            .map(assignment => renderHeatTable(assignment.heatDesignation));
+        })()}
       </div>
       
       {/* Overall standings - moved below heats as requested */}
@@ -810,8 +815,8 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
           onCompleteHeat(currentHeat);
           setShowCompleteHeatConfirm(false);
         }}
-        title={`Complete Heat ${currentHeat}?`}
-        message={`All skippers have been scored. Confirm to finalize Heat ${currentHeat} and proceed to the next heat.`}
+        title={`Complete Heat ${getHeatDisplayLabel(currentHeat, configuration)}?`}
+        message={`All skippers have been scored. Confirm to finalize Heat ${getHeatDisplayLabel(currentHeat, configuration)} and proceed to the next heat.`}
         confirmText="Complete Heat"
         cancelText="Keep Editing"
         darkMode={darkMode}

@@ -3,7 +3,7 @@ import { X, Trophy, Download, ChevronDown, Eye } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Skipper } from '../types';
-import { HeatManagement, HeatDesignation } from '../types/heat';
+import { HeatManagement, HeatDesignation, getHeatDisplayLabel } from '../types/heat';
 import { isEntrantsPlusOne } from '../types/letterScores';
 import { getObserverAssignments, resolveObserverEventId, ObserverAssignment } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
@@ -277,7 +277,7 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
         const row: string[] = [];
 
         if (posIdx === 0) {
-          row.push(`Heat ${heat}`);
+          row.push(`Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}`);
         } else {
           row.push('');
         }
@@ -499,7 +499,7 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                   <div key={h} className="flex items-center gap-1.5">
                     <div className={`w-3 h-3 rounded-full ${fleet.bgClass}`} />
                     <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                      Heat {h} = {fleet.name}
+                      Heat {getHeatDisplayLabel(h, heatManagement.configuration)} = {fleet.name}
                     </span>
                   </div>
                 );
@@ -597,7 +597,7 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                             >
                               <div className="sticky top-20 pt-2">
                                 <span className={darkMode ? 'text-slate-200' : 'text-slate-900'}>
-                                  Heat {heat}
+                                  Heat {getHeatDisplayLabel(heat, heatManagement.configuration)}
                                 </span>
                                 {isShrs && hasFinalRounds && (
                                   <div className={`mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${getShrsFleetInfo(heat).bgClass} ${getShrsFleetInfo(heat).textClass}`}>

@@ -114,6 +114,14 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     initialHeatManagement?.configuration.shrsAssignmentMode || 'progressive'
   );
 
+  // Heat display settings
+  const [heatLabelStyle, setHeatLabelStyle] = useState<'letters' | 'numbers'>(
+    initialHeatManagement?.configuration.heatLabelStyle || 'letters'
+  );
+  const [heatOrder, setHeatOrder] = useState<'ascending' | 'descending'>(
+    initialHeatManagement?.configuration.heatOrder || 'ascending'
+  );
+
   // Load national association ID from club's state association
   useEffect(() => {
     let mounted = true;
@@ -499,7 +507,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         autoAssign: false,
         scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
         ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
-        fleetManagementEnabled
+        fleetManagementEnabled,
+        heatLabelStyle,
+        heatOrder
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
@@ -1857,6 +1867,90 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                           )}
                         </div>
 
+                        {/* Heat Display Settings */}
+                        <div className="space-y-3">
+                          <div>
+                            <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Heat Identification
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => setHeatLabelStyle('letters')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatLabelStyle === 'letters'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                Letters (A, B, C)
+                              </button>
+                              <button
+                                onClick={() => setHeatLabelStyle('numbers')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatLabelStyle === 'numbers'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                Numbers (1, 2, 3)
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Heat Racing Order
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => setHeatOrder('ascending')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatOrder === 'ascending'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {heatLabelStyle === 'numbers'
+                                  ? `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => i + 1).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                  : `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => String.fromCharCode(65 + i)).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                }
+                              </button>
+                              <button
+                                onClick={() => setHeatOrder('descending')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatOrder === 'descending'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {heatLabelStyle === 'numbers'
+                                  ? `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => numHeats - i).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                  : `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => String.fromCharCode(65 + numHeats - 1 - i)).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                }
+                              </button>
+                            </div>
+                            <p className={`text-xs mt-1.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                              Sets the display and scoring order of heats
+                            </p>
+                          </div>
+                        </div>
+
                         {/* Show validation warning if configuration is not practical */}
                         {!configValidation.isValid && (
                           <div className={`flex items-start gap-2 p-3 rounded-lg ${
@@ -2226,6 +2320,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         skippers={skippers}
         numHeats={numHeats}
         darkMode={darkMode}
+        heatConfiguration={initialHeatManagement?.configuration}
         onRankingAssignment={() => {
           setShowManualAssignmentModal(false);
           setShowHMSSeedingModal(true);

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, AlertTriangle, CheckCircle, Users, RefreshCw, Hash, Trophy, Loader2 } from 'lucide-react';
+import { X, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Users, RefreshCw, Hash, Trophy, Loader as Loader2 } from 'lucide-react';
 import type { Skipper } from '../types';
-import type { HeatDesignation } from '../types/heat';
+import type { HeatDesignation, HeatConfiguration } from '../types/heat';
+import { getHeatDisplayLabel } from '../types/heat';
 import type { RaceEvent } from '../types/race';
 import type { SkipperWithRanking } from '../utils/hmsSeeding';
 import { assignSkippersUsingHMSSeeding, previewHMSSeeding, validateHMSSeeding } from '../utils/hmsSeeding';
@@ -23,6 +24,7 @@ interface HMSSeedingModalProps {
   currentEvent?: RaceEvent | null;
   nationalAssociationId?: string;
   yachtClassName?: string;
+  heatConfiguration?: HeatConfiguration;
 }
 
 export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
@@ -34,7 +36,8 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
   darkMode,
   currentEvent,
   nationalAssociationId,
-  yachtClassName
+  yachtClassName,
+  heatConfiguration
 }) => {
   const [loading, setLoading] = useState(false);
   const [skippersWithRankings, setSkippersWithRankings] = useState<SkipperWithRanking[]>([]);
@@ -412,10 +415,10 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
                             darkMode ? 'bg-slate-700 text-white' : 'bg-white text-gray-700 shadow-sm border border-gray-200'
                           }`}>
-                            {heat.heatName}
+                            {getHeatDisplayLabel(heat.heatName as HeatDesignation, heatConfiguration)}
                           </div>
                           <span className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                            Heat {heat.heatName}
+                            Heat {getHeatDisplayLabel(heat.heatName as HeatDesignation, heatConfiguration)}
                           </span>
                         </div>
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${

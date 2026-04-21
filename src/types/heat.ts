@@ -34,6 +34,8 @@ export interface HeatConfiguration {
   shrsQualifyingRounds?: number;
   shrsFinalsStarted?: boolean;
   fleetManagementEnabled?: boolean;
+  heatLabelStyle?: 'letters' | 'numbers';
+  heatOrder?: 'ascending' | 'descending';
 }
 
 export interface HeatAssignment {
@@ -271,6 +273,29 @@ export const isSHRSTransitionRound = (round: number, config: HeatConfiguration):
   return qualifyingRounds > 0 && round === qualifyingRounds;
 };
 
+export const getHeatDisplayLabel = (heat: HeatDesignation, config?: HeatConfiguration): string => {
+  const style = config?.heatLabelStyle || 'letters';
+  if (style === 'numbers') {
+    const index = ['A', 'B', 'C', 'D', 'E', 'F'].indexOf(heat);
+    return String(index + 1);
+  }
+  return heat;
+};
+
+export const getHeatDisplayName = (heat: HeatDesignation, config?: HeatConfiguration): string => {
+  const label = getHeatDisplayLabel(heat, config);
+  const style = config?.heatLabelStyle || 'letters';
+  return style === 'numbers' ? `Heat ${label}` : `Heat ${label}`;
+};
+
+export const getOrderedHeats = (numberOfHeats: number, config?: HeatConfiguration): HeatDesignation[] => {
+  const heats = getAvailableHeats(numberOfHeats);
+  if (config?.heatOrder === 'descending') {
+    return [...heats].reverse();
+  }
+  return heats;
+};
+
 export const getSHRSHeatLabel = (heat: HeatDesignation, round: number, config: HeatConfiguration): string => {
   const phase = getSHRSPhase(round, config);
   if (phase === 'finals') {
@@ -284,7 +309,8 @@ export const getSHRSHeatLabel = (heat: HeatDesignation, round: number, config: H
     };
     return fleetNames[heat] || `Fleet ${heat}`;
   }
-  return `Heat ${heat}`;
+  const label = getHeatDisplayLabel(heat, config);
+  return `Heat ${label}`;
 };
 
 export const getSHRSRoundLabel = (round: number, config: HeatConfiguration): string => {

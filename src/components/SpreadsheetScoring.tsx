@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
-import { HeatManagement, HeatDesignation, HeatAssignment } from '../types/heat';
+import { HeatManagement, HeatDesignation, HeatAssignment, getHeatDisplayLabel } from '../types/heat';
 import { getLetterScoreDisplayCode } from '../types/letterScores';
 import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type, ChevronLeft, ChevronRight, Timer, Flag } from 'lucide-react';
 import { LetterScoreSelector } from './LetterScoreSelector';
@@ -1102,7 +1102,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm">Heat {heat}</span>
+                    <span className="font-bold text-sm">Heat {getHeatDisplayLabel(heat, heatManagement?.configuration)}</span>
                     <span className="text-xs opacity-80">{totalPositions} skippers</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1401,7 +1401,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                     }`}>
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Heat {heat} Sail Numbers
+                          Heat {getHeatDisplayLabel(heat, heatManagement?.configuration)} Sail Numbers
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
@@ -1479,7 +1479,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                       className="w-full py-2.5 rounded-lg text-white font-bold text-sm bg-green-600 hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md active:scale-[0.98]"
                     >
                       <Check size={18} />
-                      Verify Heat {heat} Results
+                      Verify Heat {getHeatDisplayLabel(heat, heatManagement?.configuration)} Results
                     </button>
                   </div>
                 )}

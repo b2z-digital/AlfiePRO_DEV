@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown } from 'lucide-react';
 import { Skipper } from '../types';
-import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound } from '../types/heat';
+import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound, getHeatDisplayLabel } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import { selectObservers, saveObserverAssignments, getObserverAssignments, getAllObserversForEvent, toggleObserver, preAllocateObserversForAllRounds, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
@@ -95,7 +95,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         for (const idx of assignment.skipperIndices) {
           const skipper = skippers[idx];
           if (skipper) {
-            rows.push(`${roundLabel},Heat ${assignment.heatDesignation},${skipper.sailNo || ''},${skipper.name || ''},${skipper.club || ''}`);
+            rows.push(`${roundLabel},Heat ${getHeatDisplayLabel(assignment.heatDesignation, configuration)},${skipper.sailNo || ''},${skipper.name || ''},${skipper.club || ''}`);
           }
         }
       }
@@ -1100,7 +1100,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   >
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-bold text-white">
-                        {(isSHRS ? getSHRSHeatLabel(heatDesignation, round, configuration) : `Heat ${heatDesignation}`).toUpperCase()}
+                        {(isSHRS ? getSHRSHeatLabel(heatDesignation, round, configuration) : `Heat ${getHeatDisplayLabel(heatDesignation, configuration)}`).toUpperCase()}
                       </h3>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] text-white opacity-80">{skippersToDisplay.length} skippers</span>
@@ -1337,7 +1337,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                   // Check if we're at the limit before allowing new selection
                                   if (currentRelegationCount >= promotionCount) {
                                     // Show warning and prevent selection
-                                    setLimitWarning(`Cannot relegate more than ${promotionCount} skippers from Heat ${heatDesignation}`);
+                                    setLimitWarning(`Cannot relegate more than ${promotionCount} skippers from Heat ${getHeatDisplayLabel(heatDesignation, configuration)}`);
                                     setTimeout(() => setLimitWarning(null), 3000);
                                     return prev; // Return unchanged set
                                   }
@@ -1361,7 +1361,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                   // Check if we're at the limit before allowing new selection
                                   if (currentPromotionCount >= promotionCount) {
                                     // Show warning and prevent selection
-                                    setLimitWarning(`Cannot promote more than ${promotionCount} skippers from Heat ${heatDesignation}`);
+                                    setLimitWarning(`Cannot promote more than ${promotionCount} skippers from Heat ${getHeatDisplayLabel(heatDesignation, configuration)}`);
                                     setTimeout(() => setLimitWarning(null), 3000);
                                     return prev; // Return unchanged set
                                   }
@@ -1965,7 +1965,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 darkMode ? 'border-slate-700' : 'border-slate-200'
               }`}>
                 <div>
-                  <h3 className="text-lg font-bold">Manage Observers - Heat {selectedHeat.heatDesignation}</h3>
+                  <h3 className="text-lg font-bold">Manage Observers - Heat {getHeatDisplayLabel(selectedHeat.heatDesignation, configuration)}</h3>
                   <p className={`text-sm mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     {currentObservers.length} of {maxObservers} observer{maxObservers !== 1 ? 's' : ''} assigned
                   </p>
@@ -2000,7 +2000,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
                     <div className="flex items-center justify-between mb-3">
                       <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Tap to select or deselect observers. Only skippers not racing in Heat {selectedHeat.heatDesignation} are shown.
+                        Tap to select or deselect observers. Only skippers not racing in Heat {getHeatDisplayLabel(selectedHeat.heatDesignation, configuration)} are shown.
                       </p>
                       <button
                         onClick={() => {

@@ -26,7 +26,7 @@ import { HeatManagement, HeatResult, HeatDesignation, generateNextRoundAssignmen
 import { HeatScoringTable } from './HeatScoringTable';
 import { updateHeatResult, completeHeat, convertHeatResultsToRaceResults, clearHeatRaceResults } from '../utils/heatUtils';
 import { HMSConfig } from '../utils/hmsHeatSystem';
-import { seedSHRSHeatsByIndex, generatePreSetQualifyingAssignments } from '../utils/shrsHeatSystem';
+import { seedSHRSHeatsByIndex, generatePreSetQualifyingAssignments, addSkippersToSHRSAssignments } from '../utils/shrsHeatSystem';
 import { SingleEventManagement } from './SingleEventManagement';
 import { TouchModeScoring } from './TouchModeScoring';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
@@ -1204,13 +1204,69 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     }
 
     if (heatManagement?.configuration.enabled && !options?.skipRaceSettingsModal) {
-      // If skippers changed and heat racing is enabled, open settings to reconfigure
-      setShowRaceSettingsModal(true);
-
-      // If skippers were removed, clear heat management data
       if (uniqueSkippers.length < skippers.length) {
+        // Skippers removed - clear heat management, force reconfigure
         setHeatManagement(null);
+        setShowRaceSettingsModal(true);
         addNotification('info', 'Skippers removed. Heat Racing assignments cleared. Please reconfigure in Race Settings.');
+      } else if (
+        newlyAddedSkippers.length > 0 &&
+        heatManagement.configuration.scoringSystem === 'shrs' &&
+        heatManagement.configuration.shrsAssignmentMode === 'preset' &&
+        heatManagement.rounds.some(r => r.completed || (r.results && r.results.length > 0))
+      ) {
+        // SHRS-B mid-event addition: slot new skippers into future rounds
+        const updatedRounds = addSkippersToSHRSAssignments(
+          heatManagement.rounds,
+          newlyAddedSkippers,
+          heatManagement.configuration.numberOfHeats
+        );
+        const updatedHM = { ...heatManagement, rounds: updatedRounds };
+        setHeatManagement(updatedHM);
+
+        // Also add DNC results for completed heat rounds
+        const updatedResults = [...raceResults];
+        for (const round of updatedRounds) {
+          if (!round.completed && !(round.results && round.results.length > 0)) continue;
+          for (const skipperIdx of newlyAddedSkippers) {
+            for (const heat of round.heatAssignments) {
+              const hasResult = round.results?.some(
+                r => r.skipperIndex === skipperIdx && r.round === round.round && r.heatDesignation === heat.heatDesignation
+              );
+              if (!hasResult) {
+                updatedResults.push({
+                  race: round.round,
+                  round: round.round,
+                  skipperIndex: skipperIdx,
+                  position: null,
+                  letterScore: 'DNC' as LetterScore,
+                  heatDesignation: heat.heatDesignation,
+                  points: uniqueSkippers.length + 1
+                });
+              }
+            }
+          }
+        }
+        setRaceResults(updatedResults);
+
+        // Save updated heat management to database
+        const currentEvt = getCurrentEvent();
+        if (currentEvt) {
+          try {
+            await updateEventResults(
+              currentEvt.id, updatedResults, uniqueSkippers,
+              lastCompletedRace, hasDeterminedInitialHcaps, isManualHandicaps,
+              false, currentDay, updatedHM, currentNumRaces, currentDropRules
+            );
+          } catch (e) {
+            console.error('Error saving mid-event skipper addition:', e);
+          }
+        }
+
+        addNotification('success', `${newlyAddedSkippers.length} skipper${newlyAddedSkippers.length > 1 ? 's' : ''} added to future qualifying rounds. Missed rounds scored as DNC.`);
+      } else {
+        // Other heat modes or no scoring started yet - open settings to reconfigure
+        setShowRaceSettingsModal(true);
       }
     } else if (newlyAddedSkippers.length === 0 && uniqueSkippers.length < skippers.length) {
       // Only clear results if skippers were removed and no new ones added

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { X, Trophy, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { Skipper } from '../types';
-import { HeatManagement, HeatDesignation } from '../types/heat';
+import { HeatManagement, HeatDesignation, getHeatDisplayLabel } from '../types/heat';
 import { convertHeatResultsToRaceResults } from '../utils/heatUtils';
 import { compareWithCountback } from '../utils/scratchCalculations';
 import { breakTie } from '../utils/hmsHeatSystem';
@@ -355,7 +355,7 @@ const HeatOverallResultsContent: React.FC<HeatOverallResultsModalProps> = ({
                     let fleetSeparator: React.ReactNode = null;
                     if (hasFinals && standing.fleet !== currentFleet) {
                       currentFleet = standing.fleet;
-                      const fleetName = FLEET_NAMES[standing.fleet] || `Fleet ${standing.fleet}`;
+                      const fleetName = FLEET_NAMES[standing.fleet] || `Fleet ${getHeatDisplayLabel(standing.fleet as HeatDesignation, heatManagement.configuration)}`;
                       const fleetColor = FLEET_COLORS[standing.fleet];
                       const totalCols = 5 + completedRaces.length + 2 + (hasFinals ? 1 : 0);
                       fleetSeparator = (
@@ -410,7 +410,7 @@ const HeatOverallResultsContent: React.FC<HeatOverallResultsModalProps> = ({
                             <td className={`px-3 py-3 text-center text-xs font-semibold ${
                               FLEET_COLORS[standing.fleet]?.text || (darkMode ? 'text-slate-400' : 'text-slate-600')
                             }`}>
-                              {standing.fleet === 'A' ? 'G' : standing.fleet === 'B' ? 'S' : standing.fleet === 'C' ? 'B' : standing.fleet}
+                              {standing.fleet === 'A' ? 'G' : standing.fleet === 'B' ? 'S' : standing.fleet === 'C' ? 'B' : getHeatDisplayLabel(standing.fleet as HeatDesignation, heatManagement.configuration)}
                             </td>
                           )}
                           <td className={`px-4 py-3 font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>

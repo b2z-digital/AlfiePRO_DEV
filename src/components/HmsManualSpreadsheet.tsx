@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Skipper } from '../types';
-import { HeatDesignation, HeatManagement } from '../types/heat';
+import { HeatDesignation, HeatManagement, getHeatDisplayLabel } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { LetterScore, isEntrantsPlusOne, getLetterScoreDisplayCode } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
@@ -1005,7 +1005,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                       className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[11px] text-black whitespace-nowrap text-center"
                       style={{ backgroundColor: '#FF00FF' }}
                     >
-                      Heat {heat}
+                      Heat {getHeatDisplayLabel(heat, heatManagement.configuration)}
                     </td>
                     {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
                       const stats = getHeatRaceStats(heat, race);

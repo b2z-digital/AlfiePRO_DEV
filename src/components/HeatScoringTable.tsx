@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { HeatManagement, HeatDesignation, generateInitialHeatAssignments } from '../types/heat';
+import { HeatManagement, HeatDesignation, generateInitialHeatAssignments, getHeatDisplayLabel } from '../types/heat';
 import { Skipper } from '../types';
 import { ScratchRaceTable } from './ScratchRaceTable';
 import { TouchModeScoring } from './TouchModeScoring';
@@ -801,9 +801,9 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   const getHeatLabel = (heat: HeatDesignation): string => {
     if (isInFinals) {
-      return SHRS_FLEET_FULL_NAMES[heat] || `Heat ${heat}`;
+      return SHRS_FLEET_FULL_NAMES[heat] || `Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}`;
     }
-    return `Heat ${heat}`;
+    return `Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}`;
   };
 
   const getHeatProgress = (heat: HeatDesignation) => {
@@ -1410,7 +1410,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                     </div>
                     <div>
                       <h3 className={`font-bold text-base ${darkMode ? 'text-teal-200' : 'text-teal-900'}`}>
-                        Heat {selectedHeat} - Roll Call
+                        Heat {getHeatDisplayLabel(selectedHeat, heatManagement.configuration)} - Roll Call
                       </h3>
                       <p className={`text-xs ${darkMode ? 'text-teal-400/60' : 'text-teal-700/60'}`}>
                         Tap to mark ready. Right-click to mark absent.
@@ -1991,6 +1991,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               // Don't close modal - let user continue assigning heats
             }
           }}
+          heatConfiguration={heatManagement.configuration}
         />
       )}
 
