@@ -1015,18 +1015,16 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
           {finalsRaces.length > 0 && ` \u2022 ${finalsRaces.length} finals`}
           {' \u2022 SHRS scoring (position within heat)'}
         </div>
-        {!isSimulated && (
-          <button
-            onClick={onBack}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              darkMode
-                ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-            }`}
-          >
-            Back to Scoring
-          </button>
-        )}
+        <button
+          onClick={onBack}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            darkMode
+              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+          }`}
+        >
+          Back to Scoring
+        </button>
       </div>
     </div>
   );

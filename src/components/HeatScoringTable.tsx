@@ -160,16 +160,13 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [showOverallResults, setShowOverallResults] = useState(false);
   const [showHmsScoreSheet, setShowHmsScoreSheet] = useState(false);
   const [showHmsRaceResults, setShowHmsRaceResults] = useState(false);
-  const hasImportedResults = heatManagement.rounds.some(r => r.results && r.results.length > 0);
-  const isSHRSImport = isShrs && currentEvent?.is_simulated && hasImportedResults;
-  const [showOverallResultsView, setShowOverallResultsView] = useState(false);
 
-  // Show overall results view by default for SHRS simulated imports (with pre-loaded results)
-  React.useEffect(() => {
-    if (isSHRSImport) {
-      setShowOverallResultsView(true);
-    }
-  }, [isSHRSImport]);
+  // Check on initial mount only whether this is an imported SHRS file (has pre-loaded results)
+  const initialHasResults = React.useRef(
+    heatManagement.rounds.some(r => r.results && r.results.length > 0)
+  );
+  const isSHRSImport = isShrs && currentEvent?.is_simulated && initialHasResults.current;
+  const [showOverallResultsView, setShowOverallResultsView] = useState(isSHRSImport);
   const [showRaceResults, setShowRaceResults] = useState(false);
   const [showHeatAssignments, setShowHeatAssignments] = useState(false);
   const [observerReloadTrigger, setObserverReloadTrigger] = useState(0);
