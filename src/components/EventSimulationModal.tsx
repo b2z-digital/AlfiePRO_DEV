@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { X, FlaskConical, Upload, Plus, ChevronRight, FileSpreadsheet, Users, Layers, ArrowLeft, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, Sailboat, TrendingUp, Shuffle, ChartBar as BarChart3, Download } from 'lucide-react';
+import { X, FlaskConical, Upload, Plus, ChevronRight, FileSpreadsheet, Users, Layers, ArrowLeft, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, Sailboat, TrendingUp, Shuffle, Download } from 'lucide-react';
 import { parseHMSFile } from '../utils/hmsParser';
 import { parseSHRSFile, reconstructSHRSHeats, ParsedSHRSData, SHRSImportMode } from '../utils/shrsParser';
 import { ParsedHMSData } from '../types/hmsValidator';
@@ -18,7 +18,7 @@ interface EventSimulationModalProps {
   onSuccess: (event: RaceEvent) => void;
 }
 
-type ScoringFormat = 'hms' | 'shrs-progressive' | 'shrs-balanced';
+type ScoringFormat = 'hms' | 'shrs';
 type SimulationStep = 'choose' | 'scratch-config' | 'format-select' | 'hms-config' | 'shrs-config' | 'hms-preview' | 'shrs-preview' | 'creating';
 
 export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
@@ -248,6 +248,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
           round: raceNum,
           markedAsUP: isUp,
           customPoints: hr.customPoints,
+          importedScore: hr.points,
         });
       }
 
@@ -393,7 +394,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
 
     try {
       const eventId = uuidv4();
-      const mode: SHRSImportMode = scoringFormat === 'shrs-balanced' ? 'shrs-balanced' : 'shrs-progressive';
+      const mode: SHRSImportMode = 'shrs-progressive';
       const numberOfHeats = shrsConfig.numberOfHeats;
 
       const reconstructedRounds = reconstructSHRSHeats(parsedSHRSData, mode, numberOfHeats);
@@ -438,7 +439,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
           seedingMethod: 'manual',
           autoAssign: false,
           scoringSystem: 'shrs',
-          shrsAssignmentMode: mode === 'shrs-balanced' ? 'preset' : 'progressive',
+          shrsAssignmentMode: 'progressive',
           shrsQualifyingRounds: qualifyingRounds,
           shrsFinalsStarted: parsedSHRSData.finalRounds > 0,
           fleetManagementEnabled: true,
@@ -669,9 +670,9 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                 </button>
 
                 <button
-                  onClick={() => setScoringFormat('shrs-progressive')}
+                  onClick={() => setScoringFormat('shrs')}
                   className={`w-full p-5 rounded-xl border-2 text-left transition-all ${
-                    scoringFormat === 'shrs-progressive'
+                    scoringFormat === 'shrs'
                       ? darkMode
                         ? 'border-teal-500/50 bg-teal-500/10'
                         : 'border-teal-500 bg-teal-50'
@@ -682,51 +683,20 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                 >
                   <div className="flex items-center gap-3 mb-2">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      scoringFormat === 'shrs-progressive' ? 'bg-teal-500/20' : darkMode ? 'bg-slate-700' : 'bg-slate-200'
+                      scoringFormat === 'shrs' ? 'bg-teal-500/20' : darkMode ? 'bg-slate-700' : 'bg-slate-200'
                     }`}>
-                      <Shuffle className={scoringFormat === 'shrs-progressive' ? 'text-teal-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} size={20} />
+                      <Shuffle className={scoringFormat === 'shrs' ? 'text-teal-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} size={20} />
                     </div>
                     <span className={`font-semibold text-sm ${
-                      scoringFormat === 'shrs-progressive'
+                      scoringFormat === 'shrs'
                         ? darkMode ? 'text-teal-400' : 'text-teal-700'
                         : darkMode ? 'text-slate-300' : 'text-slate-700'
                     }`}>
-                      SHRS Progressive
+                      SHRS (Simple Heat Racing System)
                     </span>
                   </div>
                   <p className={`text-xs ml-[52px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Heat assignments determined by previous round results using Heat Movement Tables. Skippers move heats based on finishing position.
-                  </p>
-                </button>
-
-                <button
-                  onClick={() => setScoringFormat('shrs-balanced')}
-                  className={`w-full p-5 rounded-xl border-2 text-left transition-all ${
-                    scoringFormat === 'shrs-balanced'
-                      ? darkMode
-                        ? 'border-blue-500/50 bg-blue-500/10'
-                        : 'border-blue-500 bg-blue-50'
-                      : darkMode
-                        ? 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      scoringFormat === 'shrs-balanced' ? 'bg-blue-500/20' : darkMode ? 'bg-slate-700' : 'bg-slate-200'
-                    }`}>
-                      <BarChart3 className={scoringFormat === 'shrs-balanced' ? 'text-blue-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} size={20} />
-                    </div>
-                    <span className={`font-semibold text-sm ${
-                      scoringFormat === 'shrs-balanced'
-                        ? darkMode ? 'text-blue-400' : 'text-blue-700'
-                        : darkMode ? 'text-slate-300' : 'text-slate-700'
-                    }`}>
-                      SHRS Balanced
-                    </span>
-                  </div>
-                  <p className={`text-xs ml-[52px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    All heat assignments pre-generated before racing using coprime cyclic shifts for maximum opponent diversity.
+                    Position-within-heat scoring with qualifying series, fleet allocation, and finals. Supports Progressive and Balanced heat formats.
                   </p>
                 </button>
               </div>
@@ -1188,7 +1158,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                   <Info className="text-teal-400 shrink-0 mt-0.5" size={16} />
                   <div className={`text-xs space-y-1 ${darkMode ? 'text-teal-300' : 'text-teal-700'}`}>
                     <p>
-                      <strong>Scoring Format:</strong> {scoringFormat === 'shrs-progressive' ? 'SHRS Progressive' : 'SHRS Balanced'}
+                      <strong>Scoring Format:</strong> SHRS (Simple Heat Racing System)
                     </p>
                     <p>
                       <strong>Structure:</strong> {parsedSHRSData.qualifyingRounds} qualifying round{parsedSHRSData.qualifyingRounds !== 1 ? 's' : ''}
@@ -1196,7 +1166,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                       {' '}with {parsedSHRSData.skippers.length} skippers across {shrsConfig.numberOfHeats} heats.
                     </p>
                     <p>
-                      Heat assignments will be {scoringFormat === 'shrs-progressive' ? 'reconstructed using Movement Tables based on finishing positions' : 'generated using coprime cyclic shift rotation'}.
+                      Heat assignments will be reconstructed from results. Scoring uses position within heat.
                     </p>
                   </div>
                 </div>
@@ -1259,7 +1229,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                 </h4>
                 <div className="space-y-2 text-sm">
                   <SummaryRow label="Event Name" value={shrsConfig.eventName} darkMode={darkMode} />
-                  <SummaryRow label="Scoring Format" value={scoringFormat === 'shrs-progressive' ? 'SHRS Progressive' : 'SHRS Balanced'} darkMode={darkMode} />
+                  <SummaryRow label="Scoring Format" value="SHRS (Simple Heat Racing System)" darkMode={darkMode} />
                   <SummaryRow label="Heats" value={String(shrsConfig.numberOfHeats)} darkMode={darkMode} />
                   <SummaryRow label="Qualifying Rounds" value={String(parsedSHRSData.qualifyingRounds)} darkMode={darkMode} />
                   <SummaryRow label="Final Rounds" value={String(parsedSHRSData.finalRounds)} darkMode={darkMode} />

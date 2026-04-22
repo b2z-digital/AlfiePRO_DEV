@@ -2047,6 +2047,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         heatManagement={heatManagement}
         dropRules={[4, 8, 16, 24, 32, 40]}
         darkMode={darkMode}
+        isSimulated={currentEvent?.is_simulated}
       />
 
       {/* Start Box Modal */}
