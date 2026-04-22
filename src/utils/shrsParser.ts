@@ -491,6 +491,8 @@ export function reconstructSHRSHeats(
       }
     }
 
+    rerankPositionsWithinHeats(reconstructedResults);
+
     rounds.push({
       round: q,
       phase: 'qualifying',
@@ -597,6 +599,8 @@ export function reconstructSHRSHeats(
         }
       }
 
+      rerankPositionsWithinHeats(reconstructedResults);
+
       rounds.push({
         round: raceNum,
         phase: 'finals',
@@ -698,6 +702,33 @@ function generateNextRoundBalanced(
 
   rebalanceAssignments(newAssignments, targetSizes);
   return newAssignments;
+}
+
+function rerankPositionsWithinHeats(
+  reconstructedResults: ReconstructedRound['results']
+): void {
+  const byHeat = new Map<string, ReconstructedRound['results']>();
+  for (const r of reconstructedResults) {
+    if (!byHeat.has(r.heatDesignation)) byHeat.set(r.heatDesignation, []);
+    byHeat.get(r.heatDesignation)!.push(r);
+  }
+
+  for (const [, heatResults] of byHeat) {
+    const finishers = heatResults
+      .filter(r => r.position !== null && !r.letterScore)
+      .sort((a, b) => (a.position || 999) - (b.position || 999));
+
+    const nonFinishers = heatResults
+      .filter(r => r.letterScore || r.position === null);
+
+    let pos = 1;
+    for (const r of finishers) {
+      r.position = pos++;
+    }
+    for (const r of nonFinishers) {
+      r.position = null;
+    }
+  }
 }
 
 function rebalanceAssignments(
