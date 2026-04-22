@@ -291,7 +291,7 @@ export const convertHeatResultsToRaceResults = (
       round.results.forEach(result => {
         const score = result.importedScore !== undefined ? result.importedScore : result.position;
         if (result.letterScore) {
-          if ((result.letterScore === 'RDG' || result.letterScore === 'DPI') && result.customPoints !== undefined) {
+          if (result.customPoints !== undefined) {
             overallPositions.set(result.skipperIndex, result.customPoints);
           } else {
             overallPositions.set(result.skipperIndex, calculateNonFinisherScore(largestHeatSize));

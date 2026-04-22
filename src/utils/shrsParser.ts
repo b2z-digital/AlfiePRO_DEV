@@ -478,7 +478,7 @@ export function reconstructSHRSHeats(
             letterScore: result.letterScore,
             points: result.points,
             customPoints: result.customPoints,
-            importedScore: result.position,
+            importedScore: result.customPoints !== undefined ? result.customPoints : result.position,
           });
         } else {
           const largestHeat = getLargestHeatSize(heatSizes);
@@ -535,9 +535,14 @@ export function reconstructSHRSHeats(
           qualScores.set(result.skipperIndex, 0);
           qualRaceScores.set(result.skipperIndex, []);
         }
-        const score = result.letterScore
-          ? calculateNonFinisherScore(largestHeat)
-          : (result.position || largestHeat + 1);
+        let score: number;
+        if (result.letterScore && result.customPoints !== undefined) {
+          score = result.customPoints;
+        } else if (result.letterScore) {
+          score = calculateNonFinisherScore(largestHeat);
+        } else {
+          score = result.importedScore ?? result.position ?? (largestHeat + 1);
+        }
         qualRaceScores.get(result.skipperIndex)!.push(score);
       }
     }
@@ -586,7 +591,7 @@ export function reconstructSHRSHeats(
               letterScore: result.letterScore,
               points: result.points,
               customPoints: result.customPoints,
-              importedScore: result.position,
+              importedScore: result.customPoints !== undefined ? result.customPoints : result.position,
             });
           } else {
             const lh = getLargestHeatSize(finalFleetSizes);
