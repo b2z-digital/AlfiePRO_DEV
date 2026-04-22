@@ -443,39 +443,60 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       };
     }).filter(Boolean) as SkipperStanding[];
 
+    const rrsA8Countback = (scoresA: number[], scoresB: number[]): number => {
+      const sortedA = [...scoresA].sort((x, y) => x - y);
+      const sortedB = [...scoresB].sort((x, y) => x - y);
+      const len = Math.max(sortedA.length, sortedB.length);
+      for (let i = 0; i < len; i++) {
+        const sa = sortedA[i] ?? 999;
+        const sb = sortedB[i] ?? 999;
+        if (sa !== sb) return sa - sb;
+      }
+      if (scoresA.length > 0 && scoresB.length > 0) {
+        const lastA = scoresA[scoresA.length - 1];
+        const lastB = scoresB[scoresB.length - 1];
+        if (lastA !== lastB) return lastA - lastB;
+      }
+      return 0;
+    };
+
+    // SHRS Rule 5.7.ii: Tie-breaking for multiple heat events
     const shrsCountback = (a: SkipperStanding, b: SkipperStanding): number => {
-      const sharedScoresA: number[] = [];
-      const sharedScoresB: number[] = [];
+      const qualSharedA: number[] = [];
+      const qualSharedB: number[] = [];
+      const finalsSharedA: number[] = [];
+      const finalsSharedB: number[] = [];
 
       for (let i = 0; i < completedRaces.length; i++) {
         const race = completedRaces[i];
         const heatA = skipperHeatByRound.get(`${a.skipperIndex}-${race}`);
         const heatB = skipperHeatByRound.get(`${b.skipperIndex}-${race}`);
         if (heatA && heatB && heatA === heatB) {
-          sharedScoresA.push(a.raceScores[i] ?? 999);
-          sharedScoresB.push(b.raceScores[i] ?? 999);
+          const scoreA = a.raceScores[i] ?? 999;
+          const scoreB = b.raceScores[i] ?? 999;
+          if (race <= shrsQualifyingRounds) {
+            qualSharedA.push(scoreA);
+            qualSharedB.push(scoreB);
+          } else {
+            finalsSharedA.push(scoreA);
+            finalsSharedB.push(scoreB);
+          }
         }
       }
 
-      if (sharedScoresA.length > 0) {
-        const countPositions = (scores: number[]) => {
-          const counts: Record<number, number> = {};
-          scores.forEach(s => { counts[s] = (counts[s] || 0) + 1; });
-          return counts;
-        };
-        const aCounts = countPositions(sharedScoresA);
-        const bCounts = countPositions(sharedScoresB);
-        const maxPos = Math.max(
-          ...Object.keys(aCounts).map(Number),
-          ...Object.keys(bCounts).map(Number)
-        );
-        for (let pos = 1; pos <= maxPos; pos++) {
-          const ac = aCounts[pos] || 0;
-          const bc = bCounts[pos] || 0;
-          if (ac !== bc) return bc - ac;
-        }
+      // Step 1: Compare qualifying shared-heat scores (Rule 5.7.ii with RRS A8.1)
+      if (qualSharedA.length > 0) {
+        const result = rrsA8Countback(qualSharedA, qualSharedB);
+        if (result !== 0) return result;
       }
 
+      // Step 2: Compare finals shared-heat scores
+      if (finalsSharedA.length > 0) {
+        const result = rrsA8Countback(finalsSharedA, finalsSharedB);
+        if (result !== 0) return result;
+      }
+
+      // Step 3: Fall back to all scores
       const aAll = a.raceScores.map(s => s ?? 999);
       const bAll = b.raceScores.map(s => s ?? 999);
       return compareWithCountback(aAll, bAll, a.droppedIndices.size, b.droppedIndices.size);
