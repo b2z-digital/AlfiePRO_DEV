@@ -19,6 +19,7 @@ import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
+import { SHRSOverallResultsView } from './SHRSOverallResultsView';
 
 interface HeatScoringTableProps {
   skippers: Skipper[];
@@ -156,6 +157,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   // Initialize to null and let useEffect set the correct heat
   const [selectedHeat, setSelectedHeat] = useState<HeatDesignation | null>(null);
   const [showOverallResults, setShowOverallResults] = useState(false);
+  const [showOverallResultsView, setShowOverallResultsView] = useState(false);
   const [showRaceResults, setShowRaceResults] = useState(false);
   const [showHeatAssignments, setShowHeatAssignments] = useState(false);
   const [observerReloadTrigger, setObserverReloadTrigger] = useState(0);
@@ -1090,6 +1092,19 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     );
   }
 
+  if (showOverallResultsView && heatManagement.configuration?.scoringSystem === 'shrs') {
+    return (
+      <div className={`${isFullscreen ? 'h-full' : 'h-[calc(100vh-200px)]'} flex flex-col no-select`}>
+        <SHRSOverallResultsView
+          skippers={skippers}
+          heatManagement={heatManagement}
+          darkMode={darkMode}
+          onBack={() => setShowOverallResultsView(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`space-y-6 ${isFullscreen ? 'p-2' : 'p-8'} no-select`}>
       {/* All Heats Complete - Show Actions (hidden in touch/spreadsheet mode as it's shown in the button instead) */}
@@ -1378,7 +1393,13 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 Race Results
               </button>
               <button
-                onClick={() => setShowOverallResults(true)}
+                onClick={() => {
+                  if (heatManagement.configuration?.scoringSystem === 'shrs') {
+                    setShowOverallResultsView(true);
+                  } else {
+                    setShowOverallResults(true);
+                  }
+                }}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   darkMode
                     ? 'bg-blue-600 text-white hover:bg-blue-700'
@@ -1843,6 +1864,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             darkMode={darkMode}
             currentEvent={currentEvent}
             parentVerifiedHeats={spreadsheetVerifiedHeats}
+            onShowOverallResults={heatManagement.configuration?.scoringSystem === 'shrs' ? () => setShowOverallResultsView(true) : undefined}
           />
         ) : (
           <ScratchRaceTable

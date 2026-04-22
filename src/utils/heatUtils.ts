@@ -348,14 +348,13 @@ export const convertHeatResultsToRaceResults = (
 
     // Convert to race results format
     overallPositions.forEach((position, skipperIndex) => {
+      const originalResult = round.results.find(r => r.skipperIndex === skipperIndex);
       raceResults.push({
-        race: round.round, // Use round number as race number
+        race: round.round,
         skipperIndex,
         position,
-        // Find the original result to get the letter score if any
-        letterScore: round.results.find(
-          r => r.skipperIndex === skipperIndex
-        )?.letterScore
+        letterScore: originalResult?.letterScore,
+        customPoints: originalResult?.customPoints,
       });
     });
   });
