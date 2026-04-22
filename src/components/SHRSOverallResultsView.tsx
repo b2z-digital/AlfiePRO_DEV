@@ -5,6 +5,7 @@ import { HeatManagement, HeatDesignation, HeatResult } from '../types/heat';
 import { convertHeatResultsToRaceResults } from '../utils/heatUtils';
 import { compareWithCountback } from '../utils/scratchCalculations';
 import { calculateSHRSDiscards } from '../utils/shrsHeatSystem';
+import { getLetterScoreDisplayCode } from '../types/letterScores';
 
 interface SHRSOverallResultsViewProps {
   skippers: Skipper[];
@@ -273,13 +274,12 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
 
   const formatScore = (score: number | null, letterScore?: string, customPoints?: number): string => {
     if (letterScore) {
-      if (letterScore === 'RDG' && customPoints !== undefined) {
-        return `RGP ${customPoints}`;
+      const displayCode = getLetterScoreDisplayCode(letterScore, customPoints);
+      if (score !== null && score !== undefined) {
+        const pointsStr = Number.isInteger(score) ? String(score) : score.toFixed(1);
+        return `${displayCode} ${pointsStr}`;
       }
-      if (letterScore === 'SCP' && customPoints !== undefined) {
-        return `SCP ${customPoints}`;
-      }
-      return letterScore;
+      return displayCode;
     }
     if (score === null || score === undefined) return '-';
     return Number.isInteger(score) ? String(score) : score.toFixed(1);
