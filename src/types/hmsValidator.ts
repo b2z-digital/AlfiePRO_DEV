@@ -7,6 +7,8 @@ export interface ParsedHMSSkipper {
   myaNumber?: string;
   totalScore?: number;
   raceScores: { [raceNumber: string]: number | string }; // number or letter score
+  sourceFleet?: string;
+  sourceFleetPosition?: number;
 }
 
 export interface ParsedHMSRaceResult {

@@ -42,7 +42,6 @@ export async function parseSHRSFile(file: File): Promise<ParsedSHRSData> {
   const workbook = XLSX.read(arrayBuffer, { type: 'array' });
 
   const worksheetNames = workbook.SheetNames;
-  console.log('SHRS File Worksheets:', worksheetNames);
 
   const sheet = workbook.Sheets[worksheetNames[0]];
   const data: any[][] = XLSX.utils.sheet_to_json(sheet, {
@@ -321,9 +320,6 @@ function parseSHRSFromRows(
     }
   }
 
-  console.log(`SHRS: ${qualifyingCols.length} qualifying columns, ${finalCols.length} final columns`);
-  console.log(`SHRS columns: pos=${posCol} sail=${sailCol} name=${nameCol} club=${clubCol} total=${totalCol} net=${netCol}`);
-
   if (sailCol === -1 && nameCol === -1) {
     throw new Error('Could not determine Name or Sail Number columns. Use a header row with labelled columns (Name, Sail, Q1, Q2, etc.).');
   }
@@ -362,9 +358,19 @@ function parseSHRSFromRows(
       }
     }
 
-    const skipperPosition = posCol >= 0 ? parseInt(String(row[posCol] || '')) || skippers.length + 1 : skippers.length + 1;
+    const rawPlace = posCol >= 0 ? String(row[posCol] || '').trim() : '';
+    const skipperPosition = parseInt(rawPlace) || skippers.length + 1;
     const totalScore = totalCol >= 0 ? parseFloat(String(row[totalCol] || '')) || undefined : undefined;
     const netScore = netCol >= 0 ? parseFloat(String(row[netCol] || '')) || undefined : undefined;
+
+    // Parse fleet designation from Place column (e.g., "G 1", "S 3", "B 12")
+    let sourceFleet: string | undefined;
+    let sourceFleetPosition: number | undefined;
+    const fleetPlaceMatch = rawPlace.match(/^([GSBC])\s*(\d+)$/i);
+    if (fleetPlaceMatch) {
+      sourceFleet = fleetPlaceMatch[1].toUpperCase();
+      sourceFleetPosition = parseInt(fleetPlaceMatch[2]);
+    }
 
     skippers.push({
       position: skipperPosition,
@@ -373,6 +379,8 @@ function parseSHRSFromRows(
       club: clubCol >= 0 ? String(row[clubCol] || '').trim() || undefined : undefined,
       totalScore: netScore || totalScore,
       raceScores,
+      sourceFleet,
+      sourceFleetPosition,
     });
 
     const skipperIndex = skippers.length - 1;
@@ -396,8 +404,6 @@ function parseSHRSFromRows(
   const numFinals = finalCols.length;
   const numRaces = numQualifying + numFinals;
   const detectedHeats = calculateOptimalHeats(skippers.length);
-
-  console.log(`SHRS parsed: ${skippers.length} skippers, ${numQualifying} qualifying rounds, ${numFinals} final rounds, ${detectedHeats} optimal heats`);
 
   const eventName = extractSHRSEventName(data, headerRowIndex) ||
     (fileName ? fileName.replace(/\.(xls|xlsx|csv)$/i, '') : undefined);
@@ -679,26 +685,53 @@ export function reconstructSHRSHeats(
     }
 
     const numDiscards = calculateSHRSDiscards(qualifyingRounds);
+
     qualRaceScores.forEach((scores, idx) => {
       const sorted = [...scores].sort((a, b) => b - a);
       const kept = sorted.slice(numDiscards);
-      qualScores.set(idx, kept.reduce((sum, s) => sum + s, 0));
+      const net = kept.reduce((sum, s) => sum + s, 0);
+      qualScores.set(idx, net);
     });
 
-    const rankedSkippers = Array.from(qualScores.entries())
-      .sort(([, a], [, b]) => a - b);
-
     const fleetSizes = calculateHeatSizes(skippers.length, numberOfHeats);
-    const fleetAssignments = heatLabels.map((label, i) => ({
+    const fleetAssignments = heatLabels.map((label) => ({
       heatDesignation: label,
       skipperIndices: [] as number[],
     }));
 
-    let idx = 0;
-    for (let f = 0; f < numberOfHeats; f++) {
-      for (let s = 0; s < fleetSizes[f] && idx < rankedSkippers.length; s++) {
-        fleetAssignments[f].skipperIndices.push(rankedSkippers[idx][0]);
-        idx++;
+    // Use source fleet designations from Place column when available
+    const fleetMap: Record<string, string> = { 'G': 'A', 'S': 'B', 'B': 'C', 'C': 'D' };
+    const skippersWithSourceFleet = skippers.filter(s => s.sourceFleet && fleetMap[s.sourceFleet]);
+
+    if (skippersWithSourceFleet.length === skippers.length) {
+      // All skippers have source fleet data - use it directly
+      for (let i = 0; i < skippers.length; i++) {
+        const skipper = skippers[i];
+        const targetHeat = fleetMap[skipper.sourceFleet!];
+        const assignment = fleetAssignments.find(a => a.heatDesignation === targetHeat);
+        if (assignment) {
+          assignment.skipperIndices.push(i);
+        }
+      }
+      // Sort within each fleet by sourceFleetPosition
+      for (const assignment of fleetAssignments) {
+        assignment.skipperIndices.sort((a, b) => {
+          const posA = skippers[a].sourceFleetPosition ?? 999;
+          const posB = skippers[b].sourceFleetPosition ?? 999;
+          return posA - posB;
+        });
+      }
+    } else {
+      // Fall back to qualifying net score ranking
+      const rankedSkippers = Array.from(qualScores.entries())
+        .sort(([, a], [, b]) => a - b);
+
+      let idx = 0;
+      for (let f = 0; f < numberOfHeats; f++) {
+        for (let s = 0; s < fleetSizes[f] && idx < rankedSkippers.length; s++) {
+          fleetAssignments[f].skipperIndices.push(rankedSkippers[idx][0]);
+          idx++;
+        }
       }
     }
 
