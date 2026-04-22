@@ -80,6 +80,7 @@ function parseSHRSFromRows(
 ): ParsedSHRSData {
   let headerRowIndex = -1;
 
+  // Strategy 1: look for a row with explicit column headers
   for (let i = 0; i < Math.min(20, data.length); i++) {
     const row = data[i];
     if (!row) continue;
@@ -95,6 +96,22 @@ function parseSHRSFromRows(
     }
   }
 
+  // Strategy 2: look for a row that contains Q1/Q2 style column headers even without Sail/Name
+  if (headerRowIndex === -1) {
+    for (let i = 0; i < Math.min(20, data.length); i++) {
+      const row = data[i];
+      if (!row) continue;
+      const cells = row.map((c: any) => String(c || '').trim());
+      const qCount = cells.filter((c: string) => /^q\s*\d+$/i.test(c)).length;
+      const fCount = cells.filter((c: string) => /^f\s*\d+$/i.test(c)).length;
+      if (qCount >= 2 || (qCount >= 1 && fCount >= 1)) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+  }
+
+  // Strategy 3: single fallback for any recognizable header keyword
   if (headerRowIndex === -1) {
     for (let i = 0; i < Math.min(20, data.length); i++) {
       const row = data[i];
@@ -108,22 +125,15 @@ function parseSHRSFromRows(
   }
 
   if (headerRowIndex === -1) {
-    throw new Error('Could not find header row. Ensure column headers include Sail, Name, Q1, etc.');
+    throw new Error('Could not find header row. Ensure the first row contains column headers like Q1, Q2, F1, F2, etc.');
   }
 
   const headers = data[headerRowIndex].map((h: any) => String(h || '').trim());
   const headersLower = headers.map((h: string) => h.toLowerCase());
-  console.log('SHRS headers:', headers.filter((h: string) => h));
 
-  const posCol = findCol(headersLower, ['pos', 'position', 'place', 'rank']);
-  const sailCol = findCol(headersLower, ['sail', 'sail no', 'sail #', 'sail number', 'sailno']);
-  const nameCol = findCol(headersLower, ['name', 'skipper', 'helmsman', 'competitor']);
-  const clubCol = findCol(headersLower, ['club', 'organization', 'org']);
-
+  // Detect round columns first (needed for column inference)
   const qualifyingCols: { index: number; round: number }[] = [];
   const finalCols: { index: number; round: number }[] = [];
-  const totalCol = findCol(headersLower, ['total', 'gross', 'tot']);
-  const netCol = findCol(headersLower, ['net', 'nett']);
 
   headers.forEach((h: string, idx: number) => {
     const clean = h.trim();
@@ -146,15 +156,77 @@ function parseSHRSFromRows(
   qualifyingCols.sort((a, b) => a.round - b.round);
   finalCols.sort((a, b) => a.round - b.round);
 
+  if (qualifyingCols.length === 0 && finalCols.length === 0) {
+    throw new Error('Could not find round columns (Q1, Q2... or F1, F2... or R1, R2...).');
+  }
+
+  // Find explicit columns
+  let posCol = findCol(headersLower, ['pos', 'position', 'place', 'rank']);
+  let sailCol = findCol(headersLower, ['sail', 'sail no', 'sail #', 'sail number', 'sailno']);
+  let nameCol = findCol(headersLower, ['name', 'skipper', 'helmsman', 'competitor']);
+  let clubCol = findCol(headersLower, ['club', 'organization', 'org']);
+  const totalCol = findCol(headersLower, ['total', 'gross', 'tot']);
+  const netCol = findCol(headersLower, ['net', 'nett']);
+
+  // Infer columns from data if headers are unlabelled (like the Oceania format)
+  const firstRoundColIndex = Math.min(
+    ...qualifyingCols.map(c => c.index),
+    ...finalCols.map(c => c.index)
+  );
+
+  if (sailCol === -1 && nameCol === -1 && firstRoundColIndex > 0) {
+    const blankHeaderCols = [];
+    for (let c = 0; c < firstRoundColIndex; c++) {
+      if (!headers[c] || headers[c] === '') {
+        blankHeaderCols.push(c);
+      }
+    }
+
+    if (blankHeaderCols.length >= 2) {
+      // Inspect data rows to figure out which column is name vs sail
+      const sampleRows = data.slice(headerRowIndex + 1, headerRowIndex + 6).filter(r => r && r.length > 0);
+      for (const col of blankHeaderCols) {
+        const sampleValues = sampleRows.map(r => String(r[col] || '').trim()).filter(Boolean);
+        if (sampleValues.length === 0) continue;
+
+        const looksLikeSail = sampleValues.every(v => /^[A-Z]{2,4}\s*\d+$/i.test(v) || /^\d+$/.test(v));
+        const looksLikeName = sampleValues.every(v => /^[A-Za-z\u00C0-\u024F\s'-]+$/.test(v) && v.includes(' '));
+        const looksLikeNumber = sampleValues.every(v => /^\d+$/.test(v) && parseInt(v) <= 200);
+
+        if (looksLikeName && nameCol === -1) {
+          nameCol = col;
+        } else if (looksLikeSail && sailCol === -1) {
+          sailCol = col;
+        } else if (looksLikeNumber && posCol === -1 && col === 0) {
+          posCol = col;
+        }
+      }
+
+      // If we still haven't found name and sail, use positional inference:
+      // typical layouts: [Name, Sail, Club?, Q1...] or [Name, Sail, Q1...]
+      if (nameCol === -1 && sailCol === -1 && blankHeaderCols.length >= 2) {
+        nameCol = blankHeaderCols[0];
+        sailCol = blankHeaderCols[1];
+        if (blankHeaderCols.length >= 3 && clubCol === -1) {
+          clubCol = blankHeaderCols[2];
+        }
+      } else if (nameCol >= 0 && sailCol === -1) {
+        const remaining = blankHeaderCols.filter(c => c !== nameCol && c !== posCol);
+        if (remaining.length > 0) sailCol = remaining[0];
+        if (remaining.length > 1 && clubCol === -1) clubCol = remaining[1];
+      } else if (sailCol >= 0 && nameCol === -1) {
+        const remaining = blankHeaderCols.filter(c => c !== sailCol && c !== posCol);
+        if (remaining.length > 0) nameCol = remaining[0];
+        if (remaining.length > 1 && clubCol === -1) clubCol = remaining[1];
+      }
+    }
+  }
+
   console.log(`SHRS: ${qualifyingCols.length} qualifying columns, ${finalCols.length} final columns`);
   console.log(`SHRS columns: pos=${posCol} sail=${sailCol} name=${nameCol} club=${clubCol} total=${totalCol} net=${netCol}`);
 
   if (sailCol === -1 && nameCol === -1) {
-    throw new Error('Could not find Sail Number or Name columns in the spreadsheet.');
-  }
-
-  if (qualifyingCols.length === 0 && finalCols.length === 0) {
-    throw new Error('Could not find round columns (Q1, Q2... or F1, F2... or R1, R2...).');
+    throw new Error('Could not determine Name or Sail Number columns. Use a header row with labelled columns (Name, Sail, Q1, Q2, etc.).');
   }
 
   const skippers: ParsedHMSSkipper[] = [];
@@ -184,10 +256,10 @@ function parseSHRSFromRows(
       if (!cellValue) continue;
 
       const numVal = parseFloat(cellValue);
-      if (isNaN(numVal)) {
-        raceScores[col.round.toString()] = cellValue.toUpperCase();
-      } else {
+      if (!isNaN(numVal) && /^\d+\.?\d*$/.test(cellValue)) {
         raceScores[col.round.toString()] = numVal;
+      } else {
+        raceScores[col.round.toString()] = cellValue.toUpperCase();
       }
     }
 
@@ -205,18 +277,19 @@ function parseSHRSFromRows(
     });
 
     const skipperIndex = skippers.length - 1;
+    const sailForResult = rawSail || String(skipperIndex + 1);
 
     for (const col of qualifyingCols) {
       const cellValue = String(row[col.index] || '').trim();
       if (!cellValue) continue;
-      parseResultCell(cellValue, col.round, rawSail || String(skipperIndex + 1), results, undefined);
+      parseResultCell(cellValue, col.round, sailForResult, results, undefined);
     }
 
     for (const col of finalCols) {
       const raceNum = col.round + qualifyingCols.length;
       const cellValue = String(row[col.index] || '').trim();
       if (!cellValue) continue;
-      parseResultCell(cellValue, raceNum, rawSail || String(skipperIndex + 1), results, undefined);
+      parseResultCell(cellValue, raceNum, sailForResult, results, undefined);
     }
   }
 
@@ -244,6 +317,12 @@ function parseSHRSFromRows(
   };
 }
 
+const KNOWN_LETTER_SCORES = [
+  'DNF', 'DNS', 'DNC', 'DSQ', 'OCS', 'RET', 'BFD', 'UFD', 'NSC',
+  'ZFP', 'SCP', 'DPI', 'DNE', 'RDG', 'RDGave', 'RDGfix', 'WDN',
+  'RGA', 'RGP', 'AVE', 'AVG',
+];
+
 function parseResultCell(
   cellValue: string,
   raceNumber: number,
@@ -251,10 +330,26 @@ function parseResultCell(
   results: ParsedHMSRaceResult[],
   heat?: string
 ): void {
-  const upper = cellValue.toUpperCase().trim();
+  const trimmed = cellValue.trim();
+  if (!trimmed) return;
 
-  const knownLetterScores = ['DNF', 'DNS', 'DNC', 'DSQ', 'OCS', 'RET', 'BFD', 'UFD', 'NSC', 'ZFP', 'SCP', 'DPI', 'DNE', 'RDG', 'WDN'];
-  if (knownLetterScores.includes(upper)) {
+  // Pure number (e.g. "3", "14", "7.5")
+  if (/^\d+\.?\d*$/.test(trimmed)) {
+    const numVal = parseFloat(trimmed);
+    results.push({
+      raceNumber,
+      sailNumber,
+      position: numVal,
+      points: numVal,
+      heat,
+    });
+    return;
+  }
+
+  const upper = trimmed.toUpperCase();
+
+  // Standalone letter score (e.g. "DNF", "DNC", "DSQ")
+  if (KNOWN_LETTER_SCORES.includes(upper)) {
     results.push({
       raceNumber,
       sailNumber,
@@ -266,44 +361,101 @@ function parseResultCell(
     return;
   }
 
-  const numVal = parseFloat(cellValue);
-  if (!isNaN(numVal) && numVal > 0) {
-    results.push({
-      raceNumber,
-      sailNumber,
-      position: numVal,
-      points: numVal,
-      heat,
-    });
-    return;
-  }
+  // Pattern: "CODE POINTS" or "CODE POINTS+FLEET" (e.g. "RGP 2", "DNF 18", "RGA 4.3",
+  // "SCP 16.4", "RGP 5S", "RET 18C", "NSC 18C", "DNC 18B", "RGP 9.3G", "RGP 9.5C",
+  // "DNF 18B", "RGP 5S", "NSC 18S", "DNC 18S")
+  const codeFirstMatch = upper.match(/^([A-Z]{2,6})\s+(\d+\.?\d*)\s*([A-Z]?)$/);
+  if (codeFirstMatch) {
+    const code = codeFirstMatch[1];
+    const points = parseFloat(codeFirstMatch[2]);
+    const fleetSuffix = codeFirstMatch[3] || '';
+    const isKnown = KNOWN_LETTER_SCORES.includes(code);
 
-  const mixed = cellValue.match(/^(\d+\.?\d*)\s*([a-zA-Z]+)$/);
-  if (mixed) {
-    const pos = parseFloat(mixed[1]);
-    const code = mixed[2].toUpperCase();
-    results.push({
-      raceNumber,
-      sailNumber,
-      position: pos,
-      points: pos,
-      letterScore: knownLetterScores.includes(code) ? code : undefined,
-      comment: code,
-      heat,
-    });
-    return;
-  }
+    let letterScore = code;
+    let customPoints: number | undefined = undefined;
 
-  if (cellValue.trim()) {
+    // RGP = RDG with fixed points, RGA = RDG with average
+    if (code === 'RGP') {
+      letterScore = 'RDG';
+      customPoints = points;
+    } else if (code === 'RGA') {
+      letterScore = 'RDG';
+      customPoints = points;
+    } else if (code === 'SCP') {
+      customPoints = points;
+    }
+
     results.push({
       raceNumber,
       sailNumber,
       position: null,
-      points: 0,
-      letterScore: upper || undefined,
+      points,
+      letterScore: isKnown || code === 'RGP' || code === 'RGA' ? letterScore : code,
+      customPoints,
+      comment: fleetSuffix ? `Fleet ${fleetSuffix}` : undefined,
       heat,
     });
+    return;
   }
+
+  // Pattern: "POINTSCODE" no space (e.g. "16.4SCP" less common but possible)
+  const numFirstMatch = upper.match(/^(\d+\.?\d*)\s*([A-Z]{2,6})\s*(\d*\.?\d*)\s*([A-Z]?)$/);
+  if (numFirstMatch) {
+    const pos = parseFloat(numFirstMatch[1]);
+    const code = numFirstMatch[2];
+    const extraPoints = numFirstMatch[3] ? parseFloat(numFirstMatch[3]) : undefined;
+    const fleetSuffix = numFirstMatch[4] || '';
+
+    let letterScore = code;
+    let customPoints: number | undefined = extraPoints;
+
+    if (code === 'RGP') {
+      letterScore = 'RDG';
+      if (!customPoints) customPoints = pos;
+    } else if (code === 'RGA') {
+      letterScore = 'RDG';
+      if (!customPoints) customPoints = pos;
+    }
+
+    results.push({
+      raceNumber,
+      sailNumber,
+      position: KNOWN_LETTER_SCORES.includes(code) ? null : pos,
+      points: extraPoints || pos,
+      letterScore,
+      customPoints,
+      comment: fleetSuffix ? `Fleet ${fleetSuffix}` : undefined,
+      heat,
+    });
+    return;
+  }
+
+  // Pattern: "CODE POINTSCODE" (e.g. "DNF 18" where 18 is the points, or "UFD 18")
+  const codePointsMatch = upper.match(/^([A-Z]{2,6})\s+(\d+\.?\d*)([A-Z]?)$/);
+  if (codePointsMatch) {
+    const code = codePointsMatch[1];
+    const points = parseFloat(codePointsMatch[2]);
+
+    results.push({
+      raceNumber,
+      sailNumber,
+      position: null,
+      points,
+      letterScore: code,
+      heat,
+    });
+    return;
+  }
+
+  // Fallback: treat as unknown letter score
+  results.push({
+    raceNumber,
+    sailNumber,
+    position: null,
+    points: 0,
+    letterScore: upper || undefined,
+    heat,
+  });
 }
 
 export function reconstructSHRSHeats(

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { X, FlaskConical, Upload, Plus, ChevronRight, FileSpreadsheet, Users, Layers, ArrowLeft, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, Sailboat, TrendingUp, Shuffle, ChartBar as BarChart3 } from 'lucide-react';
+import { X, FlaskConical, Upload, Plus, ChevronRight, FileSpreadsheet, Users, Layers, ArrowLeft, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, Sailboat, TrendingUp, Shuffle, ChartBar as BarChart3, Download } from 'lucide-react';
 import { parseHMSFile } from '../utils/hmsParser';
 import { parseSHRSFile, reconstructSHRSHeats, ParsedSHRSData, SHRSImportMode } from '../utils/shrsParser';
 import { ParsedHMSData } from '../types/hmsValidator';
@@ -10,6 +10,7 @@ import { HeatManagement, HeatDesignation, HeatAssignment, HeatRound, HeatResult 
 import { Skipper, BoatType, RaceType } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
+import * as XLSX from 'xlsx';
 
 interface EventSimulationModalProps {
   darkMode: boolean;
@@ -55,6 +56,60 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
     raceFormat: 'scratch' as RaceType,
     numRaces: 12,
   });
+
+  const downloadSHRSTemplate = useCallback(() => {
+    const wb = XLSX.utils.book_new();
+    const headerRow = ['Name', 'Sail', 'Club', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8', 'Q9', 'Q10', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'Total', 'Net'];
+    const exampleRows = [
+      ['John Smith', 'AUS 48', 'LMRYC', '1', '2', '6', '2', '1', '3', '2', '1', '', '', 'RGP 2', 'DNF 18', 'NSC 18', '', '', '', '', ''],
+      ['Jane Doe', 'NZL 61', 'WMYC', '7', '2', '1', '2', '1', '5', '7', '1', '4', '', 'DSQ 18', 'SCP 16.4', '', '', '', '', '', ''],
+      ['Bob Wilson', 'ESP 47', 'RYC', '1', '2', '4', '2', '2', '2', '11', '4', '7', '', 'DNC 18', 'UFD 18', 'RET 18C', '', '', '', '', ''],
+    ];
+    const data = [headerRow, ...exampleRows];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    const colWidths = [20, 12, 12, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 10, 10, 10, 10, 10, 10, 8, 8];
+    ws['!cols'] = colWidths.map(w => ({ wch: w }));
+
+    XLSX.utils.book_append_sheet(wb, ws, 'AllScores');
+
+    const notesWs = XLSX.utils.aoa_to_sheet([
+      ['SHRS Import Template - Instructions'],
+      [''],
+      ['Column Structure:'],
+      ['  Name   - Skipper full name'],
+      ['  Sail   - Sail number (e.g. AUS 48, NZL 61)'],
+      ['  Club   - Club abbreviation (optional)'],
+      ['  Q1-Qn  - Qualifying round scores (position number or letter score)'],
+      ['  F1-Fn  - Final round scores (position number or letter score)'],
+      ['  Total  - Gross total points (optional, calculated by system)'],
+      ['  Net    - Net points after discards (optional, calculated by system)'],
+      [''],
+      ['Supported Score Formats:'],
+      ['  3       - Position (3rd place)'],
+      ['  DNF 18  - Did Not Finish (with assigned points)'],
+      ['  DNS 18  - Did Not Start'],
+      ['  DNC 18  - Did Not Compete'],
+      ['  DSQ 18  - Disqualified'],
+      ['  UFD 18  - U-Flag Disqualification'],
+      ['  NSC 18  - Non Starter Code'],
+      ['  OCS 18  - On Course Side'],
+      ['  BFD 18  - Black Flag Disqualification'],
+      ['  RET 18  - Retired'],
+      ['  SCP 16.4 - Scoring Penalty (with calculated points)'],
+      ['  RGP 2   - Redress Given Points (fixed points)'],
+      ['  RGA 4.3 - Redress Given Average (average points)'],
+      [''],
+      ['Fleet Suffixes (optional, for finals):'],
+      ['  DNC 18B  - Letter after points indicates fleet (G=Gold, S=Silver, B=Bronze, C=Copper)'],
+      ['  RET 18C  - Retired in Copper fleet'],
+      ['  NSC 18S  - Non Starter Code in Silver fleet'],
+    ]);
+    notesWs['!cols'] = [{ wch: 80 }];
+    XLSX.utils.book_append_sheet(wb, notesWs, 'Instructions');
+
+    XLSX.writeFile(wb, 'SHRS_Import_Template.xlsx');
+  }, []);
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -566,6 +621,18 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                   <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Select the scoring format used in this file</p>
                 </div>
               </div>
+
+              <button
+                onClick={downloadSHRSTemplate}
+                className={`flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg transition-colors ${
+                  darkMode
+                    ? 'text-amber-400 hover:bg-amber-500/10'
+                    : 'text-amber-600 hover:bg-amber-50'
+                }`}
+              >
+                <Download size={14} />
+                Download SHRS import template (.xlsx)
+              </button>
 
               <div className="space-y-3">
                 <button
