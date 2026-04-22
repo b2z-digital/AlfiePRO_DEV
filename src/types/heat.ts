@@ -355,12 +355,24 @@ export const generateNextRoundAssignments = (
           allSkipperScores.set(result.skipperIndex, 0);
           allSkipperRaceScores.set(result.skipperIndex, []);
         }
-        const score = result.letterScore
-          ? (Math.max(...heats.map((_, i) => {
-              const ha = r.heatAssignments.find(a => a.heatDesignation === heats[i]);
-              return ha ? ha.skipperIndices.length : 0;
-            })) + 1)
-          : (result.position || 999);
+
+        let score: number;
+        if (result.importedScore !== undefined && result.importedScore !== null) {
+          // Use the original imported score when available (preserves correct SHRS scoring)
+          score = result.importedScore;
+        } else if (result.letterScore) {
+          if (result.customPoints !== undefined && result.customPoints > 0) {
+            // RDGfix or other custom-pointed letter scores
+            score = result.customPoints;
+          } else {
+            // Standard letter score penalty: largest heat size + 1
+            const heatSizes = r.heatAssignments.map(a => a.skipperIndices.length);
+            score = Math.max(...heatSizes) + 1;
+          }
+        } else {
+          score = result.position || 999;
+        }
+
         allSkipperRaceScores.get(result.skipperIndex)!.push(score);
       }
     }
