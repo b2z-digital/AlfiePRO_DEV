@@ -57,7 +57,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const html = await response.text();
+    // Read as ArrayBuffer to handle UTF-16 encoded pages
+    const buffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+
+    let html: string;
+    // Detect UTF-16 LE BOM (FF FE) or UTF-16 BE BOM (FE FF)
+    if ((bytes[0] === 0xFF && bytes[1] === 0xFE) || (bytes[0] === 0xFE && bytes[1] === 0xFF)) {
+      const encoding = bytes[0] === 0xFF ? "utf-16le" : "utf-16be";
+      html = new TextDecoder(encoding).decode(buffer);
+    } else {
+      // Check for null bytes indicating UTF-16 without BOM
+      const hasNullBytes = bytes.length > 4 && (bytes[1] === 0 || bytes[0] === 0);
+      if (hasNullBytes) {
+        const encoding = bytes[0] === 0 ? "utf-16be" : "utf-16le";
+        html = new TextDecoder(encoding).decode(buffer);
+      } else {
+        html = new TextDecoder("utf-8").decode(buffer);
+      }
+    }
 
     return new Response(
       JSON.stringify({ html }),

@@ -75,7 +75,11 @@ export function parseSHRSFromCSV(csvText: string): ParsedSHRSData {
   return parseSHRSFromRows(data, ['Pasted Data']);
 }
 
-export function parseSHRSFromHTML(html: string, sourceUrl?: string): ParsedSHRSData {
+export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSHRSData {
+  // Strip null bytes (UTF-16 encoded pages have \x00 between every character)
+  // Also strip BOM markers
+  const html = rawHtml.replace(/\x00/g, '').replace(/^\uFEFF|\uFFFE/g, '');
+
   const rows: string[][] = [];
 
   // Extract all table rows
