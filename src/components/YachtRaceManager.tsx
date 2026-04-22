@@ -449,6 +449,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               console.warn(`Heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
               setHeatManagement(null);
             }
+          } else {
+            setHeatManagement(null);
           }
 
           // Load drop rules from current day data if not from heat management
@@ -477,12 +479,16 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 console.warn(`Day 1 heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
                 setHeatManagement(null);
               }
+            } else {
+              setHeatManagement(null);
             }
 
             // Load drop rules from day 1 data if not from heat management
             if (day1Data.dropRules && !day1Data.heatManagement?.configuration.enabled) {
               setCurrentDropRules(day1Data.dropRules);
             }
+          } else {
+            setHeatManagement(null);
           }
         }
       } else {
@@ -596,6 +602,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             console.warn(`Heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
             setHeatManagement(null);
           }
+        } else {
+          setHeatManagement(null);
         }
 
         // Load drop rules from event if not from heat management
