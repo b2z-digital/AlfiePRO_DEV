@@ -122,7 +122,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       for (const race of completedRaces) {
         const result = skipperRaceResults.find((r: any) => r.race === race);
         if (result) {
-          raceScores.push(result.position || null);
+          raceScores.push(result.position ?? null);
           raceLetterScores.push(result.letterScore);
           raceCustomPoints.push(result.customPoints);
         } else {

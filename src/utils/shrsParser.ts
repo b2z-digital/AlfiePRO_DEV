@@ -33,6 +33,7 @@ export interface ReconstructedRound {
     letterScore?: string;
     points: number;
     customPoints?: number;
+    importedScore?: number | null;
   }[];
 }
 
@@ -477,6 +478,7 @@ export function reconstructSHRSHeats(
             letterScore: result.letterScore,
             points: result.points,
             customPoints: result.customPoints,
+            importedScore: result.position,
           });
         } else {
           const largestHeat = getLargestHeatSize(heatSizes);
@@ -486,12 +488,11 @@ export function reconstructSHRSHeats(
             position: null,
             letterScore: 'DNC',
             points: largestHeat + 1,
+            importedScore: null,
           });
         }
       }
     }
-
-    rerankPositionsWithinHeats(reconstructedResults);
 
     rounds.push({
       round: q,
@@ -585,6 +586,7 @@ export function reconstructSHRSHeats(
               letterScore: result.letterScore,
               points: result.points,
               customPoints: result.customPoints,
+              importedScore: result.position,
             });
           } else {
             const lh = getLargestHeatSize(finalFleetSizes);
@@ -594,12 +596,11 @@ export function reconstructSHRSHeats(
               position: null,
               letterScore: 'DNC',
               points: lh + 1,
+              importedScore: null,
             });
           }
         }
       }
-
-      rerankPositionsWithinHeats(reconstructedResults);
 
       rounds.push({
         round: raceNum,
@@ -702,33 +703,6 @@ function generateNextRoundBalanced(
 
   rebalanceAssignments(newAssignments, targetSizes);
   return newAssignments;
-}
-
-function rerankPositionsWithinHeats(
-  reconstructedResults: ReconstructedRound['results']
-): void {
-  const byHeat = new Map<string, ReconstructedRound['results']>();
-  for (const r of reconstructedResults) {
-    if (!byHeat.has(r.heatDesignation)) byHeat.set(r.heatDesignation, []);
-    byHeat.get(r.heatDesignation)!.push(r);
-  }
-
-  for (const [, heatResults] of byHeat) {
-    const finishers = heatResults
-      .filter(r => r.position !== null && !r.letterScore)
-      .sort((a, b) => (a.position || 999) - (b.position || 999));
-
-    const nonFinishers = heatResults
-      .filter(r => r.letterScore || r.position === null);
-
-    let pos = 1;
-    for (const r of finishers) {
-      r.position = pos++;
-    }
-    for (const r of nonFinishers) {
-      r.position = null;
-    }
-  }
 }
 
 function rebalanceAssignments(

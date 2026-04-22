@@ -14,6 +14,7 @@ export interface HeatResult {
   round: number;
   markedAsUP?: boolean; // HMS: Promoted to higher heat, doesn't score in this heat
   customPoints?: number; // For RDG fix
+  importedScore?: number | null; // Original score from imported file, used for SHRS overall results
 }
 
 export type SeedingMethod = 'random' | 'manual' | 'ranking';

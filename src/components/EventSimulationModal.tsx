@@ -422,6 +422,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
           race: rr.round,
           round: rr.round,
           customPoints: r.customPoints,
+          importedScore: r.importedScore,
         })),
         completed: true,
       }));

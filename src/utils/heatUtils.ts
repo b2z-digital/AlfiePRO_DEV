@@ -289,14 +289,15 @@ export const convertHeatResultsToRaceResults = (
       const largestHeatSize = getLargestHeatSize(heatSizes);
 
       round.results.forEach(result => {
-        if (result.position !== null && !result.letterScore) {
-          overallPositions.set(result.skipperIndex, result.position);
-        } else if (result.letterScore) {
+        const score = result.importedScore !== undefined ? result.importedScore : result.position;
+        if (result.letterScore) {
           if ((result.letterScore === 'RDG' || result.letterScore === 'DPI') && result.customPoints !== undefined) {
             overallPositions.set(result.skipperIndex, result.customPoints);
           } else {
             overallPositions.set(result.skipperIndex, calculateNonFinisherScore(largestHeatSize));
           }
+        } else if (score !== null && score !== undefined) {
+          overallPositions.set(result.skipperIndex, score);
         }
       });
     }
