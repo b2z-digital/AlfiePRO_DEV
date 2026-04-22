@@ -89,8 +89,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   onOpenStartBox,
 }) => {
   const { addNotification } = useNotification();
-  const numberOfHeats = heatManagement.configuration.numberOfHeats;
-  const promotionCount = heatManagement.configuration.promotionCount;
+  const numberOfHeats = heatManagement?.configuration?.numberOfHeats || 4;
+  const promotionCount = heatManagement?.configuration?.promotionCount || 0;
   const heats = HEAT_LABELS.slice(0, Math.max(numberOfHeats, 5));
   const maxPositions = Math.max(24, Math.ceil(skippers.length / numberOfHeats) + 4);
 

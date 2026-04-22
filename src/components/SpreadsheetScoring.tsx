@@ -115,6 +115,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   }, []);
 
   const isMultiHeatMode = !!(heatManagement && propAvailableHeats && heatSkipperIndicesMap && allHeatRaceResults);
+  const isSHRS = heatManagement?.configuration?.scoringSystem === 'shrs';
+  const isHMS = heatManagement?.configuration?.scoringSystem === 'hms';
 
   useEffect(() => {
     if (!isMultiHeatMode) {
@@ -161,9 +163,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     }
     return completed;
   }, [isMultiHeatMode, singleFleetRace, raceResults]);
-
-  const isSHRS = heatManagement?.configuration?.scoringSystem === 'shrs';
-  const isHMS = heatManagement?.configuration?.scoringSystem === 'hms';
 
   const promotionCount = useMemo(() => {
     if (!isHeatScoring || !heatManagement || isSHRS) return 0;

@@ -138,11 +138,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const isCalculatingHandicaps = useRef(false);
   const liveSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load user's scoring mode preference (skip for non-HMS simulated events which default to touch)
+  // Load user's scoring mode preference (simulated events default to touch)
   useEffect(() => {
     const loadScoringModePreference = async () => {
       const currentEvent = getCurrentEvent();
-      if (currentEvent?.is_simulated && currentEvent.scoringSystem !== 'hms') {
+      if (currentEvent?.is_simulated) {
         setScoringMode('touch');
         return;
       }
@@ -206,7 +206,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       console.log('🏁 YachtRaceManager: event.dayResults:', Object.keys(currentEvent.dayResults || {}));
       setRaceType(currentEvent.raceFormat);
 
-      if (currentEvent.is_simulated && currentEvent.scoringSystem !== 'hms') {
+      if (currentEvent.is_simulated) {
         setScoringMode('touch');
       }
 
