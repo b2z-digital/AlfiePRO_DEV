@@ -1,7 +1,9 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { X, FlaskConical, Upload, Plus, ChevronRight, FileSpreadsheet, Users, Layers, ArrowLeft, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, Sailboat, TrendingUp } from 'lucide-react';
+import { X, FlaskConical, Upload, Plus, ChevronRight, FileSpreadsheet, Users, Layers, ArrowLeft, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, Sailboat, TrendingUp, Shuffle, ChartBar as BarChart3 } from 'lucide-react';
 import { parseHMSFile } from '../utils/hmsParser';
+import { parseSHRSFile, reconstructSHRSHeats, ParsedSHRSData, SHRSImportMode } from '../utils/shrsParser';
 import { ParsedHMSData } from '../types/hmsValidator';
+import { calculateOptimalHeats } from '../utils/shrsHeatSystem';
 import { storeRaceEvent, setCurrentEvent } from '../utils/raceStorage';
 import { RaceEvent } from '../types/race';
 import { HeatManagement, HeatDesignation, HeatAssignment, HeatRound, HeatResult } from '../types/heat';
@@ -15,7 +17,8 @@ interface EventSimulationModalProps {
   onSuccess: (event: RaceEvent) => void;
 }
 
-type SimulationStep = 'choose' | 'scratch-config' | 'hms-config' | 'hms-preview' | 'creating';
+type ScoringFormat = 'hms' | 'shrs-progressive' | 'shrs-balanced';
+type SimulationStep = 'choose' | 'scratch-config' | 'format-select' | 'hms-config' | 'shrs-config' | 'hms-preview' | 'shrs-preview' | 'creating';
 
 export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
   darkMode,
@@ -25,17 +28,26 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
   const { currentClub } = useAuth();
   const [step, setStep] = useState<SimulationStep>('choose');
   const [parsedData, setParsedData] = useState<ParsedHMSData | null>(null);
+  const [parsedSHRSData, setParsedSHRSData] = useState<ParsedSHRSData | null>(null);
+  const [scoringFormat, setScoringFormat] = useState<ScoringFormat>('hms');
   const [fileName, setFileName] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [rawFile, setRawFile] = useState<File | null>(null);
 
   const [config, setConfig] = useState({
     eventName: '',
     promotionCount: 4,
     fleetManagement: true,
     raceFormat: 'handicap' as RaceType,
+  });
+
+  const [shrsConfig, setShrsConfig] = useState({
+    eventName: '',
+    numberOfHeats: 3,
+    raceFormat: 'scratch' as RaceType,
   });
 
   const [scratchConfig, setScratchConfig] = useState({
@@ -51,24 +63,48 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
     setUploading(true);
     setError(null);
     setFileName(file.name);
+    setRawFile(file);
 
     try {
-      const data = await parseHMSFile(file);
-      setParsedData(data);
-
-      setConfig(prev => ({
-        ...prev,
-        eventName: data.eventName || file.name.replace(/\.(xls|xlsx|csv)$/i, ''),
-        promotionCount: data.promotionCount || 4,
-      }));
-
-      setStep('hms-config');
-    } catch (err: any) {
-      setError(err.message || 'Failed to parse HMS file');
+      setStep('format-select');
     } finally {
       setUploading(false);
     }
   }, []);
+
+  const handleFormatConfirm = useCallback(async () => {
+    if (!rawFile) return;
+    setUploading(true);
+    setError(null);
+
+    try {
+      if (scoringFormat === 'hms') {
+        const data = await parseHMSFile(rawFile);
+        setParsedData(data);
+        setConfig(prev => ({
+          ...prev,
+          eventName: data.eventName || rawFile.name.replace(/\.(xls|xlsx|csv)$/i, ''),
+          promotionCount: data.promotionCount || 4,
+        }));
+        setStep('hms-config');
+      } else {
+        const data = await parseSHRSFile(rawFile);
+        setParsedSHRSData(data);
+        const optimalHeats = calculateOptimalHeats(data.skippers.length);
+        setShrsConfig(prev => ({
+          ...prev,
+          eventName: data.eventName || rawFile.name.replace(/\.(xls|xlsx|csv)$/i, ''),
+          numberOfHeats: optimalHeats,
+        }));
+        setStep('shrs-config');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to parse file');
+      setStep('format-select');
+    } finally {
+      setUploading(false);
+    }
+  }, [rawFile, scoringFormat]);
 
   const handleCreateFromScratch = async () => {
     if (creating || !scratchConfig.eventName.trim()) return;
@@ -295,16 +331,117 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
     }
   }, [parsedData, config, currentClub, buildSkippers, buildSpreadsheetRaceResults, buildHeatManagement, onSuccess]);
 
-  const totalEntrants = parsedData?.skippers.length || 0;
-  const totalRaces = parsedData?.numRaces || 0;
-  const totalHeats = parsedData?.heats?.length || 0;
-  const totalResults = parsedData?.results.length || 0;
+  const handleCreateSHRSEvent = useCallback(async () => {
+    if (!parsedSHRSData) return;
+    setCreating(true);
+    setError(null);
 
-  const stepLabel = {
+    try {
+      const eventId = uuidv4();
+      const mode: SHRSImportMode = scoringFormat === 'shrs-balanced' ? 'shrs-balanced' : 'shrs-progressive';
+      const numberOfHeats = shrsConfig.numberOfHeats;
+
+      const reconstructedRounds = reconstructSHRSHeats(parsedSHRSData, mode, numberOfHeats);
+
+      const skippers: Skipper[] = parsedSHRSData.skippers.map(s => ({
+        name: s.name,
+        sailNo: s.sailNumber,
+        sailNumber: s.sailNumber,
+        club: s.club || '',
+        boatModel: '',
+        startHcap: 100,
+      }));
+
+      const heats = ['A', 'B', 'C', 'D', 'E'].slice(0, numberOfHeats) as HeatDesignation[];
+      const rounds: HeatRound[] = reconstructedRounds.map(rr => ({
+        round: rr.round,
+        heatAssignments: rr.heatAssignments.map(a => ({
+          heatDesignation: a.heatDesignation as HeatDesignation,
+          skipperIndices: [...a.skipperIndices],
+        })),
+        results: rr.results.map(r => ({
+          skipperIndex: r.skipperIndex,
+          position: r.position,
+          letterScore: r.letterScore as any,
+          heatDesignation: r.heatDesignation as HeatDesignation,
+          race: rr.round,
+          round: rr.round,
+        })),
+        completed: true,
+      }));
+
+      const totalRaces = parsedSHRSData.qualifyingRounds + parsedSHRSData.finalRounds;
+      const qualifyingRounds = parsedSHRSData.qualifyingRounds;
+
+      const heatManagement: HeatManagement = {
+        configuration: {
+          enabled: true,
+          numberOfHeats,
+          promotionCount: 0,
+          seedingMethod: 'manual',
+          autoAssign: false,
+          scoringSystem: 'shrs',
+          shrsAssignmentMode: mode === 'shrs-balanced' ? 'preset' : 'progressive',
+          shrsQualifyingRounds: qualifyingRounds,
+          shrsFinalsStarted: parsedSHRSData.finalRounds > 0,
+          fleetManagementEnabled: true,
+          heatLabelStyle: 'letters',
+        },
+        rounds,
+        currentRound: totalRaces,
+        currentHeat: null,
+      };
+
+      const discards: number[] = [];
+      if (totalRaces >= 4) discards.push(4);
+      if (totalRaces >= 8) discards.push(8);
+      if (totalRaces >= 16) discards.push(16);
+      if (totalRaces >= 24) discards.push(24);
+
+      const event: RaceEvent = {
+        id: eventId,
+        eventName: shrsConfig.eventName || parsedSHRSData.eventName || 'SHRS Simulation',
+        clubName: currentClub?.clubName || 'Simulation',
+        clubId: currentClub?.clubId,
+        date: new Date().toISOString().split('T')[0],
+        venue: '',
+        raceClass: '' as BoatType,
+        raceFormat: shrsConfig.raceFormat,
+        skippers,
+        raceResults: [],
+        lastCompletedRace: totalRaces,
+        hasDeterminedInitialHcaps: false,
+        isManualHandicaps: false,
+        completed: false,
+        heatManagement,
+        numRaces: Math.max(totalRaces + 10, 30),
+        dropRules: discards,
+        scoringSystem: 'shrs',
+        is_simulated: true,
+      };
+
+      await storeRaceEvent(event);
+      setCurrentEvent(event);
+      onSuccess(event);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create SHRS event');
+      setCreating(false);
+    }
+  }, [parsedSHRSData, shrsConfig, scoringFormat, currentClub, onSuccess]);
+
+  const totalEntrants = parsedData?.skippers.length || parsedSHRSData?.skippers.length || 0;
+  const totalRaces = parsedData?.numRaces || parsedSHRSData?.numRaces || 0;
+  const totalHeats = parsedData?.heats?.length || parsedSHRSData?.detectedHeats || 0;
+  const totalResults = parsedData?.results.length || parsedSHRSData?.results.length || 0;
+
+  const stepLabel: Record<SimulationStep, string> = {
     'choose': 'Choose how to create your simulation',
     'scratch-config': 'Configure your simulated event',
+    'format-select': 'Select scoring format for import',
     'hms-config': 'Configure HMS import settings',
+    'shrs-config': 'Configure SHRS import settings',
     'hms-preview': 'Review imported data',
+    'shrs-preview': 'Review SHRS imported data',
     'creating': 'Creating event...',
   };
 
@@ -360,10 +497,10 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                     <FileSpreadsheet className={darkMode ? 'text-amber-400' : 'text-amber-600'} size={28} />
                   </div>
                   <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Import HMS File
+                    Import Results File
                   </h3>
                   <p className={`text-sm mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Import an HMS Excel file to validate results and simulate scoring in AlfiePRO's format
+                    Import an HMS or SHRS results file to validate scoring against AlfiePRO's scoring engine
                   </p>
                   <div className="flex items-center gap-2 text-sm font-medium text-amber-500">
                     <Upload size={16} />
@@ -405,6 +542,125 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                 onChange={handleFileSelect}
                 className="hidden"
               />
+            </div>
+          )}
+
+          {step === 'format-select' && (
+            <div className="space-y-6">
+              <button
+                onClick={() => { setStep('choose'); setRawFile(null); setFileName(''); setScoringFormat('hms'); }}
+                className={`flex items-center gap-2 text-sm font-medium mb-2 ${
+                  darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ArrowLeft size={16} />
+                Back
+              </button>
+
+              <div className={`p-4 rounded-xl border flex items-center gap-3 ${
+                darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <FileSpreadsheet className={darkMode ? 'text-amber-400' : 'text-amber-600'} size={20} />
+                <div>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{fileName}</p>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Select the scoring format used in this file</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => setScoringFormat('hms')}
+                  className={`w-full p-5 rounded-xl border-2 text-left transition-all ${
+                    scoringFormat === 'hms'
+                      ? darkMode
+                        ? 'border-amber-500/50 bg-amber-500/10'
+                        : 'border-amber-500 bg-amber-50'
+                      : darkMode
+                        ? 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      scoringFormat === 'hms' ? 'bg-amber-500/20' : darkMode ? 'bg-slate-700' : 'bg-slate-200'
+                    }`}>
+                      <Layers className={scoringFormat === 'hms' ? 'text-amber-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} size={20} />
+                    </div>
+                    <span className={`font-semibold text-sm ${
+                      scoringFormat === 'hms'
+                        ? darkMode ? 'text-amber-400' : 'text-amber-700'
+                        : darkMode ? 'text-slate-300' : 'text-slate-700'
+                    }`}>
+                      HMS (Heat Management System)
+                    </span>
+                  </div>
+                  <p className={`text-xs ml-[52px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Traditional heat system with promotion and relegation between heats each round. Standard HMS Excel format.
+                  </p>
+                </button>
+
+                <button
+                  onClick={() => setScoringFormat('shrs-progressive')}
+                  className={`w-full p-5 rounded-xl border-2 text-left transition-all ${
+                    scoringFormat === 'shrs-progressive'
+                      ? darkMode
+                        ? 'border-teal-500/50 bg-teal-500/10'
+                        : 'border-teal-500 bg-teal-50'
+                      : darkMode
+                        ? 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      scoringFormat === 'shrs-progressive' ? 'bg-teal-500/20' : darkMode ? 'bg-slate-700' : 'bg-slate-200'
+                    }`}>
+                      <Shuffle className={scoringFormat === 'shrs-progressive' ? 'text-teal-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} size={20} />
+                    </div>
+                    <span className={`font-semibold text-sm ${
+                      scoringFormat === 'shrs-progressive'
+                        ? darkMode ? 'text-teal-400' : 'text-teal-700'
+                        : darkMode ? 'text-slate-300' : 'text-slate-700'
+                    }`}>
+                      SHRS Progressive
+                    </span>
+                  </div>
+                  <p className={`text-xs ml-[52px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Heat assignments determined by previous round results using Heat Movement Tables. Skippers move heats based on finishing position.
+                  </p>
+                </button>
+
+                <button
+                  onClick={() => setScoringFormat('shrs-balanced')}
+                  className={`w-full p-5 rounded-xl border-2 text-left transition-all ${
+                    scoringFormat === 'shrs-balanced'
+                      ? darkMode
+                        ? 'border-blue-500/50 bg-blue-500/10'
+                        : 'border-blue-500 bg-blue-50'
+                      : darkMode
+                        ? 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                        : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      scoringFormat === 'shrs-balanced' ? 'bg-blue-500/20' : darkMode ? 'bg-slate-700' : 'bg-slate-200'
+                    }`}>
+                      <BarChart3 className={scoringFormat === 'shrs-balanced' ? 'text-blue-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} size={20} />
+                    </div>
+                    <span className={`font-semibold text-sm ${
+                      scoringFormat === 'shrs-balanced'
+                        ? darkMode ? 'text-blue-400' : 'text-blue-700'
+                        : darkMode ? 'text-slate-300' : 'text-slate-700'
+                    }`}>
+                      SHRS Balanced
+                    </span>
+                  </div>
+                  <p className={`text-xs ml-[52px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    All heat assignments pre-generated before racing using coprime cyclic shifts for maximum opponent diversity.
+                  </p>
+                </button>
+              </div>
             </div>
           )}
 
@@ -778,19 +1034,213 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
               </div>
             </div>
           )}
+
+          {step === 'shrs-config' && parsedSHRSData && (
+            <div className="space-y-6">
+              <button
+                onClick={() => { setStep('format-select'); setParsedSHRSData(null); }}
+                className={`flex items-center gap-2 text-sm font-medium mb-2 ${
+                  darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ArrowLeft size={16} />
+                Back
+              </button>
+
+              <div className={`p-4 rounded-xl border ${
+                darkMode ? 'bg-emerald-900/15 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'
+              }`}>
+                <div className="flex items-center gap-3 mb-3">
+                  <CheckCircle className="text-emerald-500" size={20} />
+                  <span className={`font-semibold ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                    SHRS File Parsed Successfully
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <StatCard label="Skippers" value={parsedSHRSData.skippers.length} color="blue" darkMode={darkMode} />
+                  <StatCard label="Qualifying" value={parsedSHRSData.qualifyingRounds} color="green" darkMode={darkMode} />
+                  <StatCard label="Finals" value={parsedSHRSData.finalRounds} color="amber" darkMode={darkMode} />
+                  <StatCard label="Results" value={parsedSHRSData.results.length} color="teal" darkMode={darkMode} />
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                    Event Name
+                  </label>
+                  <input
+                    type="text"
+                    value={shrsConfig.eventName}
+                    onChange={(e) => setShrsConfig(prev => ({ ...prev, eventName: e.target.value }))}
+                    className={`w-full px-4 py-3 rounded-xl border text-sm ${
+                      darkMode
+                        ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500'
+                        : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                    } outline-none transition-colors`}
+                    placeholder="Enter event name"
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                    Number of Heats
+                  </label>
+                  <p className={`text-xs mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    How many heats were used in the SHRS event
+                    {parsedSHRSData.detectedHeats > 0 && (
+                      <span className="ml-1 text-teal-500">
+                        (auto-detected: {parsedSHRSData.detectedHeats} from {parsedSHRSData.skippers.length} skippers)
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    {[2, 3, 4, 5].map(n => (
+                      <button
+                        key={n}
+                        onClick={() => setShrsConfig(prev => ({ ...prev, numberOfHeats: n }))}
+                        className={`w-12 h-12 rounded-xl font-bold text-lg transition-all ${
+                          shrsConfig.numberOfHeats === n
+                            ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/25'
+                            : darkMode
+                              ? 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-teal-500/50'
+                              : 'bg-slate-100 text-slate-600 border border-slate-300 hover:border-teal-500/50'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={`p-4 rounded-xl border flex items-start gap-3 ${
+                  darkMode ? 'bg-teal-900/15 border-teal-500/20' : 'bg-teal-50 border-teal-200'
+                }`}>
+                  <Info className="text-teal-400 shrink-0 mt-0.5" size={16} />
+                  <div className={`text-xs space-y-1 ${darkMode ? 'text-teal-300' : 'text-teal-700'}`}>
+                    <p>
+                      <strong>Scoring Format:</strong> {scoringFormat === 'shrs-progressive' ? 'SHRS Progressive' : 'SHRS Balanced'}
+                    </p>
+                    <p>
+                      <strong>Structure:</strong> {parsedSHRSData.qualifyingRounds} qualifying round{parsedSHRSData.qualifyingRounds !== 1 ? 's' : ''}
+                      {parsedSHRSData.finalRounds > 0 && ` + ${parsedSHRSData.finalRounds} final round${parsedSHRSData.finalRounds !== 1 ? 's' : ''}`}
+                      {' '}with {parsedSHRSData.skippers.length} skippers across {shrsConfig.numberOfHeats} heats.
+                    </p>
+                    <p>
+                      Heat assignments will be {scoringFormat === 'shrs-progressive' ? 'reconstructed using Movement Tables based on finishing positions' : 'generated using coprime cyclic shift rotation'}.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 'shrs-preview' && parsedSHRSData && (
+            <div className="space-y-6">
+              <button
+                onClick={() => setStep('shrs-config')}
+                className={`flex items-center gap-2 text-sm font-medium mb-2 ${
+                  darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ArrowLeft size={16} />
+                Back to settings
+              </button>
+
+              <div className={`rounded-xl border overflow-hidden ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                <div className={`px-5 py-3 border-b ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                  <h3 className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Skippers ({parsedSHRSData.skippers.length})
+                  </h3>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className={`sticky top-0 ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                      <tr>
+                        <th className={`px-4 py-2 text-left text-xs font-semibold uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pos</th>
+                        <th className={`px-4 py-2 text-left text-xs font-semibold uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sail #</th>
+                        <th className={`px-4 py-2 text-left text-xs font-semibold uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Name</th>
+                        <th className={`px-4 py-2 text-left text-xs font-semibold uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Club</th>
+                        <th className={`px-4 py-2 text-right text-xs font-semibold uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedSHRSData.skippers.slice(0, 20).map((s, i) => (
+                        <tr key={i} className={`border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                          <td className={`px-4 py-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{s.position}</td>
+                          <td className={`px-4 py-2 font-mono font-semibold ${darkMode ? 'text-teal-400' : 'text-teal-600'}`}>{s.sailNumber}</td>
+                          <td className={`px-4 py-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{s.name}</td>
+                          <td className={`px-4 py-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{s.club || '-'}</td>
+                          <td className={`px-4 py-2 text-right font-mono ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{s.totalScore ?? '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {parsedSHRSData.skippers.length > 20 && (
+                    <p className={`px-4 py-2 text-xs text-center ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      ... and {parsedSHRSData.skippers.length - 20} more skippers
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className={`p-4 rounded-xl ${darkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                <h4 className={`font-semibold text-sm mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  Import Summary
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <SummaryRow label="Event Name" value={shrsConfig.eventName} darkMode={darkMode} />
+                  <SummaryRow label="Scoring Format" value={scoringFormat === 'shrs-progressive' ? 'SHRS Progressive' : 'SHRS Balanced'} darkMode={darkMode} />
+                  <SummaryRow label="Heats" value={String(shrsConfig.numberOfHeats)} darkMode={darkMode} />
+                  <SummaryRow label="Qualifying Rounds" value={String(parsedSHRSData.qualifyingRounds)} darkMode={darkMode} />
+                  <SummaryRow label="Final Rounds" value={String(parsedSHRSData.finalRounds)} darkMode={darkMode} />
+                  <SummaryRow label="Total Races" value={String(parsedSHRSData.numRaces)} darkMode={darkMode} />
+                  <SummaryRow label="Skippers" value={String(parsedSHRSData.skippers.length)} darkMode={darkMode} />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className={`px-8 py-5 border-t flex items-center justify-between ${
           darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'
         }`}>
           <button
-            onClick={step === 'scratch-config' ? () => setStep('choose') : onClose}
+            onClick={
+              step === 'scratch-config' ? () => setStep('choose')
+              : step === 'format-select' ? () => { setStep('choose'); setRawFile(null); setFileName(''); }
+              : step === 'shrs-config' ? () => { setStep('format-select'); setParsedSHRSData(null); }
+              : step === 'hms-config' ? () => { setStep('format-select'); setParsedData(null); }
+              : step === 'shrs-preview' ? () => setStep('shrs-config')
+              : step === 'hms-preview' ? () => setStep('hms-config')
+              : onClose
+            }
             className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
               darkMode ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
             }`}
           >
-            {step === 'scratch-config' ? 'Back' : 'Cancel'}
+            {step === 'choose' ? 'Cancel' : 'Back'}
           </button>
+
+          {step === 'format-select' && (
+            <button
+              onClick={handleFormatConfirm}
+              disabled={uploading}
+              className="px-6 py-2.5 rounded-xl text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-amber-500/20"
+            >
+              {uploading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Parsing File...
+                </>
+              ) : (
+                <>
+                  Continue
+                  <ChevronRight size={16} />
+                </>
+              )}
+            </button>
+          )}
 
           {step === 'scratch-config' && (
             <button
@@ -823,9 +1273,40 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
             </button>
           )}
 
+          {step === 'shrs-config' && (
+            <button
+              onClick={() => setStep('shrs-preview')}
+              disabled={!shrsConfig.eventName.trim()}
+              className="px-6 py-2.5 rounded-xl text-sm font-semibold bg-teal-500 text-white hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-teal-500/20"
+            >
+              Preview Import
+              <ChevronRight size={16} />
+            </button>
+          )}
+
           {step === 'hms-preview' && (
             <button
               onClick={handleCreateEvent}
+              disabled={creating}
+              className="px-6 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+            >
+              {creating ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Creating Event...
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={16} />
+                  Create Simulation Event
+                </>
+              )}
+            </button>
+          )}
+
+          {step === 'shrs-preview' && (
+            <button
+              onClick={handleCreateSHRSEvent}
               disabled={creating}
               className="px-6 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-emerald-500/20"
             >
