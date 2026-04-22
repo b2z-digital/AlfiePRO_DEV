@@ -569,6 +569,18 @@ export function reconstructSHRSHeats(
 
         if (result) {
           const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
+          let importedScore: number | null | undefined;
+          if (isRDGave) {
+            importedScore = undefined;
+          } else if (result.customPoints !== undefined && result.customPoints > 0) {
+            importedScore = result.customPoints;
+          } else if (result.position !== null && result.position !== undefined) {
+            importedScore = result.position;
+          } else if (result.points > 0) {
+            importedScore = result.points;
+          } else {
+            importedScore = null;
+          }
           reconstructedResults.push({
             skipperIndex,
             heatDesignation: assignment.heatDesignation,
@@ -576,7 +588,7 @@ export function reconstructSHRSHeats(
             letterScore: result.letterScore,
             points: result.points,
             customPoints: result.customPoints,
-            importedScore: isRDGave ? undefined : (result.customPoints !== undefined ? result.customPoints : result.position),
+            importedScore,
           });
         } else {
           const largestHeat = getLargestHeatSize(heatSizes);
@@ -586,7 +598,7 @@ export function reconstructSHRSHeats(
             position: null,
             letterScore: 'DNC',
             points: largestHeat + 1,
-            importedScore: null,
+            importedScore: largestHeat + 1,
           });
         }
       }
@@ -627,8 +639,7 @@ export function reconstructSHRSHeats(
     const qualRaceScores = new Map<number, number[]>();
     const largestHeat = getLargestHeatSize(heatSizes);
 
-    // First pass: collect all scored results per skipper for RDGave average calculation
-    // Includes sailed positions AND penalty scores (DNF, RDGfix, etc.) but excludes RDGave rounds
+    // First pass: collect all non-RDGave scores per skipper for RDGave average calculation
     const aveQualScores = new Map<number, number[]>();
     for (const round of rounds) {
       for (const result of round.results) {
@@ -637,21 +648,14 @@ export function reconstructSHRSHeats(
         }
         const resIsRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
         if (resIsRDGave) continue;
-        let s: number;
-        if (!result.letterScore && result.position !== null) {
-          s = result.importedScore ?? result.position ?? (largestHeat + 1);
-        } else if (result.letterScore && result.customPoints !== undefined && result.customPoints > 0) {
-          s = result.customPoints;
-        } else if (result.letterScore) {
-          s = calculateNonFinisherScore(largestHeat);
-        } else {
-          continue;
-        }
+        const s = (result.importedScore !== undefined && result.importedScore !== null)
+          ? result.importedScore
+          : calculateNonFinisherScore(largestHeat);
         aveQualScores.get(result.skipperIndex)!.push(s);
       }
     }
 
-    // Second pass: build race scores with RDGave averages computed
+    // Second pass: build race scores using importedScore (set from source data during reconstruction)
     for (const round of rounds) {
       for (const result of round.results) {
         if (!qualScores.has(result.skipperIndex)) {
@@ -665,12 +669,10 @@ export function reconstructSHRSHeats(
           score = scores.length > 0
             ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10
             : calculateNonFinisherScore(largestHeat);
-        } else if (result.letterScore && result.customPoints !== undefined && result.customPoints > 0) {
-          score = result.customPoints;
-        } else if (result.letterScore) {
-          score = calculateNonFinisherScore(largestHeat);
+        } else if (result.importedScore !== undefined && result.importedScore !== null) {
+          score = result.importedScore;
         } else {
-          score = result.importedScore ?? result.position ?? (largestHeat + 1);
+          score = calculateNonFinisherScore(largestHeat);
         }
         qualRaceScores.get(result.skipperIndex)!.push(score);
       }
@@ -714,6 +716,18 @@ export function reconstructSHRSHeats(
 
           if (result) {
             const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
+            let finImportedScore: number | null | undefined;
+            if (isRDGave) {
+              finImportedScore = undefined;
+            } else if (result.customPoints !== undefined && result.customPoints > 0) {
+              finImportedScore = result.customPoints;
+            } else if (result.position !== null && result.position !== undefined) {
+              finImportedScore = result.position;
+            } else if (result.points > 0) {
+              finImportedScore = result.points;
+            } else {
+              finImportedScore = null;
+            }
             reconstructedResults.push({
               skipperIndex,
               heatDesignation: assignment.heatDesignation,
@@ -721,7 +735,7 @@ export function reconstructSHRSHeats(
               letterScore: result.letterScore,
               points: result.points,
               customPoints: result.customPoints,
-              importedScore: isRDGave ? undefined : (result.customPoints !== undefined ? result.customPoints : result.position),
+              importedScore: finImportedScore,
             });
           } else {
             const lh = getLargestHeatSize(finalFleetSizes);
@@ -731,7 +745,7 @@ export function reconstructSHRSHeats(
               position: null,
               letterScore: 'DNC',
               points: lh + 1,
-              importedScore: null,
+              importedScore: lh + 1,
             });
           }
         }

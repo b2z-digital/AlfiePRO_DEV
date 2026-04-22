@@ -305,12 +305,14 @@ export const convertHeatResultsToRaceResults = (
           const resIsRDGave = res.letterScore === 'RDG' && (res.customPoints === -1 || res.customPoints === -2);
           if (resIsRDGave) continue;
           let s: number;
-          if (!res.letterScore && res.position !== null) {
-            s = res.importedScore !== undefined && res.importedScore !== null ? res.importedScore : res.position;
+          if (res.importedScore !== undefined && res.importedScore !== null) {
+            s = res.importedScore;
           } else if (res.letterScore && res.customPoints !== undefined && res.customPoints > 0) {
             s = res.customPoints;
           } else if (res.letterScore) {
             s = calculateNonFinisherScore(rLargestHeat);
+          } else if (res.position !== null) {
+            s = res.position;
           } else {
             continue;
           }
@@ -327,17 +329,16 @@ export const convertHeatResultsToRaceResults = (
             ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10
             : calculateNonFinisherScore(largestHeatSize);
           overallPositions.set(result.skipperIndex, avg);
+        } else if (result.importedScore !== undefined && result.importedScore !== null) {
+          overallPositions.set(result.skipperIndex, result.importedScore);
         } else if (result.letterScore) {
           if (result.customPoints !== undefined && result.customPoints > 0) {
             overallPositions.set(result.skipperIndex, result.customPoints);
           } else {
             overallPositions.set(result.skipperIndex, calculateNonFinisherScore(largestHeatSize));
           }
-        } else {
-          const score = result.importedScore !== undefined && result.importedScore !== null ? result.importedScore : result.position;
-          if (score !== null && score !== undefined) {
-            overallPositions.set(result.skipperIndex, score);
-          }
+        } else if (result.position !== null && result.position !== undefined) {
+          overallPositions.set(result.skipperIndex, result.position);
         }
       });
     }
