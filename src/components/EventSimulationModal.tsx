@@ -41,7 +41,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
   const [config, setConfig] = useState({
     eventName: '',
     promotionCount: 4,
-    fleetManagement: true,
+    fleetManagement: false,
     raceFormat: 'handicap' as RaceType,
   });
 
@@ -926,69 +926,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                       </div>
                     </div>
 
-                    <div>
-                      <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                        Fleet Management
-                      </label>
-                      <p className={`text-xs mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Controls how results are imported into the scoring system
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button
-                          onClick={() => setConfig(prev => ({ ...prev, fleetManagement: true }))}
-                          className={`p-4 rounded-xl border-2 text-left transition-all ${
-                            config.fleetManagement
-                              ? darkMode
-                                ? 'border-amber-500/50 bg-amber-500/10'
-                                : 'border-amber-500 bg-amber-50'
-                              : darkMode
-                                ? 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                                : 'border-slate-200 bg-slate-50 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 mb-2">
-                            <Layers className={config.fleetManagement ? 'text-amber-500' : darkMode ? 'text-slate-500' : 'text-slate-400'} size={20} />
-                            <span className={`font-semibold text-sm ${
-                              config.fleetManagement
-                                ? darkMode ? 'text-amber-400' : 'text-amber-700'
-                                : darkMode ? 'text-slate-300' : 'text-slate-700'
-                            }`}>
-                              Fleet Managed HMS
-                            </span>
-                          </div>
-                          <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Import into AlfiePRO's fleet-managed HMS scoring with automatic heat assignments and promotion/relegation
-                          </p>
-                        </button>
-
-                        <button
-                          onClick={() => setConfig(prev => ({ ...prev, fleetManagement: false }))}
-                          className={`p-4 rounded-xl border-2 text-left transition-all ${
-                            !config.fleetManagement
-                              ? darkMode
-                                ? 'border-blue-500/50 bg-blue-500/10'
-                                : 'border-blue-500 bg-blue-50'
-                              : darkMode
-                                ? 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                                : 'border-slate-200 bg-slate-50 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 mb-2">
-                            <FileSpreadsheet className={!config.fleetManagement ? 'text-blue-500' : darkMode ? 'text-slate-500' : 'text-slate-400'} size={20} />
-                            <span className={`font-semibold text-sm ${
-                              !config.fleetManagement
-                                ? darkMode ? 'text-blue-400' : 'text-blue-700'
-                                : darkMode ? 'text-slate-300' : 'text-slate-700'
-                            }`}>
-                              Spreadsheet Mode
-                            </span>
-                          </div>
-                          <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Import directly into the HMS manual spreadsheet scoring mode for raw data entry and validation
-                          </p>
-                        </button>
-                      </div>
-                    </div>
+                    {/* Fleet Management is always Spreadsheet mode for simulated imports */}
                   </>
                 )}
 
