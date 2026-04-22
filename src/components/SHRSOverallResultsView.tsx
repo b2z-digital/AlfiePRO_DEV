@@ -92,6 +92,19 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
 
   const hasFinals = skipperFleetMap.size > 0;
 
+  const skipperHeatByRound = useMemo(() => {
+    const map = new Map<string, HeatDesignation>();
+    for (const round of (heatManagement?.rounds || [])) {
+      if (!round.completed) continue;
+      for (const assignment of (round.heatAssignments || [])) {
+        for (const idx of assignment.skipperIndices) {
+          map.set(`${idx}-${round.round}`, assignment.heatDesignation);
+        }
+      }
+    }
+    return map;
+  }, [heatManagement]);
+
   const standings = useMemo((): SkipperStanding[] => {
     if (!skippers?.length || !raceResults.length) return [];
 
@@ -187,24 +200,54 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       };
     }).filter(Boolean) as SkipperStanding[];
 
+    const shrsCountback = (a: SkipperStanding, b: SkipperStanding): number => {
+      const sharedScoresA: number[] = [];
+      const sharedScoresB: number[] = [];
+
+      for (let i = 0; i < completedRaces.length; i++) {
+        const race = completedRaces[i];
+        const heatA = skipperHeatByRound.get(`${a.skipperIndex}-${race}`);
+        const heatB = skipperHeatByRound.get(`${b.skipperIndex}-${race}`);
+        if (heatA && heatB && heatA === heatB) {
+          sharedScoresA.push(a.raceScores[i] ?? 999);
+          sharedScoresB.push(b.raceScores[i] ?? 999);
+        }
+      }
+
+      if (sharedScoresA.length > 0) {
+        const countPositions = (scores: number[]) => {
+          const counts: Record<number, number> = {};
+          scores.forEach(s => { counts[s] = (counts[s] || 0) + 1; });
+          return counts;
+        };
+        const aCounts = countPositions(sharedScoresA);
+        const bCounts = countPositions(sharedScoresB);
+        const maxPos = Math.max(
+          ...Object.keys(aCounts).map(Number),
+          ...Object.keys(bCounts).map(Number)
+        );
+        for (let pos = 1; pos <= maxPos; pos++) {
+          const ac = aCounts[pos] || 0;
+          const bc = bCounts[pos] || 0;
+          if (ac !== bc) return bc - ac;
+        }
+      }
+
+      const aAll = a.raceScores.map(s => s ?? 999);
+      const bAll = b.raceScores.map(s => s ?? 999);
+      return compareWithCountback(aAll, bAll, a.droppedIndices.size, b.droppedIndices.size);
+    };
+
     if (hasFinals) {
       allStandings.sort((a, b) => {
         if (a.fleet !== b.fleet) return a.fleet.localeCompare(b.fleet);
         if (a.net !== b.net) return a.net - b.net;
-        try {
-          const aPoints = a.raceScores.map(s => s ?? 999);
-          const bPoints = b.raceScores.map(s => s ?? 999);
-          return compareWithCountback(aPoints, bPoints, a.droppedIndices.size, b.droppedIndices.size);
-        } catch { return 0; }
+        try { return shrsCountback(a, b); } catch { return 0; }
       });
     } else {
       allStandings.sort((a, b) => {
         if (a.net !== b.net) return a.net - b.net;
-        try {
-          const aPoints = a.raceScores.map(s => s ?? 999);
-          const bPoints = b.raceScores.map(s => s ?? 999);
-          return compareWithCountback(aPoints, bPoints, a.droppedIndices.size, b.droppedIndices.size);
-        } catch { return 0; }
+        try { return shrsCountback(a, b); } catch { return 0; }
       });
     }
 
@@ -220,7 +263,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     });
 
     return allStandings;
-  }, [skippers, raceResults, completedRaces, qualifyingRaces, finalsRaces, skipperFleetMap, hasFinals, shrsQualifyingRounds]);
+  }, [skippers, raceResults, completedRaces, qualifyingRaces, finalsRaces, skipperFleetMap, hasFinals, shrsQualifyingRounds, skipperHeatByRound]);
 
   const totalDiscards = useMemo(() => {
     const qualDiscards = calculateSHRSDiscards(qualifyingRaces.length);
