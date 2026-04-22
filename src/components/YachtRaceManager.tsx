@@ -3316,6 +3316,72 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                     return updatedHM;
                   });
                 }}
+                onFinaliseQualifying={() => {
+                  setHeatManagement(prevHM => {
+                    if (!prevHM) return prevHM;
+                    const currentRd = prevHM.currentRound;
+                    console.log(`Finalising Qualifying after Round ${currentRd} - transitioning to Finals`);
+
+                    // Update configuration to set current round as the last qualifying round
+                    const updatedConfig = {
+                      ...prevHM.configuration,
+                      shrsQualifyingRounds: currentRd,
+                      shrsFinalsStarted: true
+                    };
+
+                    const updatedRounds = [...prevHM.rounds];
+                    const roundIdx = updatedRounds.findIndex(r => r.round === currentRd);
+                    if (roundIdx === -1) return prevHM;
+
+                    // Mark current round complete
+                    updatedRounds[roundIdx] = { ...updatedRounds[roundIdx], completed: true };
+
+                    // Build the updated HM with new config so generateNextRoundAssignments sees the transition
+                    const hmForGeneration: HeatManagement = {
+                      ...prevHM,
+                      configuration: updatedConfig,
+                      rounds: updatedRounds
+                    };
+
+                    try {
+                      const nextRoundAssignments = generateNextRoundAssignments(updatedRounds[roundIdx], hmForGeneration);
+                      const nextRoundIdx = updatedRounds.findIndex(r => r.round === currentRd + 1);
+                      if (nextRoundIdx === -1) {
+                        updatedRounds.push({
+                          round: currentRd + 1,
+                          heatAssignments: nextRoundAssignments,
+                          results: [],
+                          completed: false
+                        });
+                      } else if (updatedRounds[nextRoundIdx].results.length === 0) {
+                        updatedRounds[nextRoundIdx] = {
+                          ...updatedRounds[nextRoundIdx],
+                          heatAssignments: nextRoundAssignments
+                        };
+                      }
+                    } catch (e) {
+                      console.error('Failed to generate finals fleet assignments', e);
+                    }
+
+                    const updatedHM = {
+                      ...prevHM,
+                      configuration: updatedConfig,
+                      rounds: updatedRounds,
+                      currentRound: currentRd + 1,
+                      roundJustCompleted: currentRd
+                    };
+
+                    const convertedResults = convertHeatResultsToRaceResults(updatedHM, skippers);
+                    if (convertedResults.length > 0) {
+                      setTimeout(() => {
+                        setRaceResults(convertedResults);
+                        setLastCompletedRace(currentRd);
+                      }, 0);
+                    }
+
+                    return updatedHM;
+                  });
+                }}
                 isFullscreen={isFullscreenScoring}
                 scoringMode={scoringMode}
               />

@@ -21,6 +21,7 @@ interface HeatAssignmentModalProps {
   onStartRound?: (roundNumber: number) => void;
   onUpdateAssignments?: (assignments: HeatAssignment[], targetRound?: number) => void;
   onAdvanceToNextRound?: (nextRoundNumber: number) => void;
+  onFinaliseQualifying?: () => void;
 }
 
 export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
@@ -34,9 +35,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   onManualAssign,
   onStartRound,
   onUpdateAssignments,
-  onAdvanceToNextRound
+  onAdvanceToNextRound,
+  onFinaliseQualifying
 }) => {
   const [editMode, setEditMode] = useState(false);
+  const [showFinaliseConfirm, setShowFinaliseConfirm] = useState(false);
   const [modifiedPromotions, setModifiedPromotions] = useState<Set<number>>(new Set());
   const [modifiedRelegations, setModifiedRelegations] = useState<Set<number>>(new Set());
   const [appliedPromotions, setAppliedPromotions] = useState<Set<number>>(new Set());
@@ -295,6 +298,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       preAllocationDone.current = false;
+      setShowFinaliseConfirm(false);
     }
   }, [isOpen]);
 
@@ -1890,6 +1894,38 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 </>
               )}
             </div>
+          )}
+
+          {/* Finalise Qualifying button - shown when in qualifying phase and round is completed */}
+          {!initialEditMode && isSHRS && !isFinalsPhase && !isTransitionRound && completed && onFinaliseQualifying && round >= 1 && (
+            showFinaliseConfirm ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-amber-400">End qualifying after Rd {round}?</span>
+                <button
+                  onClick={() => {
+                    onFinaliseQualifying();
+                    setShowFinaliseConfirm(false);
+                    onClose();
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setShowFinaliseConfirm(false)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-600 text-slate-300 hover:bg-slate-500 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowFinaliseConfirm(true)}
+                className="px-4 py-1.5 rounded-lg transition-all font-medium text-sm bg-gradient-to-r from-amber-600 to-yellow-600 text-white hover:from-amber-700 hover:to-yellow-700 shadow-lg"
+              >
+                Finalise Qualifying
+              </button>
+            )
           )}
 
           {!initialEditMode && <button

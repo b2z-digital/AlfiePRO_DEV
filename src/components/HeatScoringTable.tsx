@@ -56,6 +56,7 @@ interface HeatScoringTableProps {
   onUpdateHeatAssignments?: (assignments: any, targetRound?: number) => void;
   onSelectHeat?: (heat: HeatDesignation) => void;
   onForceRoundComplete?: (roundNumber: number) => void;
+  onFinaliseQualifying?: () => void;
   isFullscreen?: boolean;
   scoringMode?: 'pro' | 'touch' | 'spreadsheet';
 }
@@ -94,6 +95,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   onUpdateHeatAssignments,
   onSelectHeat,
   onForceRoundComplete,
+  onFinaliseQualifying,
   isFullscreen,
   scoringMode: initialScoringMode = 'touch'
 }) => {
@@ -2058,6 +2060,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             onGoToRound(nextRoundNumber);
           }
         }}
+        onFinaliseQualifying={onFinaliseQualifying}
       />
 
       {/* Manual Heat Assignment Modal */}
