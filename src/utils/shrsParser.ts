@@ -81,26 +81,22 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
 
   const rows: string[][] = [];
 
-  // Extract all table rows
-  const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  let trMatch: RegExpExecArray | null;
+  // Split by <tr> boundaries to handle malformed HTML with missing </tr> tags
+  const trSegments = html.split(/<tr[^>]*>/gi).slice(1);
 
-  while ((trMatch = trRegex.exec(html)) !== null) {
-    const trContent = trMatch[1];
+  for (const segment of trSegments) {
+    // Take content up to </tr> or next <tr> (whichever comes first), or entire segment
+    const content = segment.replace(/<\/tr>[\s\S]*$/, '');
     const cells: string[] = [];
 
-    // Extract cell text from <td>...<div class="cell">TEXT</div>...</td> pattern
     const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
     let tdMatch: RegExpExecArray | null;
 
-    while ((tdMatch = tdRegex.exec(trContent)) !== null) {
+    while ((tdMatch = tdRegex.exec(content)) !== null) {
       const tdContent = tdMatch[1];
-      // Extract text from <div class="cell">...</div> if present
       const divMatch = tdContent.match(/<div[^>]*class="cell"[^>]*>([\s\S]*?)<\/div>/i);
       let text = divMatch ? divMatch[1] : tdContent;
-      // Strip remaining HTML tags
       text = text.replace(/<[^>]+>/g, '');
-      // Decode HTML entities
       text = text.replace(/&nbsp;?/gi, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(parseInt(n)));
       cells.push(text.trim());
     }
@@ -693,45 +689,21 @@ export function reconstructSHRSHeats(
       qualScores.set(idx, net);
     });
 
+    // Rank skippers by qualifying net score (lowest = best) for fleet allocation
+    const rankedSkippers = Array.from(qualScores.entries())
+      .sort(([, a], [, b]) => a - b);
+
     const fleetSizes = calculateHeatSizes(skippers.length, numberOfHeats);
     const fleetAssignments = heatLabels.map((label) => ({
       heatDesignation: label,
       skipperIndices: [] as number[],
     }));
 
-    // Use source fleet designations from Place column when available
-    const fleetMap: Record<string, string> = { 'G': 'A', 'S': 'B', 'B': 'C', 'C': 'D' };
-    const skippersWithSourceFleet = skippers.filter(s => s.sourceFleet && fleetMap[s.sourceFleet]);
-
-    if (skippersWithSourceFleet.length === skippers.length) {
-      // All skippers have source fleet data - use it directly
-      for (let i = 0; i < skippers.length; i++) {
-        const skipper = skippers[i];
-        const targetHeat = fleetMap[skipper.sourceFleet!];
-        const assignment = fleetAssignments.find(a => a.heatDesignation === targetHeat);
-        if (assignment) {
-          assignment.skipperIndices.push(i);
-        }
-      }
-      // Sort within each fleet by sourceFleetPosition
-      for (const assignment of fleetAssignments) {
-        assignment.skipperIndices.sort((a, b) => {
-          const posA = skippers[a].sourceFleetPosition ?? 999;
-          const posB = skippers[b].sourceFleetPosition ?? 999;
-          return posA - posB;
-        });
-      }
-    } else {
-      // Fall back to qualifying net score ranking
-      const rankedSkippers = Array.from(qualScores.entries())
-        .sort(([, a], [, b]) => a - b);
-
-      let idx = 0;
-      for (let f = 0; f < numberOfHeats; f++) {
-        for (let s = 0; s < fleetSizes[f] && idx < rankedSkippers.length; s++) {
-          fleetAssignments[f].skipperIndices.push(rankedSkippers[idx][0]);
-          idx++;
-        }
+    let idx = 0;
+    for (let f = 0; f < numberOfHeats; f++) {
+      for (let s = 0; s < fleetSizes[f] && idx < rankedSkippers.length; s++) {
+        fleetAssignments[f].skipperIndices.push(rankedSkippers[idx][0]);
+        idx++;
       }
     }
 
