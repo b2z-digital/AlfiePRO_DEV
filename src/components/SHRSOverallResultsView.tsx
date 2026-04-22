@@ -39,6 +39,14 @@ const FLEET_HEADER_COLORS: Record<string, { bg: string; text: string; border: st
   'E': { bg: 'bg-pink-600', text: 'text-white', border: 'border-pink-500' },
 };
 
+const FLEET_TEXT_COLORS: Record<string, { dark: string; light: string }> = {
+  'A': { dark: 'text-yellow-300', light: 'text-yellow-700' },
+  'B': { dark: 'text-slate-300', light: 'text-slate-500' },
+  'C': { dark: 'text-amber-400', light: 'text-amber-700' },
+  'D': { dark: 'text-orange-400', light: 'text-orange-600' },
+  'E': { dark: 'text-pink-400', light: 'text-pink-600' },
+};
+
 interface SkipperStanding {
   skipperIndex: number;
   skipper: Skipper;
@@ -533,9 +541,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
                               ? darkMode
                                 ? 'text-red-400/60 line-through'
                                 : 'text-red-500/60 line-through'
-                              : letter
-                                ? darkMode ? 'text-amber-400' : 'text-amber-600'
-                                : darkMode ? 'text-slate-300' : 'text-slate-700'
+                              : darkMode ? 'text-slate-300' : 'text-slate-700'
                           }`}>
                             {display}
                           </td>
@@ -550,15 +556,14 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
                         const isDropped = standing.droppedIndices.has(raceIdx);
                         const display = formatScore(score, letter, custom);
 
+                        const fleetColors = FLEET_TEXT_COLORS[standing.fleet] || FLEET_TEXT_COLORS['A'];
                         return (
                           <td key={`f-${race}`} className={`px-2.5 py-2 text-center whitespace-nowrap ${
                             isDropped
                               ? darkMode
                                 ? 'text-red-400/60 line-through'
                                 : 'text-red-500/60 line-through'
-                              : letter
-                                ? darkMode ? 'text-amber-400' : 'text-amber-600'
-                                : darkMode ? 'text-yellow-300' : 'text-yellow-700'
+                              : darkMode ? fleetColors.dark : fleetColors.light
                           }`}>
                             {display}
                           </td>
