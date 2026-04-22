@@ -10,7 +10,7 @@ import { HeatAssignmentModal } from './HeatAssignmentModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
-import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 as Grid3X3, Check, Timer } from 'lucide-react';
+import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 as Grid3X3, Check, Timer, Trophy } from 'lucide-react';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
@@ -20,6 +20,7 @@ import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment, ge
 import { supabase } from '../utils/supabase';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import { SHRSOverallResultsView } from './SHRSOverallResultsView';
+import { HmsScoreSheet } from './HmsScoreSheet';
 
 interface HeatScoringTableProps {
   skippers: Skipper[];
@@ -157,6 +158,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   // Initialize to null and let useEffect set the correct heat
   const [selectedHeat, setSelectedHeat] = useState<HeatDesignation | null>(null);
   const [showOverallResults, setShowOverallResults] = useState(false);
+  const [showHmsScoreSheet, setShowHmsScoreSheet] = useState(false);
   const isSHRSImport = isShrs && currentEvent?.is_simulated;
   const [showOverallResultsView, setShowOverallResultsView] = useState(false);
 
@@ -1114,6 +1116,38 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     );
   }
 
+  if (showHmsScoreSheet && heatManagement.configuration?.scoringSystem === 'hms') {
+    return (
+      <div className={`${isFullscreen ? 'h-full' : 'h-[calc(100vh-200px)]'} flex flex-col no-select`}>
+        <div className={`flex items-center justify-between px-4 py-2.5 border-b shrink-0 ${
+          darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'
+        }`}>
+          <button
+            onClick={() => setShowHmsScoreSheet(false)}
+            className={`flex items-center gap-2 text-sm font-medium transition-colors ${
+              darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            Back to Scoring
+          </button>
+          <span className={`text-sm font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            HMS Score Sheet
+          </span>
+        </div>
+        <div className="flex-1 overflow-auto">
+          <HmsScoreSheet
+            skippers={skippers}
+            heatManagement={heatManagement}
+            dropRules={currentEvent?.dropRules || [4, 8, 16, 24, 32, 40]}
+            darkMode={darkMode}
+            eventName={currentEvent?.eventName || currentEvent?.clubName}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`space-y-6 ${isFullscreen ? 'p-2' : 'p-8'} no-select`}>
       {/* All Heats Complete - Show Actions (hidden in touch/spreadsheet mode as it's shown in the button instead) */}
@@ -1343,6 +1377,21 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 </button>
               ))}
 
+              {heatManagement.configuration?.scoringSystem === 'hms' && fleetManagementEnabled && (
+                <button
+                  onClick={() => setShowHmsScoreSheet(true)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
+                    darkMode
+                      ? 'bg-amber-700 text-amber-100 hover:bg-amber-600'
+                      : 'bg-amber-500 text-white hover:bg-amber-600'
+                  }`}
+                  title="View HMS Score Sheet"
+                >
+                  <Trophy size={18} />
+                  <span className="text-xs font-medium hidden sm:inline">Score Sheet</span>
+                </button>
+              )}
+
               <button
                 onClick={() => setShowHeatAssignments(true)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -1405,6 +1454,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 onClick={() => {
                   if (heatManagement.configuration?.scoringSystem === 'shrs') {
                     setShowOverallResultsView(true);
+                  } else if (heatManagement.configuration?.scoringSystem === 'hms' && fleetManagementEnabled) {
+                    setShowHmsScoreSheet(true);
                   } else {
                     setShowOverallResults(true);
                   }
@@ -1415,7 +1466,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
               >
-                Overall Results
+                {heatManagement.configuration?.scoringSystem === 'hms' && fleetManagementEnabled ? 'Score Sheet' : 'Overall Results'}
               </button>
             </div>
           </div>

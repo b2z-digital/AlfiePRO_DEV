@@ -53,10 +53,20 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
     raceFormat: 'scratch' as RaceType,
   });
 
+  const YACHT_CLASSES: { value: BoatType; label: string }[] = [
+    { value: 'IOM', label: 'IOM' },
+    { value: 'DF65', label: 'DF65' },
+    { value: 'DF95', label: 'DF95' },
+    { value: '10R', label: '10 Rater' },
+    { value: 'Marblehead', label: 'Marblehead' },
+    { value: 'A Class', label: 'A Class' },
+    { value: 'RC Laser', label: 'RC Laser' },
+  ];
+
   const [scratchConfig, setScratchConfig] = useState({
     eventName: '',
     raceFormat: 'scratch' as RaceType,
-    numRaces: 12,
+    raceClass: '' as BoatType,
   });
 
   const downloadSHRSTemplate = useCallback(() => {
@@ -219,7 +229,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
         clubId: currentClub?.clubId,
         date: new Date().toISOString().split('T')[0],
         venue: '',
-        raceClass: '' as BoatType,
+        raceClass: scratchConfig.raceClass || '' as BoatType,
         raceFormat: scratchConfig.raceFormat,
         skippers: [],
         raceResults: [],
@@ -227,7 +237,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
         hasDeterminedInitialHcaps: false,
         isManualHandicaps: false,
         completed: false,
-        numRaces: scratchConfig.numRaces,
+        numRaces: 20,
         dropRules: [4, 8, 16, 24, 32, 40],
         is_simulated: true,
       };
@@ -912,22 +922,25 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
 
                 <div>
                   <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                    Number of Races
+                    Yacht Class
                   </label>
-                  <div className="flex items-center gap-3">
-                    {[6, 8, 10, 12, 16, 20].map(n => (
+                  <p className={`text-xs mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Select the class to enable national rankings seeding
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {YACHT_CLASSES.map(cls => (
                       <button
-                        key={n}
-                        onClick={() => setScratchConfig(prev => ({ ...prev, numRaces: n }))}
-                        className={`w-12 h-12 rounded-xl font-bold text-lg transition-all ${
-                          scratchConfig.numRaces === n
+                        key={cls.value}
+                        onClick={() => setScratchConfig(prev => ({ ...prev, raceClass: cls.value }))}
+                        className={`px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                          scratchConfig.raceClass === cls.value
                             ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
                             : darkMode
                               ? 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-blue-500/50'
                               : 'bg-slate-100 text-slate-600 border border-slate-300 hover:border-blue-500/50'
                         }`}
                       >
-                        {n}
+                        {cls.label}
                       </button>
                     ))}
                   </div>
