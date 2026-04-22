@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Trophy, ArrowLeft } from 'lucide-react';
+import { Trophy, ArrowLeft, ShieldCheck, CircleAlert as AlertCircle } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, HeatResult } from '../types/heat';
 import { convertHeatResultsToRaceResults } from '../utils/heatUtils';
@@ -12,6 +12,7 @@ interface SHRSOverallResultsViewProps {
   heatManagement: HeatManagement;
   darkMode: boolean;
   onBack: () => void;
+  isSimulated?: boolean;
 }
 
 const FLEET_NAMES: Record<string, string> = {
@@ -59,6 +60,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
   heatManagement,
   darkMode,
   onBack,
+  isSimulated,
 }) => {
   const isShrs = heatManagement?.configuration?.scoringSystem === 'shrs';
   const shrsQualifyingRounds = heatManagement?.configuration?.shrsQualifyingRounds || 0;
@@ -75,6 +77,40 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
 
   const qualifyingRaces = completedRaces.filter(r => r <= shrsQualifyingRounds);
   const finalsRaces = completedRaces.filter(r => r > shrsQualifyingRounds);
+
+  const shrsVerification = useMemo(() => {
+    if (!isSimulated) return null;
+    const importedLookup = new Map<string, number>();
+    for (const round of (heatManagement?.rounds || [])) {
+      if (!round.completed) continue;
+      for (const res of round.results) {
+        if (res.importedScore !== undefined && res.importedScore !== null) {
+          importedLookup.set(`${res.skipperIndex}-${round.round}`, res.importedScore);
+        }
+      }
+    }
+    if (importedLookup.size === 0) return null;
+
+    let matched = 0;
+    let mismatched = 0;
+    let total = 0;
+    const mismatches: { skipperIndex: number; race: number; computed: number; imported: number }[] = [];
+
+    for (const r of raceResults) {
+      const key = `${r.skipperIndex}-${r.race}`;
+      const imported = importedLookup.get(key);
+      if (imported === undefined) continue;
+      total++;
+      const computed = r.position;
+      if (computed != null && Math.abs(computed - imported) < 0.05) {
+        matched++;
+      } else {
+        mismatched++;
+        mismatches.push({ skipperIndex: r.skipperIndex, race: r.race, computed, imported });
+      }
+    }
+    return { matched, mismatched, total, mismatches };
+  }, [isSimulated, heatManagement, raceResults]);
 
   const skipperFleetMap = useMemo(() => {
     const map = new Map<number, HeatDesignation>();
@@ -299,14 +335,16 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
         darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'
       }`}>
         <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className={`p-2 rounded-lg transition-colors ${
-              darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'
-            }`}
-          >
-            <ArrowLeft size={20} />
-          </button>
+          {!isSimulated && (
+            <button
+              onClick={onBack}
+              className={`p-2 rounded-lg transition-colors ${
+                darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'
+              }`}
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
           <Trophy className="text-yellow-500" size={24} />
           <div>
             <h2 className={`text-xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
@@ -324,6 +362,33 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
           {standings.length} skippers
         </div>
       </div>
+
+      {/* SHRS Import Verification Banner */}
+      {shrsVerification && (
+        <div className={`flex items-center gap-2 px-4 py-2 border-b flex-shrink-0 ${
+          shrsVerification.mismatched === 0
+            ? darkMode ? 'bg-emerald-900/30 border-emerald-700/50' : 'bg-emerald-50 border-emerald-200'
+            : darkMode ? 'bg-amber-900/30 border-amber-700/50' : 'bg-amber-50 border-amber-200'
+        }`}>
+          {shrsVerification.mismatched === 0 ? (
+            <ShieldCheck size={16} className={darkMode ? 'text-emerald-400' : 'text-emerald-600'} />
+          ) : (
+            <AlertCircle size={16} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+          )}
+          <span className="text-xs font-medium">
+            {shrsVerification.mismatched === 0 ? (
+              <span className={darkMode ? 'text-emerald-300' : 'text-emerald-700'}>
+                SHRS Verified: All {shrsVerification.total} race scores match the original file
+              </span>
+            ) : (
+              <span className={darkMode ? 'text-amber-300' : 'text-amber-700'}>
+                SHRS Comparison: {shrsVerification.matched}/{shrsVerification.total} scores match
+                {' '}&bull;{' '}{shrsVerification.mismatched} discrepancies found
+              </span>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Scrollable table */}
       <div className="flex-1 overflow-auto">
@@ -519,16 +584,18 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
           {finalsRaces.length > 0 && ` \u2022 ${finalsRaces.length} finals`}
           {' \u2022 SHRS scoring (position within heat)'}
         </div>
-        <button
-          onClick={onBack}
-          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-            darkMode
-              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-          }`}
-        >
-          Back to Scoring
-        </button>
+        {!isSimulated && (
+          <button
+            onClick={onBack}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              darkMode
+                ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+            }`}
+          >
+            Back to Scoring
+          </button>
+        )}
       </div>
     </div>
   );

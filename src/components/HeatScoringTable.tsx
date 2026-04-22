@@ -157,7 +157,15 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   // Initialize to null and let useEffect set the correct heat
   const [selectedHeat, setSelectedHeat] = useState<HeatDesignation | null>(null);
   const [showOverallResults, setShowOverallResults] = useState(false);
+  const isSHRSImport = isShrs && currentEvent?.is_simulated;
   const [showOverallResultsView, setShowOverallResultsView] = useState(false);
+
+  // Show overall results view by default for SHRS simulated imports
+  React.useEffect(() => {
+    if (isSHRSImport) {
+      setShowOverallResultsView(true);
+    }
+  }, [isSHRSImport]);
   const [showRaceResults, setShowRaceResults] = useState(false);
   const [showHeatAssignments, setShowHeatAssignments] = useState(false);
   const [observerReloadTrigger, setObserverReloadTrigger] = useState(0);
@@ -1100,6 +1108,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           heatManagement={heatManagement}
           darkMode={darkMode}
           onBack={() => setShowOverallResultsView(false)}
+          isSimulated={currentEvent?.is_simulated}
         />
       </div>
     );

@@ -290,29 +290,41 @@ export const convertHeatResultsToRaceResults = (
       const qualRounds = heatManagement.configuration.shrsQualifyingRounds || heatManagement.rounds.length;
       const isQualifying = round.round <= qualRounds;
 
-      // Collect sailed scores for this skipper in the same phase for RDGave calculation
-      const sailedScoresBySkipper = new Map<number, number[]>();
+      // Collect all scored results (sailed + penalty) per skipper in same phase for RDGave calculation
+      // RDGave averages all other round scores (including DNF, RDGfix, etc.) excluding only other RDGave rounds
+      const aveScoresBySkipper = new Map<number, number[]>();
+      const allHeatSizesByRound = new Map<number, number>();
       for (const r of heatManagement.rounds) {
         if (!r.completed) continue;
         const rIsQual = r.round <= qualRounds;
         if (rIsQual !== isQualifying) continue;
+        const rHeatSizes = r.heatAssignments.map(a => a.skipperIndices.length);
+        const rLargestHeat = getLargestHeatSize(rHeatSizes);
+        allHeatSizesByRound.set(r.round, rLargestHeat);
         for (const res of r.results) {
+          const resIsRDGave = res.letterScore === 'RDG' && (res.customPoints === -1 || res.customPoints === -2);
+          if (resIsRDGave) continue;
+          let s: number;
           if (!res.letterScore && res.position !== null) {
-            const s = res.importedScore !== undefined && res.importedScore !== null ? res.importedScore : res.position;
-            if (s !== null && s !== undefined) {
-              if (!sailedScoresBySkipper.has(res.skipperIndex)) sailedScoresBySkipper.set(res.skipperIndex, []);
-              sailedScoresBySkipper.get(res.skipperIndex)!.push(s);
-            }
+            s = res.importedScore !== undefined && res.importedScore !== null ? res.importedScore : res.position;
+          } else if (res.letterScore && res.customPoints !== undefined && res.customPoints > 0) {
+            s = res.customPoints;
+          } else if (res.letterScore) {
+            s = calculateNonFinisherScore(rLargestHeat);
+          } else {
+            continue;
           }
+          if (!aveScoresBySkipper.has(res.skipperIndex)) aveScoresBySkipper.set(res.skipperIndex, []);
+          aveScoresBySkipper.get(res.skipperIndex)!.push(s);
         }
       }
 
       round.results.forEach(result => {
         const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
         if (isRDGave) {
-          const sailed = sailedScoresBySkipper.get(result.skipperIndex) || [];
-          const avg = sailed.length > 0
-            ? Math.round((sailed.reduce((s, v) => s + v, 0) / sailed.length) * 10) / 10
+          const scores = aveScoresBySkipper.get(result.skipperIndex) || [];
+          const avg = scores.length > 0
+            ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10
             : calculateNonFinisherScore(largestHeatSize);
           overallPositions.set(result.skipperIndex, avg);
         } else if (result.letterScore) {
