@@ -421,6 +421,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
           heatDesignation: r.heatDesignation as HeatDesignation,
           race: rr.round,
           round: rr.round,
+          customPoints: r.customPoints,
         })),
         completed: true,
       }));

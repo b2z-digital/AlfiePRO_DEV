@@ -32,6 +32,7 @@ export interface ReconstructedRound {
     position: number | null;
     letterScore?: string;
     points: number;
+    customPoints?: number;
   }[];
 }
 
@@ -319,9 +320,10 @@ function parseSHRSFromRows(
 
 const KNOWN_LETTER_SCORES = [
   'DNF', 'DNS', 'DNC', 'DSQ', 'OCS', 'RET', 'BFD', 'UFD', 'NSC',
-  'ZFP', 'SCP', 'DPI', 'DNE', 'RDG', 'RDGave', 'RDGfix', 'WDN',
-  'RGA', 'RGP', 'AVE', 'AVG',
+  'ZFP', 'SCP', 'DPI', 'DNE', 'RDG', 'WDN', 'RGA', 'RGP',
 ];
+
+const FLEET_SUFFIXES = ['G', 'S', 'B', 'C'];
 
 function parseResultCell(
   cellValue: string,
@@ -332,49 +334,40 @@ function parseResultCell(
 ): void {
   const trimmed = cellValue.trim();
   if (!trimmed) return;
-
-  // Pure number (e.g. "3", "14", "7.5")
-  if (/^\d+\.?\d*$/.test(trimmed)) {
-    const numVal = parseFloat(trimmed);
-    results.push({
-      raceNumber,
-      sailNumber,
-      position: numVal,
-      points: numVal,
-      heat,
-    });
-    return;
-  }
-
   const upper = trimmed.toUpperCase();
 
-  // Standalone letter score (e.g. "DNF", "DNC", "DSQ")
-  if (KNOWN_LETTER_SCORES.includes(upper)) {
-    results.push({
-      raceNumber,
-      sailNumber,
-      position: null,
-      points: 0,
-      letterScore: upper,
-      heat,
-    });
+  // Pure number: "3", "14", "7.5"
+  if (/^\d+\.?\d*$/.test(trimmed)) {
+    const numVal = parseFloat(trimmed);
+    results.push({ raceNumber, sailNumber, position: numVal, points: numVal, heat });
     return;
   }
 
-  // Pattern: "CODE POINTS" or "CODE POINTS+FLEET" (e.g. "RGP 2", "DNF 18", "RGA 4.3",
-  // "SCP 16.4", "RGP 5S", "RET 18C", "NSC 18C", "DNC 18B", "RGP 9.3G", "RGP 9.5C",
-  // "DNF 18B", "RGP 5S", "NSC 18S", "DNC 18S")
-  const codeFirstMatch = upper.match(/^([A-Z]{2,6})\s+(\d+\.?\d*)\s*([A-Z]?)$/);
-  if (codeFirstMatch) {
-    const code = codeFirstMatch[1];
-    const points = parseFloat(codeFirstMatch[2]);
-    const fleetSuffix = codeFirstMatch[3] || '';
-    const isKnown = KNOWN_LETTER_SCORES.includes(code);
+  // Number + single fleet suffix: "1G", "3S", "12B", "9C" (finals position with fleet indicator)
+  const numFleetMatch = upper.match(/^(\d+\.?\d*)([GSBC])$/);
+  if (numFleetMatch) {
+    const pos = parseFloat(numFleetMatch[1]);
+    results.push({ raceNumber, sailNumber, position: pos, points: pos, heat });
+    return;
+  }
+
+  // Standalone letter score: "DNF", "DNC", "DSQ", etc.
+  if (KNOWN_LETTER_SCORES.includes(upper)) {
+    results.push({ raceNumber, sailNumber, position: null, points: 0, letterScore: upper, heat });
+    return;
+  }
+
+  // Letter score + space + points + optional fleet suffix:
+  // "DNF 18", "RGP 2", "RGA 4.3", "SCP 16.4", "NSC 18", "UFD 18",
+  // "RET 18C", "NSC 18B", "DNC 18S", "RGP 9.3G", "RGP 5S", "DNF 18B"
+  const codeSpacePointsMatch = upper.match(/^([A-Z]{2,6})\s+(\d+\.?\d*)\s*([GSBC]?)$/);
+  if (codeSpacePointsMatch) {
+    const code = codeSpacePointsMatch[1];
+    const points = parseFloat(codeSpacePointsMatch[2]);
 
     let letterScore = code;
     let customPoints: number | undefined = undefined;
 
-    // RGP = RDG with fixed points, RGA = RDG with average
     if (code === 'RGP') {
       letterScore = 'RDG';
       customPoints = points;
@@ -390,71 +383,55 @@ function parseResultCell(
       sailNumber,
       position: null,
       points,
-      letterScore: isKnown || code === 'RGP' || code === 'RGA' ? letterScore : code,
-      customPoints,
-      comment: fleetSuffix ? `Fleet ${fleetSuffix}` : undefined,
-      heat,
-    });
-    return;
-  }
-
-  // Pattern: "POINTSCODE" no space (e.g. "16.4SCP" less common but possible)
-  const numFirstMatch = upper.match(/^(\d+\.?\d*)\s*([A-Z]{2,6})\s*(\d*\.?\d*)\s*([A-Z]?)$/);
-  if (numFirstMatch) {
-    const pos = parseFloat(numFirstMatch[1]);
-    const code = numFirstMatch[2];
-    const extraPoints = numFirstMatch[3] ? parseFloat(numFirstMatch[3]) : undefined;
-    const fleetSuffix = numFirstMatch[4] || '';
-
-    let letterScore = code;
-    let customPoints: number | undefined = extraPoints;
-
-    if (code === 'RGP') {
-      letterScore = 'RDG';
-      if (!customPoints) customPoints = pos;
-    } else if (code === 'RGA') {
-      letterScore = 'RDG';
-      if (!customPoints) customPoints = pos;
-    }
-
-    results.push({
-      raceNumber,
-      sailNumber,
-      position: KNOWN_LETTER_SCORES.includes(code) ? null : pos,
-      points: extraPoints || pos,
       letterScore,
       customPoints,
-      comment: fleetSuffix ? `Fleet ${fleetSuffix}` : undefined,
       heat,
     });
     return;
   }
 
-  // Pattern: "CODE POINTSCODE" (e.g. "DNF 18" where 18 is the points, or "UFD 18")
-  const codePointsMatch = upper.match(/^([A-Z]{2,6})\s+(\d+\.?\d*)([A-Z]?)$/);
-  if (codePointsMatch) {
-    const code = codePointsMatch[1];
-    const points = parseFloat(codePointsMatch[2]);
+  // Letter score + space + "number.number" + fleet suffix: "RGP 9.5C", "RGA 4.3G"
+  const codeDecimalFleetMatch = upper.match(/^([A-Z]{2,6})\s+(\d+\.\d+)([GSBC])$/);
+  if (codeDecimalFleetMatch) {
+    const code = codeDecimalFleetMatch[1];
+    const points = parseFloat(codeDecimalFleetMatch[2]);
+
+    let letterScore = code;
+    let customPoints: number | undefined = undefined;
+
+    if (code === 'RGP') { letterScore = 'RDG'; customPoints = points; }
+    else if (code === 'RGA') { letterScore = 'RDG'; customPoints = points; }
+    else if (code === 'SCP') { customPoints = points; }
 
     results.push({
-      raceNumber,
-      sailNumber,
-      position: null,
-      points,
-      letterScore: code,
-      heat,
+      raceNumber, sailNumber, position: null, points, letterScore, customPoints, heat,
     });
     return;
+  }
+
+  // Number + letter score code (no space): "14DNF" (uncommon but handle it)
+  const numCodeMatch = upper.match(/^(\d+\.?\d*)([A-Z]{2,6})$/);
+  if (numCodeMatch) {
+    const points = parseFloat(numCodeMatch[1]);
+    const code = numCodeMatch[2];
+
+    if (KNOWN_LETTER_SCORES.includes(code)) {
+      let letterScore = code;
+      let customPoints: number | undefined = undefined;
+      if (code === 'RGP') { letterScore = 'RDG'; customPoints = points; }
+      else if (code === 'RGA') { letterScore = 'RDG'; customPoints = points; }
+      else if (code === 'SCP') { customPoints = points; }
+
+      results.push({
+        raceNumber, sailNumber, position: null, points, letterScore, customPoints, heat,
+      });
+      return;
+    }
   }
 
   // Fallback: treat as unknown letter score
   results.push({
-    raceNumber,
-    sailNumber,
-    position: null,
-    points: 0,
-    letterScore: upper || undefined,
-    heat,
+    raceNumber, sailNumber, position: null, points: 0, letterScore: upper || undefined, heat,
   });
 }
 
@@ -499,6 +476,7 @@ export function reconstructSHRSHeats(
             position: result.position,
             letterScore: result.letterScore,
             points: result.points,
+            customPoints: result.customPoints,
           });
         } else {
           const largestHeat = getLargestHeatSize(heatSizes);
@@ -604,6 +582,7 @@ export function reconstructSHRSHeats(
               position: result.position,
               letterScore: result.letterScore,
               points: result.points,
+              customPoints: result.customPoints,
             });
           } else {
             const lh = getLargestHeatSize(finalFleetSizes);
