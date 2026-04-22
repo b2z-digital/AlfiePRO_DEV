@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { X, FlaskConical, Upload, Plus, ChevronRight, FileSpreadsheet, Users, Layers, ArrowLeft, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, Sailboat, TrendingUp, Shuffle, Download } from 'lucide-react';
+import { X, FlaskConical, Upload, Plus, ChevronRight, FileSpreadsheet, Users, Layers, ArrowLeft, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, Sailboat, TrendingUp, Shuffle, Download, Globe, Loader as Loader2 } from 'lucide-react';
 import { parseHMSFile } from '../utils/hmsParser';
-import { parseSHRSFile, reconstructSHRSHeats, ParsedSHRSData, SHRSImportMode } from '../utils/shrsParser';
+import { parseSHRSFile, parseSHRSFromHTML, reconstructSHRSHeats, ParsedSHRSData, SHRSImportMode } from '../utils/shrsParser';
 import { ParsedHMSData } from '../types/hmsValidator';
 import { calculateOptimalHeats } from '../utils/shrsHeatSystem';
 import { storeRaceEvent, setCurrentEvent } from '../utils/raceStorage';
@@ -37,6 +37,8 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
   const [creating, setCreating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [rawFile, setRawFile] = useState<File | null>(null);
+  const [importUrl, setImportUrl] = useState('');
+  const [fetchingUrl, setFetchingUrl] = useState(false);
 
   const [config, setConfig] = useState({
     eventName: '',
@@ -126,6 +128,48 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
       setUploading(false);
     }
   }, []);
+
+  const handleUrlImport = useCallback(async () => {
+    if (!importUrl.trim()) return;
+    setFetchingUrl(true);
+    setError(null);
+
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-external-html`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: importUrl.trim() }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to fetch URL (${response.status})`);
+      }
+
+      const { html } = await response.json();
+      if (!html) throw new Error('No HTML content received');
+
+      const data = parseSHRSFromHTML(html, importUrl.trim());
+      setParsedSHRSData(data);
+      const optimalHeats = calculateOptimalHeats(data.skippers.length);
+      setShrsConfig(prev => ({
+        ...prev,
+        eventName: data.eventName || 'Imported SHRS Event',
+        numberOfHeats: optimalHeats,
+      }));
+      setScoringFormat('shrs');
+      setFileName(importUrl.trim());
+      setStep('shrs-config');
+    } catch (err: any) {
+      setError(err.message || 'Failed to import from URL');
+    } finally {
+      setFetchingUrl(false);
+    }
+  }, [importUrl]);
 
   const handleFormatConfirm = useCallback(async () => {
     if (!rawFile) return;
@@ -591,6 +635,62 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
                     <span>Configure event</span>
                   </div>
                 </button>
+              </div>
+
+              <div className={`relative rounded-xl border-2 border-dashed p-5 ${
+                darkMode
+                  ? 'border-slate-700 bg-slate-800/30'
+                  : 'border-slate-200 bg-slate-50/50'
+              }`}>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                    darkMode ? 'bg-teal-500/15' : 'bg-teal-100'
+                  }`}>
+                    <Globe className={darkMode ? 'text-teal-400' : 'text-teal-600'} size={18} />
+                  </div>
+                  <div>
+                    <h4 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      Import SHRS from URL
+                    </h4>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Paste a link to an ANZAM-style HTML results page
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={importUrl}
+                    onChange={(e) => setImportUrl(e.target.value)}
+                    placeholder="https://anzamsystems.com/AUS/df65nat26/HTMLResults.html"
+                    className={`flex-1 text-sm rounded-lg border px-3 py-2.5 outline-none transition-colors ${
+                      darkMode
+                        ? 'bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-teal-500'
+                        : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-teal-500'
+                    }`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && importUrl.trim()) handleUrlImport();
+                    }}
+                    disabled={fetchingUrl}
+                  />
+                  <button
+                    onClick={handleUrlImport}
+                    disabled={!importUrl.trim() || fetchingUrl}
+                    className="px-4 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium flex items-center gap-2 transition-colors whitespace-nowrap"
+                  >
+                    {fetchingUrl ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Fetching...
+                      </>
+                    ) : (
+                      <>
+                        <Download size={16} />
+                        Import
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               <input

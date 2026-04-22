@@ -75,6 +75,99 @@ export function parseSHRSFromCSV(csvText: string): ParsedSHRSData {
   return parseSHRSFromRows(data, ['Pasted Data']);
 }
 
+export function parseSHRSFromHTML(html: string, sourceUrl?: string): ParsedSHRSData {
+  const rows: string[][] = [];
+
+  // Extract all table rows
+  const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let trMatch: RegExpExecArray | null;
+
+  while ((trMatch = trRegex.exec(html)) !== null) {
+    const trContent = trMatch[1];
+    const cells: string[] = [];
+
+    // Extract cell text from <td>...<div class="cell">TEXT</div>...</td> pattern
+    const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    let tdMatch: RegExpExecArray | null;
+
+    while ((tdMatch = tdRegex.exec(trContent)) !== null) {
+      const tdContent = tdMatch[1];
+      // Extract text from <div class="cell">...</div> if present
+      const divMatch = tdContent.match(/<div[^>]*class="cell"[^>]*>([\s\S]*?)<\/div>/i);
+      let text = divMatch ? divMatch[1] : tdContent;
+      // Strip remaining HTML tags
+      text = text.replace(/<[^>]+>/g, '');
+      // Decode HTML entities
+      text = text.replace(/&nbsp;?/gi, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(parseInt(n)));
+      cells.push(text.trim());
+    }
+
+    if (cells.length > 0) {
+      rows.push(cells);
+    }
+  }
+
+  if (rows.length === 0) {
+    throw new Error('No table data found in the HTML page');
+  }
+
+  // Filter out fleet label rows (GOLD FLEET, SILVER FLEET, etc.) and repeated header rows
+  // Keep only: the first header row, and data rows
+  let headerFound = false;
+  const filteredRows: string[][] = [];
+
+  for (const row of rows) {
+    const joined = row.map(c => c.toLowerCase()).join(' ');
+
+    // Skip fleet label rows
+    if (/\bgold\s+fleet\b/i.test(joined) || /\bsilver\s+fleet\b/i.test(joined) ||
+        /\bbronze\s+fleet\b/i.test(joined) || /\bcopper\s+fleet\b/i.test(joined)) {
+      continue;
+    }
+
+    // Detect header row (Place, Sail No, Skipper, etc.)
+    const hasPlace = row.some(c => /^place$/i.test(c.trim()));
+    const hasSail = row.some(c => /^sail\s*no$/i.test(c.trim()));
+    const hasQ = row.some(c => /^q\s*1$/i.test(c.trim()));
+
+    if ((hasPlace || hasSail) && hasQ) {
+      if (!headerFound) {
+        headerFound = true;
+        filteredRows.push(row);
+      }
+      // Skip duplicate header rows (repeated after each fleet)
+      continue;
+    }
+
+    // Skip empty rows
+    const nonEmpty = row.filter(c => c.trim() !== '');
+    if (nonEmpty.length < 3) continue;
+
+    filteredRows.push(row);
+  }
+
+  if (filteredRows.length < 2) {
+    throw new Error('Could not find valid header and data rows in the HTML');
+  }
+
+  // Extract event name from page title or URL
+  let eventName = 'Imported SHRS Event';
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (titleMatch) {
+    const title = titleMatch[1].replace(/<[^>]+>/g, '').trim();
+    if (title && title.length > 3) eventName = title;
+  }
+  if (sourceUrl) {
+    // Try to extract event name from URL path, e.g. /AUS/df65nat26/
+    const pathMatch = sourceUrl.match(/\/([^/]+)\/[^/]*$/);
+    if (pathMatch && pathMatch[1].length > 3) {
+      eventName = pathMatch[1].replace(/[-_]/g, ' ');
+    }
+  }
+
+  return parseSHRSFromRows(filteredRows, ['HTML Import'], eventName);
+}
+
 function parseSHRSFromRows(
   data: any[][],
   worksheetNames: string[],
