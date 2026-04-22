@@ -374,7 +374,7 @@ function parseResultCell(
       customPoints = points;
     } else if (code === 'RGA') {
       letterScore = 'RDG';
-      customPoints = points;
+      customPoints = -1;
     } else if (code === 'SCP') {
       customPoints = points;
     }
@@ -401,7 +401,7 @@ function parseResultCell(
     let customPoints: number | undefined = undefined;
 
     if (code === 'RGP') { letterScore = 'RDG'; customPoints = points; }
-    else if (code === 'RGA') { letterScore = 'RDG'; customPoints = points; }
+    else if (code === 'RGA') { letterScore = 'RDG'; customPoints = -1; }
     else if (code === 'SCP') { customPoints = points; }
 
     results.push({
@@ -420,7 +420,7 @@ function parseResultCell(
       let letterScore = code;
       let customPoints: number | undefined = undefined;
       if (code === 'RGP') { letterScore = 'RDG'; customPoints = points; }
-      else if (code === 'RGA') { letterScore = 'RDG'; customPoints = points; }
+      else if (code === 'RGA') { letterScore = 'RDG'; customPoints = -1; }
       else if (code === 'SCP') { customPoints = points; }
 
       results.push({
@@ -471,6 +471,7 @@ export function reconstructSHRSHeats(
         const result = roundResults.find(r => r.sailNumber === skipper.sailNumber);
 
         if (result) {
+          const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
           reconstructedResults.push({
             skipperIndex,
             heatDesignation: assignment.heatDesignation,
@@ -478,7 +479,7 @@ export function reconstructSHRSHeats(
             letterScore: result.letterScore,
             points: result.points,
             customPoints: result.customPoints,
-            importedScore: result.customPoints !== undefined ? result.customPoints : result.position,
+            importedScore: isRDGave ? undefined : (result.customPoints !== undefined ? result.customPoints : result.position),
           });
         } else {
           const largestHeat = getLargestHeatSize(heatSizes);
@@ -529,6 +530,23 @@ export function reconstructSHRSHeats(
     const qualRaceScores = new Map<number, number[]>();
     const largestHeat = getLargestHeatSize(heatSizes);
 
+    // First pass: collect sailed (numeric) results per skipper for average calculation
+    const sailedQualScores = new Map<number, number[]>();
+    for (const round of rounds) {
+      for (const result of round.results) {
+        if (!sailedQualScores.has(result.skipperIndex)) {
+          sailedQualScores.set(result.skipperIndex, []);
+        }
+        if (!result.letterScore && result.position !== null) {
+          const score = result.importedScore ?? result.position;
+          if (score !== null && score !== undefined) {
+            sailedQualScores.get(result.skipperIndex)!.push(score);
+          }
+        }
+      }
+    }
+
+    // Second pass: build race scores with RDGave averages computed
     for (const round of rounds) {
       for (const result of round.results) {
         if (!qualScores.has(result.skipperIndex)) {
@@ -536,7 +554,13 @@ export function reconstructSHRSHeats(
           qualRaceScores.set(result.skipperIndex, []);
         }
         let score: number;
-        if (result.letterScore && result.customPoints !== undefined) {
+        const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
+        if (isRDGave) {
+          const sailed = sailedQualScores.get(result.skipperIndex) || [];
+          score = sailed.length > 0
+            ? Math.round((sailed.reduce((s, v) => s + v, 0) / sailed.length) * 10) / 10
+            : calculateNonFinisherScore(largestHeat);
+        } else if (result.letterScore && result.customPoints !== undefined && result.customPoints > 0) {
           score = result.customPoints;
         } else if (result.letterScore) {
           score = calculateNonFinisherScore(largestHeat);
@@ -584,6 +608,7 @@ export function reconstructSHRSHeats(
           const result = roundResults.find(r => r.sailNumber === skipper.sailNumber);
 
           if (result) {
+            const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
             reconstructedResults.push({
               skipperIndex,
               heatDesignation: assignment.heatDesignation,
@@ -591,7 +616,7 @@ export function reconstructSHRSHeats(
               letterScore: result.letterScore,
               points: result.points,
               customPoints: result.customPoints,
-              importedScore: result.customPoints !== undefined ? result.customPoints : result.position,
+              importedScore: isRDGave ? undefined : (result.customPoints !== undefined ? result.customPoints : result.position),
             });
           } else {
             const lh = getLargestHeatSize(finalFleetSizes);
