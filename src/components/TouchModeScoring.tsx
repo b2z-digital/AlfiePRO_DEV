@@ -796,12 +796,14 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   };
 
   const isCompletedPreviousRace = (): boolean => {
-    if (currentRace >= initialRace) return false;
     const allSkippersHaveResult = skippers.every((_, skipperIndex) => {
       const result = raceResults.find(r => r.race === currentRace && r.skipperIndex === skipperIndex);
       return result && (result.position !== null || result.letterScore);
     });
-    return allSkippersHaveResult;
+    if (!allSkippersHaveResult) return false;
+
+    const hasLaterRaceResults = raceResults.some(r => r.race > currentRace && (r.position !== null || r.letterScore));
+    return hasLaterRaceResults;
   };
 
   const isPreviousRace = (): boolean => {
