@@ -487,10 +487,22 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     }).filter(Boolean) as SkipperStanding[];
 
     // SHRS tie-breaking: standard RRS A8.1 countback on all race scores (qualifying + finals)
+    // Final fallback: alphabetical by skipper name (common convention when countback is exhausted)
     const shrsCountback = (a: SkipperStanding, b: SkipperStanding): number => {
       const aAll = a.raceScores.map(s => s ?? 999);
       const bAll = b.raceScores.map(s => s ?? 999);
-      return compareWithCountback(aAll, bAll, a.droppedIndices.size, b.droppedIndices.size);
+      const countbackResult = compareWithCountback(aAll, bAll, a.droppedIndices.size, b.droppedIndices.size);
+      if (countbackResult !== 0) return countbackResult;
+      const getSurname = (name: string) => {
+        const parts = name.trim().split(/\s+/);
+        return parts.length > 1 ? parts[parts.length - 1] : parts[0];
+      };
+      const aSurname = getSurname(a.skipper?.name || '').toUpperCase();
+      const bSurname = getSurname(b.skipper?.name || '').toUpperCase();
+      if (aSurname !== bSurname) return aSurname.localeCompare(bSurname);
+      const aName = (a.skipper?.name || '').toUpperCase();
+      const bName = (b.skipper?.name || '').toUpperCase();
+      return aName.localeCompare(bName);
     };
 
     if (hasFinals) {
