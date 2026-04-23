@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader as Loader2, Trash2, ArrowLeft, Clock, Pencil, Circle as HelpCircle, Volume2, Share2, ImagePlus, X as XIcon } from 'lucide-react';
+import { Send, Loader as Loader2, Trash2, ArrowLeft, Clock, Pencil, HelpCircle, Volume2, Share2, ImagePlus, Camera, Image as ImageIcon, X as XIcon } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { RaceScenarioCanvas } from './RaceScenarioCanvas';
@@ -89,6 +89,7 @@ interface AskAlfieChatPanelProps {
   darkMode: boolean;
   onClose: () => void;
   embedded?: boolean;
+  courseMode?: boolean;
 }
 
 const QUICK_ACTIONS = [
@@ -109,6 +110,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   darkMode,
   onClose,
   embedded = false,
+  courseMode = false,
 }) => {
   const { user, currentClub } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -120,9 +122,11 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   const [showHistory, setShowHistory] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('welcome');
   const [attachedDrawing, setAttachedDrawing] = useState<string | null>(null);
+  const [drawingCourseMode, setDrawingCourseMode] = useState(courseMode);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const lastAssistantRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const prevMessageCountRef = useRef(0);
 
   useEffect(() => {
@@ -159,21 +163,21 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
     }
   };
 
-  const sendMessage = async (text?: string, drawingData?: string) => {
+  const sendMessage = async (text?: string, imageData?: string) => {
     const messageText = text || input.trim();
     if (!messageText || isLoading) return;
 
     if (showHistory) setShowHistory(false);
     if (viewMode !== 'chat') setViewMode('chat');
 
-    const drawing = drawingData || attachedDrawing;
+    const image = imageData || attachedDrawing;
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content: messageText,
       timestamp: new Date(),
-      drawingImage: drawing || undefined,
+      drawingImage: image || undefined,
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -190,11 +194,6 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
         content: m.content,
       }));
 
-      let enrichedMessage = messageText;
-      if (drawing) {
-        enrichedMessage = `[The user has drawn a race scenario diagram showing boats, marks, arrows, and/or wind direction on a canvas. Please analyse the scenario they've described and provide advice based on the racing rules of sailing.]\n\n${messageText}`;
-      }
-
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ask-alfie-chat`,
         {
@@ -205,11 +204,12 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
             Apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({
-            message: enrichedMessage,
+            message: messageText,
             conversationHistory,
             clubId: currentClub?.clubId || null,
             source: 'web_platform',
-            hasDrawing: !!drawing,
+            image_url: image || undefined,
+            course_mode: drawingCourseMode || undefined,
           }),
         }
       );
@@ -239,6 +239,20 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
       setIsLoading(false);
       inputRef.current?.focus();
     }
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setAttachedDrawing(result);
+      if (viewMode === 'welcome') setViewMode('chat');
+      setTimeout(() => inputRef.current?.focus(), 100);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -325,6 +339,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
           onSave={handleDrawingSave}
           onClose={() => setViewMode(messages.length > 0 ? 'chat' : 'welcome')}
           darkMode
+          courseMode={drawingCourseMode}
         />
       </div>
     );
@@ -385,16 +400,27 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
           </p>
 
           {/* Action tiles */}
-          <div className="grid grid-cols-2 gap-3 w-full mb-6">
+          <div className="grid grid-cols-3 gap-3 w-full mb-6">
             <button
               onClick={() => handleQuickAction('draw')}
-              className="flex flex-col items-center gap-2.5 p-5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+              className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
             >
               <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
                 <Pencil className="w-5 h-5 text-cyan-400" />
               </div>
-              <span className="text-sm font-medium text-white text-center leading-tight">
+              <span className="text-xs font-medium text-white text-center leading-tight">
                 Draw<br />Scenario
+              </span>
+            </button>
+            <button
+              onClick={() => { setDrawingCourseMode(true); setViewMode('drawing'); }}
+              className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
+                <ImagePlus className="w-5 h-5 text-cyan-400" />
+              </div>
+              <span className="text-xs font-medium text-white text-center leading-tight">
+                Draw<br />Course
               </span>
             </button>
             <button
@@ -404,12 +430,12 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                   sendMessage('What are the key racing rules I should know about?');
                 }, 100);
               }}
-              className="flex flex-col items-center gap-2.5 p-5 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+              className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
             >
               <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
                 <HelpCircle className="w-5 h-5 text-cyan-400" />
               </div>
-              <span className="text-sm font-medium text-white text-center leading-tight">
+              <span className="text-xs font-medium text-white text-center leading-tight">
                 Racing<br />Rules
               </span>
             </button>
@@ -651,12 +677,14 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
         )}
       </div>
 
-      {/* Drawing attachment preview */}
+      {/* Drawing/Photo attachment preview */}
       {attachedDrawing && (
         <div className="px-3 pt-2">
           <div className="flex items-center gap-3 px-3 py-2 rounded-xl border border-slate-700/50 bg-slate-800/60">
-            <img src={attachedDrawing} alt="Drawing" className="w-10 h-10 rounded-lg object-cover bg-[#0f1729]" />
-            <span className="text-xs text-slate-300 flex-1">Drawing attached</span>
+            <img src={attachedDrawing} alt="Attached" className="w-10 h-10 rounded-lg object-cover bg-[#0f1729]" />
+            <span className="text-xs text-slate-300 flex-1">
+              {attachedDrawing.startsWith('data:image/png') ? 'Drawing attached' : 'Photo attached'}
+            </span>
             <button
               onClick={() => setAttachedDrawing(null)}
               className="text-xs font-medium text-red-400 hover:text-red-300 transition-colors"
@@ -666,6 +694,16 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* Hidden file input for photo upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handlePhotoUpload}
+        className="hidden"
+      />
 
       {/* Input area */}
       <div className="px-3 pt-2 pb-3 border-t border-slate-700/30 bg-[#0b1120]">
@@ -680,11 +718,18 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
         )}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setViewMode('drawing')}
+            onClick={() => { setDrawingCourseMode(false); setViewMode('drawing'); }}
             className="p-2 rounded-xl text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors border border-slate-700/40"
             title="Draw scenario"
           >
-            <ImagePlus size={18} />
+            <Pencil size={18} />
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 rounded-xl text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors border border-slate-700/40"
+            title="Upload photo"
+          >
+            <Camera size={18} />
           </button>
           <div
             className="flex-1 rounded-xl p-[1.5px]"
