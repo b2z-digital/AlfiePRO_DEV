@@ -155,13 +155,14 @@ export const compareWithCountback = (
   const aCounts = countPositions(aKept);
   const bCounts = countPositions(bKept);
 
-  // Compare from 1st place upward
-  const maxPosition = Math.max(
+  // Compare from best (lowest) score upward
+  const allPositions = new Set([
     ...Object.keys(aCounts).map(Number),
-    ...Object.keys(bCounts).map(Number)
-  );
+    ...Object.keys(bCounts).map(Number),
+  ]);
+  const sortedPositions = Array.from(allPositions).sort((a, b) => a - b);
 
-  for (let pos = 1; pos <= maxPosition; pos++) {
+  for (const pos of sortedPositions) {
     const aCount = aCounts[pos] || 0;
     const bCount = bCounts[pos] || 0;
 
@@ -170,11 +171,12 @@ export const compareWithCountback = (
     }
   }
 
-  // If still tied, use last race as tiebreaker
-  if (aPoints.length > 0 && bPoints.length > 0) {
-    const aLast = aPoints[aPoints.length - 1];
-    const bLast = bPoints[bPoints.length - 1];
-    return aLast - bLast; // Lower position in last race wins
+  // RRS A8.2: Compare from last race backwards until tie is broken
+  const minLen = Math.min(aPoints.length, bPoints.length);
+  for (let i = minLen - 1; i >= 0; i--) {
+    if (aPoints[i] !== bPoints[i]) {
+      return aPoints[i] - bPoints[i];
+    }
   }
 
   return 0; // Complete tie

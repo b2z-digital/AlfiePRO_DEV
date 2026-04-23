@@ -486,11 +486,10 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       };
     }).filter(Boolean) as SkipperStanding[];
 
-    // SHRS Rule 5.7 tie-breaking:
-    // 1. Only use scores from races where tied boats competed in the SAME heat
-    // 2. Discarded scores SHALL be included (pass 0 drops to countback)
-    // 3. If tied boats never sailed in the same heat, fall back to unmodified RRS A8.1/A8.2
-    // 4. Final fallback: alphanumerical sail number order
+    // SHRS Rule 5.6 tie-breaking:
+    // 5.6(a): RRS A8.1/A8.2 using only same-heat scores, with excluded scores included
+    // 5.6(b): If never sailed together, use unmodified RRS A8.1/A8.2
+    // Final fallback: surname, first name, then sail number
     const roundHeatMap = new Map<number, Map<number, HeatDesignation>>();
     for (const round of (heatManagement?.rounds || [])) {
       if (!round.completed) continue;
@@ -502,10 +501,14 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       }
       roundHeatMap.set(round.round, skipperToHeat);
     }
+    console.log(`[SHRS 5.6 DEBUG] roundHeatMap keys: [${Array.from(roundHeatMap.keys()).join(',')}]`);
+    console.log(`[SHRS 5.6 DEBUG] completedRaces: [${completedRaces.join(',')}]`);
+    console.log(`[SHRS 5.6 DEBUG] heatManagement rounds: ${(heatManagement?.rounds || []).length}, completed: ${(heatManagement?.rounds || []).filter(r => r.completed).length}`);
 
     const shrsCountback = (a: SkipperStanding, b: SkipperStanding): number => {
       const aSameHeatScores: number[] = [];
       const bSameHeatScores: number[] = [];
+      const sameHeatRounds: number[] = [];
 
       for (let i = 0; i < completedRaces.length; i++) {
         const roundNum = completedRaces[i];
@@ -516,24 +519,68 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
         if (aHeat && bHeat && aHeat === bHeat) {
           aSameHeatScores.push(a.raceScores[i] ?? 999);
           bSameHeatScores.push(b.raceScores[i] ?? 999);
+          sameHeatRounds.push(roundNum);
         }
       }
 
-      if (aSameHeatScores.length > 0) {
-        const result = compareWithCountback(aSameHeatScores, bSameHeatScores, 0, 0);
-        if (result !== 0) return result;
+      const aName = a.skipper?.name || `#${a.skipperIndex}`;
+      const bName = b.skipper?.name || `#${b.skipperIndex}`;
+      const isTied = a.net === b.net;
+
+      if (isTied) {
+        console.log(`[SHRS 5.6] Tie-break: ${aName} vs ${bName} (net=${a.net}, fleet=${a.fleet})`);
+        console.log(`  All race scores A: [${a.raceScores.join(',')}]`);
+        console.log(`  All race scores B: [${b.raceScores.join(',')}]`);
+        console.log(`  Same-heat rounds: [${sameHeatRounds.join(',')}]`);
+        console.log(`  A same-heat scores: [${aSameHeatScores.join(',')}]`);
+        console.log(`  B same-heat scores: [${bSameHeatScores.join(',')}]`);
       }
 
-      // Fallback: unmodified RRS A8.1/A8.2 on all scores if never sailed together or still tied
-      const aAll = a.raceScores.map(s => s ?? 999);
-      const bAll = b.raceScores.map(s => s ?? 999);
-      const fallbackResult = compareWithCountback(aAll, bAll, a.droppedIndices.size, b.droppedIndices.size);
-      if (fallbackResult !== 0) return fallbackResult;
+      if (aSameHeatScores.length > 0) {
+        // SHRS 5.6: Use only same-heat scores with discards INCLUDED (0 drops)
+        const result = compareWithCountback(aSameHeatScores, bSameHeatScores, 0, 0);
+        if (isTied) console.log(`  Same-heat countback result: ${result}`);
+        if (result !== 0) return result;
+        // If same-heat countback still tied, go directly to sail number (per SHRS 5.6)
+      } else {
+        // SHRS 5.6: Never sailed together -> use unmodified RRS A8.1/A8.2
+        const aAll = a.raceScores.map(s => s ?? 999);
+        const bAll = b.raceScores.map(s => s ?? 999);
+        const fallbackResult = compareWithCountback(aAll, bAll, a.droppedIndices.size, b.droppedIndices.size);
+        if (isTied) {
+          console.log(`  No same-heat rounds -> RRS A8.1 fallback`);
+          console.log(`  A scores: [${aAll.join(',')}] drops=${a.droppedIndices.size}`);
+          console.log(`  B scores: [${bAll.join(',')}] drops=${b.droppedIndices.size}`);
+          console.log(`  A8.1 result: ${fallbackResult}`);
+        }
+        if (fallbackResult !== 0) return fallbackResult;
+      }
 
-      // Final fallback: alphanumerical sail number order
+      // Final fallback: surname then first name, then sail number
+      const extractSurname = (name: string): { surname: string; firstName: string } => {
+        const parts = (name || '').trim().split(/\s+/);
+        if (parts.length <= 1) return { surname: parts[0] || '', firstName: '' };
+        const surname = parts[parts.length - 1];
+        const firstName = parts.slice(0, -1).join(' ');
+        return { surname, firstName };
+      };
+      const aNameParts = extractSurname(a.skipper?.name || '');
+      const bNameParts = extractSurname(b.skipper?.name || '');
+      const surnameResult = aNameParts.surname.localeCompare(bNameParts.surname, undefined, { sensitivity: 'base' });
+      if (surnameResult !== 0) {
+        if (isTied) console.log(`  Surname: "${aNameParts.surname}" vs "${bNameParts.surname}" = ${surnameResult}`);
+        return surnameResult;
+      }
+      const firstNameResult = aNameParts.firstName.localeCompare(bNameParts.firstName, undefined, { sensitivity: 'base' });
+      if (firstNameResult !== 0) {
+        if (isTied) console.log(`  First name: "${aNameParts.firstName}" vs "${bNameParts.firstName}" = ${firstNameResult}`);
+        return firstNameResult;
+      }
       const aSail = (a.skipper?.sailNo || a.skipper?.sailNumber || '').toUpperCase();
       const bSail = (b.skipper?.sailNo || b.skipper?.sailNumber || '').toUpperCase();
-      return aSail.localeCompare(bSail, undefined, { numeric: true, sensitivity: 'base' });
+      const sailResult = aSail.localeCompare(bSail, undefined, { numeric: true, sensitivity: 'base' });
+      if (isTied) console.log(`  Sail number: "${aSail}" vs "${bSail}" = ${sailResult}`);
+      return sailResult;
     };
 
     if (hasFinals) {
