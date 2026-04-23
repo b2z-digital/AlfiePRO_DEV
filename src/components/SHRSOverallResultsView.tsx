@@ -58,6 +58,7 @@ interface SkipperStanding {
   total: number;
   discardTotal: number;
   net: number;
+  qualNet: number;
   droppedIndices: Set<number>;
   qualifyingDiscardTotal: number;
   finalsDiscardTotal: number;
@@ -335,18 +336,6 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
 
   const hasFinals = skipperFleetMap.size > 0;
 
-  const skipperHeatByRound = useMemo(() => {
-    const map = new Map<string, HeatDesignation>();
-    for (const round of (heatManagement?.rounds || [])) {
-      if (!round.completed) continue;
-      for (const assignment of (round.heatAssignments || [])) {
-        for (const idx of assignment.skipperIndices) {
-          map.set(`${idx}-${round.round}`, assignment.heatDesignation);
-        }
-      }
-    }
-    return map;
-  }, [heatManagement]);
 
   const standings = useMemo((): SkipperStanding[] => {
     if (!skippers?.length || !raceResults.length) return [];
@@ -437,66 +426,19 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
         total,
         discardTotal,
         net,
+        qualNet,
         droppedIndices,
         qualifyingDiscardTotal: qualDropped.reduce((s, p) => s + p, 0),
         finalsDiscardTotal: finalsDropped.reduce((s, p) => s + p, 0),
       };
     }).filter(Boolean) as SkipperStanding[];
 
-    const rrsA8Countback = (scoresA: number[], scoresB: number[]): number => {
-      const sortedA = [...scoresA].sort((x, y) => x - y);
-      const sortedB = [...scoresB].sort((x, y) => x - y);
-      const len = Math.max(sortedA.length, sortedB.length);
-      for (let i = 0; i < len; i++) {
-        const sa = sortedA[i] ?? 999;
-        const sb = sortedB[i] ?? 999;
-        if (sa !== sb) return sa - sb;
-      }
-      if (scoresA.length > 0 && scoresB.length > 0) {
-        const lastA = scoresA[scoresA.length - 1];
-        const lastB = scoresB[scoresB.length - 1];
-        if (lastA !== lastB) return lastA - lastB;
-      }
-      return 0;
-    };
-
-    // SHRS Rule 5.7.ii: Tie-breaking for multiple heat events
+    // SHRS tie-breaking: qualifying net determines fleet ranking,
+    // so it serves as the primary tie-breaker within a fleet when total nets are equal.
+    // Falls back to RRS A8.1 countback on all scores if qualifying nets also match.
     const shrsCountback = (a: SkipperStanding, b: SkipperStanding): number => {
-      const qualSharedA: number[] = [];
-      const qualSharedB: number[] = [];
-      const finalsSharedA: number[] = [];
-      const finalsSharedB: number[] = [];
+      if (a.qualNet !== b.qualNet) return a.qualNet - b.qualNet;
 
-      for (let i = 0; i < completedRaces.length; i++) {
-        const race = completedRaces[i];
-        const heatA = skipperHeatByRound.get(`${a.skipperIndex}-${race}`);
-        const heatB = skipperHeatByRound.get(`${b.skipperIndex}-${race}`);
-        if (heatA && heatB && heatA === heatB) {
-          const scoreA = a.raceScores[i] ?? 999;
-          const scoreB = b.raceScores[i] ?? 999;
-          if (race <= shrsQualifyingRounds) {
-            qualSharedA.push(scoreA);
-            qualSharedB.push(scoreB);
-          } else {
-            finalsSharedA.push(scoreA);
-            finalsSharedB.push(scoreB);
-          }
-        }
-      }
-
-      // Step 1: Compare qualifying shared-heat scores (Rule 5.7.ii with RRS A8.1)
-      if (qualSharedA.length > 0) {
-        const result = rrsA8Countback(qualSharedA, qualSharedB);
-        if (result !== 0) return result;
-      }
-
-      // Step 2: Compare finals shared-heat scores
-      if (finalsSharedA.length > 0) {
-        const result = rrsA8Countback(finalsSharedA, finalsSharedB);
-        if (result !== 0) return result;
-      }
-
-      // Step 3: Fall back to all scores
       const aAll = a.raceScores.map(s => s ?? 999);
       const bAll = b.raceScores.map(s => s ?? 999);
       return compareWithCountback(aAll, bAll, a.droppedIndices.size, b.droppedIndices.size);
@@ -527,7 +469,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     });
 
     return allStandings;
-  }, [skippers, raceResults, completedRaces, qualifyingRaces, finalsRaces, skipperFleetMap, hasFinals, shrsQualifyingRounds, skipperHeatByRound]);
+  }, [skippers, raceResults, completedRaces, qualifyingRaces, finalsRaces, skipperFleetMap, hasFinals, shrsQualifyingRounds]);
 
   const totalDiscards = useMemo(() => {
     const qualDiscards = calculateSHRSDiscards(qualifyingRaces.length);
