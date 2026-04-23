@@ -1538,15 +1538,21 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
               setShowOverallResults(true);
             }
           }}
-          className={`fixed right-0 bottom-28 z-40 rounded-l-xl shadow-2xl flex items-center gap-1.5 pl-3 pr-2 py-3 transition-all hover:-translate-x-1 ${
+          className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 rounded-l-xl shadow-2xl flex flex-col items-center gap-2 px-2 py-4 transition-all duration-200 hover:scale-105 ${
             darkMode
-              ? 'bg-gradient-to-br from-cyan-600 to-blue-700 text-white hover:from-cyan-500 hover:to-blue-600'
-              : 'bg-gradient-to-br from-blue-600 to-cyan-600 text-white hover:from-blue-500 hover:to-cyan-500'
+              ? 'bg-gradient-to-b from-cyan-600 to-blue-700 text-white hover:from-cyan-500 hover:to-blue-600'
+              : 'bg-gradient-to-b from-blue-600 to-cyan-600 text-white hover:from-blue-500 hover:to-cyan-500'
           }`}
           title="Current Rankings"
         >
-          <Trophy size={20} />
-          <span className="text-xs font-semibold whitespace-nowrap">Rankings</span>
+          <Trophy size={18} />
+          <div className="flex flex-col items-center">
+            {'RANKINGS'.split('').map((letter, index) => (
+              <span key={index} className="text-[10px] font-semibold leading-tight">
+                {letter}
+              </span>
+            ))}
+          </div>
         </button>
       )}
 
