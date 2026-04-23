@@ -106,7 +106,7 @@ Deno.serve(async (req: Request) => {
         .limit(30),
       supabaseAdmin.rpc("search_knowledge_text", {
         search_query: message,
-        match_count: 5,
+        match_count: 15,
       }),
     ]);
 
@@ -241,7 +241,7 @@ function buildSystemPrompt(
   aiInstructions: Array<{ category: string; instruction_text: string; priority: number }>,
   relevantFaqs: FaqMatch[],
   corrections: Array<{ scenario: string; correct_information: string; topic: string }>,
-  knowledgeChunks: Array<{ content: string; source_name: string }>,
+  knowledgeChunks: Array<{ content: string; source_name: string; similarity: number }>,
   firstName: string,
   hasImage: boolean,
   courseMode: boolean
@@ -304,10 +304,20 @@ function buildSystemPrompt(
   }
 
   if (knowledgeChunks.length > 0) {
-    prompt += "\nRelevant knowledge from uploaded documents:\n";
+    prompt += `\n--- EXPERT KNOWLEDGE BASE ---\n`;
+    prompt += `The following knowledge chunks are from expert-curated documents uploaded by administrators. These contain authoritative information about scoring systems (HMS, SHRS), sailing rules, race management, and other specialist topics.\n\n`;
+    prompt += `CRITICAL RULES for using this knowledge:\n`;
+    prompt += `- When the user asks about a specific scoring system (e.g. SHRS, HMS), ONLY use knowledge chunks from that system's documents. Do NOT mix information from different scoring systems.\n`;
+    prompt += `- These chunks are the PRIMARY source of truth for scoring rules, tie-breaking procedures, heat structures, and race management topics.\n`;
+    prompt += `- Use the FULL content of each chunk — do not summarise or skip details.\n`;
+    prompt += `- If a chunk directly answers the user's question, base your answer on that chunk's content.\n\n`;
+
     for (const chunk of knowledgeChunks) {
-      prompt += `[${chunk.source_name}]: ${chunk.content.substring(0, 400)}\n\n`;
+      const name = chunk.source_name || 'Knowledge Document';
+      prompt += `[${name}]:\n${chunk.content}\n\n`;
     }
+
+    prompt += `--- END EXPERT KNOWLEDGE BASE ---\n`;
   }
 
   return prompt;
