@@ -3128,8 +3128,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               </div>
             )}
 
-            {/* Scoring Mode Buttons - Only show for non-heat races */}
-            {!heatManagement?.configuration.enabled && (
+            {/* Scoring Mode Buttons - Only show for non-heat races, hide when scratch spreadsheet uses HMS component */}
+            {!heatManagement?.configuration.enabled && !(scoringMode === 'spreadsheet' && raceType === 'scratch') && (
               <div className="flex justify-end mb-4 gap-2">
                 {scoringMode === 'pro' && (
                   <button
@@ -3520,6 +3520,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   isFullscreen={isFullscreenScoring}
                   singleFleetMode={true}
                   numRaces={currentNumRaces}
+                  onScoringModeChange={async (mode) => {
+                    setScoringMode(mode);
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                      await supabase.from('profiles').update({ scoring_mode_preference: mode }).eq('id', user.id);
+                    }
+                  }}
                 />
               </div>
             ) : scoringMode === 'spreadsheet' ? (

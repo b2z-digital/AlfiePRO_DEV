@@ -4,7 +4,7 @@ import { HeatDesignation, HeatManagement, getHeatDisplayLabel } from '../types/h
 import { RaceEvent } from '../types/race';
 import { LetterScore, isEntrantsPlusOne, getLetterScoreDisplayCode } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
-import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer, Trophy, TableProperties } from 'lucide-react';
+import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer, Trophy, TableProperties, Table2, Hand } from 'lucide-react';
 import { useNotification } from '../contexts/NotificationContext';
 import { HmsScoreSheet } from './HmsScoreSheet';
 
@@ -53,6 +53,7 @@ interface HmsManualSpreadsheetProps {
   onOpenStartBox?: () => void;
   singleFleetMode?: boolean;
   numRaces?: number;
+  onScoringModeChange?: (mode: 'pro' | 'touch' | 'spreadsheet') => void;
 }
 
 const LETTER_SCORES_PATTERN = 'DNS|DNF|DSQ|OCS|BFD|UFD|RDG|DPI|ZFP|SCP|RET|DNC|DNE|NSC|WDN';
@@ -91,6 +92,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   onOpenStartBox,
   singleFleetMode = false,
   numRaces: propNumRaces,
+  onScoringModeChange,
 }) => {
   const { addNotification } = useNotification();
   const numberOfHeats = singleFleetMode ? 1 : (heatManagement?.configuration?.numberOfHeats || 4);
@@ -908,6 +910,26 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
   return (
     <div className={`flex flex-col h-full text-slate-900 relative`}>
+      {singleFleetMode && onScoringModeChange && (
+      <div className="absolute top-[-44px] right-0 z-30 flex items-center gap-1">
+        <button
+          onClick={() => onScoringModeChange('pro')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-slate-700 hover:bg-slate-600 text-slate-200"
+          title="Switch to Pro Mode"
+        >
+          <Table2 size={14} />
+          Pro Mode
+        </button>
+        <button
+          onClick={() => onScoringModeChange('touch')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-slate-700 hover:bg-slate-600 text-slate-200"
+          title="Switch to Touch Mode"
+        >
+          <Hand size={14} />
+          Touch Mode
+        </button>
+      </div>
+      )}
       {!singleFleetMode && (
       <div className="absolute top-[-44px] right-0 z-30 flex items-center gap-1">
         <button
