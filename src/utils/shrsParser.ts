@@ -444,10 +444,10 @@ function parseResultCell(
     return;
   }
 
-  // Number + single fleet suffix: "1G", "3S", "12B", "9C" (finals position with fleet indicator)
-  const numFleetMatch = upper.match(/^(\d+\.?\d*)([GSBC])$/);
-  if (numFleetMatch) {
-    const pos = parseFloat(numFleetMatch[1]);
+  // Number + single letter suffix: "1G", "3S", "12B", "9C" (fleet indicator) or "1A", "4B", "1C" (heat indicator)
+  const numLetterMatch = upper.match(/^(\d+\.?\d*)([A-Z])$/);
+  if (numLetterMatch) {
+    const pos = parseFloat(numLetterMatch[1]);
     results.push({ raceNumber, sailNumber, position: pos, points: pos, heat });
     return;
   }
@@ -458,10 +458,10 @@ function parseResultCell(
     return;
   }
 
-  // Letter score + space + points + optional fleet suffix:
+  // Letter score + space + points + optional single letter suffix:
   // "DNF 18", "RGP 2", "RGA 4.3", "SCP 16.4", "NSC 18", "UFD 18",
-  // "RET 18C", "NSC 18B", "DNC 18S", "RGP 9.3G", "RGP 5S", "DNF 18B"
-  const codeSpacePointsMatch = upper.match(/^([A-Z]{2,6})\s+(\d+\.?\d*)\s*([GSBC]?)$/);
+  // "RET 18C", "NSC 18B", "DNC 18S", "RGP 9.3G", "RGP 5S", "DNF 18B", "DNF 16A"
+  const codeSpacePointsMatch = upper.match(/^([A-Z]{2,6})\s+(\d+\.?\d*)\s*([A-Z]?)$/);
   if (codeSpacePointsMatch) {
     const code = codeSpacePointsMatch[1];
     const points = parseFloat(codeSpacePointsMatch[2]);
@@ -491,8 +491,8 @@ function parseResultCell(
     return;
   }
 
-  // Letter score + space + "number.number" + fleet suffix: "RGP 9.5C", "RGA 4.3G"
-  const codeDecimalFleetMatch = upper.match(/^([A-Z]{2,6})\s+(\d+\.\d+)([GSBC])$/);
+  // Letter score + space + "number.number" + single letter suffix: "RGP 9.5C", "RGA 4.3G"
+  const codeDecimalFleetMatch = upper.match(/^([A-Z]{2,6})\s+(\d+\.\d+)([A-Z])$/);
   if (codeDecimalFleetMatch) {
     const code = codeDecimalFleetMatch[1];
     const points = parseFloat(codeDecimalFleetMatch[2]);
