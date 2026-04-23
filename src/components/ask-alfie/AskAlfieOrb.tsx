@@ -139,6 +139,13 @@ export const AskAlfieOrb: React.FC<AskAlfieOrbProps> = ({ darkMode }) => {
           onClose={() => setIsOpen(false)}
         />
       )}
+
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-[9988]"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
     </>,
     document.body
   );
