@@ -11,6 +11,7 @@ import {
   getNonFinisherPriority,
   compareSailNumbers,
 } from './shrsHeatSystem';
+import { compareWithCountback } from './scratchCalculations';
 import { LetterScore } from '../types/letterScores';
 
 export type SHRSImportMode = 'shrs-progressive' | 'shrs-balanced';
@@ -690,21 +691,47 @@ export function reconstructSHRSHeats(
       qualScores.set(idx, net);
     });
 
-    // Rank skippers by qualifying net score (lowest = best) for fleet allocation
-    const rankedSkippers = Array.from(qualScores.entries())
-      .sort(([, a], [, b]) => a - b);
-
     const fleetSizes = calculateHeatSizes(skippers.length, numberOfHeats);
     const fleetAssignments = heatLabels.map((label) => ({
       heatDesignation: label,
       skipperIndices: [] as number[],
     }));
 
-    let idx = 0;
-    for (let f = 0; f < numberOfHeats; f++) {
-      for (let s = 0; s < fleetSizes[f] && idx < rankedSkippers.length; s++) {
-        fleetAssignments[f].skipperIndices.push(rankedSkippers[idx][0]);
-        idx++;
+    // Use source fleet allocation when available (respects the event organizer's fleet assignment)
+    const fleetLetterToIndex: Record<string, number> = { 'G': 0, 'S': 1, 'B': 2, 'C': 3 };
+    const allHaveSourceFleet = skippers.every(s => s.sourceFleet && fleetLetterToIndex[s.sourceFleet] !== undefined);
+
+    if (allHaveSourceFleet) {
+      skippers.forEach((s, skipperIdx) => {
+        const fleetIdx = fleetLetterToIndex[s.sourceFleet!];
+        if (fleetIdx !== undefined && fleetIdx < numberOfHeats) {
+          fleetAssignments[fleetIdx].skipperIndices.push(skipperIdx);
+        }
+      });
+      // Sort within each fleet by source fleet position
+      fleetAssignments.forEach(fa => {
+        fa.skipperIndices.sort((a, b) => {
+          const posA = skippers[a].sourceFleetPosition ?? 999;
+          const posB = skippers[b].sourceFleetPosition ?? 999;
+          return posA - posB;
+        });
+      });
+    } else {
+      // Fall back to ranking by qualifying net score with RRS A8.1 countback
+      const rankedSkippers = Array.from(qualScores.entries())
+        .sort(([idxA, a], [idxB, b]) => {
+          if (a !== b) return a - b;
+          const aScores = qualRaceScores.get(idxA) || [];
+          const bScores = qualRaceScores.get(idxB) || [];
+          return compareWithCountback(aScores, bScores, numDiscards, numDiscards);
+        });
+
+      let idx = 0;
+      for (let f = 0; f < numberOfHeats; f++) {
+        for (let s = 0; s < fleetSizes[f] && idx < rankedSkippers.length; s++) {
+          fleetAssignments[f].skipperIndices.push(rankedSkippers[idx][0]);
+          idx++;
+        }
       }
     }
 
