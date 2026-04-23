@@ -43,6 +43,7 @@ export interface HeatConfiguration {
       name: string;
       sailNumber: string;
       sourceNet?: number;
+      sourceTotal?: number;
       sourceFleet?: string;
       sourceFleetPosition?: number;
     }[];

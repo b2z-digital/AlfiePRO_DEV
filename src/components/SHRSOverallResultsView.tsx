@@ -308,24 +308,27 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     if (expandedVerification) {
       lines.push('');
       lines.push('─── OVERALL VERIFICATION SUMMARY ───');
-      lines.push(`Net Scores:       ${expandedVerification.netMatched}/${expandedVerification.netTotal} matched${expandedVerification.netMatched === expandedVerification.netTotal ? ' (100%)' : ` (${((expandedVerification.netMatched / expandedVerification.netTotal) * 100).toFixed(1)}%)`}`);
-      lines.push(`Fleet Allocations: ${expandedVerification.fleetMatched}/${expandedVerification.fleetTotal} matched${expandedVerification.fleetMatched === expandedVerification.fleetTotal ? ' (100%)' : ` (${((expandedVerification.fleetMatched / expandedVerification.fleetTotal) * 100).toFixed(1)}%)`}`);
-      lines.push(`Fleet Rankings:    ${expandedVerification.rankMatched}/${expandedVerification.rankTotal} matched${expandedVerification.rankMatched === expandedVerification.rankTotal ? ' (100%)' : ` (${((expandedVerification.rankMatched / expandedVerification.rankTotal) * 100).toFixed(1)}%)`}`);
+      lines.push(`Gross Scores:      ${expandedVerification.totalMatched}/${expandedVerification.totalCount} matched${expandedVerification.totalCount > 0 ? (expandedVerification.totalMatched === expandedVerification.totalCount ? ' (100%)' : ` (${((expandedVerification.totalMatched / expandedVerification.totalCount) * 100).toFixed(1)}%)`) : ''}`);
+      lines.push(`Final Scores:      ${expandedVerification.netMatched}/${expandedVerification.netTotal} matched${expandedVerification.netTotal > 0 ? (expandedVerification.netMatched === expandedVerification.netTotal ? ' (100%)' : ` (${((expandedVerification.netMatched / expandedVerification.netTotal) * 100).toFixed(1)}%)`) : ''}`);
+      lines.push(`Fleet Allocations: ${expandedVerification.fleetMatched}/${expandedVerification.fleetTotal} matched${expandedVerification.fleetTotal > 0 ? (expandedVerification.fleetMatched === expandedVerification.fleetTotal ? ' (100%)' : ` (${((expandedVerification.fleetMatched / expandedVerification.fleetTotal) * 100).toFixed(1)}%)`) : ''}`);
+      lines.push(`Fleet Rankings:    ${expandedVerification.rankMatched}/${expandedVerification.rankTotal} matched${expandedVerification.rankTotal > 0 ? (expandedVerification.rankMatched === expandedVerification.rankTotal ? ' (100%)' : ` (${((expandedVerification.rankMatched / expandedVerification.rankTotal) * 100).toFixed(1)}%)`) : ''}`);
       lines.push('');
       lines.push('─── SKIPPER RESULTS VERIFICATION ───');
       lines.push('');
-      const header = 'Skipper'.padEnd(28) + 'Total'.padStart(7) + 'Disc'.padStart(7) + 'Net'.padStart(7) + 'SrcNet'.padStart(8) + '  Fleet' + ' SrcFl' + '  Pos' + ' SrcPos' + '  Status';
+      const header = 'Skipper'.padEnd(28) + 'Total'.padStart(7) + 'SrcTot'.padStart(8) + 'Disc'.padStart(7) + 'Final'.padStart(7) + 'SrcFin'.padStart(8) + '  Fleet' + ' SrcFl' + '  Pos' + ' SrcPos' + '  Status';
       lines.push(header);
       lines.push('─'.repeat(header.length));
       for (const sv of expandedVerification.skipperVerification) {
-        const allMatch = sv.netMatch && sv.fleetMatch && sv.rankMatch;
+        const allMatch = sv.totalMatch && sv.netMatch && sv.fleetMatch && sv.rankMatch;
         const status = allMatch ? 'OK' : 'MISMATCH';
+        const srcTotalStr = sv.sourceTotal !== null ? String(sv.sourceTotal) : 'N/A';
         const srcNetStr = sv.sourceNet !== null ? String(sv.sourceNet) : 'N/A';
         const srcFleetStr = sv.sourceFleet || 'N/A';
         const srcRankStr = sv.sourceRank !== null ? String(sv.sourceRank) : 'N/A';
         lines.push(
           sv.name.padEnd(28) +
           String(sv.alfieTotal).padStart(7) +
+          srcTotalStr.padStart(8) +
           String(sv.alfieDisc).padStart(7) +
           String(sv.alfieNet).padStart(7) +
           srcNetStr.padStart(8) +
@@ -535,18 +538,18 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     const sourceByIndex = new Map(sourceData.map(s => [s.skipperIndex, s]));
     const fleetPrefixToDesignation: Record<string, string> = { 'G': 'A', 'S': 'B', 'B': 'C', 'C': 'D' };
 
-    // Total/Disc/Net verification per skipper
     const skipperVerification: {
       name: string; sailNumber: string; fleet: string; fleetPosition: number;
       alfieTotal: number; alfieDisc: number; alfieNet: number;
-      sourceNet: number | null;
-      netMatch: boolean;
+      sourceTotal: number | null; sourceNet: number | null;
+      totalMatch: boolean; netMatch: boolean;
       alfieFleet: string; sourceFleet: string | null;
       fleetMatch: boolean;
       alfieRank: number; sourceRank: number | null;
       rankMatch: boolean;
     }[] = [];
 
+    let totalMatched = 0; let totalCount = 0;
     let netMatched = 0; let netTotal = 0;
     let fleetMatched = 0; let fleetTotal = 0;
     let rankMatched = 0; let rankTotal = 0;
@@ -556,13 +559,16 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       const alfieFleetPrefix = FLEET_PREFIX[s.fleet] || s.fleet;
       const sourceFleet = src?.sourceFleet || null;
       const sourceFleetDesignation = sourceFleet ? (fleetPrefixToDesignation[sourceFleet] || sourceFleet) : null;
+      const sourceTotal = src?.sourceTotal ?? null;
       const sourceNet = src?.sourceNet ?? null;
       const sourceRank = src?.sourceFleetPosition ?? null;
 
+      const totalMatch = sourceTotal !== null ? Math.abs(s.total - sourceTotal) < 0.05 : false;
       const netMatch = sourceNet !== null ? Math.abs(s.net - sourceNet) < 0.05 : false;
       const fleetMatch = sourceFleetDesignation !== null ? s.fleet === sourceFleetDesignation : false;
       const rankMatch = sourceRank !== null ? s.fleetPosition === sourceRank : false;
 
+      if (sourceTotal !== null) { totalCount++; if (totalMatch) totalMatched++; }
       if (sourceNet !== null) { netTotal++; if (netMatch) netMatched++; }
       if (sourceFleetDesignation !== null) { fleetTotal++; if (fleetMatch) fleetMatched++; }
       if (sourceRank !== null) { rankTotal++; if (rankMatch) rankMatched++; }
@@ -573,7 +579,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
         fleet: alfieFleetPrefix,
         fleetPosition: s.fleetPosition,
         alfieTotal: s.total, alfieDisc: s.discardTotal, alfieNet: s.net,
-        sourceNet, netMatch,
+        sourceTotal, sourceNet, totalMatch, netMatch,
         alfieFleet: alfieFleetPrefix, sourceFleet, fleetMatch,
         alfieRank: s.fleetPosition, sourceRank, rankMatch,
       });
@@ -581,6 +587,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
 
     return {
       skipperVerification,
+      totalMatched, totalCount,
       netMatched, netTotal,
       fleetMatched, fleetTotal,
       rankMatched, rankTotal,
@@ -901,9 +908,10 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
                     <h4 className={`text-xs font-bold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                       Overall Verification Summary
                     </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {[
-                        { label: 'Net Scores', matched: expandedVerification.netMatched, total: expandedVerification.netTotal },
+                        { label: 'Gross Scores', matched: expandedVerification.totalMatched, total: expandedVerification.totalCount },
+                        { label: 'Final Scores', matched: expandedVerification.netMatched, total: expandedVerification.netTotal },
                         { label: 'Fleet Allocations', matched: expandedVerification.fleetMatched, total: expandedVerification.fleetTotal },
                         { label: 'Fleet Rankings', matched: expandedVerification.rankMatched, total: expandedVerification.rankTotal },
                       ].map((item) => {
@@ -957,9 +965,10 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
                           <tr className={darkMode ? 'bg-slate-800' : 'bg-slate-100'}>
                             <th className={`px-2 py-1.5 text-left font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Skipper</th>
                             <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Total</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Src Total</th>
                             <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Disc</th>
-                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Net</th>
-                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Source Net</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Final</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Src Final</th>
                             <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Fleet</th>
                             <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Src Fleet</th>
                             <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Pos</th>
@@ -969,8 +978,8 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
                         </thead>
                         <tbody>
                           {expandedVerification.skipperVerification.map((sv, i) => {
-                            const allMatch = sv.netMatch && sv.fleetMatch && sv.rankMatch;
-                            const anySource = sv.sourceNet !== null || sv.sourceFleet !== null || sv.sourceRank !== null;
+                            const allMatch = sv.totalMatch && sv.netMatch && sv.fleetMatch && sv.rankMatch;
+                            const anySource = sv.sourceTotal !== null || sv.sourceNet !== null || sv.sourceFleet !== null || sv.sourceRank !== null;
                             return (
                               <tr key={i} className={`border-t ${
                                 darkMode ? 'border-slate-700/50' : 'border-slate-200/60'
@@ -980,6 +989,15 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
                                 </td>
                                 <td className={`px-2 py-1 text-center font-mono ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                   {formatNumber(sv.alfieTotal)}
+                                </td>
+                                <td className={`px-2 py-1 text-center font-mono ${
+                                  sv.totalMatch
+                                    ? darkMode ? 'text-emerald-400' : 'text-emerald-600'
+                                    : sv.sourceTotal !== null
+                                      ? darkMode ? 'text-amber-400' : 'text-amber-600'
+                                      : darkMode ? 'text-slate-500' : 'text-slate-400'
+                                }`}>
+                                  {sv.sourceTotal !== null ? formatNumber(sv.sourceTotal) : '-'}
                                 </td>
                                 <td className={`px-2 py-1 text-center font-mono ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                                   {formatNumber(sv.alfieDisc)}

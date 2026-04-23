@@ -260,7 +260,7 @@ function parseSHRSFromRows(
   let nameCol = findCol(headersLower, ['name', 'skipper', 'helmsman', 'competitor']);
   let clubCol = findCol(headersLower, ['club', 'organization', 'org']);
   const totalCol = findCol(headersLower, ['total', 'gross', 'tot']);
-  const netCol = findCol(headersLower, ['net', 'nett']);
+  const netCol = findCol(headersLower, ['net', 'nett', 'final']);
 
   // Infer columns from data if headers are unlabelled (like the Oceania format)
   const firstRoundColIndex = Math.min(
@@ -374,6 +374,7 @@ function parseSHRSFromRows(
       sailNumber: rawSail || String(skippers.length + 1),
       club: clubCol >= 0 ? String(row[clubCol] || '').trim() || undefined : undefined,
       totalScore: netScore || totalScore,
+      grossTotal: netScore ? totalScore : undefined,
       raceScores,
       sourceFleet,
       sourceFleetPosition,

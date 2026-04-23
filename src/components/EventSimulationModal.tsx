@@ -491,6 +491,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
           name: s.name,
           sailNumber: s.sailNumber,
           sourceNet: s.totalScore,
+          sourceTotal: s.grossTotal,
           sourceFleet: s.sourceFleet,
           sourceFleetPosition: s.sourceFleetPosition,
         })),
