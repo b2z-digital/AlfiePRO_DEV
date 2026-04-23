@@ -30,6 +30,7 @@ import { seedSHRSHeatsByIndex, generatePreSetQualifyingAssignments, addSkippersT
 import { SingleEventManagement } from './SingleEventManagement';
 import { TouchModeScoring } from './TouchModeScoring';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
+import { HmsManualSpreadsheet } from './HmsManualSpreadsheet';
 import { calculateHandicaps } from '../utils/handicapCalculator';
 import { RaceSettingsModal } from './RaceSettingsModal';
 import { StartBoxModal } from './start-box/StartBoxModal';
@@ -3507,6 +3508,20 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 updateSkipper={updateSkipper}
                 setSkippers={setSkippers}
               />
+            ) : scoringMode === 'spreadsheet' && raceType === 'scratch' ? (
+              <div className={`flex flex-col ${isFullscreenScoring ? 'h-full' : 'h-[calc(100vh-200px)]'} no-select`}>
+                <HmsManualSpreadsheet
+                  skippers={skippers}
+                  darkMode={darkMode}
+                  raceResults={raceResults}
+                  currentEvent={currentEvent}
+                  updateRaceResults={updateRaceResults}
+                  deleteRaceResult={deleteRaceResult}
+                  isFullscreen={isFullscreenScoring}
+                  singleFleetMode={true}
+                  numRaces={currentNumRaces}
+                />
+              </div>
             ) : scoringMode === 'spreadsheet' ? (
               <SpreadsheetScoring
                 skippers={skippers}
