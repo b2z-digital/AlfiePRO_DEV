@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, MoveHorizontal as MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Timer, Flag, Pause } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoveHorizontal as MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Timer, Flag, Pause, Pencil, Lock } from 'lucide-react';
 import { Skipper, RaceResult } from '../types';
 import { RaceEvent } from '../types/race';
 import { LetterScoreSelector } from './LetterScoreSelector';
@@ -77,7 +77,9 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [splitPosition, setSplitPosition] = useState(33); // Default 33% for left panel
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
-  const [isConfirmed, setIsConfirmed] = useState(false); // Track if user confirmed the finish order
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isEditingPreviousRace, setIsEditingPreviousRace] = useState(false);
+  const activeTargetRace = useRef(initialRace);
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [touchDragging, setTouchDragging] = useState(false);
@@ -245,6 +247,10 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     setCurrentRace(initialRace);
     setIsConfirmed(false);
     setRaceTimerRunning(false);
+
+    if (initialRace > activeTargetRace.current) {
+      activeTargetRace.current = initialRace;
+    }
 
     const isAutoAdvancing = initialRace === previousRace + 1 && isHandicapViewerOpen;
     if (!isAutoAdvancing) {
@@ -696,6 +702,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     const newRace = direction === 'prev' ? currentRace - 1 : currentRace + 1;
     if (newRace >= 1 && newRace <= numRaces) {
       setCurrentRace(newRace);
+      setIsEditingPreviousRace(false);
       onRaceChange?.(newRace);
     }
   };
@@ -793,19 +800,18 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     return completedCount;
   };
 
-  // Check if we're viewing a previous race (locked from editing)
-  const isPreviousRace = (): boolean => {
-    // If the current race being viewed is less than the initial race (the active race from parent),
-    // and it has been fully scored, then it's a previous race that should be locked
-    if (currentRace >= initialRace) return false;
-
-    // Check if this race has been fully scored
+  const isCompletedPreviousRace = (): boolean => {
+    if (currentRace >= activeTargetRace.current) return false;
     const allSkippersHaveResult = skippers.every((_, skipperIndex) => {
       const result = raceResults.find(r => r.race === currentRace && r.skipperIndex === skipperIndex);
       return result && (result.position !== null || result.letterScore);
     });
-
     return allSkippersHaveResult;
+  };
+
+  const isPreviousRace = (): boolean => {
+    if (isEditingPreviousRace) return false;
+    return isCompletedPreviousRace();
   };
 
   // Get scoring system display name
@@ -1184,8 +1190,25 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             )}
           </div>
 
-          {/* Confirm Button - appears when all racing skippers scored but not confirmed */}
-          {finishOrder.length === skippers.length && !isConfirmed && (
+          {/* Locked previous race - show Edit Results button */}
+          {isCompletedPreviousRace() && !isEditingPreviousRace && (
+            <div className={`px-4 py-3 border-t flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
+              <div className={`flex items-center justify-center gap-2 mb-2 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                <Lock size={14} />
+                Race {currentRace} results are locked
+              </div>
+              <button
+                onClick={() => setIsEditingPreviousRace(true)}
+                className={`w-full py-3 px-4 rounded-lg font-semibold text-white bg-amber-600 hover:bg-amber-700 transition-colors flex items-center justify-center gap-2 shadow-lg active:scale-98`}
+              >
+                <Pencil size={20} />
+                Edit Results
+              </button>
+            </div>
+          )}
+
+          {/* Confirm Button - appears when all racing skippers scored but not confirmed, and not viewing a locked previous race */}
+          {finishOrder.length === skippers.length && !isConfirmed && !isCompletedPreviousRace() && (
             <div className={`px-4 py-3 border-t flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
               <button
                 onClick={(e) => {
@@ -1202,6 +1225,24 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
               >
                 <Check size={20} />
                 {isScoringLastHeat ? 'Verify Results & Complete Round' : 'Verify & Apply Results'}
+              </button>
+            </div>
+          )}
+
+          {/* Re-verify button when editing a previous race */}
+          {isEditingPreviousRace && finishOrder.length === skippers.length && (
+            <div className={`px-4 py-3 border-t flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsEditingPreviousRace(false);
+                  handleConfirmResults();
+                }}
+                className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-green-600 hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-lg active:scale-98"
+              >
+                <Check size={20} />
+                Save Changes
               </button>
             </div>
           )}
