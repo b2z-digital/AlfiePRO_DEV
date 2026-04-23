@@ -32,6 +32,7 @@ import { TouchModeScoring } from './TouchModeScoring';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
 import { HmsManualSpreadsheet } from './HmsManualSpreadsheet';
 import { calculateHandicaps } from '../utils/handicapCalculator';
+import { calculateScratchResults } from '../utils/scratchCalculations';
 import { RaceSettingsModal } from './RaceSettingsModal';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -133,6 +134,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [scoringMode, setScoringMode] = useState<'pro' | 'touch' | 'spreadsheet'>('pro');
   const [touchModeCurrentRace, setTouchModeCurrentRace] = useState<number>(1);
   const [isFullscreenScoring, setIsFullscreenScoring] = useState(false);
+  const [showOverallResults, setShowOverallResults] = useState(false);
   const [eventUpdateTrigger, setEventUpdateTrigger] = useState(0);
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
@@ -3172,6 +3174,21 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                     </span>
                   </button>
                 ))}
+                {raceType === 'scratch' && (
+                  <button
+                    onClick={() => setShowOverallResults(true)}
+                    className={`
+                      flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+                      ${darkMode
+                        ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25'
+                        : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'}
+                    `}
+                    title="View Overall Results"
+                  >
+                    <Trophy size={18} />
+                    <span className="text-sm font-medium">Overall Results</span>
+                  </button>
+                )}
               </div>
             )}
 
@@ -3527,6 +3544,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                       await supabase.from('profiles').update({ scoring_mode_preference: mode }).eq('id', user.id);
                     }
                   }}
+                  onShowOverallResults={() => setShowOverallResults(true)}
                 />
               </div>
             ) : scoringMode === 'spreadsheet' ? (
@@ -3842,6 +3860,142 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           clubId={getCurrentEvent()?.clubId || null}
           darkMode={darkMode}
         />
+
+        {showOverallResults && raceType === 'scratch' && (() => {
+          const results = calculateScratchResults(skippers, raceResults, currentNumRaces, currentDropRules as number[]);
+          const completedRaceCount = (() => {
+            let count = 0;
+            for (let r = 1; r <= currentNumRaces; r++) {
+              const hasAnyResult = raceResults.some(res => res.race === r && (res.position !== null || res.letterScore));
+              if (hasAnyResult) count = r;
+            }
+            return count;
+          })();
+
+          return (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className={`
+                w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl overflow-hidden border flex flex-col
+                ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
+              `}>
+                <div className={`
+                  flex items-center justify-between px-6 py-4 border-b shrink-0
+                  ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}
+                `}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${darkMode ? 'bg-amber-500/15' : 'bg-amber-50'}`}>
+                      <Trophy size={20} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+                    </div>
+                    <div>
+                      <h2 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Overall Results
+                      </h2>
+                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {getCurrentEvent()?.name || 'Event'} — {completedRaceCount} race{completedRaceCount !== 1 ? 's' : ''} completed
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowOverallResults(false)}
+                    className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="overflow-auto flex-1">
+                  <table className="w-full">
+                    <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-slate-750' : 'bg-slate-50'}`}>
+                      <tr className={`border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-14 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pos</th>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Skipper</th>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-20 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sail No</th>
+                        {Array.from({ length: completedRaceCount }, (_, i) => (
+                          <th key={i} className={`px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider w-14 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            R{i + 1}
+                          </th>
+                        ))}
+                        <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider w-20 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.map((result, idx) => {
+                        const skipper = skippers[result.skipperIndex];
+                        if (!skipper) return null;
+                        const isTop3 = idx < 3;
+
+                        return (
+                          <tr
+                            key={result.skipperIndex}
+                            className={`
+                              border-b transition-colors
+                              ${darkMode
+                                ? `border-slate-700/50 ${isTop3 ? 'bg-amber-500/5' : idx % 2 === 0 ? 'bg-slate-800' : 'bg-slate-800/50'}`
+                                : `border-slate-100 ${isTop3 ? 'bg-amber-50/50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`
+                              }
+                            `}
+                          >
+                            <td className="px-4 py-2.5">
+                              <span className={`
+                                inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold
+                                ${idx === 0 ? 'bg-amber-400 text-amber-900'
+                                  : idx === 1 ? (darkMode ? 'bg-slate-400 text-slate-900' : 'bg-slate-300 text-slate-800')
+                                  : idx === 2 ? 'bg-amber-600 text-white'
+                                  : darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}
+                              `}>
+                                {idx + 1}
+                              </span>
+                            </td>
+                            <td className={`px-4 py-2.5 font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                              {skipper.name}
+                            </td>
+                            <td className={`px-4 py-2.5 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              {skipper.sailNumber || '-'}
+                            </td>
+                            {Array.from({ length: completedRaceCount }, (_, raceIdx) => {
+                              const raceNum = raceIdx + 1;
+                              const raceDetail = result.raceDetails?.find((d: any) => d.race === raceNum);
+                              const raceResult = raceResults.find(r => r.race === raceNum && r.skipperIndex === result.skipperIndex);
+                              const displayValue = raceResult?.letterScore
+                                ? raceResult.letterScore
+                                : raceResult?.position || '';
+                              const isDropped = raceDetail?.isDropped;
+
+                              return (
+                                <td
+                                  key={raceIdx}
+                                  className={`px-3 py-2.5 text-center text-sm ${
+                                    isDropped
+                                      ? darkMode ? 'text-slate-600 line-through' : 'text-slate-300 line-through'
+                                      : raceResult?.letterScore
+                                        ? darkMode ? 'text-red-400' : 'text-red-500'
+                                        : darkMode ? 'text-slate-300' : 'text-slate-700'
+                                  }`}
+                                >
+                                  {displayValue}
+                                </td>
+                              );
+                            })}
+                            <td className={`px-4 py-2.5 text-center font-bold ${darkMode ? 'text-amber-400' : 'text-amber-700'}`}>
+                              {result.totalPoints}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {results.length === 0 && (
+                        <tr>
+                          <td colSpan={3 + completedRaceCount + 1} className={`px-6 py-12 text-center ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                            No results recorded yet. Start scoring races to see overall standings.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

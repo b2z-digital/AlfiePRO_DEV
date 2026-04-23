@@ -54,6 +54,7 @@ interface HmsManualSpreadsheetProps {
   singleFleetMode?: boolean;
   numRaces?: number;
   onScoringModeChange?: (mode: 'pro' | 'touch' | 'spreadsheet') => void;
+  onShowOverallResults?: () => void;
 }
 
 const LETTER_SCORES_PATTERN = 'DNS|DNF|DSQ|OCS|BFD|UFD|RDG|DPI|ZFP|SCP|RET|DNC|DNE|NSC|WDN';
@@ -93,6 +94,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   singleFleetMode = false,
   numRaces: propNumRaces,
   onScoringModeChange,
+  onShowOverallResults,
 }) => {
   const { addNotification } = useNotification();
   const numberOfHeats = singleFleetMode ? 1 : (heatManagement?.configuration?.numberOfHeats || 4);
@@ -928,6 +930,16 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           <Hand size={14} />
           Touch Mode
         </button>
+        {onShowOverallResults && (
+          <button
+            onClick={onShowOverallResults}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25"
+            title="View Overall Results"
+          >
+            <Trophy size={14} />
+            Overall Results
+          </button>
+        )}
       </div>
       )}
       {!singleFleetMode && (
