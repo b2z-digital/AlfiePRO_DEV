@@ -3857,7 +3857,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           isOpen={showStartBoxModal}
           onClose={() => setShowStartBoxModal(false)}
           onSequenceComplete={() => {}}
-          clubId={getCurrentEvent()?.clubId || null}
+          clubId={getCurrentEvent()?.clubId || localStorage.getItem('currentClubId') || null}
           darkMode={darkMode}
         />
 
