@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Award, ChevronLeft, RotateCcw, Edit3, Check, History, Zap } from 'lucide-react';
+import { X, Award, ChevronLeft, RotateCcw, CreditCard as Edit3, Check, History, Zap } from 'lucide-react';
 import { Skipper, RaceResult } from '../../types';
 import { RaceEvent } from '../../types/race';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -399,12 +399,12 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
   return (
     <>
       <motion.button
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        whileHover={{ scale: 1.05 }}
+        initial={{ x: 20, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        whileHover={{ x: -4 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-colors ${
+        className={`fixed right-0 bottom-28 z-40 rounded-l-xl shadow-2xl flex items-center gap-1.5 pl-3 pr-2 py-3 transition-colors ${
           canEditHandicaps && allHandicapsZero && hasStoredHandicaps
             ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:from-green-400 hover:to-emerald-500 animate-pulse'
             : canEditHandicaps && allHandicapsZero
@@ -414,7 +414,8 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
               : 'bg-gradient-to-br from-blue-600 to-cyan-600 text-white hover:from-blue-500 hover:to-cyan-500'
         }`}
       >
-        {isOpen ? <X size={24} /> : <Award size={24} />}
+        {isOpen ? <X size={20} /> : <Award size={20} />}
+        <span className="text-xs font-semibold whitespace-nowrap">{isScratchEvent ? 'Rankings' : 'Handicaps'}</span>
       </motion.button>
 
       <AnimatePresence>
