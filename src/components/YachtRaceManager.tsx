@@ -1226,7 +1226,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         heatManagement.configuration.shrsAssignmentMode === 'preset' &&
         heatManagement.rounds.some(r => r.completed || (r.results && r.results.length > 0))
       ) {
-        // SHRS-B mid-event addition: slot new skippers into future rounds
+        // SHRS-PA mid-event addition: slot new skippers into future rounds
         const updatedRounds = addSkippersToSHRSAssignments(
           heatManagement.rounds,
           newlyAddedSkippers,

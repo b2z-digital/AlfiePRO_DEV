@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Users, RefreshCw, Hash, Trophy, Loader as Loader2 } from 'lucide-react';
+import { X, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Users, RefreshCw, Hash, Trophy, Loader as Loader2, Globe, Pencil } from 'lucide-react';
 import type { Skipper } from '../types';
 import type { HeatDesignation, HeatConfiguration } from '../types/heat';
 import { getHeatDisplayLabel } from '../types/heat';
@@ -43,29 +43,74 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
   const [skippersWithRankings, setSkippersWithRankings] = useState<SkipperWithRanking[]>([]);
   const [preview, setPreview] = useState<ReturnType<typeof previewHMSSeeding> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rankingSource, setRankingSource] = useState<'imported' | 'database' | 'none'>('none');
+  const [internationalSkippers, setInternationalSkippers] = useState<number[]>([]);
+  const [editingRankIndex, setEditingRankIndex] = useState<number | null>(null);
+  const [editingRankValue, setEditingRankValue] = useState('');
 
   useEffect(() => {
     if (isOpen) {
+      setEditingRankIndex(null);
       loadRankings();
     }
   }, [isOpen, skippers, nationalAssociationId, yachtClassName]);
+
+  function handleManualRankChange(skipperOriginalIndex: number, newRank: number) {
+    const updated = skippersWithRankings.map(s => {
+      if (s.originalIndex === skipperOriginalIndex) {
+        return { ...s, rank: newRank > 0 ? newRank : undefined };
+      }
+      return s;
+    });
+    setSkippersWithRankings(updated);
+    generatePreview(updated);
+    setEditingRankIndex(null);
+  }
 
   async function loadRankings() {
     console.log('HMS Seeding: Loading rankings', {
       nationalAssociationId,
       yachtClassName,
-      skipperCount: skippers.length,
-      firstSkipperSample: skippers[0]
+      skipperCount: skippers.length
     });
 
+    // Check if skippers have imported national_ranking values
+    const skippersWithImportedRanking = skippers.filter(s => s.national_ranking && s.national_ranking > 0);
+    const hasImportedRankings = skippersWithImportedRanking.length > 0;
+
+    // Detect international skippers (non-AUS or country not set to Australia)
+    const intlIndices = skippers
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => {
+        const code = (s.country_code || '').toUpperCase();
+        return code && code !== 'AU' && code !== 'AUS' && code !== 'AUSTRALIA';
+      })
+      .map(({ i }) => i);
+    setInternationalSkippers(intlIndices);
+
+    if (hasImportedRankings) {
+      console.log(`HMS Seeding: Using ${skippersWithImportedRanking.length} imported rankings`);
+      setRankingSource('imported');
+
+      const skippersData: SkipperWithRanking[] = skippers.map((s, index) => ({
+        ...s,
+        rank: s.national_ranking && s.national_ranking > 0 ? s.national_ranking : undefined,
+        ranking: undefined,
+        originalIndex: index
+      }));
+      setSkippersWithRankings(skippersData);
+      generatePreview(skippersData);
+      return;
+    }
+
     if (!nationalAssociationId || !yachtClassName) {
-      console.warn('HMS Seeding: Missing nationalAssociationId or yachtClassName');
-      // No rankings available - just use skippers without rankings
+      console.warn('HMS Seeding: No imported rankings and no association configured');
+      setRankingSource('none');
       const skippersData: SkipperWithRanking[] = skippers.map((s, index) => ({
         ...s,
         rank: undefined,
         ranking: undefined,
-        originalIndex: index  // Store the original index for later lookup
+        originalIndex: index
       }));
       setSkippersWithRankings(skippersData);
       generatePreview(skippersData);
@@ -75,13 +120,12 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
     try {
       setLoading(true);
       setError(null);
+      setRankingSource('database');
 
-      // Get member IDs from skippers
       const memberIds = skippers
         .map(s => s.memberId)
         .filter(id => id) as string[];
 
-      // Fetch rankings for these members
       const rankingsMap = await getRankingsForMembers(
         memberIds,
         nationalAssociationId,
@@ -90,50 +134,25 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
 
       console.log(`Found ${rankingsMap.size} rankings via memberId lookup`);
 
-      // Always try fuzzy matching for skippers that don't have rankings yet
-      console.log('Attempting fuzzy matching for unmatched skippers...');
-
-      // Import required functions dynamically
       const { getRankingsByClass } = await import('../utils/rankingsStorage');
-
-      // Get all rankings for this class
       const allRankings = await getRankingsByClass(nationalAssociationId, yachtClassName);
 
-      console.log('Fuzzy matching data:', {
-        skipperNames: skippers.map(s => s.name),
-        rankingNames: allRankings.map(r => r.skipper_name),
-        totalSkippers: skippers.length,
-        totalRankings: allRankings.length
-      });
-
-      // Try to match skippers to rankings by name
       for (const skipper of skippers) {
         const key = skipper.memberId || skipper.name;
-
-        // Skip if already matched via memberId
-        if (rankingsMap.has(key)) {
-          console.log(`⊙ Skipper "${skipper.name}" already matched via memberId`);
-          continue;
-        }
+        if (rankingsMap.has(key)) continue;
 
         const skipperFullName = skipper.name.toLowerCase().trim();
 
-        // Find matching ranking by name
         const matchedRanking = allRankings.find(ranking => {
           const rankingName = ranking.skipper_name.toLowerCase().trim();
-
-          // Try exact match first
           if (rankingName === skipperFullName) return true;
 
-          // Try partial match (handles "Steve" vs "Stephen", etc.)
           const rankingParts = rankingName.split(' ');
           const skipperParts = skipperFullName.split(' ');
 
-          // Check if both first and last names are similar
           if (rankingParts.length >= 2 && skipperParts.length >= 2) {
             const firstMatch = rankingParts[0].includes(skipperParts[0]) || skipperParts[0].includes(rankingParts[0]);
             const lastMatch = rankingParts[rankingParts.length - 1] === skipperParts[skipperParts.length - 1];
-
             if (firstMatch && lastMatch) return true;
           }
 
@@ -141,27 +160,11 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
         });
 
         if (matchedRanking) {
-          console.log(`✓ Matched "${skipper.name}" to "${matchedRanking.skipper_name}" (rank #${matchedRanking.rank})`);
+          console.log(`Matched "${skipper.name}" to "${matchedRanking.skipper_name}" (rank #${matchedRanking.rank})`);
           rankingsMap.set(key, matchedRanking);
-        } else {
-          console.log(`✗ No match for "${skipper.name}"`);
         }
       }
 
-      if (rankingsMap.size > 0) {
-        console.log(`Total matched ${rankingsMap.size} skippers to rankings`);
-      } else {
-        console.warn('No fuzzy matches found. Sample data:', {
-          firstSkipperName: skippers[0]?.name,
-          firstRankingName: allRankings[0]?.skipper_name,
-          totalSkippers: skippers.length,
-          totalRankings: allRankings.length
-        });
-      }
-
-      console.log('Final rankings map size:', rankingsMap.size);
-
-      // Merge rankings with skippers AND add the original index
       const skippersData: SkipperWithRanking[] = skippers.map((skipper, index) => {
         const key = skipper.memberId || skipper.name;
         const ranking = rankingsMap.get(key);
@@ -169,7 +172,7 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
           ...skipper,
           rank: ranking?.rank,
           ranking,
-          originalIndex: index  // Store the original index for later lookup
+          originalIndex: index
         };
       });
 
@@ -341,8 +344,59 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
               </div>
             ) : preview ? (
               <>
+                {/* Ranking Source Banner */}
+                {rankingSource === 'imported' && (
+                  <div className={`p-3 rounded-xl flex items-center gap-3 ${
+                    darkMode ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-100'
+                  }`}>
+                    <Trophy className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-blue-400' : 'text-blue-500'}`} />
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${darkMode ? 'text-blue-300' : 'text-blue-800'}`}>
+                        Rankings loaded from import data
+                      </p>
+                      <p className={`text-xs mt-0.5 ${darkMode ? 'text-blue-400/70' : 'text-blue-600'}`}>
+                        {skippers.filter(s => s.national_ranking && s.national_ranking > 0).length} skippers have imported rankings.
+                        {internationalSkippers.length > 0 && ` ${internationalSkippers.length} international skipper${internationalSkippers.length !== 1 ? 's' : ''} detected.`}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {rankingSource === 'database' && (
+                  <div className={`p-3 rounded-xl flex items-center gap-3 ${
+                    darkMode ? 'bg-slate-800/80 border border-slate-700/50' : 'bg-gray-50 border border-gray-200'
+                  }`}>
+                    <Hash className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`} />
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                        Rankings loaded from Australian database
+                      </p>
+                      {internationalSkippers.length > 0 && (
+                        <p className={`text-xs mt-0.5 ${darkMode ? 'text-amber-400/80' : 'text-amber-600'}`}>
+                          <Globe className="w-3 h-3 inline mr-1" />
+                          {internationalSkippers.length} international skipper{internationalSkippers.length !== 1 ? 's' : ''} detected — click their rank badge to assign a ranking manually.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {rankingSource === 'none' && (
+                  <div className={`p-3 rounded-xl flex items-center gap-3 ${
+                    darkMode ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-100'
+                  }`}>
+                    <AlertTriangle className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-amber-400' : 'text-amber-500'}`} />
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
+                        No rankings available
+                      </p>
+                      <p className={`text-xs mt-0.5 ${darkMode ? 'text-amber-400/70' : 'text-amber-600'}`}>
+                        Import skippers with a national ranking column, or configure a national association to load rankings from the database. You can also click rank badges below to assign rankings manually.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Stats Row */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className={`grid gap-3 ${internationalSkippers.length > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
                   <div className={`p-4 rounded-xl ${
                     darkMode ? 'bg-slate-800/80 border border-slate-700/50' : 'bg-gray-50 border border-gray-100'
                   }`}>
@@ -397,6 +451,22 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
                       {unrankedCount}
                     </p>
                   </div>
+
+                  {internationalSkippers.length > 0 && (
+                    <div className={`p-4 rounded-xl ${
+                      darkMode ? 'bg-slate-800/80 border border-slate-700/50' : 'bg-gray-50 border border-gray-100'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                          International
+                        </span>
+                        <Globe className={`w-4 h-4 ${darkMode ? 'text-blue-500/60' : 'text-blue-400'}`} />
+                      </div>
+                      <p className={`text-3xl font-bold tabular-nums ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                        {internationalSkippers.length}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Heat Preview */}
@@ -428,50 +498,132 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
                         </span>
                       </div>
 
-                      <div className="divide-y divide-slate-800/50">
-                        {heat.skippers.map((skipper, skipperIndex) => (
-                          <div
-                            key={skipperIndex}
-                            className={`flex items-center justify-between px-4 py-2.5 transition-colors ${
-                              darkMode ? 'hover:bg-slate-800/60' : 'hover:bg-gray-50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              {skipper.rank ? (
-                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
-                                  darkMode ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-                                }`}>
-                                  {skipper.rank}
-                                </div>
-                              ) : (
-                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs ${
-                                  darkMode ? 'bg-slate-700/50 text-slate-500' : 'bg-gray-100 text-gray-400'
-                                }`}>
-                                  -
-                                </div>
-                              )}
+                      <div className={`divide-y ${darkMode ? 'divide-slate-800/50' : 'divide-gray-100'}`}>
+                        {heat.skippers.map((skipper, skipperIndex) => {
+                          const isInternational = internationalSkippers.includes(skipper.originalIndex ?? -1);
+                          const isEditingThis = editingRankIndex === (skipper.originalIndex ?? -1);
 
-                              <div>
-                                <p className={`text-sm font-medium leading-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                  {skipper.name}
-                                </p>
-                                <p className={`text-xs leading-tight ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
-                                  Sail #{skipper.sailNumber}
-                                </p>
+                          return (
+                            <div
+                              key={skipperIndex}
+                              className={`flex items-center justify-between px-4 py-2.5 transition-colors ${
+                                darkMode ? 'hover:bg-slate-800/60' : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                {isEditingThis ? (
+                                  <form
+                                    className="flex items-center gap-1"
+                                    onSubmit={(e) => {
+                                      e.preventDefault();
+                                      handleManualRankChange(skipper.originalIndex!, parseInt(editingRankValue) || 0);
+                                    }}
+                                  >
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      autoFocus
+                                      value={editingRankValue}
+                                      onChange={(e) => setEditingRankValue(e.target.value)}
+                                      onBlur={() => {
+                                        handleManualRankChange(skipper.originalIndex!, parseInt(editingRankValue) || 0);
+                                      }}
+                                      className={`w-12 h-7 text-center text-xs font-bold rounded-lg border ${
+                                        darkMode
+                                          ? 'bg-slate-700 border-blue-500 text-white focus:ring-1 focus:ring-blue-500'
+                                          : 'bg-white border-blue-400 text-gray-900 focus:ring-1 focus:ring-blue-400'
+                                      }`}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Escape') {
+                                          setEditingRankIndex(null);
+                                        }
+                                      }}
+                                    />
+                                  </form>
+                                ) : skipper.rank ? (
+                                  <button
+                                    onClick={() => {
+                                      if (skipper.originalIndex !== undefined) {
+                                        setEditingRankIndex(skipper.originalIndex);
+                                        setEditingRankValue(String(skipper.rank));
+                                      }
+                                    }}
+                                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold cursor-pointer transition-all ${
+                                      darkMode
+                                        ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20 hover:ring-emerald-400/40'
+                                        : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:ring-emerald-400'
+                                    }`}
+                                    title="Click to edit ranking"
+                                  >
+                                    {skipper.rank}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      if (skipper.originalIndex !== undefined) {
+                                        setEditingRankIndex(skipper.originalIndex);
+                                        setEditingRankValue('');
+                                      }
+                                    }}
+                                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs cursor-pointer transition-all group ${
+                                      isInternational
+                                        ? darkMode
+                                          ? 'bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20 hover:ring-blue-400/40'
+                                          : 'bg-blue-50 text-blue-500 ring-1 ring-blue-200 hover:ring-blue-400'
+                                        : darkMode
+                                          ? 'bg-slate-700/50 text-slate-500 hover:bg-slate-700 hover:text-slate-300'
+                                          : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                                    }`}
+                                    title="Click to assign ranking"
+                                  >
+                                    <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <span className="group-hover:hidden">-</span>
+                                  </button>
+                                )}
+
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    {isInternational && skipper.country_code && (
+                                      <span className="text-sm" title={getIOCCode(skipper.country_code)}>
+                                        {getCountryFlag(skipper.country_code)}
+                                      </span>
+                                    )}
+                                    <p className={`text-sm font-medium leading-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                      {skipper.name}
+                                    </p>
+                                  </div>
+                                  <p className={`text-xs leading-tight ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                                    Sail #{skipper.sailNumber}
+                                    {isInternational && skipper.country_code && (
+                                      <span className={`ml-1.5 ${darkMode ? 'text-blue-400/70' : 'text-blue-500'}`}>
+                                        ({getIOCCode(skipper.country_code)})
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {isInternational && !skipper.rank && (
+                                  <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                    darkMode ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'
+                                  }`}>
+                                    INT
+                                  </span>
+                                )}
+                                {skipper.rank && (
+                                  <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${
+                                    darkMode
+                                      ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
+                                      : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                                  }`}>
+                                    #{skipper.rank}
+                                  </span>
+                                )}
                               </div>
                             </div>
-
-                            {skipper.rank && (
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${
-                                darkMode
-                                  ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
-                                  : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-                              }`}>
-                                #{skipper.rank}
-                              </span>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   ))}

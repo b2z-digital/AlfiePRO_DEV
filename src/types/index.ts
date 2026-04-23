@@ -70,8 +70,9 @@ export interface Skipper {
   memberId?: string;
   boatId?: string;
   withdrawnFromRace?: number | null; // Race number from which they withdrew (null = not withdrawn)
-  country_code?: string; // Country code for international events (e.g., 'AUS', 'NZL', 'USA')
-  country?: string; // Full country name
-  category?: string; // Sailor category
-  state?: string; // State/province
+  country_code?: string;
+  country?: string;
+  category?: string;
+  state?: string;
+  national_ranking?: number;
 }

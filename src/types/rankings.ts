@@ -64,6 +64,7 @@ export interface HMSSeeding {
     sailNumber: string;
     rank?: number;
     ranking?: NationalRanking;
-    originalIndex?: number;  // The original index in the skippers array
+    originalIndex?: number;
+    country_code?: string;
   }>;
 }
