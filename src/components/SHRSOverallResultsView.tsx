@@ -486,23 +486,54 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       };
     }).filter(Boolean) as SkipperStanding[];
 
-    // SHRS tie-breaking: standard RRS A8.1 countback on all race scores (qualifying + finals)
-    // Final fallback: alphabetical by skipper name (common convention when countback is exhausted)
+    // SHRS Rule 5.7 tie-breaking:
+    // 1. Only use scores from races where tied boats competed in the SAME heat
+    // 2. Discarded scores SHALL be included (pass 0 drops to countback)
+    // 3. If tied boats never sailed in the same heat, fall back to unmodified RRS A8.1/A8.2
+    // 4. Final fallback: alphanumerical sail number order
+    const roundHeatMap = new Map<number, Map<number, HeatDesignation>>();
+    for (const round of (heatManagement?.rounds || [])) {
+      if (!round.completed) continue;
+      const skipperToHeat = new Map<number, HeatDesignation>();
+      for (const ha of round.heatAssignments) {
+        for (const si of ha.skipperIndices) {
+          skipperToHeat.set(si, ha.heatDesignation);
+        }
+      }
+      roundHeatMap.set(round.round, skipperToHeat);
+    }
+
     const shrsCountback = (a: SkipperStanding, b: SkipperStanding): number => {
+      const aSameHeatScores: number[] = [];
+      const bSameHeatScores: number[] = [];
+
+      for (let i = 0; i < completedRaces.length; i++) {
+        const roundNum = completedRaces[i];
+        const skipperToHeat = roundHeatMap.get(roundNum);
+        if (!skipperToHeat) continue;
+        const aHeat = skipperToHeat.get(a.skipperIndex);
+        const bHeat = skipperToHeat.get(b.skipperIndex);
+        if (aHeat && bHeat && aHeat === bHeat) {
+          aSameHeatScores.push(a.raceScores[i] ?? 999);
+          bSameHeatScores.push(b.raceScores[i] ?? 999);
+        }
+      }
+
+      if (aSameHeatScores.length > 0) {
+        const result = compareWithCountback(aSameHeatScores, bSameHeatScores, 0, 0);
+        if (result !== 0) return result;
+      }
+
+      // Fallback: unmodified RRS A8.1/A8.2 on all scores if never sailed together or still tied
       const aAll = a.raceScores.map(s => s ?? 999);
       const bAll = b.raceScores.map(s => s ?? 999);
-      const countbackResult = compareWithCountback(aAll, bAll, a.droppedIndices.size, b.droppedIndices.size);
-      if (countbackResult !== 0) return countbackResult;
-      const getSurname = (name: string) => {
-        const parts = name.trim().split(/\s+/);
-        return parts.length > 1 ? parts[parts.length - 1] : parts[0];
-      };
-      const aSurname = getSurname(a.skipper?.name || '').toUpperCase();
-      const bSurname = getSurname(b.skipper?.name || '').toUpperCase();
-      if (aSurname !== bSurname) return aSurname.localeCompare(bSurname);
-      const aName = (a.skipper?.name || '').toUpperCase();
-      const bName = (b.skipper?.name || '').toUpperCase();
-      return aName.localeCompare(bName);
+      const fallbackResult = compareWithCountback(aAll, bAll, a.droppedIndices.size, b.droppedIndices.size);
+      if (fallbackResult !== 0) return fallbackResult;
+
+      // Final fallback: alphanumerical sail number order
+      const aSail = (a.skipper?.sailNo || a.skipper?.sailNumber || '').toUpperCase();
+      const bSail = (b.skipper?.sailNo || b.skipper?.sailNumber || '').toUpperCase();
+      return aSail.localeCompare(bSail, undefined, { numeric: true, sensitivity: 'base' });
     };
 
     if (hasFinals) {
@@ -530,7 +561,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     });
 
     return allStandings;
-  }, [skippers, raceResults, completedRaces, qualifyingRaces, finalsRaces, skipperFleetMap, hasFinals, shrsQualifyingRounds]);
+  }, [skippers, raceResults, completedRaces, qualifyingRaces, finalsRaces, skipperFleetMap, hasFinals, shrsQualifyingRounds, heatManagement]);
 
   const totalDiscards = useMemo(() => {
     const qualDiscards = calculateSHRSDiscards(qualifyingRaces.length);
