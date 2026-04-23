@@ -4,7 +4,7 @@ import { HeatDesignation, HeatManagement, getHeatDisplayLabel } from '../types/h
 import { RaceEvent } from '../types/race';
 import { LetterScore, isEntrantsPlusOne, getLetterScoreDisplayCode } from '../types/letterScores';
 import { LetterScoreSelector } from './LetterScoreSelector';
-import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer, Trophy, TableProperties } from 'lucide-react';
+import { CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, ShieldCheck, X, Search, RotateCcw, CircleAlert as AlertCircle, Timer, Trophy, TableProperties, Table2, Hand } from 'lucide-react';
 import { useNotification } from '../contexts/NotificationContext';
 import { HmsScoreSheet } from './HmsScoreSheet';
 
@@ -42,15 +42,19 @@ interface VerifyResult {
 
 interface HmsManualSpreadsheetProps {
   skippers: Skipper[];
-  heatManagement: HeatManagement;
+  heatManagement?: HeatManagement;
   darkMode: boolean;
   raceResults: any[];
   currentEvent: RaceEvent | null;
-  onConfigureHeats: () => void;
+  onConfigureHeats?: () => void;
   updateRaceResults: (race: number, skipperIndex: number, position: number | null, letterScore?: any, customPoints?: number, hmsHeat?: string, hmsPosition?: number) => void;
   deleteRaceResult: (race: number, skipperIndex: number) => void;
   isFullscreen?: boolean;
   onOpenStartBox?: () => void;
+  singleFleetMode?: boolean;
+  numRaces?: number;
+  onScoringModeChange?: (mode: 'pro' | 'touch' | 'spreadsheet') => void;
+  onShowOverallResults?: () => void;
 }
 
 const LETTER_SCORES_PATTERN = 'DNS|DNF|DSQ|OCS|BFD|UFD|RDG|DPI|ZFP|SCP|RET|DNC|DNE|NSC|WDN';
@@ -87,12 +91,19 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   deleteRaceResult,
   isFullscreen = false,
   onOpenStartBox,
+  singleFleetMode = false,
+  numRaces: propNumRaces,
+  onScoringModeChange,
+  onShowOverallResults,
 }) => {
   const { addNotification } = useNotification();
-  const numberOfHeats = heatManagement?.configuration?.numberOfHeats || 4;
-  const promotionCount = heatManagement?.configuration?.promotionCount || 0;
-  const heats = HEAT_LABELS.slice(0, Math.max(numberOfHeats, 5));
-  const maxPositions = Math.max(24, Math.ceil(skippers.length / numberOfHeats) + 4);
+  const numberOfHeats = singleFleetMode ? 1 : (heatManagement?.configuration?.numberOfHeats || 4);
+  const promotionCount = singleFleetMode ? 0 : (heatManagement?.configuration?.promotionCount || 0);
+  const heats = singleFleetMode ? ['A' as HeatDesignation] : HEAT_LABELS.slice(0, Math.max(numberOfHeats, 5));
+  const maxPositions = singleFleetMode
+    ? Math.max(skippers.length, 10) + 2
+    : Math.max(24, Math.ceil(skippers.length / numberOfHeats) + 4);
+  const displayRaceCount = singleFleetMode ? (propNumRaces || 20) : TOTAL_RACES;
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -145,26 +156,65 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
   useEffect(() => {
     const newCells: Record<string, CellData> = {};
-    raceResults.forEach((result: any) => {
-      if (result.hmsHeat && result.hmsPosition && result.race) {
-        const key = getCellKey(result.hmsHeat, result.hmsPosition, result.race);
-        const skipper = skippers[result.skipperIndex];
-        const sailNo = skipper?.sailNumber || skipper?.sailNo || skipper?.boat_sail_number || result.hmsSailNumber || '';
-        if (sailNo) {
-          newCells[key] = {
-            sailNumber: String(sailNo),
-            comment: result.letterScore ? getLetterScoreDisplayCode(result.letterScore, result.customPoints) : 'OK',
-            points: result.letterScore ? '' : (result.position?.toString() || ''),
-            letterScore: result.letterScore || null,
-            customPoints: result.customPoints,
-            hmsPoints: result.hmsPoints,
-            skipperIndex: result.skipperIndex,
-            isValid: true,
-            isDuplicate: false,
-          };
+    if (singleFleetMode) {
+      const resultsByRace: Record<number, any[]> = {};
+      raceResults.forEach((result: any) => {
+        if (result.race && result.skipperIndex != null) {
+          if (!resultsByRace[result.race]) resultsByRace[result.race] = [];
+          resultsByRace[result.race].push(result);
         }
-      }
-    });
+      });
+      Object.entries(resultsByRace).forEach(([raceStr, results]) => {
+        const race = parseInt(raceStr);
+        const sorted = [...results].sort((a, b) => {
+          if (a.letterScore && !b.letterScore) return 1;
+          if (!a.letterScore && b.letterScore) return -1;
+          if (a.letterScore && b.letterScore) return 0;
+          return (a.position || 999) - (b.position || 999);
+        });
+        sorted.forEach((result, idx) => {
+          const pos = result.hmsPosition || (idx + 1);
+          const heat = 'A' as HeatDesignation;
+          const key = getCellKey(heat, pos, race);
+          const skipper = skippers[result.skipperIndex];
+          const sailNo = skipper?.sailNumber || skipper?.sailNo || skipper?.boat_sail_number || '';
+          if (sailNo) {
+            newCells[key] = {
+              sailNumber: String(sailNo),
+              comment: result.letterScore ? getLetterScoreDisplayCode(result.letterScore, result.customPoints) : 'OK',
+              points: result.letterScore ? '' : (result.position?.toString() || ''),
+              letterScore: result.letterScore || null,
+              customPoints: result.customPoints,
+              hmsPoints: result.hmsPoints,
+              skipperIndex: result.skipperIndex,
+              isValid: true,
+              isDuplicate: false,
+            };
+          }
+        });
+      });
+    } else {
+      raceResults.forEach((result: any) => {
+        if (result.hmsHeat && result.hmsPosition && result.race) {
+          const key = getCellKey(result.hmsHeat, result.hmsPosition, result.race);
+          const skipper = skippers[result.skipperIndex];
+          const sailNo = skipper?.sailNumber || skipper?.sailNo || skipper?.boat_sail_number || result.hmsSailNumber || '';
+          if (sailNo) {
+            newCells[key] = {
+              sailNumber: String(sailNo),
+              comment: result.letterScore ? getLetterScoreDisplayCode(result.letterScore, result.customPoints) : 'OK',
+              points: result.letterScore ? '' : (result.position?.toString() || ''),
+              letterScore: result.letterScore || null,
+              customPoints: result.customPoints,
+              hmsPoints: result.hmsPoints,
+              skipperIndex: result.skipperIndex,
+              isValid: true,
+              isDuplicate: false,
+            };
+          }
+        }
+      });
+    }
     if (Object.keys(newCells).length > 0) {
       if (!loadedRef.current) {
         setCells(prev => ({ ...prev, ...newCells }));
@@ -414,11 +464,13 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
         const sailLower = cell.sailNumber.trim().toLowerCase();
 
         if (!cell.isValid && cell.skipperIndex == null) {
-          errors.push(`Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}, ${getOrdinal(pos)}: Sail "${cell.sailNumber}" not registered`);
+          const heatLabel = singleFleetMode ? '' : `Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)}, `;
+          errors.push(`${heatLabel}${getOrdinal(pos)}: Sail "${cell.sailNumber}" not registered`);
         }
 
         if (heatEntries.includes(sailLower)) {
-          errors.push(`Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}: Duplicate entry "${cell.sailNumber}"`);
+          const heatLabel = singleFleetMode ? '' : `Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)}: `;
+          errors.push(`${heatLabel}Duplicate entry "${cell.sailNumber}"`);
         }
         heatEntries.push(sailLower);
 
@@ -427,7 +479,11 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           const existingIsPromotion = race > 1 && existing.heat !== 'A' && existing.position <= promotionCount;
           const currentIsPromotion = race > 1 && heat !== 'A' && pos <= promotionCount;
           if (!existingIsPromotion && !currentIsPromotion) {
-            errors.push(`"${cell.sailNumber}" appears in Heat ${getHeatDisplayLabel(existing.heat, heatManagement.configuration)} (${getOrdinal(existing.position)}) and Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)} (${getOrdinal(pos)})`);
+            if (singleFleetMode) {
+              errors.push(`"${cell.sailNumber}" appears at ${getOrdinal(existing.position)} and ${getOrdinal(pos)}`);
+            } else {
+              errors.push(`"${cell.sailNumber}" appears in Heat ${getHeatDisplayLabel(existing.heat, heatManagement?.configuration)} (${getOrdinal(existing.position)}) and Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)} (${getOrdinal(pos)})`);
+            }
           }
         } else {
           allSailsInRace.set(sailLower, { heat, position: pos });
@@ -821,7 +877,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     const results: any[] = [];
     const seenSkipperRaces = new Set<string>();
 
-    for (let race = 1; race <= TOTAL_RACES; race++) {
+    for (let race = 1; race <= displayRaceCount; race++) {
       for (const heat of heats) {
         for (let position = 1; position <= maxPositions; position++) {
           const key = getCellKey(heat, position, race);
@@ -856,6 +912,37 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
   return (
     <div className={`flex flex-col h-full text-slate-900 relative`}>
+      {singleFleetMode && onScoringModeChange && (
+      <div className="absolute top-[-44px] right-0 z-30 flex items-center gap-1">
+        <button
+          onClick={() => onScoringModeChange('pro')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-slate-700 hover:bg-slate-600 text-slate-200"
+          title="Switch to Pro Mode"
+        >
+          <Table2 size={14} />
+          Pro Mode
+        </button>
+        <button
+          onClick={() => onScoringModeChange('touch')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-slate-700 hover:bg-slate-600 text-slate-200"
+          title="Switch to Touch Mode"
+        >
+          <Hand size={14} />
+          Touch Mode
+        </button>
+        {onShowOverallResults && (
+          <button
+            onClick={onShowOverallResults}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25"
+            title="View Overall Results"
+          >
+            <Trophy size={14} />
+            Overall Results
+          </button>
+        )}
+      </div>
+      )}
+      {!singleFleetMode && (
       <div className="absolute top-[-44px] right-0 z-30 flex items-center gap-1">
         <button
           onClick={() => setActiveTab('races')}
@@ -880,12 +967,13 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           Score Sheet
         </button>
       </div>
+      )}
 
-      {activeTab === 'scoresheet' ? (
+      {!singleFleetMode && activeTab === 'scoresheet' ? (
         <div className="flex-1 overflow-auto relative">
           <HmsScoreSheet
             skippers={skippers}
-            heatManagement={heatManagement}
+            heatManagement={heatManagement!}
             dropRules={currentEvent?.dropRules || [4, 8, 16, 24, 32, 40]}
             darkMode={darkMode}
             externalRaceResults={overallRaceResults}
@@ -899,11 +987,11 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       >
         <table
           className="border-collapse text-xs bg-white"
-          style={{ tableLayout: 'fixed', minWidth: 140 + TOTAL_RACES * 240 }}
+          style={{ tableLayout: 'fixed', minWidth: 140 + displayRaceCount * 240 }}
         >
           <colgroup>
             <col style={{ width: 140, minWidth: 140 }} />
-            {Array.from({ length: TOTAL_RACES }).map((_, i) => (
+            {Array.from({ length: displayRaceCount }).map((_, i) => (
               <React.Fragment key={i}>
                 <col style={{ width: 50 }} />
                 <col style={{ width: 90 }} />
@@ -926,7 +1014,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                   <span className="text-xs font-semibold text-white">StartBox</span>
                 </div>
               </th>
-              {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
+              {Array.from({ length: displayRaceCount }, (_, i) => i + 1).map(race => {
                 const isVerified = verifiedRaces.has(race);
                 const isSeeding = race === 1;
 
@@ -942,7 +1030,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                         <span className="text-[11px] font-extrabold text-black">
                           Race {race}
                         </span>
-                        {isSeeding && (
+                        {!singleFleetMode && isSeeding && (
                           <span className="text-[8px] font-medium px-1 py-0 rounded bg-blue-200 text-blue-800">
                             Seeding
                           </span>
@@ -950,7 +1038,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                         {isVerified && (
                           <CheckCircle2 size={10} className="text-emerald-600" />
                         )}
-                        {!isSeeding && (
+                        {!singleFleetMode && !isSeeding && (
                           <span className="text-[7px] text-slate-600 font-medium">
                             P={promotionCount}
                           </span>
@@ -979,7 +1067,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             </tr>
 
             <tr>
-              {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => (
+              {Array.from({ length: displayRaceCount }, (_, i) => i + 1).map(race => (
                 <React.Fragment key={race}>
                   <th className={`px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 ${raceSeparator} text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
                     Sail No
@@ -1004,14 +1092,15 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
               return (
                 <React.Fragment key={heat}>
+                  {!singleFleetMode && (
                   <tr style={{ height: 14 }}>
                     <td
                       className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[11px] text-black whitespace-nowrap text-center"
                       style={{ backgroundColor: '#FF00FF' }}
                     >
-                      Heat {getHeatDisplayLabel(heat, heatManagement.configuration)}
+                      Heat {getHeatDisplayLabel(heat, heatManagement?.configuration)}
                     </td>
-                    {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
+                    {Array.from({ length: displayRaceCount }, (_, i) => i + 1).map(race => {
                       const stats = getHeatRaceStats(heat, race);
                       return (
                         <React.Fragment key={race}>
@@ -1043,6 +1132,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                       );
                     })}
                   </tr>
+                  )}
 
                   {Array.from({ length: maxPositions }, (_, posIdx) => posIdx + 1).map(position => {
                     const showPromotion = !isTopHeat && isPromotionRow(heat, position);
@@ -1060,7 +1150,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                           {getOrdinal(position)}
                         </td>
 
-                        {Array.from({ length: TOTAL_RACES }, (_, i) => i + 1).map(race => {
+                        {Array.from({ length: displayRaceCount }, (_, i) => i + 1).map(race => {
                           const key = getCellKey(heat, position, race);
                           const cell = cells[key];
                           const isDropdownOpen = dropdownTarget?.heat === heat && dropdownTarget?.position === position && dropdownTarget?.race === race;
