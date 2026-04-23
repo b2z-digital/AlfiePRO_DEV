@@ -1424,21 +1424,6 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           {/* Action Buttons */}
           <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 touch-show transition-opacity">
             <div className="flex gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedEventForTracking(race);
-                  setShowLiveTrackingQR(true);
-                }}
-                className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${
-                  darkMode
-                    ? 'bg-blue-900/90 hover:bg-blue-800 text-blue-400'
-                    : 'bg-blue-50/90 hover:bg-blue-100 text-blue-600'
-                }`}
-                title="Live Skipper Tracking QR Code"
-              >
-                <QrCode size={16} />
-              </button>
               {(race.eventLevel === 'state' || race.eventLevel === 'national') && (
                 <button
                   onClick={async (e) => {

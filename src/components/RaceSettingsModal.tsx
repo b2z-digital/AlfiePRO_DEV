@@ -1284,7 +1284,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 {isHeatRacingEnabled ? (
                   <p>
                     <span className="font-semibold">{currentDropRules === 'shrs' ? `SHRS-${shrsAssignmentMode === 'preset' ? 'B' : 'P'}` : 'HMS'} Heat Racing Active:</span> Skippers will be divided into heats{currentDropRules === 'shrs' ? '' : ' with promotion/relegation between races'}.
-                    {currentDropRules === 'shrs' ? ` Using ${shrsAssignmentMode === 'preset' ? 'Balanced' : 'Progressive'} assignment.` : ' Heats are scored from lowest to highest (F → A).'} Configure your settings below.
+                    {currentDropRules === 'shrs' ? ` Using ${shrsAssignmentMode === 'preset' ? 'Pre-Assigned' : 'Progressive'} assignment.` : ' Heats are scored from lowest to highest (F → A).'} Configure your settings below.
                   </p>
                 ) : (
                   <p>
@@ -1790,7 +1790,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                     ? 'text-green-600'
                                     : darkMode ? 'text-slate-300' : 'text-slate-700'
                                   }`}>
-                                    Balanced (SHRS-B)
+                                    Pre-Assigned (SHRS-PA)
                                   </div>
                                   <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                     All qualifying heats for the nominated rounds are pre-assigned before racing. The rotation is structured to balance heat sizes and distribute competitor matchups evenly across the fleet.
@@ -1861,7 +1861,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         <div className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'} p-2 rounded ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                           {isSHRS ? (
                             <>
-                              <strong>SHRS-{shrsAssignmentMode === 'preset' ? 'B' : 'P'} Configuration:</strong> {numHeats} heats, {shrsQualifyingRounds} qualifying + {Math.max(0, currentNumRaces - shrsQualifyingRounds)} finals rounds ({shrsAssignmentMode === 'preset' ? 'Balanced' : 'Progressive'}). Sizes: {heatSizes.join(', ')} boats.
+                              <strong>SHRS-{shrsAssignmentMode === 'preset' ? 'PA' : 'P'} Configuration:</strong> {numHeats} heats, {shrsQualifyingRounds} qualifying + {Math.max(0, currentNumRaces - shrsQualifyingRounds)} finals rounds ({shrsAssignmentMode === 'preset' ? 'Pre-Assigned' : 'Progressive'}). Sizes: {heatSizes.join(', ')} boats.
                             </>
                           ) : manualHeatCount !== null || manualPromotionCount !== null ? (
                             <>

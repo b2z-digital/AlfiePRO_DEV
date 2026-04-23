@@ -65,14 +65,15 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   const [manualSkipper, setManualSkipper] = useState({
     name: '',
     sailNo: '',
-    hull: '', // Added hull field for boat design
+    hull: '',
     club: '',
     country: 'Australia',
     countryCode: 'AU',
     category: '',
     clubState: '',
     boatModel: currentEvent?.raceClass || '',
-    startHcap: 0
+    startHcap: 0,
+    nationalRanking: 0
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -898,27 +899,28 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       sailNo: manualSkipper.sailNo,
       hull: manualSkipper.hull,
       club: manualSkipper.club,
-      boatModel: manualSkipper.hull || manualSkipper.boatModel, // Use hull (boat design) as the boat model
+      boatModel: manualSkipper.hull || manualSkipper.boatModel,
       startHcap: manualSkipper.startHcap || 0,
-      country_code: manualSkipper.countryCode, // Map camelCase to snake_case
+      country_code: manualSkipper.countryCode,
       country: manualSkipper.country,
-      category: manualSkipper.category
+      category: manualSkipper.category,
+      ...(manualSkipper.nationalRanking > 0 ? { national_ranking: manualSkipper.nationalRanking } : {})
     }];
 
     onUpdateSkippers(updatedSkippers);
 
-    // Reset form
     setManualSkipper({
       name: '',
       sailNo: '',
-      hull: '', // Reset hull field
+      hull: '',
       club: '',
       country: 'Australia',
       countryCode: 'AU',
       category: '',
       clubState: '',
       boatModel: currentEvent?.raceClass || '',
-      startHcap: 0
+      startHcap: 0,
+      nationalRanking: 0
     });
 
     // If not keeping the form open, return to initial view
@@ -940,7 +942,8 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       category: skipper.category || '',
       clubState: skipper.state || '',
       boatModel: currentEvent?.raceClass || '',
-      startHcap: skipper.startHcap || 0
+      startHcap: skipper.startHcap || 0,
+      nationalRanking: skipper.national_ranking || 0
     });
     setShowAddBoatForEdit(false);
     setEditNewBoatData({ sailNumber: '', hull: '' });
@@ -992,6 +995,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       state: manualSkipper.clubState,
       boatModel: manualSkipper.hull || currentEvent?.raceClass || '',
       ...(matchedBoat ? { boatId: matchedBoat.id } : {}),
+      national_ranking: manualSkipper.nationalRanking > 0 ? manualSkipper.nationalRanking : undefined,
     };
 
     onUpdateSkippers(updatedSkippers);
@@ -1008,7 +1012,8 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       category: '',
       clubState: '',
       boatModel: currentEvent?.raceClass || '',
-      startHcap: 0
+      startHcap: 0,
+      nationalRanking: 0
     });
   };
 
@@ -1783,6 +1788,21 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               </select>
             </div>
 
+            {/* National Ranking - optional */}
+            <div>
+              <label className="block text-sm font-medium mb-1 text-slate-300">
+                National Ranking
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={manualSkipper.nationalRanking || ''}
+                onChange={(e) => setManualSkipper(prev => ({ ...prev, nationalRanking: parseInt(e.target.value) || 0 }))}
+                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                placeholder="e.g. 5 (leave blank if unknown)"
+              />
+            </div>
+
             {/* Show State field if event display settings require it */}
             {currentEvent?.show_club_state && (
               <div>
@@ -2115,6 +2135,21 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               </select>
             </div>
 
+            {/* National Ranking - optional */}
+            <div>
+              <label className="block text-sm font-medium mb-1 text-slate-300">
+                National Ranking
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={manualSkipper.nationalRanking || ''}
+                onChange={(e) => setManualSkipper(prev => ({ ...prev, nationalRanking: parseInt(e.target.value) || 0 }))}
+                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                placeholder="e.g. 5 (leave blank if unknown)"
+              />
+            </div>
+
             {currentEvent?.show_club_state && (
               <div>
                 <label className="block text-sm font-medium mb-1 text-slate-300">
@@ -2172,6 +2207,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       { key: 'category', label: 'Category', required: false, aliases: ['category', 'age', 'age group', 'division', 'cat', 'cat.'] },
       { key: 'email', label: 'Email', required: false, aliases: ['email', 'e-mail', 'email address', 'contact email'] },
       { key: 'hull_number', label: 'Hull / Reg No', required: false, aliases: ['hull', 'hull reg no', 'hull_reg_no', 'hull number', 'hull_number', 'registration', 'reg no', 'reg_no'] },
+      { key: 'national_ranking', label: 'National Ranking', required: false, aliases: ['ranking', 'national ranking', 'national_ranking', 'rank', 'nat ranking', 'nat_ranking', 'world ranking', 'world_ranking', 'seeding', 'seed'] },
     ];
 
     const autoDetectSkipperMappings = (headers: string[]): { mappings: Record<string, string>; autoDetected: Set<string> } => {
@@ -2364,6 +2400,8 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
         const category = (row[fieldToColumn['category']] || '').trim();
         const state = (row[fieldToColumn['state']] || '').trim();
         const hullNumber = (row[fieldToColumn['hull_number']] || '').trim();
+        const nationalRankingRaw = (row[fieldToColumn['national_ranking']] || '').trim();
+        const nationalRanking = parseInt(nationalRankingRaw, 10) || 0;
 
         if (!firstName && !lastName && fullName) {
           if (fullName.includes(',')) {
@@ -2418,7 +2456,8 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               country_code: countryCode,
               country: country,
               category: category,
-              clubState: state
+              clubState: state,
+              ...(nationalRanking > 0 ? { national_ranking: nationalRanking } : {})
             });
           }
         }

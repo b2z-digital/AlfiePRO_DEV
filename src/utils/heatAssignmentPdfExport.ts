@@ -10,7 +10,7 @@ function getScoringLabel(config: HeatConfiguration): string {
 
 function getScoringFullLabel(config: HeatConfiguration): string {
   if (config.scoringSystem === 'shrs') {
-    const code = config.shrsAssignmentMode === 'preset' ? 'SHRS-B' : 'SHRS-P';
+    const code = config.shrsAssignmentMode === 'preset' ? 'SHRS-PA' : 'SHRS-P';
     return `${code} | Simple Heat Race System`;
   }
   return `${config.scoringSystem?.toUpperCase() || 'HMS'} | Heat Management`;

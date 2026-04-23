@@ -64,7 +64,8 @@ export function assignSkippersUsingHMSSeeding(
       sailNumber: skipper.sailNumber || skipper.sailNo,
       rank: skipper.rank,
       ranking: skipper.ranking,
-      originalIndex: skipper.originalIndex  // Preserve the original index
+      originalIndex: skipper.originalIndex,
+      country_code: skipper.country_code
     });
   });
 
@@ -75,7 +76,8 @@ export function assignSkippersUsingHMSSeeding(
       id: skipper.id,
       name: skipper.name,
       sailNumber: skipper.sailNumber || skipper.sailNo,
-      originalIndex: skipper.originalIndex  // Preserve the original index
+      originalIndex: skipper.originalIndex,
+      country_code: skipper.country_code
     });
   });
 
