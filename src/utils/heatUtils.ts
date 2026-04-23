@@ -1,6 +1,6 @@
 import { HeatManagement, HeatDesignation, HeatResult, HeatRound, generateNextRoundAssignments } from '../types/heat';
 import { Skipper } from '../types';
-import { getNextHeat, getLargestHeatSize, calculateNonFinisherScore } from './shrsHeatSystem';
+import { getNextHeat, getLargestHeatSize, calculateNonFinisherScore, calculateSHRSDiscards } from './shrsHeatSystem';
 import { isEntrantsPlusOne, LetterScore } from '../types/letterScores';
 
 // Function to update a heat result in the heat management object
@@ -287,16 +287,58 @@ export const convertHeatResultsToRaceResults = (
     if (isShrs) {
       const heatSizes = round.heatAssignments.map(a => a.skipperIndices.length);
       const largestHeatSize = getLargestHeatSize(heatSizes);
+      const qualRounds = heatManagement.configuration.shrsQualifyingRounds || heatManagement.rounds.length;
+      const isQualifying = round.round <= qualRounds;
+
+      // Collect all scored results (sailed + penalty) per skipper in same phase for RDGave calculation
+      // RDGave averages all other round scores (including DNF, RDGfix, etc.) excluding only other RDGave rounds
+      const aveScoresBySkipper = new Map<number, number[]>();
+      const allHeatSizesByRound = new Map<number, number>();
+      for (const r of heatManagement.rounds) {
+        if (!r.completed) continue;
+        const rIsQual = r.round <= qualRounds;
+        if (rIsQual !== isQualifying) continue;
+        const rHeatSizes = r.heatAssignments.map(a => a.skipperIndices.length);
+        const rLargestHeat = getLargestHeatSize(rHeatSizes);
+        allHeatSizesByRound.set(r.round, rLargestHeat);
+        for (const res of r.results) {
+          const resIsRDGave = res.letterScore === 'RDG' && (res.customPoints === -1 || res.customPoints === -2);
+          if (resIsRDGave) continue;
+          let s: number;
+          if (res.importedScore !== undefined && res.importedScore !== null) {
+            s = res.importedScore;
+          } else if (res.letterScore && res.customPoints !== undefined && res.customPoints > 0) {
+            s = res.customPoints;
+          } else if (res.letterScore) {
+            s = calculateNonFinisherScore(rLargestHeat);
+          } else if (res.position !== null) {
+            s = res.position;
+          } else {
+            continue;
+          }
+          if (!aveScoresBySkipper.has(res.skipperIndex)) aveScoresBySkipper.set(res.skipperIndex, []);
+          aveScoresBySkipper.get(res.skipperIndex)!.push(s);
+        }
+      }
 
       round.results.forEach(result => {
-        if (result.position !== null && !result.letterScore) {
-          overallPositions.set(result.skipperIndex, result.position);
+        const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
+        if (isRDGave) {
+          const scores = aveScoresBySkipper.get(result.skipperIndex) || [];
+          const avg = scores.length > 0
+            ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10
+            : calculateNonFinisherScore(largestHeatSize);
+          overallPositions.set(result.skipperIndex, avg);
+        } else if (result.importedScore !== undefined && result.importedScore !== null) {
+          overallPositions.set(result.skipperIndex, result.importedScore);
         } else if (result.letterScore) {
-          if ((result.letterScore === 'RDG' || result.letterScore === 'DPI') && result.customPoints !== undefined) {
+          if (result.customPoints !== undefined && result.customPoints > 0) {
             overallPositions.set(result.skipperIndex, result.customPoints);
           } else {
             overallPositions.set(result.skipperIndex, calculateNonFinisherScore(largestHeatSize));
           }
+        } else if (result.position !== null && result.position !== undefined) {
+          overallPositions.set(result.skipperIndex, result.position);
         }
       });
     }
@@ -348,14 +390,13 @@ export const convertHeatResultsToRaceResults = (
 
     // Convert to race results format
     overallPositions.forEach((position, skipperIndex) => {
+      const originalResult = round.results.find(r => r.skipperIndex === skipperIndex);
       raceResults.push({
-        race: round.round, // Use round number as race number
+        race: round.round,
         skipperIndex,
         position,
-        // Find the original result to get the letter score if any
-        letterScore: round.results.find(
-          r => r.skipperIndex === skipperIndex
-        )?.letterScore
+        letterScore: originalResult?.letterScore,
+        customPoints: originalResult?.customPoints,
       });
     });
   });

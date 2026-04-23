@@ -39,6 +39,7 @@ interface SpreadsheetScoringProps {
   selectedHeat?: HeatDesignation | null;
   onSelectHeat?: (heat: HeatDesignation) => void;
   parentVerifiedHeats?: Set<string>;
+  onShowOverallResults?: () => void;
 }
 
 interface CellEntry {
@@ -86,7 +87,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   onUpdateHeatResults,
   selectedHeat,
   onSelectHeat,
-  parentVerifiedHeats
+  parentVerifiedHeats,
+  onShowOverallResults,
 }) => {
   const [cells, setCells] = useState<Record<HeatDesignation, CellEntry[]>>({} as any);
   const [localVerifiedHeats, setLocalVerifiedHeats] = useState<Set<HeatDesignation>>(new Set());
@@ -113,6 +115,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   }, []);
 
   const isMultiHeatMode = !!(heatManagement && propAvailableHeats && heatSkipperIndicesMap && allHeatRaceResults);
+  const isSHRS = heatManagement?.configuration?.scoringSystem === 'shrs';
+  const isHMS = heatManagement?.configuration?.scoringSystem === 'hms';
 
   useEffect(() => {
     if (!isMultiHeatMode) {
@@ -159,9 +163,6 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     }
     return completed;
   }, [isMultiHeatMode, singleFleetRace, raceResults]);
-
-  const isSHRS = heatManagement?.configuration?.scoringSystem === 'shrs';
-  const isHMS = heatManagement?.configuration?.scoringSystem === 'hms';
 
   const promotionCount = useMemo(() => {
     if (!isHeatScoring || !heatManagement || isSHRS) return 0;
@@ -1530,7 +1531,13 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
       {isHeatScoring && heatManagement && heatManagement.configuration?.scoringSystem !== 'hms' && (
         <button
-          onClick={() => setShowOverallResults(true)}
+          onClick={() => {
+            if (onShowOverallResults) {
+              onShowOverallResults();
+            } else {
+              setShowOverallResults(true);
+            }
+          }}
           className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-colors ${
             darkMode
               ? 'bg-gradient-to-br from-cyan-600 to-blue-700 text-white hover:from-cyan-500 hover:to-blue-600'

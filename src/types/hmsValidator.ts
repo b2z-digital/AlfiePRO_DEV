@@ -6,7 +6,10 @@ export interface ParsedHMSSkipper {
   hull?: string;
   myaNumber?: string;
   totalScore?: number;
+  grossTotal?: number;
   raceScores: { [raceNumber: string]: number | string }; // number or letter score
+  sourceFleet?: string;
+  sourceFleetPosition?: number;
 }
 
 export interface ParsedHMSRaceResult {

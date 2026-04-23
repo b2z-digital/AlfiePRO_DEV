@@ -138,11 +138,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const isCalculatingHandicaps = useRef(false);
   const liveSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load user's scoring mode preference (skip for non-HMS simulated events which default to touch)
+  // Load user's scoring mode preference (simulated events default to touch)
   useEffect(() => {
     const loadScoringModePreference = async () => {
       const currentEvent = getCurrentEvent();
-      if (currentEvent?.is_simulated && currentEvent.scoringSystem !== 'hms') {
+      if (currentEvent?.is_simulated) {
         setScoringMode('touch');
         return;
       }
@@ -206,7 +206,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       console.log('🏁 YachtRaceManager: event.dayResults:', Object.keys(currentEvent.dayResults || {}));
       setRaceType(currentEvent.raceFormat);
 
-      if (currentEvent.is_simulated && currentEvent.scoringSystem !== 'hms') {
+      if (currentEvent.is_simulated) {
         setScoringMode('touch');
       }
 
@@ -449,6 +449,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               console.warn(`Heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
               setHeatManagement(null);
             }
+          } else {
+            setHeatManagement(null);
           }
 
           // Load drop rules from current day data if not from heat management
@@ -477,12 +479,16 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 console.warn(`Day 1 heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
                 setHeatManagement(null);
               }
+            } else {
+              setHeatManagement(null);
             }
 
             // Load drop rules from day 1 data if not from heat management
             if (day1Data.dropRules && !day1Data.heatManagement?.configuration.enabled) {
               setCurrentDropRules(day1Data.dropRules);
             }
+          } else {
+            setHeatManagement(null);
           }
         }
       } else {
@@ -596,6 +602,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             console.warn(`Heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
             setHeatManagement(null);
           }
+        } else {
+          setHeatManagement(null);
         }
 
         // Load drop rules from event if not from heat management
@@ -3305,6 +3313,72 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                       setRaceResults(convertedResults);
                       setLastCompletedRace(roundNumber);
                     }
+                    return updatedHM;
+                  });
+                }}
+                onFinaliseQualifying={() => {
+                  setHeatManagement(prevHM => {
+                    if (!prevHM) return prevHM;
+                    const currentRd = prevHM.currentRound;
+                    console.log(`Finalising Qualifying after Round ${currentRd} - transitioning to Finals`);
+
+                    // Update configuration to set current round as the last qualifying round
+                    const updatedConfig = {
+                      ...prevHM.configuration,
+                      shrsQualifyingRounds: currentRd,
+                      shrsFinalsStarted: true
+                    };
+
+                    const updatedRounds = [...prevHM.rounds];
+                    const roundIdx = updatedRounds.findIndex(r => r.round === currentRd);
+                    if (roundIdx === -1) return prevHM;
+
+                    // Mark current round complete
+                    updatedRounds[roundIdx] = { ...updatedRounds[roundIdx], completed: true };
+
+                    // Build the updated HM with new config so generateNextRoundAssignments sees the transition
+                    const hmForGeneration: HeatManagement = {
+                      ...prevHM,
+                      configuration: updatedConfig,
+                      rounds: updatedRounds
+                    };
+
+                    try {
+                      const nextRoundAssignments = generateNextRoundAssignments(updatedRounds[roundIdx], hmForGeneration);
+                      const nextRoundIdx = updatedRounds.findIndex(r => r.round === currentRd + 1);
+                      if (nextRoundIdx === -1) {
+                        updatedRounds.push({
+                          round: currentRd + 1,
+                          heatAssignments: nextRoundAssignments,
+                          results: [],
+                          completed: false
+                        });
+                      } else if (updatedRounds[nextRoundIdx].results.length === 0) {
+                        updatedRounds[nextRoundIdx] = {
+                          ...updatedRounds[nextRoundIdx],
+                          heatAssignments: nextRoundAssignments
+                        };
+                      }
+                    } catch (e) {
+                      console.error('Failed to generate finals fleet assignments', e);
+                    }
+
+                    const updatedHM = {
+                      ...prevHM,
+                      configuration: updatedConfig,
+                      rounds: updatedRounds,
+                      currentRound: currentRd + 1,
+                      roundJustCompleted: currentRd
+                    };
+
+                    const convertedResults = convertHeatResultsToRaceResults(updatedHM, skippers);
+                    if (convertedResults.length > 0) {
+                      setTimeout(() => {
+                        setRaceResults(convertedResults);
+                        setLastCompletedRace(currentRd);
+                      }, 0);
+                    }
+
                     return updatedHM;
                   });
                 }}

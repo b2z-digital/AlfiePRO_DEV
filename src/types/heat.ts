@@ -2,6 +2,7 @@ import { Skipper } from './index';
 import { LetterScore } from './letterScores';
 import { generateHeatAssignmentsForNextRace, HMSConfig } from '../utils/hmsHeatSystem';
 import { getNextHeat, getNonFinisherPriority, compareSailNumbers } from '../utils/shrsHeatSystem';
+import { compareWithCountback } from '../utils/scratchCalculations';
 
 export type HeatDesignation = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -14,6 +15,7 @@ export interface HeatResult {
   round: number;
   markedAsUP?: boolean; // HMS: Promoted to higher heat, doesn't score in this heat
   customPoints?: number; // For RDG fix
+  importedScore?: number | null; // Original score from imported file, used for SHRS overall results
 }
 
 export type SeedingMethod = 'random' | 'manual' | 'ranking';
@@ -36,6 +38,17 @@ export interface HeatConfiguration {
   fleetManagementEnabled?: boolean;
   heatLabelStyle?: 'letters' | 'numbers';
   heatOrder?: 'ascending' | 'descending';
+  sourceVerification?: {
+    skippers: {
+      skipperIndex: number;
+      name: string;
+      sailNumber: string;
+      sourceNet?: number;
+      sourceTotal?: number;
+      sourceFleet?: string;
+      sourceFleetPosition?: number;
+    }[];
+  };
 }
 
 export interface HeatAssignment {
@@ -354,12 +367,24 @@ export const generateNextRoundAssignments = (
           allSkipperScores.set(result.skipperIndex, 0);
           allSkipperRaceScores.set(result.skipperIndex, []);
         }
-        const score = result.letterScore
-          ? (Math.max(...heats.map((_, i) => {
-              const ha = r.heatAssignments.find(a => a.heatDesignation === heats[i]);
-              return ha ? ha.skipperIndices.length : 0;
-            })) + 1)
-          : (result.position || 999);
+
+        let score: number;
+        if (result.importedScore !== undefined && result.importedScore !== null) {
+          // Use the original imported score when available (preserves correct SHRS scoring)
+          score = result.importedScore;
+        } else if (result.letterScore) {
+          if (result.customPoints !== undefined && result.customPoints > 0) {
+            // RDGfix or other custom-pointed letter scores
+            score = result.customPoints;
+          } else {
+            // Standard letter score penalty: largest heat size + 1
+            const heatSizes = r.heatAssignments.map(a => a.skipperIndices.length);
+            score = Math.max(...heatSizes) + 1;
+          }
+        } else {
+          score = result.position || 999;
+        }
+
         allSkipperRaceScores.get(result.skipperIndex)!.push(score);
       }
     }
@@ -375,7 +400,12 @@ export const generateNextRoundAssignments = (
     });
 
     const rankedSkippers = Array.from(allSkipperScores.entries())
-      .sort(([, scoreA], [, scoreB]) => scoreA - scoreB);
+      .sort(([idxA, scoreA], [idxB, scoreB]) => {
+        if (scoreA !== scoreB) return scoreA - scoreB;
+        const aScores = allSkipperRaceScores.get(idxA) || [];
+        const bScores = allSkipperRaceScores.get(idxB) || [];
+        return compareWithCountback(aScores, bScores, fleetRankingDiscards, fleetRankingDiscards);
+      });
 
     const fleetSizes: number[] = [];
     const totalSkippers = rankedSkippers.length;
