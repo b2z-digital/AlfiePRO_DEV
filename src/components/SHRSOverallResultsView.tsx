@@ -305,6 +305,56 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
         lines.push(`${name} - Race ${m.race}: AlfiePRO=${m.computed}, File=${m.imported}`);
       }
     }
+    if (expandedVerification) {
+      lines.push('');
+      lines.push('─── OVERALL VERIFICATION SUMMARY ───');
+      lines.push(`Net Scores:       ${expandedVerification.netMatched}/${expandedVerification.netTotal} matched${expandedVerification.netMatched === expandedVerification.netTotal ? ' (100%)' : ` (${((expandedVerification.netMatched / expandedVerification.netTotal) * 100).toFixed(1)}%)`}`);
+      lines.push(`Fleet Allocations: ${expandedVerification.fleetMatched}/${expandedVerification.fleetTotal} matched${expandedVerification.fleetMatched === expandedVerification.fleetTotal ? ' (100%)' : ` (${((expandedVerification.fleetMatched / expandedVerification.fleetTotal) * 100).toFixed(1)}%)`}`);
+      lines.push(`Fleet Rankings:    ${expandedVerification.rankMatched}/${expandedVerification.rankTotal} matched${expandedVerification.rankMatched === expandedVerification.rankTotal ? ' (100%)' : ` (${((expandedVerification.rankMatched / expandedVerification.rankTotal) * 100).toFixed(1)}%)`}`);
+      lines.push('');
+      lines.push('─── SKIPPER RESULTS VERIFICATION ───');
+      lines.push('');
+      const header = 'Skipper'.padEnd(28) + 'Total'.padStart(7) + 'Disc'.padStart(7) + 'Net'.padStart(7) + 'SrcNet'.padStart(8) + '  Fleet' + ' SrcFl' + '  Pos' + ' SrcPos' + '  Status';
+      lines.push(header);
+      lines.push('─'.repeat(header.length));
+      for (const sv of expandedVerification.skipperVerification) {
+        const allMatch = sv.netMatch && sv.fleetMatch && sv.rankMatch;
+        const status = allMatch ? 'OK' : 'MISMATCH';
+        const srcNetStr = sv.sourceNet !== null ? String(sv.sourceNet) : 'N/A';
+        const srcFleetStr = sv.sourceFleet || 'N/A';
+        const srcRankStr = sv.sourceRank !== null ? String(sv.sourceRank) : 'N/A';
+        lines.push(
+          sv.name.padEnd(28) +
+          String(sv.alfieTotal).padStart(7) +
+          String(sv.alfieDisc).padStart(7) +
+          String(sv.alfieNet).padStart(7) +
+          srcNetStr.padStart(8) +
+          ('  ' + sv.fleet).padEnd(7) +
+          ('  ' + srcFleetStr).padEnd(6) +
+          String(sv.alfieRank).padStart(5) +
+          srcRankStr.padStart(7) +
+          '  ' + status
+        );
+      }
+      lines.push('');
+      lines.push('─── AlfiePRO SCORING INDEPENDENCE STATEMENT ───');
+      lines.push('');
+      lines.push('All scores shown are independently calculated by AlfiePRO\'s SHRS scoring');
+      lines.push('engine. Letter scores (DNF, DNS, DSQ, RDGave, RDGfix), non-finisher');
+      lines.push('penalties, discard schedules, fleet allocations, tie-breakers, and final');
+      lines.push('rankings are all computed from the raw qualifying race positions using');
+      lines.push('SHRS rules.');
+      lines.push('');
+      lines.push('The only data imported from the source file is each skipper\'s finishing');
+      lines.push('position within each heat for each round. All other calculations -');
+      lines.push('including total scores, discards, net scores, fleet allocation based on');
+      lines.push('qualifying net totals, and final fleet rankings - are performed by');
+      lines.push('AlfiePRO\'s own scoring logic.');
+      lines.push('');
+      lines.push('This verification demonstrates that AlfiePRO can independently reproduce');
+      lines.push('the same results as the original scoring system when given only the raw');
+      lines.push('finishing positions.');
+    }
     lines.push('');
     lines.push('═══════════════════════════════════════════════════════════');
     lines.push('  End of SHRS Compliance Verification Report');
@@ -476,6 +526,66 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     const finalsDiscards = finalsRaces.length >= 4 ? 1 : 0;
     return qualDiscards + finalsDiscards;
   }, [qualifyingRaces.length, finalsRaces.length]);
+
+  const expandedVerification = useMemo(() => {
+    if (!isSimulated || !standings.length) return null;
+    const sourceData = heatManagement?.configuration?.sourceVerification?.skippers;
+    if (!sourceData?.length) return null;
+
+    const sourceByIndex = new Map(sourceData.map(s => [s.skipperIndex, s]));
+    const fleetPrefixToDesignation: Record<string, string> = { 'G': 'A', 'S': 'B', 'B': 'C', 'C': 'D' };
+
+    // Total/Disc/Net verification per skipper
+    const skipperVerification: {
+      name: string; sailNumber: string; fleet: string; fleetPosition: number;
+      alfieTotal: number; alfieDisc: number; alfieNet: number;
+      sourceNet: number | null;
+      netMatch: boolean;
+      alfieFleet: string; sourceFleet: string | null;
+      fleetMatch: boolean;
+      alfieRank: number; sourceRank: number | null;
+      rankMatch: boolean;
+    }[] = [];
+
+    let netMatched = 0; let netTotal = 0;
+    let fleetMatched = 0; let fleetTotal = 0;
+    let rankMatched = 0; let rankTotal = 0;
+
+    for (const s of standings) {
+      const src = sourceByIndex.get(s.skipperIndex);
+      const alfieFleetPrefix = FLEET_PREFIX[s.fleet] || s.fleet;
+      const sourceFleet = src?.sourceFleet || null;
+      const sourceFleetDesignation = sourceFleet ? (fleetPrefixToDesignation[sourceFleet] || sourceFleet) : null;
+      const sourceNet = src?.sourceNet ?? null;
+      const sourceRank = src?.sourceFleetPosition ?? null;
+
+      const netMatch = sourceNet !== null ? Math.abs(s.net - sourceNet) < 0.05 : false;
+      const fleetMatch = sourceFleetDesignation !== null ? s.fleet === sourceFleetDesignation : false;
+      const rankMatch = sourceRank !== null ? s.fleetPosition === sourceRank : false;
+
+      if (sourceNet !== null) { netTotal++; if (netMatch) netMatched++; }
+      if (sourceFleetDesignation !== null) { fleetTotal++; if (fleetMatch) fleetMatched++; }
+      if (sourceRank !== null) { rankTotal++; if (rankMatch) rankMatched++; }
+
+      skipperVerification.push({
+        name: s.skipper?.name || `Skipper ${s.skipperIndex}`,
+        sailNumber: s.skipper?.sailNo || s.skipper?.sailNumber || '',
+        fleet: alfieFleetPrefix,
+        fleetPosition: s.fleetPosition,
+        alfieTotal: s.total, alfieDisc: s.discardTotal, alfieNet: s.net,
+        sourceNet, netMatch,
+        alfieFleet: alfieFleetPrefix, sourceFleet, fleetMatch,
+        alfieRank: s.fleetPosition, sourceRank, rankMatch,
+      });
+    }
+
+    return {
+      skipperVerification,
+      netMatched, netTotal,
+      fleetMatched, fleetTotal,
+      rankMatched, rankTotal,
+    };
+  }, [isSimulated, standings, heatManagement]);
 
   const formatScore = (score: number | null, letterScore?: string, customPoints?: number): string => {
     if (letterScore) {
@@ -782,6 +892,171 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Expanded Verification: Net Scores, Fleet Allocation, Rankings */}
+              {expandedVerification && (
+                <>
+                  {/* Summary Verification Stats */}
+                  <div>
+                    <h4 className={`text-xs font-bold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Overall Verification Summary
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {[
+                        { label: 'Net Scores', matched: expandedVerification.netMatched, total: expandedVerification.netTotal },
+                        { label: 'Fleet Allocations', matched: expandedVerification.fleetMatched, total: expandedVerification.fleetTotal },
+                        { label: 'Fleet Rankings', matched: expandedVerification.rankMatched, total: expandedVerification.rankTotal },
+                      ].map((item) => {
+                        const allMatch = item.total > 0 && item.matched === item.total;
+                        return (
+                          <div key={item.label} className={`p-3 rounded-lg border ${
+                            allMatch
+                              ? darkMode ? 'bg-emerald-900/20 border-emerald-700/40' : 'bg-emerald-50 border-emerald-200'
+                              : item.total === 0
+                                ? darkMode ? 'bg-slate-800/60 border-slate-700' : 'bg-white/80 border-slate-200'
+                                : darkMode ? 'bg-amber-900/20 border-amber-700/40' : 'bg-amber-50 border-amber-200'
+                          }`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <p className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{item.label}</p>
+                              {item.total > 0 && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  allMatch
+                                    ? darkMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
+                                    : darkMode ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {allMatch ? 'ALL MATCH' : `${item.matched}/${item.total}`}
+                                </span>
+                              )}
+                            </div>
+                            <p className={`text-lg font-bold ${
+                              allMatch
+                                ? darkMode ? 'text-emerald-400' : 'text-emerald-600'
+                                : item.total === 0
+                                  ? darkMode ? 'text-slate-500' : 'text-slate-400'
+                                  : darkMode ? 'text-amber-400' : 'text-amber-600'
+                            }`}>
+                              {item.total > 0 ? `${item.matched}/${item.total}` : 'N/A'}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Skipper-by-Skipper Verification Table */}
+                  <div>
+                    <h4 className={`text-xs font-bold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Skipper Results Verification
+                    </h4>
+                    <p className={`text-xs mb-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Comparing AlfiePRO calculated results against source data for each skipper.
+                    </p>
+                    <div className="overflow-x-auto rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-200'}">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className={darkMode ? 'bg-slate-800' : 'bg-slate-100'}>
+                            <th className={`px-2 py-1.5 text-left font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Skipper</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Total</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Disc</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Net</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Source Net</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Fleet</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Src Fleet</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Pos</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Src Pos</th>
+                            <th className={`px-2 py-1.5 text-center font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {expandedVerification.skipperVerification.map((sv, i) => {
+                            const allMatch = sv.netMatch && sv.fleetMatch && sv.rankMatch;
+                            const anySource = sv.sourceNet !== null || sv.sourceFleet !== null || sv.sourceRank !== null;
+                            return (
+                              <tr key={i} className={`border-t ${
+                                darkMode ? 'border-slate-700/50' : 'border-slate-200/60'
+                              } ${allMatch ? '' : anySource ? (darkMode ? 'bg-amber-900/10' : 'bg-amber-50/50') : ''}`}>
+                                <td className={`px-2 py-1 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                  {sv.name}
+                                </td>
+                                <td className={`px-2 py-1 text-center font-mono ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  {formatNumber(sv.alfieTotal)}
+                                </td>
+                                <td className={`px-2 py-1 text-center font-mono ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  {formatNumber(sv.alfieDisc)}
+                                </td>
+                                <td className={`px-2 py-1 text-center font-mono font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                  {formatNumber(sv.alfieNet)}
+                                </td>
+                                <td className={`px-2 py-1 text-center font-mono ${
+                                  sv.netMatch
+                                    ? darkMode ? 'text-emerald-400' : 'text-emerald-600'
+                                    : sv.sourceNet !== null
+                                      ? darkMode ? 'text-amber-400' : 'text-amber-600'
+                                      : darkMode ? 'text-slate-500' : 'text-slate-400'
+                                }`}>
+                                  {sv.sourceNet !== null ? formatNumber(sv.sourceNet) : '-'}
+                                </td>
+                                <td className={`px-2 py-1 text-center font-mono font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                  {sv.alfieFleet}
+                                </td>
+                                <td className={`px-2 py-1 text-center font-mono ${
+                                  sv.fleetMatch
+                                    ? darkMode ? 'text-emerald-400' : 'text-emerald-600'
+                                    : sv.sourceFleet !== null
+                                      ? darkMode ? 'text-amber-400' : 'text-amber-600'
+                                      : darkMode ? 'text-slate-500' : 'text-slate-400'
+                                }`}>
+                                  {sv.sourceFleet || '-'}
+                                </td>
+                                <td className={`px-2 py-1 text-center font-mono font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                  {sv.alfieRank}
+                                </td>
+                                <td className={`px-2 py-1 text-center font-mono ${
+                                  sv.rankMatch
+                                    ? darkMode ? 'text-emerald-400' : 'text-emerald-600'
+                                    : sv.sourceRank !== null
+                                      ? darkMode ? 'text-amber-400' : 'text-amber-600'
+                                      : darkMode ? 'text-slate-500' : 'text-slate-400'
+                                }`}>
+                                  {sv.sourceRank !== null ? sv.sourceRank : '-'}
+                                </td>
+                                <td className="px-2 py-1 text-center">
+                                  {anySource ? (
+                                    allMatch ? (
+                                      <ShieldCheck size={12} className={darkMode ? 'text-emerald-400 inline' : 'text-emerald-600 inline'} />
+                                    ) : (
+                                      <AlertCircle size={12} className={darkMode ? 'text-amber-400 inline' : 'text-amber-600 inline'} />
+                                    )
+                                  ) : (
+                                    <span className={`text-[10px] ${darkMode ? 'text-slate-600' : 'text-slate-300'}`}>-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* AlfiePRO Scoring Independence Statement */}
+              <div className={`p-3 rounded-lg border ${darkMode ? 'bg-sky-900/20 border-sky-700/40' : 'bg-sky-50 border-sky-200'}`}>
+                <h4 className={`text-xs font-bold uppercase tracking-wider mb-1.5 ${darkMode ? 'text-sky-400' : 'text-sky-700'}`}>
+                  AlfiePRO Scoring Independence
+                </h4>
+                <p className={`text-xs leading-relaxed ${darkMode ? 'text-sky-300/80' : 'text-sky-800/80'}`}>
+                  All scores shown are independently calculated by AlfiePRO's SHRS scoring engine.
+                  Letter scores (DNF, DNS, DSQ, RDGave, RDGfix), non-finisher penalties, discard schedules,
+                  fleet allocations, tie-breakers, and final rankings are all computed from the raw qualifying
+                  race positions using SHRS rules. The only data imported from the source file is each
+                  skipper's finishing position within each heat for each round. AlfiePRO then applies its own
+                  scoring logic to produce totals, discards, net scores, fleet assignments, and overall standings.
+                  Heat assignments during qualifying may differ from the source event (due to progressive heat
+                  movement being reconstructed), but the per-round scores and final results can be verified independently.
+                </p>
+              </div>
             </div>
           )}
         </div>

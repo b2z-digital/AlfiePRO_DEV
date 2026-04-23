@@ -37,6 +37,16 @@ export interface HeatConfiguration {
   fleetManagementEnabled?: boolean;
   heatLabelStyle?: 'letters' | 'numbers';
   heatOrder?: 'ascending' | 'descending';
+  sourceVerification?: {
+    skippers: {
+      skipperIndex: number;
+      name: string;
+      sailNumber: string;
+      sourceNet?: number;
+      sourceFleet?: string;
+      sourceFleetPosition?: number;
+    }[];
+  };
 }
 
 export interface HeatAssignment {

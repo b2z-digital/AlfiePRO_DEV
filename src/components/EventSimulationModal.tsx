@@ -485,6 +485,17 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
       const totalRaces = parsedSHRSData.qualifyingRounds + parsedSHRSData.finalRounds;
       const qualifyingRounds = parsedSHRSData.qualifyingRounds;
 
+      const sourceVerification = {
+        skippers: parsedSHRSData.skippers.map((s, i) => ({
+          skipperIndex: i,
+          name: s.name,
+          sailNumber: s.sailNumber,
+          sourceNet: s.totalScore,
+          sourceFleet: s.sourceFleet,
+          sourceFleetPosition: s.sourceFleetPosition,
+        })),
+      };
+
       const heatManagement: HeatManagement = {
         configuration: {
           enabled: true,
@@ -498,6 +509,7 @@ export const EventSimulationModal: React.FC<EventSimulationModalProps> = ({
           shrsFinalsStarted: parsedSHRSData.finalRounds > 0,
           fleetManagementEnabled: true,
           heatLabelStyle: 'letters',
+          sourceVerification,
         },
         rounds,
         currentRound: totalRaces,
