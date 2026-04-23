@@ -79,6 +79,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [isEditingPreviousRace, setIsEditingPreviousRace] = useState(false);
+  const activeTargetRace = useRef(initialRace);
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [touchDragging, setTouchDragging] = useState(false);
@@ -246,6 +247,10 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     setCurrentRace(initialRace);
     setIsConfirmed(false);
     setRaceTimerRunning(false);
+
+    if (initialRace > activeTargetRace.current) {
+      activeTargetRace.current = initialRace;
+    }
 
     const isAutoAdvancing = initialRace === previousRace + 1 && isHandicapViewerOpen;
     if (!isAutoAdvancing) {
@@ -796,14 +801,12 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   };
 
   const isCompletedPreviousRace = (): boolean => {
+    if (currentRace >= activeTargetRace.current) return false;
     const allSkippersHaveResult = skippers.every((_, skipperIndex) => {
       const result = raceResults.find(r => r.race === currentRace && r.skipperIndex === skipperIndex);
       return result && (result.position !== null || result.letterScore);
     });
-    if (!allSkippersHaveResult) return false;
-
-    const hasLaterRaceResults = raceResults.some(r => r.race > currentRace && (r.position !== null || r.letterScore));
-    return hasLaterRaceResults;
+    return allSkippersHaveResult;
   };
 
   const isPreviousRace = (): boolean => {
