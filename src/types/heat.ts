@@ -2,6 +2,7 @@ import { Skipper } from './index';
 import { LetterScore } from './letterScores';
 import { generateHeatAssignmentsForNextRace, HMSConfig } from '../utils/hmsHeatSystem';
 import { getNextHeat, getNonFinisherPriority, compareSailNumbers } from '../utils/shrsHeatSystem';
+import { compareWithCountback } from '../utils/scratchCalculations';
 
 export type HeatDesignation = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -399,7 +400,12 @@ export const generateNextRoundAssignments = (
     });
 
     const rankedSkippers = Array.from(allSkipperScores.entries())
-      .sort(([, scoreA], [, scoreB]) => scoreA - scoreB);
+      .sort(([idxA, scoreA], [idxB, scoreB]) => {
+        if (scoreA !== scoreB) return scoreA - scoreB;
+        const aScores = allSkipperRaceScores.get(idxA) || [];
+        const bScores = allSkipperRaceScores.get(idxB) || [];
+        return compareWithCountback(aScores, bScores, fleetRankingDiscards, fleetRankingDiscards);
+      });
 
     const fleetSizes: number[] = [];
     const totalSkippers = rankedSkippers.length;

@@ -327,10 +327,10 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
         const srcRankStr = sv.sourceRank !== null ? String(sv.sourceRank) : 'N/A';
         lines.push(
           sv.name.padEnd(28) +
-          String(sv.alfieTotal).padStart(7) +
+          formatNumber(sv.alfieTotal).padStart(7) +
           srcTotalStr.padStart(8) +
-          String(sv.alfieDisc).padStart(7) +
-          String(sv.alfieNet).padStart(7) +
+          formatNumber(sv.alfieDisc).padStart(7) +
+          formatNumber(sv.alfieNet).padStart(7) +
           srcNetStr.padStart(8) +
           ('  ' + sv.fleet).padEnd(7) +
           ('  ' + srcFleetStr).padEnd(6) +
@@ -486,12 +486,8 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       };
     }).filter(Boolean) as SkipperStanding[];
 
-    // SHRS tie-breaking: qualifying net determines fleet ranking,
-    // so it serves as the primary tie-breaker within a fleet when total nets are equal.
-    // Falls back to RRS A8.1 countback on all scores if qualifying nets also match.
+    // SHRS tie-breaking: standard RRS A8.1 countback on all race scores (qualifying + finals)
     const shrsCountback = (a: SkipperStanding, b: SkipperStanding): number => {
-      if (a.qualNet !== b.qualNet) return a.qualNet - b.qualNet;
-
       const aAll = a.raceScores.map(s => s ?? 999);
       const bAll = b.raceScores.map(s => s ?? 999);
       return compareWithCountback(aAll, bAll, a.droppedIndices.size, b.droppedIndices.size);
