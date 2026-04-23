@@ -1111,7 +1111,11 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           skippers={skippers}
           heatManagement={heatManagement}
           darkMode={darkMode}
-          onBack={() => setShowOverallResultsView(false)}
+          onBack={() => {
+            if (!isFullSHRSImport.current) {
+              setShowOverallResultsView(false);
+            }
+          }}
           isSimulated={currentEvent?.is_simulated}
         />
       </div>
