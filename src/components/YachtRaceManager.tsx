@@ -38,6 +38,7 @@ import { StartBoxModal } from './start-box/StartBoxModal';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
 import { updateRaceStatus } from '../utils/liveTrackingStorage';
+import { AskAlfieOrb } from './ask-alfie/AskAlfieOrb';
 
 class ScoringErrorBoundary extends Component<
   { children: React.ReactNode; darkMode?: boolean; onRetry?: () => void },
@@ -3997,6 +3998,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           );
         })()}
       </div>
+
+      <AskAlfieOrb darkMode={darkMode} />
     </div>
   );
 };
