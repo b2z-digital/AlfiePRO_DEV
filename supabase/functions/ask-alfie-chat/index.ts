@@ -13,6 +13,66 @@ interface ChatMessage {
   content: string;
 }
 
+interface ScoringContext {
+  isActive: boolean;
+  raceType: string | null;
+  scoringSystem: string | null;
+  eventName: string | null;
+  clubName: string | null;
+  boatClass: string | null;
+  currentDay: number;
+  currentRace: number;
+  totalRaces: number;
+  lastCompletedRace: number;
+  dropRules: number[] | string | null;
+  skippers: Array<{
+    index: number;
+    name: string;
+    sailNo: string;
+    club: string;
+    boatModel: string;
+    startHcap: number;
+    currentHcap?: number;
+    withdrawn?: boolean;
+  }>;
+  raceResults: Array<{
+    race: number;
+    skipperIndex: number;
+    skipperName: string;
+    position: number | null;
+    letterScore?: string;
+    points?: number;
+    hcapBefore?: number;
+    hcapAfter?: number;
+    heatDesignation?: string;
+  }>;
+  heatInfo: {
+    scoringSystem: string;
+    currentRound: number;
+    totalRounds: number;
+    currentHeat: string | null;
+    numberOfHeats: number;
+    promotionCount: number;
+    heatAssignments: Array<{ heat: string; skipperNames: string[] }>;
+    roundResults: Array<{ round: number; completed: boolean; heats: string[] }>;
+    lastPromotion?: {
+      promoted: string[];
+      relegated: string[];
+      fromHeat: string;
+      toHeat: string;
+    };
+  } | null;
+  standings: Array<{
+    rank: number;
+    skipperName: string;
+    sailNo: string;
+    totalPoints: number;
+    netPoints: number;
+    racePoints: number[];
+    droppedRaces: number[];
+  }>;
+}
+
 interface RequestPayload {
   message: string;
   conversationHistory?: ChatMessage[];
@@ -20,6 +80,7 @@ interface RequestPayload {
   source?: string;
   image_url?: string;
   course_mode?: boolean;
+  scoring_context?: ScoringContext;
 }
 
 interface FaqMatch {
@@ -72,6 +133,7 @@ Deno.serve(async (req: Request) => {
       source = "web_platform",
       image_url,
       course_mode,
+      scoring_context,
     } = payload;
 
     if (!message || !message.trim()) {
@@ -124,6 +186,8 @@ Deno.serve(async (req: Request) => {
     const firstName = profileData?.first_name || profileData?.full_name?.split(" ")[0] || "";
     const userName = profileData?.full_name || profileData?.first_name || "there";
 
+    const hasScoringContext = scoring_context?.isActive === true;
+
     let systemPrompt = buildSystemPrompt(
       aiInstructions,
       relevantFaqs,
@@ -131,7 +195,8 @@ Deno.serve(async (req: Request) => {
       knowledgeChunks,
       firstName,
       hasImage,
-      course_mode || false
+      course_mode || false,
+      hasScoringContext ? scoring_context : undefined
     );
 
     // Build user message content - multi-content array when image present
@@ -154,10 +219,11 @@ Deno.serve(async (req: Request) => {
       { role: "user", content: userContent },
     ];
 
-    // Use gpt-4o for image analysis, gpt-4o-mini for text-only
-    const model = hasImage ? "gpt-4o" : "gpt-4o-mini";
-    const temperature = hasImage ? 0.3 : 0.7;
-    const maxTokens = hasImage ? 2500 : 1500;
+    // Use gpt-4o for image analysis or scoring context (needs reasoning), gpt-4o-mini for general text
+    const useAdvancedModel = hasImage || hasScoringContext;
+    const model = useAdvancedModel ? "gpt-4o" : "gpt-4o-mini";
+    const temperature = hasImage ? 0.3 : hasScoringContext ? 0.4 : 0.7;
+    const maxTokens = hasImage ? 2500 : hasScoringContext ? 2000 : 1500;
 
     const openaiResponse = await fetch(
       "https://api.openai.com/v1/chat/completions",
@@ -192,8 +258,8 @@ Deno.serve(async (req: Request) => {
     const responseTimeMs = Date.now() - startTime;
 
     // Cost calculation - different rates for gpt-4o vs gpt-4o-mini
-    const inputRate = hasImage ? 0.0025 / 1000 : 0.00015 / 1000;
-    const outputRate = hasImage ? 0.01 / 1000 : 0.0006 / 1000;
+    const inputRate = useAdvancedModel ? 0.0025 / 1000 : 0.00015 / 1000;
+    const outputRate = useAdvancedModel ? 0.01 / 1000 : 0.0006 / 1000;
     const inputCost = (usage.prompt_tokens || 0) * inputRate;
     const outputCost = (usage.completion_tokens || 0) * outputRate;
 
@@ -204,7 +270,7 @@ Deno.serve(async (req: Request) => {
         club_id: clubId || null,
         session_id: crypto.randomUUID(),
         question_preview: message.substring(0, 200),
-        category: hasImage ? (course_mode ? "course_analysis" : "race_scenario") : "platform_help",
+        category: hasImage ? (course_mode ? "course_analysis" : "race_scenario") : hasScoringContext ? "live_scoring" : "platform_help",
         model_id: model,
         input_tokens: usage.prompt_tokens || 0,
         output_tokens: usage.completion_tokens || 0,
@@ -244,7 +310,8 @@ function buildSystemPrompt(
   knowledgeChunks: Array<{ content: string; source_name: string; similarity: number }>,
   firstName: string,
   hasImage: boolean,
-  courseMode: boolean
+  courseMode: boolean,
+  scoringContext?: ScoringContext
 ): string {
   let prompt = "";
 
@@ -263,6 +330,11 @@ function buildSystemPrompt(
   // Add image analysis rules when an image is present
   if (hasImage) {
     prompt += buildImageAnalysisPrompt(courseMode);
+  }
+
+  // Add live scoring context when user is actively scoring
+  if (scoringContext?.isActive) {
+    prompt += buildScoringContextPrompt(scoringContext);
   }
 
   if (corrections.length > 0) {
@@ -458,6 +530,189 @@ Structure your response as:
 
 Be encouraging but constructive. Frame suggestions as improvements rather than criticisms.
 `;
+}
+
+function buildScoringContextPrompt(ctx: ScoringContext): string {
+  let p = `\n--- LIVE SCORING SESSION ---\n`;
+  p += `IMPORTANT: The user is CURRENTLY scoring a live race event. You have access to the real-time scoring data below. When the user asks about results, handicaps, standings, heat assignments, or calculations, use THIS DATA as your primary source of truth. Reference specific skipper names, sail numbers, and actual values from the data.\n\n`;
+
+  // Event overview
+  p += `## Event Details\n`;
+  p += `- Event: ${ctx.eventName || "Unnamed event"}\n`;
+  if (ctx.clubName) p += `- Club: ${ctx.clubName}\n`;
+  if (ctx.boatClass) p += `- Class: ${ctx.boatClass}\n`;
+  p += `- Race Type: ${ctx.raceType || "unknown"}\n`;
+  p += `- Scoring System: ${ctx.scoringSystem === "hms" ? "HMS (Heat Management System)" : ctx.scoringSystem === "shrs" ? "SHRS (Single Handed Racing Series)" : ctx.raceType === "handicap" ? "Standard Handicap" : "Scratch (no handicaps)"}\n`;
+  p += `- Day: ${ctx.currentDay}\n`;
+  p += `- Races: ${ctx.lastCompletedRace} completed out of ${ctx.totalRaces} scheduled\n`;
+  if (ctx.dropRules) {
+    p += `- Drop Rules: ${Array.isArray(ctx.dropRules) ? ctx.dropRules.join(", ") : ctx.dropRules}\n`;
+  }
+  p += `\n`;
+
+  // Skippers
+  if (ctx.skippers.length > 0) {
+    p += `## Competitors (${ctx.skippers.length} skippers)\n`;
+    for (const s of ctx.skippers) {
+      let line = `- ${s.name} (Sail: ${s.sailNo})`;
+      if (s.club) line += ` [${s.club}]`;
+      if (s.boatModel) line += ` - ${s.boatModel}`;
+      if (ctx.raceType === "handicap") {
+        line += ` | Start Hcap: ${s.startHcap}`;
+        if (s.currentHcap !== undefined && s.currentHcap !== s.startHcap) {
+          line += ` → Current: ${s.currentHcap}`;
+        }
+      }
+      if (s.withdrawn) line += ` [WITHDRAWN]`;
+      p += line + `\n`;
+    }
+    p += `\n`;
+  }
+
+  // Race results
+  if (ctx.raceResults.length > 0) {
+    p += `## Race Results\n`;
+    const raceGroups: Record<number, typeof ctx.raceResults> = {};
+    for (const r of ctx.raceResults) {
+      if (!raceGroups[r.race]) raceGroups[r.race] = [];
+      raceGroups[r.race].push(r);
+    }
+    for (const [raceNum, results] of Object.entries(raceGroups)) {
+      const sorted = results.sort((a, b) => {
+        if (a.letterScore && !b.letterScore) return 1;
+        if (!a.letterScore && b.letterScore) return -1;
+        if (a.position === null) return 1;
+        if (b.position === null) return -1;
+        return a.position - b.position;
+      });
+      p += `### Race ${raceNum}${sorted[0]?.heatDesignation ? ` (Heat ${sorted[0].heatDesignation})` : ""}\n`;
+      for (const r of sorted) {
+        let line = `  ${r.position !== null ? `${r.position}.` : "-"} ${r.skipperName}`;
+        if (r.letterScore) line += ` (${r.letterScore})`;
+        if (r.points !== undefined) line += ` → ${r.points} pts`;
+        if (ctx.raceType === "handicap" && r.hcapBefore !== undefined && r.hcapAfter !== undefined) {
+          const change = r.hcapAfter - r.hcapBefore;
+          line += ` | Hcap: ${r.hcapBefore} → ${r.hcapAfter} (${change >= 0 ? "+" : ""}${change})`;
+        }
+        p += line + `\n`;
+      }
+    }
+    p += `\n`;
+  }
+
+  // Heat information
+  if (ctx.heatInfo) {
+    const h = ctx.heatInfo;
+    p += `## Heat Racing Details\n`;
+    p += `- System: ${h.scoringSystem === "hms" ? "HMS" : "SHRS"}\n`;
+    p += `- Current Round: ${h.currentRound} of ${h.totalRounds}\n`;
+    p += `- Number of Heats: ${h.numberOfHeats}\n`;
+    p += `- Promotion Count: ${h.promotionCount} skippers per round\n`;
+    if (h.currentHeat) p += `- Currently Scoring: Heat ${h.currentHeat}\n`;
+    p += `\n`;
+
+    if (h.heatAssignments.length > 0) {
+      p += `### Current Heat Assignments\n`;
+      for (const ha of h.heatAssignments) {
+        p += `- Heat ${ha.heat}: ${ha.skipperNames.join(", ")}\n`;
+      }
+      p += `\n`;
+    }
+
+    if (h.lastPromotion) {
+      p += `### Last Promotion/Relegation\n`;
+      if (h.lastPromotion.promoted.length > 0) {
+        p += `- Promoted (${h.lastPromotion.fromHeat} → ${h.lastPromotion.toHeat}): ${h.lastPromotion.promoted.join(", ")}\n`;
+      }
+      if (h.lastPromotion.relegated.length > 0) {
+        p += `- Relegated: ${h.lastPromotion.relegated.join(", ")}\n`;
+      }
+      p += `\n`;
+    }
+
+    if (h.roundResults.length > 0) {
+      p += `### Round Progress\n`;
+      for (const rr of h.roundResults) {
+        p += `- Round ${rr.round}: ${rr.completed ? "Complete" : "In Progress"} (Heats: ${rr.heats.join(", ")})\n`;
+      }
+      p += `\n`;
+    }
+  }
+
+  // Standings
+  if (ctx.standings.length > 0) {
+    p += `## Current Standings\n`;
+    for (const s of ctx.standings) {
+      let line = `${s.rank}. ${s.skipperName} (${s.sailNo}) — Net: ${s.netPoints} pts`;
+      if (s.totalPoints !== s.netPoints) line += ` (Gross: ${s.totalPoints})`;
+      if (s.racePoints.length > 0) {
+        const raceStr = s.racePoints.map((pts, i) =>
+          s.droppedRaces.includes(i + 1) ? `[${pts}]` : `${pts}`
+        ).join(", ");
+        line += ` | Races: ${raceStr}`;
+      }
+      p += line + `\n`;
+    }
+    p += `\n`;
+  }
+
+  // Add handicap calculation rules when in handicap mode
+  if (ctx.raceType === "handicap") {
+    p += `## AlfiePRO Handicap Calculation Rules\n`;
+    p += `These are the EXACT rules used by AlfiePRO to calculate handicaps. Use these when explaining how handicaps were calculated.\n\n`;
+    p += `### Race 1 Seeding (All Boats on Scratch)\n`;
+    p += `When ALL boats start Race 1 with handicap 0 (scratch) and handicaps are NOT set manually:\n`;
+    p += `- Race 1 is a "seeding race" — finishing positions set initial handicaps\n`;
+    p += `- 1st place → handicap remains 0 (stays on scratch)\n`;
+    p += `- 2nd place → handicap set to 10\n`;
+    p += `- 3rd place → handicap set to 20\n`;
+    p += `- 4th place → handicap set to 30\n`;
+    p += `- Formula: (finishing_position - 1) × 10\n`;
+    p += `- Letter scores (DNS, DNF, etc.) → handicap set to 0\n\n`;
+    p += `### Standard Handicap Adjustments (Race 2+)\n`;
+    p += `Position-based adjustments applied to each skipper's current handicap:\n`;
+    p += `- 1st place: -30 seconds (handicap decreases)\n`;
+    p += `- 2nd place: -20 seconds (handicap decreases)\n`;
+    p += `- 3rd place: -10 seconds (handicap decreases)\n`;
+    p += `- 4th place and below: 0 (no change from position alone)\n\n`;
+    p += `### Scratch Boat Bonus (+30 seconds)\n`;
+    p += `When a boat sailing on scratch (handicap = 0) WINS the race (finishes 1st):\n`;
+    p += `- ALL other boats receive +30 seconds added to their handicap adjustment\n`;
+    p += `- The scratch boat winner ALSO gets +30 (which offsets their -30 for 1st, resulting in net 0 change)\n`;
+    p += `- Other scratch boats in 2nd/3rd also get the +30 bonus added to their position adjustment\n`;
+    p += `- This bonus does NOT apply when ALL boats are on scratch\n`;
+    p += `- This bonus does NOT apply when the race winner is NOT a scratch boat\n\n`;
+    p += `### Combined Calculation\n`;
+    p += `For each skipper: new_handicap = current_handicap + position_adjustment + scratch_boat_bonus\n`;
+    p += `- The result is clamped: minimum 0, maximum = cap limit\n\n`;
+    p += `### Letter Score Handling\n`;
+    p += `- DNS, DNF, RET, DNC, DSQ, OCS, BFD, DNE, NSC: No position-based adjustment (0)\n`;
+    p += `- If scratch boat bonus is active, non-withdrawn letter scores still receive the +30 bonus\n`;
+    p += `- WDN (withdrawn): receives 0 adjustment, even if scratch boat bonus is active\n`;
+    p += `- RDGfix: treated as a normal finishing position for handicap calculation\n\n`;
+    p += `### Last Place Rules\n`;
+    p += `- Non-scratch boat finishing last: gets +30 bonus (if last place bonus is enabled for the event)\n`;
+    p += `- Scratch boat finishing last: tracked for "streak" — 3 consecutive last-place finishes awards +30\n\n`;
+    p += `### WORKED EXAMPLE INSTRUCTION\n`;
+    p += `When explaining handicap calculations, you MUST show the worked calculation for EACH skipper using their actual data from the race results above. Format each as:\n`;
+    p += `"[Skipper Name] (Sail [X]): finished [position] — [current_hcap] + ([position_adj]) + ([bonus]) = [new_hcap]"\n`;
+    p += `For example: "John Smith (Sail 42): finished 2nd — 30 + (-20) + (0) = 10"\n`;
+    p += `Always identify whether a scratch boat won the race first, as this determines if the +30 bonus applies.\n\n`;
+  }
+
+  // Scoring-specific instructions
+  p += `## How to Use This Data\n`;
+  p += `- When the user asks "why is X in position Y", look at the standings and race results to explain.\n`;
+  p += `- For handicap questions, ALWAYS show the step-by-step worked calculation for each skipper using the Handicap Calculation Rules above and the actual race data. Use real names and numbers — never generalise.\n`;
+  p += `- For tie-break questions, explain the countback procedure: compare best individual race positions after drops.\n`;
+  p += `- For HMS/SHRS questions, explain heat assignments, promotion rules, and how overall standings are calculated.\n`;
+  p += `- For letter scores (DNS, DNF, DSQ, OCS, etc.), explain the scoring penalty: DNF/RET = finishers + 1, DNS/DNC = total competitors + 1, DSQ/DNE = total competitors + 2.\n`;
+  p += `- For drop rule questions, explain which races are dropped (shown in brackets in standings) and how they affect net points.\n`;
+  p += `- Always reference actual data from the scoring session — use real skipper names, sail numbers, and values.\n`;
+  p += `- Be specific and precise. Show your working. Don't generalise when you have the actual numbers.\n`;
+  p += `--- END LIVE SCORING SESSION ---\n\n`;
+
+  return p;
 }
 
 function buildSailingFlagIdentificationPrompt(): string {

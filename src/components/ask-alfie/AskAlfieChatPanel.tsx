@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader as Loader2, Trash2, ArrowLeft, Clock, Pencil, Circle as HelpCircle, Volume2, Share2, ImagePlus, Camera, Image as ImageIcon, X as XIcon } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useScoringContext } from '../../contexts/ScoringContext';
 import { RaceScenarioCanvas } from './RaceScenarioCanvas';
 
 const AlfieLogo: React.FC<{ size?: number; className?: string }> = ({ size = 16, className = '' }) => (
@@ -106,6 +107,52 @@ const QUICK_QUESTIONS = [
   'How do I add a new member?',
 ];
 
+function getScoringQuickQuestions(ctx: import('../../contexts/ScoringContext').ScoringContextData | null | undefined): string[] {
+  if (!ctx?.isActive) return QUICK_QUESTIONS;
+
+  const questions: string[] = [];
+
+  if (ctx.raceType === 'handicap') {
+    questions.push('How are the handicaps being calculated for this race?');
+    questions.push('Explain how the adjusted handicap is determined after each race');
+    if (ctx.skippers.length > 0) {
+      questions.push('Who has had the biggest handicap change so far?');
+    }
+  }
+
+  if (ctx.scoringSystem === 'hms') {
+    questions.push('How does the HMS heat promotion and relegation work?');
+    questions.push('Explain how tie-breaks are resolved in HMS scoring');
+    if (ctx.heatInfo) {
+      questions.push(`How are skippers assigned to heats in round ${ctx.heatInfo.currentRound}?`);
+      questions.push('What determines which skippers get promoted to a higher heat?');
+    }
+  } else if (ctx.scoringSystem === 'shrs') {
+    questions.push('How does the SHRS qualifying and finals system work?');
+    questions.push('Explain the SHRS tie-break procedure');
+    if (ctx.heatInfo?.currentRound) {
+      questions.push('How are the fleet assignments determined for this round?');
+    }
+  }
+
+  if (ctx.raceType === 'scratch') {
+    questions.push('How are the standings calculated in scratch racing?');
+    questions.push('Explain how drop races work with the current drop rules');
+  }
+
+  if (ctx.lastCompletedRace > 0) {
+    questions.push(`Explain the current standings after race ${ctx.lastCompletedRace}`);
+  }
+
+  questions.push('What does each letter score (DNS, DNF, DSQ, OCS) mean for points?');
+
+  if (ctx.dropRules) {
+    questions.push('How do the drop rules apply with the current race count?');
+  }
+
+  return questions.slice(0, 6);
+}
+
 export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   darkMode,
   onClose,
@@ -113,6 +160,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   courseMode = false,
 }) => {
   const { user, currentClub } = useAuth();
+  const { scoringContext, getScoringSnapshot } = useScoringContext();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -124,6 +172,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   const [attachedDrawing, setAttachedDrawing] = useState<string | null>(null);
   const [drawingCourseMode, setDrawingCourseMode] = useState(courseMode);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const scoringSnapshot = scoringContext.isActive ? scoringContext : null;
+  const activeQuestions = getScoringQuickQuestions(scoringSnapshot);
   const lastAssistantRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -210,6 +260,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
             source: 'web_platform',
             image_url: image || undefined,
             course_mode: drawingCourseMode || undefined,
+            scoring_context: getScoringSnapshot().isActive ? getScoringSnapshot() : undefined,
           }),
         }
       );
@@ -394,10 +445,25 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
           <h2 className="text-2xl font-bold text-white mb-2">
             Hi {userName || 'there'},
           </h2>
-          <p className="text-sm text-slate-400 text-center mb-8 leading-relaxed">
-            I'm your sailing assistant for racing rules,<br />
-            rig tuning, app help, and more
+          <p className="text-sm text-slate-400 text-center mb-4 leading-relaxed">
+            {scoringSnapshot?.isActive
+              ? <>I can see your live scoring session.<br />Ask me about results, handicaps, or rules</>
+              : <>I'm your sailing assistant for racing rules,<br />rig tuning, app help, and more</>
+            }
           </p>
+
+          {scoringSnapshot?.isActive && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 mb-6">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="text-[11px] text-cyan-300 font-medium">
+                Live: {scoringSnapshot.eventName || 'Race in progress'} — {
+                  scoringSnapshot.scoringSystem === 'hms' ? 'HMS Heat Scoring' :
+                  scoringSnapshot.scoringSystem === 'shrs' ? 'SHRS Heat Scoring' :
+                  scoringSnapshot.raceType === 'handicap' ? 'Handicap Racing' : 'Scratch Racing'
+                }
+              </span>
+            </div>
+          )}
 
           {/* Action tiles */}
           <div className="grid grid-cols-3 gap-3 w-full mb-6">
@@ -443,7 +509,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
 
           {/* Quick questions */}
           <div className="w-full space-y-2">
-            {QUICK_QUESTIONS.slice(0, 4).map((q, i) => (
+            {activeQuestions.slice(0, 4).map((q, i) => (
               <button
                 key={i}
                 onClick={() => {
@@ -585,11 +651,25 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
             <p className="text-sm font-medium mb-1 text-white">
               {userName ? `Hi ${userName}!` : 'Hi there!'}
             </p>
-            <p className="text-xs text-center mb-5 text-slate-400">
-              I'm Alfie. Ask me anything about racing rules or using AlfiePRO.
+            <p className="text-xs text-center mb-3 text-slate-400">
+              {scoringSnapshot?.isActive
+                ? 'I can see your live scoring session. Ask me about results, handicaps, or rules.'
+                : 'I\'m Alfie. Ask me anything about racing rules or using AlfiePRO.'}
             </p>
+            {scoringSnapshot?.isActive && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 mb-3">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="text-[10px] text-cyan-300 font-medium">
+                  Live: {scoringSnapshot.eventName || 'Race in progress'} — {
+                    scoringSnapshot.scoringSystem === 'hms' ? 'HMS Heat Scoring' :
+                    scoringSnapshot.scoringSystem === 'shrs' ? 'SHRS Heat Scoring' :
+                    scoringSnapshot.raceType === 'handicap' ? 'Handicap Racing' : 'Scratch Racing'
+                  }
+                </span>
+              </div>
+            )}
             <div className="w-full space-y-2">
-              {QUICK_QUESTIONS.map((q, i) => (
+              {activeQuestions.map((q, i) => (
                 <button
                   key={i}
                   onClick={() => sendMessage(q)}
