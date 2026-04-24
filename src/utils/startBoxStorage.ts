@@ -142,8 +142,33 @@ export async function getSequences(clubId: string | null): Promise<StartSequence
       query = query.is('club_id', null);
     }
 
-    const { data, error } = await query;
-    if (error) throw error;
+    let { data, error } = await query;
+
+    if (error) {
+      // Fallback: retry without the minute_callout_sound join
+      let fallbackQuery = supabase
+        .from('start_sequences')
+        .select(`
+          *,
+          sounds:start_sequence_sounds(
+            *,
+            sound:start_box_sounds(*)
+          )
+        `)
+        .eq('is_active', true)
+        .order('sort_order')
+        .order('name');
+
+      if (clubId) {
+        fallbackQuery = fallbackQuery.or(`club_id.is.null,club_id.eq.${clubId}`);
+      } else {
+        fallbackQuery = fallbackQuery.is('club_id', null);
+      }
+
+      const fallbackResult = await fallbackQuery;
+      if (fallbackResult.error) throw fallbackResult.error;
+      data = fallbackResult.data;
+    }
 
     return (data || []).map(seq => ({
       ...seq,
@@ -159,7 +184,7 @@ export async function getSequences(clubId: string | null): Promise<StartSequence
 
 export async function getSequence(sequenceId: string): Promise<StartSequence | null> {
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('start_sequences')
       .select(`
         *,
@@ -172,7 +197,24 @@ export async function getSequence(sequenceId: string): Promise<StartSequence | n
       .eq('id', sequenceId)
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      // Fallback: retry without the minute_callout_sound join
+      const fallbackResult = await supabase
+        .from('start_sequences')
+        .select(`
+          *,
+          sounds:start_sequence_sounds(
+            *,
+            sound:start_box_sounds(*)
+          )
+        `)
+        .eq('id', sequenceId)
+        .maybeSingle();
+
+      if (fallbackResult.error) throw fallbackResult.error;
+      data = fallbackResult.data;
+    }
+
     if (!data) return null;
 
     return {
