@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Award, ChevronLeft, RotateCcw, CreditCard as Edit3, Check, History, Zap } from 'lucide-react';
+import { X, Award, ChevronLeft, RotateCcw, CreditCard as Edit3, Check, History, Zap, TrendingUp, TrendingDown } from 'lucide-react';
 import { Skipper, RaceResult } from '../../types';
 import { RaceEvent } from '../../types/race';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -666,6 +666,19 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                                       onClick={() => handleStartEdit(handicap.skipperIndex, handicap.currentHandicap)}
                                       className="group flex items-center gap-1.5 transition-colors"
                                     >
+                                      {handicap.change !== 0 && (
+                                        handicap.change < 0 ? (
+                                          <div className="flex items-center gap-0.5">
+                                            <TrendingUp size={14} className="text-green-400" />
+                                            <span className="text-[10px] font-medium text-green-400">{handicap.change}s</span>
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center gap-0.5">
+                                            <TrendingDown size={14} className="text-red-400" />
+                                            <span className="text-[10px] font-medium text-red-400">+{handicap.change}s</span>
+                                          </div>
+                                        )
+                                      )}
                                       <span className="text-xl font-bold text-green-500">{handicap.currentHandicap}</span>
                                       <Edit3 size={14} className={`${darkMode ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-600'} transition-colors`} />
                                     </button>
@@ -676,7 +689,22 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                                     )}
                                   </div>
                                 ) : (
-                                  <div className="text-xl font-bold text-green-500">{handicap.currentHandicap}</div>
+                                  <div className="flex items-center gap-1.5">
+                                    {handicap.change !== 0 && (
+                                      handicap.change < 0 ? (
+                                        <div className="flex items-center gap-0.5">
+                                          <TrendingUp size={16} className="text-green-400" />
+                                          <span className="text-[10px] font-medium text-green-400">{handicap.change}s</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-0.5">
+                                          <TrendingDown size={16} className="text-red-400" />
+                                          <span className="text-[10px] font-medium text-red-400">+{handicap.change}s</span>
+                                        </div>
+                                      )
+                                    )}
+                                    <span className="text-xl font-bold text-green-500">{handicap.currentHandicap}</span>
+                                  </div>
                                 )}
                               </div>
                             </div>
