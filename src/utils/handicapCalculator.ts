@@ -80,6 +80,28 @@ export const calculateHandicaps = (
     // Check if ALL boats are on true scratch (all handicaps === 0)
     const allOnScratch = positions.every(p => p.isOnScratch);
 
+    // Seeding race: R1 with all boats on 0 and not manual handicaps
+    // Assign handicaps based on finishing position (1st=0, 2nd=10, 3rd=20, etc.)
+    if (race === 1 && allOnScratch && !isManualHandicaps) {
+      raceData.forEach(result => {
+        const idx = result.skipperIndex;
+        const pos = result.position;
+        result.handicap = 0;
+        const seedHcap = pos !== null && !result.letterScore ? (pos - 1) * 10 : 0;
+        const resultIndex = updatedResults.findIndex(
+          r => r.race === 1 && r.skipperIndex === idx
+        );
+        if (resultIndex !== -1) {
+          updatedResults[resultIndex] = {
+            ...result,
+            handicap: 0,
+            adjustedHcap: seedHcap
+          };
+        }
+      });
+      continue;
+    }
+
     // Scratch boat bonus only applies when a scratch boat (handicap 0) WINS the race
     const scratchBoatWinner = !allOnScratch ? positions
       .find(p => p.isOnScratch && p.position === 1) : undefined;
