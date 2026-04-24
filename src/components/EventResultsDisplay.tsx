@@ -1020,9 +1020,13 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   // Get all results for this race
                   const raceData = resultsByRace[raceNum] || [];
 
-                  // Calculate current handicaps for all skippers at the start of this race
+                  // Calculate handicaps as they were at the START of this race
                   const currentHcaps = (event.skippers || []).map((skipper, idx) => {
-                    if (raceNum === 1) return skipper.startHcap || 0;
+                    if (raceNum === 1) {
+                      const r1Result = raceData.find(r => r.skipperIndex === idx);
+                      if (r1Result && r1Result.handicap !== undefined) return r1Result.handicap;
+                      return skipper.startHcap || 0;
+                    }
 
                     // Look for adjusted handicap from previous race
                     for (let prevRace = raceNum - 1; prevRace >= 1; prevRace--) {

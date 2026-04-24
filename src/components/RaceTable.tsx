@@ -1050,9 +1050,11 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                     const race = i + 1;
                     const raceData = raceResults.filter(r => r.race === race);
 
-                    // Get current handicaps for this race
+                    // Get handicaps as they were at the START of this race
                     const currentHcaps = skippers.map((_, idx) => {
                       if (race === 1) {
+                        const r1Result = raceData.find(r => r.skipperIndex === idx);
+                        if (r1Result && r1Result.handicap !== undefined) return r1Result.handicap;
                         return skippers[idx].startHcap;
                       }
                       const prevRaceResults = raceResults.filter(r => r.race === race - 1);
