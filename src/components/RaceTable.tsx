@@ -1071,8 +1071,10 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                       }))
                       .sort((a, b) => a.position - b.position);
 
-                    const scratchBoatWinner = positions
-                      .find(p => p.isOnScratch && p.position === 1);
+                    const allOnScratch = positions.every(p => p.isOnScratch);
+
+                    const scratchBoatWinner = !allOnScratch ? positions
+                      .find(p => p.isOnScratch && p.position === 1) : undefined;
 
                     let scratchBoatBonus = 0;
                     if (scratchBoatWinner) {

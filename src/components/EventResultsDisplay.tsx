@@ -1046,8 +1046,10 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     }))
                     .sort((a, b) => (a.position || 999) - (b.position || 999));
 
-                  const scratchBoatWinner = positions
-                    .find(p => p.isOnScratch && p.position === 1);
+                  const allOnScratch = positions.every(p => p.isOnScratch);
+
+                  const scratchBoatWinner = !allOnScratch ? positions
+                    .find(p => p.isOnScratch && p.position === 1) : undefined;
 
                   let scratchBoatBonus = 0;
                   if (scratchBoatWinner) {
