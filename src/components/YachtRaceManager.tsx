@@ -156,6 +156,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       ? (heatManagement.configuration.scoringSystem || 'hms')
       : 'standard';
 
+    // For imported/simulated heat events, raceResults may be empty while heatManagement has all data
+    const effectiveRaceResults = (() => {
+      if (raceResults.length > 0) return raceResults;
+      if (heatManagement?.configuration?.enabled && heatManagement.rounds.some(r => r.completed)) {
+        return convertHeatResultsToRaceResults(heatManagement, skippers);
+      }
+      return raceResults;
+    })();
+
     const scoringSkippers: ScoringSkipper[] = skippers.map((s, i) => ({
       index: i,
       name: s.name,
@@ -163,12 +172,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       club: s.club,
       boatModel: s.boatModel,
       startHcap: s.startHcap,
-      currentHcap: raceResults.length > 0 ? s.startHcap : undefined,
+      currentHcap: effectiveRaceResults.length > 0 ? s.startHcap : undefined,
       withdrawn: s.withdrawnFromRace != null,
     }));
 
     // Build race results with skipper names
-    const scoringResults: ScoringRaceResult[] = raceResults.map(r => ({
+    const scoringResults: ScoringRaceResult[] = effectiveRaceResults.map(r => ({
       race: r.race,
       skipperIndex: r.skipperIndex,
       skipperName: skippers[r.skipperIndex]?.name || `Skipper ${r.skipperIndex}`,
@@ -253,7 +262,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       }
 
       const skipperIndicesWithResults = new Set(
-        raceResults.map(r => r.skipperIndex).filter(idx => idx != null)
+        effectiveRaceResults.map(r => r.skipperIndex).filter(idx => idx != null)
       );
 
       const skipperPointsData: Record<number, { races: number[]; letterScores: (string | undefined)[]; heats: string[] }> = {};
@@ -263,7 +272,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
       for (let race = 1; race <= lastCompletedRace; race++) {
         for (const i of skipperIndicesWithResults) {
-          const result = raceResults.find(r => r.race === race && r.skipperIndex === i);
+          const result = effectiveRaceResults.find(r => r.race === race && r.skipperIndex === i);
           // For SHRS/HMS, use position within heat as points; for standard, use points or position
           let pts: number;
           if (result) {
