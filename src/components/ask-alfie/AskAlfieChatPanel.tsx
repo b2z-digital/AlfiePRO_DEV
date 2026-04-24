@@ -181,7 +181,9 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
 
   // Voice input state (Speech-to-Text)
   const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
+  const lastInputWasVoiceRef = useRef(false);
 
   // Text-to-Speech state
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -226,6 +228,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   };
 
   // Voice input (Speech-to-Text)
+  const pendingVoiceSubmitRef = useRef<string | null>(null);
+
   const startListening = useCallback(() => {
     if (!hasSpeechRecognition || isListening) return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -235,21 +239,48 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
     recognition.continuous = false;
     recognition.maxAlternatives = 1;
 
+    setInput('');
+    setInterimTranscript('');
+
     recognition.onresult = (event: any) => {
-      const transcript = Array.from(event.results)
-        .map((result: any) => result[0].transcript)
-        .join('');
-      setInput(transcript);
+      let interim = '';
+      let final = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          final += result[0].transcript;
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+      if (final) {
+        setInput(final);
+        setInterimTranscript('');
+        pendingVoiceSubmitRef.current = final;
+      } else {
+        setInterimTranscript(interim);
+      }
     };
 
     recognition.onend = () => {
       setIsListening(false);
+      setInterimTranscript('');
       recognitionRef.current = null;
+      const textToSubmit = pendingVoiceSubmitRef.current;
+      pendingVoiceSubmitRef.current = null;
+      if (textToSubmit?.trim()) {
+        lastInputWasVoiceRef.current = true;
+        setTimeout(() => {
+          sendMessage(textToSubmit.trim());
+        }, 100);
+      }
     };
 
     recognition.onerror = () => {
       setIsListening(false);
+      setInterimTranscript('');
       recognitionRef.current = null;
+      pendingVoiceSubmitRef.current = null;
     };
 
     recognitionRef.current = recognition;
@@ -260,9 +291,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
-      recognitionRef.current = null;
     }
-    setIsListening(false);
   }, []);
 
   // Text-to-Speech
@@ -302,6 +331,16 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
     setIsSpeaking(true);
     setSpeakingMessageId(messageId);
   }, [hasSpeechSynthesis, isSpeaking, speakingMessageId]);
+
+  // Auto-read AI response when last input was voice
+  useEffect(() => {
+    if (messages.length < 2) return;
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.role === 'assistant' && lastInputWasVoiceRef.current && !isLoading) {
+      lastInputWasVoiceRef.current = false;
+      setTimeout(() => speakText(lastMsg.content, lastMsg.id), 300);
+    }
+  }, [messages, isLoading, speakText]);
 
   // Stop speech on unmount
   useEffect(() => {
@@ -480,6 +519,102 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
+  // Listening overlay — animated screen matching mobile app
+  const ListeningOverlay = () => {
+    const waveCanvasRef = useRef<HTMLCanvasElement>(null);
+    const waveAnimRef = useRef<number>(0);
+
+    useEffect(() => {
+      const canvas = waveCanvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d')!;
+      const w = 200;
+      const h = 60;
+      canvas.width = w * 2;
+      canvas.height = h * 2;
+      ctx.scale(2, 2);
+      let time = 0;
+
+      const draw = () => {
+        ctx.clearRect(0, 0, w, h);
+        const bars = 9;
+        const barWidth = 4;
+        const gap = 12;
+        const totalWidth = bars * barWidth + (bars - 1) * gap;
+        const startX = (w - totalWidth) / 2;
+        const centerY = h / 2;
+
+        for (let i = 0; i < bars; i++) {
+          const phase = (i / bars) * Math.PI * 2;
+          const height = 8 + Math.abs(Math.sin(time * 3 + phase)) * 22;
+          const x = startX + i * (barWidth + gap);
+
+          const gradient = ctx.createLinearGradient(x, centerY - height / 2, x, centerY + height / 2);
+          gradient.addColorStop(0, 'rgba(56, 189, 248, 0.9)');
+          gradient.addColorStop(0.5, 'rgba(34, 211, 238, 1)');
+          gradient.addColorStop(1, 'rgba(56, 189, 248, 0.9)');
+
+          const y = centerY - height / 2;
+          const r = 2;
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(x, y, barWidth, height, r);
+          } else {
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + barWidth - r, y);
+            ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + r);
+            ctx.lineTo(x + barWidth, y + height - r);
+            ctx.quadraticCurveTo(x + barWidth, y + height, x + barWidth - r, y + height);
+            ctx.lineTo(x + r, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+          }
+          ctx.fillStyle = gradient;
+          ctx.fill();
+        }
+
+        time += 0.02;
+        waveAnimRef.current = requestAnimationFrame(draw);
+      };
+
+      draw();
+      return () => { if (waveAnimRef.current) cancelAnimationFrame(waveAnimRef.current); };
+    }, []);
+
+    return (
+      <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0b1120]/95 backdrop-blur-sm">
+        <div className="mb-6 opacity-60">
+          <MiniOrb size={80} />
+        </div>
+
+        <h3 className="text-xl font-bold text-white mb-2">Listening...</h3>
+        <p className="text-sm text-slate-400 mb-8">Stops automatically when you pause</p>
+
+        <canvas
+          ref={waveCanvasRef}
+          className="mb-10"
+          style={{ width: 200, height: 60, imageRendering: 'auto' }}
+        />
+
+        {interimTranscript && (
+          <div className="px-6 mb-8 max-w-[90%]">
+            <p className="text-sm text-cyan-300/80 text-center italic">"{interimTranscript}"</p>
+          </div>
+        )}
+
+        <button
+          onClick={stopListening}
+          className="w-16 h-16 rounded-full bg-cyan-500 hover:bg-cyan-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 transition-all hover:scale-105"
+        >
+          <Mic className="w-7 h-7 text-white" />
+        </button>
+        <p className="text-xs text-slate-500 mt-3">Listening... tap to stop early</p>
+      </div>
+    );
+  };
+
   // Drawing mode
   if (viewMode === 'drawing') {
     return (
@@ -501,7 +636,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   // Welcome screen
   if (viewMode === 'welcome' && messages.length === 0) {
     return (
-      <div className={`${containerClass} bg-[#0b1120] ${!embedded ? 'border-slate-700/50' : ''}`}>
+      <div className={`${containerClass} bg-[#0b1120] ${!embedded ? 'border-slate-700/50' : ''} relative`}>
+        {isListening && <ListeningOverlay />}
         {/* Header bar */}
         {!embedded && (
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/30">
@@ -744,7 +880,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
 
   // Chat view
   return (
-    <div className={`${containerClass} ${!embedded ? 'bg-[#0b1120] border-slate-700/50' : ''}`}>
+    <div className={`${containerClass} ${!embedded ? 'bg-[#0b1120] border-slate-700/50' : ''} relative`}>
+      {isListening && <ListeningOverlay />}
       {/* Chat header */}
       {!embedded && (
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/30 bg-[#0b1120]">
