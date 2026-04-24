@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader as Loader2, Trash2, ArrowLeft, Clock, Pencil, Circle as HelpCircle, Volume2, Share2, ImagePlus, Camera, Image as ImageIcon, X as XIcon } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useScoringContext } from '../../contexts/ScoringContext';
 import { RaceScenarioCanvas } from './RaceScenarioCanvas';
 
 const AlfieLogo: React.FC<{ size?: number; className?: string }> = ({ size = 16, className = '' }) => (
@@ -90,7 +91,6 @@ interface AskAlfieChatPanelProps {
   onClose: () => void;
   embedded?: boolean;
   courseMode?: boolean;
-  getScoringSnapshot?: () => import('../../contexts/ScoringContext').ScoringContextData;
 }
 
 const QUICK_ACTIONS = [
@@ -107,7 +107,7 @@ const QUICK_QUESTIONS = [
   'How do I add a new member?',
 ];
 
-function getScoringQuickQuestions(ctx: import('../../contexts/ScoringContext').ScoringContextData | null): string[] {
+function getScoringQuickQuestions(ctx: import('../../contexts/ScoringContext').ScoringContextData | null | undefined): string[] {
   if (!ctx?.isActive) return QUICK_QUESTIONS;
 
   const questions: string[] = [];
@@ -158,9 +158,9 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   onClose,
   embedded = false,
   courseMode = false,
-  getScoringSnapshot,
 }) => {
   const { user, currentClub } = useAuth();
+  const { scoringContext, getScoringSnapshot } = useScoringContext();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -172,7 +172,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   const [attachedDrawing, setAttachedDrawing] = useState<string | null>(null);
   const [drawingCourseMode, setDrawingCourseMode] = useState(courseMode);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const scoringSnapshot = getScoringSnapshot?.() || null;
+  const scoringSnapshot = scoringContext.isActive ? scoringContext : null;
   const activeQuestions = getScoringQuickQuestions(scoringSnapshot);
   const lastAssistantRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -260,7 +260,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
             source: 'web_platform',
             image_url: image || undefined,
             course_mode: drawingCourseMode || undefined,
-            scoring_context: getScoringSnapshot?.()?.isActive ? getScoringSnapshot() : undefined,
+            scoring_context: getScoringSnapshot().isActive ? getScoringSnapshot() : undefined,
           }),
         }
       );
