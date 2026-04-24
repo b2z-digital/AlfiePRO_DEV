@@ -36,6 +36,8 @@ class StartBoxAudioEngine {
 
   private countdownAudioSource: AudioBufferSourceNode | null = null;
   private countdownAudioStartCtxTime = 0;
+  private audioStopScheduled = false;
+  private audioStopTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private stateCallbacks: StateChangeCallback[] = [];
   private tickCallbacks: TickCallback[] = [];
@@ -159,6 +161,7 @@ class StartBoxAudioEngine {
     this.lastBeepSecond = -1;
     this.firedMinuteCallouts.clear();
     this.pausedElapsedMs = 0;
+    this.audioStopScheduled = false;
     this.setState('armed');
     this.emitTick();
 
@@ -183,9 +186,14 @@ class StartBoxAudioEngine {
           source.buffer = buffer;
           source.connect(this.gainNode);
 
+          const audioStartMs = this.currentSequence.audio_start_ms || 0;
+          const audioEndMs = this.currentSequence.audio_end_ms;
+
           if (this.currentSequence.use_audio_only) {
             const elapsedSec = this.pausedElapsedMs / 1000;
-            source.start(0, elapsedSec);
+            const startOffset = audioStartMs / 1000 + elapsedSec;
+            const duration = audioEndMs != null ? (audioEndMs / 1000) - startOffset : undefined;
+            source.start(0, startOffset, duration);
           } else {
             const offsetMs = this.currentSequence.audio_offset_ms || 0;
             const elapsedSec = this.pausedElapsedMs / 1000;
@@ -197,6 +205,17 @@ class StartBoxAudioEngine {
               source.start(this.audioContext.currentTime + Math.abs(audioStartSec), 0);
             }
           }
+
+          if (audioEndMs != null && this.currentSequence.use_audio_only && !this.audioStopScheduled) {
+            const effectivePlayMs = (audioEndMs - audioStartMs) - this.pausedElapsedMs;
+            if (effectivePlayMs > 0) {
+              this.audioStopTimeout = setTimeout(() => {
+                this.stopCountdownAudio();
+                this.audioStopScheduled = true;
+              }, effectivePlayMs);
+            }
+          }
+
           source.onended = () => {
             if (this.countdownAudioSource === source) {
               this.countdownAudioSource = null;
@@ -351,6 +370,10 @@ class StartBoxAudioEngine {
   }
 
   private stopCountdownAudio(): void {
+    if (this.audioStopTimeout !== null) {
+      clearTimeout(this.audioStopTimeout);
+      this.audioStopTimeout = null;
+    }
     if (this.countdownAudioSource) {
       try { this.countdownAudioSource.stop(); } catch {}
       this.countdownAudioSource = null;

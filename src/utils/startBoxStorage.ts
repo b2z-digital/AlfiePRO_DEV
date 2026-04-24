@@ -392,6 +392,8 @@ export async function duplicateSequence(
       race_type_default: original.race_type_default,
       sort_order: original.sort_order + 100,
       created_by: userId,
+      audio_start_ms: original.audio_start_ms,
+      audio_end_ms: original.audio_end_ms,
     });
 
     if (!created) return null;
