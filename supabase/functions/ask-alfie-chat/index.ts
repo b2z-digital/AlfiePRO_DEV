@@ -644,7 +644,8 @@ function buildScoringContextPrompt(ctx: ScoringContext): string {
 
   // Standings
   if (ctx.standings.length > 0) {
-    p += `## Current Standings\n`;
+    p += `## Current Standings (ranked by FINAL/Net points — lowest wins)\n`;
+    p += `IMPORTANT: The "Final" column = Net points (after discards). This is what determines finishing positions. The "Total" column = Gross points (before discards) and is NOT used for ranking.\n`;
     const hasFleets = ctx.standings.some(s => s.fleet);
     let currentFleet = '';
     for (const s of ctx.standings) {
@@ -654,8 +655,8 @@ function buildScoringContextPrompt(ctx: ScoringContext): string {
       }
       let line = `${s.rank}. ${s.skipperName} (${s.sailNo})`;
       if (s.fleet) line += ` [${s.fleet}]`;
-      line += ` — Net: ${s.netPoints} pts`;
-      if (s.totalPoints !== s.netPoints) line += ` (Gross: ${s.totalPoints})`;
+      line += ` — FINAL: ${s.netPoints} pts`;
+      if (s.totalPoints !== s.netPoints) line += ` (Total/Gross: ${s.totalPoints})`;
       if (s.racePoints.length > 0) {
         const raceStr = s.racePoints.map((pts, i) => {
           const isDropped = s.droppedRaces.includes(i + 1);
@@ -762,10 +763,11 @@ function buildScoringContextPrompt(ctx: ScoringContext): string {
   p += `You have the REAL scoring data for this event. NEVER give a generic or theoretical explanation. ALWAYS look up the specific skippers mentioned in the question, find their actual race-by-race scores in the Race Results and Standings sections above, and walk through the calculation using their real numbers.\n\n`;
 
   p += `### For tie-break questions:\n`;
+  p += `IMPORTANT: Ties are determined by the FINAL column (net points after discards), NOT the Total column (gross points). Two skippers are only "tied" if their FINAL/net points are equal. If their FINAL points differ, there is no tie — the lower FINAL score wins.\n\n`;
   if (ctx.scoringSystem === 'shrs') {
     p += `**THIS IS AN SHRS EVENT — use SHRS Rule 5.6 tie-breaking (see above).**\n`;
     p += `1. Find both skippers in the Standings data above — copy their ACTUAL race scores and heat assignments\n`;
-    p += `2. Confirm they have equal net points (show the actual number)\n`;
+    p += `2. Confirm they have equal FINAL/net points (show the actual number). If their FINAL points differ, state clearly that there is NO tie and the lower score wins.\n`;
     p += `3. Compare their heat assignments round by round to find races where they were in the SAME heat\n`;
     p += `4. List the same-heat scores for each skipper (if any)\n`;
     p += `5. Compare same-heat scores using countback (sorted best-to-worst, NO drops)\n`;
@@ -773,7 +775,7 @@ function buildScoringContextPrompt(ctx: ScoringContext): string {
     p += `7. If no same-heat races exist, fall back to full RRS A8.1 countback with normal drops\n\n`;
   } else {
     p += `1. Find both skippers in the Standings data above\n`;
-    p += `2. Confirm they have equal net points (show the actual number)\n`;
+    p += `2. Confirm they have equal FINAL/net points (show the actual number). If their FINAL points differ, state clearly that there is NO tie.\n`;
     p += `3. List EACH skipper's race-by-race scores from the data, identifying which are dropped (in brackets)\n`;
     p += `4. Compare their non-dropped scores from best to worst, side by side\n`;
     p += `5. Show the EXACT point where the scores differ and who wins the tie-break\n\n`;
@@ -781,10 +783,10 @@ function buildScoringContextPrompt(ctx: ScoringContext): string {
 
   p += `### For "why is X in position Y" questions:\n`;
   p += `1. Find the skipper in the Standings data\n`;
-  p += `2. Show their race-by-race scores, identifying drops\n`;
-  p += `3. Calculate gross and net totals from the actual numbers\n`;
-  p += `4. Compare with skippers above and below them in the standings\n`;
-  p += `5. If tied, show the tie-break comparison\n\n`;
+  p += `2. Show their race-by-race scores, identifying drops (in brackets)\n`;
+  p += `3. Show FINAL/net points (sum of non-dropped scores) — this determines their ranking position\n`;
+  p += `4. Compare FINAL/net points with skippers above and below them in the standings\n`;
+  p += `5. If tied on FINAL/net points, show the tie-break comparison\n\n`;
 
   p += `### For handicap questions:\n`;
   p += `- ALWAYS show the worked calculation for each skipper using the Handicap Calculation Rules and actual race data\n`;
