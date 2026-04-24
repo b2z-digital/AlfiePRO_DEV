@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useScoringContext } from '../../contexts/ScoringContext';
 import { AskAlfieChatPanel } from './AskAlfieChatPanel';
 
 interface AskAlfieOrbProps {
@@ -10,6 +11,7 @@ interface AskAlfieOrbProps {
 
 export const AskAlfieOrb: React.FC<AskAlfieOrbProps> = ({ darkMode }) => {
   const { user } = useAuth();
+  const { getScoringSnapshot } = useScoringContext();
   const [isOpen, setIsOpen] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [orbKey, setOrbKey] = useState(0);
@@ -137,6 +139,7 @@ export const AskAlfieOrb: React.FC<AskAlfieOrbProps> = ({ darkMode }) => {
           key={orbKey}
           darkMode={darkMode}
           onClose={() => setIsOpen(false)}
+          getScoringSnapshot={getScoringSnapshot}
         />
       )}
 

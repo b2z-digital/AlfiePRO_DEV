@@ -39,6 +39,8 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
 import { updateRaceStatus } from '../utils/liveTrackingStorage';
 import { AskAlfieOrb } from './ask-alfie/AskAlfieOrb';
+import { useScoringContext } from '../contexts/ScoringContext';
+import type { ScoringSkipper, ScoringRaceResult, ScoringHeatInfo, ScoringStanding } from '../contexts/ScoringContext';
 
 class ScoringErrorBoundary extends Component<
   { children: React.ReactNode; darkMode?: boolean; onRetry?: () => void },
@@ -141,6 +143,149 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const navigate = useNavigate();
   const isCalculatingHandicaps = useRef(false);
   const liveSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { updateScoringContext, setScoringActive } = useScoringContext();
+
+  // Sync live scoring state to ScoringContext for AskAlfie
+  useEffect(() => {
+    if (isRaceManagementOpen || !selectedEvent) {
+      setScoringActive(false);
+      return;
+    }
+
+    const scoringSystem = heatManagement?.configuration?.enabled
+      ? (heatManagement.configuration.scoringSystem || 'hms')
+      : 'standard';
+
+    const scoringSkippers: ScoringSkipper[] = skippers.map((s, i) => ({
+      index: i,
+      name: s.name,
+      sailNo: s.sailNo,
+      club: s.club,
+      boatModel: s.boatModel,
+      startHcap: s.startHcap,
+      currentHcap: raceResults.length > 0 ? s.startHcap : undefined,
+      withdrawn: s.withdrawnFromRace != null,
+    }));
+
+    // Build race results with skipper names
+    const scoringResults: ScoringRaceResult[] = raceResults.map(r => ({
+      race: r.race,
+      skipperIndex: r.skipperIndex,
+      skipperName: skippers[r.skipperIndex]?.name || `Skipper ${r.skipperIndex}`,
+      position: r.position,
+      letterScore: r.letterScore,
+      points: r.points,
+      hcapBefore: r.startHcap,
+      hcapAfter: r.adjustedHcap ?? r.startHcap,
+      heatDesignation: r.hmsHeat || r.heatDesignation,
+    }));
+
+    // Build heat info
+    let heatInfo: ScoringHeatInfo | null = null;
+    if (heatManagement?.configuration?.enabled) {
+      const currentRound = heatManagement.currentRound;
+      const currentRoundData = heatManagement.rounds[currentRound - 1];
+      const heatAssignments = currentRoundData?.heatAssignments?.map(ha => ({
+        heat: ha.heatDesignation,
+        skipperNames: ha.skipperIndices.map(i => skippers[i]?.name || `Skipper ${i}`),
+      })) || [];
+
+      const roundResults = heatManagement.rounds.map(r => ({
+        round: r.round,
+        completed: r.completed,
+        heats: r.heatAssignments.map(ha => ha.heatDesignation),
+      }));
+
+      let lastPromotion: ScoringHeatInfo['lastPromotion'];
+      if (heatManagement.lastPromotionInfo) {
+        const lp = heatManagement.lastPromotionInfo;
+        lastPromotion = {
+          promoted: lp.promotedSkippers.map(i => skippers[i]?.name || `Skipper ${i}`),
+          relegated: (lp.relegatedSkippers || []).map(i => skippers[i]?.name || `Skipper ${i}`),
+          fromHeat: lp.fromHeat,
+          toHeat: lp.toHeat,
+        };
+      }
+
+      heatInfo = {
+        scoringSystem: heatManagement.configuration.scoringSystem || 'hms',
+        currentRound,
+        totalRounds: heatManagement.rounds.length,
+        currentHeat: heatManagement.currentHeat,
+        numberOfHeats: heatManagement.configuration.numberOfHeats,
+        promotionCount: heatManagement.configuration.promotionCount,
+        heatAssignments,
+        roundResults,
+        lastPromotion,
+      };
+    }
+
+    // Build standings from race results
+    const standings: ScoringStanding[] = [];
+    if (lastCompletedRace > 0 && skippers.length > 0) {
+      const skipperPoints: Record<number, { total: number; races: number[]; dropped: number[] }> = {};
+      for (let i = 0; i < skippers.length; i++) {
+        skipperPoints[i] = { total: 0, races: [], dropped: [] };
+      }
+
+      for (let race = 1; race <= lastCompletedRace; race++) {
+        for (let i = 0; i < skippers.length; i++) {
+          const result = raceResults.find(r => r.race === race && r.skipperIndex === i);
+          const pts = result?.points ?? (skippers.length + 1);
+          skipperPoints[i].races.push(pts);
+        }
+      }
+
+      // Determine drops
+      const dropCount = Array.isArray(currentDropRules)
+        ? currentDropRules.filter(d => lastCompletedRace >= d).length
+        : 0;
+
+      for (const [idx, data] of Object.entries(skipperPoints)) {
+        const sorted = [...data.races].map((pts, i) => ({ pts, race: i + 1 })).sort((a, b) => b.pts - a.pts);
+        const droppedRaces = sorted.slice(0, dropCount).map(d => d.race);
+        const netPoints = data.races.reduce((sum, pts, i) => droppedRaces.includes(i + 1) ? sum : sum + pts, 0);
+        const totalPoints = data.races.reduce((sum, pts) => sum + pts, 0);
+
+        standings.push({
+          rank: 0,
+          skipperName: skippers[Number(idx)]?.name || '',
+          sailNo: skippers[Number(idx)]?.sailNo || '',
+          totalPoints,
+          netPoints,
+          racePoints: data.races,
+          droppedRaces,
+        });
+      }
+
+      standings.sort((a, b) => a.netPoints - b.netPoints);
+      standings.forEach((s, i) => { s.rank = i + 1; });
+    }
+
+    updateScoringContext({
+      isActive: true,
+      raceType,
+      scoringSystem,
+      eventName: selectedEvent.eventName || selectedEvent.clubName || null,
+      clubName: selectedEvent.clubName || null,
+      boatClass: selectedEvent.raceClass || null,
+      currentDay,
+      currentRace: touchModeCurrentRace,
+      totalRaces: currentNumRaces,
+      lastCompletedRace,
+      dropRules: currentDropRules,
+      skippers: scoringSkippers,
+      raceResults: scoringResults.slice(-100),
+      heatInfo,
+      standings: standings.slice(0, 50),
+    });
+
+    return () => setScoringActive(false);
+  }, [
+    selectedEvent, isRaceManagementOpen, skippers, raceResults, lastCompletedRace,
+    raceType, heatManagement, currentDay, touchModeCurrentRace, currentNumRaces,
+    currentDropRules,
+  ]);
 
   // Load user's scoring mode preference (simulated events default to touch)
   useEffect(() => {

@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ImpersonationProvider } from './contexts/ImpersonationContext';
+import { ScoringContextProvider } from './contexts/ScoringContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import App from './App';
 import MobileStreamPage from './pages/MobileStreamPage';
@@ -47,9 +48,11 @@ function Root() {
       <AuthProvider>
         <ImpersonationProvider>
           <NotificationProvider>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
+            <ScoringContextProvider>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </ScoringContextProvider>
           </NotificationProvider>
         </ImpersonationProvider>
       </AuthProvider>
