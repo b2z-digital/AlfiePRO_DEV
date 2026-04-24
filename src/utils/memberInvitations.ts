@@ -105,7 +105,8 @@ export async function sendMemberInvitation(
 
     console.log('Invitation created:', invitation.id);
 
-    const appUrl = window.location.origin;
+    const rawOrigin = window.location.origin;
+    const appUrl = rawOrigin.replace(/^http:\/\//, 'https://');
     const invitationUrl = `${appUrl}/invite/${token}`;
 
     console.log('Attempting to send email via edge function');

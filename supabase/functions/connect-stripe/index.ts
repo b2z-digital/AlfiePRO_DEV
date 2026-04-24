@@ -181,7 +181,8 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    const siteUrl = Deno.env.get('SITE_URL') || req.headers.get('origin') || 'http://localhost:5173'
+    const rawSiteUrl = Deno.env.get('SITE_URL') || req.headers.get('origin') || 'https://localhost:5173';
+    const siteUrl = rawSiteUrl.replace(/^http:\/\//, 'https://');
     const clientId = Deno.env.get('STRIPE_CLIENT_ID')
 
     // OAuth flow for connecting existing Stripe account

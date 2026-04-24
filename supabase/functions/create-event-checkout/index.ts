@@ -161,8 +161,8 @@ Deno.serve(async (req: Request) => {
           },
         ],
         customer_email: registration.guest_email || undefined,
-        success_url: success_url || `${req.headers.get("origin")}/events/${event_id}?payment=success`,
-        cancel_url: cancel_url || `${req.headers.get("origin")}/events/${event_id}?payment=cancelled`,
+        success_url: success_url || `${(req.headers.get("origin") || 'https://localhost').replace(/^http:\/\//, 'https://')}/events/${event_id}?payment=success`,
+        cancel_url: cancel_url || `${(req.headers.get("origin") || 'https://localhost').replace(/^http:\/\//, 'https://')}/events/${event_id}?payment=cancelled`,
         metadata: {
           registration_id,
           event_id,

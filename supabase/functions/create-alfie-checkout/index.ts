@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
       throw new Error('Invalid subscription type')
     }
 
-    const baseUrl = Deno.env.get('SUPABASE_URL')?.replace('https://', 'https://app.') || 'http://localhost:5173'
+    const baseUrl = Deno.env.get('SUPABASE_URL')?.replace('https://', 'https://app.') || 'https://localhost:5173'
     const successUrl = `${baseUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`
     const cancelUrl = `${baseUrl}/onboarding/club-setup`
 

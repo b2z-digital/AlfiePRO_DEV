@@ -175,7 +175,7 @@ export const eventInvitationStorage = {
 
     if (!event) return false;
 
-    const inviteLink = `${window.location.origin}/event-registration?token=${invitation.invitation_token}`;
+    const inviteLink = `${window.location.origin.replace(/^http:\/\//, 'https://')}/event-registration?token=${invitation.invitation_token}`;
 
     const { error } = await supabase.functions.invoke('send-event-invitation', {
       body: {
