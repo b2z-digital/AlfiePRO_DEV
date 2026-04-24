@@ -161,7 +161,6 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
 }) => {
   const { user, currentClub } = useAuth();
   const { scoringContext, getScoringSnapshot } = useScoringContext();
-  console.log('[AskAlfie] scoringContext.isActive:', scoringContext.isActive, 'skippers:', scoringContext.skippers?.length, 'event:', scoringContext.eventName);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -652,9 +651,23 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
             <p className="text-sm font-medium mb-1 text-white">
               {userName ? `Hi ${userName}!` : 'Hi there!'}
             </p>
-            <p className="text-xs text-center mb-5 text-slate-400">
-              I'm Alfie. Ask me anything about racing rules or using AlfiePRO.
+            <p className="text-xs text-center mb-3 text-slate-400">
+              {scoringSnapshot?.isActive
+                ? 'I can see your live scoring session. Ask me about results, handicaps, or rules.'
+                : 'I\'m Alfie. Ask me anything about racing rules or using AlfiePRO.'}
             </p>
+            {scoringSnapshot?.isActive && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 mb-3">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="text-[10px] text-cyan-300 font-medium">
+                  Live: {scoringSnapshot.eventName || 'Race in progress'} — {
+                    scoringSnapshot.scoringSystem === 'hms' ? 'HMS Heat Scoring' :
+                    scoringSnapshot.scoringSystem === 'shrs' ? 'SHRS Heat Scoring' :
+                    scoringSnapshot.raceType === 'handicap' ? 'Handicap Racing' : 'Scratch Racing'
+                  }
+                </span>
+              </div>
+            )}
             <div className="w-full space-y-2">
               {activeQuestions.map((q, i) => (
                 <button

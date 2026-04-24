@@ -147,9 +147,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
   // Sync live scoring state to ScoringContext for AskAlfie
   useEffect(() => {
-    console.log('[ScoringContext Sync] isRaceManagementOpen:', isRaceManagementOpen, 'selectedEvent:', !!selectedEvent, 'eventName:', selectedEvent?.eventName);
     if (isRaceManagementOpen || !selectedEvent) {
-      console.log('[ScoringContext Sync] Deactivating - isRaceManagementOpen:', isRaceManagementOpen, 'selectedEvent:', !!selectedEvent);
       setScoringActive(false);
       return;
     }
@@ -264,7 +262,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       standings.forEach((s, i) => { s.rank = i + 1; });
     }
 
-    console.log('[ScoringContext Sync] ACTIVATING with', skippers.length, 'skippers,', raceResults.length, 'results, lastCompletedRace:', lastCompletedRace);
     updateScoringContext({
       isActive: true,
       raceType,
