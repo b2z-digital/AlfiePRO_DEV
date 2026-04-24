@@ -766,6 +766,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       }
 
       console.log('🔍 Final currentDropRules state after loading:', currentDropRules);
+      setSelectedEvent(currentEvent);
       setIsRaceManagementOpen(false);
 
       // Auto-open skipper modal only if skippers haven't been added yet AND no scoring has started
