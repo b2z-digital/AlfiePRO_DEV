@@ -1098,10 +1098,24 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
       {attachedDrawing && (
         <div className="px-3 pt-2">
           <div className="flex items-center gap-3 px-3 py-2 rounded-xl border border-slate-700/50 bg-slate-800/60">
-            <img src={attachedDrawing} alt="Attached" className="w-10 h-10 rounded-lg object-cover bg-[#0f1729]" />
-            <span className="text-xs text-slate-300 flex-1">
-              {attachedDrawing.startsWith('data:image/png') ? 'Drawing attached' : 'Photo attached'}
+            <div
+              className="w-10 h-10 rounded-lg overflow-hidden bg-[#0f1729] cursor-pointer flex-shrink-0"
+              onClick={() => setPreviewImage(attachedDrawing)}
+            >
+              <img src={attachedDrawing} alt="Attached" className="w-full h-full object-cover" />
+            </div>
+            <span
+              className="text-xs text-slate-300 flex-1 cursor-pointer hover:text-cyan-400 transition-colors"
+              onClick={() => setPreviewImage(attachedDrawing)}
+            >
+              {attachedDrawing.startsWith('data:image/png') ? 'Drawing attached — tap to view' : 'Photo attached — tap to view'}
             </span>
+            <button
+              onClick={() => setEditingImage(attachedDrawing)}
+              className="text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
+            >
+              Edit
+            </button>
             <button
               onClick={() => setAttachedDrawing(null)}
               className="text-xs font-medium text-red-400 hover:text-red-300 transition-colors"
