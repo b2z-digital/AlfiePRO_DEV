@@ -700,16 +700,58 @@ function buildScoringContextPrompt(ctx: ScoringContext): string {
     p += `Always identify whether a scratch boat won the race first, as this determines if the +30 bonus applies.\n\n`;
   }
 
-  // Scoring-specific instructions
-  p += `## How to Use This Data\n`;
-  p += `- When the user asks "why is X in position Y", look at the standings and race results to explain.\n`;
-  p += `- For handicap questions, ALWAYS show the step-by-step worked calculation for each skipper using the Handicap Calculation Rules above and the actual race data. Use real names and numbers — never generalise.\n`;
-  p += `- For tie-break questions, explain the countback procedure: compare best individual race positions after drops.\n`;
-  p += `- For HMS/SHRS questions, explain heat assignments, promotion rules, and how overall standings are calculated.\n`;
-  p += `- For letter scores (DNS, DNF, DSQ, OCS, etc.), explain the scoring penalty: DNF/RET = finishers + 1, DNS/DNC = total competitors + 1, DSQ/DNE = total competitors + 2.\n`;
-  p += `- For drop rule questions, explain which races are dropped (shown in brackets in standings) and how they affect net points.\n`;
-  p += `- Always reference actual data from the scoring session — use real skipper names, sail numbers, and values.\n`;
-  p += `- Be specific and precise. Show your working. Don't generalise when you have the actual numbers.\n`;
+  // Scoring-specific instructions — CRITICAL DATA-DRIVEN RESPONSE RULES
+  p += `## CRITICAL: How You MUST Answer Scoring Questions\n\n`;
+  p += `### Golden Rule: ALWAYS use the actual race data above\n`;
+  p += `You have the REAL scoring data for this event. NEVER give a generic or theoretical explanation. ALWAYS look up the specific skippers mentioned in the question, find their actual race-by-race scores in the Race Results and Standings sections above, and walk through the calculation using their real numbers.\n\n`;
+
+  p += `### For tie-break questions:\n`;
+  p += `1. Find both skippers in the Standings data above\n`;
+  p += `2. Confirm they have equal net points (show the actual number)\n`;
+  p += `3. List EACH skipper's race-by-race scores from the data, identifying which are dropped (in brackets)\n`;
+  p += `4. Compare their non-dropped scores from best to worst, side by side\n`;
+  p += `5. Show the EXACT point where the scores differ and who wins the tie-break\n`;
+  p += `Example format:\n`;
+  p += `"Dave Panting (NZL 60): Race scores: 13, 8, 3, 12, 4, 7, [17], [15], 2, 12, 1, 4, 13, 6, 11, 8\n`;
+  p += `  Non-dropped sorted: 1, 2, 3, 4, 4, 6, 7, 8, 8, 12, 12, 13, 13\n`;
+  p += `Roger Paul (AUS 66): Race scores: 14, 13, 5, 12, 6, 1, [15], [15], 9, [16], 8, 15, 6, 1, 5, 6\n`;
+  p += `  Non-dropped sorted: 1, 1, 5, 5, 6, 6, 6, 8, 9, 12, 13, 14, 15\n`;
+  p += `Comparing position by position: Both have a 1st... Dave has 2nd vs Roger's 1st — Roger wins."\n\n`;
+
+  p += `### For "why is X in position Y" questions:\n`;
+  p += `1. Find the skipper in the Standings data\n`;
+  p += `2. Show their race-by-race scores, identifying drops\n`;
+  p += `3. Calculate gross and net totals from the actual numbers\n`;
+  p += `4. Compare with skippers above and below them in the standings\n`;
+  p += `5. If tied, show the tie-break comparison\n\n`;
+
+  p += `### For handicap questions:\n`;
+  p += `- ALWAYS show the worked calculation for each skipper using the Handicap Calculation Rules and actual race data\n`;
+  p += `- Use format: "[Name] ([Sail]): finished [pos] — [current_hcap] + ([adj]) + ([bonus]) = [new_hcap]"\n\n`;
+
+  p += `### For HMS/SHRS questions:\n`;
+  p += `- Reference the actual heat assignments and round results from the data above\n`;
+  p += `- Explain how points are calculated within heats using the real positions\n`;
+  p += `- For promotion/relegation questions, show which skippers moved between heats using the actual data\n\n`;
+
+  p += `### For letter scores (DNS, DNF, DSQ, OCS, etc.):\n`;
+  p += `- DNF/RET = number of finishers in that race + 1\n`;
+  p += `- DNS/DNC/NSC/WDN = total competitors + 1\n`;
+  p += `- DSQ/DNE = total competitors + 2\n`;
+  p += `- OCS/BFD = total competitors + 1\n`;
+  p += `- Show the actual point value calculated from the real fleet size\n\n`;
+
+  p += `### For drop rule questions:\n`;
+  p += `- Show which races are dropped (shown in brackets in standings) using the real data\n`;
+  p += `- Explain how gross minus drops equals net\n`;
+  p += `- Calculate using actual numbers\n\n`;
+
+  p += `### FORBIDDEN RESPONSES:\n`;
+  p += `- Do NOT just explain the rule and stop. You MUST then APPLY it to the specific data.\n`;
+  p += `- Do NOT say "you would compare their scores" — actually compare them using the numbers.\n`;
+  p += `- Do NOT give a generic example when you have the real data available.\n`;
+  p += `- Do NOT leave out the step-by-step working. Show ALL the numbers.\n`;
+  p += `- If you cannot find a skipper's data, say so explicitly rather than guessing.\n`;
   p += `--- END LIVE SCORING SESSION ---\n\n`;
 
   return p;
