@@ -73,15 +73,15 @@ export const calculateHandicaps = (
       .map(r => ({
         position: r.letterScore === 'RDGfix' ? r.position : r.position,
         skipperIndex: r.skipperIndex,
-        isOnScratch: currentHcaps[r.skipperIndex] <= 10
+        isOnScratch: currentHcaps[r.skipperIndex] === 0
       }))
       .sort((a, b) => a.position - b.position);
 
-    // Check if ALL boats are on scratch (all handicaps <= 10)
+    // Check if ALL boats are on true scratch (all handicaps === 0)
     const allOnScratch = positions.every(p => p.isOnScratch);
 
-    // Find the best-performing scratch boat in top 3 (if any)
-    // Only apply scratch boat bonus when there's a MIX of scratch and non-scratch boats
+    // Find the best-performing scratch boat (handicap 0) in top 3
+    // Only skip the bonus when literally every boat is on 0 (true scratch start)
     const bestScratchInTop3 = !allOnScratch ? positions
       .filter(p => p.isOnScratch && p.position >= 1 && p.position <= 3)
       .sort((a, b) => a.position - b.position)[0] : undefined;
@@ -125,7 +125,7 @@ export const calculateHandicaps = (
 
       if (pos === null) return;
 
-      const isOnScratch = currentHcaps[idx] <= 10;
+      const isOnScratch = currentHcaps[idx] === 0;
       let adj = 0;
 
       // Calculate position-based adjustment

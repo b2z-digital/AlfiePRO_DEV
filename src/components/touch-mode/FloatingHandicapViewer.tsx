@@ -180,6 +180,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
     });
 
     skipperHandicaps.sort((a, b) => {
+      if (a.currentHandicap !== b.currentHandicap) return a.currentHandicap - b.currentHandicap;
       const sailA = parseInt(a.sailNumber) || 0;
       const sailB = parseInt(b.sailNumber) || 0;
       return sailA - sailB;
