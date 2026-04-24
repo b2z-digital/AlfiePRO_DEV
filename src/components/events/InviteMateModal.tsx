@@ -68,7 +68,7 @@ export default function InviteMateModal({
 
       if (insertError) throw insertError;
 
-      const inviteLink = `${window.location.origin}/event-registration?token=${invitation.invitation_token}`;
+      const inviteLink = `${window.location.origin.replace(/^http:\/\//, 'https://')}/event-registration?token=${invitation.invitation_token}`;
       setInvitationLink(inviteLink);
 
       const { error: emailError } = await supabase.functions.invoke('send-event-invitation', {

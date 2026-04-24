@@ -171,6 +171,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   const [viewMode, setViewMode] = useState<ViewMode>('welcome');
   const [attachedDrawing, setAttachedDrawing] = useState<string | null>(null);
   const [drawingCourseMode, setDrawingCourseMode] = useState(courseMode);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [editingImage, setEditingImage] = useState<string | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const scoringSnapshot = scoringContext.isActive ? scoringContext : null;
   const activeQuestions = getScoringQuickQuestions(scoringSnapshot);
@@ -615,6 +617,28 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
     );
   };
 
+  const handleEditDrawingSave = (imageData: string, _elements: any[]) => {
+    setEditingImage(null);
+    setPreviewImage(null);
+    setAttachedDrawing(imageData);
+    setViewMode('chat');
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  // Drawing edit mode (re-open existing image for editing)
+  if (editingImage) {
+    return (
+      <div className={`${embedded ? 'w-full h-full' : 'fixed bottom-24 right-6 z-[9989] w-[480px] h-[700px] max-h-[85vh] rounded-2xl shadow-2xl border border-slate-700/50 overflow-hidden'}`}>
+        <RaceScenarioCanvas
+          onSave={handleEditDrawingSave}
+          onClose={() => { setEditingImage(null); }}
+          darkMode
+          initialImage={editingImage}
+        />
+      </div>
+    );
+  }
+
   // Drawing mode
   if (viewMode === 'drawing') {
     return (
@@ -992,8 +1016,16 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                 )}
                 <div className="max-w-[80%]">
                   {msg.drawingImage && (
-                    <div className="mb-1.5 rounded-lg overflow-hidden border border-slate-600/50">
+                    <div
+                      className="mb-1.5 rounded-lg overflow-hidden border border-slate-600/50 cursor-pointer group/img relative"
+                      onClick={() => setPreviewImage(msg.drawingImage!)}
+                    >
                       <img src={msg.drawingImage} alt="Race scenario" className="w-full max-h-48 object-contain bg-[#0f1729]" />
+                      <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover/img:opacity-100">
+                        <span className="text-xs text-white font-medium bg-black/50 px-2.5 py-1 rounded-full backdrop-blur-sm">
+                          Tap to view / edit
+                        </span>
+                      </div>
                     </div>
                   )}
                   <div
@@ -1066,10 +1098,24 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
       {attachedDrawing && (
         <div className="px-3 pt-2">
           <div className="flex items-center gap-3 px-3 py-2 rounded-xl border border-slate-700/50 bg-slate-800/60">
-            <img src={attachedDrawing} alt="Attached" className="w-10 h-10 rounded-lg object-cover bg-[#0f1729]" />
-            <span className="text-xs text-slate-300 flex-1">
-              {attachedDrawing.startsWith('data:image/png') ? 'Drawing attached' : 'Photo attached'}
+            <div
+              className="w-10 h-10 rounded-lg overflow-hidden bg-[#0f1729] cursor-pointer flex-shrink-0"
+              onClick={() => setPreviewImage(attachedDrawing)}
+            >
+              <img src={attachedDrawing} alt="Attached" className="w-full h-full object-cover" />
+            </div>
+            <span
+              className="text-xs text-slate-300 flex-1 cursor-pointer hover:text-cyan-400 transition-colors"
+              onClick={() => setPreviewImage(attachedDrawing)}
+            >
+              {attachedDrawing.startsWith('data:image/png') ? 'Drawing attached — tap to view' : 'Photo attached — tap to view'}
             </span>
+            <button
+              onClick={() => setEditingImage(attachedDrawing)}
+              className="text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
+            >
+              Edit
+            </button>
             <button
               onClick={() => setAttachedDrawing(null)}
               className="text-xs font-medium text-red-400 hover:text-red-300 transition-colors"
@@ -1168,6 +1214,48 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Image preview lightbox */}
+      {previewImage && (
+        <div
+          className="absolute inset-0 z-50 flex flex-col bg-[#0b1120]/98 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setPreviewImage(null); }}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/30">
+            <span className="text-sm font-semibold text-white">Scenario Drawing</span>
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+            >
+              <XIcon size={16} />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+            <img
+              src={previewImage}
+              alt="Race scenario"
+              className="max-w-full max-h-full rounded-lg border border-slate-700/50 object-contain"
+            />
+          </div>
+          <div className="flex items-center justify-center gap-3 px-4 py-3 border-t border-slate-700/30">
+            <button
+              onClick={() => {
+                setEditingImage(previewImage);
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium transition-colors"
+            >
+              <Pencil size={14} />
+              Edit Drawing
+            </button>
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

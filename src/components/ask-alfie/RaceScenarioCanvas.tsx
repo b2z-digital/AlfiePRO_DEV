@@ -71,15 +71,18 @@ interface RaceScenarioCanvasProps {
   onClose: () => void;
   darkMode?: boolean;
   courseMode?: boolean;
+  initialImage?: string;
 }
 
 export const RaceScenarioCanvas: React.FC<RaceScenarioCanvasProps> = ({
   onSave,
   onClose,
   courseMode = false,
+  initialImage,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const bgImageRef = useRef<HTMLImageElement | null>(null);
   const [activeTool, setActiveTool] = useState<Tool>(courseMode ? 'mark' : 'pen');
   const [elements, setElements] = useState<CanvasElement[]>([]);
   const [history, setHistory] = useState<CanvasElement[][]>([[]]);
@@ -107,6 +110,16 @@ export const RaceScenarioCanvas: React.FC<RaceScenarioCanvasProps> = ({
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  useEffect(() => {
+    if (!initialImage) return;
+    const img = new Image();
+    img.onload = () => {
+      bgImageRef.current = img;
+      drawCanvas(elements);
+    };
+    img.src = initialImage;
+  }, [initialImage]);
 
   const pushHistory = useCallback((newElements: CanvasElement[]) => {
     const newHistory = history.slice(0, historyIndex + 1);
@@ -326,6 +339,10 @@ export const RaceScenarioCanvas: React.FC<RaceScenarioCanvasProps> = ({
       ctx.moveTo(0, y);
       ctx.lineTo(canvas.width, y);
       ctx.stroke();
+    }
+
+    if (bgImageRef.current) {
+      ctx.drawImage(bgImageRef.current, 0, 0, canvas.width, canvas.height);
     }
 
     for (const el of els) {

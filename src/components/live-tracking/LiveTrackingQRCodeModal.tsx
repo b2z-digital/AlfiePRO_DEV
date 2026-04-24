@@ -93,7 +93,7 @@ export default function LiveTrackingQRCodeModal({
 
       const shortCode = event.short_code;
       const eventDomain = await getEventWebsiteDomain();
-      const localBaseUrl = eventDomain || window.location.origin;
+      const localBaseUrl = eventDomain || window.location.origin.replace(/^http:\/\//, 'https://');
 
       const qrUrl = shortCode
         ? `${localBaseUrl}/t/${shortCode}`

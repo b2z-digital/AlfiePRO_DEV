@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Smartphone, Camera, CheckCircle } from 'lucide-react';
+import { X, Smartphone, Camera, CircleCheck as CheckCircle } from 'lucide-react';
 import QRCode from 'qrcode';
 import { livestreamStorage } from '../../utils/livestreamStorage';
 
@@ -20,7 +20,7 @@ export function MobileCameraQRModal({
   useEffect(() => {
     if (canvasRef.current) {
       // Generate URL for mobile streaming page
-      const mobileUrl = `${window.location.origin}/mobile-stream/${sessionId}`;
+      const mobileUrl = `${window.location.origin.replace(/^http:\/\//, 'https://')}/mobile-stream/${sessionId}`;
 
       // Generate QR code
       QRCode.toCanvas(canvasRef.current, mobileUrl, {
@@ -61,7 +61,7 @@ export function MobileCameraQRModal({
     };
   }, [sessionId, cameraConnected, onClose]);
 
-  const mobileUrl = `${window.location.origin}/mobile-stream/${sessionId}`;
+  const mobileUrl = `${window.location.origin.replace(/^http:\/\//, 'https://')}/mobile-stream/${sessionId}`;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">

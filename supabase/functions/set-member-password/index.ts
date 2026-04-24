@@ -89,9 +89,12 @@ Deno.serve(async (req: Request) => {
       });
 
       if (updateError) {
-        console.error("Admin password set failed:", updateError);
+        console.error("Admin password set failed:", updateError.message, updateError);
+        const msg = updateError.message?.includes("not found")
+          ? "The linked user account was not found. The member may need to be re-linked."
+          : updateError.message || "Failed to set password. Please try again.";
         return new Response(
-          JSON.stringify({ error: "Failed to set password. Please try again." }),
+          JSON.stringify({ error: msg }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
