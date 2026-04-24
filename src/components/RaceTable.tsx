@@ -1060,34 +1060,29 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                       return prevResult?.adjustedHcap ?? skippers[idx].startHcap;
                     });
 
-                    // Find scratch boats in top 3
+                    // Find if a scratch boat (handicap 0) won the race
                     const positions = raceData
                       .filter(r => r.position !== null || r.letterScore === 'RDGfix')
                       .map(r => ({
                         position: r.position,
                         skipperIndex: r.skipperIndex,
                         skipperName: skippers[r.skipperIndex]?.name || '',
-                        isOnScratch: currentHcaps[r.skipperIndex] <= 10
+                        isOnScratch: currentHcaps[r.skipperIndex] === 0
                       }))
                       .sort((a, b) => a.position - b.position);
 
-                    const bestScratchInTop3 = positions
-                      .filter(p => p.isOnScratch && p.position >= 1 && p.position <= 3)
-                      .sort((a, b) => a.position - b.position)[0];
+                    const scratchBoatWinner = positions
+                      .find(p => p.isOnScratch && p.position === 1);
 
                     let scratchBoatBonus = 0;
-                    if (bestScratchInTop3) {
-                      const scratchBoatHandicap = currentHcaps[bestScratchInTop3.skipperIndex];
-                      const baseBonus = 30 - scratchBoatHandicap;
-                      if (bestScratchInTop3.position === 1) scratchBoatBonus = baseBonus;
-                      else if (bestScratchInTop3.position === 2) scratchBoatBonus = Math.max(0, baseBonus - 10);
-                      else if (bestScratchInTop3.position === 3) scratchBoatBonus = Math.max(0, baseBonus - 20);
+                    if (scratchBoatWinner) {
+                      scratchBoatBonus = 30;
                     }
 
                     return (
                       <th key={race} className={`text-center px-2 py-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {scratchBoatBonus > 0 && bestScratchInTop3 && (
-                          <div className="text-[10px] italic font-normal" title={`${bestScratchInTop3.skipperName} finished ${bestScratchInTop3.position}${bestScratchInTop3.position === 1 ? 'st' : bestScratchInTop3.position === 2 ? 'nd' : 'rd'} on scratch`}>
+                        {scratchBoatBonus > 0 && scratchBoatWinner && (
+                          <div className="text-[10px] italic font-normal" title={`${scratchBoatWinner.skipperName} won on scratch`}>
                             +{scratchBoatBonus}s
                           </div>
                         )}

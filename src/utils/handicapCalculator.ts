@@ -80,20 +80,13 @@ export const calculateHandicaps = (
     // Check if ALL boats are on true scratch (all handicaps === 0)
     const allOnScratch = positions.every(p => p.isOnScratch);
 
-    // Find the best-performing scratch boat (handicap 0) in top 3
-    // Only skip the bonus when literally every boat is on 0 (true scratch start)
-    const bestScratchInTop3 = !allOnScratch ? positions
-      .filter(p => p.isOnScratch && p.position >= 1 && p.position <= 3)
-      .sort((a, b) => a.position - b.position)[0] : undefined;
+    // Scratch boat bonus only applies when a scratch boat (handicap 0) WINS the race
+    const scratchBoatWinner = !allOnScratch ? positions
+      .find(p => p.isOnScratch && p.position === 1) : undefined;
 
     let scratchBoatBonus = 0;
-    if (bestScratchInTop3) {
-      const scratchBoatHandicap = currentHcaps[bestScratchInTop3.skipperIndex];
-      const baseBonus = 30 - scratchBoatHandicap;
-
-      if (bestScratchInTop3.position === 1) scratchBoatBonus = baseBonus;
-      else if (bestScratchInTop3.position === 2) scratchBoatBonus = Math.max(0, baseBonus - 10);
-      else if (bestScratchInTop3.position === 3) scratchBoatBonus = Math.max(0, baseBonus - 20);
+    if (scratchBoatWinner) {
+      scratchBoatBonus = 30;
     }
 
     const maxPlace = Math.max(...positions.map(p => p.position));
