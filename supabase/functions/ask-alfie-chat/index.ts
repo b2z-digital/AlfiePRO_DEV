@@ -656,16 +656,60 @@ function buildScoringContextPrompt(ctx: ScoringContext): string {
     p += `\n`;
   }
 
+  // Add handicap calculation rules when in handicap mode
+  if (ctx.raceType === "handicap") {
+    p += `## AlfiePRO Handicap Calculation Rules\n`;
+    p += `These are the EXACT rules used by AlfiePRO to calculate handicaps. Use these when explaining how handicaps were calculated.\n\n`;
+    p += `### Race 1 Seeding (All Boats on Scratch)\n`;
+    p += `When ALL boats start Race 1 with handicap 0 (scratch) and handicaps are NOT set manually:\n`;
+    p += `- Race 1 is a "seeding race" — finishing positions set initial handicaps\n`;
+    p += `- 1st place → handicap remains 0 (stays on scratch)\n`;
+    p += `- 2nd place → handicap set to 10\n`;
+    p += `- 3rd place → handicap set to 20\n`;
+    p += `- 4th place → handicap set to 30\n`;
+    p += `- Formula: (finishing_position - 1) × 10\n`;
+    p += `- Letter scores (DNS, DNF, etc.) → handicap set to 0\n\n`;
+    p += `### Standard Handicap Adjustments (Race 2+)\n`;
+    p += `Position-based adjustments applied to each skipper's current handicap:\n`;
+    p += `- 1st place: -30 seconds (handicap decreases)\n`;
+    p += `- 2nd place: -20 seconds (handicap decreases)\n`;
+    p += `- 3rd place: -10 seconds (handicap decreases)\n`;
+    p += `- 4th place and below: 0 (no change from position alone)\n\n`;
+    p += `### Scratch Boat Bonus (+30 seconds)\n`;
+    p += `When a boat sailing on scratch (handicap = 0) WINS the race (finishes 1st):\n`;
+    p += `- ALL other boats receive +30 seconds added to their handicap adjustment\n`;
+    p += `- The scratch boat winner ALSO gets +30 (which offsets their -30 for 1st, resulting in net 0 change)\n`;
+    p += `- Other scratch boats in 2nd/3rd also get the +30 bonus added to their position adjustment\n`;
+    p += `- This bonus does NOT apply when ALL boats are on scratch\n`;
+    p += `- This bonus does NOT apply when the race winner is NOT a scratch boat\n\n`;
+    p += `### Combined Calculation\n`;
+    p += `For each skipper: new_handicap = current_handicap + position_adjustment + scratch_boat_bonus\n`;
+    p += `- The result is clamped: minimum 0, maximum = cap limit\n\n`;
+    p += `### Letter Score Handling\n`;
+    p += `- DNS, DNF, RET, DNC, DSQ, OCS, BFD, DNE, NSC: No position-based adjustment (0)\n`;
+    p += `- If scratch boat bonus is active, non-withdrawn letter scores still receive the +30 bonus\n`;
+    p += `- WDN (withdrawn): receives 0 adjustment, even if scratch boat bonus is active\n`;
+    p += `- RDGfix: treated as a normal finishing position for handicap calculation\n\n`;
+    p += `### Last Place Rules\n`;
+    p += `- Non-scratch boat finishing last: gets +30 bonus (if last place bonus is enabled for the event)\n`;
+    p += `- Scratch boat finishing last: tracked for "streak" — 3 consecutive last-place finishes awards +30\n\n`;
+    p += `### WORKED EXAMPLE INSTRUCTION\n`;
+    p += `When explaining handicap calculations, you MUST show the worked calculation for EACH skipper using their actual data from the race results above. Format each as:\n`;
+    p += `"[Skipper Name] (Sail [X]): finished [position] — [current_hcap] + ([position_adj]) + ([bonus]) = [new_hcap]"\n`;
+    p += `For example: "John Smith (Sail 42): finished 2nd — 30 + (-20) + (0) = 10"\n`;
+    p += `Always identify whether a scratch boat won the race first, as this determines if the +30 bonus applies.\n\n`;
+  }
+
   // Scoring-specific instructions
   p += `## How to Use This Data\n`;
   p += `- When the user asks "why is X in position Y", look at the standings and race results to explain.\n`;
-  p += `- For handicap questions, explain how the handicap changed based on race performance. Handicaps increase (get worse) when a skipper finishes lower than expected, and decrease (improve) when they finish higher.\n`;
-  p += `- For tie-break questions, explain the countback procedure: compare last race, then second-to-last, etc.\n`;
+  p += `- For handicap questions, ALWAYS show the step-by-step worked calculation for each skipper using the Handicap Calculation Rules above and the actual race data. Use real names and numbers — never generalise.\n`;
+  p += `- For tie-break questions, explain the countback procedure: compare best individual race positions after drops.\n`;
   p += `- For HMS/SHRS questions, explain heat assignments, promotion rules, and how overall standings are calculated.\n`;
-  p += `- For letter scores (DNS, DNF, DSQ, OCS, etc.), explain the scoring penalty: DNF/DNS = finishers + 1, DSQ/BFD/UFD = total competitors + 1.\n`;
+  p += `- For letter scores (DNS, DNF, DSQ, OCS, etc.), explain the scoring penalty: DNF/RET = finishers + 1, DNS/DNC = total competitors + 1, DSQ/DNE = total competitors + 2.\n`;
   p += `- For drop rule questions, explain which races are dropped (shown in brackets in standings) and how they affect net points.\n`;
   p += `- Always reference actual data from the scoring session — use real skipper names, sail numbers, and values.\n`;
-  p += `- Be specific and precise. Don't generalise when you have the actual numbers.\n`;
+  p += `- Be specific and precise. Show your working. Don't generalise when you have the actual numbers.\n`;
   p += `--- END LIVE SCORING SESSION ---\n\n`;
 
   return p;
