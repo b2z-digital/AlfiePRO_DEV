@@ -636,7 +636,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   // Welcome screen
   if (viewMode === 'welcome' && messages.length === 0) {
     return (
-      <div className={`${containerClass} bg-[#0b1120] ${!embedded ? 'border-slate-700/50' : ''} relative`}>
+      <div className={`${containerClass} bg-[#0b1120] ${!embedded ? 'border-slate-700/50' : ''}`}>
         {isListening && <ListeningOverlay />}
         {/* Header bar */}
         {!embedded && (
@@ -880,7 +880,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
 
   // Chat view
   return (
-    <div className={`${containerClass} ${!embedded ? 'bg-[#0b1120] border-slate-700/50' : ''} relative`}>
+    <div className={`${containerClass} ${!embedded ? 'bg-[#0b1120] border-slate-700/50' : ''}`}>
       {isListening && <ListeningOverlay />}
       {/* Chat header */}
       {!embedded && (
