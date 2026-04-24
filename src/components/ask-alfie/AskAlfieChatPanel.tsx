@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader as Loader2, Trash2, ArrowLeft, Clock, Pencil, Circle as HelpCircle, Volume2, Share2, ImagePlus, Camera, Image as ImageIcon, X as XIcon } from 'lucide-react';
+import { Send, Loader as Loader2, Trash2, ArrowLeft, Clock, Pencil, Circle as HelpCircle, Volume2, VolumeX, Share2, ImagePlus, Camera, Image as ImageIcon, X as XIcon, Mic, MicOff, TriangleAlert as AlertTriangle, Trophy, Scale } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useScoringContext } from '../../contexts/ScoringContext';
@@ -179,6 +179,20 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevMessageCountRef = useRef(0);
 
+  // Voice input state (Speech-to-Text)
+  const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const recognitionRef = useRef<any>(null);
+  const lastInputWasVoiceRef = useRef(false);
+
+  // Text-to-Speech state
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const synthRef = useRef(typeof window !== 'undefined' ? window.speechSynthesis : null);
+
+  const hasSpeechRecognition = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+  const hasSpeechSynthesis = typeof window !== 'undefined' && 'speechSynthesis' in window;
+
   useEffect(() => {
     loadUserProfile();
   }, []);
@@ -212,6 +226,129 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
       setUserInitials(first + last || '?');
     }
   };
+
+  // Voice input (Speech-to-Text)
+  const pendingVoiceSubmitRef = useRef<string | null>(null);
+
+  const startListening = useCallback(() => {
+    if (!hasSpeechRecognition || isListening) return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-AU';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 1;
+
+    setInput('');
+    setInterimTranscript('');
+
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      let final = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          final += result[0].transcript;
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+      if (final) {
+        setInput(final);
+        setInterimTranscript('');
+        pendingVoiceSubmitRef.current = final;
+      } else {
+        setInterimTranscript(interim);
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      setInterimTranscript('');
+      recognitionRef.current = null;
+      const textToSubmit = pendingVoiceSubmitRef.current;
+      pendingVoiceSubmitRef.current = null;
+      if (textToSubmit?.trim()) {
+        lastInputWasVoiceRef.current = true;
+        setTimeout(() => {
+          sendMessage(textToSubmit.trim());
+        }, 100);
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+      setInterimTranscript('');
+      recognitionRef.current = null;
+      pendingVoiceSubmitRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [hasSpeechRecognition, isListening]);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+  }, []);
+
+  // Text-to-Speech
+  const speakText = useCallback((text: string, messageId: string) => {
+    if (!hasSpeechSynthesis || !synthRef.current) return;
+    synthRef.current.cancel();
+
+    if (speakingMessageId === messageId && isSpeaking) {
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+      return;
+    }
+
+    const clean = text.replace(/\*\*/g, '').replace(/\n{2,}/g, '. ').replace(/\n/g, '. ');
+    const utterance = new SpeechSynthesisUtterance(clean);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+
+    const voices = synthRef.current.getVoices();
+    const britishMale = voices.find(v =>
+      v.lang.startsWith('en-GB') && v.name.toLowerCase().includes('male')
+    ) || voices.find(v =>
+      v.lang.startsWith('en-GB') && (v.name.includes('Daniel') || v.name.includes('George') || v.name.includes('James'))
+    ) || voices.find(v => v.lang.startsWith('en-GB'));
+    if (britishMale) utterance.voice = britishMale;
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+    };
+
+    synthRef.current.speak(utterance);
+    setIsSpeaking(true);
+    setSpeakingMessageId(messageId);
+  }, [hasSpeechSynthesis, isSpeaking, speakingMessageId]);
+
+  // Auto-read AI response when last input was voice
+  useEffect(() => {
+    if (messages.length < 2) return;
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.role === 'assistant' && lastInputWasVoiceRef.current && !isLoading) {
+      lastInputWasVoiceRef.current = false;
+      setTimeout(() => speakText(lastMsg.content, lastMsg.id), 300);
+    }
+  }, [messages, isLoading, speakText]);
+
+  // Stop speech on unmount
+  useEffect(() => {
+    return () => {
+      synthRef.current?.cancel();
+      recognitionRef.current?.abort();
+    };
+  }, []);
 
   const sendMessage = async (text?: string, imageData?: string) => {
     const messageText = text || input.trim();
@@ -382,6 +519,102 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
+  // Listening overlay — animated screen matching mobile app
+  const ListeningOverlay = () => {
+    const waveCanvasRef = useRef<HTMLCanvasElement>(null);
+    const waveAnimRef = useRef<number>(0);
+
+    useEffect(() => {
+      const canvas = waveCanvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d')!;
+      const w = 200;
+      const h = 60;
+      canvas.width = w * 2;
+      canvas.height = h * 2;
+      ctx.scale(2, 2);
+      let time = 0;
+
+      const draw = () => {
+        ctx.clearRect(0, 0, w, h);
+        const bars = 9;
+        const barWidth = 4;
+        const gap = 12;
+        const totalWidth = bars * barWidth + (bars - 1) * gap;
+        const startX = (w - totalWidth) / 2;
+        const centerY = h / 2;
+
+        for (let i = 0; i < bars; i++) {
+          const phase = (i / bars) * Math.PI * 2;
+          const height = 8 + Math.abs(Math.sin(time * 3 + phase)) * 22;
+          const x = startX + i * (barWidth + gap);
+
+          const gradient = ctx.createLinearGradient(x, centerY - height / 2, x, centerY + height / 2);
+          gradient.addColorStop(0, 'rgba(56, 189, 248, 0.9)');
+          gradient.addColorStop(0.5, 'rgba(34, 211, 238, 1)');
+          gradient.addColorStop(1, 'rgba(56, 189, 248, 0.9)');
+
+          const y = centerY - height / 2;
+          const r = 2;
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(x, y, barWidth, height, r);
+          } else {
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + barWidth - r, y);
+            ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + r);
+            ctx.lineTo(x + barWidth, y + height - r);
+            ctx.quadraticCurveTo(x + barWidth, y + height, x + barWidth - r, y + height);
+            ctx.lineTo(x + r, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+          }
+          ctx.fillStyle = gradient;
+          ctx.fill();
+        }
+
+        time += 0.02;
+        waveAnimRef.current = requestAnimationFrame(draw);
+      };
+
+      draw();
+      return () => { if (waveAnimRef.current) cancelAnimationFrame(waveAnimRef.current); };
+    }, []);
+
+    return (
+      <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0b1120]/95 backdrop-blur-sm">
+        <div className="mb-6 opacity-60">
+          <MiniOrb size={80} />
+        </div>
+
+        <h3 className="text-xl font-bold text-white mb-2">Listening...</h3>
+        <p className="text-sm text-slate-400 mb-8">Stops automatically when you pause</p>
+
+        <canvas
+          ref={waveCanvasRef}
+          className="mb-10"
+          style={{ width: 200, height: 60, imageRendering: 'auto' }}
+        />
+
+        {interimTranscript && (
+          <div className="px-6 mb-8 max-w-[90%]">
+            <p className="text-sm text-cyan-300/80 text-center italic">"{interimTranscript}"</p>
+          </div>
+        )}
+
+        <button
+          onClick={stopListening}
+          className="w-16 h-16 rounded-full bg-cyan-500 hover:bg-cyan-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 transition-all hover:scale-105"
+        >
+          <Mic className="w-7 h-7 text-white" />
+        </button>
+        <p className="text-xs text-slate-500 mt-3">Listening... tap to stop early</p>
+      </div>
+    );
+  };
+
   // Drawing mode
   if (viewMode === 'drawing') {
     return (
@@ -404,6 +637,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   if (viewMode === 'welcome' && messages.length === 0) {
     return (
       <div className={`${containerClass} bg-[#0b1120] ${!embedded ? 'border-slate-700/50' : ''}`}>
+        {isListening && <ListeningOverlay />}
         {/* Header bar */}
         {!embedded && (
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/30">
@@ -465,47 +699,91 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
             </div>
           )}
 
-          {/* Action tiles */}
-          <div className="grid grid-cols-3 gap-3 w-full mb-6">
-            <button
-              onClick={() => handleQuickAction('draw')}
-              className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
-                <Pencil className="w-5 h-5 text-cyan-400" />
-              </div>
-              <span className="text-xs font-medium text-white text-center leading-tight">
-                Draw<br />Scenario
-              </span>
-            </button>
-            <button
-              onClick={() => { setDrawingCourseMode(true); setViewMode('drawing'); }}
-              className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
-                <ImagePlus className="w-5 h-5 text-cyan-400" />
-              </div>
-              <span className="text-xs font-medium text-white text-center leading-tight">
-                Draw<br />Course
-              </span>
-            </button>
-            <button
-              onClick={() => {
-                setViewMode('chat');
-                setTimeout(() => {
-                  sendMessage('What are the key racing rules I should know about?');
-                }, 100);
-              }}
-              className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
-                <HelpCircle className="w-5 h-5 text-cyan-400" />
-              </div>
-              <span className="text-xs font-medium text-white text-center leading-tight">
-                Racing<br />Rules
-              </span>
-            </button>
-          </div>
+          {/* Action tiles — contextual to scoring mode */}
+          {scoringSnapshot?.isActive ? (
+            <div className="grid grid-cols-3 gap-3 w-full mb-6">
+              <button
+                onClick={() => { setDrawingCourseMode(false); setViewMode('drawing'); }}
+                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-amber-600/40 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/60 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                </div>
+                <span className="text-xs font-medium text-white text-center leading-tight">
+                  Draw<br />Protest
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('chat');
+                  setTimeout(() => sendMessage('Explain the current standings and any close battles'), 50);
+                }}
+                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
+                  <Trophy className="w-5 h-5 text-cyan-400" />
+                </div>
+                <span className="text-xs font-medium text-white text-center leading-tight">
+                  Explain<br />Standings
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('chat');
+                  setTimeout(() => sendMessage('Are there any tie-breaks in the current results? Show me the details.'), 50);
+                }}
+                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
+                  <Scale className="w-5 h-5 text-cyan-400" />
+                </div>
+                <span className="text-xs font-medium text-white text-center leading-tight">
+                  Check<br />Tie-breaks
+                </span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-3 w-full mb-6">
+              <button
+                onClick={() => handleQuickAction('draw')}
+                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
+                  <Pencil className="w-5 h-5 text-cyan-400" />
+                </div>
+                <span className="text-xs font-medium text-white text-center leading-tight">
+                  Draw<br />Scenario
+                </span>
+              </button>
+              <button
+                onClick={() => { setDrawingCourseMode(true); setViewMode('drawing'); }}
+                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
+                  <ImagePlus className="w-5 h-5 text-cyan-400" />
+                </div>
+                <span className="text-xs font-medium text-white text-center leading-tight">
+                  Draw<br />Course
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('chat');
+                  setTimeout(() => {
+                    sendMessage('What are the key racing rules I should know about?');
+                  }, 100);
+                }}
+                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
+                  <HelpCircle className="w-5 h-5 text-cyan-400" />
+                </div>
+                <span className="text-xs font-medium text-white text-center leading-tight">
+                  Racing<br />Rules
+                </span>
+              </button>
+            </div>
+          )}
 
           {/* Quick questions */}
           <div className="w-full space-y-2">
@@ -560,12 +838,26 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                   }
                 }}
                 onFocus={startChatFromWelcome}
-                placeholder="Tap here to chat with Alfie"
+                placeholder={isListening ? 'Listening...' : 'Tap here to chat with Alfie'}
                 className="flex-1 bg-transparent text-sm outline-none text-white placeholder-slate-500"
               />
+              {hasSpeechRecognition && (
+                <button
+                  onClick={isListening ? stopListening : startListening}
+                  className={`p-1.5 rounded-lg transition-all ${
+                    isListening
+                      ? 'bg-red-500/20 text-red-400 animate-pulse'
+                      : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-700/50'
+                  }`}
+                  title={isListening ? 'Stop listening' : 'Voice input'}
+                >
+                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                </button>
+              )}
               <button
                 onClick={() => {
                   if (input.trim()) {
+                    if (isListening) stopListening();
                     setViewMode('chat');
                     setTimeout(() => sendMessage(), 50);
                   }
@@ -589,6 +881,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   // Chat view
   return (
     <div className={`${containerClass} ${!embedded ? 'bg-[#0b1120] border-slate-700/50' : ''}`}>
+      {isListening && <ListeningOverlay />}
       {/* Chat header */}
       {!embedded && (
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/30 bg-[#0b1120]">
@@ -714,10 +1007,22 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                   </div>
                   {msg.role === 'assistant' && isLastAssistant && !isLoading && (
                     <div className="flex items-center gap-3 mt-1.5 ml-1">
-                      <button className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition-colors">
-                        <Volume2 size={11} />
-                        Listen
-                      </button>
+                      {hasSpeechSynthesis && (
+                        <button
+                          onClick={() => speakText(msg.content, msg.id)}
+                          className={`flex items-center gap-1 text-[10px] transition-colors ${
+                            speakingMessageId === msg.id && isSpeaking
+                              ? 'text-cyan-400'
+                              : 'text-slate-500 hover:text-cyan-400'
+                          }`}
+                        >
+                          {speakingMessageId === msg.id && isSpeaking ? (
+                            <><VolumeX size={11} /> Stop</>
+                          ) : (
+                            <><Volume2 size={11} /> Listen</>
+                          )}
+                        </button>
+                      )}
                       <button className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition-colors">
                         <Share2 size={11} />
                         Share
@@ -824,12 +1129,28 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask Alfie..."
+                placeholder={isListening ? 'Listening...' : 'Ask Alfie...'}
                 disabled={isLoading}
                 className="flex-1 bg-transparent text-sm outline-none text-white placeholder-slate-500"
               />
+              {hasSpeechRecognition && !isLoading && (
+                <button
+                  onClick={isListening ? stopListening : startListening}
+                  className={`p-1.5 rounded-lg transition-all ${
+                    isListening
+                      ? 'bg-red-500/20 text-red-400 animate-pulse'
+                      : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-700/50'
+                  }`}
+                  title={isListening ? 'Stop listening' : 'Voice input'}
+                >
+                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                </button>
+              )}
               <button
-                onClick={() => sendMessage()}
+                onClick={() => {
+                  if (isListening) stopListening();
+                  sendMessage();
+                }}
                 disabled={!input.trim() || isLoading}
                 className={`p-1.5 rounded-lg transition-all ${
                   input.trim() && !isLoading
