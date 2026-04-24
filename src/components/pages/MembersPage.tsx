@@ -86,6 +86,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [setPasswordMember, setSetPasswordMember] = useState<Member | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [settingPassword, setSettingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
   const [resendingActivation, setResendingActivation] = useState<string | null>(null);
   const activationMenuRef = useRef<HTMLDivElement>(null);
 
@@ -855,10 +856,11 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
   const handleSetPasswordForMember = async () => {
     if (!setPasswordMember || !newPassword || newPassword.length < 6) {
-      addNotification('Password must be at least 6 characters', 'error');
+      setPasswordError('Password must be at least 6 characters');
       return;
     }
 
+    setPasswordError('');
     setSettingPassword(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -886,9 +888,15 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       setShowSetPasswordModal(false);
       setSetPasswordMember(null);
       setNewPassword('');
+      setPasswordError('');
       fetchMembers();
     } catch (err: any) {
-      addNotification(err.message || 'Failed to set password', 'error');
+      const msg = err.message || 'Failed to set password';
+      setPasswordError(
+        msg.includes('weak') || msg.includes('easy to guess')
+          ? 'This password is too common or easy to guess. Please choose a stronger password with a mix of letters, numbers, and symbols.'
+          : msg
+      );
     } finally {
       setSettingPassword(false);
     }
@@ -2150,6 +2158,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                     setShowSetPasswordModal(false);
                     setSetPasswordMember(null);
                     setNewPassword('');
+                    setPasswordError('');
                   }}
                   className="text-slate-400 hover:text-slate-300 transition-colors"
                 >
@@ -2167,7 +2176,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                 <input
                   type="text"
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onChange={(e) => { setNewPassword(e.target.value); setPasswordError(''); }}
                   onKeyDown={(e) => e.key === 'Enter' && handleSetPasswordForMember()}
                   placeholder="Enter password (min 6 characters)"
                   className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -2175,6 +2184,11 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                 />
                 {newPassword.length > 0 && newPassword.length < 6 && (
                   <p className="text-xs text-red-400 mt-1">Password must be at least 6 characters</p>
+                )}
+                {passwordError && (
+                  <div className="mt-2 p-2.5 bg-red-900/20 border border-red-900/30 rounded-lg">
+                    <p className="text-xs text-red-400">{passwordError}</p>
+                  </div>
                 )}
               </div>
               <div className="p-3 bg-amber-900/20 border border-amber-900/30 rounded-lg">
