@@ -328,9 +328,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       lastCompletedRace,
       dropRules: currentDropRules,
       skippers: scoringSkippers,
-      raceResults: scoringResults.slice(-100),
+      raceResults: scoringResults.slice(-(skippers.length * 6)),
       heatInfo,
-      standings: standings.slice(0, 50),
+      standings,
     });
 
     return () => setScoringActive(false);

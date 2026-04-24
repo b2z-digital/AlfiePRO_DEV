@@ -226,7 +226,7 @@ Deno.serve(async (req: Request) => {
     const useAdvancedModel = hasImage || hasScoringContext;
     const model = useAdvancedModel ? "gpt-4o" : "gpt-4o-mini";
     const temperature = hasImage ? 0.3 : hasScoringContext ? 0.4 : 0.7;
-    const maxTokens = hasImage ? 2500 : hasScoringContext ? 2000 : 1500;
+    const maxTokens = hasImage ? 2500 : hasScoringContext ? 3000 : 1500;
 
     const openaiResponse = await fetch(
       "https://api.openai.com/v1/chat/completions",
@@ -807,12 +807,16 @@ function buildScoringContextPrompt(ctx: ScoringContext): string {
   p += `- Explain how gross minus drops equals net\n`;
   p += `- Calculate using actual numbers\n\n`;
 
-  p += `### FORBIDDEN RESPONSES:\n`;
-  p += `- Do NOT just explain the rule and stop. You MUST then APPLY it to the specific data.\n`;
-  p += `- Do NOT say "you would compare their scores" — actually compare them using the numbers.\n`;
-  p += `- Do NOT give a generic example when you have the real data available.\n`;
-  p += `- Do NOT leave out the step-by-step working. Show ALL the numbers.\n`;
-  p += `- If you cannot find a skipper's data, say so explicitly rather than guessing.\n`;
+  p += `### ABSOLUTELY FORBIDDEN RESPONSES:\n`;
+  p += `- NEVER use placeholder text like "[List of scores and heat assignments]" or "[Check each round]". You MUST write out the ACTUAL numbers from the Standings data above.\n`;
+  p += `- NEVER say "Check each round for heat assignments and scores" — YOU must do the checking and show the results.\n`;
+  p += `- NEVER tell the user to look something up themselves. YOU have the data — present it.\n`;
+  p += `- NEVER just explain the rule and stop. You MUST then APPLY it to the specific data.\n`;
+  p += `- NEVER say "you would compare their scores" — actually compare them using the real numbers.\n`;
+  p += `- NEVER give a generic example when you have the real data available.\n`;
+  p += `- NEVER leave out the step-by-step working. Show ALL the numbers.\n`;
+  p += `- If you cannot find a skipper's data in the Standings above, say "I don't have data for that skipper" — do NOT use placeholders or make up numbers.\n`;
+  p += `\nRemember: The Standings section above contains each skipper's race-by-race scores (in "Races:" field), dropped races (in brackets), and heat assignments (in "Heats:" field). Copy these actual values into your response.\n`;
   p += `--- END LIVE SCORING SESSION ---\n\n`;
 
   return p;
