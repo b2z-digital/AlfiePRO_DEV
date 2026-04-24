@@ -148,8 +148,13 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
 
   const loadSequences = async () => {
     const seqs = await getSequences(clubId || null);
-    setAvailableSequences(seqs.filter(s => s.sequence_type !== 'botw'));
+    const nonBotw = seqs.filter(s => s.sequence_type !== 'botw');
+    setAvailableSequences(nonBotw);
     setBotwSequences(seqs.filter(s => s.sequence_type === 'botw'));
+
+    if (!selectedSeqId && !sequenceId && nonBotw.length > 0) {
+      setSelectedSeqId(nonBotw[0].id);
+    }
   };
 
   const loadSequence = async (id: string) => {

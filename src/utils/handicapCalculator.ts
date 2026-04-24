@@ -73,27 +73,42 @@ export const calculateHandicaps = (
       .map(r => ({
         position: r.letterScore === 'RDGfix' ? r.position : r.position,
         skipperIndex: r.skipperIndex,
-        isOnScratch: currentHcaps[r.skipperIndex] <= 10
+        isOnScratch: currentHcaps[r.skipperIndex] === 0
       }))
       .sort((a, b) => a.position - b.position);
 
-    // Check if ALL boats are on scratch (all handicaps <= 10)
+    // Check if ALL boats are on true scratch (all handicaps === 0)
     const allOnScratch = positions.every(p => p.isOnScratch);
 
-    // Find the best-performing scratch boat in top 3 (if any)
-    // Only apply scratch boat bonus when there's a MIX of scratch and non-scratch boats
-    const bestScratchInTop3 = !allOnScratch ? positions
-      .filter(p => p.isOnScratch && p.position >= 1 && p.position <= 3)
-      .sort((a, b) => a.position - b.position)[0] : undefined;
+    // Seeding race: R1 with all boats on 0 and not manual handicaps
+    // Assign handicaps based on finishing position (1st=0, 2nd=10, 3rd=20, etc.)
+    if (race === 1 && allOnScratch && !isManualHandicaps) {
+      raceData.forEach(result => {
+        const idx = result.skipperIndex;
+        const pos = result.position;
+        result.handicap = 0;
+        const seedHcap = pos !== null && !result.letterScore ? (pos - 1) * 10 : 0;
+        const resultIndex = updatedResults.findIndex(
+          r => r.race === 1 && r.skipperIndex === idx
+        );
+        if (resultIndex !== -1) {
+          updatedResults[resultIndex] = {
+            ...result,
+            handicap: 0,
+            adjustedHcap: seedHcap
+          };
+        }
+      });
+      continue;
+    }
+
+    // Scratch boat bonus only applies when a scratch boat (handicap 0) WINS the race
+    const scratchBoatWinner = !allOnScratch ? positions
+      .find(p => p.isOnScratch && p.position === 1) : undefined;
 
     let scratchBoatBonus = 0;
-    if (bestScratchInTop3) {
-      const scratchBoatHandicap = currentHcaps[bestScratchInTop3.skipperIndex];
-      const baseBonus = 30 - scratchBoatHandicap;
-
-      if (bestScratchInTop3.position === 1) scratchBoatBonus = baseBonus;
-      else if (bestScratchInTop3.position === 2) scratchBoatBonus = Math.max(0, baseBonus - 10);
-      else if (bestScratchInTop3.position === 3) scratchBoatBonus = Math.max(0, baseBonus - 20);
+    if (scratchBoatWinner) {
+      scratchBoatBonus = 30;
     }
 
     const maxPlace = Math.max(...positions.map(p => p.position));
@@ -125,7 +140,7 @@ export const calculateHandicaps = (
 
       if (pos === null) return;
 
-      const isOnScratch = currentHcaps[idx] <= 10;
+      const isOnScratch = currentHcaps[idx] === 0;
       let adj = 0;
 
       // Calculate position-based adjustment

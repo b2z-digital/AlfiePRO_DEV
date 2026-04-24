@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Users, Search, Download, Mail, Phone, Building2, CircleCheck as CheckCircle2, ArrowUpRight, ListFilter as Filter, Save, FolderOpen, Upload, Trash2, UserPlus, DollarSign, X, Pencil, Eye, Smartphone, Loader as Loader2, Hop as Home } from 'lucide-react';
+import { Users, Search, Download, Mail, Phone, Building2, CircleCheck as CheckCircle2, ArrowUpRight, ListFilter as Filter, Save, FolderOpen, Upload, Trash2, UserPlus, DollarSign, X, Pencil, Eye, Smartphone, Loader as Loader2, Hop as Home, Clock, Link } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { supabase } from '../../utils/supabase';
@@ -38,6 +38,7 @@ interface MemberWithClub {
   state_association_name: string;
   avatar_url?: string;
   user_id?: string;
+  activation_status?: string;
 }
 
 export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = ({
@@ -80,6 +81,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   const [selectedDefaultClubId, setSelectedDefaultClubId] = useState('');
   const [deletingMember, setDeletingMember] = useState<MemberWithClub | null>(null);
   const [deleteProcessing, setDeleteProcessing] = useState(false);
+  const [memberInvitations, setMemberInvitations] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const state = location.state as { viewClubId?: string } | null;
@@ -119,6 +121,27 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
     }
   };
 
+  const fetchMemberInvitations = async (clubIds: string[]) => {
+    if (clubIds.length === 0) return;
+    try {
+      const { data, error } = await supabase
+        .from('member_invitations')
+        .select('id, member_id, club_id, status, created_at')
+        .in('club_id', clubIds)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const invitationsMap: Record<string, any> = {};
+      data?.forEach(inv => {
+        if (!invitationsMap[inv.member_id] || new Date(inv.created_at) > new Date(invitationsMap[inv.member_id].created_at)) {
+          invitationsMap[inv.member_id] = inv;
+        }
+      });
+      setMemberInvitations(invitationsMap);
+    } catch (err) {
+      console.error('Error fetching member invitations:', err);
+    }
+  };
+
   const loadStateAssociationData = async () => {
     if (!user) return;
     try {
@@ -153,7 +176,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       if (clubIds.length > 0) {
         const { data: clubMembersData } = await supabase
           .from('members')
-          .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status, user_id')
+          .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status, user_id, activation_status')
           .in('club_id', clubIds)
           .order('last_name');
         clubMembers = clubMembersData || [];
@@ -161,7 +184,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
 
       const { data: assocMembersData } = await supabase
         .from('members')
-        .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status, user_id')
+        .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status, user_id, activation_status')
         .eq('state_association_id', stateId)
         .order('last_name');
 
@@ -187,6 +210,9 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       setMembers(formattedMembers);
       if (formattedMembers.length > 0) {
         fetchRemittanceStatuses(formattedMembers.map(m => m.id));
+      }
+      if (clubIds.length > 0) {
+        fetchMemberInvitations(clubIds);
       }
     } catch (err: any) {
       console.error('Error loading state association data:', err);
@@ -428,6 +454,13 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       'Financial Status': m.is_financial ? 'Financial' : 'Unfinancial',
       'Date Joined': m.date_joined ? formatDate(m.date_joined) : '',
       'Renewal Date': m.renewal_date ? formatDate(m.renewal_date) : '',
+      'Invite Status': m.user_id && m.activation_status === 'activated' ? 'Active' :
+                       m.user_id && m.activation_status === 'pending' ? 'Awaiting Setup' :
+                       m.user_id ? 'Connected' :
+                       memberInvitations[m.id]?.status === 'pending' ? 'Invite Sent' :
+                       memberInvitations[m.id]?.status === 'expired' ? 'Expired' :
+                       m.activation_status === 'pending' ? 'Invite Sent' :
+                       m.email ? 'Not Invited' : 'No Email',
       'State Remittance': memberRemittanceStatus[m.id]?.statePaid ? 'Paid' : 'Unpaid',
       'National Remittance': memberRemittanceStatus[m.id]?.nationalPaid ? 'Paid' : 'Unpaid'
     }));
@@ -477,9 +510,24 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
             </div>
             <div>
               <h1 className="text-3xl font-bold text-white">Members</h1>
-              <p className="text-sm text-slate-400">
-                {stats.totalMembers} total members across {stats.totalClubs} clubs
-                {unassignedCount > 0 && <span className="text-amber-400 ml-2">({unassignedCount} unassigned)</span>}
+              <p className="text-sm text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span>{stats.totalMembers} total across {stats.totalClubs} clubs</span>
+                {unassignedCount > 0 && <span className="text-amber-400">({unassignedCount} unassigned)</span>}
+                <span className="hidden sm:inline text-slate-600">|</span>
+                <span className="flex items-center gap-1.5 text-green-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                  {members.filter(m => m.user_id).length} Connected
+                </span>
+                {members.filter(m => !m.user_id && (memberInvitations[m.id]?.status === 'pending' || m.activation_status === 'pending')).length > 0 && (
+                  <span className="flex items-center gap-1.5 text-orange-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                    {members.filter(m => !m.user_id && (memberInvitations[m.id]?.status === 'pending' || m.activation_status === 'pending')).length} Invite Sent
+                  </span>
+                )}
+                <span className="flex items-center gap-1.5 text-slate-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                  {members.filter(m => !m.user_id && m.email && !memberInvitations[m.id] && m.activation_status !== 'pending').length} Not Invited
+                </span>
               </p>
             </div>
           </div>
@@ -734,6 +782,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Contact</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Membership</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Financial Status</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Invite Status</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Dates</th>
                   <th className="px-4 py-3 text-right text-sm font-medium text-slate-300 w-16"></th>
                 </tr>
@@ -741,7 +790,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
               <tbody className="divide-y divide-slate-700/50">
                 {filteredMembers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                    <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
                       No members found
                     </td>
                   </tr>
@@ -822,6 +871,75 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                             </div>
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {(() => {
+                          const hasUserId = !!member.user_id;
+                          const activationStatus = member.activation_status;
+                          const invitation = memberInvitations[member.id];
+
+                          if (hasUserId && activationStatus === 'activated') {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                                <CheckCircle2 size={12} />
+                                Active
+                              </span>
+                            );
+                          }
+                          if (hasUserId && activationStatus === 'pending') {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-900/30 text-sky-400">
+                                <Smartphone size={12} />
+                                Awaiting Setup
+                              </span>
+                            );
+                          }
+                          if (hasUserId) {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                                <Link size={12} />
+                                Connected
+                              </span>
+                            );
+                          }
+                          if (invitation?.status === 'pending') {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-900/30 text-orange-400">
+                                <Clock size={12} />
+                                Invite Sent
+                              </span>
+                            );
+                          }
+                          if (invitation?.status === 'expired') {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-900/30 text-red-400">
+                                <Clock size={12} />
+                                Expired
+                              </span>
+                            );
+                          }
+                          if (activationStatus === 'pending') {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-900/30 text-sky-400">
+                                <Smartphone size={12} />
+                                Invite Sent
+                              </span>
+                            );
+                          }
+                          if (member.email) {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-700/50 text-slate-400">
+                                <Smartphone size={12} />
+                                Not Invited
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800/50 text-slate-500">
+                              No Email
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-4">
                         <div className="space-y-1 text-sm">

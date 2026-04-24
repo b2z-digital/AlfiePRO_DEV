@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Award, ChevronLeft, RotateCcw, Edit3, Check, History, Zap } from 'lucide-react';
+import { X, Award, ChevronLeft, RotateCcw, CreditCard as Edit3, Check, History, Zap, TrendingUp, TrendingDown } from 'lucide-react';
 import { Skipper, RaceResult } from '../../types';
 import { RaceEvent } from '../../types/race';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -180,6 +180,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
     });
 
     skipperHandicaps.sort((a, b) => {
+      if (a.currentHandicap !== b.currentHandicap) return a.currentHandicap - b.currentHandicap;
       const sailA = parseInt(a.sailNumber) || 0;
       const sailB = parseInt(b.sailNumber) || 0;
       return sailA - sailB;
@@ -399,22 +400,29 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
   return (
     <>
       <motion.button
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
+        initial={{ x: 20, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-colors ${
+        className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 rounded-l-xl shadow-2xl flex flex-col items-center gap-2 px-2 py-4 transition-all duration-200 ${
           canEditHandicaps && allHandicapsZero && hasStoredHandicaps
-            ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:from-green-400 hover:to-emerald-500 animate-pulse'
+            ? 'bg-gradient-to-b from-green-500 to-emerald-600 text-white animate-pulse'
             : canEditHandicaps && allHandicapsZero
-              ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:from-amber-400 hover:to-orange-500 animate-pulse'
+              ? 'bg-gradient-to-b from-amber-500 to-orange-600 text-white animate-pulse'
               : darkMode
-              ? 'bg-gradient-to-br from-cyan-600 to-blue-700 text-white hover:from-cyan-500 hover:to-blue-600'
-              : 'bg-gradient-to-br from-blue-600 to-cyan-600 text-white hover:from-blue-500 hover:to-cyan-500'
+              ? 'bg-gradient-to-b from-cyan-600 to-blue-700 text-white hover:from-cyan-500 hover:to-blue-600'
+              : 'bg-gradient-to-b from-blue-600 to-cyan-600 text-white hover:from-blue-500 hover:to-cyan-500'
         }`}
       >
-        {isOpen ? <X size={24} /> : <Award size={24} />}
+        {isOpen ? <X size={18} /> : <Award size={18} />}
+        <div className="flex flex-col items-center">
+          {(isScratchEvent ? 'RANKINGS' : 'HANDICAPS').split('').map((letter, index) => (
+            <span key={index} className="text-[10px] font-semibold leading-tight">
+              {letter}
+            </span>
+          ))}
+        </div>
       </motion.button>
 
       <AnimatePresence>
@@ -658,6 +666,19 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                                       onClick={() => handleStartEdit(handicap.skipperIndex, handicap.currentHandicap)}
                                       className="group flex items-center gap-1.5 transition-colors"
                                     >
+                                      {handicap.change !== 0 && (
+                                        handicap.change < 0 ? (
+                                          <div className="flex items-center gap-0.5">
+                                            <TrendingUp size={14} className="text-green-400" />
+                                            <span className="text-[10px] font-medium text-green-400">{handicap.change}s</span>
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center gap-0.5">
+                                            <TrendingDown size={14} className="text-red-400" />
+                                            <span className="text-[10px] font-medium text-red-400">+{handicap.change}s</span>
+                                          </div>
+                                        )
+                                      )}
                                       <span className="text-xl font-bold text-green-500">{handicap.currentHandicap}</span>
                                       <Edit3 size={14} className={`${darkMode ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-600'} transition-colors`} />
                                     </button>
@@ -668,7 +689,22 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                                     )}
                                   </div>
                                 ) : (
-                                  <div className="text-xl font-bold text-green-500">{handicap.currentHandicap}</div>
+                                  <div className="flex items-center gap-1.5">
+                                    {handicap.change !== 0 && (
+                                      handicap.change < 0 ? (
+                                        <div className="flex items-center gap-0.5">
+                                          <TrendingUp size={16} className="text-green-400" />
+                                          <span className="text-[10px] font-medium text-green-400">{handicap.change}s</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-0.5">
+                                          <TrendingDown size={16} className="text-red-400" />
+                                          <span className="text-[10px] font-medium text-red-400">+{handicap.change}s</span>
+                                        </div>
+                                      )
+                                    )}
+                                    <span className="text-xl font-bold text-green-500">{handicap.currentHandicap}</span>
+                                  </div>
                                 )}
                               </div>
                             </div>
