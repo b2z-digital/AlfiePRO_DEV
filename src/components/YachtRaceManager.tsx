@@ -156,6 +156,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       ? (heatManagement.configuration.scoringSystem || 'hms')
       : 'standard';
 
+    // For imported/simulated heat events, raceResults may be empty while heatManagement has all data
+    const effectiveRaceResults = (() => {
+      if (raceResults.length > 0) return raceResults;
+      if (heatManagement?.configuration?.enabled && heatManagement.rounds.some(r => r.completed)) {
+        return convertHeatResultsToRaceResults(heatManagement, skippers);
+      }
+      return raceResults;
+    })();
+
     const scoringSkippers: ScoringSkipper[] = skippers.map((s, i) => ({
       index: i,
       name: s.name,
@@ -163,12 +172,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       club: s.club,
       boatModel: s.boatModel,
       startHcap: s.startHcap,
-      currentHcap: raceResults.length > 0 ? s.startHcap : undefined,
+      currentHcap: effectiveRaceResults.length > 0 ? s.startHcap : undefined,
       withdrawn: s.withdrawnFromRace != null,
     }));
 
     // Build race results with skipper names
-    const scoringResults: ScoringRaceResult[] = raceResults.map(r => ({
+    const scoringResults: ScoringRaceResult[] = effectiveRaceResults.map(r => ({
       race: r.race,
       skipperIndex: r.skipperIndex,
       skipperName: skippers[r.skipperIndex]?.name || `Skipper ${r.skipperIndex}`,
@@ -221,18 +230,66 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     }
 
     // Build standings from race results
+    const isHeatScoring = scoringSystem === 'hms' || scoringSystem === 'shrs';
     const standings: ScoringStanding[] = [];
     if (lastCompletedRace > 0 && skippers.length > 0) {
-      const skipperPoints: Record<number, { total: number; races: number[]; dropped: number[] }> = {};
-      for (let i = 0; i < skippers.length; i++) {
-        skipperPoints[i] = { total: 0, races: [], dropped: [] };
+      // Build heat assignment map per round for SHRS/HMS
+      const roundHeatMap = new Map<number, Map<number, string>>();
+      if (isHeatScoring && heatManagement?.rounds) {
+        for (const round of heatManagement.rounds) {
+          const skipperToHeat = new Map<number, string>();
+          for (const ha of (round.heatAssignments || [])) {
+            for (const idx of (ha.skipperIndices || [])) {
+              skipperToHeat.set(idx, ha.heatDesignation);
+            }
+          }
+          roundHeatMap.set(round.round, skipperToHeat);
+        }
+      }
+
+      // Build fleet map from first finals round heat assignments (SHRS)
+      const skipperFleetMap = new Map<number, string>();
+      if (scoringSystem === 'shrs' && heatManagement?.rounds) {
+        const qualRoundCount = heatManagement.configuration?.qualifyingRounds || 0;
+        const finalsRounds = heatManagement.rounds.filter(r => r.round > qualRoundCount);
+        if (finalsRounds.length > 0) {
+          for (const ha of (finalsRounds[0].heatAssignments || [])) {
+            for (const idx of (ha.skipperIndices || [])) {
+              skipperFleetMap.set(idx, ha.heatDesignation);
+            }
+          }
+        }
+      }
+
+      const skipperIndicesWithResults = new Set(
+        effectiveRaceResults.map(r => r.skipperIndex).filter(idx => idx != null)
+      );
+
+      const skipperPointsData: Record<number, { races: number[]; letterScores: (string | undefined)[]; heats: string[] }> = {};
+      for (const i of skipperIndicesWithResults) {
+        skipperPointsData[i] = { races: [], letterScores: [], heats: [] };
       }
 
       for (let race = 1; race <= lastCompletedRace; race++) {
-        for (let i = 0; i < skippers.length; i++) {
-          const result = raceResults.find(r => r.race === race && r.skipperIndex === i);
-          const pts = result?.points ?? (skippers.length + 1);
-          skipperPoints[i].races.push(pts);
+        for (const i of skipperIndicesWithResults) {
+          const result = effectiveRaceResults.find(r => r.race === race && r.skipperIndex === i);
+          // For SHRS/HMS, use position within heat as points; for standard, use points or position
+          let pts: number;
+          if (result) {
+            if (result.letterScore && result.letterScore !== 'RDGfix') {
+              pts = result.points ?? result.position ?? (skippers.length + 1);
+            } else {
+              pts = isHeatScoring
+                ? (result.position ?? (skippers.length + 1))
+                : (result.points ?? result.position ?? (skippers.length + 1));
+            }
+          } else {
+            pts = skippers.length + 1;
+          }
+          skipperPointsData[i].races.push(pts);
+          skipperPointsData[i].letterScores.push(result?.letterScore);
+          const heatForRound = roundHeatMap.get(race)?.get(i);
+          skipperPointsData[i].heats.push(heatForRound || '');
         }
       }
 
@@ -241,11 +298,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         ? currentDropRules.filter(d => lastCompletedRace >= d).length
         : 0;
 
-      for (const [idx, data] of Object.entries(skipperPoints)) {
+      for (const [idx, data] of Object.entries(skipperPointsData)) {
         const sorted = [...data.races].map((pts, i) => ({ pts, race: i + 1 })).sort((a, b) => b.pts - a.pts);
         const droppedRaces = sorted.slice(0, dropCount).map(d => d.race);
         const netPoints = data.races.reduce((sum, pts, i) => droppedRaces.includes(i + 1) ? sum : sum + pts, 0);
         const totalPoints = data.races.reduce((sum, pts) => sum + pts, 0);
+        const fleetDesignation = skipperFleetMap.get(Number(idx));
+        const fleetNames: Record<string, string> = { 'A': 'Gold', 'B': 'Silver', 'C': 'Bronze', 'D': 'Copper', 'E': 'Fleet E' };
 
         standings.push({
           rank: 0,
@@ -255,6 +314,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           netPoints,
           racePoints: data.races,
           droppedRaces,
+          fleet: fleetDesignation ? (fleetNames[fleetDesignation] || fleetDesignation) : undefined,
+          heatPerRace: isHeatScoring ? data.heats : undefined,
+          letterScores: data.letterScores.some(ls => ls) ? data.letterScores : undefined,
         });
       }
 
@@ -275,9 +337,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       lastCompletedRace,
       dropRules: currentDropRules,
       skippers: scoringSkippers,
-      raceResults: scoringResults.slice(-100),
+      raceResults: scoringResults.slice(-(skippers.length * 6)),
       heatInfo,
-      standings: standings.slice(0, 50),
+      standings,
     });
 
     return () => setScoringActive(false);

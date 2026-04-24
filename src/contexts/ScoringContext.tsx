@@ -70,6 +70,9 @@ export interface ScoringStanding {
   netPoints: number;
   racePoints: number[];
   droppedRaces: number[];
+  fleet?: string;
+  heatPerRace?: string[];
+  letterScores?: (string | undefined)[];
 }
 
 interface ScoringContextValue {

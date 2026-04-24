@@ -70,6 +70,9 @@ interface ScoringContext {
     netPoints: number;
     racePoints: number[];
     droppedRaces: number[];
+    fleet?: string;
+    heatPerRace?: string[];
+    letterScores?: (string | undefined)[];
   }>;
 }
 
@@ -223,7 +226,7 @@ Deno.serve(async (req: Request) => {
     const useAdvancedModel = hasImage || hasScoringContext;
     const model = useAdvancedModel ? "gpt-4o" : "gpt-4o-mini";
     const temperature = hasImage ? 0.3 : hasScoringContext ? 0.4 : 0.7;
-    const maxTokens = hasImage ? 2500 : hasScoringContext ? 2000 : 1500;
+    const maxTokens = hasImage ? 2500 : hasScoringContext ? 3000 : 1500;
 
     const openaiResponse = await fetch(
       "https://api.openai.com/v1/chat/completions",
@@ -641,15 +644,31 @@ function buildScoringContextPrompt(ctx: ScoringContext): string {
 
   // Standings
   if (ctx.standings.length > 0) {
-    p += `## Current Standings\n`;
+    p += `## Current Standings (ranked by FINAL/Net points — lowest wins)\n`;
+    p += `IMPORTANT: The "Final" column = Net points (after discards). This is what determines finishing positions. The "Total" column = Gross points (before discards) and is NOT used for ranking.\n`;
+    const hasFleets = ctx.standings.some(s => s.fleet);
+    let currentFleet = '';
     for (const s of ctx.standings) {
-      let line = `${s.rank}. ${s.skipperName} (${s.sailNo}) — Net: ${s.netPoints} pts`;
-      if (s.totalPoints !== s.netPoints) line += ` (Gross: ${s.totalPoints})`;
+      if (hasFleets && s.fleet && s.fleet !== currentFleet) {
+        currentFleet = s.fleet;
+        p += `\n### ${currentFleet} Fleet\n`;
+      }
+      let line = `${s.rank}. ${s.skipperName} (${s.sailNo})`;
+      if (s.fleet) line += ` [${s.fleet}]`;
+      line += ` — FINAL: ${s.netPoints} pts`;
+      if (s.totalPoints !== s.netPoints) line += ` (Total/Gross: ${s.totalPoints})`;
       if (s.racePoints.length > 0) {
-        const raceStr = s.racePoints.map((pts, i) =>
-          s.droppedRaces.includes(i + 1) ? `[${pts}]` : `${pts}`
-        ).join(", ");
+        const raceStr = s.racePoints.map((pts, i) => {
+          const isDropped = s.droppedRaces.includes(i + 1);
+          const letterScore = s.letterScores?.[i];
+          let display = letterScore && letterScore !== 'RDGfix' ? `${letterScore}(${pts})` : `${pts}`;
+          if (isDropped) display = `[${display}]`;
+          return display;
+        }).join(", ");
         line += ` | Races: ${raceStr}`;
+      }
+      if (s.heatPerRace && s.heatPerRace.length > 0) {
+        line += ` | Heats: ${s.heatPerRace.join(", ")}`;
       }
       p += line + `\n`;
     }
@@ -700,16 +719,106 @@ function buildScoringContextPrompt(ctx: ScoringContext): string {
     p += `Always identify whether a scratch boat won the race first, as this determines if the +30 bonus applies.\n\n`;
   }
 
-  // Scoring-specific instructions
-  p += `## How to Use This Data\n`;
-  p += `- When the user asks "why is X in position Y", look at the standings and race results to explain.\n`;
-  p += `- For handicap questions, ALWAYS show the step-by-step worked calculation for each skipper using the Handicap Calculation Rules above and the actual race data. Use real names and numbers — never generalise.\n`;
-  p += `- For tie-break questions, explain the countback procedure: compare best individual race positions after drops.\n`;
-  p += `- For HMS/SHRS questions, explain heat assignments, promotion rules, and how overall standings are calculated.\n`;
-  p += `- For letter scores (DNS, DNF, DSQ, OCS, etc.), explain the scoring penalty: DNF/RET = finishers + 1, DNS/DNC = total competitors + 1, DSQ/DNE = total competitors + 2.\n`;
-  p += `- For drop rule questions, explain which races are dropped (shown in brackets in standings) and how they affect net points.\n`;
-  p += `- Always reference actual data from the scoring session — use real skipper names, sail numbers, and values.\n`;
-  p += `- Be specific and precise. Show your working. Don't generalise when you have the actual numbers.\n`;
+  // Add SHRS/HMS-specific scoring rules
+  if (ctx.scoringSystem === 'shrs' || ctx.scoringSystem === 'hms') {
+    p += `## ${ctx.scoringSystem === 'shrs' ? 'SHRS' : 'HMS'} Scoring Rules (Used by This Event)\n\n`;
+    p += `### Scoring Method\n`;
+    p += `- Points = finishing position within each heat (1st=1pt, 2nd=2pts, etc.)\n`;
+    p += `- Low-point scoring: lowest total wins\n`;
+    p += `- Penalty scores for non-finishers are based on the number of boats in the LARGEST heat (not total fleet)\n\n`;
+    if (ctx.scoringSystem === 'shrs') {
+      p += `### SHRS Discard Schedule\n`;
+      p += `- Qualifying series: drop 1 after 4 races, drop 2 after 8, then +1 per 8 additional races\n`;
+      p += `- Finals series: drop 1 if 4 or more finals races, otherwise 0 drops\n`;
+      p += `- Discards are applied SEPARATELY to qualifying and finals\n\n`;
+      p += `### SHRS Tie-Breaking (Rule 5.6) — CRITICAL\n`;
+      p += `This is the EXACT tie-break procedure used by AlfiePRO for SHRS events:\n\n`;
+      p += `**Step 1: Did the tied boats ever sail in the SAME heat?**\n`;
+      p += `Look at the "Heats" data in each skipper's standings line. For each round/race, check if both skippers have the same heat letter.\n\n`;
+      p += `**Step 2a: If they DID sail in the same heat (at least once):**\n`;
+      p += `- Collect ONLY the race scores from rounds where both boats were in the SAME heat\n`;
+      p += `- Compare using countback WITH NO DROPS (all same-heat scores count, even if normally discarded)\n`;
+      p += `- Countback: sort scores best-to-worst, compare position by position, first difference wins\n`;
+      p += `- If STILL tied after same-heat countback: fall back to surname alphabetical order, then first name, then sail number\n\n`;
+      p += `**Step 2b: If they NEVER sailed in the same heat:**\n`;
+      p += `- Use standard RRS A8.1 countback on ALL their race scores (with normal drops applied)\n`;
+      p += `- Sort non-dropped scores best to worst, compare position by position\n`;
+      p += `- If still tied: surname → first name → sail number\n\n`;
+      p += `### WORKED TIE-BREAK INSTRUCTION\n`;
+      p += `When explaining an SHRS tie-break, you MUST:\n`;
+      p += `1. Find both skippers in the Standings data above\n`;
+      p += `2. Show their ACTUAL race-by-race scores and heats from the data\n`;
+      p += `3. Identify which rounds they were in the SAME heat (compare heat letters round by round)\n`;
+      p += `4. List the same-heat scores for each skipper\n`;
+      p += `5. Sort those scores best-to-worst and compare position by position\n`;
+      p += `6. Show the EXACT point where the tie breaks\n`;
+      p += `Example: "Round 3 — both in Heat B: Dave scored 3, Roger scored 5. Round 7 — both in Heat A: Dave scored 2, Roger scored 8..."\n`;
+      p += `Then: "Same-heat scores sorted: Dave [2,3] vs Roger [5,8] → Dave wins at first comparison (2 vs 5)."\n\n`;
+    }
+  }
+
+  // Scoring-specific instructions — CRITICAL DATA-DRIVEN RESPONSE RULES
+  p += `## CRITICAL: How You MUST Answer Scoring Questions\n\n`;
+  p += `### Golden Rule: ALWAYS use the actual race data above\n`;
+  p += `You have the REAL scoring data for this event. NEVER give a generic or theoretical explanation. ALWAYS look up the specific skippers mentioned in the question, find their actual race-by-race scores in the Race Results and Standings sections above, and walk through the calculation using their real numbers.\n\n`;
+
+  p += `### For tie-break questions:\n`;
+  p += `IMPORTANT: Ties are determined by the FINAL column (net points after discards), NOT the Total column (gross points). Two skippers are only "tied" if their FINAL/net points are equal. If their FINAL points differ, there is no tie — the lower FINAL score wins.\n\n`;
+  if (ctx.scoringSystem === 'shrs') {
+    p += `**THIS IS AN SHRS EVENT — use SHRS Rule 5.6 tie-breaking (see above).**\n`;
+    p += `1. Find both skippers in the Standings data above — copy their ACTUAL race scores and heat assignments\n`;
+    p += `2. Confirm they have equal FINAL/net points (show the actual number). If their FINAL points differ, state clearly that there is NO tie and the lower score wins.\n`;
+    p += `3. Compare their heat assignments round by round to find races where they were in the SAME heat\n`;
+    p += `4. List the same-heat scores for each skipper (if any)\n`;
+    p += `5. Compare same-heat scores using countback (sorted best-to-worst, NO drops)\n`;
+    p += `6. Show the EXACT point where the scores differ and who wins\n`;
+    p += `7. If no same-heat races exist, fall back to full RRS A8.1 countback with normal drops\n\n`;
+  } else {
+    p += `1. Find both skippers in the Standings data above\n`;
+    p += `2. Confirm they have equal FINAL/net points (show the actual number). If their FINAL points differ, state clearly that there is NO tie.\n`;
+    p += `3. List EACH skipper's race-by-race scores from the data, identifying which are dropped (in brackets)\n`;
+    p += `4. Compare their non-dropped scores from best to worst, side by side\n`;
+    p += `5. Show the EXACT point where the scores differ and who wins the tie-break\n\n`;
+  }
+
+  p += `### For "why is X in position Y" questions:\n`;
+  p += `1. Find the skipper in the Standings data\n`;
+  p += `2. Show their race-by-race scores, identifying drops (in brackets)\n`;
+  p += `3. Show FINAL/net points (sum of non-dropped scores) — this determines their ranking position\n`;
+  p += `4. Compare FINAL/net points with skippers above and below them in the standings\n`;
+  p += `5. If tied on FINAL/net points, show the tie-break comparison\n\n`;
+
+  p += `### For handicap questions:\n`;
+  p += `- ALWAYS show the worked calculation for each skipper using the Handicap Calculation Rules and actual race data\n`;
+  p += `- Use format: "[Name] ([Sail]): finished [pos] — [current_hcap] + ([adj]) + ([bonus]) = [new_hcap]"\n\n`;
+
+  p += `### For HMS/SHRS questions:\n`;
+  p += `- Reference the actual heat assignments and round results from the data above\n`;
+  p += `- Explain how points are calculated within heats using the real positions\n`;
+  p += `- For promotion/relegation questions, show which skippers moved between heats using the actual data\n\n`;
+
+  p += `### For letter scores (DNS, DNF, DSQ, OCS, etc.):\n`;
+  p += `- DNF/RET = number of finishers in that race + 1\n`;
+  p += `- DNS/DNC/NSC/WDN = total competitors + 1\n`;
+  p += `- DSQ/DNE = total competitors + 2\n`;
+  p += `- OCS/BFD = total competitors + 1\n`;
+  p += `- Show the actual point value calculated from the real fleet size\n\n`;
+
+  p += `### For drop rule questions:\n`;
+  p += `- Show which races are dropped (shown in brackets in standings) using the real data\n`;
+  p += `- Explain how gross minus drops equals net\n`;
+  p += `- Calculate using actual numbers\n\n`;
+
+  p += `### ABSOLUTELY FORBIDDEN RESPONSES:\n`;
+  p += `- NEVER use placeholder text like "[List of scores and heat assignments]" or "[Check each round]". You MUST write out the ACTUAL numbers from the Standings data above.\n`;
+  p += `- NEVER say "Check each round for heat assignments and scores" — YOU must do the checking and show the results.\n`;
+  p += `- NEVER tell the user to look something up themselves. YOU have the data — present it.\n`;
+  p += `- NEVER just explain the rule and stop. You MUST then APPLY it to the specific data.\n`;
+  p += `- NEVER say "you would compare their scores" — actually compare them using the real numbers.\n`;
+  p += `- NEVER give a generic example when you have the real data available.\n`;
+  p += `- NEVER leave out the step-by-step working. Show ALL the numbers.\n`;
+  p += `- If you cannot find a skipper's data in the Standings above, say "I don't have data for that skipper" — do NOT use placeholders or make up numbers.\n`;
+  p += `\nRemember: The Standings section above contains each skipper's race-by-race scores (in "Races:" field), dropped races (in brackets), and heat assignments (in "Heats:" field). Copy these actual values into your response.\n`;
   p += `--- END LIVE SCORING SESSION ---\n\n`;
 
   return p;
