@@ -161,6 +161,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
 }) => {
   const { user, currentClub } = useAuth();
   const { scoringContext, getScoringSnapshot } = useScoringContext();
+  console.log('[AskAlfie] scoringContext.isActive:', scoringContext.isActive, 'skippers:', scoringContext.skippers?.length, 'event:', scoringContext.eventName);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
