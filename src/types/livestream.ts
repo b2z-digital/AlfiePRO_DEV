@@ -203,7 +203,8 @@ export interface LivestreamArchive {
   cloudflare_video_id?: string;
   cloudflare_customer_code?: string;
   cloudflare_playback_url?: string;
-  source?: 'youtube' | 'cloudflare';
+  storage_path?: string;
+  source?: 'youtube' | 'cloudflare' | 'local';
 
   event_id?: string;
   heat_number?: number;

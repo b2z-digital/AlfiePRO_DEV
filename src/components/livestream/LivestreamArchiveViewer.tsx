@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Eye, ThumbsUp, MessageSquare, Calendar, Clock, Video } from 'lucide-react';
 import { livestreamStorage } from '../../utils/livestreamStorage';
+import { supabase } from '../../utils/supabase';
 import type { LivestreamArchive } from '../../types/livestream';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -137,28 +138,7 @@ export function LivestreamArchiveViewer({ clubId, eventId }: LivestreamArchiveVi
             onClick={(e) => e.stopPropagation()}
           >
             <div className="aspect-video bg-black">
-              {(selectedArchive as any).source === 'cloudflare' && (selectedArchive as any).cloudflare_playback_url ? (
-                <iframe
-                  src={`${(selectedArchive as any).cloudflare_playback_url}?autoplay=true&muted=false&preload=auto`}
-                  title={selectedArchive.title}
-                  allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                  allowFullScreen
-                  className="w-full h-full"
-                  style={{ border: 'none' }}
-                />
-              ) : selectedArchive.youtube_video_id ? (
-                <iframe
-                  src={`https://www.youtube.com/embed/${selectedArchive.youtube_video_id}?autoplay=1`}
-                  title={selectedArchive.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="w-full h-full"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Video className="w-16 h-16 text-slate-600" />
-                </div>
-              )}
+              <ArchiveVideoPlayer archive={selectedArchive} />
             </div>
 
             <div className="p-6">
@@ -215,6 +195,77 @@ export function LivestreamArchiveViewer({ clubId, eventId }: LivestreamArchiveVi
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ArchiveVideoPlayer({ archive }: { archive: LivestreamArchive }) {
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (archive.source === 'local' && archive.storage_path) {
+      setLoading(true);
+      supabase.storage
+        .from('livestream-recordings')
+        .createSignedUrl(archive.storage_path, 3600)
+        .then(({ data, error }) => {
+          if (data?.signedUrl) setVideoUrl(data.signedUrl);
+          else console.error('Failed to get signed URL:', error);
+          setLoading(false);
+        });
+    }
+  }, [archive.id, archive.source, archive.storage_path]);
+
+  if (archive.source === 'local' && archive.storage_path) {
+    if (loading) {
+      return (
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="text-slate-400">Loading recording...</div>
+        </div>
+      );
+    }
+    if (videoUrl) {
+      return (
+        <video
+          src={videoUrl}
+          controls
+          autoPlay
+          className="w-full h-full"
+          style={{ backgroundColor: '#000' }}
+        />
+      );
+    }
+  }
+
+  if (archive.source === 'cloudflare' && archive.cloudflare_playback_url) {
+    return (
+      <iframe
+        src={`${archive.cloudflare_playback_url}?autoplay=true&muted=false&preload=auto`}
+        title={archive.title}
+        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allowFullScreen
+        className="w-full h-full"
+        style={{ border: 'none' }}
+      />
+    );
+  }
+
+  if (archive.youtube_video_id) {
+    return (
+      <iframe
+        src={`https://www.youtube.com/embed/${archive.youtube_video_id}?autoplay=1`}
+        title={archive.title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        className="w-full h-full"
+      />
+    );
+  }
+
+  return (
+    <div className="w-full h-full flex items-center justify-center">
+      <Video className="w-16 h-16 text-slate-600" />
     </div>
   );
 }
