@@ -22,8 +22,8 @@ export function useCanvasCompositor({
   overlayElement,
   sourceStream,
   enabled,
-  width = 1280,
-  height = 720,
+  width = 1920,
+  height = 1080,
   overlayCaptureFps = 2,
   frameRate = 30,
 }: UseCanvasCompositorOptions): UseCanvasCompositorReturn {

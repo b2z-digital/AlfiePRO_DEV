@@ -11,9 +11,11 @@ interface LivestreamOverlayRendererProps {
   weatherData?: any;
   showTitleCard?: boolean;
   titleCardTrigger?: number;
+  venueImage?: string;
+  venueName?: string;
 }
 
-export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, LivestreamOverlayRendererProps>(function LivestreamOverlayRenderer({ session, raceData, weatherData, showTitleCard, titleCardTrigger = 0 }, ref) {
+export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, LivestreamOverlayRendererProps>(function LivestreamOverlayRenderer({ session, raceData, weatherData, showTitleCard, titleCardTrigger = 0, venueImage, venueName }, ref) {
   const [overlays, setOverlays] = useState<LivestreamOverlay[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [liveTrackingData, setLiveTrackingData] = useState<any>(null);
@@ -474,8 +476,8 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
 
       {/* Skippers List - Top Left */}
       {config.showSkippers && displaySkippers && displaySkippers.length > 0 && (
-        <div className="absolute top-4 left-8">
-          <div className="bg-slate-800/80 backdrop-blur-md rounded-lg shadow-lg overflow-hidden min-w-[240px] max-w-[340px]">
+        <div className="absolute top-4 left-8" style={{ maxHeight: 'calc(100% - 70px)' }}>
+          <div className="bg-slate-800/80 backdrop-blur-md rounded-lg shadow-lg overflow-hidden min-w-[240px] max-w-[340px]" style={{ maxHeight: 'calc(100% - 4px)' }}>
             <div className="px-3 py-1.5 bg-slate-900/80 border-b border-slate-600/40">
               <div className="flex items-center gap-2">
                 <Users className="w-3.5 h-3.5 text-yellow-400" />
@@ -485,7 +487,7 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
               </div>
             </div>
 
-            <div className="max-h-[500px] overflow-y-auto">
+            <div className="overflow-y-auto" style={{ maxHeight: 'min(500px, calc(100% - 32px))' }}>
               <table className="w-full">
                 <tbody className="text-white">
                   {displaySkippers.slice(0, 25).map((skipper: any, index: number) => (
@@ -554,45 +556,58 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
         </div>
       )}
 
-      {config.showHeatNumber && (displayData || session.heat_number) && (
-        <div className="absolute bottom-6 left-6">
-          <p className="text-4xl font-bold text-yellow-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-            {displayData?.heat_label || (
-              `${displayData?.race_type === 'heat' ? 'Heat' : 'Race'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || '1'}`
-            )}
-          </p>
+      {/* Footer Bar */}
+      <div className="absolute bottom-0 left-0 right-0 h-12 flex items-center justify-between px-4" style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(15,23,42,0.80) 50%, rgba(0,0,0,0.85) 100%)' }}>
+        <div className="flex items-center gap-3">
+          {config.showHeatNumber && (displayData || session.heat_number) && (
+            <p className="text-lg font-bold text-yellow-400 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+              {displayData?.heat_label || (
+                `${displayData?.race_type === 'heat' ? 'Heat' : 'Race'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || '1'}`
+              )}
+            </p>
+          )}
+          {displayData?.event_name && (
+            <>
+              <span className="text-slate-600 text-sm">|</span>
+              <p className="text-sm font-medium text-slate-300 truncate max-w-[300px]">{displayData.event_name}</p>
+            </>
+          )}
         </div>
-      )}
-
-      {/* Alfie Logo Watermark - Bottom Right */}
-      <div className="absolute bottom-4 right-4 opacity-60">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" className="w-16 h-16">
-          <path fill="#0066b4" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
-          <path fill="#0078d3" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
-        </svg>
+        <div className="flex items-center gap-2 opacity-80">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" className="w-6 h-6">
+            <path fill="#0078d3" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
+            <path fill="#0066b4" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
+          </svg>
+          <span className="text-sm font-bold text-white tracking-wide">Alfie<span style={{ color: '#0078d3' }}>PRO</span></span>
+        </div>
       </div>
 
       {titleCardVisible && (
         <div
           className="absolute inset-0 z-50 flex items-center justify-center"
           style={{
-            background: 'linear-gradient(135deg, rgba(0,0,0,0.95) 0%, rgba(10,15,30,0.97) 40%, rgba(5,10,25,0.97) 60%, rgba(0,0,0,0.95) 100%)',
             opacity: titleCardPhase === 'entering' ? 0 : titleCardPhase === 'exiting' ? 0 : 1,
             transition: 'opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
-          <div
-            className="absolute inset-0"
-            style={{
-              background: 'radial-gradient(ellipse at center, rgba(0,102,180,0.12) 0%, transparent 70%)',
-            }}
-          />
+          {venueImage ? (
+            <>
+              <img
+                src={venueImage}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.75) 0%, rgba(0,10,30,0.80) 50%, rgba(0,0,0,0.75) 100%)' }} />
+            </>
+          ) : (
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.95) 0%, rgba(10,15,30,0.97) 40%, rgba(5,10,25,0.97) 60%, rgba(0,0,0,0.95) 100%)' }} />
+          )}
+
+          <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, rgba(0,102,180,0.10) 0%, transparent 70%)' }} />
 
           <div
             className="absolute top-0 left-0 right-0 h-1"
-            style={{
-              background: 'linear-gradient(90deg, transparent 10%, rgba(0,102,180,0.6) 30%, rgba(0,120,211,0.8) 50%, rgba(0,102,180,0.6) 70%, transparent 90%)',
-            }}
+            style={{ background: 'linear-gradient(90deg, transparent 10%, rgba(0,102,180,0.6) 30%, rgba(0,120,211,0.8) 50%, rgba(0,102,180,0.6) 70%, transparent 90%)' }}
           />
 
           <div className="relative text-center px-8" style={{
@@ -601,40 +616,50 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
             transition: 'transform 1.5s cubic-bezier(0.4, 0, 0.2, 1)',
           }}>
             <div
-              className="flex items-center justify-center gap-4 mb-8"
+              className="flex items-center justify-center gap-3 mb-8"
               style={{
                 opacity: titleCardPhase === 'visible' ? 1 : 0,
                 transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(-10px)',
                 transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.3s',
               }}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" className="w-10 h-10">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" className="w-12 h-12" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,102,180,0.4))' }}>
                 <path fill="#0078d3" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
                 <path fill="#0066b4" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
               </svg>
-              <span
-                className="text-xl font-bold tracking-[0.35em] uppercase"
-                style={{
-                  background: 'linear-gradient(135deg, #0078d3, #00a3ff)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}
-              >
-                AlfiePRO
-              </span>
+              <div className="flex flex-col items-start">
+                <span className="text-2xl font-extrabold tracking-[0.15em] text-white" style={{ textShadow: '0 2px 12px rgba(0,120,211,0.5)' }}>
+                  Alfie<span style={{ color: '#0078d3' }}>PRO</span>
+                </span>
+                <span className="text-[10px] font-medium tracking-[0.3em] uppercase text-slate-400">Live Race Broadcast</span>
+              </div>
             </div>
 
             <h1
-              className="text-4xl font-bold text-white mb-4 leading-tight"
+              className="text-5xl font-bold text-white mb-3 leading-tight"
               style={{
                 opacity: titleCardPhase === 'visible' ? 1 : 0,
                 transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(15px)',
                 transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.6s',
-                textShadow: '0 2px 20px rgba(0,0,0,0.5)',
+                textShadow: '0 2px 20px rgba(0,0,0,0.7)',
               }}
             >
               {displayData?.event_name || session.title || 'Live Race'}
             </h1>
+
+            {venueName && (
+              <p
+                className="text-lg text-slate-300 mb-4 font-medium"
+                style={{
+                  opacity: titleCardPhase === 'visible' ? 1 : 0,
+                  transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(15px)',
+                  transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.75s',
+                  textShadow: '0 1px 8px rgba(0,0,0,0.5)',
+                }}
+              >
+                {venueName}
+              </p>
+            )}
 
             <div
               className="flex items-center justify-center gap-4 text-base"
@@ -644,13 +669,13 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
                 transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.9s',
               }}
             >
-              <span className="text-slate-400 font-medium">
+              <span className="text-slate-300 font-medium" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>
                 {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
               </span>
               {(displayData?.heat_label || displayData?.heat_number || displayData?.race_number || session.heat_number) && (
                 <>
-                  <span className="text-slate-600">|</span>
-                  <span className="text-yellow-400 font-semibold">
+                  <span className="text-slate-500">|</span>
+                  <span className="text-yellow-400 font-semibold" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>
                     {displayData?.heat_label || (
                       `${displayData?.race_type === 'heat' ? 'Heat' : 'Race'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || 1}`
                     )}
@@ -662,9 +687,7 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
 
           <div
             className="absolute bottom-0 left-0 right-0 h-1"
-            style={{
-              background: 'linear-gradient(90deg, transparent 10%, rgba(0,102,180,0.4) 30%, rgba(0,120,211,0.6) 50%, rgba(0,102,180,0.4) 70%, transparent 90%)',
-            }}
+            style={{ background: 'linear-gradient(90deg, transparent 10%, rgba(0,102,180,0.4) 30%, rgba(0,120,211,0.6) 50%, rgba(0,102,180,0.4) 70%, transparent 90%)' }}
           />
         </div>
       )}

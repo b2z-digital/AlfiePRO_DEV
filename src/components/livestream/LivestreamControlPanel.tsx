@@ -105,8 +105,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     sourceStream: activePreviewStream || mediaStream,
     enabled: activeSession?.enable_overlays === true &&
              (streamStatus === 'testing' || streamStatus === 'live' || streamStatus === 'connecting'),
-    width: 1280,
-    height: 720,
+    width: 1920,
+    height: 1080,
     overlayCaptureFps: 2,
     frameRate: 30,
   });
@@ -833,7 +833,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
           ? 'video/webm;codecs=vp8,opus'
           : 'video/webm';
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 2500000 });
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
       recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunksRef.current.push(e.data); };
       recorder.start(2000);
       mediaRecorderRef.current = recorder;
@@ -1654,7 +1654,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               <video ref={(el) => { (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el; setVideoElReady(el); }} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
 
               {activeSession.enable_overlays && streamStatus !== 'offline' && (
-                <LivestreamOverlayRenderer ref={(el: HTMLDivElement | null) => { (overlayRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setOverlayElReady(el); }} session={activeSession} showTitleCard={showTitleCard} titleCardTrigger={titleCardTrigger} />
+                <LivestreamOverlayRenderer ref={(el: HTMLDivElement | null) => { (overlayRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setOverlayElReady(el); }} session={activeSession} showTitleCard={showTitleCard} titleCardTrigger={titleCardTrigger} venueImage={(activeSession as SessionWithVenue).venueImage} venueName={(activeSession as SessionWithVenue).venueName} />
               )}
 
               {isPaused && streamStatus === 'live' && (
