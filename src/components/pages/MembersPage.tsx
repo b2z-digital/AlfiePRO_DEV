@@ -511,7 +511,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       return matchesSearch;
     });
 
-    // Step 3: Sort by name
+    // Step 4: Sort by name
     return filtered.sort((a, b) => {
       const lastNameCompare = (a.last_name || '').localeCompare(b.last_name || '');
       if (lastNameCompare !== 0) {

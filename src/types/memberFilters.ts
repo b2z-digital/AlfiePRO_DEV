@@ -275,6 +275,20 @@ export const MEMBER_FILTER_FIELDS: FilterField[] = [
       { value: 'false', label: 'No (Not Linked)' }
     ],
     description: 'Whether member has a linked user account'
+  },
+  {
+    id: 'invite_status',
+    label: 'Invite Status',
+    type: 'select',
+    operators: ['equals', 'not_equals', 'in', 'not_in'],
+    options: [
+      { value: 'connected', label: 'Connected' },
+      { value: 'awaiting_setup', label: 'Awaiting Setup' },
+      { value: 'invite_sent', label: 'Invite Sent' },
+      { value: 'not_invited', label: 'Not Invited' },
+      { value: 'no_email', label: 'No Email' }
+    ],
+    description: 'Member invitation and account connection status'
   }
 ];
 

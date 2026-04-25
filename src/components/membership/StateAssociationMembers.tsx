@@ -96,7 +96,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
 
   useEffect(() => {
     filterMembers();
-  }, [members, searchTerm, selectedClub, selectedStatus, advancedFilterConfig]);
+  }, [members, searchTerm, selectedClub, selectedStatus, advancedFilterConfig, memberInvitations]);
 
   const fetchRemittanceStatuses = async (memberIds: string[]) => {
     if (memberIds.length === 0) return;
