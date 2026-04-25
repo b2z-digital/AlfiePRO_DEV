@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Calendar, Video, ArrowLeft, ArrowRight, ChevronDown, Radio, Globe, Link, Lock, Users } from 'lucide-react';
+import { X, Check, Calendar, Video, ArrowLeft, ArrowRight, ChevronDown, Radio } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { livestreamStorage } from '../../utils/livestreamStorage';
@@ -16,7 +16,7 @@ interface LivestreamSetupWizardProps {
   onClose: () => void;
 }
 
-type Step = 'timing' | 'event' | 'details' | 'customization' | 'visibility' | 'review';
+type Step = 'timing' | 'event' | 'details' | 'review';
 
 interface WizardData {
   timing: 'now' | 'later';
@@ -24,18 +24,10 @@ interface WizardData {
   title: string;
   description: string;
   eventId?: string;
-  eventDay?: number; // For multi-day events: which day (1, 2, 3, etc.)
+  eventDay?: number;
   heatNumber?: number;
-  category: string;
-  thumbnailUrl?: string;
   enableChat: boolean;
   enableLeaderboard: boolean;
-  chatMode: 'anyone' | 'subscribers' | 'members';
-  enableReactions: boolean;
-  slowMode: boolean;
-  slowModeSeconds: number;
-  visibility: 'public' | 'unlisted' | 'private';
-  madeForKids: boolean;
 }
 
 export function LivestreamSetupWizard({
@@ -60,15 +52,8 @@ export function LivestreamSetupWizard({
       title: preSelectedEventName ? `${preSelectedEventName} - Live Coverage` : '',
       description: '',
       eventId: preSelectedEventId,
-      category: 'Sports',
       enableChat: true,
       enableLeaderboard: true,
-      chatMode: 'anyone',
-      enableReactions: true,
-      slowMode: false,
-      slowModeSeconds: 60,
-      visibility: 'public',
-      madeForKids: true,
     };
 
     // Pre-populate scheduled time if event date is provided
@@ -98,7 +83,7 @@ export function LivestreamSetupWizard({
 
   const [wizardData, setWizardData] = useState<WizardData>(getInitialWizardData());
 
-  const steps: Step[] = ['timing', 'event', 'details', 'customization', 'visibility', 'review'];
+  const steps: Step[] = ['timing', 'event', 'details', 'review'];
   const currentStepIndex = steps.indexOf(currentStep);
 
   useEffect(() => {
@@ -358,7 +343,7 @@ export function LivestreamSetupWizard({
         scheduled_start_time: wizardData.timing === 'later' ? wizardData.scheduledTime : undefined,
         enable_chat: wizardData.enableChat,
         enable_overlays: wizardData.enableLeaderboard,
-        is_public: wizardData.visibility === 'public',
+        is_public: true,
         streaming_mode: 'cloudflare_relay',
         overlay_config: {
           showHeatNumber: true,
@@ -368,60 +353,46 @@ export function LivestreamSetupWizard({
           showHandicaps: false,
           position: 'bottom',
           theme: 'dark',
-          chatMode: wizardData.chatMode,
-          enableReactions: wizardData.enableReactions,
-          slowMode: wizardData.slowMode,
-          slowModeSeconds: wizardData.slowModeSeconds,
-          visibility: wizardData.visibility,
         },
       };
 
-      // Step 1: Create Cloudflare Stream live input
+      // Create Cloudflare Stream live input via platform-level account
       setLoadingMessage('Creating Cloudflare Stream input...');
-      console.log('[LivestreamWizard] Creating Cloudflare Stream live input...');
-      try {
-        const cfResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            action: 'createLiveInput',
-            clubId,
-            sessionData: {
-              title: wizardData.title,
-              recording: true
-            }
-          })
-        });
+      console.log('[LivestreamWizard] Creating Cloudflare Stream live input via platform account...');
 
-        const cfData = await cfResponse.json();
-
-        if (cfResponse.ok && cfData.liveInput) {
-          console.log('[LivestreamWizard] Cloudflare live input created:', cfData.liveInput.uid);
-          sessionData.cloudflare_live_input_id = cfData.liveInput.uid;
-          sessionData.cloudflare_whip_url = cfData.liveInput.webRTC?.url;
-          sessionData.cloudflare_whip_playback_url = cfData.liveInput.webRTCPlayback?.url;
-          sessionData.cloudflare_rtmps_url = cfData.liveInput.rtmps?.url;
-          sessionData.cloudflare_rtmps_stream_key = cfData.liveInput.rtmps?.streamKey;
-
-          const playbackUrl = cfData.liveInput.webRTCPlayback?.url || cfData.liveInput.rtmpsPlayback?.url || '';
-          const customerMatch = playbackUrl.match(/customer-([a-z0-9]+)\./);
-          if (customerMatch) {
-            sessionData.cloudflare_customer_code = customerMatch[1];
-            console.log('[LivestreamWizard] Extracted Cloudflare customer code:', customerMatch[1]);
+      const cfResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'createLiveInput',
+          clubId,
+          sessionData: {
+            title: wizardData.title,
+            recording: true
           }
-          console.log('[LivestreamWizard] Cloudflare RTMPS ingest URL:', cfData.liveInput.rtmps?.url);
-        } else {
-          console.warn('[LivestreamWizard] Cloudflare Stream not configured:', cfData.error);
-          addNotification('warning', cfData.hint || 'Cloudflare Stream not configured. Please set it up in Settings > Integrations.', 8000);
-        }
-      } catch (cfError: any) {
-        console.error('[LivestreamWizard] Cloudflare error:', cfError);
-        addNotification('warning', 'Cloudflare Stream setup failed. Please check your integration settings.', 6000);
+        })
+      });
+
+      const cfData = await cfResponse.json();
+
+      if (!cfResponse.ok || !cfData.liveInput) {
+        throw new Error(cfData.error || 'Failed to create Cloudflare Stream input');
+      }
+
+      console.log('[LivestreamWizard] Cloudflare live input created:', cfData.liveInput.uid);
+      sessionData.cloudflare_live_input_id = cfData.liveInput.uid;
+      sessionData.cloudflare_whip_url = cfData.liveInput.webRTC?.url;
+      sessionData.cloudflare_whip_playback_url = cfData.liveInput.webRTCPlayback?.url;
+
+      const playbackUrl = cfData.liveInput.webRTCPlayback?.url || cfData.liveInput.rtmpsPlayback?.url || '';
+      const customerMatch = playbackUrl.match(/customer-([a-z0-9]+)\./);
+      if (customerMatch) {
+        sessionData.cloudflare_customer_code = customerMatch[1];
       }
 
       setLoadingMessage('Finalizing setup...');
-      addNotification('success', 'Successfully created livestream session', 3000);
       const session = await livestreamStorage.createSession(sessionData);
+      addNotification('success', 'Stream created successfully', 3000);
       onComplete(session);
     } catch (error) {
       console.error('Error creating livestream session:', error);
@@ -434,9 +405,8 @@ export function LivestreamSetupWizard({
   const getStepTitle = () => {
     switch (currentStep) {
       case 'timing': return 'Welcome to AlfiePRO Live Control Room';
+      case 'event': return 'Select Event';
       case 'details': return 'Stream Details';
-      case 'customization': return 'Customisation';
-      case 'visibility': return 'Visibility';
       case 'review': return 'Review & Go Live';
       default: return '';
     }
@@ -691,200 +661,6 @@ export function LivestreamSetupWizard({
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Category
-                </label>
-                <div className="relative">
-                  <select
-                    value={wizardData.category}
-                    onChange={(e) => updateWizardData({ category: e.target.value })}
-                    className="w-full px-3 py-2 pr-10 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 appearance-none backdrop-blur-sm transition-colors"
-                  >
-                    <option value="Sports">Sports</option>
-                    <option value="Entertainment">Entertainment</option>
-                    <option value="Education">Education</option>
-                    <option value="Gaming">Gaming</option>
-                    <option value="People & Blogs">People & Blogs</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {currentStep === 'customization' && (
-            <div className="space-y-6">
-              <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-5 space-y-4">
-                <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Features</h3>
-                <div className="space-y-1">
-                  <button
-                    type="button"
-                    onClick={() => updateWizardData({ enableChat: !wizardData.enableChat })}
-                    className="w-full flex items-center justify-between py-3 px-1 group"
-                  >
-                    <span className="text-slate-200">Live chat</span>
-                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.enableChat ? 'bg-cyan-500' : 'bg-slate-600'}`}>
-                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.enableChat ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </div>
-                  </button>
-                  <div className="border-t border-slate-700/30" />
-                  <button
-                    type="button"
-                    onClick={() => updateWizardData({ enableLeaderboard: !wizardData.enableLeaderboard })}
-                    className="w-full flex items-center justify-between py-3 px-1 group"
-                  >
-                    <span className="text-slate-200">Live leaderboard overlay</span>
-                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.enableLeaderboard ? 'bg-cyan-500' : 'bg-slate-600'}`}>
-                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.enableLeaderboard ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </div>
-                  </button>
-                  <div className="border-t border-slate-700/30" />
-                  <button
-                    type="button"
-                    onClick={() => updateWizardData({ enableReactions: !wizardData.enableReactions })}
-                    className="w-full flex items-center justify-between py-3 px-1 group"
-                  >
-                    <span className="text-slate-200">Live reactions</span>
-                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.enableReactions ? 'bg-cyan-500' : 'bg-slate-600'}`}>
-                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.enableReactions ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </div>
-                  </button>
-                  <div className="border-t border-slate-700/30" />
-                  <button
-                    type="button"
-                    onClick={() => updateWizardData({ slowMode: !wizardData.slowMode })}
-                    className="w-full flex items-center justify-between py-3 px-1 group"
-                  >
-                    <div>
-                      <span className="text-slate-200">Slow mode</span>
-                      {wizardData.slowMode && (
-                        <span className="text-slate-400 text-sm ml-2">({wizardData.slowModeSeconds}s delay)</span>
-                      )}
-                    </div>
-                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.slowMode ? 'bg-cyan-500' : 'bg-slate-600'}`}>
-                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.slowMode ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </div>
-                  </button>
-                </div>
-                {wizardData.slowMode && (
-                  <div className="pt-2 pl-1">
-                    <label className="block text-sm text-slate-400 mb-2">Seconds between messages</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="300"
-                      value={wizardData.slowModeSeconds}
-                      onChange={(e) => updateWizardData({ slowModeSeconds: parseInt(e.target.value) || 60 })}
-                      className="w-32 px-3 py-2 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 backdrop-blur-sm transition-colors"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-5">
-                <h3 className="text-white font-semibold text-sm uppercase tracking-wider mb-2">Chat Permissions</h3>
-                <p className="text-slate-400 text-sm mb-4">Who can send messages</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { value: 'anyone', label: 'Anyone' },
-                    { value: 'subscribers', label: 'Subscribers' },
-                    { value: 'members', label: 'Members' },
-                  ] as const).map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => updateWizardData({ chatMode: option.value })}
-                      className={`py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 ${
-                        wizardData.chatMode === option.value
-                          ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 ring-1 ring-cyan-500/30'
-                          : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
-                      } border`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {currentStep === 'visibility' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-white font-semibold text-sm uppercase tracking-wider mb-4">Who can watch this stream?</h3>
-                <div className="space-y-3">
-                  {([
-                    { value: 'public' as const, label: 'Public', desc: 'Anyone can watch your stream', icon: Globe },
-                    { value: 'unlisted' as const, label: 'Unlisted', desc: 'Only people with the link can watch', icon: Link },
-                    { value: 'private' as const, label: 'Private', desc: 'Only club members can watch', icon: Lock },
-                  ]).map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => updateWizardData({ visibility: option.value })}
-                      className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all duration-200 text-left ${
-                        wizardData.visibility === option.value
-                          ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/20'
-                          : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50 hover:border-slate-600/50'
-                      } backdrop-blur-sm`}
-                    >
-                      <div className={`p-2.5 rounded-xl ${
-                        wizardData.visibility === option.value
-                          ? 'bg-cyan-500/20 text-cyan-400'
-                          : 'bg-slate-700/50 text-slate-400'
-                      }`}>
-                        <option.icon className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-white font-medium">{option.label}</div>
-                        <div className="text-slate-400 text-sm">{option.desc}</div>
-                      </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                        wizardData.visibility === option.value
-                          ? 'border-cyan-500 bg-cyan-500'
-                          : 'border-slate-500'
-                      }`}>
-                        {wizardData.visibility === option.value && (
-                          <Check className="w-3 h-3 text-white" />
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-5">
-                <div className="flex items-center gap-3 mb-2">
-                  <Users className="w-4 h-4 text-slate-400" />
-                  <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Audience</h3>
-                </div>
-                <p className="text-slate-400 text-sm mb-4">Is this stream made for kids?</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateWizardData({ madeForKids: true })}
-                    className={`py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 border ${
-                      wizardData.madeForKids === true
-                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 ring-1 ring-cyan-500/30'
-                        : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
-                    }`}
-                  >
-                    Yes, for kids
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateWizardData({ madeForKids: false })}
-                    className={`py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 border ${
-                      wizardData.madeForKids === false
-                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 ring-1 ring-cyan-500/30'
-                        : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
-                    }`}
-                  >
-                    No, not for kids
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
@@ -925,19 +701,12 @@ export function LivestreamSetupWizard({
                   )}
 
                   <div className="flex justify-between py-3 border-b border-slate-700/30">
-                    <span className="text-slate-400">Visibility</span>
-                    <span className="text-white font-medium capitalize">{wizardData.visibility}</span>
-                  </div>
-
-                  <div className="flex justify-between py-3 border-b border-slate-700/30">
-                    <span className="text-slate-400">Chat</span>
-                    <span className={`font-medium ${wizardData.enableChat ? 'text-cyan-400' : 'text-slate-500'}`}>
-                      {wizardData.enableChat ? 'Enabled' : 'Disabled'}
-                    </span>
+                    <span className="text-slate-400">Platform</span>
+                    <span className="text-white font-medium">Cloudflare Stream (WHIP)</span>
                   </div>
 
                   <div className="flex justify-between py-3">
-                    <span className="text-slate-400">Leaderboard</span>
+                    <span className="text-slate-400">Leaderboard Overlay</span>
                     <span className={`font-medium ${wizardData.enableLeaderboard ? 'text-cyan-400' : 'text-slate-500'}`}>
                       {wizardData.enableLeaderboard ? 'Enabled' : 'Disabled'}
                     </span>
@@ -969,7 +738,7 @@ export function LivestreamSetupWizard({
           {currentStep !== 'review' ? (
             <button
               onClick={handleNext}
-              disabled={currentStep === 'details' && (!wizardData.title || !wizardData.eventId)}
+              disabled={currentStep === 'details' && !wizardData.title}
               className="btn-primary-green flex items-center space-x-2 px-6 py-2.5 from-cyan-600 to-blue-600 text-white rounded-xl hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30"
             >
               <span>Next</span>
@@ -978,7 +747,7 @@ export function LivestreamSetupWizard({
           ) : (
             <button
               onClick={handleComplete}
-              disabled={loading || !wizardData.title || !wizardData.eventId}
+              disabled={loading || !wizardData.title}
               className="btn-primary-green flex items-center space-x-2 px-6 py-2.5 text-white rounded-xl disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg"
             >
               <Check className="w-4 h-4" />

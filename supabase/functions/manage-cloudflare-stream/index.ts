@@ -43,25 +43,34 @@ Deno.serve(async (req: Request) => {
 
     const { action, clubId, sessionData } = await req.json();
 
-    const { data: integration } = await supabaseClient
+    // Use service role client to query platform-level integrations (club_id IS NULL)
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Look up platform-level Cloudflare credentials (shared AlfiePRO account)
+    const { data: platformIntegration } = await serviceClient
       .from("integrations")
       .select("credentials")
-      .eq("club_id", clubId)
+      .is("club_id", null)
+      .is("state_association_id", null)
+      .is("national_association_id", null)
       .eq("platform", "cloudflare_stream")
       .eq("is_active", true)
       .maybeSingle();
 
-    if (!integration?.credentials) {
+    if (!platformIntegration?.credentials) {
       return new Response(
         JSON.stringify({
-          error: "Cloudflare Stream not configured",
-          hint: "Please add your Cloudflare account ID and API token in Settings > Integrations"
+          error: "Cloudflare Stream not configured at platform level",
+          hint: "A super admin needs to configure Cloudflare Stream credentials in the platform integrations"
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const credentials = integration.credentials as CloudflareCredentials;
+    const credentials = platformIntegration.credentials as CloudflareCredentials;
 
     switch (action) {
       case "createLiveInput":
