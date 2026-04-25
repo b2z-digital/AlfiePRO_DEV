@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Award, ChevronLeft, RotateCcw, CreditCard as Edit3, Check, History, Zap, TrendingUp, TrendingDown } from 'lucide-react';
+import { X, Award, ChevronLeft, RotateCcw, CreditCard as Edit3, Check, History, Zap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Skipper, RaceResult } from '../../types';
 import { RaceEvent } from '../../types/race';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -433,7 +433,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30"
+              className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[9995]"
             />
 
             <motion.div
@@ -441,7 +441,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`fixed right-0 top-0 bottom-0 w-[480px] max-w-[95vw] shadow-2xl z-40 flex flex-col ${
+              className={`fixed right-0 top-0 bottom-0 w-[480px] max-w-[95vw] shadow-2xl z-[9996] flex flex-col ${
                 darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'
               }`}
             >
@@ -667,17 +667,21 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                                       className="group flex items-center gap-1.5 transition-colors"
                                     >
                                       {handicap.change !== 0 && (
-                                        handicap.change < 0 ? (
+                                        <div className="flex flex-col items-end mr-1">
                                           <div className="flex items-center gap-0.5">
-                                            <TrendingUp size={14} className="text-green-400" />
-                                            <span className="text-[10px] font-medium text-green-400">{handicap.change}s</span>
+                                            {handicap.change < 0 ? (
+                                              <ArrowUpRight size={12} strokeWidth={2.5} className="text-green-400" />
+                                            ) : (
+                                              <ArrowDownRight size={12} strokeWidth={2.5} className="text-red-400" />
+                                            )}
+                                            <span className={`text-[10px] font-semibold ${handicap.change < 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                              {handicap.change < 0 ? handicap.change : `+${handicap.change}`}s
+                                            </span>
                                           </div>
-                                        ) : (
-                                          <div className="flex items-center gap-0.5">
-                                            <TrendingDown size={14} className="text-red-400" />
-                                            <span className="text-[10px] font-medium text-red-400">+{handicap.change}s</span>
-                                          </div>
-                                        )
+                                          <span className={`text-[9px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                            was {handicap.previousHandicap}
+                                          </span>
+                                        </div>
                                       )}
                                       <span className="text-xl font-bold text-green-500">{handicap.currentHandicap}</span>
                                       <Edit3 size={14} className={`${darkMode ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-600'} transition-colors`} />
@@ -691,17 +695,21 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                                 ) : (
                                   <div className="flex items-center gap-1.5">
                                     {handicap.change !== 0 && (
-                                      handicap.change < 0 ? (
+                                      <div className="flex flex-col items-end mr-1">
                                         <div className="flex items-center gap-0.5">
-                                          <TrendingUp size={16} className="text-green-400" />
-                                          <span className="text-[10px] font-medium text-green-400">{handicap.change}s</span>
+                                          {handicap.change < 0 ? (
+                                            <ArrowUpRight size={12} strokeWidth={2.5} className="text-green-400" />
+                                          ) : (
+                                            <ArrowDownRight size={12} strokeWidth={2.5} className="text-red-400" />
+                                          )}
+                                          <span className={`text-[10px] font-semibold ${handicap.change < 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            {handicap.change < 0 ? handicap.change : `+${handicap.change}`}s
+                                          </span>
                                         </div>
-                                      ) : (
-                                        <div className="flex items-center gap-0.5">
-                                          <TrendingDown size={16} className="text-red-400" />
-                                          <span className="text-[10px] font-medium text-red-400">+{handicap.change}s</span>
-                                        </div>
-                                      )
+                                        <span className={`text-[9px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                          was {handicap.previousHandicap}
+                                        </span>
+                                      </div>
                                     )}
                                     <span className="text-xl font-bold text-green-500">{handicap.currentHandicap}</span>
                                   </div>
