@@ -15,6 +15,7 @@ import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import type { ObserverAssignment } from '../utils/observerUtils';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
+import { LiveStatusControl } from './LiveStatusControl';
 
 
 interface TouchModeScoringProps {
@@ -188,7 +189,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
   useEffect(() => {
     const autoUpdateRaceStatus = async () => {
-      if (!currentEvent?.id || !currentEvent?.enableLiveTracking) return;
+      if (!currentEvent?.id || !(currentEvent?.enableLiveTracking || currentEvent?.enableLiveStream)) return;
 
       const { getRaceStatus, updateRaceStatus } = await import('../utils/liveTrackingStorage');
 
@@ -948,8 +949,11 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
               }`}
             >
               <Timer size={16} />
-              Starter Console
+              StartBox
             </button>
+          )}
+          {currentEvent?.id && (currentEvent?.enableLiveTracking || currentEvent?.enableLiveStream) && !currentEvent?.completed && (
+            <LiveStatusControl eventId={currentEvent.id} darkMode={darkMode} />
           )}
         </div>
 

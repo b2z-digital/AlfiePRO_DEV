@@ -1255,7 +1255,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
                       : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
                 } px-3 py-2`}
-                title="Starter Console"
+                title="StartBox"
               >
                 <Timer size={22} />
               </button>

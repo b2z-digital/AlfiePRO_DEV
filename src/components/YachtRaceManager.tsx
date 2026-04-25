@@ -3352,36 +3352,35 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               </div>
             )}
 
-            {/* Race Status Control - Show for non-heat events with live tracking or livestream enabled */}
-            {(() => {
-              if (heatManagement?.configuration.enabled) return null;
-              const evt = getCurrentEvent();
-              if (!evt?.id || (!evt.enableLiveTracking && !evt.enableLiveStream) || evt.completed) return null;
-              return (
-                <div className="mb-4">
-                  <LiveStatusControl eventId={evt.id} darkMode={darkMode} />
-                </div>
-              );
-            })()}
-
             {/* Scoring Mode Buttons - Only show for non-heat races, hide when scratch spreadsheet uses HMS component */}
             {!heatManagement?.configuration.enabled && !(scoringMode === 'spreadsheet' && raceType === 'scratch') && (
-              <div className="flex justify-end mb-4 gap-2">
-                {scoringMode === 'pro' && (
-                  <button
-                    onClick={() => setShowStartBoxModal(true)}
-                    className={`
-                      flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-                      ${darkMode
-                        ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
-                        : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'}
-                    `}
-                    title="Open StartBox"
-                  >
-                    <Timer size={18} />
-                    <span className="text-sm font-medium">StartBox</span>
-                  </button>
-                )}
+              <div className="flex justify-between items-center mb-4">
+                {/* Left side: StartBox + Race Status (Pro Mode only) */}
+                <div className="flex items-center gap-2">
+                  {scoringMode === 'pro' && (
+                    <button
+                      onClick={() => setShowStartBoxModal(true)}
+                      className={`
+                        flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+                        ${darkMode
+                          ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
+                          : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'}
+                      `}
+                      title="Open StartBox"
+                    >
+                      <Timer size={18} />
+                      <span className="text-sm font-medium">StartBox</span>
+                    </button>
+                  )}
+                  {scoringMode === 'pro' && (() => {
+                    const evt = getCurrentEvent();
+                    if (!evt?.id || (!evt.enableLiveTracking && !evt.enableLiveStream) || evt.completed) return null;
+                    return <LiveStatusControl eventId={evt.id} darkMode={darkMode} />;
+                  })()}
+                </div>
+
+                {/* Right side: mode switchers */}
+                <div className="flex items-center gap-2">
                 {(['pro', 'touch', 'spreadsheet'] as const).filter(m => m !== scoringMode).filter(m => !(raceType === 'handicap' && m === 'spreadsheet')).map(mode => (
                   <button
                     key={mode}
@@ -3423,6 +3422,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                     <span className="text-sm font-medium">Overall Results</span>
                   </button>
                 )}
+                </div>
               </div>
             )}
 
