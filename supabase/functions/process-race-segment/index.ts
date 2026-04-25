@@ -553,7 +553,9 @@ Deno.serve(async (req: Request) => {
       })
       .eq("id", segmentId);
 
-    await serviceClient.from("livestream_archives").insert({
+    // Create a per-race archive for this segment (each race gets its own archive entry)
+    console.log(`[Segment] Creating per-race archive for: ${segment.segment_title}`);
+    const { data: newArchive } = await serviceClient.from("livestream_archives").insert({
       session_id: segment.session_id,
       club_id: segment.club_id,
       title: segment.segment_title,
@@ -566,7 +568,19 @@ Deno.serve(async (req: Request) => {
       recorded_at: segment.segment_start_time,
       is_public: true,
       duration,
-    });
+    }).select("id").maybeSingle();
+
+    // If there was a session-level placeholder archive with source 'local', remove it
+    // since the per-race archives now replace it
+    if (newArchive) {
+      await serviceClient
+        .from("livestream_archives")
+        .delete()
+        .eq("session_id", segment.session_id)
+        .eq("club_id", segment.club_id)
+        .eq("source", "local")
+        .neq("id", newArchive.id);
+    }
 
     // Cleanup: delete Cloudflare video if we used one, delete local recording from storage
     if (cfVideoId) {

@@ -71,6 +71,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const [segmentProcessing, setSegmentProcessing] = useState(false);
   const segmentTransitionRef = useRef(false);
   const pendingSegmentStartRef = useRef(false);
+  const lastCompletedRaceRef = useRef<number | null>(null);
   const [showTitleCard, setShowTitleCard] = useState(false);
   const [titleCardTrigger, setTitleCardTrigger] = useState(0);
   const whipHealthRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -105,8 +106,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     sourceStream: activePreviewStream || mediaStream,
     enabled: activeSession?.enable_overlays === true &&
              (streamStatus === 'testing' || streamStatus === 'live' || streamStatus === 'connecting'),
-    width: 1280,
-    height: 720,
+    width: 1920,
+    height: 1080,
     overlayCaptureFps: 2,
     frameRate: 30,
   });
@@ -430,6 +431,59 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     return unsubscribe;
   }, [activeSession?.event_id, streamStatus, autoSegmentEnabled]);
 
+  // Fallback: watch quick_races.last_completed_race for race scoring events.
+  // This triggers segment splits even if the race officer doesn't update live_tracking_events.
+  useEffect(() => {
+    if (!activeSession?.event_id || streamStatus !== 'live' || !autoSegmentEnabled) return;
+
+    const eventId = activeSession.event_id;
+    const isSeriesRound = eventId.includes('-') && eventId.split('-').length > 5;
+    if (isSeriesRound) return;
+
+    const channel = supabase
+      .channel(`race_scoring_${eventId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'quick_races',
+          filter: `id=eq.${eventId}`,
+        },
+        async (payload) => {
+          const newData = payload.new as any;
+          const newCompleted = newData.last_completed_race;
+          if (typeof newCompleted !== 'number' || newCompleted < 1) return;
+
+          const prev = lastCompletedRaceRef.current;
+          if (prev !== null && newCompleted > prev && !segmentTransitionRef.current) {
+            console.log(`[Segment] Race ${newCompleted} scored (was ${prev}). Stopping segment recording.`);
+            lastCompletedRaceRef.current = newCompleted;
+            await handleSegmentStop('race_scored', false);
+            // Do NOT auto-start next segment -- wait for 'live' status from subscribeToRaceStatus
+          } else if (prev === null) {
+            lastCompletedRaceRef.current = newCompleted;
+          }
+        }
+      )
+      .subscribe();
+
+    supabase
+      .from('quick_races')
+      .select('last_completed_race')
+      .eq('id', eventId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.last_completed_race != null) {
+          lastCompletedRaceRef.current = data.last_completed_race;
+        } else {
+          lastCompletedRaceRef.current = 0;
+        }
+      });
+
+    return () => { supabase.removeChannel(channel); };
+  }, [activeSession?.event_id, streamStatus, autoSegmentEnabled]);
+
   const buildSegmentTitle = (raceNumber: number) => {
     const eventTitle = activeSession?.title || 'Race';
     const heatNum = activeSession?.heat_number;
@@ -446,11 +500,12 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
     try {
       const segmentToFinalize = currentSegment;
+      // Stop local recording only -- WHIP live broadcast stays connected
       const recordingBlob = await stopLocalRecording();
 
       if (segmentToFinalize) {
         await livestreamStorage.finalizeSegment(segmentToFinalize.id, triggerType);
-        addNotification('info', `Race ${segmentToFinalize.race_number} recording saved. Processing upload...`, 4000);
+        addNotification('info', `Race ${segmentToFinalize.race_number} recording saved. Uploading to YouTube...`, 4000);
 
         if (recordingBlob && recordingBlob.size > 10000) {
           uploadLocalRecording(recordingBlob, segmentToFinalize.id, activeSession.club_id).then(() => {
@@ -465,20 +520,18 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         }
       }
 
-      await stopWhipStreaming();
-      await new Promise(r => setTimeout(r, 1000));
       setCurrentSegment(null);
 
       if (isFinalSegment) {
-        addNotification('success', 'Final race segment saved. Recordings will be uploaded to YouTube.', 5000);
+        addNotification('success', 'Final race recording saved. Videos will be uploaded to YouTube.', 5000);
       } else {
         setIsPaused(true);
         await livestreamStorage.updateSession(activeSession.id, { is_paused: true });
-        addNotification('info', 'Recording paused between races. Will resume when next race starts.', 5000);
+        addNotification('info', 'Race recording paused. Live broadcast continues. Recording will resume when next race starts.', 5000);
       }
     } catch (error) {
       console.error('[Segment] Stop error:', error);
-      addNotification('error', 'Failed to save segment. Stream may need manual restart.', 8000);
+      addNotification('error', 'Failed to save segment recording.', 8000);
     } finally {
       segmentTransitionRef.current = false;
       setSegmentProcessing(false);
@@ -493,16 +546,12 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
   const handleSegmentStart = async () => {
     if (!activeSession || segmentTransitionRef.current) return;
-    if (whipPeerConnectionRef.current?.connectionState === 'connected') return;
 
     segmentTransitionRef.current = true;
     setSegmentProcessing(true);
 
     try {
-      if (!activeSession.cloudflare_whip_url) {
-        addNotification('error', 'No Cloudflare WHIP URL available', 5000);
-        return;
-      }
+      const whipAlreadyConnected = whipPeerConnectionRef.current?.connectionState === 'connected';
 
       let rawStream = activePreviewStream || mediaStream;
       if (!rawStream || rawStream.getVideoTracks().filter(t => t.readyState === 'live').length === 0) {
@@ -514,39 +563,48 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         rawStream = freshStream;
       }
 
-      if (activeSession.cloudflare_live_input_id) {
-        try {
-          const { data: { session: authSession } } = await supabase.auth.getSession();
-          if (authSession) {
-            await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${authSession.access_token}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'ensureRecording',
-                clubId: activeSession.club_id,
-                sessionData: { liveInputId: activeSession.cloudflare_live_input_id },
-              }),
-            });
-          }
-        } catch (e) { console.warn('[Segment] Could not verify recording mode:', e); }
-      }
-
       let streamToSend = rawStream;
       const cs = compositedStreamRef.current;
       if (cs && cs.getVideoTracks().some(t => t.readyState === 'live' && t.enabled)) {
         streamToSend = cs;
       }
 
-      let whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
-      if (!whipSuccess) {
-        console.warn('[Segment] First WHIP attempt failed, retrying after 2s...');
-        await new Promise(r => setTimeout(r, 2000));
-        whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
-      }
+      if (!whipAlreadyConnected) {
+        if (!activeSession.cloudflare_whip_url) {
+          addNotification('error', 'No Cloudflare WHIP URL available', 5000);
+          return;
+        }
 
-      if (!whipSuccess) {
-        addNotification('error', 'Failed to start recording for new race. Try resuming manually.', 8000);
-        return;
+        if (activeSession.cloudflare_live_input_id) {
+          try {
+            const { data: { session: authSession } } = await supabase.auth.getSession();
+            if (authSession) {
+              await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authSession.access_token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'ensureRecording',
+                  clubId: activeSession.club_id,
+                  sessionData: { liveInputId: activeSession.cloudflare_live_input_id },
+                }),
+              });
+            }
+          } catch (e) { console.warn('[Segment] Could not verify recording mode:', e); }
+        }
+
+        let whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
+        if (!whipSuccess) {
+          console.warn('[Segment] First WHIP attempt failed, retrying after 2s...');
+          await new Promise(r => setTimeout(r, 2000));
+          whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
+        }
+
+        if (!whipSuccess) {
+          addNotification('error', 'Failed to start live broadcast for new race. Try resuming manually.', 8000);
+          return;
+        }
+      } else {
+        console.log('[Segment] WHIP already connected, starting local recording only');
       }
 
       startLocalRecording(streamToSend);
@@ -833,7 +891,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
           ? 'video/webm;codecs=vp8,opus'
           : 'video/webm';
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 2500000 });
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
       recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunksRef.current.push(e.data); };
       recorder.start(2000);
       mediaRecorderRef.current = recorder;
@@ -1232,31 +1290,36 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       await livestreamStorage.updateSession(activeSession.id, { status: 'ended', end_time: new Date().toISOString(), is_paused: false });
       setStreamStatus('offline');
 
-      try {
-        const archiveData: Record<string, unknown> = {
-          session_id: activeSession.id,
-          club_id: activeSession.club_id,
-          title: activeSession.title,
-          description: activeSession.description,
-          event_id: activeSession.event_id || null,
-          heat_number: activeSession.heat_number || null,
-          recorded_at: activeSession.actual_start_time || activeSession.created_at,
-          is_public: activeSession.is_public,
-        };
+      // Only create a session-level archive if no segments were used.
+      // When auto-segmentation is active, each race segment gets its own archive
+      // via the process-race-segment edge function.
+      if (segmentCount === 0) {
+        try {
+          const archiveData: Record<string, unknown> = {
+            session_id: activeSession.id,
+            club_id: activeSession.club_id,
+            title: activeSession.title,
+            description: activeSession.description,
+            event_id: activeSession.event_id || null,
+            heat_number: activeSession.heat_number || null,
+            recorded_at: activeSession.actual_start_time || activeSession.created_at,
+            is_public: activeSession.is_public,
+          };
 
-        if (localStoragePath) {
-          archiveData.source = 'local';
-          archiveData.storage_path = localStoragePath;
-        } else if (activeSession.cloudflare_live_input_id && activeSession.cloudflare_customer_code) {
-          archiveData.source = 'cloudflare';
-          archiveData.cloudflare_video_id = activeSession.cloudflare_live_input_id;
-          archiveData.cloudflare_customer_code = activeSession.cloudflare_customer_code;
-          archiveData.cloudflare_playback_url = `https://customer-${activeSession.cloudflare_customer_code}.cloudflarestream.com/${activeSession.cloudflare_live_input_id}/iframe`;
+          if (localStoragePath) {
+            archiveData.source = 'local';
+            archiveData.storage_path = localStoragePath;
+          } else if (activeSession.cloudflare_live_input_id && activeSession.cloudflare_customer_code) {
+            archiveData.source = 'cloudflare';
+            archiveData.cloudflare_video_id = activeSession.cloudflare_live_input_id;
+            archiveData.cloudflare_customer_code = activeSession.cloudflare_customer_code;
+            archiveData.cloudflare_playback_url = `https://customer-${activeSession.cloudflare_customer_code}.cloudflarestream.com/${activeSession.cloudflare_live_input_id}/iframe`;
+          }
+
+          await supabase.from('livestream_archives').insert(archiveData);
+        } catch (archiveErr) {
+          console.error('Error creating archive record:', archiveErr);
         }
-
-        await supabase.from('livestream_archives').insert(archiveData);
-      } catch (archiveErr) {
-        console.error('Error creating archive record:', archiveErr);
       }
 
       addNotification('success', 'Stream ended. Recording saved to replays.', 3000);
@@ -1654,7 +1717,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               <video ref={(el) => { (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el; setVideoElReady(el); }} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
 
               {activeSession.enable_overlays && streamStatus !== 'offline' && (
-                <LivestreamOverlayRenderer ref={(el: HTMLDivElement | null) => { (overlayRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setOverlayElReady(el); }} session={activeSession} showTitleCard={showTitleCard} titleCardTrigger={titleCardTrigger} />
+                <LivestreamOverlayRenderer ref={(el: HTMLDivElement | null) => { (overlayRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setOverlayElReady(el); }} session={activeSession} showTitleCard={showTitleCard} titleCardTrigger={titleCardTrigger} venueImage={(activeSession as SessionWithVenue).venueImage} venueName={(activeSession as SessionWithVenue).venueName} />
               )}
 
               {isPaused && streamStatus === 'live' && (

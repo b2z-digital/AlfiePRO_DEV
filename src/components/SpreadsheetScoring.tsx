@@ -8,6 +8,7 @@ import { LetterScoreSelector } from './LetterScoreSelector';
 import { HeatOverallResultsModal } from './HeatOverallResultsModal';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
+import { LiveStatusControl } from './LiveStatusControl';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 
 interface SpreadsheetScoringProps {
@@ -634,8 +635,11 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
               }`}
             >
               <Timer size={16} />
-              <span className="hidden sm:inline">Starter Console</span>
+              <span className="hidden sm:inline">StartBox</span>
             </button>
+            {currentEvent?.id && (currentEvent?.enableLiveTracking || currentEvent?.enableLiveStream) && !currentEvent?.completed && (
+              <LiveStatusControl eventId={currentEvent.id} darkMode={darkMode} />
+            )}
           </div>
 
           <div className="flex items-center gap-3">
