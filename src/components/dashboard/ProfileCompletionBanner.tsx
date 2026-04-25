@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Phone, Heart, Sailboat, ChevronRight, X, Camera, CircleCheck as CheckCircle2, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { supabase } from '../../utils/supabase';
 import { useNavigate } from 'react-router-dom';
 
@@ -84,10 +85,65 @@ const CircularProgress: React.FC<{ percentage: number }> = ({ percentage }) => {
 
 export const ProfileCompletionBanner: React.FC = () => {
   const { user, currentClub } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
   const navigate = useNavigate();
   const [profileData, setProfileData] = useState<ProfileCompleteness | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const checkProfileCompletenessForMember = useCallback(async (memberId: string) => {
+    const { data: member, error: memberError } = await supabase
+      .from('members')
+      .select('id, club_id, first_name, last_name, email, phone, street, city, state, postcode, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, avatar_url, membership_status')
+      .eq('id', memberId)
+      .maybeSingle();
+
+    if (memberError || !member) return null;
+
+    const { data: club } = await supabase
+      .from('clubs')
+      .select('name')
+      .eq('id', member.club_id)
+      .maybeSingle();
+
+    const { count: boatCount } = await supabase
+      .from('member_boats')
+      .select('id', { count: 'exact', head: true })
+      .eq('member_id', member.id);
+
+    const missingFields: string[] = [];
+    if (!member.avatar_url || member.avatar_url.trim() === '') missingFields.push('avatar');
+    if (!member.phone || member.phone.trim() === '') missingFields.push('phone');
+    if (!member.street || member.street.trim() === '') missingFields.push('address');
+    if (!member.emergency_contact_name || member.emergency_contact_name.trim() === '') missingFields.push('emergency_contact');
+    const hasBoats = (boatCount || 0) > 0;
+    if (!hasBoats) missingFields.push('boats');
+
+    if (missingFields.length === 0) return null;
+
+    return {
+      needs_completion: true,
+      member_id: member.id,
+      club_id: member.club_id,
+      club_name: club?.name || '',
+      missing_fields: missingFields,
+      has_boats: hasBoats,
+      current_data: {
+        first_name: member.first_name,
+        last_name: member.last_name,
+        email: member.email,
+        phone: member.phone,
+        street: member.street,
+        city: member.city,
+        state: member.state,
+        postcode: member.postcode,
+        emergency_contact_name: member.emergency_contact_name,
+        emergency_contact_phone: member.emergency_contact_phone,
+        emergency_contact_relationship: member.emergency_contact_relationship,
+        avatar_url: member.avatar_url,
+      },
+    } as ProfileCompleteness;
+  }, []);
 
   const checkProfileCompleteness = useCallback(async () => {
     if (!user) {
@@ -96,26 +152,32 @@ export const ProfileCompletionBanner: React.FC = () => {
     }
 
     try {
-      const dismissedKey = `profile_completion_dismissed_${user.id}`;
+      const effectiveId = isImpersonating ? impersonationSession?.targetMemberId : user.id;
+      const dismissedKey = `profile_completion_dismissed_${effectiveId}`;
       if (localStorage.getItem(dismissedKey) === 'true') {
         setDismissed(true);
         setLoading(false);
         return;
       }
 
-      const { data } = await supabase.rpc('check_member_profile_completeness');
-      if (data?.success) {
-        if (data.needs_completion) {
-          setProfileData(data);
-        } else {
-          setProfileData(null);
+      if (isImpersonating && impersonationSession?.targetMemberId) {
+        const result = await checkProfileCompletenessForMember(impersonationSession.targetMemberId);
+        setProfileData(result);
+      } else {
+        const { data } = await supabase.rpc('check_member_profile_completeness');
+        if (data?.success) {
+          if (data.needs_completion) {
+            setProfileData(data);
+          } else {
+            setProfileData(null);
+          }
         }
       }
     } catch (err) {
       console.error('Error checking profile completeness:', err);
     }
     setLoading(false);
-  }, [user]);
+  }, [user, isImpersonating, impersonationSession?.targetMemberId, checkProfileCompletenessForMember]);
 
   useEffect(() => {
     checkProfileCompleteness();
@@ -141,8 +203,9 @@ export const ProfileCompletionBanner: React.FC = () => {
   }, [checkProfileCompleteness]);
 
   const handleDismiss = () => {
-    if (user) {
-      localStorage.setItem(`profile_completion_dismissed_${user.id}`, 'true');
+    const effectiveId = isImpersonating ? impersonationSession?.targetMemberId : user?.id;
+    if (effectiveId) {
+      localStorage.setItem(`profile_completion_dismissed_${effectiveId}`, 'true');
     }
     setDismissed(true);
   };
