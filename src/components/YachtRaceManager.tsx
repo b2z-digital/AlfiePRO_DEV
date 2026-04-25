@@ -349,11 +349,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     currentDropRules,
   ]);
 
-  // Load user's scoring mode preference (simulated events default to touch)
+  // Load user's scoring mode preference (simulated/handicap events default to touch)
   useEffect(() => {
     const loadScoringModePreference = async () => {
       const currentEvent = getCurrentEvent();
-      if (currentEvent?.is_simulated) {
+      if (currentEvent?.is_simulated || currentEvent?.raceFormat === 'handicap') {
         setScoringMode('touch');
         return;
       }
@@ -417,7 +417,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       console.log('🏁 YachtRaceManager: event.dayResults:', Object.keys(currentEvent.dayResults || {}));
       setRaceType(currentEvent.raceFormat);
 
-      if (currentEvent.is_simulated) {
+      if (currentEvent.is_simulated || currentEvent.raceFormat === 'handicap') {
         setScoringMode('touch');
       }
 
@@ -1105,6 +1105,19 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     }
   }, [raceResults, skippers, capLimit, lastPlaceBonus, raceType, heatManagement]);
 
+  // When all handicaps are zeroed before any race (Scratch Start), clear originalHandicaps
+  // so old stored handicaps don't interfere with seeding race logic
+  useEffect(() => {
+    if (lastCompletedRace === 0 && raceType === 'handicap' && skippers.length > 0) {
+      const allZero = skippers.every(s => s.startHcap === 0 || s.startHcap === undefined);
+      if (allZero && Object.keys(originalHandicaps).length > 0) {
+        setOriginalHandicaps({});
+        setHasDeterminedInitialHcaps(false);
+        setIsManualHandicaps(false);
+      }
+    }
+  }, [skippers, lastCompletedRace, raceType]);
+
   const startNewSession = () => {
     setRaceResults([]);
     setEditingRace(null);
@@ -1112,6 +1125,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     setLastCompletedRace(0);
     setHasDeterminedInitialHcaps(false);
     setIsManualHandicaps(false);
+    setOriginalHandicaps({});
     setError(null);
 
     // If heat management is enabled, reset it but preserve the configuration
@@ -1206,7 +1220,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const enableManualHandicaps = () => {
     setIsManualHandicaps(true);
     setHasDeterminedInitialHcaps(false);
-    
+    setOriginalHandicaps({});
+
     const newSkippers = skippers.map(skipper => ({
       ...skipper,
       startHcap: 0
@@ -1935,16 +1950,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       return skipper;
     });
 
-    // If clearing R1, also restore original handicaps
-    if (race === 1 && Object.keys(originalHandicaps).length > 0) {
-      console.log('Restoring original handicaps after clearing R1:', originalHandicaps);
-      const skipperWithRestoredHcaps = newSkippers.map((skipper, idx) => ({
-        ...skipper,
-        startHcap: originalHandicaps[idx] !== undefined ? originalHandicaps[idx] : skipper.startHcap
-      }));
-      setSkippers(skipperWithRestoredHcaps);
-    } else {
-      setSkippers(newSkippers);
+    setSkippers(newSkippers);
+
+    // If clearing R1, reset handicap determination so seeding race logic works again
+    if (race === 1) {
+      setHasDeterminedInitialHcaps(false);
+      setIsManualHandicaps(false);
+      setOriginalHandicaps({});
     }
 
     // If clearing any race, update lastCompletedRace to the race before the one being cleared
@@ -3943,14 +3955,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setRaceResults([]);
             setLastCompletedRace(0);
 
-            // Restore original handicaps and clear withdrawal flags
-            console.log('Restoring original handicaps and clearing withdrawals after clearing all results');
-            const newSkippers = skippers.map((skipper, idx) => ({
+            // Clear withdrawal flags but keep current handicap values as-is
+            const newSkippers = skippers.map((skipper) => ({
               ...skipper,
-              startHcap: originalHandicaps[idx] !== undefined ? originalHandicaps[idx] : skipper.startHcap,
-              withdrawnFromRace: undefined // Clear withdrawal flag when clearing results
+              withdrawnFromRace: undefined
             }));
             setSkippers(newSkippers);
+
+            // Clear original handicaps so they don't get restored later
+            setOriginalHandicaps({});
 
             // Reset handicap determination flags so seeding race logic will work again
             setHasDeterminedInitialHcaps(false);
