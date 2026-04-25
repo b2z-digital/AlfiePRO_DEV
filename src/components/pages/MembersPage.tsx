@@ -56,6 +56,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [memberToArchive, setMemberToArchive] = useState<Member | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [selectedInviteStatus, setSelectedInviteStatus] = useState<string>('all');
   const [showInviteConfirmModal, setShowInviteConfirmModal] = useState(false);
   const [memberToInvite, setMemberToInvite] = useState<Member | null>(null);
   const [memberRemittanceStatus, setMemberRemittanceStatus] = useState<Record<string, 'paid' | 'pending' | 'none'>>({});
@@ -511,7 +512,24 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       return matchesSearch;
     });
 
-    // Step 3: Sort by name
+    // Step 4: Apply invite status filter
+    if (selectedInviteStatus !== 'all') {
+      filtered = filtered.filter(member => {
+        const hasUserId = !!member.user_id;
+        const activationStatus = member.activation_status;
+        const invitation = memberInvitations[member.id];
+
+        if (selectedInviteStatus === 'connected') return hasUserId && activationStatus === 'activated';
+        if (selectedInviteStatus === 'awaiting_setup') return hasUserId && activationStatus === 'pending';
+        if (selectedInviteStatus === 'linked') return hasUserId && activationStatus !== 'activated' && activationStatus !== 'pending';
+        if (selectedInviteStatus === 'invite_sent') return !hasUserId && (invitation?.status === 'pending' || activationStatus === 'pending');
+        if (selectedInviteStatus === 'not_invited') return !hasUserId && member.email && !invitation && activationStatus !== 'pending';
+        if (selectedInviteStatus === 'no_email') return !member.email;
+        return true;
+      });
+    }
+
+    // Step 5: Sort by name
     return filtered.sort((a, b) => {
       const lastNameCompare = (a.last_name || '').localeCompare(b.last_name || '');
       if (lastNameCompare !== 0) {
@@ -1010,6 +1028,20 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                 <Search size={18} />
               </button>
             )}
+
+            {/* Invite Status Filter */}
+            <select
+              value={selectedInviteStatus}
+              onChange={(e) => setSelectedInviteStatus(e.target.value)}
+              className="px-3 py-2 bg-slate-700 border border-slate-600 text-slate-200 rounded-lg text-sm hover:bg-slate-600 transition-colors"
+            >
+              <option value="all">All Invite Status</option>
+              <option value="connected">Connected</option>
+              <option value="awaiting_setup">Awaiting Setup</option>
+              <option value="invite_sent">Invite Sent</option>
+              <option value="not_invited">Not Invited</option>
+              <option value="no_email">No Email</option>
+            </select>
 
             {/* Map View Button */}
             <button
