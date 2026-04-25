@@ -731,8 +731,9 @@ async function getRecordings(
 
   console.log("[CF Stream] Getting recordings for live input:", liveInputId);
 
+  // Use the live-input-specific videos endpoint (correct API)
   const response = await fetch(
-    `${CF_API_BASE}/accounts/${credentials.account_id}/stream?search=${liveInputId}&type=live`,
+    `${CF_API_BASE}/accounts/${credentials.account_id}/stream/live_inputs/${liveInputId}/videos`,
     {
       method: "GET",
       headers: {
@@ -765,7 +766,7 @@ async function getRecordings(
     liveInput: video.liveInput,
   }));
 
-  console.log("[CF Stream] Found", recordings.length, "recordings");
+  console.log("[CF Stream] Found", recordings.length, "recordings for live input", liveInputId);
 
   return new Response(
     JSON.stringify({ success: true, recordings }),

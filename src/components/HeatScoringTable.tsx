@@ -10,7 +10,7 @@ import { HeatAssignmentModal } from './HeatAssignmentModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
-import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 as Grid3X3, Check, Timer } from 'lucide-react';
+import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 as Grid3X3, Check, Timer, Share2 } from 'lucide-react';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
@@ -21,6 +21,7 @@ import { supabase } from '../utils/supabase';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import { SHRSOverallResultsView } from './SHRSOverallResultsView';
 import { HmsScoreSheet } from './HmsScoreSheet';
+import { ShareRollCallModal } from './ShareRollCallModal';
 
 interface HeatScoringTableProps {
   skippers: Skipper[];
@@ -192,6 +193,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [rollCallAbsent, setRollCallAbsent] = useState<Set<number>>(new Set());
   const [showStartBoxModal, setShowStartBoxModal] = useState(false);
   const [raceTimerRunning, setRaceTimerRunning] = useState(false);
+  const [showShareRollCall, setShowShareRollCall] = useState(false);
 
   // Track the round number to detect actual round changes (not just object reference changes)
   const lastRoundNumber = React.useRef<number | null>(null);
@@ -1554,6 +1556,18 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       )}
                     </div>
                     <button
+                      onClick={() => setShowShareRollCall(true)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                        darkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                      }`}
+                      title="Delegate roll call to another device"
+                    >
+                      <Share2 size={12} />
+                      <span className="hidden sm:inline">Share</span>
+                    </button>
+                    <button
                       onClick={() => {
                         setRollCallReady(new Set(racingSkippers));
                         setRollCallAbsent(new Set());
@@ -2143,6 +2157,30 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         onSequenceComplete={() => setRaceTimerRunning(true)}
         clubId={currentEvent?.clubId || null}
         darkMode={darkMode}
+      />
+
+      {/* Share Roll Call Modal */}
+      <ShareRollCallModal
+        isOpen={showShareRollCall}
+        onClose={() => setShowShareRollCall(false)}
+        eventId={currentEvent?.id || ''}
+        clubId={currentEvent?.clubId || ''}
+        currentHeat={selectedHeat || null}
+        currentRound={heatManagement.currentRound}
+        currentRace={lastCompletedRace + 1}
+        darkMode={darkMode}
+        onRollCallUpdate={(data) => {
+          if (data.ready) setRollCallReady(new Set(data.ready));
+          if (data.absent) setRollCallAbsent(new Set(data.absent));
+          if (data.letterScores) {
+            Object.entries(data.letterScores).forEach(([idxStr, score]) => {
+              const skipperIdx = parseInt(idxStr, 10);
+              if (!isNaN(skipperIdx) && score) {
+                updateRaceResults(lastCompletedRace + 1, skipperIdx, null, score as any);
+              }
+            });
+          }
+        }}
       />
     </div>
   );
