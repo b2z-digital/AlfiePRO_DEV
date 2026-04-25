@@ -83,19 +83,20 @@ async function getYouTubeCredentials(
 }
 
 async function getCloudflareCredentials(
-  serviceClient: any,
-  clubId: string
+  serviceClient: any
 ): Promise<CloudflareCredentials> {
   const { data: integration } = await serviceClient
     .from("integrations")
     .select("credentials")
-    .eq("club_id", clubId)
+    .is("club_id", null)
+    .is("state_association_id", null)
+    .is("national_association_id", null)
     .eq("platform", "cloudflare_stream")
     .eq("is_active", true)
     .maybeSingle();
 
   if (!integration?.credentials) {
-    throw new Error("Cloudflare Stream not configured for this club");
+    throw new Error("Cloudflare Stream not configured at platform level");
   }
 
   return integration.credentials as CloudflareCredentials;
@@ -448,7 +449,7 @@ Deno.serve(async (req: Request) => {
       }
     } else {
       console.log("[Segment] No local recording, trying Cloudflare recordings...");
-      const cfCreds = await getCloudflareCredentials(serviceClient, segment.club_id);
+      const cfCreds = await getCloudflareCredentials(serviceClient);
 
       let recording: any;
       if (segment.cloudflare_video_id) {
@@ -570,7 +571,7 @@ Deno.serve(async (req: Request) => {
     // Cleanup: delete Cloudflare video if we used one, delete local recording from storage
     if (cfVideoId) {
       console.log(`[Segment] Cleaning up Cloudflare video: ${cfVideoId}`);
-      const cfCreds = await getCloudflareCredentials(serviceClient, segment.club_id);
+      const cfCreds = await getCloudflareCredentials(serviceClient);
       await deleteCloudflareVideo(cfCreds, cfVideoId);
     }
 
