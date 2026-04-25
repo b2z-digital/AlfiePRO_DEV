@@ -75,6 +75,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const [titleCardTrigger, setTitleCardTrigger] = useState(0);
   const whipHealthRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastBytesSentRef = useRef<number>(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     if (sessionId) {
@@ -443,18 +445,28 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     setSegmentProcessing(true);
 
     try {
-      if (currentSegment) {
-        await livestreamStorage.finalizeSegment(currentSegment.id, triggerType);
-        addNotification('info', `Race ${currentSegment.race_number} recording saved. Processing upload...`, 4000);
+      const segmentToFinalize = currentSegment;
+      const recordingBlob = await stopLocalRecording();
 
-        livestreamStorage.triggerSegmentProcessing(currentSegment.id).catch((err) => {
-          console.error('[Segment] Background processing error:', err);
-        });
+      if (segmentToFinalize) {
+        await livestreamStorage.finalizeSegment(segmentToFinalize.id, triggerType);
+        addNotification('info', `Race ${segmentToFinalize.race_number} recording saved. Processing upload...`, 4000);
+
+        if (recordingBlob && recordingBlob.size > 10000) {
+          uploadLocalRecording(recordingBlob, segmentToFinalize.id, activeSession.club_id).then(() => {
+            livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch((err) => {
+              console.error('[Segment] Background processing error:', err);
+            });
+          });
+        } else {
+          livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch((err) => {
+            console.error('[Segment] Background processing error:', err);
+          });
+        }
       }
 
       await stopWhipStreaming();
-      console.log('[Segment] WHIP disconnected. Waiting 3s for Cloudflare to finalize recording...');
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 1000));
       setCurrentSegment(null);
 
       if (isFinalSegment) {
@@ -536,6 +548,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         addNotification('error', 'Failed to start recording for new race. Try resuming manually.', 8000);
         return;
       }
+
+      startLocalRecording(streamToSend);
 
       setIsPaused(false);
       await livestreamStorage.updateSession(activeSession.id, { is_paused: false });
@@ -811,6 +825,70 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     lastBytesSentRef.current = 0;
   };
 
+  const startLocalRecording = (stream: MediaStream) => {
+    try {
+      recordedChunksRef.current = [];
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+        ? 'video/webm;codecs=vp9,opus'
+        : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+          ? 'video/webm;codecs=vp8,opus'
+          : 'video/webm';
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 2500000 });
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunksRef.current.push(e.data); };
+      recorder.start(2000);
+      mediaRecorderRef.current = recorder;
+      console.log('[LocalRec] Started recording with', mimeType);
+    } catch (e) {
+      console.warn('[LocalRec] MediaRecorder not available:', e);
+    }
+  };
+
+  const stopLocalRecording = (): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const recorder = mediaRecorderRef.current;
+      if (!recorder || recorder.state === 'inactive') {
+        const chunks = recordedChunksRef.current;
+        if (chunks.length > 0) {
+          resolve(new Blob(chunks, { type: chunks[0].type || 'video/webm' }));
+        } else {
+          resolve(null);
+        }
+        mediaRecorderRef.current = null;
+        return;
+      }
+      recorder.onstop = () => {
+        const chunks = recordedChunksRef.current;
+        if (chunks.length > 0) {
+          resolve(new Blob(chunks, { type: recorder.mimeType || 'video/webm' }));
+        } else {
+          resolve(null);
+        }
+        mediaRecorderRef.current = null;
+      };
+      recorder.stop();
+    });
+  };
+
+  const uploadLocalRecording = async (blob: Blob, segmentId: string, clubId: string): Promise<string | null> => {
+    try {
+      const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+      const path = `${clubId}/${segmentId}.${ext}`;
+      const { error } = await supabase.storage
+        .from('livestream-recordings')
+        .upload(path, blob, { contentType: blob.type, upsert: true });
+      if (error) { console.error('[LocalRec] Upload error:', error); return null; }
+      console.log(`[LocalRec] Uploaded ${(blob.size / 1024 / 1024).toFixed(1)}MB to ${path}`);
+      await supabase
+        .from('livestream_race_segments')
+        .update({ local_recording_path: path, updated_at: new Date().toISOString() })
+        .eq('id', segmentId);
+      return path;
+    } catch (e) {
+      console.error('[LocalRec] Upload failed:', e);
+      return null;
+    }
+  };
+
   const reconnectToLiveSession = async (session: LivestreamSession) => {
     try {
       const stream = await requestCameraAccess();
@@ -1018,6 +1096,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
         if (!whipSuccess) { addNotification('error', 'Failed to connect to streaming server.', 8000); setStreamStatus('testing'); return; }
         addNotification('success', 'Connected to Cloudflare! Live on AlfieTV.', 4000);
+        startLocalRecording(streamToSend);
       }
       const { data: updatedSession, error: updateError } = await supabase
         .from('livestream_sessions').update({ status: 'live', actual_start_time: actualStartTime }).eq('id', activeSession.id).select().single();
@@ -1125,9 +1204,18 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const stopStream = async () => {
     if (!activeSession) return;
     try {
-      if (currentSegment) {
-        await livestreamStorage.finalizeSegment(currentSegment.id, 'stream_end');
-        livestreamStorage.triggerSegmentProcessing(currentSegment.id).catch(() => {});
+      const segmentToFinalize = currentSegment;
+      const recordingBlob = await stopLocalRecording();
+
+      if (segmentToFinalize) {
+        await livestreamStorage.finalizeSegment(segmentToFinalize.id, 'stream_end');
+        if (recordingBlob && recordingBlob.size > 10000) {
+          uploadLocalRecording(recordingBlob, segmentToFinalize.id, activeSession.club_id).then(() => {
+            livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch(() => {});
+          });
+        } else {
+          livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch(() => {});
+        }
         setCurrentSegment(null);
       }
       await stopWhipStreaming();
@@ -1161,14 +1249,13 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               if (result.success && result.recordings?.length > 0) {
                 return result.recordings[0];
               }
-              if (attempt < 3) {
-                await new Promise(r => setTimeout(r, 5000));
+              if (attempt < 2) {
+                await new Promise(r => setTimeout(r, 3000));
                 return retryFetch(attempt + 1);
               }
               return null;
             };
 
-            await new Promise(r => setTimeout(r, 3000));
             const recording = await retryFetch(1);
             if (recording) {
               recordingVideoId = recording.uid;

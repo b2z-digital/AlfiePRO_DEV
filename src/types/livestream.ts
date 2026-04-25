@@ -53,6 +53,7 @@ export interface LivestreamRaceSegment {
   upload_status: SegmentUploadStatus;
   upload_error?: string;
   trigger_type: SegmentTriggerType;
+  local_recording_path?: string;
   created_at: string;
   updated_at: string;
 }

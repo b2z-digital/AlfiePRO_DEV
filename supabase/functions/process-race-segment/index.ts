@@ -214,19 +214,45 @@ async function getDownloadUrl(
   throw new Error("Download URL not ready after polling");
 }
 
+async function downloadVideoFromStorage(
+  serviceClient: any,
+  storagePath: string
+): Promise<ArrayBuffer> {
+  console.log(`[Segment] Downloading local recording from storage: ${storagePath}`);
+  const { data, error } = await serviceClient.storage
+    .from("livestream-recordings")
+    .download(storagePath);
+
+  if (error || !data) {
+    throw new Error(`Failed to download from storage: ${error?.message || "No data"}`);
+  }
+
+  const buffer = await data.arrayBuffer();
+  console.log(`[Segment] Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB from storage`);
+  return buffer;
+}
+
 async function uploadToYouTube(
   ytCreds: YouTubeCredentials,
-  videoUrl: string,
+  videoSource: string | ArrayBuffer,
   title: string,
-  description: string
+  description: string,
+  contentType = "video/mp4"
 ): Promise<string> {
-  console.log(`[Segment] Downloading video from Cloudflare: ${videoUrl}`);
-  const videoRes = await fetch(videoUrl);
-  if (!videoRes.ok) {
-    throw new Error(`Failed to download video: ${videoRes.status}`);
+  let videoData: ArrayBuffer;
+
+  if (typeof videoSource === "string") {
+    console.log(`[Segment] Downloading video from URL: ${videoSource}`);
+    const videoRes = await fetch(videoSource);
+    if (!videoRes.ok) {
+      throw new Error(`Failed to download video: ${videoRes.status}`);
+    }
+    videoData = await videoRes.arrayBuffer();
+    console.log(`[Segment] Downloaded ${(videoData.byteLength / 1024 / 1024).toFixed(1)}MB`);
+  } else {
+    videoData = videoSource;
+    console.log(`[Segment] Using pre-downloaded video: ${(videoData.byteLength / 1024 / 1024).toFixed(1)}MB`);
   }
-  const videoData = await videoRes.arrayBuffer();
-  console.log(`[Segment] Downloaded ${(videoData.byteLength / 1024 / 1024).toFixed(1)}MB`);
 
   const metadata = {
     snippet: { title, description, categoryId: "17" },
@@ -242,7 +268,7 @@ async function uploadToYouTube(
         Authorization: `Bearer ${ytCreds.access_token}`,
         "Content-Type": "application/json",
         "X-Upload-Content-Length": videoData.byteLength.toString(),
-        "X-Upload-Content-Type": "video/mp4",
+        "X-Upload-Content-Type": contentType,
       },
       body: JSON.stringify(metadata),
     }
@@ -261,7 +287,7 @@ async function uploadToYouTube(
   console.log("[Segment] Uploading video data to YouTube...");
   const uploadRes = await fetch(uploadUrl, {
     method: "PUT",
-    headers: { "Content-Type": "video/mp4" },
+    headers: { "Content-Type": contentType },
     body: videoData,
   });
 
@@ -403,31 +429,52 @@ Deno.serve(async (req: Request) => {
       .update({ upload_status: "uploading", updated_at: new Date().toISOString() })
       .eq("id", segmentId);
 
-    const cfCreds = await getCloudflareCredentials(serviceClient, segment.club_id);
+    // Determine video source: local recording (browser MediaRecorder) or Cloudflare
+    let videoSource: string | ArrayBuffer;
+    let contentType = "video/mp4";
+    let cfVideoId: string | null = null;
+    let duration: number | null = null;
+    const useLocalRecording = !!segment.local_recording_path;
 
-    let recording: any;
-    if (segment.cloudflare_video_id) {
-      const res = await fetch(
-        `${CF_API_BASE}/accounts/${cfCreds.account_id}/stream/${segment.cloudflare_video_id}`,
-        { headers: { Authorization: `Bearer ${cfCreds.api_token}` } }
-      );
-      const data = await res.json();
-      if (res.ok && data.success) {
-        recording = data.result;
+    if (useLocalRecording) {
+      console.log(`[Segment] Using local recording: ${segment.local_recording_path}`);
+      videoSource = await downloadVideoFromStorage(serviceClient, segment.local_recording_path);
+      contentType = segment.local_recording_path.endsWith(".webm") ? "video/webm" : "video/mp4";
+
+      if (segment.segment_start_time && segment.segment_end_time) {
+        const startMs = new Date(segment.segment_start_time).getTime();
+        const endMs = new Date(segment.segment_end_time).getTime();
+        duration = Math.round((endMs - startMs) / 1000);
+      }
+    } else {
+      console.log("[Segment] No local recording, trying Cloudflare recordings...");
+      const cfCreds = await getCloudflareCredentials(serviceClient, segment.club_id);
+
+      let recording: any;
+      if (segment.cloudflare_video_id) {
+        const res = await fetch(
+          `${CF_API_BASE}/accounts/${cfCreds.account_id}/stream/${segment.cloudflare_video_id}`,
+          { headers: { Authorization: `Bearer ${cfCreds.api_token}` } }
+        );
+        const data = await res.json();
+        if (res.ok && data.success) {
+          recording = data.result;
+        } else {
+          recording = await waitForRecording(cfCreds, segment.cloudflare_input_id, segment.segment_start_time, segment.segment_end_time);
+        }
       } else {
         recording = await waitForRecording(cfCreds, segment.cloudflare_input_id, segment.segment_start_time, segment.segment_end_time);
       }
-    } else {
-      recording = await waitForRecording(cfCreds, segment.cloudflare_input_id, segment.segment_start_time, segment.segment_end_time);
+
+      cfVideoId = recording.uid;
+      await serviceClient
+        .from("livestream_race_segments")
+        .update({ cloudflare_video_id: cfVideoId })
+        .eq("id", segmentId);
+
+      videoSource = await getDownloadUrl(cfCreds, cfVideoId);
+      duration = recording.duration ? Math.round(recording.duration) : null;
     }
-
-    const cfVideoId = recording.uid;
-    await serviceClient
-      .from("livestream_race_segments")
-      .update({ cloudflare_video_id: cfVideoId })
-      .eq("id", segmentId);
-
-    const downloadUrl = await getDownloadUrl(cfCreds, cfVideoId);
 
     const { credentials: ytCreds } = await getYouTubeCredentials(serviceClient);
 
@@ -483,16 +530,15 @@ Deno.serve(async (req: Request) => {
 
     const youtubeVideoId = await uploadToYouTube(
       ytCreds,
-      downloadUrl,
+      videoSource,
       segment.segment_title,
-      `${segment.segment_title} - Powered by AlfiePRO`
+      `${segment.segment_title} - Powered by AlfiePRO`,
+      contentType
     );
 
     if (playlistId) {
       await addToPlaylist(ytCreds, playlistId, youtubeVideoId, segment.race_number - 1);
     }
-
-    const duration = recording.duration ? Math.round(recording.duration) : null;
 
     await serviceClient
       .from("livestream_race_segments")
@@ -521,8 +567,19 @@ Deno.serve(async (req: Request) => {
       duration,
     });
 
-    console.log(`[Segment] Cleaning up Cloudflare video: ${cfVideoId}`);
-    await deleteCloudflareVideo(cfCreds, cfVideoId);
+    // Cleanup: delete Cloudflare video if we used one, delete local recording from storage
+    if (cfVideoId) {
+      console.log(`[Segment] Cleaning up Cloudflare video: ${cfVideoId}`);
+      const cfCreds = await getCloudflareCredentials(serviceClient, segment.club_id);
+      await deleteCloudflareVideo(cfCreds, cfVideoId);
+    }
+
+    if (useLocalRecording && segment.local_recording_path) {
+      console.log(`[Segment] Cleaning up local recording: ${segment.local_recording_path}`);
+      await serviceClient.storage
+        .from("livestream-recordings")
+        .remove([segment.local_recording_path]);
+    }
 
     await serviceClient
       .from("livestream_race_segments")
@@ -532,14 +589,15 @@ Deno.serve(async (req: Request) => {
       })
       .eq("id", segmentId);
 
-    console.log(`[Segment] Fully processed segment ${segmentId}: CF -> YouTube -> Cleanup`);
+    const source = useLocalRecording ? "LocalRec -> YouTube" : "CF -> YouTube";
+    console.log(`[Segment] Fully processed segment ${segmentId}: ${source} -> Cleanup`);
 
     return new Response(
       JSON.stringify({
         success: true,
         youtubeVideoId,
         playlistId,
-        cloudflareVideoDeleted: true,
+        source: useLocalRecording ? "local_recording" : "cloudflare",
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
