@@ -35,6 +35,7 @@ import { calculateHandicaps } from '../utils/handicapCalculator';
 import { calculateScratchResults } from '../utils/scratchCalculations';
 import { RaceSettingsModal } from './RaceSettingsModal';
 import { StartBoxModal } from './start-box/StartBoxModal';
+import { LiveStatusControl } from './LiveStatusControl';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
 import { updateRaceStatus } from '../utils/liveTrackingStorage';
@@ -395,7 +396,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   useEffect(() => {
     return () => {
       const currentEvent = getCurrentEvent();
-      if (currentEvent?.id && currentEvent?.enableLiveTracking) {
+      if (currentEvent?.id && (currentEvent?.enableLiveTracking || currentEvent?.enableLiveStream)) {
         updateRaceStatus(currentEvent.id, 'on_hold', undefined, currentEvent.clubId).catch(() => {});
       }
     };
@@ -3350,6 +3351,18 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 </button>
               </div>
             )}
+
+            {/* Race Status Control - Show for non-heat events with live tracking or livestream enabled */}
+            {(() => {
+              if (heatManagement?.configuration.enabled) return null;
+              const evt = getCurrentEvent();
+              if (!evt?.id || (!evt.enableLiveTracking && !evt.enableLiveStream) || evt.completed) return null;
+              return (
+                <div className="mb-4">
+                  <LiveStatusControl eventId={evt.id} darkMode={darkMode} />
+                </div>
+              );
+            })()}
 
             {/* Scoring Mode Buttons - Only show for non-heat races, hide when scratch spreadsheet uses HMS component */}
             {!heatManagement?.configuration.enabled && !(scoringMode === 'spreadsheet' && raceType === 'scratch') && (
