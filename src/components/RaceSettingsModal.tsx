@@ -2359,41 +2359,53 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         isOpen={showHeatClearConfirmation}
         onClose={() => setShowHeatClearConfirmation(false)}
         onConfirm={async () => {
-          // Clear all race results first
-          if (onClearAllRaceResults) {
-            await onClearAllRaceResults();
-          }
-
-          // Reset heat management to Round 1 with original assignments
-          onSaveSettings({
-            numRaces: currentNumRaces,
-            dropRules: currentDropRules,
-            heatManagement: {
-              ...currentHeatManagement!,
-              currentRound: 1,
-              roundJustCompleted: null,
-              lastPromotionInfo: null,
-              rounds: [{
-                round: 1,
-                heatAssignments: currentHeatManagement!.rounds[0].heatAssignments,
-                results: [],
-                completed: false
-              }]
-            },
-            displaySettings: {
-              show_flag: showFlag,
-              show_country: showCountry
-            },
-            observerSettings: {
-              enable_observers: enableObservers,
-              observers_per_heat: observersPerHeat,
-              enable_roll_call: enableRollCall,
-              auto_complete_sail: autoCompleteSail
+          try {
+            // Clear all race results first
+            if (onClearAllRaceResults) {
+              await onClearAllRaceResults();
             }
-          });
 
-          if (addNotification) {
-            addNotification('success', 'All heat results have been cleared. Starting fresh from Round 1.');
+            // Reset heat management to Round 1 with original assignments (only if heat management is active)
+            const settingsUpdate: any = {
+              numRaces: currentNumRaces,
+              dropRules: currentDropRules,
+              displaySettings: {
+                show_flag: showFlag,
+                show_country: showCountry
+              },
+              observerSettings: {
+                enable_observers: enableObservers,
+                observers_per_heat: observersPerHeat,
+                enable_roll_call: enableRollCall,
+                auto_complete_sail: autoCompleteSail
+              }
+            };
+
+            if (currentHeatManagement?.rounds?.[0]) {
+              settingsUpdate.heatManagement = {
+                ...currentHeatManagement,
+                currentRound: 1,
+                roundJustCompleted: null,
+                lastPromotionInfo: null,
+                rounds: [{
+                  round: 1,
+                  heatAssignments: currentHeatManagement.rounds[0].heatAssignments,
+                  results: [],
+                  completed: false
+                }]
+              };
+            }
+
+            onSaveSettings(settingsUpdate);
+
+            if (addNotification) {
+              addNotification('success', 'All results have been cleared. Starting fresh from Race 1.');
+            }
+          } catch (error) {
+            console.error('Error clearing results:', error);
+            if (addNotification) {
+              addNotification('error', 'Failed to clear results. Please try again.');
+            }
           }
 
           setShowHeatClearConfirmation(false);

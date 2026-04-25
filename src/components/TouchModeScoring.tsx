@@ -262,8 +262,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     if (!isLoadingPreferences) {
       const isHcapEvent = currentEvent?.raceFormat === 'handicap' ||
         (!currentEvent?.raceFormat && skippers.some(s => s.startHcap !== undefined && s.startHcap > 0));
-      const hasR1 = raceResults.some(r => r.race === 1);
-      if (isHcapEvent && !hasR1 && currentRace === 1 && skippers.length > 0) {
+      if (isHcapEvent && skippers.length > 0) {
         setIsHandicapViewerOpen(true);
       }
     }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { CreditCard, Calendar, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Mail, Phone, MapPin, FileText, Download, SquarePen as Edit2, X, Sailboat, Shield, Clock, ChevronRight, User, Anchor, Heart, Users, TrendingUp, Award, Activity, ArrowRightLeft, Info, Landmark, Copy, Check } from 'lucide-react';
+import { CreditCard, Calendar, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Mail, Phone, MapPin, FileText, Download, SquarePen as Edit2, X, Sailboat, Shield, Clock, ChevronRight, User, Anchor, Heart, Users, TrendingUp, Award, Activity, ArrowRightLeft, Info, Landmark, Copy, Check, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
@@ -111,12 +111,14 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   const { addNotification } = useNotifications();
   const location = useLocation();
   const pendingEditOpen = useRef(!!(location.state as any)?.edit);
+  const pendingEditTab = useRef<'details' | 'boats' | undefined>((location.state as any)?.editTab);
   const [loading, setLoading] = useState(true);
   const [memberData, setMemberData] = useState<MemberData | null>(null);
   const [boats, setBoats] = useState<BoatData[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editModalTab, setEditModalTab] = useState<'details' | 'boats' | 'membership' | undefined>(undefined);
   const [showRenewalModal, setShowRenewalModal] = useState(false);
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
   const [selectedMembershipType, setSelectedMembershipType] = useState<string>('');
@@ -141,6 +143,8 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   useEffect(() => {
     if (pendingEditOpen.current && memberData && !loading) {
       pendingEditOpen.current = false;
+      setEditModalTab(pendingEditTab.current);
+      pendingEditTab.current = undefined;
       window.history.replaceState({}, '');
       setShowEditModal(true);
     }
@@ -552,18 +556,16 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
           >
             <div className="p-6">
               <div className="flex flex-col sm:flex-row items-start gap-5">
-                <div className="relative flex-shrink-0">
+                <div className="relative flex-shrink-0 group cursor-pointer" onClick={() => setShowEditModal(true)}>
                   <Avatar
                     src={memberData.avatar_url}
-                    alt={`${memberData.first_name} ${memberData.last_name}`}
+                    name={`${memberData.first_name} ${memberData.last_name}`}
                     size="lg"
                     className="w-20 h-20 rounded-2xl ring-2 ring-slate-600/50"
                   />
-                  {membershipStatus.status === 'active' && (
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-slate-800 flex items-center justify-center">
-                      <CheckCircle size={12} className="text-white" />
-                    </div>
-                  )}
+                  <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-slate-700 border-2 border-slate-800 flex items-center justify-center shadow-lg group-hover:bg-slate-600 transition-colors">
+                    <Camera size={13} className="text-slate-300" />
+                  </div>
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -1078,11 +1080,12 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
       {showEditModal && memberData && currentClub?.clubId && (
         <MemberEditModal
           isOpen={showEditModal}
-          onClose={() => setShowEditModal(false)}
+          onClose={() => { setShowEditModal(false); setEditModalTab(undefined); }}
           memberId={memberData.id}
           clubId={currentClub.clubId}
           darkMode={darkMode}
           onSuccess={handleEditSuccess}
+          initialTab={editModalTab}
         />
       )}
 

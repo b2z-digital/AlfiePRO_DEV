@@ -32,7 +32,7 @@ interface SailingDay {
 }
 
 export const ClubProfileSettings: React.FC<ClubProfileSettingsProps> = ({ darkMode }) => {
-  const { currentClub, refreshClubData } = useAuth();
+  const { currentClub, refreshUserClubs } = useAuth();
   const [clubName, setClubName] = useState('');
   const [abbreviatedName, setAbbreviatedName] = useState('');
   const [clubIntroduction, setClubIntroduction] = useState('');
@@ -378,8 +378,8 @@ export const ClubProfileSettings: React.FC<ClubProfileSettingsProps> = ({ darkMo
       await loadSailingDays();
 
       // Refresh club data in auth context
-      if (refreshClubData) {
-        await refreshClubData();
+      if (refreshUserClubs) {
+        await refreshUserClubs();
       }
 
       setTimeout(() => setSuccess(false), 3000);
@@ -429,8 +429,8 @@ export const ClubProfileSettings: React.FC<ClubProfileSettingsProps> = ({ darkMo
       setFeaturedImageUrl(publicUrl);
       setCoverImagePosition(position);
 
-      if (refreshClubData) {
-        await refreshClubData();
+      if (refreshUserClubs) {
+        await refreshUserClubs();
       }
     } catch (error) {
       console.error('Error saving cover image:', error);

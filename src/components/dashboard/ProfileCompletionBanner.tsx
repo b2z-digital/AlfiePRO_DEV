@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Phone, Heart, Sailboat, ChevronRight, X, Camera, CircleCheck as CheckCircle2, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { supabase } from '../../utils/supabase';
 import { useNavigate } from 'react-router-dom';
 
@@ -84,10 +85,65 @@ const CircularProgress: React.FC<{ percentage: number }> = ({ percentage }) => {
 
 export const ProfileCompletionBanner: React.FC = () => {
   const { user, currentClub } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
   const navigate = useNavigate();
   const [profileData, setProfileData] = useState<ProfileCompleteness | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const checkProfileCompletenessForMember = useCallback(async (memberId: string) => {
+    const { data: member, error: memberError } = await supabase
+      .from('members')
+      .select('id, club_id, first_name, last_name, email, phone, street, city, state, postcode, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, avatar_url, membership_status')
+      .eq('id', memberId)
+      .maybeSingle();
+
+    if (memberError || !member) return null;
+
+    const { data: club } = await supabase
+      .from('clubs')
+      .select('name')
+      .eq('id', member.club_id)
+      .maybeSingle();
+
+    const { count: boatCount } = await supabase
+      .from('member_boats')
+      .select('id', { count: 'exact', head: true })
+      .eq('member_id', member.id);
+
+    const missingFields: string[] = [];
+    if (!member.avatar_url || member.avatar_url.trim() === '') missingFields.push('avatar');
+    if (!member.phone || member.phone.trim() === '') missingFields.push('phone');
+    if (!member.street || member.street.trim() === '') missingFields.push('address');
+    if (!member.emergency_contact_name || member.emergency_contact_name.trim() === '') missingFields.push('emergency_contact');
+    const hasBoats = (boatCount || 0) > 0;
+    if (!hasBoats) missingFields.push('boats');
+
+    if (missingFields.length === 0) return null;
+
+    return {
+      needs_completion: true,
+      member_id: member.id,
+      club_id: member.club_id,
+      club_name: club?.name || '',
+      missing_fields: missingFields,
+      has_boats: hasBoats,
+      current_data: {
+        first_name: member.first_name,
+        last_name: member.last_name,
+        email: member.email,
+        phone: member.phone,
+        street: member.street,
+        city: member.city,
+        state: member.state,
+        postcode: member.postcode,
+        emergency_contact_name: member.emergency_contact_name,
+        emergency_contact_phone: member.emergency_contact_phone,
+        emergency_contact_relationship: member.emergency_contact_relationship,
+        avatar_url: member.avatar_url,
+      },
+    } as ProfileCompleteness;
+  }, []);
 
   const checkProfileCompleteness = useCallback(async () => {
     if (!user) {
@@ -96,26 +152,32 @@ export const ProfileCompletionBanner: React.FC = () => {
     }
 
     try {
-      const dismissedKey = `profile_completion_dismissed_${user.id}`;
+      const effectiveId = isImpersonating ? impersonationSession?.targetMemberId : user.id;
+      const dismissedKey = `profile_completion_dismissed_${effectiveId}`;
       if (localStorage.getItem(dismissedKey) === 'true') {
         setDismissed(true);
         setLoading(false);
         return;
       }
 
-      const { data } = await supabase.rpc('check_member_profile_completeness');
-      if (data?.success) {
-        if (data.needs_completion) {
-          setProfileData(data);
-        } else {
-          setProfileData(null);
+      if (isImpersonating && impersonationSession?.targetMemberId) {
+        const result = await checkProfileCompletenessForMember(impersonationSession.targetMemberId);
+        setProfileData(result);
+      } else {
+        const { data } = await supabase.rpc('check_member_profile_completeness');
+        if (data?.success) {
+          if (data.needs_completion) {
+            setProfileData(data);
+          } else {
+            setProfileData(null);
+          }
         }
       }
     } catch (err) {
       console.error('Error checking profile completeness:', err);
     }
     setLoading(false);
-  }, [user]);
+  }, [user, isImpersonating, impersonationSession?.targetMemberId, checkProfileCompletenessForMember]);
 
   useEffect(() => {
     checkProfileCompleteness();
@@ -141,26 +203,27 @@ export const ProfileCompletionBanner: React.FC = () => {
   }, [checkProfileCompleteness]);
 
   const handleDismiss = () => {
-    if (user) {
-      localStorage.setItem(`profile_completion_dismissed_${user.id}`, 'true');
+    const effectiveId = isImpersonating ? impersonationSession?.targetMemberId : user?.id;
+    if (effectiveId) {
+      localStorage.setItem(`profile_completion_dismissed_${effectiveId}`, 'true');
     }
     setDismissed(true);
   };
 
-  const handleGoToProfile = () => {
-    navigate('/my-membership', { state: { edit: true } });
+  const handleGoToProfile = (tab?: 'details' | 'boats') => {
+    navigate('/my-membership', { state: { edit: true, editTab: tab } });
   };
 
   if (loading || dismissed || !profileData || !profileData.needs_completion) {
     return null;
   }
 
-  const allItems = [
-    { key: 'avatar', icon: Camera, label: 'Profile photo', missing: profileData.missing_fields.includes('avatar') },
-    { key: 'phone', icon: Phone, label: 'Phone number', missing: profileData.missing_fields.includes('phone') },
-    { key: 'address', icon: MapPin, label: 'Address', missing: profileData.missing_fields.includes('address') },
-    { key: 'emergency', icon: Heart, label: 'Emergency contact', missing: profileData.missing_fields.includes('emergency_contact') },
-    { key: 'boats', icon: Sailboat, label: 'Boat information', missing: !profileData.has_boats },
+  const allItems: Array<{ key: string; icon: typeof Camera; label: string; missing: boolean; tab: 'details' | 'boats' }> = [
+    { key: 'avatar', icon: Camera, label: 'Profile photo', missing: profileData.missing_fields.includes('avatar'), tab: 'details' },
+    { key: 'phone', icon: Phone, label: 'Phone number', missing: profileData.missing_fields.includes('phone'), tab: 'details' },
+    { key: 'address', icon: MapPin, label: 'Address', missing: profileData.missing_fields.includes('address'), tab: 'details' },
+    { key: 'emergency', icon: Heart, label: 'Emergency contact', missing: profileData.missing_fields.includes('emergency_contact'), tab: 'details' },
+    { key: 'boats', icon: Sailboat, label: 'Boat information', missing: !profileData.has_boats, tab: 'boats' },
   ];
 
   const missingCount = allItems.filter(i => i.missing).length;
@@ -199,20 +262,22 @@ export const ProfileCompletionBanner: React.FC = () => {
             <div className="flex flex-wrap gap-2 mb-4">
               {allItems.map((item) => {
                 const ItemIcon = item.icon;
-                return (
+                return item.missing ? (
+                  <button
+                    key={item.key}
+                    onClick={() => handleGoToProfile(item.tab)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all bg-slate-700/50 border border-slate-600/50 text-slate-300 hover:bg-slate-600/50 hover:border-slate-500/50 hover:text-white cursor-pointer"
+                  >
+                    <ItemIcon size={13} className="text-amber-400" />
+                    <span>{item.label}</span>
+                    <ChevronRight size={11} className="text-slate-500 -ml-0.5" />
+                  </button>
+                ) : (
                   <div
                     key={item.key}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors ${
-                      item.missing
-                        ? 'bg-slate-700/50 border border-slate-600/50 text-slate-300'
-                        : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
-                    }`}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
                   >
-                    {item.missing ? (
-                      <ItemIcon size={13} className="text-amber-400" />
-                    ) : (
-                      <CheckCircle2 size={13} className="text-emerald-400" />
-                    )}
+                    <CheckCircle2 size={13} className="text-emerald-400" />
                     <span>{item.label}</span>
                   </div>
                 );
@@ -220,8 +285,8 @@ export const ProfileCompletionBanner: React.FC = () => {
             </div>
 
             <button
-              onClick={handleGoToProfile}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30"
+              onClick={() => handleGoToProfile()}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
             >
               Update My Details
               <ChevronRight size={16} />

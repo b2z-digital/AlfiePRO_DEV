@@ -440,6 +440,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
       addNotification('success', 'Profile updated successfully');
       setSuccess(true);
       fetchUserProfile();
+      refreshUserClubs();
+      window.dispatchEvent(new Event('profile-updated'));
 
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {

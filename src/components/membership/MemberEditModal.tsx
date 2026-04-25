@@ -17,6 +17,7 @@ interface MemberEditModalProps {
   clubId: string;
   darkMode?: boolean;
   onSuccess?: () => void;
+  initialTab?: 'details' | 'boats' | 'membership';
 }
 
 interface MemberData {
@@ -56,14 +57,15 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   memberId,
   clubId,
   darkMode = true,
-  onSuccess
+  onSuccess,
+  initialTab
 }) => {
   const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [memberData, setMemberData] = useState<MemberData | null>(null);
   const [boats, setBoats] = useState<Array<{ id?: string; boat_type: string; sail_number: string; hull: string; handicap?: number }>>([]);
-  const [activeTab, setActiveTab] = useState<'details' | 'boats' | 'membership'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'boats' | 'membership'>(initialTab || 'details');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [showCropModal, setShowCropModal] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
@@ -479,24 +481,20 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-4 relative z-10">
             {memberData ? (
-              <div className="relative group">
+              <div className="relative group cursor-pointer" onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}>
                 <Avatar
                   name={`${memberData.first_name} ${memberData.last_name}`}
                   imageUrl={memberData.avatar_url}
                   size="xl"
                 />
-                <button
-                  type="button"
-                  onClick={() => avatarInputRef.current?.click()}
-                  disabled={uploadingAvatar}
-                  className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  {uploadingAvatar ? (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 group-hover:bg-black/40 transition-colors">
+                  {uploadingAvatar && (
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                  ) : (
-                    <Camera size={24} className="text-white" />
                   )}
-                </button>
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white shadow-lg flex items-center justify-center border-2 border-cyan-700">
+                  <Camera size={13} className="text-slate-700" />
+                </div>
                 <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
               </div>
             ) : (

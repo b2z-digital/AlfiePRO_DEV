@@ -87,9 +87,10 @@ export const ConnectionMonitor: React.FC = () => {
           setConnectionTested(true);
           setShowStaleWarning(false);
 
-          if (elapsed > 3000) {
+          if (elapsed > 5000) {
             console.warn('Connection is slow:', elapsed, 'ms');
             setConnectionSlow(true);
+            setTimeout(() => setConnectionSlow(false), 5000);
           } else {
             setConnectionSlow(false);
           }
@@ -110,7 +111,7 @@ export const ConnectionMonitor: React.FC = () => {
         console.warn('Session appears stale, testing connection...');
         testConnection();
       }
-    }, 30000); // Check every 30 seconds
+    }, 60000); // Check every 60 seconds
 
     // Detect when page becomes visible again (user returns to tab)
     const handleVisibilityChange = async () => {
@@ -135,7 +136,7 @@ export const ConnectionMonitor: React.FC = () => {
     window.addEventListener('keydown', activityHandler, { passive: true });
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    setTimeout(testConnection, 1000);
+    setTimeout(testConnection, 3000);
 
     return () => {
       window.removeEventListener('online', handleOnline);
