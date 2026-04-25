@@ -553,41 +553,33 @@ Deno.serve(async (req: Request) => {
       })
       .eq("id", segmentId);
 
-    // Update existing session-level archive with YouTube data, or create segment archive
-    const { data: existingArchive } = await serviceClient
-      .from("livestream_archives")
-      .select("id")
-      .eq("session_id", segment.session_id)
-      .eq("club_id", segment.club_id)
-      .maybeSingle();
+    // Create a per-race archive for this segment (each race gets its own archive entry)
+    console.log(`[Segment] Creating per-race archive for: ${segment.segment_title}`);
+    const { data: newArchive } = await serviceClient.from("livestream_archives").insert({
+      session_id: segment.session_id,
+      club_id: segment.club_id,
+      title: segment.segment_title,
+      description: `${segment.segment_title} - Powered by AlfiePRO`,
+      event_id: segment.event_id || null,
+      heat_number: segment.heat_number || null,
+      youtube_video_id: youtubeVideoId,
+      youtube_url: `https://www.youtube.com/watch?v=${youtubeVideoId}`,
+      source: "youtube",
+      recorded_at: segment.segment_start_time,
+      is_public: true,
+      duration,
+    }).select("id").maybeSingle();
 
-    if (existingArchive) {
-      console.log(`[Segment] Updating existing archive ${existingArchive.id} with YouTube data`);
+    // If there was a session-level placeholder archive with source 'local', remove it
+    // since the per-race archives now replace it
+    if (newArchive) {
       await serviceClient
         .from("livestream_archives")
-        .update({
-          youtube_video_id: youtubeVideoId,
-          youtube_url: `https://www.youtube.com/watch?v=${youtubeVideoId}`,
-          source: "youtube",
-          duration,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existingArchive.id);
-    } else {
-      await serviceClient.from("livestream_archives").insert({
-        session_id: segment.session_id,
-        club_id: segment.club_id,
-        title: segment.segment_title,
-        description: `${segment.segment_title} - Powered by AlfiePRO`,
-        event_id: segment.event_id || null,
-        heat_number: segment.heat_number || null,
-        youtube_video_id: youtubeVideoId,
-        youtube_url: `https://www.youtube.com/watch?v=${youtubeVideoId}`,
-        source: "youtube",
-        recorded_at: segment.segment_start_time,
-        is_public: true,
-        duration,
-      });
+        .delete()
+        .eq("session_id", segment.session_id)
+        .eq("club_id", segment.club_id)
+        .eq("source", "local")
+        .neq("id", newArchive.id);
     }
 
     // Cleanup: delete Cloudflare video if we used one, delete local recording from storage
@@ -602,14 +594,6 @@ Deno.serve(async (req: Request) => {
       await serviceClient.storage
         .from("livestream-recordings")
         .remove([segment.local_recording_path]);
-
-      // Also clear storage_path from archive since file is deleted
-      if (existingArchive) {
-        await serviceClient
-          .from("livestream_archives")
-          .update({ storage_path: null, updated_at: new Date().toISOString() })
-          .eq("id", existingArchive.id);
-      }
     }
 
     await serviceClient

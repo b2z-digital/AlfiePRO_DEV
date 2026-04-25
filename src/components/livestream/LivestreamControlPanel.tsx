@@ -71,6 +71,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const [segmentProcessing, setSegmentProcessing] = useState(false);
   const segmentTransitionRef = useRef(false);
   const pendingSegmentStartRef = useRef(false);
+  const lastCompletedRaceRef = useRef<number | null>(null);
   const [showTitleCard, setShowTitleCard] = useState(false);
   const [titleCardTrigger, setTitleCardTrigger] = useState(0);
   const whipHealthRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -428,6 +429,59 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     );
 
     return unsubscribe;
+  }, [activeSession?.event_id, streamStatus, autoSegmentEnabled]);
+
+  // Fallback: watch quick_races.last_completed_race for race scoring events.
+  // This triggers segment splits even if the race officer doesn't update live_tracking_events.
+  useEffect(() => {
+    if (!activeSession?.event_id || streamStatus !== 'live' || !autoSegmentEnabled) return;
+
+    const eventId = activeSession.event_id;
+    const isSeriesRound = eventId.includes('-') && eventId.split('-').length > 5;
+    if (isSeriesRound) return;
+
+    const channel = supabase
+      .channel(`race_scoring_${eventId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'quick_races',
+          filter: `id=eq.${eventId}`,
+        },
+        async (payload) => {
+          const newData = payload.new as any;
+          const newCompleted = newData.last_completed_race;
+          if (typeof newCompleted !== 'number' || newCompleted < 1) return;
+
+          const prev = lastCompletedRaceRef.current;
+          if (prev !== null && newCompleted > prev && !segmentTransitionRef.current) {
+            console.log(`[Segment] Race ${newCompleted} scored (was ${prev}). Auto-splitting segment.`);
+            lastCompletedRaceRef.current = newCompleted;
+            await handleSegmentStop('race_scored', false);
+            setTimeout(() => handleSegmentStart(), 2000);
+          } else if (prev === null) {
+            lastCompletedRaceRef.current = newCompleted;
+          }
+        }
+      )
+      .subscribe();
+
+    supabase
+      .from('quick_races')
+      .select('last_completed_race')
+      .eq('id', eventId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.last_completed_race != null) {
+          lastCompletedRaceRef.current = data.last_completed_race;
+        } else {
+          lastCompletedRaceRef.current = 0;
+        }
+      });
+
+    return () => { supabase.removeChannel(channel); };
   }, [activeSession?.event_id, streamStatus, autoSegmentEnabled]);
 
   const buildSegmentTitle = (raceNumber: number) => {
@@ -1232,31 +1286,36 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       await livestreamStorage.updateSession(activeSession.id, { status: 'ended', end_time: new Date().toISOString(), is_paused: false });
       setStreamStatus('offline');
 
-      try {
-        const archiveData: Record<string, unknown> = {
-          session_id: activeSession.id,
-          club_id: activeSession.club_id,
-          title: activeSession.title,
-          description: activeSession.description,
-          event_id: activeSession.event_id || null,
-          heat_number: activeSession.heat_number || null,
-          recorded_at: activeSession.actual_start_time || activeSession.created_at,
-          is_public: activeSession.is_public,
-        };
+      // Only create a session-level archive if no segments were used.
+      // When auto-segmentation is active, each race segment gets its own archive
+      // via the process-race-segment edge function.
+      if (segmentCount === 0) {
+        try {
+          const archiveData: Record<string, unknown> = {
+            session_id: activeSession.id,
+            club_id: activeSession.club_id,
+            title: activeSession.title,
+            description: activeSession.description,
+            event_id: activeSession.event_id || null,
+            heat_number: activeSession.heat_number || null,
+            recorded_at: activeSession.actual_start_time || activeSession.created_at,
+            is_public: activeSession.is_public,
+          };
 
-        if (localStoragePath) {
-          archiveData.source = 'local';
-          archiveData.storage_path = localStoragePath;
-        } else if (activeSession.cloudflare_live_input_id && activeSession.cloudflare_customer_code) {
-          archiveData.source = 'cloudflare';
-          archiveData.cloudflare_video_id = activeSession.cloudflare_live_input_id;
-          archiveData.cloudflare_customer_code = activeSession.cloudflare_customer_code;
-          archiveData.cloudflare_playback_url = `https://customer-${activeSession.cloudflare_customer_code}.cloudflarestream.com/${activeSession.cloudflare_live_input_id}/iframe`;
+          if (localStoragePath) {
+            archiveData.source = 'local';
+            archiveData.storage_path = localStoragePath;
+          } else if (activeSession.cloudflare_live_input_id && activeSession.cloudflare_customer_code) {
+            archiveData.source = 'cloudflare';
+            archiveData.cloudflare_video_id = activeSession.cloudflare_live_input_id;
+            archiveData.cloudflare_customer_code = activeSession.cloudflare_customer_code;
+            archiveData.cloudflare_playback_url = `https://customer-${activeSession.cloudflare_customer_code}.cloudflarestream.com/${activeSession.cloudflare_live_input_id}/iframe`;
+          }
+
+          await supabase.from('livestream_archives').insert(archiveData);
+        } catch (archiveErr) {
+          console.error('Error creating archive record:', archiveErr);
         }
-
-        await supabase.from('livestream_archives').insert(archiveData);
-      } catch (archiveErr) {
-        console.error('Error creating archive record:', archiveErr);
       }
 
       addNotification('success', 'Stream ended. Recording saved to replays.', 3000);
