@@ -1206,83 +1206,57 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     try {
       const segmentToFinalize = currentSegment;
       const recordingBlob = await stopLocalRecording();
+      let localStoragePath: string | null = null;
 
       if (segmentToFinalize) {
         await livestreamStorage.finalizeSegment(segmentToFinalize.id, 'stream_end');
         if (recordingBlob && recordingBlob.size > 10000) {
-          uploadLocalRecording(recordingBlob, segmentToFinalize.id, activeSession.club_id).then(() => {
-            livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch(() => {});
-          });
+          localStoragePath = await uploadLocalRecording(recordingBlob, segmentToFinalize.id, activeSession.club_id);
+          livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch(() => {});
         } else {
           livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch(() => {});
         }
         setCurrentSegment(null);
+      } else if (recordingBlob && recordingBlob.size > 10000) {
+        const fallbackId = crypto.randomUUID();
+        const ext = recordingBlob.type.includes('mp4') ? 'mp4' : 'webm';
+        const path = `${activeSession.club_id}/${fallbackId}.${ext}`;
+        const { error } = await supabase.storage
+          .from('livestream-recordings')
+          .upload(path, recordingBlob, { contentType: recordingBlob.type, upsert: true });
+        if (!error) localStoragePath = path;
       }
+
       await stopWhipStreaming();
       if (mediaStream) { mediaStream.getTracks().forEach(track => track.stop()); setMediaStream(null); }
       await livestreamStorage.updateSession(activeSession.id, { status: 'ended', end_time: new Date().toISOString(), is_paused: false });
       setStreamStatus('offline');
 
-      if (activeSession.cloudflare_live_input_id && activeSession.cloudflare_customer_code) {
-        try {
-          const { data: { session: authSession } } = await supabase.auth.getSession();
-          let recordingVideoId = activeSession.cloudflare_live_input_id;
-          let recordingThumbnail: string | null = null;
-          let recordingDuration: number | null = null;
+      try {
+        const archiveData: Record<string, unknown> = {
+          session_id: activeSession.id,
+          club_id: activeSession.club_id,
+          title: activeSession.title,
+          description: activeSession.description,
+          event_id: activeSession.event_id || null,
+          heat_number: activeSession.heat_number || null,
+          recorded_at: activeSession.actual_start_time || activeSession.created_at,
+          is_public: activeSession.is_public,
+        };
 
-          if (authSession) {
-            const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`;
-            const retryFetch = async (attempt: number): Promise<any> => {
-              const res = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${authSession.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  action: 'getRecordings',
-                  clubId: activeSession.club_id,
-                  sessionData: { liveInputId: activeSession.cloudflare_live_input_id },
-                }),
-              });
-              const result = await res.json();
-              if (result.success && result.recordings?.length > 0) {
-                return result.recordings[0];
-              }
-              if (attempt < 2) {
-                await new Promise(r => setTimeout(r, 3000));
-                return retryFetch(attempt + 1);
-              }
-              return null;
-            };
-
-            const recording = await retryFetch(1);
-            if (recording) {
-              recordingVideoId = recording.uid;
-              recordingThumbnail = recording.thumbnail || null;
-              recordingDuration = recording.duration ? Math.round(recording.duration) : null;
-            }
-          }
-
-          await supabase.from('livestream_archives').insert({
-            session_id: activeSession.id,
-            club_id: activeSession.club_id,
-            title: activeSession.title,
-            description: activeSession.description,
-            event_id: activeSession.event_id || null,
-            heat_number: activeSession.heat_number || null,
-            cloudflare_video_id: recordingVideoId,
-            cloudflare_customer_code: activeSession.cloudflare_customer_code,
-            cloudflare_playback_url: `https://customer-${activeSession.cloudflare_customer_code}.cloudflarestream.com/${recordingVideoId}/iframe`,
-            thumbnail_url: recordingThumbnail,
-            duration: recordingDuration,
-            source: 'cloudflare',
-            recorded_at: activeSession.actual_start_time || activeSession.created_at,
-            is_public: activeSession.is_public,
-          });
-        } catch (archiveErr) {
-          console.error('Error creating archive record:', archiveErr);
+        if (localStoragePath) {
+          archiveData.source = 'local';
+          archiveData.storage_path = localStoragePath;
+        } else if (activeSession.cloudflare_live_input_id && activeSession.cloudflare_customer_code) {
+          archiveData.source = 'cloudflare';
+          archiveData.cloudflare_video_id = activeSession.cloudflare_live_input_id;
+          archiveData.cloudflare_customer_code = activeSession.cloudflare_customer_code;
+          archiveData.cloudflare_playback_url = `https://customer-${activeSession.cloudflare_customer_code}.cloudflarestream.com/${activeSession.cloudflare_live_input_id}/iframe`;
         }
+
+        await supabase.from('livestream_archives').insert(archiveData);
+      } catch (archiveErr) {
+        console.error('Error creating archive record:', archiveErr);
       }
 
       addNotification('success', 'Stream ended. Recording saved to replays.', 3000);
