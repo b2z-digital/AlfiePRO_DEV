@@ -34,11 +34,36 @@ export const applyFilterCondition = (member: any, condition: FilterCondition): b
   }
 
   if (field === 'user_id') {
-    // Check if user has an account
     const hasAccount = !!member.user_id;
     if (operator === 'equals') {
       return value === 'true' ? hasAccount : !hasAccount;
     }
+    return false;
+  }
+
+  if (field === 'invite_status') {
+    const hasUserId = !!member.user_id;
+    const activationStatus = member.activation_status;
+    let status: string;
+
+    if (hasUserId && activationStatus === 'activated') {
+      status = 'connected';
+    } else if (hasUserId && activationStatus === 'pending') {
+      status = 'awaiting_setup';
+    } else if (hasUserId) {
+      status = 'connected';
+    } else if (activationStatus === 'pending') {
+      status = 'invite_sent';
+    } else if (member.email) {
+      status = 'not_invited';
+    } else {
+      status = 'no_email';
+    }
+
+    if (operator === 'equals') return status === value;
+    if (operator === 'not_equals') return status !== value;
+    if (operator === 'in') return Array.isArray(value) ? value.includes(status) : status === value;
+    if (operator === 'not_in') return Array.isArray(value) ? !value.includes(status) : status !== value;
     return false;
   }
 

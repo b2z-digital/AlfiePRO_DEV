@@ -55,7 +55,6 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClub, setSelectedClub] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [selectedInviteStatus, setSelectedInviteStatus] = useState<string>('all');
   const [clubs, setClubs] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [memberRemittanceStatus, setMemberRemittanceStatus] = useState<Record<string, { statePaid: boolean; nationalPaid: boolean }>>({});
@@ -97,7 +96,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
 
   useEffect(() => {
     filterMembers();
-  }, [members, searchTerm, selectedClub, selectedStatus, selectedInviteStatus, advancedFilterConfig, memberInvitations]);
+  }, [members, searchTerm, selectedClub, selectedStatus, advancedFilterConfig, memberInvitations]);
 
   const fetchRemittanceStatuses = async (memberIds: string[]) => {
     if (memberIds.length === 0) return;
@@ -251,22 +250,6 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       } else if (selectedStatus === 'unfinancial') {
         filtered = filtered.filter((m) => !m.is_financial);
       }
-    }
-    if (selectedInviteStatus !== 'all') {
-      filtered = filtered.filter((m) => {
-        const hasUserId = !!m.user_id;
-        const activationStatus = m.activation_status;
-        const invitation = memberInvitations[m.id];
-
-        if (selectedInviteStatus === 'connected') return hasUserId && activationStatus === 'activated';
-        if (selectedInviteStatus === 'awaiting_setup') return hasUserId && activationStatus === 'pending';
-        if (selectedInviteStatus === 'linked') return hasUserId && activationStatus !== 'activated' && activationStatus !== 'pending';
-        if (selectedInviteStatus === 'invite_sent') return !hasUserId && (invitation?.status === 'pending' || activationStatus === 'pending');
-        if (selectedInviteStatus === 'expired') return !hasUserId && invitation?.status === 'expired';
-        if (selectedInviteStatus === 'not_invited') return !hasUserId && m.email && !invitation && activationStatus !== 'pending';
-        if (selectedInviteStatus === 'no_email') return !m.email;
-        return true;
-      });
     }
     setFilteredMembers(filtered);
   };
@@ -718,18 +701,6 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
               <option value="all">All Status</option>
               <option value="financial">Financial</option>
               <option value="unfinancial">Unfinancial</option>
-            </select>
-            <select
-              value={selectedInviteStatus}
-              onChange={(e) => setSelectedInviteStatus(e.target.value)}
-              className="px-4 py-2 rounded-lg border bg-slate-700/50 border-slate-600/50 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-            >
-              <option value="all">All Invite Status</option>
-              <option value="connected">Connected</option>
-              <option value="awaiting_setup">Awaiting Setup</option>
-              <option value="invite_sent">Invite Sent</option>
-              <option value="not_invited">Not Invited</option>
-              <option value="no_email">No Email</option>
             </select>
           </div>
 
