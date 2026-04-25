@@ -56,6 +56,7 @@ import AlfieTVPage from './pages/AlfieTVPage';
 import StripeOAuthCallback from './components/StripeOAuthCallback';
 import { HMSValidatorPage } from './pages/HMSValidatorPage';
 import PublicVideoPlayer from './components/public/PublicVideoPlayer';
+import { DelegatedRollCallPage } from './pages/DelegatedRollCallPage';
 import { MobileAppComingSoon } from './components/MobileAppComingSoon';
 import './styles/index.css';
 
@@ -250,6 +251,9 @@ function App() {
         <Route path="/live/:token" element={<LiveTrackingPage />} />
         <Route path="/live/:token/dashboard" element={<LiveDashboardPage />} />
         <Route path="/live/:token/pro-broadcast" element={<ProBroadcastView />} />
+
+        {/* Delegated Roll Call Route (Public) */}
+        <Route path="/rc/:token" element={<DelegatedRollCallPage />} />
 
         {/* Mobile Livestream Route (Public) */}
         <Route path="/mobile-stream/:sessionId" element={<MobileStreamPage />} />
