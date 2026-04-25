@@ -222,22 +222,25 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
       </p>
 
       <div className="space-y-4 sm:space-y-6">
-          <div className="flex justify-center mb-6 sm:mb-8">
-            <div className="relative">
+          <div className="flex flex-col items-center mb-6 sm:mb-8">
+            <div className="relative mb-3">
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className={`relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 transition-all ${
-                  darkMode ? 'border-slate-700' : 'border-slate-200'
+                className={`relative w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden border-4 transition-all ${
+                  avatarUrl
+                    ? 'border-green-500/60'
+                    : darkMode ? 'border-blue-500/40 border-dashed' : 'border-blue-400/40 border-dashed'
                 } ${uploading ? 'opacity-50' : 'hover:border-blue-500'} group`}
               >
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <div className={`w-full h-full flex items-center justify-center ${
-                    darkMode ? 'bg-slate-800' : 'bg-slate-100'
+                  <div className={`w-full h-full flex flex-col items-center justify-center gap-1.5 ${
+                    darkMode ? 'bg-slate-800/80' : 'bg-slate-100'
                   }`}>
-                    <User size={36} className={`sm:w-12 sm:h-12 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
+                    <Upload size={24} className={`sm:w-7 sm:h-7 ${darkMode ? 'text-blue-400' : 'text-blue-500'}`} />
+                    <span className={`text-[10px] sm:text-xs font-medium ${darkMode ? 'text-blue-400' : 'text-blue-500'}`}>Add Photo</span>
                   </div>
                 )}
 
@@ -258,11 +261,20 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
                 className="hidden"
               />
             </div>
-          </div>
 
-          <p className={`text-center text-xs sm:text-sm -mt-3 sm:-mt-4 mb-4 sm:mb-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-            Click to upload a profile photo (optional)
-          </p>
+            {avatarUrl ? (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className={`text-xs font-medium ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-500'} transition-colors`}
+              >
+                Change photo
+              </button>
+            ) : (
+              <p className={`text-center text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                Add a profile photo so other members can recognise you
+              </p>
+            )}
+          </div>
 
           <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
