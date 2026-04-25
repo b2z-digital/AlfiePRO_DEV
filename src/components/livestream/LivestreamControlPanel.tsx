@@ -457,10 +457,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
           const prev = lastCompletedRaceRef.current;
           if (prev !== null && newCompleted > prev && !segmentTransitionRef.current) {
-            console.log(`[Segment] Race ${newCompleted} scored (was ${prev}). Auto-splitting segment.`);
+            console.log(`[Segment] Race ${newCompleted} scored (was ${prev}). Stopping segment recording.`);
             lastCompletedRaceRef.current = newCompleted;
             await handleSegmentStop('race_scored', false);
-            setTimeout(() => handleSegmentStart(), 2000);
+            // Do NOT auto-start next segment -- wait for 'live' status from subscribeToRaceStatus
           } else if (prev === null) {
             lastCompletedRaceRef.current = newCompleted;
           }
@@ -500,11 +500,12 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
     try {
       const segmentToFinalize = currentSegment;
+      // Stop local recording only -- WHIP live broadcast stays connected
       const recordingBlob = await stopLocalRecording();
 
       if (segmentToFinalize) {
         await livestreamStorage.finalizeSegment(segmentToFinalize.id, triggerType);
-        addNotification('info', `Race ${segmentToFinalize.race_number} recording saved. Processing upload...`, 4000);
+        addNotification('info', `Race ${segmentToFinalize.race_number} recording saved. Uploading to YouTube...`, 4000);
 
         if (recordingBlob && recordingBlob.size > 10000) {
           uploadLocalRecording(recordingBlob, segmentToFinalize.id, activeSession.club_id).then(() => {
@@ -519,20 +520,18 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         }
       }
 
-      await stopWhipStreaming();
-      await new Promise(r => setTimeout(r, 1000));
       setCurrentSegment(null);
 
       if (isFinalSegment) {
-        addNotification('success', 'Final race segment saved. Recordings will be uploaded to YouTube.', 5000);
+        addNotification('success', 'Final race recording saved. Videos will be uploaded to YouTube.', 5000);
       } else {
         setIsPaused(true);
         await livestreamStorage.updateSession(activeSession.id, { is_paused: true });
-        addNotification('info', 'Recording paused between races. Will resume when next race starts.', 5000);
+        addNotification('info', 'Race recording paused. Live broadcast continues. Recording will resume when next race starts.', 5000);
       }
     } catch (error) {
       console.error('[Segment] Stop error:', error);
-      addNotification('error', 'Failed to save segment. Stream may need manual restart.', 8000);
+      addNotification('error', 'Failed to save segment recording.', 8000);
     } finally {
       segmentTransitionRef.current = false;
       setSegmentProcessing(false);
@@ -547,16 +546,12 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
   const handleSegmentStart = async () => {
     if (!activeSession || segmentTransitionRef.current) return;
-    if (whipPeerConnectionRef.current?.connectionState === 'connected') return;
 
     segmentTransitionRef.current = true;
     setSegmentProcessing(true);
 
     try {
-      if (!activeSession.cloudflare_whip_url) {
-        addNotification('error', 'No Cloudflare WHIP URL available', 5000);
-        return;
-      }
+      const whipAlreadyConnected = whipPeerConnectionRef.current?.connectionState === 'connected';
 
       let rawStream = activePreviewStream || mediaStream;
       if (!rawStream || rawStream.getVideoTracks().filter(t => t.readyState === 'live').length === 0) {
@@ -568,39 +563,48 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         rawStream = freshStream;
       }
 
-      if (activeSession.cloudflare_live_input_id) {
-        try {
-          const { data: { session: authSession } } = await supabase.auth.getSession();
-          if (authSession) {
-            await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${authSession.access_token}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'ensureRecording',
-                clubId: activeSession.club_id,
-                sessionData: { liveInputId: activeSession.cloudflare_live_input_id },
-              }),
-            });
-          }
-        } catch (e) { console.warn('[Segment] Could not verify recording mode:', e); }
-      }
-
       let streamToSend = rawStream;
       const cs = compositedStreamRef.current;
       if (cs && cs.getVideoTracks().some(t => t.readyState === 'live' && t.enabled)) {
         streamToSend = cs;
       }
 
-      let whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
-      if (!whipSuccess) {
-        console.warn('[Segment] First WHIP attempt failed, retrying after 2s...');
-        await new Promise(r => setTimeout(r, 2000));
-        whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
-      }
+      if (!whipAlreadyConnected) {
+        if (!activeSession.cloudflare_whip_url) {
+          addNotification('error', 'No Cloudflare WHIP URL available', 5000);
+          return;
+        }
 
-      if (!whipSuccess) {
-        addNotification('error', 'Failed to start recording for new race. Try resuming manually.', 8000);
-        return;
+        if (activeSession.cloudflare_live_input_id) {
+          try {
+            const { data: { session: authSession } } = await supabase.auth.getSession();
+            if (authSession) {
+              await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authSession.access_token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'ensureRecording',
+                  clubId: activeSession.club_id,
+                  sessionData: { liveInputId: activeSession.cloudflare_live_input_id },
+                }),
+              });
+            }
+          } catch (e) { console.warn('[Segment] Could not verify recording mode:', e); }
+        }
+
+        let whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
+        if (!whipSuccess) {
+          console.warn('[Segment] First WHIP attempt failed, retrying after 2s...');
+          await new Promise(r => setTimeout(r, 2000));
+          whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
+        }
+
+        if (!whipSuccess) {
+          addNotification('error', 'Failed to start live broadcast for new race. Try resuming manually.', 8000);
+          return;
+        }
+      } else {
+        console.log('[Segment] WHIP already connected, starting local recording only');
       }
 
       startLocalRecording(streamToSend);
