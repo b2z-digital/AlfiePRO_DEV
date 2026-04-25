@@ -661,7 +661,9 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   // Get unique years from all events
   const availableYears = Array.from(
     new Set(
-      Object.values(uniqueEvents).map(event => new Date(event.date).getFullYear())
+      Object.values(uniqueEvents)
+        .map(event => new Date(event.date).getFullYear())
+        .filter(year => !isNaN(year))
     )
   ).sort((a, b) => b - a); // Sort descending (newest first)
 
@@ -681,6 +683,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   const filteredEvents = Object.values(uniqueEvents)
     .filter(event => {
       const eventDate = new Date(event.date);
+      if (isNaN(eventDate.getTime())) return false;
       if (eventDate.getFullYear() !== selectedYear) {
         return false;
       }

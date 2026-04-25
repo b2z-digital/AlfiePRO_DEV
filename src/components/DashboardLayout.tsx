@@ -2158,7 +2158,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         />
       )}
 
-      {(can('membership.manage') || isSuperAdmin || currentClub?.role === 'admin' || currentClub?.role === 'editor') && (
+      {(can('membership.manage') || isSuperAdmin || currentClub?.role === 'admin' || currentClub?.role === 'editor') && !location.pathname.startsWith('/comms') && (
         <AskAlfieOrb darkMode={darkMode} />
       )}
     </div>
