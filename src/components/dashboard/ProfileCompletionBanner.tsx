@@ -210,20 +210,20 @@ export const ProfileCompletionBanner: React.FC = () => {
     setDismissed(true);
   };
 
-  const handleGoToProfile = () => {
-    navigate('/my-membership', { state: { edit: true } });
+  const handleGoToProfile = (tab?: 'details' | 'boats') => {
+    navigate('/my-membership', { state: { edit: true, editTab: tab } });
   };
 
   if (loading || dismissed || !profileData || !profileData.needs_completion) {
     return null;
   }
 
-  const allItems = [
-    { key: 'avatar', icon: Camera, label: 'Profile photo', missing: profileData.missing_fields.includes('avatar') },
-    { key: 'phone', icon: Phone, label: 'Phone number', missing: profileData.missing_fields.includes('phone') },
-    { key: 'address', icon: MapPin, label: 'Address', missing: profileData.missing_fields.includes('address') },
-    { key: 'emergency', icon: Heart, label: 'Emergency contact', missing: profileData.missing_fields.includes('emergency_contact') },
-    { key: 'boats', icon: Sailboat, label: 'Boat information', missing: !profileData.has_boats },
+  const allItems: Array<{ key: string; icon: typeof Camera; label: string; missing: boolean; tab: 'details' | 'boats' }> = [
+    { key: 'avatar', icon: Camera, label: 'Profile photo', missing: profileData.missing_fields.includes('avatar'), tab: 'details' },
+    { key: 'phone', icon: Phone, label: 'Phone number', missing: profileData.missing_fields.includes('phone'), tab: 'details' },
+    { key: 'address', icon: MapPin, label: 'Address', missing: profileData.missing_fields.includes('address'), tab: 'details' },
+    { key: 'emergency', icon: Heart, label: 'Emergency contact', missing: profileData.missing_fields.includes('emergency_contact'), tab: 'details' },
+    { key: 'boats', icon: Sailboat, label: 'Boat information', missing: !profileData.has_boats, tab: 'boats' },
   ];
 
   const missingCount = allItems.filter(i => i.missing).length;
@@ -262,20 +262,22 @@ export const ProfileCompletionBanner: React.FC = () => {
             <div className="flex flex-wrap gap-2 mb-4">
               {allItems.map((item) => {
                 const ItemIcon = item.icon;
-                return (
+                return item.missing ? (
+                  <button
+                    key={item.key}
+                    onClick={() => handleGoToProfile(item.tab)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all bg-slate-700/50 border border-slate-600/50 text-slate-300 hover:bg-slate-600/50 hover:border-slate-500/50 hover:text-white cursor-pointer"
+                  >
+                    <ItemIcon size={13} className="text-amber-400" />
+                    <span>{item.label}</span>
+                    <ChevronRight size={11} className="text-slate-500 -ml-0.5" />
+                  </button>
+                ) : (
                   <div
                     key={item.key}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors ${
-                      item.missing
-                        ? 'bg-slate-700/50 border border-slate-600/50 text-slate-300'
-                        : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
-                    }`}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
                   >
-                    {item.missing ? (
-                      <ItemIcon size={13} className="text-amber-400" />
-                    ) : (
-                      <CheckCircle2 size={13} className="text-emerald-400" />
-                    )}
+                    <CheckCircle2 size={13} className="text-emerald-400" />
                     <span>{item.label}</span>
                   </div>
                 );
@@ -283,8 +285,8 @@ export const ProfileCompletionBanner: React.FC = () => {
             </div>
 
             <button
-              onClick={handleGoToProfile}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30"
+              onClick={() => handleGoToProfile()}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
             >
               Update My Details
               <ChevronRight size={16} />
