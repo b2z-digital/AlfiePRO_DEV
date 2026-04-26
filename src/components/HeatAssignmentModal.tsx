@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound, getHeatDisplayLabel } from '../types/heat';
@@ -727,7 +728,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     ? 'max-w-[60vw]'
     : 'max-w-[40vw]';
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/75">
       <div
         className={`w-full ${maxWidthClass} max-h-[92vh] rounded-xl shadow-2xl overflow-hidden flex flex-col relative ${
@@ -2296,7 +2297,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           </div>
         );
       })()}
-    </div>
+    </div>,
+    document.body
   );
 };
 
