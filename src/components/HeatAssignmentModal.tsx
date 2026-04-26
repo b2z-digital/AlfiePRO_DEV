@@ -197,57 +197,81 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     const stateObs = buildObserverMap();
     stateObs.forEach((obs, key) => allObservers.set(key, obs));
 
-    const skipperData = new Map<number, { name: string; sailNo: string; club: string; heats: string[]; observing: string[] }>();
+    const roundLabels = roundsToExport.map(rd =>
+      config.scoringSystem === 'shrs' ? getSHRSRoundLabel(rd.round, config) : `R${rd.round}`
+    );
+
+    const skipperData = new Map<number, {
+      name: string;
+      sailNo: string;
+      club: string;
+      heatByRound: Map<number, string>;
+      observerByRound: Map<number, string>;
+    }>();
+
+    const ensureSkipper = (idx: number) => {
+      if (!skipperData.has(idx)) {
+        const s = skippers[idx];
+        if (!s) return null;
+        skipperData.set(idx, {
+          name: s.name || '',
+          sailNo: s.sailNo || '',
+          club: s.club || '',
+          heatByRound: new Map(),
+          observerByRound: new Map(),
+        });
+      }
+      return skipperData.get(idx)!;
+    };
 
     for (const rd of roundsToExport) {
-      const roundLabel = config.scoringSystem === 'shrs'
-        ? getSHRSRoundLabel(rd.round, config)
-        : `R${rd.round}`;
-
       for (const assignment of rd.heatAssignments) {
-        const heatLabel = getHeatDisplayLabel(assignment.heatDesignation, config);
+        const heatLabel = `Heat ${getHeatDisplayLabel(assignment.heatDesignation, config)}`;
         for (const idx of assignment.skipperIndices) {
-          const skipper = skippers[idx];
-          if (!skipper) continue;
-          if (!skipperData.has(idx)) {
-            skipperData.set(idx, { name: skipper.name || '', sailNo: skipper.sailNo || '', club: skipper.club || '', heats: [], observing: [] });
-          }
-          skipperData.get(idx)!.heats.push(`${roundLabel}: Heat ${heatLabel}`);
+          const data = ensureSkipper(idx);
+          if (data) data.heatByRound.set(rd.round, heatLabel);
         }
       }
 
       for (const [key, observers] of allObservers.entries()) {
-        const [rStr] = key.split('-');
-        if (parseInt(rStr) !== rd.round) continue;
+        const parts = key.split('-');
+        const rNum = parseInt(parts[0]);
+        if (rNum !== rd.round) continue;
+        const designation = parts[1] || '';
+        const heatLabel = `Heat ${getHeatDisplayLabel(designation as any, config)}`;
         for (const obs of observers) {
-          const matchIdx = skippers.findIndex(s => s.sailNo === obs.sailNumber || s.name === obs.skipperName);
+          const matchIdx = skippers.findIndex(s =>
+            (obs.sailNumber && s.sailNo === obs.sailNumber) ||
+            (obs.skipperName && s.name === obs.skipperName)
+          );
           if (matchIdx >= 0) {
-            if (!skipperData.has(matchIdx)) {
-              const s = skippers[matchIdx];
-              skipperData.set(matchIdx, { name: s.name || '', sailNo: s.sailNo || '', club: s.club || '', heats: [], observing: [] });
-            }
-            const designation = key.split('-')[1] || '';
-            const heatLabel = getHeatDisplayLabel(designation as any, config);
-            skipperData.get(matchIdx)!.observing.push(`${roundLabel}: Heat ${heatLabel}`);
+            const data = ensureSkipper(matchIdx);
+            if (data) data.observerByRound.set(rd.round, heatLabel);
           }
         }
       }
     }
 
-    const rows: string[] = ['Sail Number,Skipper Name,Club,Heat Assignments,Observer Duties'];
+    const escapeCsv = (v: string) => v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
+
+    const heatHeaders = roundLabels.map(l => `${l} Heat`);
+    const obsHeaders = roundLabels.map(l => `${l} Observer`);
+    const headerRow = ['Sail Number', 'Skipper Name', 'Club', ...heatHeaders, ...obsHeaders].join(',');
+
     const sorted = [...skipperData.values()].sort((a, b) => {
       const numA = parseInt(a.sailNo) || 99999;
       const numB = parseInt(b.sailNo) || 99999;
       return numA - numB;
     });
 
-    for (const s of sorted) {
-      const escapeCsv = (v: string) => v.includes(',') ? `"${v}"` : v;
-      rows.push(`${s.sailNo},${escapeCsv(s.name)},${escapeCsv(s.club)},${escapeCsv(s.heats.join('; '))},${escapeCsv(s.observing.join('; '))}`);
-    }
+    const dataRows = sorted.map(s => {
+      const heatCols = roundsToExport.map(rd => s.heatByRound.get(rd.round) || '');
+      const obsCols = roundsToExport.map(rd => s.observerByRound.get(rd.round) || '');
+      return [s.sailNo, escapeCsv(s.name), escapeCsv(s.club), ...heatCols, ...obsCols].join(',');
+    });
 
     const eventSlug = (currentEvent?.name || currentEvent?.eventName || 'Heat_Assignments').replace(/[^a-zA-Z0-9]/g, '_');
-    downloadCsv(rows.join('\n'), `${eventSlug}_Assignments_By_Skipper.csv`);
+    downloadCsv([headerRow, ...dataRows].join('\n'), `${eventSlug}_Assignments_By_Skipper.csv`);
   };
 
   const buildObserverMap = () => {
