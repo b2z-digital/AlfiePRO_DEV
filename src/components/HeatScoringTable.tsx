@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { HeatManagement, HeatDesignation, generateInitialHeatAssignments, getHeatDisplayLabel } from '../types/heat';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { HeatManagement, HeatDesignation, generateInitialHeatAssignments, getHeatDisplayLabel, getSHRSRoundLabel } from '../types/heat';
 import { Skipper } from '../types';
 import { ScratchRaceTable } from './ScratchRaceTable';
 import { TouchModeScoring } from './TouchModeScoring';
@@ -10,12 +10,12 @@ import { HeatAssignmentModal } from './HeatAssignmentModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
-import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 as Grid3X3, Check, Timer, Share2 } from 'lucide-react';
+import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 as Grid3X3, Check, Timer, Share2, Download, ChevronDown, FileSpreadsheet, Users } from 'lucide-react';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
 import { HmsManualSpreadsheet } from './HmsManualSpreadsheet';
-import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
+import { exportAllRoundsPdf, exportSingleRoundPdf } from '../utils/heatAssignmentPdfExport';
 import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
@@ -194,6 +194,19 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [showStartBoxModal, setShowStartBoxModal] = useState(false);
   const [raceTimerRunning, setRaceTimerRunning] = useState(false);
   const [showShareRollCall, setShowShareRollCall] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showExportMenu]);
 
   // Track the round number to detect actual round changes (not just object reference changes)
   const lastRoundNumber = React.useRef<number | null>(null);
@@ -1192,6 +1205,175 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     );
   }
 
+  const getExportOptions = () => ({
+    eventName: currentEvent?.name || currentEvent?.eventName || '',
+    eventDate: currentEvent?.date || '',
+    venueName: (currentEvent as any)?.venue || '',
+    clubName: (currentEvent as any)?.clubName || '',
+    showFlag: currentEvent?.show_flag ?? false,
+    showCountry: currentEvent?.show_country ?? false,
+  });
+
+  const buildFullObserverMap = async () => {
+    let obsMap: Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]> | undefined;
+    const pdfEventId = observerEventId || await resolveObserverEventId(currentEvent);
+    if (pdfEventId) {
+      const rawMap = await getAllObserversForEvent(pdfEventId);
+      obsMap = new Map();
+      rawMap.forEach((observers, key) => {
+        obsMap!.set(key, observers.map(o => {
+          const matched = skippers.find(s => s.sailNo === o.sailNumber || s.name === o.skipperName);
+          return { ...o, countryCode: matched?.country_code || undefined };
+        }));
+      });
+    }
+    return obsMap;
+  };
+
+  const downloadCsv = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const handleExportCurrentHeatPdf = async () => {
+    const roundIdx = heatManagement.rounds.findIndex(r => r.round === safeCurrentRound);
+    if (roundIdx < 0) return;
+    const obsMap = await buildFullObserverMap();
+    exportSingleRoundPdf(heatManagement, roundIdx, skippers, getExportOptions(), obsMap);
+  };
+
+  const handleExportAllHeatsPdf = async () => {
+    const obsMap = await buildFullObserverMap();
+    exportAllRoundsPdf(heatManagement, skippers, getExportOptions(), obsMap);
+  };
+
+  const exportCurrentHeatCsv = async () => {
+    const config = heatManagement.configuration;
+    const roundIdx = heatManagement.rounds.findIndex(r => r.round === safeCurrentRound);
+    if (roundIdx < 0) return;
+    const rd = heatManagement.rounds[roundIdx];
+    if (!rd) return;
+
+    const allObservers = await buildFullObserverMap() || new Map();
+    const roundLabel = config.scoringSystem === 'shrs' ? getSHRSRoundLabel(rd.round, config) : `R${rd.round}`;
+    const rows: string[] = ['Round,Heat,Sail Number,Skipper Name,Club,Observer'];
+    const sorted = [...rd.heatAssignments].sort((a, b) => a.heatDesignation.localeCompare(b.heatDesignation));
+
+    for (const assignment of sorted) {
+      const heatLabel = getHeatDisplayLabel(assignment.heatDesignation, config);
+      const obsKey = `${rd.round}-${assignment.heatDesignation}`;
+      const heatObs = allObservers.get(obsKey) || [];
+      const obsText = heatObs.map(o => `${o.sailNumber} ${o.skipperName}`.trim()).join('; ');
+      for (const idx of assignment.skipperIndices) {
+        const s = skippers[idx];
+        if (s) {
+          const esc = (v: string) => v.includes(',') ? `"${v}"` : v;
+          rows.push(`${roundLabel},Heat ${heatLabel},${s.sailNo || ''},${esc(s.name || '')},${esc(s.club || '')},${esc(obsText)}`);
+        }
+      }
+    }
+
+    const slug = (currentEvent?.name || currentEvent?.eventName || 'Heat_Assignments').replace(/[^a-zA-Z0-9]/g, '_');
+    downloadCsv(rows.join('\n'), `${slug}_${roundLabel}_Assignments.csv`);
+  };
+
+  const exportAllHeatsCsv = async () => {
+    const config = heatManagement.configuration;
+    const qualifyingRounds = config.shrsQualifyingRounds || heatManagement.rounds.length;
+    const roundsToExport = heatManagement.rounds.filter(r => r.round <= qualifyingRounds);
+    const allObservers = await buildFullObserverMap() || new Map();
+
+    const rows: string[] = ['Round,Heat,Sail Number,Skipper Name,Club,Observer'];
+    for (const rd of roundsToExport) {
+      const sorted = [...rd.heatAssignments].sort((a, b) => a.heatDesignation.localeCompare(b.heatDesignation));
+      const roundLabel = config.scoringSystem === 'shrs' ? getSHRSRoundLabel(rd.round, config) : `R${rd.round}`;
+      for (const assignment of sorted) {
+        const heatLabel = getHeatDisplayLabel(assignment.heatDesignation, config);
+        const obsKey = `${rd.round}-${assignment.heatDesignation}`;
+        const heatObs = allObservers.get(obsKey) || [];
+        const obsText = heatObs.map(o => `${o.sailNumber} ${o.skipperName}`.trim()).join('; ');
+        for (const idx of assignment.skipperIndices) {
+          const s = skippers[idx];
+          if (s) {
+            const esc = (v: string) => v.includes(',') ? `"${v}"` : v;
+            rows.push(`${roundLabel},Heat ${heatLabel},${s.sailNo || ''},${esc(s.name || '')},${esc(s.club || '')},${esc(obsText)}`);
+          }
+        }
+      }
+    }
+
+    const slug = (currentEvent?.name || currentEvent?.eventName || 'Heat_Assignments').replace(/[^a-zA-Z0-9]/g, '_');
+    downloadCsv(rows.join('\n'), `${slug}_All_Assignments.csv`);
+  };
+
+  const exportBySkipperCsv = async () => {
+    const config = heatManagement.configuration;
+    const qualifyingRounds = config.shrsQualifyingRounds || heatManagement.rounds.length;
+    const roundsToExport = heatManagement.rounds.filter(r => r.round <= qualifyingRounds);
+    const allObservers = await buildFullObserverMap() || new Map();
+
+    const roundLabels = roundsToExport.map(rd =>
+      config.scoringSystem === 'shrs' ? getSHRSRoundLabel(rd.round, config) : `R${rd.round}`
+    );
+
+    const skipperData = new Map<number, {
+      name: string; sailNo: string; club: string;
+      heatByRound: Map<number, string>; observerByRound: Map<number, string>;
+    }>();
+
+    const ensure = (idx: number) => {
+      if (!skipperData.has(idx)) {
+        const s = skippers[idx];
+        if (!s) return null;
+        skipperData.set(idx, { name: s.name || '', sailNo: s.sailNo || '', club: s.club || '', heatByRound: new Map(), observerByRound: new Map() });
+      }
+      return skipperData.get(idx)!;
+    };
+
+    for (const rd of roundsToExport) {
+      for (const assignment of rd.heatAssignments) {
+        const heatLabel = `Heat ${getHeatDisplayLabel(assignment.heatDesignation, config)}`;
+        for (const idx of assignment.skipperIndices) {
+          const data = ensure(idx);
+          if (data) data.heatByRound.set(rd.round, heatLabel);
+        }
+      }
+      for (const [key, observers] of allObservers.entries()) {
+        const parts = key.split('-');
+        const rNum = parseInt(parts[0]);
+        if (rNum !== rd.round) continue;
+        const designation = parts[1] || '';
+        const heatLabel = `Heat ${getHeatDisplayLabel(designation as any, config)}`;
+        for (const obs of observers) {
+          const matchIdx = skippers.findIndex(s => (obs.sailNumber && s.sailNo === obs.sailNumber) || (obs.skipperName && s.name === obs.skipperName));
+          if (matchIdx >= 0) {
+            const data = ensure(matchIdx);
+            if (data) data.observerByRound.set(rd.round, heatLabel);
+          }
+        }
+      }
+    }
+
+    const esc = (v: string) => v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
+    const heatHeaders = roundLabels.map(l => `${l} Heat`);
+    const obsHeaders = roundLabels.map(l => `${l} Observer`);
+    const headerRow = ['Sail Number', 'Skipper Name', 'Club', ...heatHeaders, ...obsHeaders].join(',');
+
+    const sorted = [...skipperData.values()].sort((a, b) => (parseInt(a.sailNo) || 99999) - (parseInt(b.sailNo) || 99999));
+    const dataRows = sorted.map(s => {
+      const heatCols = roundsToExport.map(rd => s.heatByRound.get(rd.round) || '');
+      const obsCols = roundsToExport.map(rd => s.observerByRound.get(rd.round) || '');
+      return [s.sailNo, esc(s.name), esc(s.club), ...heatCols, ...obsCols].join(',');
+    });
+
+    const slug = (currentEvent?.name || currentEvent?.eventName || 'Heat_Assignments').replace(/[^a-zA-Z0-9]/g, '_');
+    downloadCsv([headerRow, ...dataRows].join('\n'), `${slug}_Assignments_By_Skipper.csv`);
+  };
+
   return (
     <div className={`space-y-6 ${isFullscreen ? 'p-2' : 'p-8'} no-select`}>
       {/* All Heats Complete - Show Actions (hidden in touch/spreadsheet mode as it's shown in the button instead) */}
@@ -1432,44 +1614,82 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               >
                 View Assignments
               </button>
-              {heatManagement.configuration.scoringSystem === 'shrs' && (
+              <div className="relative" ref={exportMenuRef}>
                 <button
-                  onClick={async () => {
-                    const opts = {
-                      eventName: currentEvent?.name || currentEvent?.eventName || '',
-                      eventDate: currentEvent?.date || '',
-                      venueName: (currentEvent as any)?.venue || '',
-                      clubName: (currentEvent as any)?.clubName || '',
-                      showFlag: currentEvent?.show_flag ?? false,
-                      showCountry: currentEvent?.show_country ?? false,
-                    };
-                    let obsMap: Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]> | undefined;
-                    const pdfEventId = observerEventId || await resolveObserverEventId(currentEvent);
-                    if (pdfEventId) {
-                      const rawMap = await getAllObserversForEvent(pdfEventId);
-                      obsMap = new Map();
-                      rawMap.forEach((observers, key) => {
-                        obsMap!.set(key, observers.map(o => {
-                          const matched = skippers.find(s =>
-                            s.sailNo === o.sailNumber || s.name === o.skipperName
-                          );
-                          return { ...o, countryCode: matched?.country_code || undefined };
-                        }));
-                      });
-                    }
-                    exportAllRoundsPdf(heatManagement, skippers, opts, obsMap);
-                  }}
+                  onClick={() => setShowExportMenu(!showExportMenu)}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     darkMode
                       ? 'bg-slate-600 text-white hover:bg-slate-500'
                       : 'bg-slate-600 text-white hover:bg-slate-500'
                   }`}
-                  title="Export all qualifying rounds as multi-page PDF"
                 >
-                  <FileDown size={16} />
-                  Export All Rounds
+                  <Download size={16} />
+                  Export Assignments
+                  <ChevronDown size={14} />
                 </button>
-              )}
+                {showExportMenu && (
+                  <div className={`absolute right-0 top-full mt-1 w-64 rounded-lg shadow-lg border z-50 py-1 ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                  }`}>
+                    <div className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider ${
+                      darkMode ? 'text-slate-500' : 'text-slate-400'
+                    }`}>
+                      PDF
+                    </div>
+                    <button
+                      onClick={() => { handleExportCurrentHeatPdf(); setShowExportMenu(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                        darkMode ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <FileDown size={15} className="flex-shrink-0" />
+                      This Heat (PDF)
+                    </button>
+                    <button
+                      onClick={() => { handleExportAllHeatsPdf(); setShowExportMenu(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                        darkMode ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <FileDown size={15} className="flex-shrink-0" />
+                      All Heats (PDF)
+                    </button>
+                    <div className={`my-1 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`} />
+                    <div className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider ${
+                      darkMode ? 'text-slate-500' : 'text-slate-400'
+                    }`}>
+                      CSV
+                    </div>
+                    <button
+                      onClick={() => { exportCurrentHeatCsv(); setShowExportMenu(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                        darkMode ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <FileSpreadsheet size={15} className="flex-shrink-0" />
+                      This Heat (CSV)
+                    </button>
+                    <button
+                      onClick={() => { exportAllHeatsCsv(); setShowExportMenu(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                        darkMode ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <FileSpreadsheet size={15} className="flex-shrink-0" />
+                      All Heats (CSV)
+                    </button>
+                    <button
+                      onClick={() => { exportBySkipperCsv(); setShowExportMenu(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                        darkMode ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Users size={15} className="flex-shrink-0" />
+                      By Skipper (CSV)
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => {
                   if (heatManagement.configuration?.scoringSystem === 'hms' && fleetManagementEnabled) {
