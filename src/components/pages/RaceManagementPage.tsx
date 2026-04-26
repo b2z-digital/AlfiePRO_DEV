@@ -1424,36 +1424,6 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           {/* Action Buttons */}
           <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 touch-show transition-opacity">
             <div className="flex gap-2">
-              {(race.eventLevel === 'state' || race.eventLevel === 'national') && (
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    // Check if website already exists
-                    const { data: existingWebsite } = await supabase
-                      .from('event_websites')
-                      .select('id')
-                      .eq('event_id', race.id)
-                      .maybeSingle();
-
-                    if (existingWebsite) {
-                      // Navigate to dashboard if website exists
-                      navigate(`/website/event-websites/${race.id}`);
-                    } else {
-                      // Show settings modal to create new website
-                      setSelectedEventForWebsite(race);
-                      setShowEventWebsiteModal(true);
-                    }
-                  }}
-                  className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${
-                    darkMode
-                      ? 'bg-purple-900/90 hover:bg-purple-800 text-purple-400'
-                      : 'bg-purple-50/90 hover:bg-purple-100 text-purple-600'
-                  }`}
-                  title="Event Website"
-                >
-                  <Globe size={16} />
-                </button>
-              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1465,8 +1435,8 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                       ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
                       : 'bg-white/50 text-slate-400 cursor-not-allowed'
                     : darkMode
-                      ? 'bg-amber-900/90 hover:bg-amber-800 text-amber-400'
-                      : 'bg-amber-50/90 hover:bg-amber-100 text-amber-600'
+                      ? 'bg-slate-700/90 hover:bg-slate-600 text-slate-300'
+                      : 'bg-white/90 hover:bg-slate-100 text-slate-600'
                 }`}
                 title={hasEventStartedScoring(race) ? "Cannot edit - scoring has commenced" : "Edit event"}
                 disabled={hasEventStartedScoring(race)}
@@ -1702,33 +1672,6 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                     seriesId: s.id,
                     clubId: s.clubId
                   };
-                  setSelectedEventForTracking(seriesEvent);
-                  setShowLiveTrackingQR(true);
-                }}
-                className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${
-                  darkMode
-                    ? 'bg-blue-900/90 hover:bg-blue-800 text-blue-400'
-                    : 'bg-blue-50/90 hover:bg-blue-100 text-blue-600'
-                }`}
-                title="Live Skipper Tracking QR Code"
-              >
-                <QrCode size={16} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const seriesEvent: RaceEvent = {
-                    id: s.id,
-                    eventName: s.seriesName,
-                    clubName: s.clubName,
-                    date: s.rounds[0]?.date || new Date().toISOString(),
-                    venue: s.rounds[0]?.venue || '',
-                    raceClass: s.raceClass,
-                    raceFormat: s.raceFormat,
-                    isSeriesEvent: true,
-                    seriesId: s.id,
-                    clubId: s.clubId
-                  };
                   handleEditClick(seriesEvent);
                 }}
                 className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${
@@ -1737,8 +1680,8 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                       ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
                       : 'bg-white/50 text-slate-400 cursor-not-allowed'
                     : darkMode
-                      ? 'bg-amber-900/90 hover:bg-amber-800 text-amber-400'
-                      : 'bg-amber-50/90 hover:bg-amber-100 text-amber-600'
+                      ? 'bg-slate-700/90 hover:bg-slate-600 text-slate-300'
+                      : 'bg-white/90 hover:bg-slate-100 text-slate-600'
                 }`}
                 title={isSeriesFullyCompleted(s) ? "Cannot edit - all rounds completed" : "Edit series"}
                 disabled={isSeriesFullyCompleted(s)}
