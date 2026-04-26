@@ -728,7 +728,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     : 'max-w-[40vw]';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black bg-opacity-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black">
       <div
         className={`w-full ${maxWidthClass} max-h-[92vh] rounded-xl shadow-2xl overflow-hidden flex flex-col relative ${
           darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'
