@@ -946,7 +946,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 }`}
               >
                 <Download size={16} />
-                Export
+                Export Assignments
                 <ChevronDown size={14} />
               </button>
               {showExportMenu && (
@@ -965,19 +965,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     }`}
                   >
                     <FileDown size={15} className="flex-shrink-0" />
-                    This Round (PDF)
+                    This Heat (PDF)
                   </button>
-                  {shrsHasPreAssignments && (
-                    <button
-                      onClick={() => { handleExportAllRoundsPdf(); setShowExportMenu(false); }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                        darkMode ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <FileDown size={15} className="flex-shrink-0" />
-                      All Rounds (PDF)
-                    </button>
-                  )}
+                  <button
+                    onClick={() => { handleExportAllRoundsPdf(); setShowExportMenu(false); }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                      darkMode ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <FileDown size={15} className="flex-shrink-0" />
+                    All Heats (PDF)
+                  </button>
                   <div className={`my-1 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`} />
                   <div className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider ${
                     darkMode ? 'text-slate-500' : 'text-slate-400'
@@ -991,7 +989,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     }`}
                   >
                     <FileSpreadsheet size={15} className="flex-shrink-0" />
-                    This Round (CSV)
+                    This Heat (CSV)
                   </button>
                   <button
                     onClick={() => { exportAllAssignmentsCsv(); setShowExportMenu(false); }}
@@ -1000,7 +998,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     }`}
                   >
                     <FileSpreadsheet size={15} className="flex-shrink-0" />
-                    All Rounds (CSV)
+                    All Heats (CSV)
                   </button>
                   <button
                     onClick={() => { exportAssignmentsBySkipperCsv(); setShowExportMenu(false); }}
