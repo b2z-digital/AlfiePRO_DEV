@@ -29,8 +29,6 @@ const PWAInstallPrompt: React.FC = () => {
       return;
     }
 
-    return;
-
     const dismissed = localStorage.getItem('pwa-install-dismissed');
     const dismissedDate = dismissed ? new Date(dismissed) : null;
     const daysSinceDismissed = dismissedDate

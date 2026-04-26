@@ -443,11 +443,12 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
         autoCompleteTimerRef.current = setTimeout(() => {
           const pending = autoCompleteCellRef.current;
           if (pending && pending.heat === heat && pending.position === position && pending.value === lower) {
-            if (position < currentSkipperCount) {
-              const nextRef = inputRefs.current[`${heat}-${position}`];
+            for (let next = position; next < currentSkipperCount; next++) {
+              const nextRef = inputRefs.current[`${heat}-${next}`];
               if (nextRef) {
                 nextRef.focus();
                 nextRef.select();
+                break;
               }
             }
           }
@@ -512,17 +513,26 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent, heat: HeatDesignation, position: number, totalPositions: number) => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
-      if (position < totalPositions) {
-        const ref = inputRefs.current[`${heat}-${position}`];
-        ref?.focus();
-        ref?.select();
+      for (let next = position; next < totalPositions; next++) {
+        const ref = inputRefs.current[`${heat}-${next}`];
+        if (ref) {
+          ref.focus();
+          ref.select();
+          return;
+        }
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      inputRefs.current[`${heat}-${position}`]?.focus();
+      for (let next = position; next < totalPositions; next++) {
+        const ref = inputRefs.current[`${heat}-${next}`];
+        if (ref) { ref.focus(); return; }
+      }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      inputRefs.current[`${heat}-${position - 2}`]?.focus();
+      for (let prev = position - 2; prev >= 0; prev--) {
+        const ref = inputRefs.current[`${heat}-${prev}`];
+        if (ref) { ref.focus(); return; }
+      }
     }
   };
 
