@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound, getHeatDisplayLabel } from '../types/heat';
@@ -727,8 +728,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     ? 'max-w-[60vw]'
     : 'max-w-[40vw]';
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black bg-opacity-50">
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/75">
       <div
         className={`w-full ${maxWidthClass} max-h-[92vh] rounded-xl shadow-2xl overflow-hidden flex flex-col relative ${
           darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'
@@ -1993,7 +1994,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           .filter(({ index }) => !selectedHeat.skipperIndices.includes(index));
 
         return (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-70">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black bg-opacity-70">
             <div
               className={`w-full max-w-2xl max-h-[80vh] rounded-lg shadow-2xl overflow-hidden flex flex-col ${
                 darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'
@@ -2296,7 +2297,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           </div>
         );
       })()}
-    </div>
+    </div>,
+    document.body
   );
 };
 
