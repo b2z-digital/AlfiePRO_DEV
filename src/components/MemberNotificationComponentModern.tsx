@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mail, Send, Inbox, Search, X, Plus, Users, Trash2, ChevronRight, Reply, Forward, FileText, Sparkles, Circle, Archive, Flag, Folder, PanelLeftClose, PanelLeft, Star, MoveHorizontal as MoreHorizontal, RefreshCw, Paperclip, Download, ListChecks } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Mail, Send, Inbox, Search, X, Plus, Users, Trash2, ChevronRight, Reply, Forward, FileText, Sparkles, Circle, Archive, Flag, Folder, PanelLeftClose, PanelLeft, Star, MoveHorizontal as MoreHorizontal, RefreshCw, Paperclip, Download, ListChecks, ExternalLink } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase } from '../utils/supabase';
@@ -66,6 +67,7 @@ interface MemberNotificationComponentModernProps {
 }
 
 export const MemberNotificationComponentModern: React.FC<MemberNotificationComponentModernProps> = ({ darkMode, initialShowCompose = false }) => {
+  const navigate = useNavigate();
   const { user, currentClub, currentOrganization } = useAuth();
   const { isImpersonating, effectiveUserId, effectiveProfile: impersonatedProfile } = useImpersonation();
   const contextId = currentOrganization?.id || currentClub?.clubId;
@@ -1186,15 +1188,25 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
 
                 {selectedNotification.link_url && (
                   <div className="mt-6">
-                    <a
-                      href={selectedNotification.link_url}
-                      target={selectedNotification.link_url.startsWith('http') ? '_blank' : undefined}
-                      rel={selectedNotification.link_url.startsWith('http') ? 'noopener noreferrer' : undefined}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl font-medium text-sm"
-                    >
-                      <ChevronRight size={16} />
-                      View Item
-                    </a>
+                    {selectedNotification.link_url.startsWith('http') ? (
+                      <a
+                        href={selectedNotification.link_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl font-medium text-sm"
+                      >
+                        <ExternalLink size={16} />
+                        View Item
+                      </a>
+                    ) : (
+                      <button
+                        onClick={() => navigate(selectedNotification.link_url!)}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl font-medium text-sm"
+                      >
+                        <ChevronRight size={16} />
+                        View Item
+                      </button>
+                    )}
                   </div>
                 )}
 

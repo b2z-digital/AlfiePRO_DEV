@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Star, Archive, Trash2, Reply, Forward, ChevronRight, MoveHorizontal as MoreHorizontal, Bell, Paperclip, Download, ExternalLink } from 'lucide-react';
 
 interface Notification {
@@ -97,6 +98,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
   onDelete,
   darkMode,
 }) => {
+  const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
   const senderName = notification.sender_name || 'System';
   const typeConfig = getTypeConfig(notification.type);
@@ -221,15 +223,25 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
 
               {notification.link_url && (
                 <div className="mt-5 pt-4 border-t border-slate-700/50">
-                  <a
-                    href={notification.link_url}
-                    target={notification.link_url.startsWith('http') ? '_blank' : undefined}
-                    rel={notification.link_url.startsWith('http') ? 'noopener noreferrer' : undefined}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 text-sm font-medium"
-                  >
-                    <ChevronRight size={16} />
-                    View Item
-                  </a>
+                  {notification.link_url.startsWith('http') ? (
+                    <a
+                      href={notification.link_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 text-sm font-medium"
+                    >
+                      <ExternalLink size={16} />
+                      View Item
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => navigate(notification.link_url!)}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 text-sm font-medium"
+                    >
+                      <ChevronRight size={16} />
+                      View Item
+                    </button>
+                  )}
                 </div>
               )}
             </div>

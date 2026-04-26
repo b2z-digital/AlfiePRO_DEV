@@ -45,6 +45,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [recipientOnline, setRecipientOnline] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -246,6 +247,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
     const messageText = newMessage.trim();
     setNewMessage('');
     setSending(true);
+    setSendError(null);
 
     try {
       let convId = convIdRef.current;
@@ -254,7 +256,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
         convId = await createConversation();
         if (!convId) {
           setNewMessage(messageText);
-          throw new Error('Failed to create conversation');
+          setSendError('Unable to start conversation. Please try again.');
+          setSending(false);
+          return;
         }
         setConversationId(convId);
         convIdRef.current = convId;
@@ -283,7 +287,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
         setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
         setNewMessage(messageText);
         console.error('Failed to send message:', msgErr);
-        throw msgErr;
+        setSendError('Message failed to send. Please try again.');
+        setSending(false);
+        return;
       }
 
       setMessages(prev =>
@@ -304,6 +310,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
       inputRef.current?.focus();
     } catch (err) {
       console.error('Error sending message:', err);
+      setSendError('Something went wrong. Please try again.');
     } finally {
       setSending(false);
     }
@@ -414,12 +421,18 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
       </div>
 
       <div className={`flex-shrink-0 p-3 border-t ${darkMode ? 'bg-slate-800/60 border-slate-700/50' : 'bg-white border-gray-200'}`}>
+        {sendError && (
+          <div className="mb-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-between">
+            <p className="text-xs text-red-400">{sendError}</p>
+            <button onClick={() => setSendError(null)} className="text-red-400 hover:text-red-300 ml-2 text-xs font-medium">Dismiss</button>
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <textarea
               ref={inputRef}
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => { setNewMessage(e.target.value); if (sendError) setSendError(null); }}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               rows={1}
