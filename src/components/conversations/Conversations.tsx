@@ -70,6 +70,7 @@ interface ConversationsProps {
   initialChatName?: string;
   initialChatAvatar?: string;
   initialTab?: TopLevelTab;
+  initialConversationId?: string;
 }
 
 export const Conversations: React.FC<ConversationsProps> = ({
@@ -80,6 +81,7 @@ export const Conversations: React.FC<ConversationsProps> = ({
   initialChatName,
   initialChatAvatar,
   initialTab,
+  initialConversationId,
 }) => {
   const { user, currentClub, currentOrganization } = useAuth();
   const { isImpersonating, effectiveUserId, effectiveProfile: impersonatedProfile } = useImpersonation();
@@ -161,6 +163,31 @@ export const Conversations: React.FC<ConversationsProps> = ({
       setDirectChatTarget({ id: initialChatWith, name: initialChatName, avatar: initialChatAvatar });
     }
   }, [initialChatWith, initialChatName, initialChatAvatar]);
+
+  useEffect(() => {
+    if (!initialConversationId || !viewingUserId) return;
+    const openConversation = async () => {
+      const { data: participants } = await supabase
+        .from('conversation_participants')
+        .select('user_id')
+        .eq('conversation_id', initialConversationId);
+      if (!participants || participants.length === 0) return;
+
+      const otherUserId = participants.find(p => p.user_id !== viewingUserId)?.user_id;
+      if (!otherUserId) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, avatar_url')
+        .eq('id', otherUserId)
+        .maybeSingle();
+
+      const name = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown' : 'Unknown';
+      setTopLevelTab('chats');
+      setDirectChatTarget({ id: otherUserId, name, avatar: profile?.avatar_url || undefined });
+    };
+    openConversation();
+  }, [initialConversationId, viewingUserId]);
 
   useEffect(() => {
     if (!viewingUserId) return;

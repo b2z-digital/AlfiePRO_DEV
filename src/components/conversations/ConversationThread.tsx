@@ -235,7 +235,14 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
                     </a>
                   ) : (
                     <button
-                      onClick={() => navigate(notification.link_url!)}
+                      onClick={() => {
+                        let url = notification.link_url!;
+                        if (url.startsWith('/community/chat')) {
+                          const convId = new URLSearchParams(url.split('?')[1] || '').get('id');
+                          url = convId ? `/comms?tab=chats&conversationId=${convId}` : '/comms?tab=chats';
+                        }
+                        navigate(url);
+                      }}
                       className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 text-sm font-medium"
                     >
                       <ChevronRight size={16} />

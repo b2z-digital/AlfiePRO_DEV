@@ -14,6 +14,7 @@ export const CommsPage: React.FC<CommsPageProps> = ({ darkMode = true }) => {
   const chatWith = searchParams.get('chatWith') || undefined;
   const chatName = searchParams.get('chatName') || undefined;
   const chatAvatar = searchParams.get('chatAvatar') || undefined;
+  const conversationId = searchParams.get('conversationId') || undefined;
   const tab = searchParams.get('tab') as TopLevelTab | null;
 
   return (
@@ -25,6 +26,7 @@ export const CommsPage: React.FC<CommsPageProps> = ({ darkMode = true }) => {
       initialChatName={chatName}
       initialChatAvatar={chatAvatar}
       initialTab={tab || undefined}
+      initialConversationId={conversationId}
     />
   );
 };

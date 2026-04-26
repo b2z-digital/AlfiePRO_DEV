@@ -1200,7 +1200,14 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
                       </a>
                     ) : (
                       <button
-                        onClick={() => navigate(selectedNotification.link_url!)}
+                        onClick={() => {
+                          let url = selectedNotification.link_url!;
+                          if (url.startsWith('/community/chat')) {
+                            const convId = new URLSearchParams(url.split('?')[1] || '').get('id');
+                            url = convId ? `/comms?tab=chats&conversationId=${convId}` : '/comms?tab=chats';
+                          }
+                          navigate(url);
+                        }}
                         className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl font-medium text-sm"
                       >
                         <ChevronRight size={16} />
