@@ -185,16 +185,18 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
               className={`p-3 bg-slate-700/30 hover:bg-slate-700/50 border border-slate-700/50 rounded-xl transition-all group ${isEditMode ? 'pointer-events-none' : 'cursor-pointer'}`}
             >
               <div className="flex items-center gap-3">
-                {article.cover_image && (
-                  <div className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-slate-700">
-                    <img
-                      src={article.cover_image}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                    />
-                  </div>
-                )}
+                <div className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-slate-700">
+                  <img
+                    src={article.cover_image || '/alfie_app_logo.svg'}
+                    alt=""
+                    className={`w-full h-full ${article.cover_image ? 'object-cover' : 'object-contain p-2'}`}
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      img.src = '/alfie_app_logo.svg';
+                      img.className = 'w-full h-full object-contain p-2';
+                    }}
+                  />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <div className="font-medium text-white text-sm leading-snug line-clamp-2 group-hover:text-amber-400 transition-colors">
