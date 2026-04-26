@@ -2780,23 +2780,28 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       const qRounds = finalHM.configuration.shrsQualifyingRounds || 1;
       const isPreset = finalHM.configuration.shrsAssignmentMode === 'preset';
       if (isPreset && qRounds > 1 && finalHM.rounds.length < qRounds) {
-        console.log('⚠️ SHRS safety net (balanced): rounds.length', finalHM.rounds.length, 'but need', qRounds, '- regenerating');
-        const firstRoundAssignments = finalHM.rounds[0]?.heatAssignments || [];
-        const numHeats = finalHM.configuration.numberOfHeats;
-        const allQR = generatePreSetQualifyingAssignments(
-          firstRoundAssignments.map(a => ({ heatDesignation: a.heatDesignation as string, skipperIndices: [...a.skipperIndices] })),
-          numHeats,
-          qRounds
-        );
-        finalHM = {
-          ...finalHM,
-          rounds: allQR.map((ra, idx) => ({
-            round: idx + 1,
-            heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as any, skipperIndices: a.skipperIndices })),
-            results: [] as any[],
-            completed: false
-          }))
-        };
+        const hasAnyResults = finalHM.rounds.some(r => r.results && r.results.length > 0);
+        if (hasAnyResults) {
+          console.log('⚠️ SHRS safety net (balanced): rounds missing but results exist - preserving existing rounds');
+        } else {
+          console.log('⚠️ SHRS safety net (balanced): rounds.length', finalHM.rounds.length, 'but need', qRounds, '- regenerating');
+          const firstRoundAssignments = finalHM.rounds[0]?.heatAssignments || [];
+          const numHeats = finalHM.configuration.numberOfHeats;
+          const allQR = generatePreSetQualifyingAssignments(
+            firstRoundAssignments.map(a => ({ heatDesignation: a.heatDesignation as string, skipperIndices: [...a.skipperIndices] })),
+            numHeats,
+            qRounds
+          );
+          finalHM = {
+            ...finalHM,
+            rounds: allQR.map((ra, idx) => ({
+              round: idx + 1,
+              heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as any, skipperIndices: a.skipperIndices })),
+              results: [] as any[],
+              completed: false
+            }))
+          };
+        }
       } else if (!isPreset && finalHM.rounds.length > 1) {
         console.log('⚠️ SHRS safety net (progressive): trimming to round 1 only');
         finalHM = {

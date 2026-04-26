@@ -87,6 +87,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   const [fleetManagementEnabled, setFleetManagementEnabled] = useState(
     initialHeatManagement?.configuration.fleetManagementEnabled ?? true
   );
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [pendingRegenerateAction, setPendingRegenerateAction] = useState<(() => void) | null>(null);
 
   // Observer settings
   const [enableObservers, setEnableObservers] = useState(currentEvent?.enable_observers ?? true);
@@ -737,77 +739,103 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             return;
           }
 
-          if (hasAnyRoundResults) {
-            console.log('⚠️ Regenerating heats will clear existing results!');
-          }
-
-          if (hasUnbalancedHeats && addNotification) {
-            addNotification('info', `Detected unbalanced heat sizes (${currentHeatSizes.join(', ')}). Auto-fixing to balanced distribution.`);
-          }
-
-          console.log('🔄 Heat count changed from', currentHeatManagement.configuration.numberOfHeats, 'to', numHeats, '- regenerating heats');
-
-          let heatAssignments;
-
-          if (currentDropRules === 'shrs') {
-            heatAssignments = seedSHRSHeatsByIndex(skippers, numHeats);
-          } else {
-            const hmsSeederConfig: HMSConfig = {
-              numberOfHeats: numHeats,
-              promotionCount: promotionCount,
-              seedingMethod,
-              maxHeatSize: 12
-            };
-            heatAssignments = seedInitialHeats(skippers, hmsSeederConfig);
-
-            const assignmentProblems = validateHeatAssignments(heatAssignments, skippers.length);
-            if (assignmentProblems.length > 0) {
-              console.warn('Heat assignment validation issues:', assignmentProblems);
+          const executeRegeneration = () => {
+            if (hasUnbalancedHeats && addNotification) {
+              addNotification('info', `Detected unbalanced heat sizes (${currentHeatSizes.join(', ')}). Auto-fixing to balanced distribution.`);
             }
-          }
 
-          let allRounds;
-          if (currentDropRules === 'shrs' && shrsAssignmentMode === 'preset' && shrsQualifyingRounds > 1) {
-            const allQualifyingRounds = generatePreSetQualifyingAssignments(
-              heatAssignments,
-              numHeats,
-              shrsQualifyingRounds
-            );
-            allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
-              round: idx + 1,
-              heatAssignments: roundAssignments.map(a => ({
-                heatDesignation: a.heatDesignation as any,
-                skipperIndices: a.skipperIndices
-              })),
-              results: [],
-              completed: false
-            }));
-          } else {
-            allRounds = [{
-              round: 1,
-              heatAssignments,
-              results: [],
-              completed: false
-            }];
-          }
+            console.log('🔄 Heat count changed from', currentHeatManagement.configuration.numberOfHeats, 'to', numHeats, '- regenerating heats');
 
-          finalHeatManagement = {
-            configuration: {
-              enabled: true,
-              numberOfHeats: numHeats,
-              promotionCount: promotionCount,
-              seedingMethod,
-              autoAssign: initialAssignment === 'random',
-              scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
-              ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
-              fleetManagementEnabled,
-              heatLabelStyle,
-              heatOrder
-            },
-            currentRound: 1,
-            currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
-            rounds: allRounds
+            let heatAssignments;
+
+            if (currentDropRules === 'shrs') {
+              heatAssignments = seedSHRSHeatsByIndex(skippers, numHeats);
+            } else {
+              const hmsSeederConfig: HMSConfig = {
+                numberOfHeats: numHeats,
+                promotionCount: promotionCount,
+                seedingMethod,
+                maxHeatSize: 12
+              };
+              heatAssignments = seedInitialHeats(skippers, hmsSeederConfig);
+
+              const assignmentProblems = validateHeatAssignments(heatAssignments, skippers.length);
+              if (assignmentProblems.length > 0) {
+                console.warn('Heat assignment validation issues:', assignmentProblems);
+              }
+            }
+
+            let allRounds;
+            if (currentDropRules === 'shrs' && shrsAssignmentMode === 'preset' && shrsQualifyingRounds > 1) {
+              const allQualifyingRounds = generatePreSetQualifyingAssignments(
+                heatAssignments,
+                numHeats,
+                shrsQualifyingRounds
+              );
+              allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
+                round: idx + 1,
+                heatAssignments: roundAssignments.map(a => ({
+                  heatDesignation: a.heatDesignation as any,
+                  skipperIndices: a.skipperIndices
+                })),
+                results: [],
+                completed: false
+              }));
+            } else {
+              allRounds = [{
+                round: 1,
+                heatAssignments,
+                results: [],
+                completed: false
+              }];
+            }
+
+            const regenHM: HeatManagement = {
+              configuration: {
+                enabled: true,
+                numberOfHeats: numHeats,
+                promotionCount: promotionCount,
+                seedingMethod,
+                autoAssign: initialAssignment === 'random',
+                scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+                ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
+                fleetManagementEnabled,
+                heatLabelStyle,
+                heatOrder
+              },
+              currentRound: 1,
+              currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
+              rounds: allRounds
+            };
+
+            onSave({
+              numRaces: currentNumRaces,
+              dropRules: currentDropRules,
+              heatManagement: regenHM,
+              displaySettings: {
+                show_flag: showFlag,
+                show_country: showCountry
+              },
+              observerSettings: {
+                enable_observers: enableObservers,
+                observers_per_heat: observersPerHeat,
+                enable_roll_call: enableRollCall,
+                auto_complete_sail: autoCompleteSail
+              }
+            });
+            onClose();
           };
+
+          // Show confirmation before regenerating assignments
+          const reasons: string[] = [];
+          if (heatCountChanged) reasons.push(`heat count changed (${actualHeatCount} → ${numHeats})`);
+          if (scoringSystemChanged) reasons.push(`scoring system changed (${previousScoringSystem} → ${newScoringSystem})`);
+          if (hasUnbalancedHeats) reasons.push(`unbalanced heat sizes detected (${currentHeatSizes.join(', ')})`);
+
+          console.log('⚠️ Regeneration needed:', reasons.join(', '));
+          setPendingRegenerateAction(() => executeRegeneration);
+          setShowRegenerateConfirm(true);
+          return;
         } else {
           console.log('ℹ️ Updating configuration only - preserving existing heat assignments and results');
           const updatedConfig = {
@@ -2414,6 +2442,27 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         title="Clear All Heat Results"
         message="⚠️ WARNING: This will permanently delete ALL heat race results and reset to Round 1. All scoring progress will be lost and cannot be recovered. Are you absolutely sure you want to continue?"
         confirmText="Clear All Heat Results"
+        cancelText="Cancel"
+        darkMode={darkMode}
+        variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={showRegenerateConfirm}
+        onClose={() => {
+          setShowRegenerateConfirm(false);
+          setPendingRegenerateAction(null);
+        }}
+        onConfirm={() => {
+          setShowRegenerateConfirm(false);
+          if (pendingRegenerateAction) {
+            pendingRegenerateAction();
+            setPendingRegenerateAction(null);
+          }
+        }}
+        title="Regenerate Heat Assignments"
+        message="This will regenerate all heat assignments. If you have previously exported or shared the heat assignment PDF, it will no longer match. Any existing results will be cleared. Do you want to continue?"
+        confirmText="Regenerate Assignments"
         cancelText="Cancel"
         darkMode={darkMode}
         variant="danger"
