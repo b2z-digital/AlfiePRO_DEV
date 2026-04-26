@@ -3110,19 +3110,19 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
               </p>
             </div>
 
-            <div className={`px-6 py-4 border-t ${
+            <div className={`px-6 py-4 border-t flex justify-end gap-3 ${
               darkMode ? 'border-slate-700' : 'border-slate-200'
-            } flex gap-3`}>
+            }`}>
               <button
                 onClick={() => {
                   setShowRejectModal(false);
                   setRejectingEventId(null);
                   setRejectReason('');
                 }}
-                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg transition-colors ${
                   darkMode
-                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                 }`}
               >
                 Cancel
@@ -3130,10 +3130,10 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
               <button
                 onClick={confirmRejectEvent}
                 disabled={!rejectReason.trim()}
-                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  !rejectReason.trim()
-                    ? 'bg-red-600/50 text-white/50 cursor-not-allowed'
-                    : 'bg-red-600 text-white hover:bg-red-700'
+                className={`px-4 py-2 rounded-lg transition-colors text-white ${
+                  rejectReason.trim()
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-red-600/50 cursor-not-allowed'
                 }`}
               >
                 Reject Event
