@@ -1,6 +1,3 @@
-Looking at this React component file, I can see it's missing several closing brackets. Let me add the missing characters:
-
-```typescript
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, Plus, SquarePen as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio, FlaskConical } from 'lucide-react';
@@ -3113,4 +3110,38 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
               </p>
             </div>
 
-            <div className={
+            <div className={`px-6 py-4 border-t flex justify-end gap-3 ${
+              darkMode ? 'border-slate-700' : 'border-slate-200'
+            }`}>
+              <button
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setRejectingEventId(null);
+                  setRejectReason('');
+                }}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  darkMode
+                    ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRejectEvent}
+                disabled={!rejectReason.trim()}
+                className={`px-4 py-2 rounded-lg transition-colors text-white ${
+                  rejectReason.trim()
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-red-600/50 cursor-not-allowed'
+                }`}
+              >
+                Reject Event
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
