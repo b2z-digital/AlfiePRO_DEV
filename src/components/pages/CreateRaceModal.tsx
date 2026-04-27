@@ -1,5 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Calendar, Building, Sailboat, Plus, Trash2, X, FileText, CalendarRange, Upload, DollarSign, Users, Globe, Clock, Map, ChevronDown, Wand as Wand2, Download, CreditCard as Edit, Radio, Video, Info, Link2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Trophy, Calendar, Building, Sailboat, Plus, Trash2, X, FileText, CalendarRange, Upload, DollarSign, Users, Globe, Clock, Map, ChevronDown, Wand as Wand2, Download, CreditCard as Edit, Radio, Video, Info, Link2, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { RaceType, BoatType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
 import { storeRaceEvent, storeRaceSeries } from '../../utils/raceStorage';
@@ -17,6 +34,199 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { DocumentGenerationWizard } from '../documents/DocumentGenerationWizard';
 import { ScheduleDocumentModal } from './ScheduleDocumentModal';
+
+interface SortableRoundRowProps {
+  id: string;
+  index: number;
+  round: {
+    name: string;
+    date: string;
+    venue: string;
+    cancelled?: boolean;
+    cancellationReason?: string;
+  };
+  darkMode: boolean;
+  venues: Venue[];
+  roundRef: (el: HTMLInputElement | null) => void;
+  onRemove: (index: number) => void;
+  onChange: (index: number, field: string, value: string | boolean) => void;
+}
+
+const SortableRoundRow: React.FC<SortableRoundRowProps> = ({
+  id,
+  index,
+  round,
+  darkMode,
+  venues,
+  roundRef,
+  onRemove,
+  onChange,
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+    position: 'relative' as const,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`grid grid-cols-12 gap-3 px-4 py-3 border-b items-center ${darkMode ? 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50' : 'bg-white border-slate-100 hover:bg-slate-50'} transition-colors ${isDragging ? 'shadow-lg ring-1 ring-blue-500/30' : ''}`}
+    >
+      {/* Drag Handle */}
+      <div className="col-span-1 flex justify-center">
+        <div
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          className={`p-1 rounded cursor-grab active:cursor-grabbing transition-colors ${
+            darkMode
+              ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700'
+              : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+          }`}
+          title="Drag to reorder"
+        >
+          <GripVertical size={16} />
+        </div>
+      </div>
+
+      {/* Round Name */}
+      <div className="col-span-3">
+        <input
+          ref={roundRef}
+          type="text"
+          required
+          value={round.name}
+          onChange={(e) => onChange(index, 'name', e.target.value)}
+          className={`
+            w-full px-3 py-2 rounded-lg transition-colors text-sm
+            ${darkMode
+              ? 'bg-slate-700 text-slate-200 border border-slate-600 focus:border-emerald-500'
+              : 'bg-white text-slate-900 border border-slate-200 focus:border-emerald-500'}
+          `}
+          placeholder="Round 1"
+        />
+      </div>
+
+      {/* Date */}
+      <div className="col-span-2">
+        <input
+          type="date"
+          required
+          value={round.date}
+          onChange={(e) => onChange(index, 'date', e.target.value)}
+          data-round-index={index}
+          data-field="date"
+          className={`
+            w-full px-3 py-2 rounded-lg transition-colors text-sm
+            ${darkMode
+              ? 'bg-slate-700 text-slate-200 border border-slate-600 focus:border-emerald-500'
+              : 'bg-white text-slate-900 border border-slate-200 focus:border-emerald-500'}
+          `}
+          style={{
+            colorScheme: darkMode ? 'dark' : 'light'
+          }}
+        />
+      </div>
+
+      {/* Venue with Avatar */}
+      <div className="col-span-5 relative">
+        <select
+          required
+          value={round.venue}
+          onChange={(e) => onChange(index, 'venue', e.target.value)}
+          className={`
+            w-full py-2 pr-3 rounded-lg transition-colors text-sm appearance-none
+            ${round.venue && venues.find(v => v.name === round.venue)?.image ? 'pl-10' : 'pl-3'}
+            ${darkMode
+              ? 'bg-slate-700 text-slate-200 border border-slate-600 focus:border-emerald-500'
+              : 'bg-white text-slate-900 border border-slate-200 focus:border-emerald-500'}
+          `}
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+            backgroundPosition: 'right 0.5rem center',
+            backgroundRepeat: 'no-repeat',
+            backgroundSize: '1.5em 1.5em'
+          }}
+        >
+          <option value="">Select venue</option>
+          {venues.map(venue => (
+            <option key={venue.id} value={venue.name}>
+              {venue.name}
+            </option>
+          ))}
+        </select>
+        {round.venue && venues.find(v => v.name === round.venue)?.image && (
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full overflow-hidden border border-slate-600">
+            <img
+              src={venues.find(v => v.name === round.venue)?.image || ''}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Delete Button */}
+      <div className="col-span-1 flex justify-end">
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:text-red-400 hover:bg-slate-700' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
+          title="Remove round"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+
+      {/* Cancellation reason (Full Width Row Below if cancelled) */}
+      {round.cancelled && (
+        <div className="col-span-12 pt-2 pb-1">
+          <div className={`flex items-start gap-3 p-3 rounded-lg ${darkMode ? 'bg-red-900/20 border border-red-900/30' : 'bg-red-50 border border-red-200'}`}>
+            <input
+              type="text"
+              value={round.cancellationReason || ''}
+              onChange={(e) => onChange(index, 'cancellationReason', e.target.value)}
+              placeholder="Reason for cancellation"
+              className={`
+                flex-1 px-3 py-2 rounded-lg transition-colors text-sm
+                ${darkMode
+                  ? 'bg-slate-800 text-slate-200 border border-slate-600'
+                  : 'bg-white text-slate-900 border border-slate-200'}
+              `}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Cancelled Checkbox (Full Width Row Below) */}
+      <div className="col-span-12 -mt-1">
+        <label className={`flex items-center gap-2 cursor-pointer text-xs ${darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`}>
+          <input
+            type="checkbox"
+            checked={round.cancelled || false}
+            onChange={(e) => onChange(index, 'cancelled', e.target.checked)}
+            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-400"
+          />
+          <span>Mark as cancelled</span>
+        </label>
+      </div>
+    </div>
+  );
+};
 
 interface CreateRaceModalProps {
   type: 'quick' | 'series';
@@ -127,6 +337,31 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const [currentStep, setCurrentStep] = useState<'details' | 'documents' | 'payments' | 'results'>('details');
   const [additionalDocuments, setAdditionalDocuments] = useState<Array<{name: string; file: File | null; url: string}>>([]);
   const roundRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const roundIds = useMemo(
+    () => formData.rounds.map((_, i) => `round-${i}`),
+    [formData.rounds.length]
+  );
+
+  const handleRoundDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = roundIds.indexOf(active.id as string);
+    const newIndex = roundIds.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    setFormData(prev => ({
+      ...prev,
+      rounds: arrayMove(prev.rounds, oldIndex, newIndex)
+    }));
+  };
+
   const [showClubDropdown, setShowClubDropdown] = useState(false);
   const [showVenueDropdown, setShowVenueDropdown] = useState(false);
   const [showClassDropdown, setShowClassDropdown] = useState(false);
@@ -3030,156 +3265,60 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                   <h3 className={`text-lg font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                     Rounds
                   </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddRound}
-                    className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-colors"
-                  >
-                    <Plus size={16} />
-                    Add Round
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {formData.rounds.length > 1 && (
+                      <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Drag to reorder
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleAddRound}
+                      className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-colors"
+                    >
+                      <Plus size={16} />
+                      Add Round
+                    </button>
+                  </div>
                 </div>
 
                 {formData.rounds.length > 0 ? (
                   <div className={`rounded-lg border overflow-hidden ${darkMode ? 'border-slate-600' : 'border-slate-200'}`}>
                     {/* Table Header */}
                     <div className={`grid grid-cols-12 gap-3 px-4 py-3 border-b font-medium text-sm ${darkMode ? 'bg-slate-700/50 border-slate-600 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                      <div className="col-span-1"></div>
                       <div className="col-span-3">Round Name</div>
-                      <div className="col-span-3">Date</div>
+                      <div className="col-span-2">Date</div>
                       <div className="col-span-5">Venue</div>
                       <div className="col-span-1"></div>
                     </div>
 
                     {/* Table Body */}
                     <div className="max-h-[400px] overflow-y-auto">
-                      {formData.rounds.map((round, index) => (
-                        <div
-                          key={index}
-                          className={`grid grid-cols-12 gap-3 px-4 py-3 border-b items-center ${darkMode ? 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50' : 'bg-white border-slate-100 hover:bg-slate-50'} transition-colors`}
+                      <DndContext
+                        sensors={dndSensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleRoundDragEnd}
+                      >
+                        <SortableContext
+                          items={roundIds}
+                          strategy={verticalListSortingStrategy}
                         >
-                          {/* Round Name */}
-                          <div className="col-span-3">
-                            <input
-                              ref={(el) => roundRefs.current[index] = el}
-                              type="text"
-                              required
-                              value={round.name}
-                              onChange={(e) => handleRoundChange(index, 'name', e.target.value)}
-                              className={`
-                                w-full px-3 py-2 rounded-lg transition-colors text-sm
-                                ${darkMode
-                                  ? 'bg-slate-700 text-slate-200 border border-slate-600 focus:border-emerald-500'
-                                  : 'bg-white text-slate-900 border border-slate-200 focus:border-emerald-500'}
-                              `}
-                              placeholder="Round 1"
+                          {formData.rounds.map((round, index) => (
+                            <SortableRoundRow
+                              key={roundIds[index]}
+                              id={roundIds[index]}
+                              index={index}
+                              round={round}
+                              darkMode={darkMode}
+                              venues={venues}
+                              roundRef={(el) => { roundRefs.current[index] = el; }}
+                              onRemove={handleRemoveRound}
+                              onChange={handleRoundChange}
                             />
-                          </div>
-
-                          {/* Date */}
-                          <div className="col-span-3">
-                            <input
-                              type="date"
-                              required
-                              value={round.date}
-                              onChange={(e) => handleRoundChange(index, 'date', e.target.value)}
-                              data-round-index={index}
-                              data-field="date"
-                              className={`
-                                w-full px-3 py-2 rounded-lg transition-colors text-sm
-                                ${darkMode
-                                  ? 'bg-slate-700 text-slate-200 border border-slate-600 focus:border-emerald-500'
-                                  : 'bg-white text-slate-900 border border-slate-200 focus:border-emerald-500'}
-                              `}
-                              style={{
-                                colorScheme: darkMode ? 'dark' : 'light'
-                              }}
-                            />
-                          </div>
-
-                          {/* Venue with Avatar */}
-                          <div className="col-span-5 relative">
-                            <select
-                              required
-                              value={round.venue}
-                              onChange={(e) => handleRoundChange(index, 'venue', e.target.value)}
-                              className={`
-                                w-full py-2 pr-3 rounded-lg transition-colors text-sm appearance-none
-                                ${round.venue && venues.find(v => v.name === round.venue)?.image ? 'pl-10' : 'pl-3'}
-                                ${darkMode
-                                  ? 'bg-slate-700 text-slate-200 border border-slate-600 focus:border-emerald-500'
-                                  : 'bg-white text-slate-900 border border-slate-200 focus:border-emerald-500'}
-                              `}
-                              style={{
-                                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                                backgroundPosition: 'right 0.5rem center',
-                                backgroundRepeat: 'no-repeat',
-                                backgroundSize: '1.5em 1.5em'
-                              }}
-                            >
-                              <option value="">Select venue</option>
-                              {venues.map(venue => (
-                                <option key={venue.id} value={venue.name}>
-                                  {venue.name}
-                                </option>
-                              ))}
-                            </select>
-                            {round.venue && venues.find(v => v.name === round.venue)?.image && (
-                              <div className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full overflow-hidden border border-slate-600">
-                                <img
-                                  src={venues.find(v => v.name === round.venue)?.image || ''}
-                                  alt=""
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Delete Button */}
-                          <div className="col-span-1 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveRound(index)}
-                              className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:text-red-400 hover:bg-slate-700' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
-                              title="Remove round"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-
-                          {/* Cancellation (Full Width Row Below if cancelled) */}
-                          {round.cancelled && (
-                            <div className="col-span-12 pt-2 pb-1">
-                              <div className={`flex items-start gap-3 p-3 rounded-lg ${darkMode ? 'bg-red-900/20 border border-red-900/30' : 'bg-red-50 border border-red-200'}`}>
-                                <input
-                                  type="text"
-                                  value={round.cancellationReason || ''}
-                                  onChange={(e) => handleRoundChange(index, 'cancellationReason', e.target.value)}
-                                  placeholder="Reason for cancellation"
-                                  className={`
-                                    flex-1 px-3 py-2 rounded-lg transition-colors text-sm
-                                    ${darkMode
-                                      ? 'bg-slate-800 text-slate-200 border border-slate-600'
-                                      : 'bg-white text-slate-900 border border-slate-200'}
-                                  `}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Cancelled Checkbox (Full Width Row Below) */}
-                          <div className="col-span-12 -mt-1">
-                            <label className={`flex items-center gap-2 cursor-pointer text-xs ${darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`}>
-                              <input
-                                type="checkbox"
-                                checked={round.cancelled || false}
-                                onChange={(e) => handleRoundChange(index, 'cancelled', e.target.checked)}
-                                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-400"
-                              />
-                              <span>Mark as cancelled</span>
-                            </label>
-                          </div>
-                        </div>
-                      ))}
+                          ))}
+                        </SortableContext>
+                      </DndContext>
                     </div>
                   </div>
                 ) : (
