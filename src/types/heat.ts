@@ -475,6 +475,22 @@ export const generateNextRoundAssignments = (
       }));
     }
 
+    // In preset mode during qualifying rounds, use the pre-generated assignments
+    // instead of recalculating via heat movement tables
+    const isPreset = configuration.shrsAssignmentMode === 'preset';
+    const qualifyingRounds = configuration.shrsQualifyingRounds || 0;
+    const isQualifyingRound = qualifyingRounds > 0 && currentRound.round < qualifyingRounds;
+    if (isPreset && isQualifyingRound) {
+      const nextRound = heatManagement.rounds.find(r => r.round === currentRound.round + 1);
+      if (nextRound && nextRound.heatAssignments && nextRound.heatAssignments.length > 0) {
+        console.log(`SHRS Preset Mode: Preserving pre-generated assignments for Round ${currentRound.round + 1}`);
+        return nextRound.heatAssignments.map(a => ({
+          heatDesignation: a.heatDesignation,
+          skipperIndices: [...a.skipperIndices]
+        }));
+      }
+    }
+
     // SHR Rule 3.1.ii: Use Heat Movement Tables to assign boats to next race heats.
     // Each skipper's next heat is determined by their position within their current heat
     // and their current heat designation, looked up in the movement table.
