@@ -18,6 +18,7 @@ interface ChatViewProps {
   recipientAvatar?: string;
   existingConversationId?: string;
   onBack: () => void;
+  onRead?: () => void;
   darkMode: boolean;
 }
 
@@ -36,7 +37,7 @@ const formatDateSeparator = (dateStr: string) => {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
 };
 
-export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, recipientAvatar, existingConversationId, onBack, darkMode }) => {
+export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, recipientAvatar, existingConversationId, onBack, onRead, darkMode }) => {
   const { user } = useAuth();
   const { isImpersonating, effectiveUserId } = useImpersonation();
   const currentUserId = isImpersonating && effectiveUserId ? effectiveUserId : user?.id;
@@ -194,6 +195,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
       .update({ last_read_at: new Date().toISOString() })
       .eq('conversation_id', id)
       .eq('user_id', currentUserId);
+    onRead?.();
   };
 
   const unhideConversation = async (convId: string) => {
