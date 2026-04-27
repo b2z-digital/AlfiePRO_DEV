@@ -2099,8 +2099,8 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
           )}
           {/* Action Buttons */}
           <div className="flex items-start justify-between gap-3 mt-6">
-            {/* Cancel Round - Left Side */}
-            {event.isSeriesEvent && (isAdmin || isEditor) && (
+            {/* Cancel Round - Left Side (series events only) */}
+            {event.isSeriesEvent && (isAdmin || isEditor) ? (
               <div className="flex flex-col gap-2">
                 <label className={`flex items-center gap-2 cursor-pointer select-none ${event.cancelled ? 'text-amber-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   <input
@@ -2122,6 +2122,8 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   />
                 )}
               </div>
+            ) : (
+              <div />
             )}
             <div className="flex items-center gap-3 flex-wrap justify-end">
             {/* Event Website Button - Only for State/National Events, restricted to host club or associations */}
