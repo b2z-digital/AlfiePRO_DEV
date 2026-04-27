@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, Circle as HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader as Loader2, CircleCheck as CheckCircle, Radio, Upload } from 'lucide-react';
+import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, Circle as HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader as Loader2, CircleCheck as CheckCircle, Radio, Upload, TriangleAlert } from 'lucide-react';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { setCurrentEvent } from '../utils/raceStorage';
@@ -22,7 +22,7 @@ import { getLiveTrackingEvent } from '../utils/liveTrackingStorage';
 import { EventWebsiteSettingsModal } from './events/EventWebsiteSettingsModal';
 import { EventLivestreamModal } from './livestream/EventLivestreamModal';
 import { ImportRoundResultsModal } from './ImportRoundResultsModal';
-import { getStoredRaceSeries } from '../utils/raceStorage';
+import { getStoredRaceSeries, storeRaceSeries } from '../utils/raceStorage';
 import { RaceSeries } from '../types/race';
 
 // Helper function to extract database UUID from app event ID
@@ -1450,6 +1450,57 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     }
   };
 
+  const handleToggleCancelled = async (cancelled: boolean) => {
+    setEvent(prev => ({ ...prev, cancelled, cancellationReason: cancelled ? prev.cancellationReason : undefined }));
+
+    if (event.isSeriesEvent && event.seriesId) {
+      try {
+        const allSeries = await getStoredRaceSeries();
+        const series = allSeries.find(s => s.id === event.seriesId);
+        if (series) {
+          const roundIdx = series.rounds.findIndex(
+            r => r.name === event.roundName || r.roundName === event.roundName
+          );
+          if (roundIdx !== -1) {
+            series.rounds[roundIdx] = {
+              ...series.rounds[roundIdx],
+              cancelled,
+              cancellationReason: cancelled ? series.rounds[roundIdx].cancellationReason : undefined
+            };
+            await storeRaceSeries(series);
+          }
+        }
+      } catch (err) {
+        console.error('Error updating cancelled status:', err);
+      }
+    }
+  };
+
+  const handleCancellationReasonChange = async (reason: string) => {
+    setEvent(prev => ({ ...prev, cancellationReason: reason }));
+
+    if (event.isSeriesEvent && event.seriesId) {
+      try {
+        const allSeries = await getStoredRaceSeries();
+        const series = allSeries.find(s => s.id === event.seriesId);
+        if (series) {
+          const roundIdx = series.rounds.findIndex(
+            r => r.name === event.roundName || r.roundName === event.roundName
+          );
+          if (roundIdx !== -1) {
+            series.rounds[roundIdx] = {
+              ...series.rounds[roundIdx],
+              cancellationReason: reason
+            };
+            await storeRaceSeries(series);
+          }
+        }
+      } catch (err) {
+        console.error('Error updating cancellation reason:', err);
+      }
+    }
+  };
+
   const handleStartScoring = async () => {
     // Use the current event state directly to avoid stale data issues
     const latestEvent = event;
@@ -2047,7 +2098,32 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             </div>
           )}
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex items-start justify-between gap-3 mt-6">
+            {/* Cancel Round - Left Side */}
+            {event.isSeriesEvent && (isAdmin || isEditor) && (
+              <div className="flex flex-col gap-2">
+                <label className={`flex items-center gap-2 cursor-pointer select-none ${event.cancelled ? 'text-amber-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <input
+                    type="checkbox"
+                    checked={!!event.cancelled}
+                    onChange={(e) => handleToggleCancelled(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-500 text-amber-500 focus:ring-amber-500"
+                  />
+                  <TriangleAlert size={16} className={event.cancelled ? 'text-amber-500' : 'opacity-50'} />
+                  <span className="text-sm font-medium">Mark as cancelled</span>
+                </label>
+                {event.cancelled && (
+                  <input
+                    type="text"
+                    placeholder="Reason (optional)"
+                    value={event.cancellationReason || ''}
+                    onChange={(e) => handleCancellationReasonChange(e.target.value)}
+                    className={`text-sm px-3 py-1.5 rounded-lg border ${darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'}`}
+                  />
+                )}
+              </div>
+            )}
+            <div className="flex items-center gap-3 flex-wrap justify-end">
             {/* Event Website Button - Only for State/National Events, restricted to host club or associations */}
             {(event.eventLevel === 'state' || event.eventLevel === 'national') &&
              (!event.isPublicEvent ||
@@ -2156,6 +2232,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 </button>
               </>
             )}
+            </div>
           </div>
         </div>
       )}
