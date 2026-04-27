@@ -448,6 +448,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         }, () => fetchUnreadConversationsCount()).subscribe()
       },
       {
+        name: `conversation-participants-${userId}`,
+        setup: (ch: any) => ch.on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversation_participants',
+          filter: `user_id=eq.${userId}`
+        }, () => fetchUnreadConversationsCount()).subscribe()
+      },
+      {
         name: `social-notifications-${userId}`,
         setup: (ch: any) => ch.on('postgres_changes', {
           event: '*',

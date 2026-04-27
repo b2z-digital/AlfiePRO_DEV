@@ -782,6 +782,11 @@ export const Conversations: React.FC<ConversationsProps> = ({
     setSelectedChat(chat);
     setDirectChatTarget(null);
     setSelectedNotification(null);
+    if (chat.is_unread) {
+      setChatConversations(prev => prev.map(c =>
+        c.id === chat.id ? { ...c, is_unread: false } : c
+      ));
+    }
   };
 
   const loadDraft = (draft: any) => {
@@ -862,6 +867,7 @@ export const Conversations: React.FC<ConversationsProps> = ({
               setDirectChatTarget(null);
               fetchChatConversations();
             }}
+            onRead={fetchChatConversations}
             darkMode={darkMode}
           />
         ) : topLevelTab === 'chats' ? (
