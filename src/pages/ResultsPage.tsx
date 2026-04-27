@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CircleCheck as CheckCircle2, Clock, ChevronRight, X, Grid2x2 as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, Circle as XCircle, Send, SquarePen as Edit2, Globe, Map } from 'lucide-react';
+import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CircleCheck as CheckCircle2, Clock, ChevronRight, X, Grid2x2 as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, Circle as XCircle, Send, SquarePen as Edit2, Globe, Map, ArrowUpDown, ListFilter as Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Papa from 'papaparse';
@@ -31,6 +31,7 @@ import { SeriesEditModal } from '../components/SeriesEditModal';
 
 type MainTab = 'events' | 'leaderboards' | 'national' | 'state' | 'world';
 type StatusFilter = 'all' | 'completed' | 'in-progress';
+type SortOption = 'date-asc' | 'date-desc' | 'name-asc' | 'name-desc' | 'status';
 
 interface ExternalResultEvent {
   id: string;
@@ -81,6 +82,14 @@ export const ResultsPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('date-desc');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [filterClass, setFilterClass] = useState<string>('all');
+  const [filterFormat, setFilterFormat] = useState<string>('all');
+  const [filterEventType, setFilterEventType] = useState<string>('all');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const sortDropdownRef = useRef<HTMLDivElement>(null);
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
 
   // Data
   const [allEvents, setAllEvents] = useState<RaceEvent[]>([]);
@@ -113,6 +122,19 @@ export const ResultsPage: React.FC = () => {
     loadClubFeaturedImage();
     loadExternalResults();
   }, [currentClub]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(e.target as Node)) {
+        setShowSortDropdown(false);
+      }
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadClubFeaturedImage = async () => {
     if (!currentClub?.clubId) return;
@@ -571,7 +593,13 @@ export const ResultsPage: React.FC = () => {
     );
   };
 
-  const filterItems = <T extends { eventName?: string; seriesName?: string; raceClass?: string; completed?: boolean; date?: string; rounds?: any[] }>(
+  const boatClasses = Array.from(new Set([
+    ...allEvents.map(e => e.raceClass),
+    ...roundResults.map(r => r.raceClass),
+    ...allSeries.map(s => s.raceClass)
+  ])).filter(Boolean) as string[];
+
+  const filterItems = <T extends { eventName?: string; seriesName?: string; raceClass?: string; raceFormat?: string; completed?: boolean; date?: string; rounds?: any[]; isSeriesEvent?: boolean }>(
     items: T[],
     search: string,
     status: StatusFilter,
@@ -580,13 +608,11 @@ export const ResultsPage: React.FC = () => {
     return items.filter(item => {
       // Year filter
       if (item.date) {
-        // For events and rounds with direct dates
         const eventDate = new Date(item.date);
         if (eventDate.getFullYear() !== year) {
           return false;
         }
       } else if (item.rounds && Array.isArray(item.rounds)) {
-        // For series, check if any round is in the selected year
         const hasRoundsInYear = item.rounds.some(round => {
           if (round.date) {
             const roundDate = new Date(round.date);
@@ -609,15 +635,54 @@ export const ResultsPage: React.FC = () => {
       if (status === 'completed' && !item.completed) return false;
       if (status === 'in-progress' && item.completed) return false;
 
+      // Class filter
+      if (filterClass !== 'all' && item.raceClass !== filterClass) return false;
+
+      // Format filter
+      if (filterFormat !== 'all' && item.raceFormat !== filterFormat) return false;
+
+      // Event type filter
+      if (filterEventType !== 'all') {
+        const isSeries = 'rounds' in item || item.isSeriesEvent || ('seriesId' in item);
+        if (filterEventType === 'single' && isSeries) return false;
+        if (filterEventType === 'series' && !isSeries) return false;
+      }
+
       return true;
     });
   };
 
-  const sortByDateDesc = <T extends { date?: string }>(items: T[]): T[] => {
+  const sortItems = <T extends { date?: string; eventName?: string; seriesName?: string; completed?: boolean; rounds?: any[] }>(items: T[]): T[] => {
     return [...items].sort((a, b) => {
-      const dateA = a.date ? new Date(a.date).getTime() : 0;
-      const dateB = b.date ? new Date(b.date).getTime() : 0;
-      return dateB - dateA; // Newest first
+      const getDate = (item: T): string => {
+        if (item.date) return item.date;
+        if (item.rounds && Array.isArray(item.rounds) && item.rounds[0]) return item.rounds[0].date || '';
+        return '';
+      };
+
+      switch (sortBy) {
+        case 'date-asc':
+          return new Date(getDate(a)).getTime() - new Date(getDate(b)).getTime();
+        case 'date-desc':
+          return new Date(getDate(b)).getTime() - new Date(getDate(a)).getTime();
+        case 'name-asc': {
+          const nameA = a.seriesName || a.eventName || '';
+          const nameB = b.seriesName || b.eventName || '';
+          return nameA.localeCompare(nameB);
+        }
+        case 'name-desc': {
+          const nameA = a.seriesName || a.eventName || '';
+          const nameB = b.seriesName || b.eventName || '';
+          return nameB.localeCompare(nameA);
+        }
+        case 'status': {
+          const statusA = a.completed ? 2 : 0;
+          const statusB = b.completed ? 2 : 0;
+          return statusA - statusB;
+        }
+        default:
+          return 0;
+      }
     });
   };
 
@@ -644,8 +709,8 @@ export const ResultsPage: React.FC = () => {
     ])
   ).sort((a, b) => b - a); // Sort descending (newest first)
 
-  const filteredEvents = sortByDateDesc(filterItems([...allEvents, ...roundResults], searchTerm, statusFilter, selectedYear));
-  const filteredSeries = filterItems(allSeries, searchTerm, statusFilter, selectedYear);
+  const filteredEvents = sortItems(filterItems([...allEvents, ...roundResults], searchTerm, statusFilter, selectedYear));
+  const filteredSeries = sortItems(filterItems(allSeries, searchTerm, statusFilter, selectedYear));
 
   const getExternalEventYear = (ev: ExternalResultEvent): number | null => {
     if (ev.event_date) return new Date(ev.event_date).getFullYear();
@@ -1836,7 +1901,7 @@ export const ResultsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Search and View Toggle */}
+          {/* Search, Sort, Filters, and View Toggle */}
           <div className="flex items-center gap-2">
             {showSearch ? (
               <div className="relative flex-1 sm:w-64">
@@ -1867,6 +1932,174 @@ export const ResultsPage: React.FC = () => {
                 <Search size={18} />
               </button>
             )}
+
+            {/* Sort Dropdown */}
+            <div className="relative" ref={sortDropdownRef}>
+              <button
+                onClick={() => { setShowSortDropdown(!showSortDropdown); setShowFilterDropdown(false); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200"
+              >
+                <ArrowUpDown size={16} />
+                Sort
+                <ChevronDown size={16} />
+              </button>
+              {showSortDropdown && (
+                <div className="absolute right-0 mt-2 w-56 rounded-lg shadow-xl border py-2 z-50 bg-slate-800 border-slate-700">
+                  {[
+                    { value: 'date-desc', label: 'Date (Newest First)' },
+                    { value: 'date-asc', label: 'Date (Oldest First)' },
+                    { value: 'name-asc', label: 'Name (A-Z)' },
+                    { value: 'name-desc', label: 'Name (Z-A)' },
+                    { value: 'status', label: 'Status' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => {
+                        setSortBy(option.value as SortOption);
+                        setShowSortDropdown(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                        sortBy === option.value
+                          ? 'bg-blue-600/20 text-blue-400'
+                          : 'text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Filters Dropdown */}
+            <div className="relative" ref={filterDropdownRef}>
+              <button
+                onClick={() => { setShowFilterDropdown(!showFilterDropdown); setShowSortDropdown(false); }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                  filterClass !== 'all' || filterFormat !== 'all' || filterEventType !== 'all'
+                    ? 'bg-blue-600/20 border-blue-500/50 text-blue-400'
+                    : 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200'
+                }`}
+              >
+                <Filter size={16} />
+                Filters
+                <ChevronDown size={16} />
+              </button>
+              {showFilterDropdown && (
+                <div className="absolute right-0 mt-2 w-80 rounded-lg shadow-xl border py-3 z-50 bg-slate-800 border-slate-700">
+                  {/* Race Format Filter */}
+                  <div className="px-4 py-2">
+                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
+                      Race Type
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setFilterFormat(filterFormat === 'scratch' ? 'all' : 'scratch')}
+                        className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                          filterFormat === 'scratch'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        }`}
+                      >
+                        Scratch
+                      </button>
+                      <button
+                        onClick={() => setFilterFormat(filterFormat === 'handicap' ? 'all' : 'handicap')}
+                        className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                          filterFormat === 'handicap'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        }`}
+                      >
+                        Handicap
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t my-2 border-slate-700" />
+
+                  {/* Boat Class Filter */}
+                  <div className="px-4 py-2">
+                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
+                      Class
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {boatClasses.map(boatClass => {
+                        const typeColors = boatTypeColors[boatClass] || defaultColorScheme;
+                        return (
+                          <button
+                            key={boatClass}
+                            onClick={() => setFilterClass(filterClass === boatClass ? 'all' : boatClass)}
+                            className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                              filterClass === boatClass
+                                ? `${typeColors.bg} ${typeColors.text} ${typeColors.darkBg} ${typeColors.darkText}`
+                                : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            }`}
+                          >
+                            {boatClass}
+                          </button>
+                        );
+                      })}
+                      {boatClasses.length === 0 && (
+                        <span className="text-xs text-slate-500">No classes available</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-t my-2 border-slate-700" />
+
+                  {/* Event Type Filter */}
+                  <div className="px-4 py-2">
+                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
+                      Event Type
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setFilterEventType(filterEventType === 'single' ? 'all' : 'single')}
+                        className={`px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 ${
+                          filterEventType === 'single'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        }`}
+                      >
+                        <Trophy size={14} />
+                        Single Events
+                      </button>
+                      <button
+                        onClick={() => setFilterEventType(filterEventType === 'series' ? 'all' : 'series')}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors ${
+                          filterEventType === 'series'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        }`}
+                      >
+                        <Calendar size={14} />
+                        Race Series
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Clear Filters */}
+                  {(filterClass !== 'all' || filterFormat !== 'all' || filterEventType !== 'all') && (
+                    <>
+                      <div className="border-t my-2 border-slate-700" />
+                      <div className="px-4 py-1">
+                        <button
+                          onClick={() => {
+                            setFilterClass('all');
+                            setFilterFormat('all');
+                            setFilterEventType('all');
+                          }}
+                          className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                        >
+                          Clear all filters
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* View Mode Toggle */}
             <div className="flex items-center bg-slate-700 rounded-lg p-1">
