@@ -1964,7 +1964,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
           {/* Edit mode controls for mid-round only (when at least one heat complete but round not finished) */}
           {/* Allow manual override of promotions/relegations */}
-          {!isInitialAllocation && !completed && round >= 3 && results && results.length > 0 && !anyScoringInProgress && (
+          {!isInitialAllocation && !completed && !isSHRS && round >= 3 && results && results.length > 0 && !anyScoringInProgress && (
             <div className="flex gap-3">
               {!editMode ? (
                 <button

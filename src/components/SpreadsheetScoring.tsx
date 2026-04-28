@@ -364,7 +364,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       newAllCells[heat] = newCells;
 
       const filledCount = newCells.filter(c => c.sailNumber.trim() || c.letterScore).length;
-      if (filledCount >= totalPos && totalPos > 0) {
+      if (filledCount >= totalPos && totalPos > 0 && existingResults.length === 0) {
         alreadyVerified.add(heat);
       }
     }
@@ -1557,11 +1557,11 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
               ? 'bg-gradient-to-b from-cyan-600 to-blue-700 text-white hover:from-cyan-500 hover:to-blue-600'
               : 'bg-gradient-to-b from-blue-600 to-cyan-600 text-white hover:from-blue-500 hover:to-cyan-500'
           }`}
-          title="Current Rankings"
+          title="Overall Results"
         >
           <Trophy size={18} />
           <div className="flex flex-col items-center">
-            {'RANKINGS'.split('').map((letter, index) => (
+            {'RESULTS'.split('').map((letter, index) => (
               <span key={index} className="text-[10px] font-semibold leading-tight">
                 {letter}
               </span>
