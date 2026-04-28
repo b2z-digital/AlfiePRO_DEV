@@ -94,7 +94,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
       });
       setWebsite(websiteData);
       const derivedName = websiteData.public_events?.event_name
-        || websiteData.custom_name
+        || websiteData.website_name
         || websiteData.slug?.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
         || 'Event Website';
       setEventName(derivedName);
@@ -271,7 +271,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
             </div>
 
             <div className="flex items-center gap-3">
-              {website.event_id && (
+              {!isOrphaned && website.event_id && (
                 <button
                   onClick={() => {
                     navigate(`/event-command-center/${website.event_id}`);
@@ -469,7 +469,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
           )}
 
           {activeTab === 'media' && website && (
-            website.event_id ? (
+            !isOrphaned && website.event_id ? (
               <EventWebsiteMediaManager websiteId={website.id} eventId={website.event_id} />
             ) : (
               <NoLinkedEventMessage darkMode={darkMode} feature="Media" onLink={handleOpenLinkModal} />
@@ -477,7 +477,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
           )}
 
           {activeTab === 'competitors' && website && (
-            website.event_id ? (
+            !isOrphaned && website.event_id ? (
               <EventWebsiteCompetitorManager websiteId={website.id} eventId={website.event_id} />
             ) : (
               <NoLinkedEventMessage darkMode={darkMode} feature="Competitors" onLink={handleOpenLinkModal} />
@@ -485,7 +485,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
           )}
 
           {activeTab === 'news' && website && (
-            website.event_id ? (
+            !isOrphaned && website.event_id ? (
               <EventWebsiteNewsManager websiteId={website.id} eventId={website.event_id} />
             ) : (
               <NoLinkedEventMessage darkMode={darkMode} feature="News" onLink={handleOpenLinkModal} />
