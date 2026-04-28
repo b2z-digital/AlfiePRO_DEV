@@ -1268,7 +1268,10 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                           <th
                             key={`race-lbl-${r.round}`}
                             colSpan={3}
-                            onClick={() => setEditingRound(r.round)}
+                            onClick={() => {
+                              if (!isCurrent && onSelectHeat) onSelectHeat(heat);
+                              setEditingRound(r.round);
+                            }}
                             className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l cursor-pointer transition-colors ${
                               darkMode ? 'text-slate-300 border-slate-500/50 hover:bg-slate-600/50 hover:text-blue-300' : 'text-slate-500 border-slate-400/50 hover:bg-slate-100 hover:text-blue-600'
                             }`}
@@ -1282,11 +1285,14 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                         ))}
                         <th
                           colSpan={3}
-                          onClick={isEditingPreviousRound ? () => setEditingRound(null) : undefined}
+                          onClick={() => {
+                            if (!isCurrent && onSelectHeat) onSelectHeat(heat);
+                            if (isEditingPreviousRound) setEditingRound(null);
+                          }}
                           className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${completedRounds.length > 0 ? 'border-l ' : ''}${
                             darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
-                          }${!isCurrent ? ' opacity-30' : ''}${isEditingPreviousRound ? ' cursor-pointer' : ''}`}
-                          title={isEditingPreviousRound ? `Return to Race ${actualCurrentRound}` : undefined}
+                          }${!isCurrent ? ' opacity-30' : ''}${!isCurrent || isEditingPreviousRound ? ' cursor-pointer' : ''}`}
+                          title={!isCurrent ? `Switch to Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)}` : isEditingPreviousRound ? `Return to Race ${actualCurrentRound}` : undefined}
                         >
                           Race {currentRound}
                         </th>
