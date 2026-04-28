@@ -3,7 +3,7 @@ import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { HeatManagement, HeatDesignation, HeatAssignment, getHeatDisplayLabel } from '../types/heat';
 import { getLetterScoreDisplayCode } from '../types/letterScores';
-import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type, ChevronLeft, ChevronRight, Timer, Flag } from 'lucide-react';
+import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type, ChevronLeft, ChevronRight, Timer, Flag, Pencil } from 'lucide-react';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { HeatOverallResultsModal } from './HeatOverallResultsModal';
 import { StartBoxModal } from './start-box/StartBoxModal';
@@ -41,6 +41,7 @@ interface SpreadsheetScoringProps {
   onSelectHeat?: (heat: HeatDesignation) => void;
   parentVerifiedHeats?: Set<string>;
   onShowOverallResults?: () => void;
+  onUpdatePreviousRoundResults?: (round: number, heat: HeatDesignation, results: { skipperIndex: number; position: number | null; letterScore?: LetterScore; customPoints?: number }[]) => void;
 }
 
 interface CellEntry {
@@ -90,6 +91,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   onSelectHeat,
   parentVerifiedHeats,
   onShowOverallResults,
+  onUpdatePreviousRoundResults,
 }) => {
   const [cells, setCells] = useState<Record<HeatDesignation, CellEntry[]>>({} as any);
   const [localVerifiedHeats, setLocalVerifiedHeats] = useState<Set<HeatDesignation>>(new Set());
@@ -108,6 +110,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   const [showStartBoxModal, setShowStartBoxModal] = useState(false);
   const [raceTimerRunning, setRaceTimerRunning] = useState(false);
   const [singleFleetRace, setSingleFleetRace] = useState(initialRace);
+  const [editingRound, setEditingRound] = useState<number | null>(null);
 
   useEffect(() => {
     return () => {
@@ -135,25 +138,44 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     return [];
   }, [isMultiHeatMode, propAvailableHeats, isHMS]);
 
-  const currentRound = heatManagement?.currentRound || initialRace;
+  const actualCurrentRound = heatManagement?.currentRound || initialRace;
+  const effectiveEditingRound = editingRound ?? actualCurrentRound;
+  const isEditingPreviousRound = editingRound !== null && editingRound !== actualCurrentRound;
+  const currentRound = effectiveEditingRound;
 
   const verifiedHeats = useMemo(() => {
     const merged = new Set(localVerifiedHeats);
     if (parentVerifiedHeats) {
       for (const key of parentVerifiedHeats) {
         const [roundStr, heat] = key.split('-');
-        if (Number(roundStr) === currentRound && heat) {
+        if (Number(roundStr) === effectiveEditingRound && heat) {
           merged.add(heat as HeatDesignation);
         }
       }
     }
     return merged;
-  }, [localVerifiedHeats, parentVerifiedHeats, currentRound]);
+  }, [localVerifiedHeats, parentVerifiedHeats, effectiveEditingRound]);
 
   const completedRounds = useMemo(() => {
     if (!heatManagement || !isMultiHeatMode) return [];
-    return heatManagement.rounds.filter(r => r.completed && r.round < currentRound);
-  }, [heatManagement, isMultiHeatMode, currentRound]);
+    return heatManagement.rounds.filter(r => {
+      if (r.round === effectiveEditingRound) return false;
+      if (r.round < actualCurrentRound && r.completed) return true;
+      if (isEditingPreviousRound && r.round === actualCurrentRound) return true;
+      return false;
+    });
+  }, [heatManagement, isMultiHeatMode, effectiveEditingRound, actualCurrentRound, isEditingPreviousRound]);
+
+  const orderedColumns = useMemo(() => {
+    if (!isMultiHeatMode) return [];
+    const cols: { round: number; type: 'completed' | 'editing'; data?: any }[] = [];
+    for (const r of completedRounds) {
+      cols.push({ round: r.round, type: 'completed', data: r });
+    }
+    cols.push({ round: effectiveEditingRound, type: 'editing' });
+    cols.sort((a, b) => a.round - b.round);
+    return cols;
+  }, [isMultiHeatMode, completedRounds, effectiveEditingRound]);
 
   const singleFleetCompletedRaces = useMemo(() => {
     if (isMultiHeatMode) return [];
@@ -174,13 +196,40 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     return allHeatObserversMap[heat] || [];
   }, [allHeatObserversMap]);
 
+  const editingRoundData = useMemo(() => {
+    if (!isEditingPreviousRound || !heatManagement) return null;
+    return heatManagement.rounds.find(r => r.round === editingRound) || null;
+  }, [isEditingPreviousRound, heatManagement, editingRound]);
+
   const getHeatSkippers = useCallback((heat: HeatDesignation): Skipper[] => {
+    if (isMultiHeatMode && editingRoundData) {
+      const assignment = editingRoundData.heatAssignments?.find(
+        (a: any) => a.heatDesignation === heat
+      );
+      const indices = assignment?.skipperIndices || [];
+      return indices.map((idx: number) => skippers[idx]).filter(Boolean);
+    }
     if (isMultiHeatMode && heatSkipperIndicesMap) {
       const indices = heatSkipperIndicesMap[heat] || [];
       return indices.map(idx => skippers[idx]).filter(Boolean);
     }
     return skippers;
-  }, [isMultiHeatMode, heatSkipperIndicesMap, skippers]);
+  }, [isMultiHeatMode, heatSkipperIndicesMap, skippers, editingRoundData]);
+
+  const getGlobalSkipperIndex = useCallback((heat: HeatDesignation, localIndex: number): number => {
+    if (editingRoundData) {
+      const assignment = editingRoundData.heatAssignments?.find(
+        (a: any) => a.heatDesignation === heat
+      );
+      const indices = assignment?.skipperIndices || [];
+      return indices[localIndex] ?? -1;
+    }
+    if (isMultiHeatMode && heatSkipperIndicesMap) {
+      const indices = heatSkipperIndicesMap[heat] || [];
+      return indices[localIndex] ?? -1;
+    }
+    return localIndex;
+  }, [isMultiHeatMode, heatSkipperIndicesMap, editingRoundData]);
 
   const getRacingSkippersForHeat = useCallback((heat: HeatDesignation): Skipper[] => {
     return getHeatSkippers(heat);
@@ -235,6 +284,14 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       return `${h}:${indices.length}`;
     }).join('|');
   }, [isMultiHeatMode, heatSkipperIndicesMap, availableHeats]);
+
+  const prevActualRoundRef = useRef<number>(actualCurrentRound);
+  useEffect(() => {
+    if (prevActualRoundRef.current !== actualCurrentRound) {
+      setEditingRound(null);
+      prevActualRoundRef.current = actualCurrentRound;
+    }
+  }, [actualCurrentRound]);
 
   useEffect(() => {
     if (prevRoundRef.current !== null && prevRoundRef.current !== currentRound) {
@@ -294,8 +351,26 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       const heatSkips = getHeatSkippers(heat);
       const racingSkips = getRacingSkippersForHeat(heat);
       let totalPos = racingSkips.length;
-      const heatResults = getHeatRaceResults(heat);
-      const existingResults = heatResults.filter(r => r.race === currentRound);
+
+      let existingResults: any[];
+      if (editingRoundData) {
+        const roundResults = (editingRoundData.results || []).filter(
+          (res: any) => res.heatDesignation === heat
+        );
+        const assignment = editingRoundData.heatAssignments?.find(
+          (a: any) => a.heatDesignation === heat
+        );
+        const assignedIndices = assignment?.skipperIndices || [];
+        totalPos = Math.max(totalPos, assignedIndices.length);
+        existingResults = roundResults.map((res: any) => ({
+          ...res,
+          race: currentRound,
+          skipperIndex: assignedIndices.indexOf(res.skipperIndex)
+        })).filter((res: any) => res.skipperIndex >= 0);
+      } else {
+        const heatResults = getHeatRaceResults(heat);
+        existingResults = heatResults.filter(r => r.race === currentRound);
+      }
 
       if (completedRounds.length > 0) {
         for (const r of completedRounds) {
@@ -364,14 +439,14 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       newAllCells[heat] = newCells;
 
       const filledCount = newCells.filter(c => c.sailNumber.trim() || c.letterScore).length;
-      if (filledCount >= totalPos && totalPos > 0) {
+      if (filledCount >= totalPos && totalPos > 0 && existingResults.length === 0) {
         alreadyVerified.add(heat);
       }
     }
 
     setCells(newAllCells as any);
     setLocalVerifiedHeats(alreadyVerified);
-  }, [isMultiHeatMode, availableHeats, currentRound, skippers, initialRace, raceResults, heatResultsKey, heatAssignmentKey, completedRounds]);
+  }, [isMultiHeatMode, availableHeats, currentRound, skippers, initialRace, raceResults, heatResultsKey, heatAssignmentKey, completedRounds, editingRoundData]);
 
   useEffect(() => {
     if (!isMultiHeatMode || !currentScoringHeat) return;
@@ -555,7 +630,24 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     const hasErrors = heatCells.some(c => (c.sailNumber.trim() && !c.isValid) || c.isDuplicate);
     if (hasErrors) return;
 
-    if (isMultiHeatMode && onUpdateHeatResults) {
+    if (isEditingPreviousRound && onUpdatePreviousRoundResults) {
+      const globalResults: { skipperIndex: number; position: number | null; letterScore?: LetterScore; customPoints?: number }[] = [];
+      let posCounter = 1;
+      heatCells.forEach((cell) => {
+        if (cell.skipperIndex !== null && (cell.sailNumber.trim() || cell.letterScore)) {
+          const globalIdx = getGlobalSkipperIndex(heat, cell.skipperIndex);
+          if (globalIdx >= 0) {
+            globalResults.push({
+              skipperIndex: globalIdx,
+              position: cell.letterScore ? null : posCounter++,
+              letterScore: cell.letterScore || undefined,
+              customPoints: cell.customPoints
+            });
+          }
+        }
+      });
+      onUpdatePreviousRoundResults(editingRound!, heat, globalResults);
+    } else if (isMultiHeatMode && onUpdateHeatResults) {
       const heatResults = getHeatRaceResults(heat);
       const newResults = heatResults.filter(r => r.race !== currentRound);
       let posCounter = 1;
@@ -591,10 +683,12 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     setLocalVerifiedHeats(prev => new Set(prev).add(heat));
     verifiedCellsRef.current[heat] = cells[heat] ? [...cells[heat]] : [];
 
-    if (onConfirmHeatResults) {
-      onConfirmHeatResults(heat);
-    } else if (onConfirmResults) {
-      onConfirmResults();
+    if (!isEditingPreviousRound) {
+      if (onConfirmHeatResults) {
+        onConfirmHeatResults(heat);
+      } else if (onConfirmResults) {
+        onConfirmResults();
+      }
     }
   };
 
@@ -1099,6 +1193,28 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     <div className={`flex flex-col rounded-b-xl ${
       darkMode ? 'bg-slate-900' : 'bg-slate-50'
     }`}>
+      {isEditingPreviousRound && (
+        <div className={`px-3 py-2 border-b flex items-center justify-between ${
+          darkMode ? 'bg-amber-900/20 border-amber-800/30' : 'bg-amber-50 border-amber-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            <Pencil size={14} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+            <span className={`text-sm font-semibold ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
+              Editing Race {editingRound}
+            </span>
+          </div>
+          <button
+            onClick={() => setEditingRound(null)}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+              darkMode
+                ? 'bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 border border-blue-500/30'
+                : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+            }`}
+          >
+            Return to Race {actualCurrentRound}
+          </button>
+        </div>
+      )}
       <div className={`${isFullscreen ? 'max-h-[calc(100vh-80px)]' : 'max-h-[75vh]'} overflow-auto`} ref={scrollContainerRef}>
         <div className="space-y-2 p-2 pb-4">
           {heatsToRender.map(heat => {
@@ -1144,74 +1260,99 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                   <table className="text-[13px] border-collapse">
                     <colgroup>
                       <col style={{ width: '40px' }} />
-                      {completedRounds.map(r => (
-                        <React.Fragment key={`tcg-${r.round}`}>
-                          <col style={{ width: '48px' }} />
-                          <col style={{ width: '40px' }} />
+                      {orderedColumns.map(col => (
+                        <React.Fragment key={`tcg-${col.round}`}>
+                          <col style={{ width: col.type === 'editing' ? '56px' : '48px' }} />
+                          <col style={{ width: col.type === 'editing' ? '48px' : '40px' }} />
                           <col style={{ width: '32px' }} />
                         </React.Fragment>
                       ))}
-                      <col style={{ width: '56px' }} />
-                      <col style={{ width: '48px' }} />
-                      <col style={{ width: '32px' }} />
                       {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && <col style={{ width: '32px' }} />}
                     </colgroup>
                     <thead>
                       <tr className={darkMode ? 'bg-slate-700' : 'bg-slate-200'}>
                         <th className="px-1.5 py-1.5" />
-                        {completedRounds.map(r => (
-                          <th
-                            key={`race-lbl-${r.round}`}
-                            colSpan={3}
-                            className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l ${
-                              darkMode ? 'text-slate-300 border-slate-500/50' : 'text-slate-500 border-slate-400/50'
-                            }`}
-                          >
-                            Race {r.round}
-                          </th>
-                        ))}
-                        <th
-                          colSpan={3}
-                          className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${completedRounds.length > 0 ? 'border-l ' : ''}${
-                            darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
-                          }${!isCurrent ? ' opacity-30' : ''}`}
-                        >
-                          Race {currentRound}
-                        </th>
+                        {orderedColumns.map((col, colIdx) => {
+                          if (col.type === 'editing') {
+                            return (
+                              <th
+                                key={`race-lbl-${col.round}`}
+                                colSpan={3}
+                                onClick={() => {
+                                  if (!isCurrent && onSelectHeat) onSelectHeat(heat);
+                                  if (isEditingPreviousRound) setEditingRound(null);
+                                }}
+                                className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${colIdx > 0 ? 'border-l ' : ''}${
+                                  darkMode ? 'text-blue-300 border-blue-500/30 bg-blue-900/20' : 'text-blue-700 border-blue-300 bg-blue-50/80'
+                                }${!isCurrent ? ' opacity-30' : ''}${!isCurrent || isEditingPreviousRound ? ' cursor-pointer' : ''}`}
+                                title={!isCurrent ? `Switch to Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)}` : isEditingPreviousRound ? `Return to Race ${actualCurrentRound}` : undefined}
+                              >
+                                Race {col.round}
+                              </th>
+                            );
+                          }
+                          return (
+                            <th
+                              key={`race-lbl-${col.round}`}
+                              colSpan={3}
+                              onClick={() => {
+                                if (!isCurrent && onSelectHeat) onSelectHeat(heat);
+                                setEditingRound(col.round);
+                              }}
+                              className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l cursor-pointer transition-colors ${
+                                darkMode ? 'text-slate-300 border-slate-500/50 hover:bg-slate-600/50 hover:text-blue-300' : 'text-slate-500 border-slate-400/50 hover:bg-slate-100 hover:text-blue-600'
+                              }`}
+                              title={`Click to edit Race ${col.round}`}
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                Race {col.round}
+                                <Pencil size={9} className="opacity-40" />
+                              </span>
+                            </th>
+                          );
+                        })}
                         {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && <th />}
                       </tr>
                       <tr className={darkMode ? 'bg-slate-700/40' : 'bg-slate-100/60'}>
                         <th className="px-1.5 py-1" />
-                        {completedRounds.map(r => (
-                          <React.Fragment key={`hdr-r${r.round}`}>
-                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider border-l ${
-                              darkMode ? 'text-slate-500 border-slate-600/40' : 'text-slate-500 border-slate-200'
-                            }`}>
-                              <span className="text-[10px]">Sail No.</span>
-                            </th>
-                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
-                              darkMode ? 'text-slate-500' : 'text-slate-500'
-                            }`}>
-                              <span className="text-[10px]">Comment</span>
-                            </th>
-                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
-                              darkMode ? 'text-slate-500' : 'text-slate-500'
-                            }`}>
-                              <span className="text-[10px]">Pts</span>
-                            </th>
-                          </React.Fragment>
-                        ))}
-                        <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${completedRounds.length > 0 ? 'border-l ' : ''}${
-                          darkMode ? 'text-blue-400 border-blue-500/30' : 'text-blue-600 border-blue-300'
-                        }${!isCurrent ? ' opacity-30' : ''}`}>
-                          <span className="text-[10px]">Sail No.</span>
-                        </th>
-                        <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
-                          darkMode ? 'text-blue-400' : 'text-blue-600'
-                        }${!isCurrent ? ' opacity-30' : ''}`}><span className="text-[10px]">Comment</span></th>
-                        <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
-                          darkMode ? 'text-blue-400' : 'text-blue-600'
-                        }${!isCurrent ? ' opacity-30' : ''}`}><span className="text-[10px]">Pts</span></th>
+                        {orderedColumns.map((col, colIdx) => {
+                          if (col.type === 'editing') {
+                            return (
+                              <React.Fragment key={`hdr-r${col.round}`}>
+                                <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${colIdx > 0 ? 'border-l ' : ''}${
+                                  darkMode ? 'text-blue-400 border-blue-500/30 bg-blue-900/20' : 'text-blue-600 border-blue-300 bg-blue-50/80'
+                                }${!isCurrent ? ' opacity-30' : ''}`}>
+                                  <span className="text-[10px]">Sail No.</span>
+                                </th>
+                                <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                                  darkMode ? 'text-blue-400 bg-blue-900/20' : 'text-blue-600 bg-blue-50/80'
+                                }${!isCurrent ? ' opacity-30' : ''}`}><span className="text-[10px]">Comment</span></th>
+                                <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                                  darkMode ? 'text-blue-400 bg-blue-900/20' : 'text-blue-600 bg-blue-50/80'
+                                }${!isCurrent ? ' opacity-30' : ''}`}><span className="text-[10px]">Pts</span></th>
+                              </React.Fragment>
+                            );
+                          }
+                          return (
+                            <React.Fragment key={`hdr-r${col.round}`}>
+                              <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider border-l ${
+                                darkMode ? 'text-slate-500 border-slate-600/40' : 'text-slate-500 border-slate-200'
+                              }`}>
+                                <span className="text-[10px]">Sail No.</span>
+                              </th>
+                              <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                                darkMode ? 'text-slate-500' : 'text-slate-500'
+                              }`}>
+                                <span className="text-[10px]">Comment</span>
+                              </th>
+                              <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                                darkMode ? 'text-slate-500' : 'text-slate-500'
+                              }`}>
+                                <span className="text-[10px]">Pts</span>
+                              </th>
+                            </React.Fragment>
+                          );
+                        })}
                         {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && (
                           <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                             darkMode ? 'text-slate-400' : 'text-slate-500'
@@ -1248,159 +1389,167 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                 : darkMode ? 'text-slate-400' : 'text-slate-500'
                             }`}>{getOrdinal(position)}</td>
 
-                            {completedRounds.map(r => {
-                              const prevHeatResults = (r.results || []).filter(
-                                res => res.heatDesignation === heat
-                              );
-                              const positioned = prevHeatResults
-                                .filter(res => res.position !== null)
-                                .sort((a, b) => (a.position || 0) - (b.position || 0));
-                              const lettered = prevHeatResults
-                                .filter(res => res.position === null && res.letterScore);
-                              const ordered = [...positioned, ...lettered];
-                              const displayResult = ordered[idx] || null;
-                              const prevSkipper = displayResult ? skippers[displayResult.skipperIndex] : null;
-                              const prevSailNo = prevSkipper ? String(prevSkipper.sailNumber || prevSkipper.sailNo || '') : '';
-                              const prevHeatSize = r.heatAssignments.find(a => a.heatDesignation === heat)?.skipperIndices.length || 0;
-                              const prevPtsRaw = displayResult
-                                ? displayResult.letterScore
-                                  ? (displayResult.customPoints !== undefined ? displayResult.customPoints : prevHeatSize + 1)
-                                  : displayResult.position
-                                : null;
-                              const prevPts = prevPtsRaw === -1 ? -1 : prevPtsRaw;
+                            {orderedColumns.map((col, colIdx) => {
+                              if (col.type === 'completed') {
+                                const r = col.data;
+                                const prevHeatResults = (r.results || []).filter(
+                                  (res: any) => res.heatDesignation === heat
+                                );
+                                const positioned = prevHeatResults
+                                  .filter((res: any) => res.position !== null)
+                                  .sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
+                                const lettered = prevHeatResults
+                                  .filter((res: any) => res.position === null && res.letterScore);
+                                const ordered = [...positioned, ...lettered];
+                                const displayResult = ordered[idx] || null;
+                                const prevSkipper = displayResult ? skippers[displayResult.skipperIndex] : null;
+                                const prevSailNo = prevSkipper ? String(prevSkipper.sailNumber || prevSkipper.sailNo || '') : '';
+                                const prevHeatSize = r.heatAssignments.find((a: any) => a.heatDesignation === heat)?.skipperIndices.length || 0;
+                                const prevPtsRaw = displayResult
+                                  ? displayResult.letterScore
+                                    ? (displayResult.customPoints !== undefined ? displayResult.customPoints : prevHeatSize + 1)
+                                    : displayResult.position
+                                  : null;
+                                const prevPts = prevPtsRaw === -1 ? -1 : prevPtsRaw;
 
+                                return (
+                                  <React.Fragment key={`prev-r${r.round}-${position}`}>
+                                    <td className={`px-1 py-1 font-mono font-semibold border-l ${
+                                      (currentEvent?.show_flag || currentEvent?.show_country) ? 'text-left' : 'text-center'
+                                    } ${darkMode ? 'text-slate-400 border-slate-600/40' : 'text-slate-600 border-slate-200'}`}>
+                                      {displayResult ? (
+                                        <span className={`flex items-center gap-1 ${(currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'}`}>
+                                          {(currentEvent?.show_flag || currentEvent?.show_country) && prevSkipper?.country_code && (
+                                            <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                              {currentEvent?.show_flag && getCountryFlag(prevSkipper.country_code)}
+                                              {currentEvent?.show_country && getIOCCode(prevSkipper.country_code)}
+                                            </span>
+                                          )}
+                                          <span>{prevSailNo}</span>
+                                        </span>
+                                      ) : ''}
+                                    </td>
+                                    <td className={`px-1 py-1 text-center ${
+                                      darkMode ? 'text-slate-500' : 'text-slate-400'
+                                    }`}>
+                                      {displayResult ? (
+                                        displayResult.letterScore
+                                          ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(displayResult.letterScore, displayResult.customPoints)}</span>
+                                          : <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
+                                      ) : ''}
+                                    </td>
+                                    <td className={`px-1 py-1 text-center font-mono font-semibold ${
+                                      prevPts === -1
+                                        ? 'text-green-500'
+                                        : darkMode ? 'text-slate-400' : 'text-slate-600'
+                                    }`}>
+                                      {prevPts !== null ? (prevPts === -1 ? 'AVG' : prevPts) : ''}
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              }
+
+                              const editBg = darkMode ? 'bg-blue-900/10' : 'bg-blue-50/60';
                               return (
-                                <React.Fragment key={`prev-r${r.round}-${position}`}>
-                                  <td className={`px-1 py-1 font-mono font-semibold border-l ${
-                                    (currentEvent?.show_flag || currentEvent?.show_country) ? 'text-left' : 'text-center'
-                                  } ${darkMode ? 'text-slate-400 border-slate-600/40' : 'text-slate-600 border-slate-200'}`}>
-                                    {displayResult ? (
-                                      <span className={`flex items-center gap-1 ${(currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'}`}>
-                                        {(currentEvent?.show_flag || currentEvent?.show_country) && prevSkipper?.country_code && (
-                                          <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                            {currentEvent?.show_flag && getCountryFlag(prevSkipper.country_code)}
-                                            {currentEvent?.show_country && getIOCCode(prevSkipper.country_code)}
-                                          </span>
-                                        )}
-                                        <span>{prevSailNo}</span>
+                                <React.Fragment key={`edit-r${col.round}-${position}`}>
+                                  <td className={`px-1 py-0.5${colIdx > 0 ? ' border-l' : ''} ${editBg} ${
+                                    darkMode ? 'border-blue-500/20' : 'border-blue-200'
+                                  }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
+                                    {isVerified || isHistoricalRow ? (
+                                      <span className={`font-mono font-bold flex items-center gap-1 ${
+                                        (currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'
+                                      } ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                        {(() => {
+                                          const cellSkipper = cell.skipperIndex !== null ? (isMultiHeatMode ? getHeatSkippers(heat)[cell.skipperIndex] : skippers[cell.skipperIndex]) : null;
+                                          return (
+                                            <>
+                                              {(currentEvent?.show_flag || currentEvent?.show_country) && cellSkipper?.country_code && (
+                                                <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                  {currentEvent?.show_flag && getCountryFlag(cellSkipper.country_code)}
+                                                  {currentEvent?.show_country && getIOCCode(cellSkipper.country_code)}
+                                                </span>
+                                              )}
+                                              <span>{cell.sailNumber || (isHistoricalRow ? '' : '-')}</span>
+                                            </>
+                                          );
+                                        })()}
                                       </span>
-                                    ) : ''}
+                                    ) : (
+                                      <div className="flex items-center justify-center gap-0.5">
+                                        <input
+                                          ref={el => { inputRefs.current[`${heat}-${idx}`] = el; }}
+                                          type="text"
+                                          value={cell.sailNumber}
+                                          onChange={e => handleCellChange(heat, position, e.target.value)}
+                                          onKeyDown={e => handleKeyDown(e, heat, position, totalPositions)}
+                                          tabIndex={!isCurrent ? -1 : undefined}
+                                          className={`w-12 h-7 px-1 rounded text-xs font-mono font-bold border text-center ${
+                                            cell.letterScore
+                                              ? darkMode
+                                                ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
+                                                : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
+                                              : !cell.isValid && cell.sailNumber.trim()
+                                                ? 'border-red-500 bg-red-50/80 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:border-red-500'
+                                                : cell.isDuplicate
+                                                  ? 'border-amber-500 bg-amber-50/80 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-500'
+                                                  : darkMode
+                                                    ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
+                                                    : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
+                                          } focus:outline-none focus:ring-1 focus:ring-blue-500/20`}
+                                        />
+                                        {!cell.isValid && cell.sailNumber.trim() && !cell.letterScore && (
+                                          <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
+                                        )}
+                                      </div>
+                                    )}
                                   </td>
-                                  <td className={`px-1 py-1 text-center ${
-                                    darkMode ? 'text-slate-500' : 'text-slate-400'
-                                  }`}>
-                                    {displayResult ? (
-                                      displayResult.letterScore
-                                        ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(displayResult.letterScore, displayResult.customPoints)}</span>
-                                        : <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
-                                    ) : ''}
+
+                                  <td className={`px-1 py-1 text-center ${editBg} ${
+                                    darkMode ? 'text-slate-400' : 'text-slate-500'
+                                  }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
+                                    {isVerified || isHistoricalRow ? (
+                                      cell.letterScore
+                                        ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}</span>
+                                        : hasValue && cell.isValid
+                                          ? <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
+                                          : ''
+                                    ) : cell.letterScore ? (
+                                      <button
+                                        onClick={() => handleLetterScore(heat, position)}
+                                        className={`h-7 rounded-full px-2 text-[9px] font-bold flex-shrink-0 inline-flex items-center justify-center ${
+                                          darkMode
+                                            ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
+                                            : 'bg-slate-100 text-slate-700 border border-slate-300'
+                                        }`}
+                                        title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
+                                      >
+                                        {getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleLetterScore(heat, position)}
+                                        className={`h-7 rounded-full px-2 text-[11px] font-medium flex-shrink-0 inline-flex items-center justify-center transition-colors ${
+                                          darkMode
+                                            ? 'text-slate-400 hover:bg-slate-700/60 hover:text-white border border-transparent hover:border-slate-600/70'
+                                            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 border border-transparent hover:border-slate-200'
+                                        }`}
+                                        title="Assign letter score (DNS, DNF, DSQ, etc.)"
+                                      >
+                                        OK
+                                      </button>
+                                    )}
                                   </td>
-                                  <td className={`px-1 py-1 text-center font-mono font-semibold ${
-                                    prevPts === -1
+
+                                  <td className={`px-1 py-1 text-center font-mono font-bold ${editBg} ${
+                                    points === 'AVG'
                                       ? 'text-green-500'
-                                      : darkMode ? 'text-slate-400' : 'text-slate-600'
-                                  }`}>
-                                    {prevPts !== null ? (prevPts === -1 ? 'AVG' : prevPts) : ''}
+                                      : darkMode ? 'text-slate-200' : 'text-slate-800'
+                                  }${!isCurrent ? ' opacity-30' : ''}`}>
+                                    {points !== null ? points : ''}
                                   </td>
                                 </React.Fragment>
                               );
                             })}
-
-                            <td className={`px-1 py-0.5${completedRounds.length > 0 ? ' border-l' : ''} ${
-                              darkMode ? 'border-blue-500/20' : 'border-blue-200'
-                            }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
-                              {isVerified || isHistoricalRow ? (
-                                <span className={`font-mono font-bold flex items-center gap-1 ${
-                                  (currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'
-                                } ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                                  {(() => {
-                                    const cellSkipper = cell.skipperIndex !== null ? (isMultiHeatMode ? getHeatSkippers(heat)[cell.skipperIndex] : skippers[cell.skipperIndex]) : null;
-                                    return (
-                                      <>
-                                        {(currentEvent?.show_flag || currentEvent?.show_country) && cellSkipper?.country_code && (
-                                          <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                            {currentEvent?.show_flag && getCountryFlag(cellSkipper.country_code)}
-                                            {currentEvent?.show_country && getIOCCode(cellSkipper.country_code)}
-                                          </span>
-                                        )}
-                                        <span>{cell.sailNumber || (isHistoricalRow ? '' : '-')}</span>
-                                      </>
-                                    );
-                                  })()}
-                                </span>
-                              ) : (
-                                <div className="flex items-center justify-center gap-0.5">
-                                  <input
-                                    ref={el => { inputRefs.current[`${heat}-${idx}`] = el; }}
-                                    type="text"
-                                    value={cell.sailNumber}
-                                    onChange={e => handleCellChange(heat, position, e.target.value)}
-                                    onKeyDown={e => handleKeyDown(e, heat, position, totalPositions)}
-                                    tabIndex={!isCurrent ? -1 : undefined}
-                                    className={`w-12 h-7 px-1 rounded text-xs font-mono font-bold border text-center ${
-                                      cell.letterScore
-                                        ? darkMode
-                                          ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
-                                          : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
-                                        : !cell.isValid && cell.sailNumber.trim()
-                                          ? 'border-red-500 bg-red-50/80 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:border-red-500'
-                                          : cell.isDuplicate
-                                            ? 'border-amber-500 bg-amber-50/80 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-500'
-                                            : darkMode
-                                              ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
-                                              : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
-                                    } focus:outline-none focus:ring-1 focus:ring-blue-500/20`}
-                                  />
-                                  {!cell.isValid && cell.sailNumber.trim() && !cell.letterScore && (
-                                    <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                                  )}
-                                </div>
-                              )}
-                            </td>
-
-                            <td className={`px-1 py-1 text-center ${
-                              darkMode ? 'text-slate-400' : 'text-slate-500'
-                            }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
-                              {isVerified || isHistoricalRow ? (
-                                cell.letterScore
-                                  ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}</span>
-                                  : hasValue && cell.isValid
-                                    ? <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
-                                    : ''
-                              ) : cell.letterScore ? (
-                                <button
-                                  onClick={() => handleLetterScore(heat, position)}
-                                  className={`h-7 rounded-full px-2 text-[9px] font-bold flex-shrink-0 inline-flex items-center justify-center ${
-                                    darkMode
-                                      ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
-                                      : 'bg-slate-100 text-slate-700 border border-slate-300'
-                                  }`}
-                                  title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
-                                >
-                                  {getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => handleLetterScore(heat, position)}
-                                  className={`h-7 rounded-full px-2 text-[11px] font-medium flex-shrink-0 inline-flex items-center justify-center transition-colors ${
-                                    darkMode
-                                      ? 'text-slate-400 hover:bg-slate-700/60 hover:text-white border border-transparent hover:border-slate-600/70'
-                                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 border border-transparent hover:border-slate-200'
-                                  }`}
-                                  title="Assign letter score (DNS, DNF, DSQ, etc.)"
-                                >
-                                  OK
-                                </button>
-                              )}
-                            </td>
-
-                            <td className={`px-1 py-1 text-center font-mono font-bold ${
-                              points === 'AVG'
-                                ? 'text-green-500'
-                                : darkMode ? 'text-slate-200' : 'text-slate-800'
-                            }${!isCurrent ? ' opacity-30' : ''}`}>
-                              {points !== null ? points : ''}
-                            </td>
 
                             {!isSeedingRound && promotionCount > 0 && !isTopHeat && (
                               <td className="px-1 py-0.5 text-center">
@@ -1503,10 +1652,17 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                   >
                     <button
                       onClick={() => handleConfirmHeat(heat)}
-                      className="w-full py-2.5 rounded-lg text-white font-bold text-sm bg-green-600 hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md active:scale-[0.98]"
+                      className={`w-full py-2.5 rounded-lg text-white font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-md active:scale-[0.98] ${
+                        isEditingPreviousRound
+                          ? 'bg-amber-600 hover:bg-amber-700'
+                          : 'bg-green-600 hover:bg-green-700'
+                      }`}
                     >
                       <Check size={18} />
-                      Verify Heat {getHeatDisplayLabel(heat, heatManagement?.configuration)} Results
+                      {isEditingPreviousRound
+                        ? `Update Race ${editingRound} - Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)}`
+                        : `Verify Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)} Results`
+                      }
                     </button>
                   </div>
                 )}
@@ -1557,11 +1713,11 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
               ? 'bg-gradient-to-b from-cyan-600 to-blue-700 text-white hover:from-cyan-500 hover:to-blue-600'
               : 'bg-gradient-to-b from-blue-600 to-cyan-600 text-white hover:from-blue-500 hover:to-cyan-500'
           }`}
-          title="Current Rankings"
+          title="Overall Results"
         >
           <Trophy size={18} />
           <div className="flex flex-col items-center">
-            {'RANKINGS'.split('').map((letter, index) => (
+            {'RESULTS'.split('').map((letter, index) => (
               <span key={index} className="text-[10px] font-semibold leading-tight">
                 {letter}
               </span>

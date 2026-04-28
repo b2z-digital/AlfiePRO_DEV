@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, CreditCard as Edit, Plus, Eye, ArrowUpRight, Activity, Users, Calendar, ChartBar as BarChart2, Clock, Settings, Palette, FileText, Image, Trophy, TrendingUp, ExternalLink, Zap, Sparkles, Rocket, LayoutGrid as Layout, Navigation } from 'lucide-react';
+import { Globe, CreditCard as Edit, Plus, Eye, ArrowUpRight, Activity, Users, Calendar, ChartBar as BarChart2, Clock, Settings, Palette, FileText, Image, TrendingUp, ExternalLink, Zap, Rocket, LayoutGrid as Layout, Navigation } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNavigate } from 'react-router-dom';
@@ -20,7 +20,6 @@ export const WebsiteOverview: React.FC<WebsiteOverviewProps> = ({ darkMode }) =>
     averageTimeOnSite: '0m 0s',
     topPage: '-'
   });
-  const [eventWebsites, setEventWebsites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,7 +28,6 @@ export const WebsiteOverview: React.FC<WebsiteOverviewProps> = ({ darkMode }) =>
       loadWebsiteStatus();
       loadActivityFeed();
       loadAnalytics();
-      loadEventWebsites();
     }
   }, [currentClub?.clubId, currentOrganization?.id]);
 
@@ -103,108 +101,6 @@ export const WebsiteOverview: React.FC<WebsiteOverviewProps> = ({ darkMode }) =>
         const fallback = currentClub?.club?.abbreviation?.toLowerCase() || 'yourclub';
         setWebsiteUrl(`${fallback}.alfiepro.com.au`);
       }
-    }
-  };
-
-  const loadEventWebsites = async () => {
-    try {
-      // Get all enabled event websites
-      const { data: websites, error } = await supabase
-        .from('event_websites')
-        .select('*')
-        .eq('enabled', true)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      if (!websites || websites.length === 0) {
-        setEventWebsites([]);
-        return;
-      }
-
-      // Get all event IDs
-      const eventIds = websites.map(w => w.event_id).filter(id => id !== null);
-
-      if (eventIds.length === 0) {
-        setEventWebsites([]);
-        return;
-      }
-
-      // Fetch all events
-      const { data: allEvents } = await supabase
-        .from('public_events')
-        .select('id, event_name, date, event_level, venue, club_id, state_association_id, national_association_id')
-        .in('id', eventIds);
-
-      // Filter events based on organization or club
-      let filteredEventIds: Set<string>;
-
-      if (currentOrganization) {
-        if (currentOrganization.type === 'state') {
-          // For state associations, get events from clubs in that state
-          const { data: clubs } = await supabase
-            .from('clubs')
-            .select('id')
-            .eq('state_association_id', currentOrganization.id);
-
-          const clubIds = new Set(clubs?.map(c => c.id) || []);
-
-          filteredEventIds = new Set(
-            allEvents?.filter(e =>
-              clubIds.has(e.club_id) || e.state_association_id === currentOrganization.id
-            ).map(e => e.id) || []
-          );
-        } else if (currentOrganization.type === 'national') {
-          // For national associations, get events from all clubs in associated states
-          const { data: states } = await supabase
-            .from('state_associations')
-            .select('id')
-            .eq('national_association_id', currentOrganization.id);
-
-          const stateIds = new Set(states?.map(s => s.id) || []);
-
-          const { data: clubs } = await supabase
-            .from('clubs')
-            .select('id')
-            .in('state_association_id', Array.from(stateIds));
-
-          const clubIds = new Set(clubs?.map(c => c.id) || []);
-
-          filteredEventIds = new Set(
-            allEvents?.filter(e =>
-              clubIds.has(e.club_id) ||
-              stateIds.has(e.state_association_id) ||
-              e.national_association_id === currentOrganization.id
-            ).map(e => e.id) || []
-          );
-        } else {
-          filteredEventIds = new Set();
-        }
-      } else if (currentClub) {
-        // Filter by club
-        filteredEventIds = new Set(
-          allEvents?.filter(e => e.club_id === currentClub.clubId).map(e => e.id) || []
-        );
-      } else {
-        filteredEventIds = new Set();
-      }
-
-      // Create event map for quick lookup
-      const eventMap = new Map(allEvents?.map(e => [e.id, e]) || []);
-
-      // Filter and enrich websites
-      const enrichedWebsites = websites
-        .filter(w => filteredEventIds.has(w.event_id))
-        .slice(0, 4)
-        .map(w => ({
-          ...w,
-          public_events: eventMap.get(w.event_id) || null
-        }));
-
-      setEventWebsites(enrichedWebsites);
-    } catch (err) {
-      console.error('Error loading event websites:', err);
-      setEventWebsites([]);
     }
   };
 
@@ -370,16 +266,14 @@ export const WebsiteOverview: React.FC<WebsiteOverviewProps> = ({ darkMode }) =>
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">Website Management</h1>
             <p className="text-slate-400">
-              Manage your club website and event websites all in one place
+              Manage your club's public-facing website
             </p>
           </div>
         </div>
 
-        {/* Two-Column Layout */}
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-8 mb-8">
-
-          {/* LEFT SIDE - Club Website (3 columns) */}
-          <div className="xl:col-span-3 space-y-6">
+        {/* Club Website Section */}
+        <div className="mb-8">
+          <div className="space-y-6">
             <div className={`
               rounded-2xl border backdrop-blur-sm overflow-hidden
               ${darkMode
@@ -643,152 +537,6 @@ export const WebsiteOverview: React.FC<WebsiteOverviewProps> = ({ darkMode }) =>
             </div>
           </div>
 
-          {/* RIGHT SIDE - Event Websites (2 columns) */}
-          <div className="xl:col-span-2">
-            <div className={`
-              rounded-2xl border backdrop-blur-sm overflow-hidden
-              ${darkMode
-                ? 'bg-gradient-to-br from-cyan-900/20 to-slate-800/30 border-cyan-700/30'
-                : 'bg-white/10 border-slate-200/20'}
-            `}>
-              {/* Event Websites Header */}
-              <div className="p-6 border-b border-cyan-700/30 from-cyan-600/10 to-blue-600/10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-cyan-600/20">
-                      <Trophy size={24} className="text-cyan-400" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-white">Event Websites</h2>
-                      <p className="text-sm text-slate-400">Dedicated sites for major events</p>
-                    </div>
-                  </div>
-                  <div className="px-3 py-1.5 rounded-full bg-cyan-600/20 text-cyan-400 text-sm font-medium">
-                    {eventWebsites.length} Active
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => navigate('/website/event-websites-management')}
-                  className="btn-primary-green w-full flex items-center justify-center gap-2 px-4 py-3 from-cyan-600 to-blue-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/30 transition-all hover:scale-[1.02] font-medium"
-                >
-                  <Plus size={18} />
-                  Manage Event Websites
-                </button>
-              </div>
-
-              {/* Event Websites List */}
-              <div className="p-6">
-                {eventWebsites.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-cyan-600/20 flex items-center justify-center">
-                      <Trophy size={28} className="text-cyan-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold mb-2 text-white">No Event Websites</h3>
-                    <p className="text-sm text-slate-400 mb-4">
-                      Create dedicated websites for state and national events
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {eventWebsites.map((website) => {
-                      const event = website.public_events;
-                      return (
-                        <div
-                          key={website.id}
-                          className={`
-                            p-4 rounded-lg border transition-all hover:scale-[1.02] cursor-pointer
-                            ${darkMode
-                              ? 'bg-slate-800/50 border-slate-700/50 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20'
-                              : 'bg-white/5 border-slate-200/10 hover:bg-white/10'}
-                          `}
-                          onClick={() => navigate(`/website/event-websites/${website.id}`)}
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-white mb-1">
-                                {event?.event_name || 'Untitled Event'}
-                              </h4>
-                              {event?.event_level && (
-                                <span className="inline-block px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded text-xs font-medium capitalize">
-                                  {event.event_level}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(`/events/${website.slug}`, '_blank');
-                                }}
-                                className="p-1.5 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"
-                              >
-                                <Eye size={16} />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/website/event-websites/${website.id}`);
-                                }}
-                                className="p-1.5 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"
-                              >
-                                <Edit size={16} />
-                              </button>
-                            </div>
-                          </div>
-                          {event && (
-                            <div className="space-y-1 text-xs text-slate-400">
-                              {event.date && (
-                                <div className="flex items-center gap-1.5">
-                                  <Calendar size={12} />
-                                  <span>{new Date(event.date).toLocaleDateString()}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {eventWebsites.length > 0 && (
-                  <button
-                    onClick={() => navigate('/website/event-websites-management')}
-                    className="w-full mt-4 px-4 py-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium"
-                  >
-                    View All Event Websites →
-                  </button>
-                )}
-              </div>
-
-              {/* Event Website Features */}
-              <div className="p-6 border-t border-cyan-700/30 bg-cyan-900/10">
-                <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <Sparkles size={16} className="text-cyan-400" />
-                  Event Website Features
-                </h3>
-                <div className="space-y-2 text-sm text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                    <span>Registration & Payment Processing</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                    <span>Live Results & Leaderboards</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                    <span>Competitor Information</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                    <span>Media Gallery & News</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

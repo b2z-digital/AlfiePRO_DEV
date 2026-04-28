@@ -9,9 +9,10 @@ export const updateHeatResult = (
   result: HeatResult
 ): HeatManagement => {
   const { rounds, currentRound } = heatManagement;
-  
-  // Find the current round
-  const roundIndex = rounds.findIndex(r => r.round === currentRound);
+
+  // Find the target round - use result.round if specified, fall back to currentRound
+  const targetRound = result.round || currentRound;
+  const roundIndex = rounds.findIndex(r => r.round === targetRound);
   if (roundIndex === -1) return heatManagement;
   
   const round = rounds[roundIndex];
