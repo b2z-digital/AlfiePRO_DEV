@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Globe, Eye, Settings, FileText, Image, Trophy, Users, Newspaper, BarChart3, ExternalLink, Loader2, CheckCircle, AlertCircle, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, Globe, Eye, Settings, FileText, Image, Trophy, Users, Newspaper, ChartBar as BarChart3, ExternalLink, Loader as Loader2, CircleCheck as CheckCircle, CircleAlert as AlertCircle, LayoutGrid } from 'lucide-react';
 import type { EventWebsite, EventWebsiteSettings } from '../types/eventWebsite';
 import { eventWebsiteStorage } from '../utils/eventWebsiteStorage';
 import { EventWebsitePageManager } from '../components/events/EventWebsitePageManager';
@@ -68,7 +68,7 @@ export const EventWebsiteDashboardPage: React.FC = () => {
       if (error) {
         console.error('Error loading website:', error);
         // Navigate back to event websites list if not found
-        navigate('/website/event-websites');
+        navigate('/event-websites');
         return;
       }
 
@@ -86,11 +86,11 @@ export const EventWebsiteDashboardPage: React.FC = () => {
         ]);
       } else {
         // No website found, navigate back
-        navigate('/website/event-websites');
+        navigate('/event-websites');
       }
     } catch (error) {
       console.error('Error loading website data:', error);
-      navigate('/website/event-websites');
+      navigate('/event-websites');
     } finally {
       setLoading(false);
     }
@@ -169,7 +169,7 @@ export const EventWebsiteDashboardPage: React.FC = () => {
             Website not found
           </p>
           <button
-            onClick={() => navigate('/website/event-websites')}
+            onClick={() => navigate('/event-websites')}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
           >
             Back to Event Websites
@@ -187,7 +187,7 @@ export const EventWebsiteDashboardPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/website/event-websites')}
+                onClick={() => navigate('/event-websites')}
                 className={`p-2 rounded-lg transition-colors ${
                   darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
                 }`}

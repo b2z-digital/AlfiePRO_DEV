@@ -2936,7 +2936,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           }}
           onOpenDashboard={() => {
             setShowEventWebsiteModal(false);
-            navigate(`/website/event-websites/${selectedEventForWebsite.id}`);
+            navigate(`/event-websites/${selectedEventForWebsite.id}`);
           }}
         />
       )}

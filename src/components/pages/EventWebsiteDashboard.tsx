@@ -62,7 +62,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
 
       if (error || !websiteData) {
         console.error('Error loading website:', error);
-        navigate('/website/event-websites-management');
+        navigate('/event-websites');
         return;
       }
 
@@ -97,7 +97,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
       ]);
     } catch (error) {
       console.error('Error loading website data:', error);
-      navigate('/website/event-websites-management');
+      navigate('/event-websites');
     } finally {
       setLoading(false);
     }
@@ -176,7 +176,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
             Website not found
           </p>
           <button
-            onClick={() => navigate('/website/event-websites-management')}
+            onClick={() => navigate('/event-websites')}
             className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors"
           >
             Back to Event Websites
@@ -230,7 +230,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
                 </a>
               )}
               <button
-                onClick={() => navigate('/website/event-websites-management')}
+                onClick={() => navigate('/event-websites')}
                 className={`p-3 rounded-xl transition-colors ${
                   darkMode
                     ? 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white'

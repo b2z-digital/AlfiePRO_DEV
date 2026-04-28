@@ -2141,7 +2141,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   if (hasEventWebsite) {
                     // Use the website ID if we have it, otherwise use public event ID (dashboard will look it up)
                     const idToUse = eventWebsiteId || extractDbId(event.id);
-                    navigate(`/website/event-websites/${idToUse}`);
+                    navigate(`/event-websites/${idToUse}`);
                   } else {
                     setShowEventWebsiteModal(true);
                   }
@@ -3593,7 +3593,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             const { eventWebsiteStorage } = await import('../utils/eventWebsiteStorage');
             const website = await eventWebsiteStorage.getEventWebsiteForEvent(extractDbId(event.id));
             if (website?.id) {
-              navigate(`/website/event-websites/${website.id}`);
+              navigate(`/event-websites/${website.id}`);
             }
           }}
         />

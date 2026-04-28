@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, X, BarChart3 } from 'lucide-react';
+import { Globe, X, ChartBar as BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
@@ -84,7 +84,7 @@ export const EventWebsitesWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
         </button>
       )}
       <button
-        onClick={() => !isEditMode && navigate('/website/event-websites-management')}
+        onClick={() => !isEditMode && navigate('/event-websites')}
         disabled={isEditMode}
         className={`relative rounded-2xl p-4 text-left transition-all w-full h-full flex items-center gap-3 border backdrop-blur-sm ${themeColors.background} ${isEditMode ? '' : 'cursor-pointer transform hover:scale-[1.02]'}`}
       >

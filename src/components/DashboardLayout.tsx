@@ -1062,6 +1062,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/venues',
           featureKey: 'venues'
         },
+        ...(!isMember && !isAssociationViewer ? [{
+          id: 'event-websites',
+          label: 'Event Websites',
+          icon: Globe,
+          description: 'Manage event websites',
+          path: '/event-websites',
+          featureKey: 'website_management'
+        }] : []),
         ...(isRaceOfficer ? [{
           id: 'ro-contacts',
           label: 'My Contacts',
@@ -2123,6 +2131,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/website/analytics" element={<ClubWebsiteAnalytics darkMode={darkMode} onBack={() => navigate('/website')} />} />
               <Route path="/website/event-websites-management" element={<EventWebsiteManagement darkMode={darkMode} />} />
               <Route path="/website/event-websites/:websiteId" element={<EventWebsiteDashboard darkMode={darkMode} />} />
+              <Route path="/event-websites" element={<EventWebsiteManagement darkMode={darkMode} />} />
+              <Route path="/event-websites/:websiteId" element={<EventWebsiteDashboard darkMode={darkMode} />} />
               <Route path="/website/settings" element={<WebsiteSettings darkMode={darkMode} />} />
               
               <Route path="*" element={<Navigate to="/" />} />
