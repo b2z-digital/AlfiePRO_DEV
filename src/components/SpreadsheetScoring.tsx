@@ -3,7 +3,7 @@ import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { HeatManagement, HeatDesignation, HeatAssignment, getHeatDisplayLabel } from '../types/heat';
 import { getLetterScoreDisplayCode } from '../types/letterScores';
-import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type, ChevronLeft, ChevronRight, Timer, Flag } from 'lucide-react';
+import { Check, CircleAlert as AlertCircle, ArrowUp, Trophy, Eye, Type, ChevronLeft, ChevronRight, Timer, Flag, Pencil } from 'lucide-react';
 import { LetterScoreSelector } from './LetterScoreSelector';
 import { HeatOverallResultsModal } from './HeatOverallResultsModal';
 import { StartBoxModal } from './start-box/StartBoxModal';
@@ -41,6 +41,7 @@ interface SpreadsheetScoringProps {
   onSelectHeat?: (heat: HeatDesignation) => void;
   parentVerifiedHeats?: Set<string>;
   onShowOverallResults?: () => void;
+  onUpdatePreviousRoundResults?: (round: number, heat: HeatDesignation, results: { skipperIndex: number; position: number | null; letterScore?: LetterScore; customPoints?: number }[]) => void;
 }
 
 interface CellEntry {
@@ -90,6 +91,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   onSelectHeat,
   parentVerifiedHeats,
   onShowOverallResults,
+  onUpdatePreviousRoundResults,
 }) => {
   const [cells, setCells] = useState<Record<HeatDesignation, CellEntry[]>>({} as any);
   const [localVerifiedHeats, setLocalVerifiedHeats] = useState<Set<HeatDesignation>>(new Set());
@@ -108,6 +110,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   const [showStartBoxModal, setShowStartBoxModal] = useState(false);
   const [raceTimerRunning, setRaceTimerRunning] = useState(false);
   const [singleFleetRace, setSingleFleetRace] = useState(initialRace);
+  const [editingRound, setEditingRound] = useState<number | null>(null);
 
   useEffect(() => {
     return () => {
@@ -135,25 +138,33 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     return [];
   }, [isMultiHeatMode, propAvailableHeats, isHMS]);
 
-  const currentRound = heatManagement?.currentRound || initialRace;
+  const actualCurrentRound = heatManagement?.currentRound || initialRace;
+  const effectiveEditingRound = editingRound ?? actualCurrentRound;
+  const isEditingPreviousRound = editingRound !== null && editingRound !== actualCurrentRound;
+  const currentRound = effectiveEditingRound;
 
   const verifiedHeats = useMemo(() => {
     const merged = new Set(localVerifiedHeats);
     if (parentVerifiedHeats) {
       for (const key of parentVerifiedHeats) {
         const [roundStr, heat] = key.split('-');
-        if (Number(roundStr) === currentRound && heat) {
+        if (Number(roundStr) === effectiveEditingRound && heat) {
           merged.add(heat as HeatDesignation);
         }
       }
     }
     return merged;
-  }, [localVerifiedHeats, parentVerifiedHeats, currentRound]);
+  }, [localVerifiedHeats, parentVerifiedHeats, effectiveEditingRound]);
 
   const completedRounds = useMemo(() => {
     if (!heatManagement || !isMultiHeatMode) return [];
-    return heatManagement.rounds.filter(r => r.completed && r.round < currentRound);
-  }, [heatManagement, isMultiHeatMode, currentRound]);
+    return heatManagement.rounds.filter(r => {
+      if (r.round === effectiveEditingRound) return false;
+      if (r.round < effectiveEditingRound) return r.completed;
+      if (isEditingPreviousRound && r.round <= actualCurrentRound) return true;
+      return false;
+    });
+  }, [heatManagement, isMultiHeatMode, effectiveEditingRound, actualCurrentRound, isEditingPreviousRound]);
 
   const singleFleetCompletedRaces = useMemo(() => {
     if (isMultiHeatMode) return [];
@@ -174,13 +185,40 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     return allHeatObserversMap[heat] || [];
   }, [allHeatObserversMap]);
 
+  const editingRoundData = useMemo(() => {
+    if (!isEditingPreviousRound || !heatManagement) return null;
+    return heatManagement.rounds.find(r => r.round === editingRound) || null;
+  }, [isEditingPreviousRound, heatManagement, editingRound]);
+
   const getHeatSkippers = useCallback((heat: HeatDesignation): Skipper[] => {
+    if (isMultiHeatMode && editingRoundData) {
+      const assignment = editingRoundData.heatAssignments?.find(
+        (a: any) => a.heatDesignation === heat
+      );
+      const indices = assignment?.skipperIndices || [];
+      return indices.map((idx: number) => skippers[idx]).filter(Boolean);
+    }
     if (isMultiHeatMode && heatSkipperIndicesMap) {
       const indices = heatSkipperIndicesMap[heat] || [];
       return indices.map(idx => skippers[idx]).filter(Boolean);
     }
     return skippers;
-  }, [isMultiHeatMode, heatSkipperIndicesMap, skippers]);
+  }, [isMultiHeatMode, heatSkipperIndicesMap, skippers, editingRoundData]);
+
+  const getGlobalSkipperIndex = useCallback((heat: HeatDesignation, localIndex: number): number => {
+    if (editingRoundData) {
+      const assignment = editingRoundData.heatAssignments?.find(
+        (a: any) => a.heatDesignation === heat
+      );
+      const indices = assignment?.skipperIndices || [];
+      return indices[localIndex] ?? -1;
+    }
+    if (isMultiHeatMode && heatSkipperIndicesMap) {
+      const indices = heatSkipperIndicesMap[heat] || [];
+      return indices[localIndex] ?? -1;
+    }
+    return localIndex;
+  }, [isMultiHeatMode, heatSkipperIndicesMap, editingRoundData]);
 
   const getRacingSkippersForHeat = useCallback((heat: HeatDesignation): Skipper[] => {
     return getHeatSkippers(heat);
@@ -235,6 +273,14 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       return `${h}:${indices.length}`;
     }).join('|');
   }, [isMultiHeatMode, heatSkipperIndicesMap, availableHeats]);
+
+  const prevActualRoundRef = useRef<number>(actualCurrentRound);
+  useEffect(() => {
+    if (prevActualRoundRef.current !== actualCurrentRound) {
+      setEditingRound(null);
+      prevActualRoundRef.current = actualCurrentRound;
+    }
+  }, [actualCurrentRound]);
 
   useEffect(() => {
     if (prevRoundRef.current !== null && prevRoundRef.current !== currentRound) {
@@ -294,8 +340,26 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       const heatSkips = getHeatSkippers(heat);
       const racingSkips = getRacingSkippersForHeat(heat);
       let totalPos = racingSkips.length;
-      const heatResults = getHeatRaceResults(heat);
-      const existingResults = heatResults.filter(r => r.race === currentRound);
+
+      let existingResults: any[];
+      if (editingRoundData) {
+        const roundResults = (editingRoundData.results || []).filter(
+          (res: any) => res.heatDesignation === heat
+        );
+        const assignment = editingRoundData.heatAssignments?.find(
+          (a: any) => a.heatDesignation === heat
+        );
+        const assignedIndices = assignment?.skipperIndices || [];
+        totalPos = Math.max(totalPos, assignedIndices.length);
+        existingResults = roundResults.map((res: any) => ({
+          ...res,
+          race: currentRound,
+          skipperIndex: assignedIndices.indexOf(res.skipperIndex)
+        })).filter((res: any) => res.skipperIndex >= 0);
+      } else {
+        const heatResults = getHeatRaceResults(heat);
+        existingResults = heatResults.filter(r => r.race === currentRound);
+      }
 
       if (completedRounds.length > 0) {
         for (const r of completedRounds) {
@@ -371,7 +435,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
     setCells(newAllCells as any);
     setLocalVerifiedHeats(alreadyVerified);
-  }, [isMultiHeatMode, availableHeats, currentRound, skippers, initialRace, raceResults, heatResultsKey, heatAssignmentKey, completedRounds]);
+  }, [isMultiHeatMode, availableHeats, currentRound, skippers, initialRace, raceResults, heatResultsKey, heatAssignmentKey, completedRounds, editingRoundData]);
 
   useEffect(() => {
     if (!isMultiHeatMode || !currentScoringHeat) return;
@@ -555,7 +619,24 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     const hasErrors = heatCells.some(c => (c.sailNumber.trim() && !c.isValid) || c.isDuplicate);
     if (hasErrors) return;
 
-    if (isMultiHeatMode && onUpdateHeatResults) {
+    if (isEditingPreviousRound && onUpdatePreviousRoundResults) {
+      const globalResults: { skipperIndex: number; position: number | null; letterScore?: LetterScore; customPoints?: number }[] = [];
+      let posCounter = 1;
+      heatCells.forEach((cell) => {
+        if (cell.skipperIndex !== null && (cell.sailNumber.trim() || cell.letterScore)) {
+          const globalIdx = getGlobalSkipperIndex(heat, cell.skipperIndex);
+          if (globalIdx >= 0) {
+            globalResults.push({
+              skipperIndex: globalIdx,
+              position: cell.letterScore ? null : posCounter++,
+              letterScore: cell.letterScore || undefined,
+              customPoints: cell.customPoints
+            });
+          }
+        }
+      });
+      onUpdatePreviousRoundResults(editingRound!, heat, globalResults);
+    } else if (isMultiHeatMode && onUpdateHeatResults) {
       const heatResults = getHeatRaceResults(heat);
       const newResults = heatResults.filter(r => r.race !== currentRound);
       let posCounter = 1;
@@ -591,10 +672,12 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     setLocalVerifiedHeats(prev => new Set(prev).add(heat));
     verifiedCellsRef.current[heat] = cells[heat] ? [...cells[heat]] : [];
 
-    if (onConfirmHeatResults) {
-      onConfirmHeatResults(heat);
-    } else if (onConfirmResults) {
-      onConfirmResults();
+    if (!isEditingPreviousRound) {
+      if (onConfirmHeatResults) {
+        onConfirmHeatResults(heat);
+      } else if (onConfirmResults) {
+        onConfirmResults();
+      }
     }
   };
 
@@ -1099,6 +1182,28 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     <div className={`flex flex-col rounded-b-xl ${
       darkMode ? 'bg-slate-900' : 'bg-slate-50'
     }`}>
+      {isEditingPreviousRound && (
+        <div className={`px-3 py-2 border-b flex items-center justify-between ${
+          darkMode ? 'bg-amber-900/20 border-amber-800/30' : 'bg-amber-50 border-amber-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            <Pencil size={14} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+            <span className={`text-sm font-semibold ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
+              Editing Race {editingRound}
+            </span>
+          </div>
+          <button
+            onClick={() => setEditingRound(null)}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+              darkMode
+                ? 'bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 border border-blue-500/30'
+                : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+            }`}
+          >
+            Return to Race {actualCurrentRound}
+          </button>
+        </div>
+      )}
       <div className={`${isFullscreen ? 'max-h-[calc(100vh-80px)]' : 'max-h-[75vh]'} overflow-auto`} ref={scrollContainerRef}>
         <div className="space-y-2 p-2 pb-4">
           {heatsToRender.map(heat => {
@@ -1163,18 +1268,25 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                           <th
                             key={`race-lbl-${r.round}`}
                             colSpan={3}
-                            className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l ${
-                              darkMode ? 'text-slate-300 border-slate-500/50' : 'text-slate-500 border-slate-400/50'
+                            onClick={() => setEditingRound(r.round)}
+                            className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l cursor-pointer transition-colors ${
+                              darkMode ? 'text-slate-300 border-slate-500/50 hover:bg-slate-600/50 hover:text-blue-300' : 'text-slate-500 border-slate-400/50 hover:bg-slate-100 hover:text-blue-600'
                             }`}
+                            title={`Click to edit Race ${r.round}`}
                           >
-                            Race {r.round}
+                            <span className="inline-flex items-center gap-1">
+                              Race {r.round}
+                              <Pencil size={9} className="opacity-40" />
+                            </span>
                           </th>
                         ))}
                         <th
                           colSpan={3}
+                          onClick={isEditingPreviousRound ? () => setEditingRound(null) : undefined}
                           className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${completedRounds.length > 0 ? 'border-l ' : ''}${
                             darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
-                          }${!isCurrent ? ' opacity-30' : ''}`}
+                          }${!isCurrent ? ' opacity-30' : ''}${isEditingPreviousRound ? ' cursor-pointer' : ''}`}
+                          title={isEditingPreviousRound ? `Return to Race ${actualCurrentRound}` : undefined}
                         >
                           Race {currentRound}
                         </th>
@@ -1503,10 +1615,17 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                   >
                     <button
                       onClick={() => handleConfirmHeat(heat)}
-                      className="w-full py-2.5 rounded-lg text-white font-bold text-sm bg-green-600 hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-md active:scale-[0.98]"
+                      className={`w-full py-2.5 rounded-lg text-white font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-md active:scale-[0.98] ${
+                        isEditingPreviousRound
+                          ? 'bg-amber-600 hover:bg-amber-700'
+                          : 'bg-green-600 hover:bg-green-700'
+                      }`}
                     >
                       <Check size={18} />
-                      Verify Heat {getHeatDisplayLabel(heat, heatManagement?.configuration)} Results
+                      {isEditingPreviousRound
+                        ? `Update Race ${editingRound} - Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)}`
+                        : `Verify Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)} Results`
+                      }
                     </button>
                   </div>
                 )}

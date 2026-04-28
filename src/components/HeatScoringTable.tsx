@@ -2193,6 +2193,35 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             currentEvent={currentEvent}
             parentVerifiedHeats={spreadsheetVerifiedHeats}
             onShowOverallResults={heatManagement.configuration?.scoringSystem === 'shrs' ? () => setShowOverallResultsView(true) : undefined}
+            onUpdatePreviousRoundResults={(round, heat, results) => {
+              const heatResults = results.map(entry => ({
+                skipperIndex: entry.skipperIndex,
+                heatDesignation: heat,
+                position: entry.position,
+                letterScore: entry.letterScore,
+                customPoints: entry.customPoints,
+                round: round,
+                race: round
+              }));
+
+              // Clear existing results for this heat in this round, then add new ones
+              const roundData = heatManagement.rounds.find(r => r.round === round);
+              if (roundData) {
+                const assignment = roundData.heatAssignments?.find(a => a.heatDesignation === heat);
+                const skipperIndices = assignment?.skipperIndices || [];
+                if (onClearHeatRaceResults) {
+                  onClearHeatRaceResults(heat, round, round, skipperIndices);
+                }
+              }
+
+              if (onBatchUpdateHeatResults && heatResults.length > 0) {
+                onBatchUpdateHeatResults(heatResults);
+              } else {
+                heatResults.forEach(heatResult => {
+                  onUpdateHeatResult(heatResult);
+                });
+              }
+            }}
           />
         ) : (
           <ScratchRaceTable
