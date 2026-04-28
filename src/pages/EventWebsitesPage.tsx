@@ -189,13 +189,11 @@ export const EventWebsitesPage: React.FC = () => {
       setLoadingEvents(true);
       const existingEventIds = new Set(eventWebsites.map(w => w.event_id).filter(Boolean));
 
-      let query = supabase
+      const { data: events, error } = await supabase
         .from('public_events')
         .select('id, event_name, date, end_date, event_level, venue, club_id, state_association_id, national_association_id')
-        .in('event_level', ['state', 'national'])
         .order('date', { ascending: false });
 
-      const { data: events, error } = await query;
       if (error) throw error;
 
       const filtered = (events || []).filter(e => !existingEventIds.has(e.id));
@@ -530,27 +528,41 @@ export const EventWebsitesPage: React.FC = () => {
             const event = website.public_events;
             const isActive = website.enabled;
 
+            const isOrphaned = !event;
+            const displayName = event?.event_name || website.slug?.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || 'Untitled Event';
+
             return (
               <div
                 key={website.id}
                 className={`rounded-xl border overflow-hidden transition-all hover:shadow-lg ${
-                  darkMode
-                    ? 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
-                    : 'bg-white border-slate-200 hover:border-slate-300'
+                  isOrphaned
+                    ? darkMode
+                      ? 'bg-slate-800/50 border-amber-600/30 hover:border-amber-500/50'
+                      : 'bg-white border-amber-300 hover:border-amber-400'
+                    : darkMode
+                      ? 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
                 }`}
               >
                   {/* Status Badge */}
                   <div className={`p-4 border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
                     <div className="flex items-center justify-between mb-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        isActive
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : darkMode
-                            ? 'bg-slate-500/20 text-slate-400'
-                            : 'bg-slate-200 text-slate-600'
-                      }`}>
-                        {isActive ? 'Active' : 'Draft'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          isActive
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : darkMode
+                              ? 'bg-slate-500/20 text-slate-400'
+                              : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {isActive ? 'Active' : 'Draft'}
+                        </span>
+                        {isOrphaned && (
+                          <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-medium">
+                            No linked event
+                          </span>
+                        )}
+                      </div>
                       {event?.event_level && (
                         <span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded text-xs font-medium capitalize">
                           {event.event_level}
@@ -559,7 +571,7 @@ export const EventWebsitesPage: React.FC = () => {
                     </div>
 
                     <h3 className={`text-lg font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      {event?.event_name || 'Untitled Event'}
+                      {displayName}
                     </h3>
 
                     {event && (
@@ -746,7 +758,7 @@ export const EventWebsitesPage: React.FC = () => {
                       Select an Event
                     </h3>
                     <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Choose a state or national event to create a website for
+                      Choose an event to create a dedicated website for
                     </p>
                   </div>
                 </div>
@@ -788,7 +800,7 @@ export const EventWebsitesPage: React.FC = () => {
                   <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     {eventSearchTerm
                       ? 'Try adjusting your search'
-                      : 'Create a state or national event in Race Management first'}
+                      : 'Create an event in Race Management first'}
                   </p>
                 </div>
               ) : (
@@ -826,13 +838,17 @@ export const EventWebsitesPage: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        <span className={`ml-3 px-2.5 py-1 rounded-full text-xs font-medium capitalize ${
-                          event.event_level === 'national'
-                            ? 'bg-amber-500/20 text-amber-400'
-                            : 'bg-cyan-500/20 text-cyan-400'
-                        }`}>
-                          {event.event_level}
-                        </span>
+                        {event.event_level && (
+                          <span className={`ml-3 px-2.5 py-1 rounded-full text-xs font-medium capitalize ${
+                            event.event_level === 'national'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : event.event_level === 'state'
+                                ? 'bg-cyan-500/20 text-cyan-400'
+                                : 'bg-slate-500/20 text-slate-400'
+                          }`}>
+                            {event.event_level}
+                          </span>
+                        )}
                       </div>
                     </button>
                   ))}

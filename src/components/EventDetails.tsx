@@ -2126,8 +2126,8 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               <div />
             )}
             <div className="flex items-center gap-3 flex-wrap justify-end">
-            {/* Event Website Button - Only for State/National Events, restricted to host club or associations */}
-            {(event.eventLevel === 'state' || event.eventLevel === 'national') &&
+            {/* Event Website Button - Available for all events, restricted to host club or associations */}
+            {(isAdmin || isEditor) &&
              (!event.isPublicEvent ||
               (event.isPublicEvent &&
                (event.clubId === currentClub?.clubId ||
