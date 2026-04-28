@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Save, Anchor, FileText, Upload } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { getBoatClasses } from '../../utils/boatClassStorage';
+import { BoatClass } from '../../types/boatClass';
 
 interface AddBoatModalProps {
   darkMode: boolean;
@@ -39,6 +41,24 @@ export const AddBoatModal: React.FC<AddBoatModalProps> = ({
   });
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [uploadingCertificate, setUploadingCertificate] = useState(false);
+  const [boatClassOptions, setBoatClassOptions] = useState<Array<{ value: string; label: string }>>([]);
+
+  useEffect(() => {
+    const fetchBoatClassOptions = async () => {
+      try {
+        const allClasses = await getBoatClasses();
+        const options = allClasses.map((bc: BoatClass) => {
+          const match = bc.name.match(/\(([^)]+)\)$/);
+          const shortCode = match ? match[1] : bc.name === 'Ten Rater' ? '10R' : bc.name;
+          return { value: shortCode, label: bc.name };
+        });
+        setBoatClassOptions(options);
+      } catch (error) {
+        console.error('Error fetching boat classes:', error);
+      }
+    };
+    fetchBoatClassOptions();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,19 +219,24 @@ export const AddBoatModal: React.FC<AddBoatModalProps> = ({
                     <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                       Boat Type <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g., IOM, DF95, 10R"
+                    <select
                       value={formData.boat_type}
                       onChange={(e) => setFormData({ ...formData, boat_type: e.target.value })}
                       className={`
                         w-full px-4 py-2.5 rounded-lg border transition-colors
                         ${darkMode
-                          ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400 focus:border-cyan-500'
-                          : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-cyan-500'}
+                          ? 'bg-slate-700 border-slate-600 text-white focus:border-cyan-500'
+                          : 'bg-white border-slate-200 text-slate-900 focus:border-cyan-500'}
                         focus:outline-none focus:ring-2 focus:ring-cyan-500/20
                       `}
-                    />
+                    >
+                      <option value="">Select boat type</option>
+                      {boatClassOptions.map(opt => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.value !== opt.label ? `${opt.value} - ${opt.label}` : opt.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
