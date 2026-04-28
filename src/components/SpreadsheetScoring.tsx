@@ -160,11 +160,22 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     if (!heatManagement || !isMultiHeatMode) return [];
     return heatManagement.rounds.filter(r => {
       if (r.round === effectiveEditingRound) return false;
-      if (r.round < effectiveEditingRound) return r.completed;
-      if (isEditingPreviousRound && r.round <= actualCurrentRound) return true;
+      if (r.round < actualCurrentRound && r.completed) return true;
+      if (isEditingPreviousRound && r.round === actualCurrentRound) return true;
       return false;
     });
   }, [heatManagement, isMultiHeatMode, effectiveEditingRound, actualCurrentRound, isEditingPreviousRound]);
+
+  const orderedColumns = useMemo(() => {
+    if (!isMultiHeatMode) return [];
+    const cols: { round: number; type: 'completed' | 'editing'; data?: any }[] = [];
+    for (const r of completedRounds) {
+      cols.push({ round: r.round, type: 'completed', data: r });
+    }
+    cols.push({ round: effectiveEditingRound, type: 'editing' });
+    cols.sort((a, b) => a.round - b.round);
+    return cols;
+  }, [isMultiHeatMode, completedRounds, effectiveEditingRound]);
 
   const singleFleetCompletedRaces = useMemo(() => {
     if (isMultiHeatMode) return [];
@@ -1249,87 +1260,99 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                   <table className="text-[13px] border-collapse">
                     <colgroup>
                       <col style={{ width: '40px' }} />
-                      {completedRounds.map(r => (
-                        <React.Fragment key={`tcg-${r.round}`}>
-                          <col style={{ width: '48px' }} />
-                          <col style={{ width: '40px' }} />
+                      {orderedColumns.map(col => (
+                        <React.Fragment key={`tcg-${col.round}`}>
+                          <col style={{ width: col.type === 'editing' ? '56px' : '48px' }} />
+                          <col style={{ width: col.type === 'editing' ? '48px' : '40px' }} />
                           <col style={{ width: '32px' }} />
                         </React.Fragment>
                       ))}
-                      <col style={{ width: '56px' }} />
-                      <col style={{ width: '48px' }} />
-                      <col style={{ width: '32px' }} />
                       {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && <col style={{ width: '32px' }} />}
                     </colgroup>
                     <thead>
                       <tr className={darkMode ? 'bg-slate-700' : 'bg-slate-200'}>
                         <th className="px-1.5 py-1.5" />
-                        {completedRounds.map(r => (
-                          <th
-                            key={`race-lbl-${r.round}`}
-                            colSpan={3}
-                            onClick={() => {
-                              if (!isCurrent && onSelectHeat) onSelectHeat(heat);
-                              setEditingRound(r.round);
-                            }}
-                            className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l cursor-pointer transition-colors ${
-                              darkMode ? 'text-slate-300 border-slate-500/50 hover:bg-slate-600/50 hover:text-blue-300' : 'text-slate-500 border-slate-400/50 hover:bg-slate-100 hover:text-blue-600'
-                            }`}
-                            title={`Click to edit Race ${r.round}`}
-                          >
-                            <span className="inline-flex items-center gap-1">
-                              Race {r.round}
-                              <Pencil size={9} className="opacity-40" />
-                            </span>
-                          </th>
-                        ))}
-                        <th
-                          colSpan={3}
-                          onClick={() => {
-                            if (!isCurrent && onSelectHeat) onSelectHeat(heat);
-                            if (isEditingPreviousRound) setEditingRound(null);
-                          }}
-                          className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${completedRounds.length > 0 ? 'border-l ' : ''}${
-                            darkMode ? 'text-blue-300 border-blue-500/30' : 'text-blue-700 border-blue-300'
-                          }${!isCurrent ? ' opacity-30' : ''}${!isCurrent || isEditingPreviousRound ? ' cursor-pointer' : ''}`}
-                          title={!isCurrent ? `Switch to Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)}` : isEditingPreviousRound ? `Return to Race ${actualCurrentRound}` : undefined}
-                        >
-                          Race {currentRound}
-                        </th>
+                        {orderedColumns.map((col, colIdx) => {
+                          if (col.type === 'editing') {
+                            return (
+                              <th
+                                key={`race-lbl-${col.round}`}
+                                colSpan={3}
+                                onClick={() => {
+                                  if (!isCurrent && onSelectHeat) onSelectHeat(heat);
+                                  if (isEditingPreviousRound) setEditingRound(null);
+                                }}
+                                className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${colIdx > 0 ? 'border-l ' : ''}${
+                                  darkMode ? 'text-blue-300 border-blue-500/30 bg-blue-900/20' : 'text-blue-700 border-blue-300 bg-blue-50/80'
+                                }${!isCurrent ? ' opacity-30' : ''}${!isCurrent || isEditingPreviousRound ? ' cursor-pointer' : ''}`}
+                                title={!isCurrent ? `Switch to Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)}` : isEditingPreviousRound ? `Return to Race ${actualCurrentRound}` : undefined}
+                              >
+                                Race {col.round}
+                              </th>
+                            );
+                          }
+                          return (
+                            <th
+                              key={`race-lbl-${col.round}`}
+                              colSpan={3}
+                              onClick={() => {
+                                if (!isCurrent && onSelectHeat) onSelectHeat(heat);
+                                setEditingRound(col.round);
+                              }}
+                              className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l cursor-pointer transition-colors ${
+                                darkMode ? 'text-slate-300 border-slate-500/50 hover:bg-slate-600/50 hover:text-blue-300' : 'text-slate-500 border-slate-400/50 hover:bg-slate-100 hover:text-blue-600'
+                              }`}
+                              title={`Click to edit Race ${col.round}`}
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                Race {col.round}
+                                <Pencil size={9} className="opacity-40" />
+                              </span>
+                            </th>
+                          );
+                        })}
                         {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && <th />}
                       </tr>
                       <tr className={darkMode ? 'bg-slate-700/40' : 'bg-slate-100/60'}>
                         <th className="px-1.5 py-1" />
-                        {completedRounds.map(r => (
-                          <React.Fragment key={`hdr-r${r.round}`}>
-                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider border-l ${
-                              darkMode ? 'text-slate-500 border-slate-600/40' : 'text-slate-500 border-slate-200'
-                            }`}>
-                              <span className="text-[10px]">Sail No.</span>
-                            </th>
-                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
-                              darkMode ? 'text-slate-500' : 'text-slate-500'
-                            }`}>
-                              <span className="text-[10px]">Comment</span>
-                            </th>
-                            <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
-                              darkMode ? 'text-slate-500' : 'text-slate-500'
-                            }`}>
-                              <span className="text-[10px]">Pts</span>
-                            </th>
-                          </React.Fragment>
-                        ))}
-                        <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${completedRounds.length > 0 ? 'border-l ' : ''}${
-                          darkMode ? 'text-blue-400 border-blue-500/30' : 'text-blue-600 border-blue-300'
-                        }${!isCurrent ? ' opacity-30' : ''}`}>
-                          <span className="text-[10px]">Sail No.</span>
-                        </th>
-                        <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
-                          darkMode ? 'text-blue-400' : 'text-blue-600'
-                        }${!isCurrent ? ' opacity-30' : ''}`}><span className="text-[10px]">Comment</span></th>
-                        <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
-                          darkMode ? 'text-blue-400' : 'text-blue-600'
-                        }${!isCurrent ? ' opacity-30' : ''}`}><span className="text-[10px]">Pts</span></th>
+                        {orderedColumns.map((col, colIdx) => {
+                          if (col.type === 'editing') {
+                            return (
+                              <React.Fragment key={`hdr-r${col.round}`}>
+                                <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${colIdx > 0 ? 'border-l ' : ''}${
+                                  darkMode ? 'text-blue-400 border-blue-500/30 bg-blue-900/20' : 'text-blue-600 border-blue-300 bg-blue-50/80'
+                                }${!isCurrent ? ' opacity-30' : ''}`}>
+                                  <span className="text-[10px]">Sail No.</span>
+                                </th>
+                                <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                                  darkMode ? 'text-blue-400 bg-blue-900/20' : 'text-blue-600 bg-blue-50/80'
+                                }${!isCurrent ? ' opacity-30' : ''}`}><span className="text-[10px]">Comment</span></th>
+                                <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                                  darkMode ? 'text-blue-400 bg-blue-900/20' : 'text-blue-600 bg-blue-50/80'
+                                }${!isCurrent ? ' opacity-30' : ''}`}><span className="text-[10px]">Pts</span></th>
+                              </React.Fragment>
+                            );
+                          }
+                          return (
+                            <React.Fragment key={`hdr-r${col.round}`}>
+                              <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider border-l ${
+                                darkMode ? 'text-slate-500 border-slate-600/40' : 'text-slate-500 border-slate-200'
+                              }`}>
+                                <span className="text-[10px]">Sail No.</span>
+                              </th>
+                              <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                                darkMode ? 'text-slate-500' : 'text-slate-500'
+                              }`}>
+                                <span className="text-[10px]">Comment</span>
+                              </th>
+                              <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
+                                darkMode ? 'text-slate-500' : 'text-slate-500'
+                              }`}>
+                                <span className="text-[10px]">Pts</span>
+                              </th>
+                            </React.Fragment>
+                          );
+                        })}
                         {!isSeedingRound && promotionCount > 0 && heat !== heatsToRender[0] && (
                           <th className={`px-1 py-1 text-center font-bold uppercase tracking-wider ${
                             darkMode ? 'text-slate-400' : 'text-slate-500'
@@ -1366,159 +1389,167 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                 : darkMode ? 'text-slate-400' : 'text-slate-500'
                             }`}>{getOrdinal(position)}</td>
 
-                            {completedRounds.map(r => {
-                              const prevHeatResults = (r.results || []).filter(
-                                res => res.heatDesignation === heat
-                              );
-                              const positioned = prevHeatResults
-                                .filter(res => res.position !== null)
-                                .sort((a, b) => (a.position || 0) - (b.position || 0));
-                              const lettered = prevHeatResults
-                                .filter(res => res.position === null && res.letterScore);
-                              const ordered = [...positioned, ...lettered];
-                              const displayResult = ordered[idx] || null;
-                              const prevSkipper = displayResult ? skippers[displayResult.skipperIndex] : null;
-                              const prevSailNo = prevSkipper ? String(prevSkipper.sailNumber || prevSkipper.sailNo || '') : '';
-                              const prevHeatSize = r.heatAssignments.find(a => a.heatDesignation === heat)?.skipperIndices.length || 0;
-                              const prevPtsRaw = displayResult
-                                ? displayResult.letterScore
-                                  ? (displayResult.customPoints !== undefined ? displayResult.customPoints : prevHeatSize + 1)
-                                  : displayResult.position
-                                : null;
-                              const prevPts = prevPtsRaw === -1 ? -1 : prevPtsRaw;
+                            {orderedColumns.map((col, colIdx) => {
+                              if (col.type === 'completed') {
+                                const r = col.data;
+                                const prevHeatResults = (r.results || []).filter(
+                                  (res: any) => res.heatDesignation === heat
+                                );
+                                const positioned = prevHeatResults
+                                  .filter((res: any) => res.position !== null)
+                                  .sort((a: any, b: any) => (a.position || 0) - (b.position || 0));
+                                const lettered = prevHeatResults
+                                  .filter((res: any) => res.position === null && res.letterScore);
+                                const ordered = [...positioned, ...lettered];
+                                const displayResult = ordered[idx] || null;
+                                const prevSkipper = displayResult ? skippers[displayResult.skipperIndex] : null;
+                                const prevSailNo = prevSkipper ? String(prevSkipper.sailNumber || prevSkipper.sailNo || '') : '';
+                                const prevHeatSize = r.heatAssignments.find((a: any) => a.heatDesignation === heat)?.skipperIndices.length || 0;
+                                const prevPtsRaw = displayResult
+                                  ? displayResult.letterScore
+                                    ? (displayResult.customPoints !== undefined ? displayResult.customPoints : prevHeatSize + 1)
+                                    : displayResult.position
+                                  : null;
+                                const prevPts = prevPtsRaw === -1 ? -1 : prevPtsRaw;
 
+                                return (
+                                  <React.Fragment key={`prev-r${r.round}-${position}`}>
+                                    <td className={`px-1 py-1 font-mono font-semibold border-l ${
+                                      (currentEvent?.show_flag || currentEvent?.show_country) ? 'text-left' : 'text-center'
+                                    } ${darkMode ? 'text-slate-400 border-slate-600/40' : 'text-slate-600 border-slate-200'}`}>
+                                      {displayResult ? (
+                                        <span className={`flex items-center gap-1 ${(currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'}`}>
+                                          {(currentEvent?.show_flag || currentEvent?.show_country) && prevSkipper?.country_code && (
+                                            <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                              {currentEvent?.show_flag && getCountryFlag(prevSkipper.country_code)}
+                                              {currentEvent?.show_country && getIOCCode(prevSkipper.country_code)}
+                                            </span>
+                                          )}
+                                          <span>{prevSailNo}</span>
+                                        </span>
+                                      ) : ''}
+                                    </td>
+                                    <td className={`px-1 py-1 text-center ${
+                                      darkMode ? 'text-slate-500' : 'text-slate-400'
+                                    }`}>
+                                      {displayResult ? (
+                                        displayResult.letterScore
+                                          ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(displayResult.letterScore, displayResult.customPoints)}</span>
+                                          : <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
+                                      ) : ''}
+                                    </td>
+                                    <td className={`px-1 py-1 text-center font-mono font-semibold ${
+                                      prevPts === -1
+                                        ? 'text-green-500'
+                                        : darkMode ? 'text-slate-400' : 'text-slate-600'
+                                    }`}>
+                                      {prevPts !== null ? (prevPts === -1 ? 'AVG' : prevPts) : ''}
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              }
+
+                              const editBg = darkMode ? 'bg-blue-900/10' : 'bg-blue-50/60';
                               return (
-                                <React.Fragment key={`prev-r${r.round}-${position}`}>
-                                  <td className={`px-1 py-1 font-mono font-semibold border-l ${
-                                    (currentEvent?.show_flag || currentEvent?.show_country) ? 'text-left' : 'text-center'
-                                  } ${darkMode ? 'text-slate-400 border-slate-600/40' : 'text-slate-600 border-slate-200'}`}>
-                                    {displayResult ? (
-                                      <span className={`flex items-center gap-1 ${(currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'}`}>
-                                        {(currentEvent?.show_flag || currentEvent?.show_country) && prevSkipper?.country_code && (
-                                          <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                            {currentEvent?.show_flag && getCountryFlag(prevSkipper.country_code)}
-                                            {currentEvent?.show_country && getIOCCode(prevSkipper.country_code)}
-                                          </span>
-                                        )}
-                                        <span>{prevSailNo}</span>
+                                <React.Fragment key={`edit-r${col.round}-${position}`}>
+                                  <td className={`px-1 py-0.5${colIdx > 0 ? ' border-l' : ''} ${editBg} ${
+                                    darkMode ? 'border-blue-500/20' : 'border-blue-200'
+                                  }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
+                                    {isVerified || isHistoricalRow ? (
+                                      <span className={`font-mono font-bold flex items-center gap-1 ${
+                                        (currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'
+                                      } ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                        {(() => {
+                                          const cellSkipper = cell.skipperIndex !== null ? (isMultiHeatMode ? getHeatSkippers(heat)[cell.skipperIndex] : skippers[cell.skipperIndex]) : null;
+                                          return (
+                                            <>
+                                              {(currentEvent?.show_flag || currentEvent?.show_country) && cellSkipper?.country_code && (
+                                                <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                  {currentEvent?.show_flag && getCountryFlag(cellSkipper.country_code)}
+                                                  {currentEvent?.show_country && getIOCCode(cellSkipper.country_code)}
+                                                </span>
+                                              )}
+                                              <span>{cell.sailNumber || (isHistoricalRow ? '' : '-')}</span>
+                                            </>
+                                          );
+                                        })()}
                                       </span>
-                                    ) : ''}
+                                    ) : (
+                                      <div className="flex items-center justify-center gap-0.5">
+                                        <input
+                                          ref={el => { inputRefs.current[`${heat}-${idx}`] = el; }}
+                                          type="text"
+                                          value={cell.sailNumber}
+                                          onChange={e => handleCellChange(heat, position, e.target.value)}
+                                          onKeyDown={e => handleKeyDown(e, heat, position, totalPositions)}
+                                          tabIndex={!isCurrent ? -1 : undefined}
+                                          className={`w-12 h-7 px-1 rounded text-xs font-mono font-bold border text-center ${
+                                            cell.letterScore
+                                              ? darkMode
+                                                ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
+                                                : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
+                                              : !cell.isValid && cell.sailNumber.trim()
+                                                ? 'border-red-500 bg-red-50/80 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:border-red-500'
+                                                : cell.isDuplicate
+                                                  ? 'border-amber-500 bg-amber-50/80 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-500'
+                                                  : darkMode
+                                                    ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
+                                                    : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
+                                          } focus:outline-none focus:ring-1 focus:ring-blue-500/20`}
+                                        />
+                                        {!cell.isValid && cell.sailNumber.trim() && !cell.letterScore && (
+                                          <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
+                                        )}
+                                      </div>
+                                    )}
                                   </td>
-                                  <td className={`px-1 py-1 text-center ${
-                                    darkMode ? 'text-slate-500' : 'text-slate-400'
-                                  }`}>
-                                    {displayResult ? (
-                                      displayResult.letterScore
-                                        ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(displayResult.letterScore, displayResult.customPoints)}</span>
-                                        : <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
-                                    ) : ''}
+
+                                  <td className={`px-1 py-1 text-center ${editBg} ${
+                                    darkMode ? 'text-slate-400' : 'text-slate-500'
+                                  }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
+                                    {isVerified || isHistoricalRow ? (
+                                      cell.letterScore
+                                        ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}</span>
+                                        : hasValue && cell.isValid
+                                          ? <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
+                                          : ''
+                                    ) : cell.letterScore ? (
+                                      <button
+                                        onClick={() => handleLetterScore(heat, position)}
+                                        className={`h-7 rounded-full px-2 text-[9px] font-bold flex-shrink-0 inline-flex items-center justify-center ${
+                                          darkMode
+                                            ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
+                                            : 'bg-slate-100 text-slate-700 border border-slate-300'
+                                        }`}
+                                        title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
+                                      >
+                                        {getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleLetterScore(heat, position)}
+                                        className={`h-7 rounded-full px-2 text-[11px] font-medium flex-shrink-0 inline-flex items-center justify-center transition-colors ${
+                                          darkMode
+                                            ? 'text-slate-400 hover:bg-slate-700/60 hover:text-white border border-transparent hover:border-slate-600/70'
+                                            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 border border-transparent hover:border-slate-200'
+                                        }`}
+                                        title="Assign letter score (DNS, DNF, DSQ, etc.)"
+                                      >
+                                        OK
+                                      </button>
+                                    )}
                                   </td>
-                                  <td className={`px-1 py-1 text-center font-mono font-semibold ${
-                                    prevPts === -1
+
+                                  <td className={`px-1 py-1 text-center font-mono font-bold ${editBg} ${
+                                    points === 'AVG'
                                       ? 'text-green-500'
-                                      : darkMode ? 'text-slate-400' : 'text-slate-600'
-                                  }`}>
-                                    {prevPts !== null ? (prevPts === -1 ? 'AVG' : prevPts) : ''}
+                                      : darkMode ? 'text-slate-200' : 'text-slate-800'
+                                  }${!isCurrent ? ' opacity-30' : ''}`}>
+                                    {points !== null ? points : ''}
                                   </td>
                                 </React.Fragment>
                               );
                             })}
-
-                            <td className={`px-1 py-0.5${completedRounds.length > 0 ? ' border-l' : ''} ${
-                              darkMode ? 'border-blue-500/20' : 'border-blue-200'
-                            }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
-                              {isVerified || isHistoricalRow ? (
-                                <span className={`font-mono font-bold flex items-center gap-1 ${
-                                  (currentEvent?.show_flag || currentEvent?.show_country) ? '' : 'justify-center'
-                                } ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                                  {(() => {
-                                    const cellSkipper = cell.skipperIndex !== null ? (isMultiHeatMode ? getHeatSkippers(heat)[cell.skipperIndex] : skippers[cell.skipperIndex]) : null;
-                                    return (
-                                      <>
-                                        {(currentEvent?.show_flag || currentEvent?.show_country) && cellSkipper?.country_code && (
-                                          <span className={`text-[9px] font-medium shrink-0 w-7 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                            {currentEvent?.show_flag && getCountryFlag(cellSkipper.country_code)}
-                                            {currentEvent?.show_country && getIOCCode(cellSkipper.country_code)}
-                                          </span>
-                                        )}
-                                        <span>{cell.sailNumber || (isHistoricalRow ? '' : '-')}</span>
-                                      </>
-                                    );
-                                  })()}
-                                </span>
-                              ) : (
-                                <div className="flex items-center justify-center gap-0.5">
-                                  <input
-                                    ref={el => { inputRefs.current[`${heat}-${idx}`] = el; }}
-                                    type="text"
-                                    value={cell.sailNumber}
-                                    onChange={e => handleCellChange(heat, position, e.target.value)}
-                                    onKeyDown={e => handleKeyDown(e, heat, position, totalPositions)}
-                                    tabIndex={!isCurrent ? -1 : undefined}
-                                    className={`w-12 h-7 px-1 rounded text-xs font-mono font-bold border text-center ${
-                                      cell.letterScore
-                                        ? darkMode
-                                          ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
-                                          : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
-                                        : !cell.isValid && cell.sailNumber.trim()
-                                          ? 'border-red-500 bg-red-50/80 text-red-700 dark:bg-red-900/20 dark:text-red-400 dark:border-red-500'
-                                          : cell.isDuplicate
-                                            ? 'border-amber-500 bg-amber-50/80 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-500'
-                                            : darkMode
-                                              ? 'bg-slate-700/60 border-slate-600/70 text-white focus:border-blue-500'
-                                              : 'bg-white/70 border-slate-300 text-slate-900 focus:border-blue-500'
-                                    } focus:outline-none focus:ring-1 focus:ring-blue-500/20`}
-                                  />
-                                  {!cell.isValid && cell.sailNumber.trim() && !cell.letterScore && (
-                                    <AlertCircle size={12} className="text-red-500 flex-shrink-0" />
-                                  )}
-                                </div>
-                              )}
-                            </td>
-
-                            <td className={`px-1 py-1 text-center ${
-                              darkMode ? 'text-slate-400' : 'text-slate-500'
-                            }${!isCurrent ? ' opacity-30 pointer-events-none' : ''}`}>
-                              {isVerified || isHistoricalRow ? (
-                                cell.letterScore
-                                  ? <span className={`font-semibold text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}</span>
-                                  : hasValue && cell.isValid
-                                    ? <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>OK</span>
-                                    : ''
-                              ) : cell.letterScore ? (
-                                <button
-                                  onClick={() => handleLetterScore(heat, position)}
-                                  className={`h-7 rounded-full px-2 text-[9px] font-bold flex-shrink-0 inline-flex items-center justify-center ${
-                                    darkMode
-                                      ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
-                                      : 'bg-slate-100 text-slate-700 border border-slate-300'
-                                  }`}
-                                  title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
-                                >
-                                  {getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => handleLetterScore(heat, position)}
-                                  className={`h-7 rounded-full px-2 text-[11px] font-medium flex-shrink-0 inline-flex items-center justify-center transition-colors ${
-                                    darkMode
-                                      ? 'text-slate-400 hover:bg-slate-700/60 hover:text-white border border-transparent hover:border-slate-600/70'
-                                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 border border-transparent hover:border-slate-200'
-                                  }`}
-                                  title="Assign letter score (DNS, DNF, DSQ, etc.)"
-                                >
-                                  OK
-                                </button>
-                              )}
-                            </td>
-
-                            <td className={`px-1 py-1 text-center font-mono font-bold ${
-                              points === 'AVG'
-                                ? 'text-green-500'
-                                : darkMode ? 'text-slate-200' : 'text-slate-800'
-                            }${!isCurrent ? ' opacity-30' : ''}`}>
-                              {points !== null ? points : ''}
-                            </td>
 
                             {!isSeedingRound && promotionCount > 0 && !isTopHeat && (
                               <td className="px-1 py-0.5 text-center">

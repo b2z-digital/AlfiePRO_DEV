@@ -163,6 +163,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [showOverallResults, setShowOverallResults] = useState(false);
   const [showHmsScoreSheet, setShowHmsScoreSheet] = useState(false);
   const [showHmsRaceResults, setShowHmsRaceResults] = useState(false);
+  const [showRoundDropdown, setShowRoundDropdown] = useState(false);
+  const roundDropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Detect a fully-imported SHRS file (all rounds pre-loaded and completed) vs a scratch event being scored
   const isFullSHRSImport = React.useRef(
@@ -207,6 +209,17 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showExportMenu]);
+
+  useEffect(() => {
+    if (!showRoundDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (roundDropdownRef.current && !roundDropdownRef.current.contains(e.target as Node)) {
+        setShowRoundDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showRoundDropdown]);
 
   // Track the round number to detect actual round changes (not just object reference changes)
   const lastRoundNumber = React.useRef<number | null>(null);
@@ -1472,11 +1485,70 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 </button>
               )}
 
-              {/* Current Round Badge */}
-              <div className={`px-3 py-1.5 rounded-lg ${
-                darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-100 text-blue-700 border border-blue-300'
-              } font-semibold text-sm`}>
-                {getShrsRoundLabel(heatManagement.currentRound, selectedHeat)}
+              {/* Current Round Badge with Dropdown */}
+              <div className="relative" ref={roundDropdownRef}>
+                <button
+                  onClick={() => {
+                    if (heatManagement.rounds.length > 1) {
+                      setShowRoundDropdown(!showRoundDropdown);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-lg font-semibold text-sm flex items-center gap-1.5 transition-colors ${
+                    darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30' : 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200'
+                  } ${heatManagement.rounds.length > 1 ? 'cursor-pointer' : ''}`}
+                >
+                  {getShrsRoundLabel(heatManagement.currentRound, selectedHeat)}
+                  {heatManagement.rounds.length > 1 && (
+                    <svg className={`w-3.5 h-3.5 transition-transform ${showRoundDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  )}
+                </button>
+                {showRoundDropdown && (
+                  <div className={`absolute top-full left-0 mt-1 z-50 min-w-[180px] rounded-lg shadow-lg border overflow-hidden ${
+                    darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
+                  }`}>
+                    {heatManagement.rounds.map(rd => {
+                      const isCurrent = rd.round === heatManagement.currentRound;
+                      const isActive = rd.round === activeRound;
+                      return (
+                        <button
+                          key={rd.round}
+                          onClick={() => {
+                            setShowRoundDropdown(false);
+                            if (!isCurrent && onGoToRound) {
+                              onGoToRound(rd.round);
+                            }
+                          }}
+                          className={`w-full px-3 py-2 text-left text-sm font-medium flex items-center justify-between transition-colors ${
+                            isCurrent
+                              ? darkMode ? 'bg-blue-600/20 text-blue-400' : 'bg-blue-50 text-blue-700'
+                              : darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span>{getShrsRoundLabel(rd.round)}</span>
+                          <span className="flex items-center gap-1.5">
+                            {rd.completed && (
+                              <svg className={`w-3.5 h-3.5 ${darkMode ? 'text-green-400' : 'text-green-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                            {isActive && !isCurrent && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                darkMode ? 'bg-green-600/20 text-green-400' : 'bg-green-100 text-green-700'
+                              }`}>Active</span>
+                            )}
+                            {isCurrent && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                darkMode ? 'bg-blue-600/20 text-blue-400' : 'bg-blue-100 text-blue-700'
+                              }`}>Current</span>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Heat Buttons - Inline */}
