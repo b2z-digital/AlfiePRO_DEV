@@ -9,6 +9,15 @@ import imageCompression from 'browser-image-compression';
 import { SAILING_NATIONS, getCountryFlag } from '../../utils/countryFlags';
 import { AdminAddToClubModal } from './AdminAddToClubModal';
 import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
+import { getBoatClasses } from '../../utils/boatClassStorage';
+import { BoatClass } from '../../types/boatClass';
+
+function getBoatClassShortCode(name: string): string {
+  const match = name.match(/\(([^)]+)\)$/);
+  if (match) return match[1];
+  if (name === 'Ten Rater') return '10R';
+  return name;
+}
 
 interface MemberEditModalProps {
   isOpen: boolean;
@@ -80,11 +89,13 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const [settingDefaultClub, setSettingDefaultClub] = useState(false);
   const [showAddToClubModal, setShowAddToClubModal] = useState(false);
   const [availableClubs, setAvailableClubs] = useState<Array<{ id: string; name: string; abbreviation?: string }>>([]);
+  const [boatClassOptions, setBoatClassOptions] = useState<Array<{ value: string; label: string }>>([]);
 
   useEffect(() => {
     if (isOpen && memberId) {
       fetchMemberData();
       fetchMembershipTypes();
+      fetchBoatClasses();
     }
   }, [isOpen, memberId, clubId]);
 
@@ -161,6 +172,19 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
       setMembershipTypes((data || []).map(t => ({ ...t, amount: t.amount || 0 })));
     } catch (error: any) {
       console.error('Error fetching membership types:', error);
+    }
+  };
+
+  const fetchBoatClasses = async () => {
+    try {
+      const allClasses = await getBoatClasses();
+      const options = allClasses.map((bc: BoatClass) => ({
+        value: getBoatClassShortCode(bc.name),
+        label: bc.name
+      }));
+      setBoatClassOptions(options);
+    } catch (error) {
+      console.error('Error fetching boat classes:', error);
     }
   };
 
@@ -955,13 +979,12 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                                 } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all`}
                               >
                                 <option value="">Select</option>
-                                <option value="10R">10R</option>
-                                <option value="IOM">IOM</option>
-                                <option value="DF65">DF65</option>
-                                <option value="DF95">DF95</option>
-                                <option value="Marblehead">Marblehead</option>
-                                <option value="A Class">A Class</option>
-                                <option value="RC Laser">RC Laser</option>
+                                {boatClassOptions.map(opt => (
+                                  <option key={opt.value} value={opt.value}>{opt.value !== opt.label ? `${opt.value}` : opt.label}</option>
+                                ))}
+                                {boat.boat_type && !boatClassOptions.some(o => o.value === boat.boat_type) && (
+                                  <option value={boat.boat_type}>{boat.boat_type}</option>
+                                )}
                               </select>
                             </div>
                             <div>
