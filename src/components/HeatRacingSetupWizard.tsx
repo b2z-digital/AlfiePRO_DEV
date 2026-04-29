@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { X, ChevronRight, ChevronLeft, Sailboat, Trophy, Users, Zap, Target, Check, Shuffle, ClipboardList, ArrowUpDown, Grid3x2 as Grid3X3, Eye, ClipboardCheck, Hand, Table2, Monitor } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Trophy, Users, Zap, Target, Check, Shuffle, ClipboardList, ArrowUpDown, Grid3x2 as Grid3X3, Eye, ClipboardCheck, Hand, Table2, Monitor } from 'lucide-react';
+import { Logo } from './Logo';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skipper } from '../types';
 import { HeatManagement, HeatConfiguration, SeedingMethod, HeatDesignation } from '../types/heat';
@@ -235,8 +236,8 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
       transition={{ duration: 0.3 }}
       className="flex flex-col items-center text-center px-4"
     >
-      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/20 border border-teal-500/30 flex items-center justify-center mb-6">
-        <Sailboat size={36} className="text-teal-400" />
+      <div className="mb-6">
+        <Logo size="xlarge" />
       </div>
 
       <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">
@@ -276,7 +277,7 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
           onClick={goNext}
           className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-teal-500/20"
         >
-          Guide Me Through Setup
+          Guide Me
           <ChevronRight size={18} />
         </button>
         <button
@@ -682,7 +683,7 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
                   >
                     -
                   </button>
-                  <div className="flex-1 text-center">
+                  <div className="flex-1 text-center py-1.5 rounded-lg bg-slate-800/60">
                     <span className="text-2xl font-bold text-teal-400">{qualifyingRounds}</span>
                   </div>
                   <button
@@ -704,7 +705,7 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
                   >
                     -
                   </button>
-                  <div className="flex-1 text-center">
+                  <div className="flex-1 text-center py-1.5 rounded-lg bg-slate-800/60">
                     <span className="text-2xl font-bold text-cyan-400">{finalsRounds}</span>
                   </div>
                   <button
@@ -984,7 +985,7 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-700/30">
           <div className="flex items-center gap-2">
-            <Sailboat size={20} className="text-teal-400" />
+            <Logo size="small" />
             <span className="text-sm font-medium text-white">Heat Racing Setup</span>
           </div>
           <div className="flex items-center gap-3">
