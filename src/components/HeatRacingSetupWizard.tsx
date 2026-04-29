@@ -139,8 +139,21 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
     const heatDesignations: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E'];
     let rounds;
 
+    // Build ranking data from skippers' national_ranking field
+    const rankingData = skippers
+      .map((s, idx) => ({ skipperIndex: idx, ranking: s.national_ranking || 0 }))
+      .filter(r => r.ranking > 0);
+
+    // Build seeding list ordered by national ranking (sail numbers sorted by rank)
+    const seedingList = seedingMethod === 'ranking' && rankingData.length > 0
+      ? [...rankingData]
+          .sort((a, b) => a.ranking - b.ranking)
+          .map(r => skippers[r.skipperIndex].sailNo || skippers[r.skipperIndex].sailNumber || '')
+          .filter(Boolean)
+      : undefined;
+
     if (scoringSystem === 'shrs') {
-      const heatsMap = seedInitialHeatsForSHRS(skippers, effectiveHeats);
+      const heatsMap = seedInitialHeatsForSHRS(skippers, effectiveHeats, seedingList);
       const initialAssignments = Array.from({ length: effectiveHeats }, (_, i) => {
         const heatSkippers = heatsMap.get(i + 1) || [];
         return {
@@ -175,9 +188,13 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
       const hmsConfig: HMSConfig = {
         numberOfHeats: effectiveHeats,
         promotionCount,
-        seedingMethod,
+        seedingMethod: fleetManagementEnabled ? seedingMethod : 'manual',
       };
-      const initialAssignments = seedInitialHeats(skippers, hmsConfig);
+      const initialAssignments = seedInitialHeats(
+        skippers,
+        hmsConfig,
+        seedingMethod === 'ranking' ? rankingData : undefined
+      );
 
       rounds = [{
         round: 1,
@@ -483,34 +500,47 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
               </p>
             </div>
 
-            {/* Seeding */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-3">Initial Seeding</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setSeedingMethod('random')}
-                  className={`p-3 rounded-xl border-2 transition-all ${
-                    seedingMethod === 'random'
-                      ? 'border-teal-500 bg-teal-500/10 text-teal-400'
-                      : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
-                  }`}
-                >
-                  <Shuffle size={18} className="mx-auto mb-1" />
-                  <span className="text-xs font-medium">Random</span>
-                </button>
-                <button
-                  onClick={() => setSeedingMethod('manual')}
-                  className={`p-3 rounded-xl border-2 transition-all ${
-                    seedingMethod === 'manual'
-                      ? 'border-teal-500 bg-teal-500/10 text-teal-400'
-                      : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
-                  }`}
-                >
-                  <ClipboardList size={18} className="mx-auto mb-1" />
-                  <span className="text-xs font-medium">Manual</span>
-                </button>
+            {/* Seeding - only show for Progressive mode (Pre-Assigned uses the algorithm) */}
+            {shrsMode === 'progressive' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-3">Initial Seeding</label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={() => setSeedingMethod('random')}
+                    className={`p-3 rounded-xl border-2 transition-all ${
+                      seedingMethod === 'random'
+                        ? 'border-teal-500 bg-teal-500/10 text-teal-400'
+                        : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                    }`}
+                  >
+                    <Shuffle size={18} className="mx-auto mb-1" />
+                    <span className="text-xs font-medium">Random</span>
+                  </button>
+                  <button
+                    onClick={() => setSeedingMethod('ranking')}
+                    className={`p-3 rounded-xl border-2 transition-all ${
+                      seedingMethod === 'ranking'
+                        ? 'border-teal-500 bg-teal-500/10 text-teal-400'
+                        : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                    }`}
+                  >
+                    <Trophy size={18} className="mx-auto mb-1" />
+                    <span className="text-xs font-medium">National Ranking</span>
+                  </button>
+                  <button
+                    onClick={() => setSeedingMethod('manual')}
+                    className={`p-3 rounded-xl border-2 transition-all ${
+                      seedingMethod === 'manual'
+                        ? 'border-teal-500 bg-teal-500/10 text-teal-400'
+                        : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                    }`}
+                  >
+                    <ClipboardList size={18} className="mx-auto mb-1" />
+                    <span className="text-xs font-medium">Manual</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           // HMS Configuration
@@ -593,34 +623,47 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
               </div>
             )}
 
-            {/* Seeding */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-3">Initial Seeding</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setSeedingMethod('random')}
-                  className={`p-3 rounded-xl border-2 transition-all ${
-                    seedingMethod === 'random'
-                      ? 'border-amber-500 bg-amber-500/10 text-amber-400'
-                      : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
-                  }`}
-                >
-                  <Shuffle size={18} className="mx-auto mb-1" />
-                  <span className="text-xs font-medium">Random</span>
-                </button>
-                <button
-                  onClick={() => setSeedingMethod('manual')}
-                  className={`p-3 rounded-xl border-2 transition-all ${
-                    seedingMethod === 'manual'
-                      ? 'border-amber-500 bg-amber-500/10 text-amber-400'
-                      : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
-                  }`}
-                >
-                  <ClipboardList size={18} className="mx-auto mb-1" />
-                  <span className="text-xs font-medium">Manual</span>
-                </button>
+            {/* Seeding - only show when Fleet Management is enabled */}
+            {fleetManagementEnabled && (
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-3">Initial Seeding</label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={() => setSeedingMethod('random')}
+                    className={`p-3 rounded-xl border-2 transition-all ${
+                      seedingMethod === 'random'
+                        ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                        : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                    }`}
+                  >
+                    <Shuffle size={18} className="mx-auto mb-1" />
+                    <span className="text-xs font-medium">Random</span>
+                  </button>
+                  <button
+                    onClick={() => setSeedingMethod('ranking')}
+                    className={`p-3 rounded-xl border-2 transition-all ${
+                      seedingMethod === 'ranking'
+                        ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                        : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                    }`}
+                  >
+                    <Trophy size={18} className="mx-auto mb-1" />
+                    <span className="text-xs font-medium">National Ranking</span>
+                  </button>
+                  <button
+                    onClick={() => setSeedingMethod('manual')}
+                    className={`p-3 rounded-xl border-2 transition-all ${
+                      seedingMethod === 'manual'
+                        ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                        : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                    }`}
+                  >
+                    <ClipboardList size={18} className="mx-auto mb-1" />
+                    <span className="text-xs font-medium">Manual</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </motion.div>
@@ -913,6 +956,14 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
               <div>
                 <span className="text-xs text-slate-500 uppercase tracking-wide">Promotion</span>
                 <p className="text-lg font-bold text-white">{promotionCount} boats</p>
+              </div>
+            )}
+            {((scoringSystem === 'shrs' && shrsMode === 'progressive') || (scoringSystem === 'hms' && fleetManagementEnabled)) && (
+              <div>
+                <span className="text-xs text-slate-500 uppercase tracking-wide">Seeding</span>
+                <p className="text-lg font-bold text-white capitalize">
+                  {seedingMethod === 'ranking' ? 'National Ranking' : seedingMethod}
+                </p>
               </div>
             )}
             <div>
