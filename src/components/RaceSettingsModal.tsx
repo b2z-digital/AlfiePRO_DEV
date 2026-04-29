@@ -3,7 +3,7 @@ import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen 
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
 import { seedInitialHeats, validateHeatConfig, validateHeatAssignments, HMSConfig, calculateOptimalHeats, calculateHMSHeatSizes } from '../utils/hmsHeatSystem';
-import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig, generatePreSetQualifyingAssignments, seedSHRSHeatsByIndex } from '../utils/shrsHeatSystem';
+import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig, generatePreSetQualifyingAssignments, seedSHRSHeatsByIndex, estimateDiversityMetrics } from '../utils/shrsHeatSystem';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
 import { ConfirmationModal } from './ConfirmationModal';
@@ -278,6 +278,17 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   };
 
   const isSHRS = currentDropRules === 'shrs';
+
+  // Auto-set recommended qualifying rounds for SHRS Pre-Assigned mode
+  useEffect(() => {
+    if (!isSHRS || shrsAssignmentMode !== 'preset' || hasRaceResults) return;
+    if (skippers.length < 4 || numHeats < 2) return;
+    const metrics = estimateDiversityMetrics(skippers.length, numHeats, shrsQualifyingRounds);
+    const recommended = Math.max(2, Math.min(metrics.recommendedMinRounds, currentNumRaces - 2));
+    if (recommended !== shrsQualifyingRounds) {
+      setShrsQualifyingRounds(recommended);
+    }
+  }, [skippers.length, numHeats, shrsAssignmentMode, isSHRS]);
 
   const validateSHRSPractical = (totalSkippers: number, heats: number): { isValid: boolean; message?: string } => {
     if (heats > 5) {
@@ -1016,7 +1027,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       {/* Slide-out Tray */}
       <div
         className={`
-          fixed top-0 right-0 h-full w-full sm:w-[500px] lg:w-[920px] z-50
+          fixed top-0 right-0 h-full w-full sm:w-[500px] z-50
           ${darkMode ? 'bg-slate-800' : 'bg-white'}
           shadow-2xl flex flex-col
           transform transition-all duration-300 ease-in-out
@@ -1725,12 +1736,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         </div>
 
                         {isSHRS && (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          {/* Left Column: Core SHRS Settings */}
-                          <div className="space-y-4">
-                            <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
-                              <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-3`}>
-                                Number of Races
+                        <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
+                          <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-3`}>
+                            Number of Races
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 {NUM_RACES_OPTIONS.map(num => (
@@ -1766,11 +1774,13 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                 />
                               </div>
                             </div>
+                        )}
 
-                            <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm space-y-4`}>
-                              <div>
-                                <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-0.5`}>
-                                  Qualifying Assignment Method
+                        {isSHRS && (
+                          <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm space-y-4`}>
+                            <div>
+                              <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-0.5`}>
+                                Qualifying Assignment Method
                                 </div>
                                 <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} mb-2`}>
                                   Select how qualifying heats will be allocated.
@@ -1884,115 +1894,25 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                     <p>Finals: Skippers split into Gold/Silver{numHeats > 2 ? '/Bronze' : ''} fleets by qualifying rank.</p>
                                   </>
                                 )}
-                              </div>
-                            </div>
-
-                            {/* Heat Display Settings */}
-                            <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm space-y-3`}>
-                              <div>
-                                <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  Heat Identification
-                                </p>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <button
-                                    onClick={() => setHeatLabelStyle('letters')}
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                                      heatLabelStyle === 'letters'
-                                        ? darkMode
-                                          ? 'bg-cyan-600 text-white'
-                                          : 'bg-cyan-500 text-white'
-                                        : darkMode
-                                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    }`}
-                                  >
-                                    Letters (A, B, C)
-                                  </button>
-                                  <button
-                                    onClick={() => setHeatLabelStyle('numbers')}
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                                      heatLabelStyle === 'numbers'
-                                        ? darkMode
-                                          ? 'bg-cyan-600 text-white'
-                                          : 'bg-cyan-500 text-white'
-                                        : darkMode
-                                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    }`}
-                                  >
-                                    Numbers (1, 2, 3)
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div>
-                                <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  Heat Racing Order
-                                </p>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <button
-                                    onClick={() => setHeatOrder('ascending')}
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                                      heatOrder === 'ascending'
-                                        ? darkMode
-                                          ? 'bg-cyan-600 text-white'
-                                          : 'bg-cyan-500 text-white'
-                                        : darkMode
-                                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    }`}
-                                  >
-                                    {heatLabelStyle === 'numbers'
-                                      ? `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => i + 1).join(', ')}${numHeats > 3 ? '...' : ''}`
-                                      : `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => String.fromCharCode(65 + i)).join(', ')}${numHeats > 3 ? '...' : ''}`
-                                    }
-                                  </button>
-                                  <button
-                                    onClick={() => setHeatOrder('descending')}
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                                      heatOrder === 'descending'
-                                        ? darkMode
-                                          ? 'bg-cyan-600 text-white'
-                                          : 'bg-cyan-500 text-white'
-                                        : darkMode
-                                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    }`}
-                                  >
-                                    {heatLabelStyle === 'numbers'
-                                      ? `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => numHeats - i).join(', ')}${numHeats > 3 ? '...' : ''}`
-                                      : `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => String.fromCharCode(65 + numHeats - 1 - i)).join(', ')}${numHeats > 3 ? '...' : ''}`
-                                    }
-                                  </button>
-                                </div>
-                                <p className={`text-xs mt-1.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                  Sets the display and scoring order of heats
-                                </p>
-                              </div>
                             </div>
                           </div>
-
-                          {/* Right Column: Diversity Analysis & Summary */}
-                          <div className="space-y-4">
-                            {shrsAssignmentMode === 'preset' && skippers.length >= 4 && numHeats >= 2 && (
-                              <DiversityGauge
-                                totalSkippers={skippers.length}
-                                numberOfHeats={numHeats}
-                                qualifyingRounds={shrsQualifyingRounds}
-                                darkMode={darkMode}
-                              />
-                            )}
-
-                            <div className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'} p-3 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                              <strong>SHRS-{shrsAssignmentMode === 'preset' ? 'PA' : 'P'} Configuration:</strong> {numHeats} heats, {shrsQualifyingRounds} qualifying + {Math.max(0, currentNumRaces - shrsQualifyingRounds)} finals rounds ({shrsAssignmentMode === 'preset' ? 'Pre-Assigned' : 'Progressive'}). Sizes: {heatSizes.join(', ')} boats.
-                            </div>
-                          </div>
-                        </div>
                         )}
 
-                        {!isSHRS && (
+                        {isSHRS && shrsAssignmentMode === 'preset' && skippers.length >= 4 && numHeats >= 2 && (
+                          <DiversityGauge
+                            totalSkippers={skippers.length}
+                            numberOfHeats={numHeats}
+                            qualifyingRounds={shrsQualifyingRounds}
+                            darkMode={darkMode}
+                          />
+                        )}
+
                         <div className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'} p-2 rounded ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                          {manualHeatCount !== null || manualPromotionCount !== null ? (
+                          {isSHRS ? (
+                            <>
+                              <strong>SHRS-{shrsAssignmentMode === 'preset' ? 'PA' : 'P'} Configuration:</strong> {numHeats} heats, {shrsQualifyingRounds} qualifying + {Math.max(0, currentNumRaces - shrsQualifyingRounds)} finals rounds ({shrsAssignmentMode === 'preset' ? 'Pre-Assigned' : 'Progressive'}). Sizes: {heatSizes.join(', ')} boats.
+                            </>
+                          ) : manualHeatCount !== null || manualPromotionCount !== null ? (
                             <>
                               <strong>Configuration:</strong> {numHeats} heats with sizes of {heatSizes.join(', ')} boats.
                               {' '}{promotionCount} boats promotion/relegation{manualPromotionCount !== null ? ' (custom)' : ''}.
@@ -2003,7 +1923,90 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                             </>
                           )}
                         </div>
-                        )}
+
+                        {/* Heat Display Settings - SHRS only */}
+                        {isSHRS && <div className="space-y-3">
+                          <div>
+                            <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Heat Identification
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => setHeatLabelStyle('letters')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatLabelStyle === 'letters'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                Letters (A, B, C)
+                              </button>
+                              <button
+                                onClick={() => setHeatLabelStyle('numbers')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatLabelStyle === 'numbers'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                Numbers (1, 2, 3)
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Heat Racing Order
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => setHeatOrder('ascending')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatOrder === 'ascending'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {heatLabelStyle === 'numbers'
+                                  ? `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => i + 1).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                  : `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => String.fromCharCode(65 + i)).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                }
+                              </button>
+                              <button
+                                onClick={() => setHeatOrder('descending')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                  heatOrder === 'descending'
+                                    ? darkMode
+                                      ? 'bg-cyan-600 text-white'
+                                      : 'bg-cyan-500 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {heatLabelStyle === 'numbers'
+                                  ? `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => numHeats - i).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                  : `${Array.from({ length: Math.min(numHeats, 3) }, (_, i) => String.fromCharCode(65 + numHeats - 1 - i)).join(', ')}${numHeats > 3 ? '...' : ''}`
+                                }
+                              </button>
+                            </div>
+                            <p className={`text-xs mt-1.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                              Sets the display and scoring order of heats
+                            </p>
+                          </div>
+                        </div>}
 
                         {/* Show validation warning if configuration is not practical */}
                         {!configValidation.isValid && (
