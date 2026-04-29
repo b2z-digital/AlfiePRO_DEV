@@ -3933,6 +3933,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           onClose={() => setShowHeatRacingRecommendation(false)}
           onComplete={async (settings) => {
             setShowHeatRacingRecommendation(false);
+            if (settings.scoringMode) {
+              setScoringMode(settings.scoringMode);
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                await supabase.from('profiles').update({ scoring_mode_preference: settings.scoringMode }).eq('id', user.id);
+              }
+            }
             await handleSaveRaceSettings(settings);
           }}
           onSkip={() => {
