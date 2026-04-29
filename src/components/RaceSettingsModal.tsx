@@ -114,7 +114,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     initialHeatManagement?.configuration.shrsQualifyingRounds || Math.max(2, Math.floor(initialNumRaces * 2 / 3))
   );
   const [shrsAssignmentMode, setShrsAssignmentMode] = useState<'progressive' | 'preset'>(
-    initialHeatManagement?.configuration.shrsAssignmentMode || 'progressive'
+    initialHeatManagement?.configuration.shrsAssignmentMode || 'preset'
   );
 
   // Heat display settings

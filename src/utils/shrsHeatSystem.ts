@@ -863,13 +863,12 @@ export function estimateDiversityMetrics(
     roundStats.push({ round: r, avgUnique, minUnique, efficiency });
   }
 
-  const targetEfficiency = 95;
   let recommendedMinRounds = qualifyingRounds;
   for (let r = 2; r <= 20; r++) {
     const coverageFraction = 1 - Math.pow(1 - (newOpponentsPerRound / totalPossibleOpponents), r);
     const optimizerBoost = Math.min(0.06, 0.015 * r);
     const eff = Math.min(100, (coverageFraction + optimizerBoost) * 100);
-    if (eff >= targetEfficiency) {
+    if (eff >= 100) {
       recommendedMinRounds = r;
       break;
     }
