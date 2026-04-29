@@ -1,0 +1,905 @@
+import React, { useState, useMemo } from 'react';
+import { X, ChevronRight, ChevronLeft, Sailboat, Trophy, Users, Zap, Target, ChartBar as BarChart3, Check, Shuffle, ClipboardList, ArrowUpDown, Layers, Grid3x2 as Grid3X3 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Skipper } from '../types';
+import { HeatManagement, HeatConfiguration, SeedingMethod, HeatDesignation } from '../types/heat';
+import { calculateOptimalHeats as calculateOptimalHeatsHMS, calculateHMSHeatSizes, seedInitialHeats, HMSConfig } from '../utils/hmsHeatSystem';
+import { calculateOptimalHeats as calculateOptimalHeatsSHRS, calculateHeatSizes, seedInitialHeatsForSHRS, generatePreSetQualifyingAssignments, estimateDiversityMetrics } from '../utils/shrsHeatSystem';
+import { DiversityGauge } from './DiversityGauge';
+
+interface HeatRacingSetupWizardProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onComplete: (settings: {
+    numRaces: number;
+    dropRules: number[] | string;
+    heatManagement: HeatManagement | null;
+  }) => void;
+  onSkip: () => void;
+  skippers: Skipper[];
+  darkMode: boolean;
+}
+
+type ScoringSystem = 'hms' | 'shrs';
+type ShrsMode = 'progressive' | 'preset';
+type Step = 'welcome' | 'system' | 'configure' | 'structure' | 'review';
+
+const STEPS: { id: Step; label: string }[] = [
+  { id: 'welcome', label: 'Welcome' },
+  { id: 'system', label: 'System' },
+  { id: 'configure', label: 'Configure' },
+  { id: 'structure', label: 'Structure' },
+  { id: 'review', label: 'Review' },
+];
+
+const NUM_RACES_OPTIONS = [6, 8, 10, 12, 14, 16];
+
+export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
+  isOpen,
+  onClose,
+  onComplete,
+  onSkip,
+  skippers,
+  darkMode,
+}) => {
+  const [currentStep, setCurrentStep] = useState<Step>('welcome');
+  const [scoringSystem, setScoringSystem] = useState<ScoringSystem>('shrs');
+  const [shrsMode, setShrsMode] = useState<ShrsMode>('preset');
+  const [numHeats, setNumHeats] = useState<number>(0);
+  const [promotionCount, setPromotionCount] = useState<number>(4);
+  const [numRaces, setNumRaces] = useState<number>(12);
+  const [qualifyingRounds, setQualifyingRounds] = useState<number>(8);
+  const [finalsRounds, setFinalsRounds] = useState<number>(4);
+  const [seedingMethod, setSeedingMethod] = useState<SeedingMethod>('random');
+
+  const totalSkippers = skippers.length;
+
+  const hmsDefaults = useMemo(() => calculateOptimalHeatsHMS(totalSkippers), [totalSkippers]);
+  const shrsDefaultHeats = useMemo(() => calculateOptimalHeatsSHRS(totalSkippers), [totalSkippers]);
+
+  const effectiveHeats = numHeats || (scoringSystem === 'hms' ? hmsDefaults.numberOfHeats : shrsDefaultHeats);
+
+  const heatSizes = useMemo(() => {
+    if (scoringSystem === 'hms') {
+      return calculateHMSHeatSizes(totalSkippers, effectiveHeats);
+    }
+    return calculateHeatSizes(totalSkippers, effectiveHeats);
+  }, [scoringSystem, totalSkippers, effectiveHeats]);
+
+  const diversityMetrics = useMemo(() => {
+    if (scoringSystem === 'shrs') {
+      return estimateDiversityMetrics(totalSkippers, effectiveHeats, qualifyingRounds);
+    }
+    return null;
+  }, [scoringSystem, totalSkippers, effectiveHeats, qualifyingRounds]);
+
+  // Initialize defaults when system is selected
+  const handleSystemSelect = (system: ScoringSystem) => {
+    setScoringSystem(system);
+    if (system === 'hms') {
+      setNumHeats(hmsDefaults.numberOfHeats);
+      setPromotionCount(hmsDefaults.promotionCount);
+    } else {
+      setNumHeats(shrsDefaultHeats);
+      const rec = estimateDiversityMetrics(totalSkippers, shrsDefaultHeats, 8).recommendedMinRounds;
+      setQualifyingRounds(rec);
+      setFinalsRounds(Math.max(2, numRaces - rec));
+    }
+  };
+
+  // Recalculate finals when qualifying changes
+  const handleQualifyingChange = (q: number) => {
+    setQualifyingRounds(q);
+    setFinalsRounds(Math.max(0, numRaces - q));
+  };
+
+  const handleFinalsChange = (f: number) => {
+    setFinalsRounds(f);
+    setQualifyingRounds(Math.max(1, numRaces - f));
+  };
+
+  const handleNumRacesChange = (n: number) => {
+    setNumRaces(n);
+    if (scoringSystem === 'shrs') {
+      const rec = diversityMetrics?.recommendedMinRounds || 8;
+      setQualifyingRounds(Math.min(rec, n));
+      setFinalsRounds(Math.max(0, n - Math.min(rec, n)));
+    }
+  };
+
+  const stepIndex = STEPS.findIndex(s => s.id === currentStep);
+
+  const goNext = () => {
+    const idx = STEPS.findIndex(s => s.id === currentStep);
+    if (idx < STEPS.length - 1) {
+      setCurrentStep(STEPS[idx + 1].id);
+    }
+  };
+
+  const goBack = () => {
+    const idx = STEPS.findIndex(s => s.id === currentStep);
+    if (idx > 0) {
+      setCurrentStep(STEPS[idx - 1].id);
+    }
+  };
+
+  const handleActivate = () => {
+    const heatDesignations: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E'];
+    let rounds;
+
+    if (scoringSystem === 'shrs') {
+      const heatsMap = seedInitialHeatsForSHRS(skippers, effectiveHeats);
+      const initialAssignments = Array.from({ length: effectiveHeats }, (_, i) => {
+        const heatSkippers = heatsMap.get(i + 1) || [];
+        return {
+          heatDesignation: heatDesignations[i] as string,
+          skipperIndices: heatSkippers.map(s => skippers.findIndex(sk => (sk.sailNo || sk.sailNumber) === (s.sailNo || s.sailNumber)))
+        };
+      });
+
+      if (shrsMode === 'preset' && qualifyingRounds > 1) {
+        const allQR = generatePreSetQualifyingAssignments(initialAssignments, effectiveHeats, qualifyingRounds);
+        rounds = allQR.map((ra, idx) => ({
+          round: idx + 1,
+          heatAssignments: ra.map(a => ({
+            heatDesignation: a.heatDesignation as HeatDesignation,
+            skipperIndices: a.skipperIndices
+          })),
+          results: [],
+          completed: false
+        }));
+      } else {
+        rounds = [{
+          round: 1,
+          heatAssignments: initialAssignments.map(a => ({
+            heatDesignation: a.heatDesignation as HeatDesignation,
+            skipperIndices: a.skipperIndices
+          })),
+          results: [],
+          completed: false
+        }];
+      }
+    } else {
+      // HMS
+      const hmsConfig = {
+        numberOfHeats: effectiveHeats,
+        promotionCount,
+        seedingMethod,
+      };
+      const initialAssignments = seedInitialHeats(skippers, hmsConfig);
+
+      rounds = [{
+        round: 1,
+        heatAssignments: initialAssignments,
+        results: [],
+        completed: false
+      }];
+    }
+
+    const configuration: HeatConfiguration = {
+      enabled: true,
+      numberOfHeats: effectiveHeats,
+      promotionCount: scoringSystem === 'hms' ? promotionCount : 0,
+      seedingMethod,
+      autoAssign: false,
+      scoringSystem,
+      fleetManagementEnabled: true,
+      heatLabelStyle: 'letters',
+      ...(scoringSystem === 'shrs' ? {
+        shrsAssignmentMode: shrsMode,
+        shrsQualifyingRounds: qualifyingRounds,
+      } : {}),
+    };
+
+    const heatManagement: HeatManagement = {
+      configuration,
+      rounds,
+      currentRound: 1,
+      currentHeat: rounds[0].heatAssignments[rounds[0].heatAssignments.length - 1].heatDesignation,
+    };
+
+    const dropRules: string = scoringSystem;
+
+    onComplete({
+      numRaces,
+      dropRules,
+      heatManagement,
+    });
+  };
+
+  if (!isOpen) return null;
+
+  const renderWelcomeStep = () => (
+    <motion.div
+      key="welcome"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col items-center text-center px-4"
+    >
+      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/20 border border-teal-500/30 flex items-center justify-center mb-6">
+        <Sailboat size={36} className="text-teal-400" />
+      </div>
+
+      <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">
+        Heat Racing Detected
+      </h2>
+
+      <p className="text-slate-400 text-base sm:text-lg max-w-lg mb-2">
+        With <span className="text-teal-400 font-semibold">{totalSkippers} skippers</span> in your fleet,
+        AlfiePRO recommends Heat Racing for optimal competition.
+      </p>
+
+      <p className="text-slate-500 text-sm max-w-md mb-8">
+        Skippers will be divided into smaller heats ensuring fairer racing and better
+        tie-breaking across the fleet.
+      </p>
+
+      <div className="grid grid-cols-3 gap-4 sm:gap-6 mb-10 w-full max-w-sm">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 sm:p-4">
+          <Users size={20} className="text-teal-400 mx-auto mb-1.5" />
+          <div className="text-lg sm:text-xl font-bold text-white">{totalSkippers}</div>
+          <div className="text-[11px] sm:text-xs text-slate-500">Skippers</div>
+        </div>
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 sm:p-4">
+          <Grid3X3 size={20} className="text-cyan-400 mx-auto mb-1.5" />
+          <div className="text-lg sm:text-xl font-bold text-white">{shrsDefaultHeats}</div>
+          <div className="text-[11px] sm:text-xs text-slate-500">Heats</div>
+        </div>
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3 sm:p-4">
+          <Target size={20} className="text-green-400 mx-auto mb-1.5" />
+          <div className="text-lg sm:text-xl font-bold text-white">100%</div>
+          <div className="text-[11px] sm:text-xs text-slate-500">Diversity</div>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
+        <button
+          onClick={goNext}
+          className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-teal-500/20"
+        >
+          Guide Me Through Setup
+          <ChevronRight size={18} />
+        </button>
+        <button
+          onClick={onSkip}
+          className="flex-1 px-6 py-3.5 bg-slate-700/50 hover:bg-slate-700 border border-slate-600/50 text-slate-300 hover:text-white font-medium rounded-xl transition-all"
+        >
+          I'll Set It Up Manually
+        </button>
+      </div>
+    </motion.div>
+  );
+
+  const renderSystemStep = () => (
+    <motion.div
+      key="system"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3 }}
+      className="px-4 w-full max-w-2xl mx-auto"
+    >
+      <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 text-center">
+        Choose Your Scoring System
+      </h2>
+      <p className="text-slate-400 text-sm sm:text-base text-center mb-8">
+        Select the heat racing format that best suits your event.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+        {/* SHRS Card */}
+        <button
+          onClick={() => handleSystemSelect('shrs')}
+          className={`relative text-left p-5 sm:p-6 rounded-2xl border-2 transition-all ${
+            scoringSystem === 'shrs'
+              ? 'border-teal-500 bg-teal-500/10 shadow-lg shadow-teal-500/10'
+              : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600 hover:bg-slate-800/50'
+          }`}
+        >
+          {scoringSystem === 'shrs' && (
+            <div className="absolute top-3 right-3 w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center">
+              <Check size={14} className="text-white" />
+            </div>
+          )}
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
+            scoringSystem === 'shrs' ? 'bg-teal-500/20' : 'bg-slate-700/50'
+          }`}>
+            <Zap size={24} className={scoringSystem === 'shrs' ? 'text-teal-400' : 'text-slate-400'} />
+          </div>
+          <h3 className="text-lg font-bold text-white mb-1">SHRS</h3>
+          <p className="text-xs text-teal-400 font-medium mb-3">Simple Heat Race System</p>
+          <ul className="space-y-2 text-sm text-slate-400">
+            <li className="flex items-start gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5 flex-shrink-0" />
+              Fixed qualifying rounds with optional finals
+            </li>
+            <li className="flex items-start gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5 flex-shrink-0" />
+              Pre-assigned heats maximise opponent diversity
+            </li>
+            <li className="flex items-start gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5 flex-shrink-0" />
+              Gold/Silver/Bronze fleet finals
+            </li>
+            <li className="flex items-start gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5 flex-shrink-0" />
+              Best for most radio yacht events
+            </li>
+          </ul>
+          <div className="mt-4 pt-3 border-t border-slate-700/50">
+            <span className="text-xs font-medium text-teal-400 bg-teal-400/10 px-2 py-1 rounded-full">
+              Recommended
+            </span>
+          </div>
+        </button>
+
+        {/* HMS Card */}
+        <button
+          onClick={() => handleSystemSelect('hms')}
+          className={`relative text-left p-5 sm:p-6 rounded-2xl border-2 transition-all ${
+            scoringSystem === 'hms'
+              ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/10'
+              : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600 hover:bg-slate-800/50'
+          }`}
+        >
+          {scoringSystem === 'hms' && (
+            <div className="absolute top-3 right-3 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center">
+              <Check size={14} className="text-white" />
+            </div>
+          )}
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
+            scoringSystem === 'hms' ? 'bg-amber-500/20' : 'bg-slate-700/50'
+          }`}>
+            <ArrowUpDown size={24} className={scoringSystem === 'hms' ? 'text-amber-400' : 'text-slate-400'} />
+          </div>
+          <h3 className="text-lg font-bold text-white mb-1">HMS</h3>
+          <p className="text-xs text-amber-400 font-medium mb-3">Heat Management System</p>
+          <ul className="space-y-2 text-sm text-slate-400">
+            <li className="flex items-start gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
+              Promotion & relegation between heats
+            </li>
+            <li className="flex items-start gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
+              Skippers move up/down based on results
+            </li>
+            <li className="flex items-start gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
+              Dynamic fleet balancing every round
+            </li>
+            <li className="flex items-start gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
+              Traditional club racing format
+            </li>
+          </ul>
+          <div className="mt-4 pt-3 border-t border-slate-700/50">
+            <span className="text-xs font-medium text-slate-400 bg-slate-700/50 px-2 py-1 rounded-full">
+              Traditional
+            </span>
+          </div>
+        </button>
+      </div>
+    </motion.div>
+  );
+
+  const renderConfigureStep = () => (
+    <motion.div
+      key="configure"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3 }}
+      className="px-4 w-full max-w-2xl mx-auto"
+    >
+      <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 text-center">
+        {scoringSystem === 'shrs' ? 'SHRS Configuration' : 'HMS Configuration'}
+      </h2>
+      <p className="text-slate-400 text-sm sm:text-base text-center mb-8">
+        {scoringSystem === 'shrs'
+          ? 'Choose how heat assignments are managed across rounds.'
+          : 'Configure promotion/relegation settings for your heats.'}
+      </p>
+
+      {scoringSystem === 'shrs' ? (
+        <div className="space-y-6">
+          {/* Assignment Mode */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-3">Assignment Mode</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={() => setShrsMode('preset')}
+                className={`text-left p-4 rounded-xl border-2 transition-all ${
+                  shrsMode === 'preset'
+                    ? 'border-teal-500 bg-teal-500/10'
+                    : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <ClipboardList size={20} className={shrsMode === 'preset' ? 'text-teal-400' : 'text-slate-400'} />
+                  <span className="font-semibold text-white text-sm">Pre-Assigned (SHRS-PA)</span>
+                  {shrsMode === 'preset' && <Check size={16} className="text-teal-400 ml-auto" />}
+                </div>
+                <p className="text-xs text-slate-400">
+                  All qualifying heats pre-assigned before racing. Maximises opponent diversity and fairness.
+                </p>
+                <span className="inline-block mt-2 text-[10px] font-medium text-teal-400 bg-teal-400/10 px-2 py-0.5 rounded-full">
+                  Recommended
+                </span>
+              </button>
+
+              <button
+                onClick={() => setShrsMode('progressive')}
+                className={`text-left p-4 rounded-xl border-2 transition-all ${
+                  shrsMode === 'progressive'
+                    ? 'border-teal-500 bg-teal-500/10'
+                    : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <Shuffle size={20} className={shrsMode === 'progressive' ? 'text-teal-400' : 'text-slate-400'} />
+                  <span className="font-semibold text-white text-sm">Progressive (SHRS-P)</span>
+                  {shrsMode === 'progressive' && <Check size={16} className="text-teal-400 ml-auto" />}
+                </div>
+                <p className="text-xs text-slate-400">
+                  Round 1 assigned, subsequent rounds determined after each round using movement tables.
+                </p>
+              </button>
+            </div>
+          </div>
+
+          {/* Heat Count */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-3">Number of Heats</label>
+            <div className="flex items-center gap-3">
+              {[2, 3, 4, 5].map(h => (
+                <button
+                  key={h}
+                  onClick={() => setNumHeats(h)}
+                  className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-all ${
+                    effectiveHeats === h
+                      ? 'border-teal-500 bg-teal-500/10 text-teal-400'
+                      : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              {heatSizes.join(', ')} skippers per heat
+            </p>
+          </div>
+
+          {/* Seeding */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-3">Initial Seeding</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setSeedingMethod('random')}
+                className={`p-3 rounded-xl border-2 transition-all ${
+                  seedingMethod === 'random'
+                    ? 'border-teal-500 bg-teal-500/10 text-teal-400'
+                    : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                <Shuffle size={18} className="mx-auto mb-1" />
+                <span className="text-xs font-medium">Random</span>
+              </button>
+              <button
+                onClick={() => setSeedingMethod('manual')}
+                className={`p-3 rounded-xl border-2 transition-all ${
+                  seedingMethod === 'manual'
+                    ? 'border-teal-500 bg-teal-500/10 text-teal-400'
+                    : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                <ClipboardList size={18} className="mx-auto mb-1" />
+                <span className="text-xs font-medium">Manual</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        // HMS Configuration
+        <div className="space-y-6">
+          {/* Heat Count */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-3">Number of Heats</label>
+            <div className="flex items-center gap-3">
+              {[2, 3, 4, 5].map(h => (
+                <button
+                  key={h}
+                  onClick={() => setNumHeats(h)}
+                  className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-all ${
+                    effectiveHeats === h
+                      ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                      : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              {heatSizes.join(', ')} skippers per heat
+            </p>
+          </div>
+
+          {/* Promotion Count */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-3">Promotion Count</label>
+            <p className="text-xs text-slate-500 mb-3">
+              Number of skippers promoted/relegated each round.
+            </p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setPromotionCount(Math.max(2, promotionCount - 1))}
+                className="w-10 h-10 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white flex items-center justify-center hover:bg-slate-700 transition-all"
+              >
+                -
+              </button>
+              <div className="text-2xl font-bold text-amber-400 w-12 text-center">{promotionCount}</div>
+              <button
+                onClick={() => setPromotionCount(Math.min(12, promotionCount + 1))}
+                className="w-10 h-10 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white flex items-center justify-center hover:bg-slate-700 transition-all"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {/* Seeding */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-3">Initial Seeding</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setSeedingMethod('random')}
+                className={`p-3 rounded-xl border-2 transition-all ${
+                  seedingMethod === 'random'
+                    ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                    : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                <Shuffle size={18} className="mx-auto mb-1" />
+                <span className="text-xs font-medium">Random</span>
+              </button>
+              <button
+                onClick={() => setSeedingMethod('manual')}
+                className={`p-3 rounded-xl border-2 transition-all ${
+                  seedingMethod === 'manual'
+                    ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                    : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                <ClipboardList size={18} className="mx-auto mb-1" />
+                <span className="text-xs font-medium">Manual</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+
+  const renderStructureStep = () => (
+    <motion.div
+      key="structure"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3 }}
+      className="px-4 w-full max-w-2xl mx-auto"
+    >
+      <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 text-center">
+        Race Structure
+      </h2>
+      <p className="text-slate-400 text-sm sm:text-base text-center mb-8">
+        {scoringSystem === 'shrs'
+          ? 'Set total races and the qualifying-to-finals split.'
+          : 'Set the number of races for your event.'}
+      </p>
+
+      <div className="space-y-6">
+        {/* Total Races */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-3">Total Races</label>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {NUM_RACES_OPTIONS.map(n => (
+              <button
+                key={n}
+                onClick={() => handleNumRacesChange(n)}
+                className={`px-4 py-2.5 rounded-xl border-2 font-semibold transition-all text-sm ${
+                  numRaces === n
+                    ? scoringSystem === 'shrs'
+                      ? 'border-teal-500 bg-teal-500/10 text-teal-400'
+                      : 'border-amber-500 bg-amber-500/10 text-amber-400'
+                    : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* SHRS: Qualifying vs Finals split */}
+        {scoringSystem === 'shrs' && (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wide">
+                  Qualifying Rounds
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleQualifyingChange(Math.max(1, qualifyingRounds - 1))}
+                    className="w-9 h-9 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white flex items-center justify-center hover:bg-slate-700 transition-all text-sm"
+                  >
+                    -
+                  </button>
+                  <div className="flex-1 text-center">
+                    <span className="text-2xl font-bold text-teal-400">{qualifyingRounds}</span>
+                  </div>
+                  <button
+                    onClick={() => handleQualifyingChange(Math.min(numRaces, qualifyingRounds + 1))}
+                    className="w-9 h-9 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white flex items-center justify-center hover:bg-slate-700 transition-all text-sm"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wide">
+                  Finals Rounds
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleFinalsChange(Math.max(0, finalsRounds - 1))}
+                    className="w-9 h-9 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white flex items-center justify-center hover:bg-slate-700 transition-all text-sm"
+                  >
+                    -
+                  </button>
+                  <div className="flex-1 text-center">
+                    <span className="text-2xl font-bold text-cyan-400">{finalsRounds}</span>
+                  </div>
+                  <button
+                    onClick={() => handleFinalsChange(Math.min(numRaces - 1, finalsRounds + 1))}
+                    className="w-9 h-9 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white flex items-center justify-center hover:bg-slate-700 transition-all text-sm"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Diversity Gauge */}
+            {shrsMode === 'preset' && (
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4">
+                <DiversityGauge
+                  totalSkippers={totalSkippers}
+                  numberOfHeats={effectiveHeats}
+                  qualifyingRounds={qualifyingRounds}
+                  darkMode={true}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </motion.div>
+  );
+
+  const renderReviewStep = () => {
+    const accentColor = scoringSystem === 'shrs' ? 'teal' : 'amber';
+
+    return (
+      <motion.div
+        key="review"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.3 }}
+        className="px-4 w-full max-w-2xl mx-auto"
+      >
+        <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 text-center">
+          Ready to Activate
+        </h2>
+        <p className="text-slate-400 text-sm sm:text-base text-center mb-8">
+          Review your heat racing configuration.
+        </p>
+
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 sm:p-6 mb-6">
+          <div className="grid grid-cols-2 gap-4 sm:gap-6">
+            <div>
+              <span className="text-xs text-slate-500 uppercase tracking-wide">System</span>
+              <p className={`text-lg font-bold ${accentColor === 'teal' ? 'text-teal-400' : 'text-amber-400'}`}>
+                {scoringSystem === 'shrs' ? 'SHRS' : 'HMS'}
+              </p>
+            </div>
+            {scoringSystem === 'shrs' && (
+              <div>
+                <span className="text-xs text-slate-500 uppercase tracking-wide">Mode</span>
+                <p className="text-lg font-bold text-white">
+                  {shrsMode === 'preset' ? 'Pre-Assigned' : 'Progressive'}
+                </p>
+              </div>
+            )}
+            <div>
+              <span className="text-xs text-slate-500 uppercase tracking-wide">Heats</span>
+              <p className="text-lg font-bold text-white">{effectiveHeats}</p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500 uppercase tracking-wide">Heat Sizes</span>
+              <p className="text-lg font-bold text-white">{heatSizes.join(', ')}</p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500 uppercase tracking-wide">Total Races</span>
+              <p className="text-lg font-bold text-white">{numRaces}</p>
+            </div>
+            {scoringSystem === 'shrs' && (
+              <div>
+                <span className="text-xs text-slate-500 uppercase tracking-wide">Structure</span>
+                <p className="text-lg font-bold text-white">{qualifyingRounds}Q + {finalsRounds}F</p>
+              </div>
+            )}
+            {scoringSystem === 'hms' && (
+              <div>
+                <span className="text-xs text-slate-500 uppercase tracking-wide">Promotion</span>
+                <p className="text-lg font-bold text-white">{promotionCount} boats</p>
+              </div>
+            )}
+            <div>
+              <span className="text-xs text-slate-500 uppercase tracking-wide">Seeding</span>
+              <p className="text-lg font-bold text-white capitalize">{seedingMethod}</p>
+            </div>
+          </div>
+
+          {scoringSystem === 'shrs' && shrsMode === 'preset' && diversityMetrics && (
+            <div className="mt-5 pt-5 border-t border-slate-700/50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-slate-500 uppercase tracking-wide">Opponent Diversity</span>
+                  <p className="text-2xl font-bold text-green-400">
+                    {diversityMetrics.roundStats[qualifyingRounds - 1]?.efficiency || 0}%
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-500 uppercase tracking-wide">Unique Opponents</span>
+                  <p className="text-2xl font-bold text-white">
+                    {Math.round(diversityMetrics.roundStats[qualifyingRounds - 1]?.avgUnique || 0)} of {diversityMetrics.totalPossibleOpponents}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={handleActivate}
+          className={`w-full flex items-center justify-center gap-2 px-6 py-4 font-semibold rounded-xl transition-all shadow-lg text-white ${
+            scoringSystem === 'shrs'
+              ? 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 shadow-teal-500/20'
+              : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 shadow-amber-500/20'
+          }`}
+        >
+          <Trophy size={20} />
+          Activate Heat Racing
+        </button>
+
+        <p className="text-xs text-slate-500 text-center mt-3">
+          You can adjust these settings anytime from Race Settings.
+        </p>
+      </motion.div>
+    );
+  };
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 'welcome': return renderWelcomeStep();
+      case 'system': return renderSystemStep();
+      case 'configure': return renderConfigureStep();
+      case 'structure': return renderStructureStep();
+      case 'review': return renderReviewStep();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+
+      <div className="relative w-full max-w-3xl max-h-[90vh] mx-4 flex flex-col bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] rounded-2xl border border-slate-700/50 shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-700/30">
+          <div className="flex items-center gap-2">
+            <Sailboat size={20} className="text-teal-400" />
+            <span className="text-sm font-medium text-white">Heat Racing Setup</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {currentStep !== 'welcome' && (
+              <button
+                onClick={onSkip}
+                className="text-xs text-slate-400 hover:text-white transition-all px-3 py-1.5 rounded-lg hover:bg-slate-700/50"
+              >
+                Skip Wizard
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-white transition-all p-1.5 rounded-lg hover:bg-slate-700/50"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Progress Bar (hidden on welcome step) */}
+        {currentStep !== 'welcome' && (
+          <div className="px-5 sm:px-6 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              {STEPS.slice(1).map((step, index) => (
+                <React.Fragment key={step.id}>
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all ${
+                        stepIndex > index + 1
+                          ? 'bg-teal-500 text-white'
+                          : stepIndex === index + 1
+                          ? 'bg-teal-500 text-white'
+                          : 'bg-slate-700/50 border border-slate-600/50 text-slate-400'
+                      }`}
+                    >
+                      {stepIndex > index + 1 ? <Check size={14} /> : index + 1}
+                    </div>
+                    <span className={`text-[10px] sm:text-xs mt-1 hidden sm:block ${
+                      stepIndex === index + 1 ? 'text-teal-400 font-medium' : 'text-slate-500'
+                    }`}>
+                      {step.label}
+                    </span>
+                  </div>
+                  {index < STEPS.length - 2 && (
+                    <div className={`flex-1 h-0.5 mx-2 rounded transition-all ${
+                      stepIndex > index + 1 ? 'bg-teal-500' : 'bg-slate-700/50'
+                    }`} />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto py-6 sm:py-8">
+          <AnimatePresence mode="wait">
+            {renderStep()}
+          </AnimatePresence>
+        </div>
+
+        {/* Footer Navigation (hidden on welcome and review) */}
+        {currentStep !== 'welcome' && currentStep !== 'review' && (
+          <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-t border-slate-700/30">
+            <button
+              onClick={goBack}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-slate-400 hover:text-white transition-all rounded-lg hover:bg-slate-700/50"
+            >
+              <ChevronLeft size={16} />
+              Back
+            </button>
+            <button
+              onClick={goNext}
+              className={`flex items-center gap-1.5 px-5 py-2.5 font-medium rounded-xl transition-all text-white ${
+                scoringSystem === 'shrs'
+                  ? 'bg-teal-600 hover:bg-teal-500'
+                  : 'bg-amber-600 hover:bg-amber-500'
+              }`}
+            >
+              Next
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

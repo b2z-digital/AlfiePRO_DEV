@@ -40,6 +40,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
 import { updateRaceStatus } from '../utils/liveTrackingStorage';
 import { AskAlfieOrb } from './ask-alfie/AskAlfieOrb';
+import { HeatRacingSetupWizard } from './HeatRacingSetupWizard';
 import { useScoringContext } from '../contexts/ScoringContext';
 import type { ScoringSkipper, ScoringRaceResult, ScoringHeatInfo, ScoringStanding } from '../contexts/ScoringContext';
 
@@ -3927,18 +3928,19 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           darkMode={darkMode}
         />
         
-        <ConfirmationModal
+        <HeatRacingSetupWizard
           isOpen={showHeatRacingRecommendation}
           onClose={() => setShowHeatRacingRecommendation(false)}
-          onConfirm={() => {
+          onComplete={async (settings) => {
+            setShowHeatRacingRecommendation(false);
+            await handleSaveRaceSettings(settings);
+          }}
+          onSkip={() => {
             setShowHeatRacingRecommendation(false);
             setAutoEnableHeatRacing(true);
             setShowRaceSettingsModal(true);
           }}
-          title="Heat Racing Recommended"
-          message={`With ${skippers.length} skippers competing, AlfiePRO recommends enabling Heat Racing. Skippers will be divided into heats using either the HMS or SHRS scoring systems. Would you like to enable Heat Racing?`}
-          confirmText="Yes, Enable Heat Racing"
-          cancelText="No Thanks"
+          skippers={skippers}
           darkMode={darkMode}
         />
 
