@@ -2441,6 +2441,48 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
         return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
       };
 
+      // Pre-detect if country codes are concatenated with names across the dataset
+      // by checking if a majority of sail numbers share a country prefix that also appears at the start of names
+      let detectedNamePrefix = '';
+      if (fieldToColumn['sail_number'] && fieldToColumn['full_name']) {
+        const sailCountryCodes = new Map<string, number>();
+        for (const row of importData.slice(0, Math.min(20, importData.length))) {
+          const sn = (row[fieldToColumn['sail_number']] || '').trim();
+          const match = sn.match(/^([A-Za-z]{2,3})\s+\d+/);
+          if (match) {
+            const code = match[1].toUpperCase();
+            sailCountryCodes.set(code, (sailCountryCodes.get(code) || 0) + 1);
+          }
+        }
+        // Find the dominant country code
+        let dominantCode = '';
+        let dominantCount = 0;
+        sailCountryCodes.forEach((count, code) => {
+          if (count > dominantCount) {
+            dominantCount = count;
+            dominantCode = code;
+          }
+        });
+        // Check if names also start with this code (indicating concatenation)
+        if (dominantCode && dominantCount >= 3) {
+          let nameMatchCount = 0;
+          const nameCol = fieldToColumn['full_name'] || fieldToColumn['last_name'] || fieldToColumn['first_name'];
+          if (nameCol) {
+            for (const row of importData.slice(0, Math.min(20, importData.length))) {
+              const name = (row[nameCol] || '').trim().toUpperCase();
+              if (name.startsWith(dominantCode) && name.length > dominantCode.length) {
+                nameMatchCount++;
+              }
+            }
+            // If more than 60% of names start with the country code, it's a concatenation artifact
+            const sampleSize = Math.min(20, importData.length);
+            if (nameMatchCount > sampleSize * 0.6) {
+              detectedNamePrefix = dominantCode;
+            }
+          }
+        }
+      }
+
       for (const row of importData) {
         let firstName = (row[fieldToColumn['first_name']] || '').trim();
         let lastName = (row[fieldToColumn['last_name']] || '').trim();
@@ -2488,6 +2530,21 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             countryCode = countryPrefixMatch[1].toUpperCase();
           }
           sailNo = countryPrefixMatch[2].trim();
+        }
+
+        // Strip country code prefix from names if concatenated during paste (e.g. "AUSALLEN" -> "ALLEN")
+        // Only strip if pre-detection confirmed this is a dataset-wide concatenation issue
+        if (detectedNamePrefix && lastName) {
+          const upperLastName = lastName.toUpperCase();
+          if (upperLastName.startsWith(detectedNamePrefix) && upperLastName.length > detectedNamePrefix.length + 1) {
+            lastName = titleCase(lastName.slice(detectedNamePrefix.length));
+          }
+        }
+        if (detectedNamePrefix && firstName) {
+          const upperFirstName = firstName.toUpperCase();
+          if (upperFirstName.startsWith(detectedNamePrefix) && upperFirstName.length > detectedNamePrefix.length + 1) {
+            firstName = titleCase(firstName.slice(detectedNamePrefix.length));
+          }
         }
 
         let skipperName = '';
