@@ -809,3 +809,77 @@ export function validateSHRSConfig(config: SHRSConfig, skipperCount: number): {
   }
   return { isValid: errors.length === 0, errors };
 }
+
+/**
+ * Estimates opponent diversity metrics for given SHRS Pre-Assigned parameters.
+ * Uses combinatorial analysis without running the full optimization.
+ * Returns cumulative diversity stats at each qualifying round checkpoint.
+ */
+export function estimateDiversityMetrics(
+  totalSkippers: number,
+  numberOfHeats: number,
+  qualifyingRounds: number
+): {
+  roundStats: { round: number; avgUnique: number; minUnique: number; efficiency: number }[];
+  totalPossibleOpponents: number;
+  pairsPerRound: number;
+  theoreticalMinRounds: number;
+  recommendedMinRounds: number;
+} {
+  const totalPossibleOpponents = totalSkippers - 1;
+  const baseSizeArr: number[] = [];
+  const baseSize = Math.floor(totalSkippers / numberOfHeats);
+  const remainder = totalSkippers % numberOfHeats;
+  for (let h = 0; h < numberOfHeats; h++) {
+    baseSizeArr.push(baseSize + (h < remainder ? 1 : 0));
+  }
+
+  let pairsPerRound = 0;
+  for (const sz of baseSizeArr) {
+    pairsPerRound += (sz * (sz - 1)) / 2;
+  }
+
+  const totalPairings = (totalSkippers * totalPossibleOpponents) / 2;
+  const theoreticalMinRounds = totalPairings / pairsPerRound;
+
+  const avgHeatSize = totalSkippers / numberOfHeats;
+  const newOpponentsPerRound = avgHeatSize - 1;
+
+  const roundStats: { round: number; avgUnique: number; minUnique: number; efficiency: number }[] = [];
+
+  for (let r = 1; r <= qualifyingRounds; r++) {
+    let avgUnique: number;
+    if (r === 1) {
+      avgUnique = newOpponentsPerRound;
+    } else {
+      const coverageFraction = 1 - Math.pow(1 - (newOpponentsPerRound / totalPossibleOpponents), r);
+      const optimizerBoost = Math.min(0.06, 0.015 * r);
+      avgUnique = Math.min(totalPossibleOpponents, totalPossibleOpponents * (coverageFraction + optimizerBoost));
+    }
+    avgUnique = Math.min(totalPossibleOpponents, Math.round(avgUnique * 10) / 10);
+    const minUnique = Math.max(1, Math.round(avgUnique * (0.88 + 0.012 * r)));
+    const efficiency = Math.round((avgUnique / totalPossibleOpponents) * 1000) / 10;
+
+    roundStats.push({ round: r, avgUnique, minUnique, efficiency });
+  }
+
+  const targetEfficiency = 95;
+  let recommendedMinRounds = qualifyingRounds;
+  for (let r = 2; r <= 20; r++) {
+    const coverageFraction = 1 - Math.pow(1 - (newOpponentsPerRound / totalPossibleOpponents), r);
+    const optimizerBoost = Math.min(0.06, 0.015 * r);
+    const eff = Math.min(100, (coverageFraction + optimizerBoost) * 100);
+    if (eff >= targetEfficiency) {
+      recommendedMinRounds = r;
+      break;
+    }
+  }
+
+  return {
+    roundStats,
+    totalPossibleOpponents,
+    pairsPerRound,
+    theoreticalMinRounds: Math.round(theoreticalMinRounds * 100) / 100,
+    recommendedMinRounds
+  };
+}

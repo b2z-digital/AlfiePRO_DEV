@@ -7,6 +7,7 @@ import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeats
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
 import { ConfirmationModal } from './ConfirmationModal';
+import { DiversityGauge } from './DiversityGauge';
 import { supabase } from '../utils/supabase';
 
 interface RaceSettingsModalProps {
@@ -1884,6 +1885,15 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                               )}
                             </div>
                           </div>
+                        )}
+
+                        {isSHRS && shrsAssignmentMode === 'preset' && skippers.length >= 4 && numHeats >= 2 && (
+                          <DiversityGauge
+                            totalSkippers={skippers.length}
+                            numberOfHeats={numHeats}
+                            qualifyingRounds={shrsQualifyingRounds}
+                            darkMode={darkMode}
+                          />
                         )}
 
                         <div className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'} p-2 rounded ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
