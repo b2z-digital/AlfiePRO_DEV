@@ -61,6 +61,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   const [allParsedSkippers, setAllParsedSkippers] = useState<Skipper[]>([]);
   const [conflictGroups, setConflictGroups] = useState<{ sailNo: string; skippers: { index: number; skipper: Skipper }[] }[]>([]);
   const [pasteText, setPasteText] = useState('');
+  const [nameDisplayFormat, setNameDisplayFormat] = useState<'first_last' | 'last_first'>('first_last');
   const [members, setMembers] = useState<MemberWithValidation[]>([]);
   const [memberAvatars, setMemberAvatars] = useState<{[key: string]: string}>({});
   const [selectedMemberBoats, setSelectedMemberBoats] = useState<Record<string, MemberBoat>>({});
@@ -2200,7 +2201,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       { key: 'full_name', label: 'Full Name (combined)', required: false, aliases: ['name', 'skipper', 'competitor', 'full name', 'full_name', 'fullname', 'skipper name', 'skipper_name', 'competitor name', 'helm', 'helmsman'] },
       { key: 'first_name', label: 'First Name', required: false, aliases: ['first name', 'first_name', 'firstname', 'fname', 'given name', 'given_name'] },
       { key: 'last_name', label: 'Last Name', required: false, aliases: ['last name', 'last_name', 'lastname', 'lname', 'surname', 'family name', 'family_name'] },
-      { key: 'sail_number', label: 'Sail Number', required: true, aliases: ['sail no', 'sail_no', 'sail number', 'sail_number', 'sailno', 'sail', 'sail no.'] },
+      { key: 'sail_number', label: 'Sail Number', required: true, aliases: ['sail no', 'sail_no', 'sail number', 'sail_number', 'sailno', 'sail', 'sail no.', 'sail no.', 'sailnumber', 'sail #'] },
       { key: 'club', label: 'Club', required: false, aliases: ['club', 'club name', 'club_name', 'organisation', 'organization', 'yacht club'] },
       { key: 'boat_type', label: 'Boat Type / Design', required: false, aliases: ['boat design', 'boat_design', 'boat type', 'boat_type', 'class', 'boat class', 'boat_class', 'design'] },
       { key: 'country_code', label: 'Country Code (IOC)', required: false, aliases: ['nat', 'nationality', 'nation', 'ioc', 'country code', 'country_code', 'nat.'] },
@@ -2242,7 +2243,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
         { field: 'first_name', match: h => (h.includes('first') && h.includes('name')) || h === 'fname' },
         { field: 'last_name', match: h => (h.includes('last') && h.includes('name')) || h.includes('surname') || h === 'lname' },
         { field: 'full_name', match: h => h === 'name' || h === 'skipper' || h === 'competitor' || h === 'helm' || h === 'helmsman' || (h.includes('skipper') && h.includes('name')) },
-        { field: 'sail_number', match: h => h.includes('sail') },
+        { field: 'sail_number', match: h => h.includes('sail') || h === 'sail no.' || h === 'sail no' },
         { field: 'club', match: h => h.includes('club') },
         { field: 'boat_type', match: h => (h.includes('boat') && (h.includes('design') || h.includes('type') || h.includes('class'))) || (h === 'class') || (h === 'design') },
         { field: 'country_code', match: h => h === 'nat' || h === 'nat.' || h === 'nationality' || h === 'ioc' || (h.includes('country') && h.includes('code')) },
@@ -2287,7 +2288,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             'boat design', 'boat_design', 'boat type', 'boat_type', 'boat class', 'class', 'design',
             'nat', 'nationality', 'country code', 'country_code', 'ioc',
             'country', 'state', 'state country', 'email', 'phone',
-            'category', 'hull', 'hull reg no', 'hull_reg_no', 'hull number',
+            'category', 'cat', 'cat.', 'hull', 'hull reg no', 'hull_reg_no', 'hull number',
             'competitor id', 'entry date', 'rank', 'pn', 'payment', '2.4 ghz',
           ];
 
@@ -2351,6 +2352,57 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           setImportData(data);
           setImportHeaders(headers);
           const { mappings, autoDetected } = autoDetectSkipperMappings(headers);
+
+          // Content-based validation: verify sail_number column actually contains sail-number-like data
+          const sailColHeader = Object.entries(mappings).find(([, v]) => v === 'sail_number')?.[0];
+          if (sailColHeader && data.length > 0) {
+            const sailSamples = data.slice(0, Math.min(10, data.length)).map(r => (r[sailColHeader] || '').trim());
+            const sailPattern = /^([A-Za-z]{2,3}\s+)?\d+/;
+            const looksLikeSailNumbers = sailSamples.filter(s => s && sailPattern.test(s)).length;
+
+            // If less than half look like sail numbers, try to find a better column
+            if (looksLikeSailNumbers < sailSamples.filter(s => s).length * 0.5) {
+              const currentBoatTypeHeader = Object.entries(mappings).find(([, v]) => v === 'boat_type')?.[0];
+
+              // Check all unmapped headers and the boat_type header for sail-number-like data
+              const candidateHeaders = headers.filter(h => {
+                const mapped = mappings[h];
+                return !mapped || mapped === 'boat_type';
+              });
+
+              let bestCandidate = '';
+              let bestScore = looksLikeSailNumbers;
+
+              for (const candidate of candidateHeaders) {
+                const samples = data.slice(0, Math.min(10, data.length)).map(r => (r[candidate] || '').trim());
+                const matchCount = samples.filter(s => s && sailPattern.test(s)).length;
+                if (matchCount > bestScore) {
+                  bestScore = matchCount;
+                  bestCandidate = candidate;
+                }
+              }
+
+              if (bestCandidate) {
+                // Swap: move old sail_number mapping to boat_type (or remove), assign new one
+                const oldSailMapping = sailColHeader;
+                if (bestCandidate === currentBoatTypeHeader) {
+                  // Swap sail_number and boat_type
+                  mappings[bestCandidate] = 'sail_number';
+                  mappings[oldSailMapping] = 'boat_type';
+                } else {
+                  // Assign the new candidate to sail_number
+                  mappings[bestCandidate] = 'sail_number';
+                  // If old sail col doesn't have a better fit, try assigning it to boat_type
+                  if (!currentBoatTypeHeader) {
+                    mappings[oldSailMapping] = 'boat_type';
+                  } else {
+                    delete mappings[oldSailMapping];
+                  }
+                }
+              }
+            }
+          }
+
           setImportMappings(mappings);
           setImportAutoDetected(autoDetected);
           setImportStep('mapping');
@@ -2438,7 +2490,12 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           sailNo = countryPrefixMatch[2].trim();
         }
 
-        const skipperName = `${firstName} ${lastName}`.trim();
+        let skipperName = '';
+        if (nameDisplayFormat === 'last_first' && firstName && lastName) {
+          skipperName = `${lastName}, ${firstName}`;
+        } else {
+          skipperName = `${firstName} ${lastName}`.trim();
+        }
         if (skipperName && sailNo) {
           parsedSkippers.push({
             name: skipperName,
@@ -2775,6 +2832,41 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                     <span className="text-xs text-slate-500">{importHeaders.length} columns in source</span>
                   </div>
                 </div>
+
+                {hasNameField && (
+                  <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/30">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-slate-300">Name Display Format</div>
+                      <div className="flex items-center gap-1 bg-slate-900/60 rounded-lg p-0.5 border border-slate-700/50">
+                        <button
+                          onClick={() => setNameDisplayFormat('first_last')}
+                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                            nameDisplayFormat === 'first_last'
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          First Last
+                        </button>
+                        <button
+                          onClick={() => setNameDisplayFormat('last_first')}
+                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                            nameDisplayFormat === 'last_first'
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Last, First
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1.5">
+                      {nameDisplayFormat === 'first_last'
+                        ? 'Names will appear as "John Smith" in results'
+                        : 'Names will appear as "Smith, John" in results'}
+                    </p>
+                  </div>
+                )}
 
                 {!canImport && (
                   <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
