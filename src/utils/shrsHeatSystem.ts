@@ -403,79 +403,122 @@ export function generateAllSHRSQualifyingRoundAssignments(
   return allRounds;
 }
 
-function gcd(a: number, b: number): number {
-  while (b) { [a, b] = [b, a % b]; }
-  return a;
+function pairKey(a: number, b: number): string {
+  return a < b ? `${a}-${b}` : `${b}-${a}`;
 }
 
-function getCoprimeOffsets(n: number, count: number): number[] {
-  const offsets: number[] = [];
-  const candidates = [];
-  for (let i = 2; i < n; i++) {
-    if (gcd(i, n) === 1) candidates.push(i);
-  }
-  candidates.sort((a, b) => {
-    const distA = Math.min(Math.abs(a - n / 3), Math.abs(a - n / 2), Math.abs(a - n * 2 / 3));
-    const distB = Math.min(Math.abs(b - n / 3), Math.abs(b - n / 2), Math.abs(b - n * 2 / 3));
-    return distA - distB;
-  });
-  for (const c of candidates) {
-    if (offsets.length >= count) break;
-    let tooClose = false;
-    for (const existing of offsets) {
-      if (Math.abs(c - existing) <= 1 || (c + existing) === n) {
-        tooClose = true;
-        break;
+function buildPairCounts(allRounds: number[][][]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const round of allRounds) {
+    for (const heat of round) {
+      for (let i = 0; i < heat.length; i++) {
+        for (let j = i + 1; j < heat.length; j++) {
+          const key = pairKey(heat[i], heat[j]);
+          counts.set(key, (counts.get(key) || 0) + 1);
+        }
       }
     }
-    if (!tooClose) offsets.push(c);
   }
-  while (offsets.length < count) {
-    offsets.push(candidates[offsets.length % candidates.length] || 1);
-  }
-  return offsets;
+  return counts;
 }
 
-function countPairOverlap(
-  assignments: number[][],
-  pairCount: Map<string, number>
+function computeGlobalDuplicateScore(pairCounts: Map<string, number>): number {
+  let score = 0;
+  for (const count of pairCounts.values()) {
+    if (count > 1) score += (count - 1) * (count - 1);
+  }
+  return score;
+}
+
+function computeSwapDelta(
+  allRounds: number[][][],
+  pairCounts: Map<string, number>,
+  roundIdx: number,
+  heatA: number,
+  posA: number,
+  heatB: number,
+  posB: number
 ): number {
-  let total = 0;
-  for (const heat of assignments) {
-    for (let i = 0; i < heat.length; i++) {
-      for (let j = i + 1; j < heat.length; j++) {
-        const key = heat[i] < heat[j] ? `${heat[i]}-${heat[j]}` : `${heat[j]}-${heat[i]}`;
-        const count = pairCount.get(key) || 0;
-        if (count > 0) total += count;
-      }
-    }
+  const heatsInRound = allRounds[roundIdx];
+  const skipperA = heatsInRound[heatA][posA];
+  const skipperB = heatsInRound[heatB][posB];
+  if (skipperA === skipperB) return 0;
+
+  let delta = 0;
+
+  for (let i = 0; i < heatsInRound[heatA].length; i++) {
+    if (i === posA) continue;
+    const other = heatsInRound[heatA][i];
+    const oldKeyA = pairKey(skipperA, other);
+    const newKeyB = pairKey(skipperB, other);
+    const oldCountA = pairCounts.get(oldKeyA) || 0;
+    const oldCountB = pairCounts.get(newKeyB) || 0;
+    const oldPenaltyA = oldCountA > 1 ? (oldCountA - 1) * (oldCountA - 1) : 0;
+    const newPenaltyA = oldCountA > 2 ? (oldCountA - 2) * (oldCountA - 2) : 0;
+    const oldPenaltyB = oldCountB > 1 ? (oldCountB - 1) * (oldCountB - 1) : 0;
+    const newPenaltyB = (oldCountB) * (oldCountB);
+    delta += (newPenaltyA - oldPenaltyA) + (newPenaltyB - oldPenaltyB);
   }
-  return total;
+
+  for (let i = 0; i < heatsInRound[heatB].length; i++) {
+    if (i === posB) continue;
+    const other = heatsInRound[heatB][i];
+    const oldKeyB = pairKey(skipperB, other);
+    const newKeyA = pairKey(skipperA, other);
+    const oldCountB = pairCounts.get(oldKeyB) || 0;
+    const oldCountA = pairCounts.get(newKeyA) || 0;
+    const oldPenaltyB = oldCountB > 1 ? (oldCountB - 1) * (oldCountB - 1) : 0;
+    const newPenaltyB = oldCountB > 2 ? (oldCountB - 2) * (oldCountB - 2) : 0;
+    const oldPenaltyA = oldCountA > 1 ? (oldCountA - 1) * (oldCountA - 1) : 0;
+    const newPenaltyA = (oldCountA) * (oldCountA);
+    delta += (newPenaltyB - oldPenaltyB) + (newPenaltyA - oldPenaltyA);
+  }
+
+  return delta;
 }
 
-function updatePairCounts(
-  assignments: number[][],
-  pairCount: Map<string, number>,
-  delta: number
+function applySwap(
+  allRounds: number[][][],
+  pairCounts: Map<string, number>,
+  roundIdx: number,
+  heatA: number,
+  posA: number,
+  heatB: number,
+  posB: number
 ): void {
-  for (const heat of assignments) {
-    for (let i = 0; i < heat.length; i++) {
-      for (let j = i + 1; j < heat.length; j++) {
-        const key = heat[i] < heat[j] ? `${heat[i]}-${heat[j]}` : `${heat[j]}-${heat[i]}`;
-        pairCount.set(key, (pairCount.get(key) || 0) + delta);
-      }
-    }
+  const heatsInRound = allRounds[roundIdx];
+  const skipperA = heatsInRound[heatA][posA];
+  const skipperB = heatsInRound[heatB][posB];
+
+  for (let i = 0; i < heatsInRound[heatA].length; i++) {
+    if (i === posA) continue;
+    const other = heatsInRound[heatA][i];
+    const keyA = pairKey(skipperA, other);
+    pairCounts.set(keyA, (pairCounts.get(keyA) || 1) - 1);
+    const keyB = pairKey(skipperB, other);
+    pairCounts.set(keyB, (pairCounts.get(keyB) || 0) + 1);
   }
+  for (let i = 0; i < heatsInRound[heatB].length; i++) {
+    if (i === posB) continue;
+    const other = heatsInRound[heatB][i];
+    const keyB = pairKey(skipperB, other);
+    pairCounts.set(keyB, (pairCounts.get(keyB) || 1) - 1);
+    const keyA = pairKey(skipperA, other);
+    pairCounts.set(keyA, (pairCounts.get(keyA) || 0) + 1);
+  }
+
+  heatsInRound[heatA][posA] = skipperB;
+  heatsInRound[heatB][posB] = skipperA;
 }
 
 /**
  * SHR Rule 3.2: Balanced Assignments.
- * Generates all qualifying round heat assignments before racing using an optimized
- * rotation algorithm that maximizes opponent diversity:
- * 1. Uses coprime cyclic shifts as the base rotation pattern
- * 2. Tracks opponent overlap and performs greedy swaps to minimize repeated matchups
- * 3. Every skipper races exactly once per round
- * 4. Heat sizes remain balanced across all rounds
+ * Generates all qualifying round heat assignments before racing using a globally
+ * optimized algorithm that maximizes opponent diversity across all rounds:
+ * 1. Generates initial round assignments using balanced block rotation
+ * 2. Performs global hill-climbing optimization across ALL rounds simultaneously
+ * 3. Uses squared-duplicate scoring to aggressively eliminate repeated pairings
+ * 4. Every skipper races exactly once per round; heat sizes remain balanced
  */
 export function generatePreSetQualifyingAssignments(
   initialAssignments: { heatDesignation: string; skipperIndices: number[] }[],
@@ -497,82 +540,125 @@ export function generatePreSetQualifyingAssignments(
     }))];
   }
 
-  const pairCount = new Map<string, number>();
-
+  // Phase 1: Build initial assignments using block rotation for maximum spread
   const allRoundsRaw: number[][][] = [];
 
   const round1: number[][] = initialAssignments.map(a => [...a.skipperIndices]);
   allRoundsRaw.push(round1);
-  updatePairCounts(round1, pairCount, 1);
-
-  const offsets = getCoprimeOffsets(N, qualifyingRounds - 1);
 
   for (let r = 1; r < qualifyingRounds; r++) {
-    const offset = offsets[(r - 1) % offsets.length];
-    const shifted = allSkippers.map((_, i) => allSkippers[(i + offset * r) % N]);
+    const blockSize = Math.ceil(N / numberOfHeats);
+    const offset = r * blockSize;
+    const rotated: number[] = allSkippers.map((_, i) => allSkippers[(i + offset) % N]);
 
     const roundHeats: number[][] = [];
     let idx = 0;
     for (let h = 0; h < numberOfHeats; h++) {
       const heat: number[] = [];
       for (let s = 0; s < targetSizes[h] && idx < N; s++) {
-        heat.push(shifted[idx]);
+        heat.push(rotated[idx]);
         idx++;
       }
       roundHeats.push(heat);
     }
+    allRoundsRaw.push(roundHeats);
+  }
 
-    const MAX_SWAPS = N * 2;
-    for (let swap = 0; swap < MAX_SWAPS; swap++) {
-      let bestImprovement = 0;
-      let bestH1 = -1, bestI1 = -1, bestH2 = -1, bestI2 = -1;
+  // Phase 2: Global hill-climbing optimization across all rounds simultaneously
+  const pairCounts = buildPairCounts(allRoundsRaw);
+  let currentScore = computeGlobalDuplicateScore(pairCounts);
 
-      for (let h1 = 0; h1 < numberOfHeats; h1++) {
-        for (let h2 = h1 + 1; h2 < numberOfHeats; h2++) {
-          if (roundHeats[h1].length === 0 || roundHeats[h2].length === 0) continue;
+  const MAX_PASSES = 20;
+  for (let pass = 0; pass < MAX_PASSES && currentScore > 0; pass++) {
+    let improved = false;
 
-          for (let i1 = 0; i1 < roundHeats[h1].length; i1++) {
-            for (let i2 = 0; i2 < roundHeats[h2].length; i2++) {
-              const skipperA = roundHeats[h1][i1];
-              const skipperB = roundHeats[h2][i2];
+    for (let r = 1; r < qualifyingRounds; r++) {
+      const heatsInRound = allRoundsRaw[r];
 
-              let currentOverlap = 0;
-              let swappedOverlap = 0;
+      for (let hA = 0; hA < numberOfHeats; hA++) {
+        for (let hB = hA + 1; hB < numberOfHeats; hB++) {
+          if (heatsInRound[hA].length === 0 || heatsInRound[hB].length === 0) continue;
 
-              for (const other of roundHeats[h1]) {
-                if (other === skipperA) continue;
-                const keyA = skipperA < other ? `${skipperA}-${other}` : `${other}-${skipperA}`;
-                const keyB = skipperB < other ? `${skipperB}-${other}` : `${other}-${skipperB}`;
-                currentOverlap += pairCount.get(keyA) || 0;
-                swappedOverlap += pairCount.get(keyB) || 0;
+          let bestDelta = 0;
+          let bestPA = -1, bestPB = -1;
+
+          for (let pA = 0; pA < heatsInRound[hA].length; pA++) {
+            for (let pB = 0; pB < heatsInRound[hB].length; pB++) {
+              const delta = computeSwapDelta(allRoundsRaw, pairCounts, r, hA, pA, hB, pB);
+              if (delta < bestDelta) {
+                bestDelta = delta;
+                bestPA = pA;
+                bestPB = pB;
               }
-              for (const other of roundHeats[h2]) {
-                if (other === skipperB) continue;
-                const keyB = skipperB < other ? `${skipperB}-${other}` : `${other}-${skipperB}`;
-                const keyA = skipperA < other ? `${skipperA}-${other}` : `${other}-${skipperA}`;
-                currentOverlap += pairCount.get(keyB) || 0;
-                swappedOverlap += pairCount.get(keyA) || 0;
-              }
+            }
+          }
 
-              const improvement = currentOverlap - swappedOverlap;
-              if (improvement > bestImprovement) {
-                bestImprovement = improvement;
-                bestH1 = h1; bestI1 = i1; bestH2 = h2; bestI2 = i2;
-              }
+          if (bestDelta < 0) {
+            applySwap(allRoundsRaw, pairCounts, r, hA, bestPA, hB, bestPB);
+            currentScore += bestDelta;
+            improved = true;
+          }
+        }
+      }
+    }
+
+    if (!improved) break;
+  }
+
+  // Phase 3: Targeted pass to eliminate remaining high-overlap pairs
+  if (currentScore > 0) {
+    const worstPairs: [number, number][] = [];
+    for (const [key, count] of pairCounts.entries()) {
+      if (count > 1) {
+        const [a, b] = key.split('-').map(Number);
+        worstPairs.push([a, b]);
+      }
+    }
+
+    for (const [skipA, skipB] of worstPairs) {
+      if ((pairCounts.get(pairKey(skipA, skipB)) || 0) <= 1) continue;
+
+      let bestDelta = 0;
+      let bestR = -1, bestHA = -1, bestPA = -1, bestHB = -1, bestPB = -1;
+
+      for (let r = 1; r < qualifyingRounds; r++) {
+        const heatsInRound = allRoundsRaw[r];
+        let foundHeat = -1, foundPos = -1;
+        let partnerHeat = -1, partnerPos = -1;
+
+        for (let h = 0; h < numberOfHeats; h++) {
+          for (let p = 0; p < heatsInRound[h].length; p++) {
+            if (heatsInRound[h][p] === skipA) { foundHeat = h; foundPos = p; }
+            if (heatsInRound[h][p] === skipB) { partnerHeat = h; partnerPos = p; }
+          }
+        }
+
+        if (foundHeat === -1 || partnerHeat === -1 || foundHeat !== partnerHeat) continue;
+
+        for (let otherH = 0; otherH < numberOfHeats; otherH++) {
+          if (otherH === foundHeat) continue;
+          for (let otherP = 0; otherP < heatsInRound[otherH].length; otherP++) {
+            const delta = computeSwapDelta(allRoundsRaw, pairCounts, r, foundHeat, foundPos, otherH, otherP);
+            if (delta < bestDelta) {
+              bestDelta = delta;
+              bestR = r; bestHA = foundHeat; bestPA = foundPos;
+              bestHB = otherH; bestPB = otherP;
+            }
+            const delta2 = computeSwapDelta(allRoundsRaw, pairCounts, r, partnerHeat, partnerPos, otherH, otherP);
+            if (delta2 < bestDelta) {
+              bestDelta = delta2;
+              bestR = r; bestHA = partnerHeat; bestPA = partnerPos;
+              bestHB = otherH; bestPB = otherP;
             }
           }
         }
       }
 
-      if (bestImprovement <= 0) break;
-
-      const temp = roundHeats[bestH1][bestI1];
-      roundHeats[bestH1][bestI1] = roundHeats[bestH2][bestI2];
-      roundHeats[bestH2][bestI2] = temp;
+      if (bestDelta < 0) {
+        applySwap(allRoundsRaw, pairCounts, bestR, bestHA, bestPA, bestHB, bestPB);
+        currentScore += bestDelta;
+      }
     }
-
-    allRoundsRaw.push(roundHeats);
-    updatePairCounts(roundHeats, pairCount, 1);
   }
 
   return allRoundsRaw.map(roundHeats =>
