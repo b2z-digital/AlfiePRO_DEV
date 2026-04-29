@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Users, UserPlus, UserCog, CircleAlert as AlertCircle, Check, CircleCheck as CheckCircle, SquarePen as Edit2, Search, ChevronRight, Sailboat, ArrowUpDown, Upload, FileUp, Trash2, ClipboardPaste, ArrowRight, Zap } from 'lucide-react';
+import { X, Plus, Users, UserPlus, UserCog, CircleAlert as AlertCircle, Check, CircleCheck as CheckCircle, SquarePen as Edit2, Search, ChevronRight, Sailboat, ArrowUpDown, Upload, FileUp, Trash2, ClipboardPaste, ArrowRight, Zap, TriangleAlert as AlertTriangle } from 'lucide-react';
 import Papa from 'papaparse';
 import { Skipper } from '../types';
 import { getStoredMembers, isValidUUID, updateMember } from '../utils/storage';
@@ -57,7 +57,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   const [importHeaders, setImportHeaders] = useState<string[]>([]);
   const [importMappings, setImportMappings] = useState<Record<string, string>>({});
   const [importAutoDetected, setImportAutoDetected] = useState<Set<string>>(new Set());
-  const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'importing' | 'complete'>('upload');
+  const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'importing' | 'conflicts' | 'complete'>('upload');
+  const [conflictSkippers, setConflictSkippers] = useState<{ skipper: Skipper; originalSailNo: string; conflictsWith: 'existing' | 'new' }[]>([]);
+  const [resolvedSkippers, setResolvedSkippers] = useState<Skipper[]>([]);
   const [pasteText, setPasteText] = useState('');
   const [members, setMembers] = useState<MemberWithValidation[]>([]);
   const [memberAvatars, setMemberAvatars] = useState<{[key: string]: string}>({});
@@ -2376,7 +2378,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     const handleImport = async () => {
       setImportStep('importing');
       const newSkippers: Skipper[] = [];
-      const duplicateSailNumbers: string[] = [];
+      const conflicts: { skipper: Skipper; originalSailNo: string; conflictsWith: 'existing' | 'new' }[] = [];
 
       const fieldToColumn: Record<string, string> = {};
       Object.entries(importMappings).forEach(([csvColumn, field]) => {
@@ -2439,42 +2441,50 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
         const skipperName = `${firstName} ${lastName}`.trim();
         if (skipperName && sailNo) {
+          const skipperData: Skipper = {
+            name: skipperName,
+            sailNo,
+            club,
+            boatModel: boatType,
+            hull: hullNumber || boatType,
+            startHcap: 0,
+            country_code: countryCode,
+            country: country,
+            category: category,
+            clubState: state,
+            ...(nationalRanking > 0 ? { national_ranking: nationalRanking } : {})
+          };
+
           const isDuplicateExisting = skippers.some(s => s.sailNo === sailNo);
           const isDuplicateNew = newSkippers.some(s => s.sailNo === sailNo);
           if (isDuplicateExisting) {
-            duplicateSailNumbers.push(sailNo);
+            conflicts.push({ skipper: skipperData, originalSailNo: sailNo, conflictsWith: 'existing' });
           } else if (isDuplicateNew) {
-            duplicateSailNumbers.push(sailNo);
+            conflicts.push({ skipper: skipperData, originalSailNo: sailNo, conflictsWith: 'new' });
           } else {
-            newSkippers.push({
-              name: skipperName,
-              sailNo,
-              club,
-              boatModel: boatType,
-              hull: hullNumber || boatType,
-              startHcap: 0,
-              country_code: countryCode,
-              country: country,
-              category: category,
-              clubState: state,
-              ...(nationalRanking > 0 ? { national_ranking: nationalRanking } : {})
-            });
+            newSkippers.push(skipperData);
           }
         }
       }
 
-      onUpdateSkippers([...skippers, ...newSkippers]);
+      if (conflicts.length > 0) {
+        setResolvedSkippers(newSkippers);
+        setConflictSkippers(conflicts);
+        setImportStep('conflicts');
+        return;
+      }
+
+      finalizeImport(newSkippers);
+    };
+
+    const finalizeImport = async (allNewSkippers: Skipper[]) => {
+      onUpdateSkippers([...skippers, ...allNewSkippers]);
       setError(null);
-      const count = newSkippers.length;
-      const dupCount = duplicateSailNumbers.length;
+      const count = allNewSkippers.length;
 
-      const dupWarning = dupCount > 0
-        ? `. ${dupCount} skipped due to duplicate sail number${dupCount !== 1 ? 's' : ''}: ${[...new Set(duplicateSailNumbers)].join(', ')}`
-        : '';
-
-      if (saveToContacts && isRaceOfficer && newSkippers.length > 0) {
+      if (saveToContacts && isRaceOfficer && allNewSkippers.length > 0) {
         try {
-          const contactRows = newSkippers.map(s => ({
+          const contactRows = allNewSkippers.map(s => ({
             name: s.name,
             sail_number: s.sailNo || '',
             boat_class: s.hull || s.boatModel || '',
@@ -2485,15 +2495,50 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             state: s.clubState || '',
           }));
           const saved = await bulkAddRaceOfficerContacts(contactRows);
-          addNotification(dupCount > 0 ? 'warning' : 'success', `${count} skipper${count !== 1 ? 's' : ''} imported and ${saved.length} saved to contacts${dupWarning}`);
+          addNotification('success', `${count} skipper${count !== 1 ? 's' : ''} imported and ${saved.length} saved to contacts`);
         } catch {
-          addNotification(dupCount > 0 ? 'warning' : 'success', `${count} skipper${count !== 1 ? 's' : ''} imported (contacts save failed)${dupWarning}`);
+          addNotification('success', `${count} skipper${count !== 1 ? 's' : ''} imported (contacts save failed)`);
         }
       } else {
-        addNotification(dupCount > 0 ? 'warning' : 'success', `${count} skipper${count !== 1 ? 's' : ''} imported successfully${dupWarning}`);
+        addNotification('success', `${count} skipper${count !== 1 ? 's' : ''} imported successfully`);
       }
 
       onClose();
+    };
+
+    const handleResolveConflicts = () => {
+      const allSailNumbers = new Set([
+        ...skippers.map(s => s.sailNo),
+        ...resolvedSkippers.map(s => s.sailNo),
+      ]);
+
+      const stillConflicting = conflictSkippers.filter(c => {
+        const newSailNo = c.skipper.sailNo;
+        if (!newSailNo.trim()) return true;
+        if (allSailNumbers.has(newSailNo)) return true;
+        return false;
+      });
+
+      if (stillConflicting.length > 0) {
+        setError(`${stillConflicting.length} skipper${stillConflicting.length !== 1 ? 's' : ''} still ${stillConflicting.length !== 1 ? 'have' : 'has'} conflicting or empty sail numbers. Please update them to unique values.`);
+        return;
+      }
+
+      setError(null);
+      const allSkippers = [...resolvedSkippers, ...conflictSkippers.map(c => c.skipper)];
+      finalizeImport(allSkippers);
+    };
+
+    const updateConflictSailNo = (index: number, newSailNo: string) => {
+      setConflictSkippers(prev => {
+        const updated = [...prev];
+        updated[index] = {
+          ...updated[index],
+          skipper: { ...updated[index].skipper, sailNo: newSailNo }
+        };
+        return updated;
+      });
+      setError(null);
     };
 
     const importFieldsList = SKIPPER_FIELDS;
@@ -2761,6 +2806,100 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               </div>
             )}
 
+            {importStep === 'conflicts' && (
+              <div className="py-4 px-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="text-amber-400" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-white">Sail Number Conflicts</h3>
+                    <p className="text-sm text-slate-400">
+                      {conflictSkippers.length} skipper{conflictSkippers.length !== 1 ? 's' : ''} {conflictSkippers.length !== 1 ? 'have' : 'has'} duplicate sail numbers. Update them to unique values to import all skippers.
+                    </p>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-300">
+                    {error}
+                  </div>
+                )}
+
+                <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+                  {conflictSkippers.map((conflict, idx) => {
+                    const allUsedSailNos = new Set([
+                      ...skippers.map(s => s.sailNo),
+                      ...resolvedSkippers.map(s => s.sailNo),
+                      ...conflictSkippers.filter((_, i) => i !== idx).map(c => c.skipper.sailNo),
+                    ]);
+                    const isStillConflicting = !conflict.skipper.sailNo.trim() || allUsedSailNos.has(conflict.skipper.sailNo);
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                          isStillConflicting
+                            ? 'border-amber-500/40 bg-amber-500/5'
+                            : 'border-emerald-500/40 bg-emerald-500/5'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-white truncate">{conflict.skipper.name}</span>
+                            {conflict.skipper.club && (
+                              <span className="text-xs text-slate-500 truncate">({conflict.skipper.club})</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            Original sail: <span className="text-amber-400 font-mono">{conflict.originalSailNo}</span>
+                            {conflict.conflictsWith === 'existing'
+                              ? ' (already in event)'
+                              : ' (duplicate in file)'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <label className="text-xs text-slate-400">New sail:</label>
+                          <input
+                            type="text"
+                            value={conflict.skipper.sailNo}
+                            onChange={(e) => updateConflictSailNo(idx, e.target.value)}
+                            className={`w-24 px-2.5 py-1.5 rounded-lg text-sm font-mono text-center border transition-all ${
+                              isStillConflicting
+                                ? 'bg-slate-700/80 border-amber-500/50 text-white focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30'
+                                : 'bg-slate-700/80 border-emerald-500/50 text-emerald-300 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/30'
+                            } outline-none`}
+                            placeholder="Sail #"
+                          />
+                          {!isStillConflicting && (
+                            <Check size={16} className="text-emerald-400" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 p-3 rounded-lg bg-slate-800/60 border border-slate-700/50">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">
+                      {resolvedSkippers.length} skipper{resolvedSkippers.length !== 1 ? 's' : ''} ready to import
+                    </span>
+                    <span className="text-slate-400">
+                      + {conflictSkippers.filter((c, idx) => {
+                        const allUsed = new Set([
+                          ...skippers.map(s => s.sailNo),
+                          ...resolvedSkippers.map(s => s.sailNo),
+                          ...conflictSkippers.filter((_, i) => i !== idx).map(cc => cc.skipper.sailNo),
+                        ]);
+                        return c.skipper.sailNo.trim() && !allUsed.has(c.skipper.sailNo);
+                      }).length} of {conflictSkippers.length} conflicts resolved
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {importStep === 'complete' && (
               <div className="text-center py-12">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -2784,13 +2923,18 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   setImportMappings({});
                   setImportAutoDetected(new Set());
                   setPasteText('');
+                } else if (importStep === 'conflicts') {
+                  setImportStep('mapping');
+                  setConflictSkippers([]);
+                  setResolvedSkippers([]);
+                  setError(null);
                 } else {
                   setView('initial');
                 }
               }}
               className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
             >
-              {importStep === 'complete' ? 'Close' : importStep === 'mapping' ? 'Upload Different Data' : 'Back'}
+              {importStep === 'complete' ? 'Close' : importStep === 'conflicts' ? 'Back to Mapping' : importStep === 'mapping' ? 'Upload Different Data' : 'Back'}
             </button>
             {importStep === 'mapping' && isRaceOfficer && (
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -2814,6 +2958,14 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                 }`}
               >
                 Import {importData.length} Skipper{importData.length !== 1 ? 's' : ''}
+              </button>
+            )}
+            {importStep === 'conflicts' && (
+              <button
+                onClick={handleResolveConflicts}
+                className="px-5 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                Import All {resolvedSkippers.length + conflictSkippers.length} Skippers
               </button>
             )}
             {importStep === 'complete' && (
