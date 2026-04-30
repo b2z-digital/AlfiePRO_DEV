@@ -7,6 +7,8 @@ import {
   getSequences, getSounds, createSequence, updateSequence, deleteSequence,
   addSequenceSound, updateSequenceSound, removeSequenceSound, duplicateSequence,
   uploadSequenceAudio, removeSequenceAudio,
+  uploadBackgroundMusic, removeBackgroundMusic,
+  uploadCustomEventSound, removeCustomEventSound,
 } from '../../utils/startBoxStorage';
 import { getStartBoxEngine } from '../../utils/startBoxAudio';
 
@@ -55,6 +57,8 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
   const [newTriggerTime, setNewTriggerTime] = useState(0);
   const [newLabel, setNewLabel] = useState('');
   const [uploadingAudioFor, setUploadingAudioFor] = useState<string | null>(null);
+  const [uploadingBgMusicFor, setUploadingBgMusicFor] = useState<string | null>(null);
+  const [uploadingEventSoundFor, setUploadingEventSoundFor] = useState<string | null>(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
@@ -71,6 +75,31 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
   const handleRemoveAudio = async (seqId: string) => {
     stopAudioPreview();
     await removeSequenceAudio(seqId);
+    await loadData();
+  };
+
+  const handleBgMusicUpload = async (seqId: string, file: File) => {
+    setUploadingBgMusicFor(seqId);
+    await uploadBackgroundMusic(seqId, clubId, file);
+    setUploadingBgMusicFor(null);
+    await loadData();
+  };
+
+  const handleRemoveBgMusic = async (seqId: string) => {
+    stopAudioPreview();
+    await removeBackgroundMusic(seqId);
+    await loadData();
+  };
+
+  const handleEventSoundUpload = async (ssId: string, file: File) => {
+    setUploadingEventSoundFor(ssId);
+    await uploadCustomEventSound(ssId, clubId, file);
+    setUploadingEventSoundFor(null);
+    await loadData();
+  };
+
+  const handleRemoveEventSound = async (ssId: string) => {
+    await removeCustomEventSound(ssId);
     await loadData();
   };
 
@@ -156,10 +185,10 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
   };
 
   const handleAddSound = async (seqId: string) => {
-    if (!newSoundId) return;
+    if (!newSoundId && !newLabel.trim()) return;
     await addSequenceSound({
       sequence_id: seqId,
-      sound_id: newSoundId,
+      sound_id: newSoundId || null,
       trigger_time_seconds: newTriggerTime,
       label: newLabel.trim() || undefined,
       repeat_count: 1,
@@ -456,6 +485,213 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                   </div>
                 )}
 
+                {/* Background Music Section */}
+                {!seq.use_audio_only && (!seq.is_system_default || isSuperAdmin) && (
+                  <div className={`mt-3 p-4 rounded-lg border ${
+                    seq.use_background_music
+                      ? darkMode ? 'bg-slate-800/50 border-cyan-500/20' : 'bg-cyan-50/50 border-cyan-200'
+                      : darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Music size={16} className={seq.use_background_music ? 'text-cyan-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                        <h4 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          Background Music
+                        </h4>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={seq.use_background_music || false}
+                            onChange={async () => {
+                              await updateSequence(seq.id, { use_background_music: !seq.use_background_music });
+                              await loadData();
+                            }}
+                            className="sr-only peer"
+                          />
+                          <div className={`w-9 h-5 rounded-full transition-colors peer-checked:bg-cyan-600 ${darkMode ? 'bg-slate-600' : 'bg-slate-300'}`} />
+                          <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
+                        </div>
+                      </label>
+                    </div>
+
+                    {seq.use_background_music && (
+                      <div className="space-y-3">
+                        <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                          Plays a music track during the countdown. Volume automatically ducks when sound events fire.
+                        </p>
+
+                        {seq.background_music_url ? (
+                          <div className="space-y-3">
+                            <div className={`flex items-center gap-3 p-3 rounded-lg ${darkMode ? 'bg-slate-900/50' : 'bg-white'}`}>
+                              <Music size={14} className="text-cyan-400" />
+                              <span className={`text-sm font-medium truncate flex-1 ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                {seq.background_music_path?.split('/').pop() || 'Background music'}
+                              </span>
+                              <button
+                                onClick={() => toggleAudioPreview(seq.background_music_url!)}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  audioPreviewUrl === seq.background_music_url
+                                    ? 'bg-cyan-500/20 text-cyan-400'
+                                    : darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-500'
+                                }`}
+                              >
+                                {audioPreviewUrl === seq.background_music_url ? <Square size={12} /> : <Play size={12} />}
+                              </button>
+                              <label className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                                darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}>
+                                <Upload size={12} />
+                                Replace
+                                <input
+                                  type="file"
+                                  accept="audio/*"
+                                  className="hidden"
+                                  onChange={e => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleBgMusicUpload(seq.id, file);
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                              <button
+                                onClick={() => handleRemoveBgMusic(seq.id)}
+                                className="p-2 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              <div>
+                                <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  Volume
+                                </label>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  value={Math.round((seq.background_music_volume ?? 0.6) * 100)}
+                                  onChange={async (e) => {
+                                    await updateSequence(seq.id, { background_music_volume: parseInt(e.target.value) / 100 });
+                                    await loadData();
+                                  }}
+                                  className="w-full accent-cyan-500"
+                                />
+                                <span className={`text-[10px] ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                                  {Math.round((seq.background_music_volume ?? 0.6) * 100)}%
+                                </span>
+                              </div>
+                              <div>
+                                <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  Duck Volume
+                                </label>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  value={Math.round((seq.background_music_duck_volume ?? 0.15) * 100)}
+                                  onChange={async (e) => {
+                                    await updateSequence(seq.id, { background_music_duck_volume: parseInt(e.target.value) / 100 });
+                                    await loadData();
+                                  }}
+                                  className="w-full accent-cyan-500"
+                                />
+                                <span className={`text-[10px] ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                                  {Math.round((seq.background_music_duck_volume ?? 0.15) * 100)}%
+                                </span>
+                              </div>
+                              <div>
+                                <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  Duck Duration
+                                </label>
+                                <input
+                                  type="number"
+                                  min={500}
+                                  max={10000}
+                                  step={500}
+                                  value={seq.background_music_duck_duration_ms ?? 3000}
+                                  onChange={async (e) => {
+                                    await updateSequence(seq.id, { background_music_duck_duration_ms: parseInt(e.target.value) || 3000 });
+                                    await loadData();
+                                  }}
+                                  className={`w-full px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                                />
+                                <span className={`text-[10px] ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>ms</span>
+                              </div>
+                              <div>
+                                <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  Fade In / Out
+                                </label>
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={10000}
+                                    step={500}
+                                    value={seq.background_music_fade_in_ms ?? 2000}
+                                    onChange={async (e) => {
+                                      await updateSequence(seq.id, { background_music_fade_in_ms: parseInt(e.target.value) || 0 });
+                                      await loadData();
+                                    }}
+                                    className={`w-full px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                                  />
+                                  <span className={`text-[10px] ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>/</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={10000}
+                                    step={500}
+                                    value={seq.background_music_fade_out_ms ?? 3000}
+                                    onChange={async (e) => {
+                                      await updateSequence(seq.id, { background_music_fade_out_ms: parseInt(e.target.value) || 0 });
+                                      await loadData();
+                                    }}
+                                    className={`w-full px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                                  />
+                                </div>
+                                <span className={`text-[10px] ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>ms</span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            {uploadingBgMusicFor === seq.id ? (
+                              <div className="flex items-center gap-2 py-3">
+                                <Loader2 size={16} className="animate-spin text-cyan-400" />
+                                <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Uploading background music...</span>
+                              </div>
+                            ) : (
+                              <label className={`flex flex-col items-center gap-2 px-6 py-5 rounded-lg border-2 border-dashed cursor-pointer transition-all ${
+                                darkMode
+                                  ? 'border-slate-700 hover:border-cyan-500/50 text-slate-400 hover:text-cyan-400'
+                                  : 'border-slate-300 hover:border-cyan-400 text-slate-500 hover:text-cyan-600'
+                              }`}>
+                                <Music size={20} />
+                                <span className="text-sm font-medium">Upload Background Music</span>
+                                <span className={`text-xs ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                                  Music will play during the countdown and duck when announcements fire
+                                </span>
+                                <input
+                                  type="file"
+                                  accept="audio/*"
+                                  className="hidden"
+                                  onChange={e => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleBgMusicUpload(seq.id, file);
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {(seq.use_audio_only || !seq.is_system_default || isSuperAdmin) && (
                   <div className={`mt-3 p-4 rounded-lg border ${
                     seq.use_audio_only
@@ -644,9 +880,12 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                             />
                           </div>
                         </div>
-                        <div className="flex gap-2 mt-2">
-                          <button onClick={() => handleAddSound(seq.id)} disabled={!newSoundId} className="btn-primary-green px-3 py-1 disabled:opacity-50 text-white text-xs rounded-lg">Add</button>
+                        <div className="flex items-center gap-2 mt-2">
+                          <button onClick={() => handleAddSound(seq.id)} disabled={!newSoundId && !newLabel.trim()} className="btn-primary-green px-3 py-1 disabled:opacity-50 text-white text-xs rounded-lg">Add</button>
                           <button onClick={() => setAddingSoundToSeq(null)} className={`px-3 py-1 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Cancel</button>
+                          <span className={`text-[10px] ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                            Tip: You can upload a custom audio after adding
+                          </span>
                         </div>
                       </div>
                     )}
@@ -656,47 +895,82 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                         <div className={`absolute left-4 top-0 bottom-0 w-px ${darkMode ? 'bg-slate-700' : 'bg-slate-300'}`} />
                         <div className="space-y-1">
                           {seq.sounds.map(ss => (
-                            <div key={ss.id} className="flex items-center gap-3 pl-2 relative">
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center z-10 flex-shrink-0 ${
-                                ss.trigger_time_seconds === 0
-                                  ? 'border-red-500 bg-red-500/20'
-                                  : ss.trigger_time_seconds === seq.total_duration_seconds
-                                    ? 'border-green-500 bg-green-500/20'
-                                    : darkMode ? 'border-slate-600 bg-slate-800' : 'border-slate-400 bg-white'
-                              }`}>
-                                <div className={`w-1.5 h-1.5 rounded-full ${
-                                  ss.trigger_time_seconds === 0 ? 'bg-red-400' : ss.trigger_time_seconds === seq.total_duration_seconds ? 'bg-green-400' : darkMode ? 'bg-slate-500' : 'bg-slate-400'
-                                }`} />
-                              </div>
-                              <div className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-lg text-xs ${darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
-                                <span className={`font-mono font-bold w-12 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                  T-{formatTime(ss.trigger_time_seconds)}
-                                </span>
-                                <span className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                                  ss.trigger_time_seconds === 0 ? 'bg-red-500' : 'bg-blue-500'
-                                }`} />
-                                <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                                  {ss.sound?.name || 'Unknown'}
-                                </span>
-                                {ss.label && (
-                                  <span className={`italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                    {ss.label}
+                            <div key={ss.id} className="pl-2 relative">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center z-10 flex-shrink-0 ${
+                                  ss.trigger_time_seconds === 0
+                                    ? 'border-red-500 bg-red-500/20'
+                                    : ss.trigger_time_seconds === seq.total_duration_seconds
+                                      ? 'border-green-500 bg-green-500/20'
+                                      : darkMode ? 'border-slate-600 bg-slate-800' : 'border-slate-400 bg-white'
+                                }`}>
+                                  <div className={`w-1.5 h-1.5 rounded-full ${
+                                    ss.trigger_time_seconds === 0 ? 'bg-red-400' : ss.trigger_time_seconds === seq.total_duration_seconds ? 'bg-green-400' : darkMode ? 'bg-slate-500' : 'bg-slate-400'
+                                  }`} />
+                                </div>
+                                <div className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-lg text-xs ${darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
+                                  <span className={`font-mono font-bold w-12 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                    T-{formatTime(ss.trigger_time_seconds)}
                                   </span>
-                                )}
-                                {ss.volume_override != null && (
-                                  <span className="flex items-center gap-0.5 text-slate-500">
-                                    <Volume2 size={10} /> {Math.round(ss.volume_override * 100)}%
+                                  <span className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                                    ss.trigger_time_seconds === 0 ? 'bg-red-500' : 'bg-blue-500'
+                                  }`} />
+                                  <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
+                                    {ss.custom_sound_name || ss.sound?.name || 'Unknown'}
                                   </span>
+                                  {ss.custom_sound_url && (
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">Custom</span>
+                                  )}
+                                  {ss.label && (
+                                    <span className={`italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                      {ss.label}
+                                    </span>
+                                  )}
+                                  {ss.volume_override != null && (
+                                    <span className="flex items-center gap-0.5 text-slate-500">
+                                      <Volume2 size={10} /> {Math.round(ss.volume_override * 100)}%
+                                    </span>
+                                  )}
+                                </div>
+                                {(!seq.is_system_default || isSuperAdmin) && (
+                                  <div className="flex items-center gap-1">
+                                    {uploadingEventSoundFor === ss.id ? (
+                                      <Loader2 size={12} className="animate-spin text-green-400" />
+                                    ) : ss.custom_sound_url ? (
+                                      <button
+                                        onClick={() => handleRemoveEventSound(ss.id)}
+                                        className="p-1 rounded text-amber-400 hover:bg-amber-500/20 transition-colors"
+                                        title="Remove custom sound"
+                                      >
+                                        <RotateCcw size={11} />
+                                      </button>
+                                    ) : (
+                                      <label
+                                        className="p-1 rounded text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer"
+                                        title="Upload custom sound for this event"
+                                      >
+                                        <Upload size={11} />
+                                        <input
+                                          type="file"
+                                          accept="audio/*"
+                                          className="hidden"
+                                          onChange={e => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleEventSoundUpload(ss.id, file);
+                                            e.target.value = '';
+                                          }}
+                                        />
+                                      </label>
+                                    )}
+                                    <button
+                                      onClick={() => handleRemoveSound(ss.id)}
+                                      className="p-1 rounded text-red-400 hover:bg-red-500/20 transition-colors"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
                                 )}
                               </div>
-                              {(!seq.is_system_default || isSuperAdmin) && (
-                                <button
-                                  onClick={() => handleRemoveSound(ss.id)}
-                                  className="p-1 rounded text-red-400 hover:bg-red-500/20 transition-colors"
-                                >
-                                  <X size={12} />
-                                </button>
-                              )}
                             </div>
                           ))}
                         </div>
