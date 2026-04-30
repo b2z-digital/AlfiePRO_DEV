@@ -133,6 +133,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [showHeatRacingRecommendation, setShowHeatRacingRecommendation] = useState(false);
   const [showWizardManualAssignModal, setShowWizardManualAssignModal] = useState(false);
   const [showWizardRankingModal, setShowWizardRankingModal] = useState(false);
+  const pendingWizardConfigRef = useRef<{ configuration: any; numRaces: number; dropRules: number[] | string } | null>(null);
   const [heatManagement, setHeatManagement] = useState<HeatManagement | null>(null);
   const [selectedVenueName, setSelectedVenueName] = useState<string | null>(null);
   const [currentNumRaces, setCurrentNumRaces] = useState(12);
@@ -3944,11 +3945,22 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 await supabase.from('profiles').update({ scoring_mode_preference: settings.scoringMode }).eq('id', user.id);
               }
             }
-            await handleSaveRaceSettings(settings);
-            if (settings.pendingSeedingAction === 'manual') {
-              setShowWizardManualAssignModal(true);
-            } else if (settings.pendingSeedingAction === 'ranking') {
-              setShowWizardRankingModal(true);
+            if (settings.pendingSeedingAction) {
+              // Store config but don't save heat management yet - modal will finalize it
+              pendingWizardConfigRef.current = {
+                configuration: settings.heatManagement?.configuration || null,
+                numRaces: settings.numRaces,
+                dropRules: settings.dropRules,
+              };
+              setCurrentNumRaces(settings.numRaces);
+              setCurrentDropRules(settings.dropRules);
+              if (settings.pendingSeedingAction === 'manual') {
+                setShowWizardManualAssignModal(true);
+              } else {
+                setShowWizardRankingModal(true);
+              }
+            } else {
+              await handleSaveRaceSettings(settings);
             }
           }}
           onSkip={() => {
@@ -4034,9 +4046,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
         <ManualHeatAssignmentModal
           isOpen={showWizardManualAssignModal}
-          onClose={() => setShowWizardManualAssignModal(false)}
+          onClose={() => {
+            setShowWizardManualAssignModal(false);
+            pendingWizardConfigRef.current = null;
+          }}
           onConfirm={(assignments) => {
-            const config = heatManagement?.configuration;
+            const pending = pendingWizardConfigRef.current;
+            const config = pending?.configuration || heatManagement?.configuration;
             if (!config) return;
 
             let allRounds;
@@ -4046,9 +4062,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 config.numberOfHeats,
                 config.shrsQualifyingRounds || 1
               );
-              allRounds = allQR.map((ra, idx) => ({
+              allRounds = allQR.map((ra: any, idx: number) => ({
                 round: idx + 1,
-                heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as HeatDesignation, skipperIndices: a.skipperIndices })),
+                heatAssignments: ra.map((a: any) => ({ heatDesignation: a.heatDesignation as HeatDesignation, skipperIndices: a.skipperIndices })),
                 results: [] as HeatResult[],
                 completed: false
               }));
@@ -4067,22 +4083,20 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               currentHeat: assignments[assignments.length - 1].heatDesignation,
               rounds: allRounds
             };
-            setHeatManagement(finalHM);
 
-            const currentEvent = getCurrentEvent();
-            if (currentEvent) {
-              updateEventResults(
-                currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id,
-                raceResults, skippers, lastCompletedRace, hasDeterminedInitialHcaps,
-                isManualHandicaps, false, currentDay, finalHM, currentNumRaces, currentDropRules as number[]
-              );
-            }
+            handleSaveRaceSettings({
+              numRaces: pending?.numRaces || currentNumRaces,
+              dropRules: pending?.dropRules || currentDropRules,
+              heatManagement: finalHM,
+            });
+
+            pendingWizardConfigRef.current = null;
             setShowWizardManualAssignModal(false);
           }}
           skippers={skippers}
-          numHeats={heatManagement?.configuration.numberOfHeats || 3}
+          numHeats={pendingWizardConfigRef.current?.configuration?.numberOfHeats || heatManagement?.configuration.numberOfHeats || 3}
           darkMode={darkMode}
-          heatConfiguration={heatManagement?.configuration}
+          heatConfiguration={pendingWizardConfigRef.current?.configuration || heatManagement?.configuration}
           onRankingAssignment={() => {
             setShowWizardManualAssignModal(false);
             setShowWizardRankingModal(true);
@@ -4091,9 +4105,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
         <HMSSeedingModal
           isOpen={showWizardRankingModal}
-          onClose={() => setShowWizardRankingModal(false)}
+          onClose={() => {
+            setShowWizardRankingModal(false);
+            pendingWizardConfigRef.current = null;
+          }}
           onConfirm={(assignments, rankedSkipperIndices) => {
-            const config = heatManagement?.configuration;
+            const pending = pendingWizardConfigRef.current;
+            const config = pending?.configuration || heatManagement?.configuration;
             if (!config) return;
 
             let allRounds;
@@ -4103,9 +4121,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 config.numberOfHeats,
                 config.shrsQualifyingRounds || 1
               );
-              allRounds = allQR.map((ra, idx) => ({
+              allRounds = allQR.map((ra: any, idx: number) => ({
                 round: idx + 1,
-                heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as HeatDesignation, skipperIndices: a.skipperIndices })),
+                heatAssignments: ra.map((a: any) => ({ heatDesignation: a.heatDesignation as HeatDesignation, skipperIndices: a.skipperIndices })),
                 results: [] as HeatResult[],
                 completed: false
               }));
@@ -4128,24 +4146,22 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               currentHeat: assignments[assignments.length - 1].heatDesignation,
               rounds: allRounds
             };
-            setHeatManagement(finalHM);
 
-            const currentEvent = getCurrentEvent();
-            if (currentEvent) {
-              updateEventResults(
-                currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id,
-                raceResults, skippers, lastCompletedRace, hasDeterminedInitialHcaps,
-                isManualHandicaps, false, currentDay, finalHM, currentNumRaces, currentDropRules as number[]
-              );
-            }
+            handleSaveRaceSettings({
+              numRaces: pending?.numRaces || currentNumRaces,
+              dropRules: pending?.dropRules || currentDropRules,
+              heatManagement: finalHM,
+            });
+
+            pendingWizardConfigRef.current = null;
             setShowWizardRankingModal(false);
           }}
           skippers={skippers}
-          numHeats={heatManagement?.configuration.numberOfHeats || 3}
+          numHeats={pendingWizardConfigRef.current?.configuration?.numberOfHeats || heatManagement?.configuration?.numberOfHeats || 3}
           darkMode={darkMode}
           currentEvent={getCurrentEvent()}
           yachtClassName={getCurrentEvent()?.raceClass}
-          heatConfiguration={heatManagement?.configuration}
+          heatConfiguration={pendingWizardConfigRef.current?.configuration || heatManagement?.configuration}
         />
 
         {showChartsModal && (

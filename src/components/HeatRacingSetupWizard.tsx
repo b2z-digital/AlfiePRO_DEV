@@ -906,13 +906,14 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
                 }`}
               >
                 <Table2 size={22} className={`mx-auto mb-2 ${scoringMode === 'spreadsheet' ? (scoringSystem === 'shrs' ? 'text-teal-400' : 'text-amber-400') : 'text-slate-400'}`} />
-                <span className={`text-xs font-semibold block ${scoringMode === 'spreadsheet' ? 'text-white' : 'text-slate-400'}`}>Sheet</span>
+                <span className={`text-xs font-semibold block ${scoringMode === 'spreadsheet' ? 'text-white' : 'text-slate-400'}`}>Spreadsheet</span>
                 <span className="text-[10px] text-slate-500 block mt-0.5">Grid entry</span>
               </button>
             </div>
           </div>
 
-          {/* Observer System */}
+          {/* Observer System - only relevant when fleet management is active */}
+          {(scoringSystem === 'shrs' || fleetManagementEnabled) && (
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -936,8 +937,10 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
               </button>
             </div>
           </div>
+          )}
 
-          {/* Roll Call */}
+          {/* Roll Call - only relevant when fleet management is active */}
+          {(scoringSystem === 'shrs' || fleetManagementEnabled) && (
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -961,6 +964,7 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
               </button>
             </div>
           </div>
+          )}
         </div>
       </motion.div>
     );
