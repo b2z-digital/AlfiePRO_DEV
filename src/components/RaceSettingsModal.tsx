@@ -3,7 +3,7 @@ import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen 
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
 import { seedInitialHeats, validateHeatConfig, validateHeatAssignments, HMSConfig, calculateOptimalHeats, calculateHMSHeatSizes } from '../utils/hmsHeatSystem';
-import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig, generatePreSetQualifyingAssignments, seedSHRSHeatsByIndex } from '../utils/shrsHeatSystem';
+import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig, generatePreSetQualifyingAssignments, seedSHRSHeatsByIndex, estimateDiversityMetrics } from '../utils/shrsHeatSystem';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
 import { ConfirmationModal } from './ConfirmationModal';
@@ -114,7 +114,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     initialHeatManagement?.configuration.shrsQualifyingRounds || Math.max(2, Math.floor(initialNumRaces * 2 / 3))
   );
   const [shrsAssignmentMode, setShrsAssignmentMode] = useState<'progressive' | 'preset'>(
-    initialHeatManagement?.configuration.shrsAssignmentMode || 'progressive'
+    initialHeatManagement?.configuration.shrsAssignmentMode || 'preset'
   );
 
   // Heat display settings
@@ -193,6 +193,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     setCurrentHeatManagement(initialHeatManagement);
     setIsHeatRacingEnabled(initialHeatManagement?.configuration.enabled || false);
     setFleetManagementEnabled(initialHeatManagement?.configuration.fleetManagementEnabled ?? true);
+    setCurrentDropRules(initialDropRules);
+    setCurrentNumRaces(initialNumRaces);
   }, [initialHeatManagement, isOpen]);
 
   // Calculate optimal heats automatically based on skipper count
@@ -278,6 +280,17 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   };
 
   const isSHRS = currentDropRules === 'shrs';
+
+  // Auto-set recommended qualifying rounds for SHRS Pre-Assigned mode
+  useEffect(() => {
+    if (!isSHRS || shrsAssignmentMode !== 'preset' || hasRaceResults) return;
+    if (skippers.length < 4 || numHeats < 2) return;
+    const metrics = estimateDiversityMetrics(skippers.length, numHeats, shrsQualifyingRounds);
+    const recommended = Math.max(2, Math.min(metrics.recommendedMinRounds, currentNumRaces - 2));
+    if (recommended !== shrsQualifyingRounds) {
+      setShrsQualifyingRounds(recommended);
+    }
+  }, [skippers.length, numHeats, shrsAssignmentMode, isSHRS]);
 
   const validateSHRSPractical = (totalSkippers: number, heats: number): { isValid: boolean; message?: string } => {
     if (heats > 5) {
@@ -708,7 +721,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         const minSize = Math.min(...currentHeatSizes);
         const hasUnbalancedHeats = currentHeatSizes.length > 0 && maxSize - minSize > 1 && !hasAnyRoundResults;
 
-        const shouldRegenerate = (heatCountChanged || scoringSystemChanged || hasUnbalancedHeats) && (!hasAnyRoundResults || isReducingHeats || scoringSystemChanged || hasUnbalancedHeats);
+        const previousSeedingMethod = currentHeatManagement.configuration.seedingMethod || 'random';
+        const seedingMethodChanged = previousSeedingMethod !== seedingMethod && !hasAnyRoundResults;
+
+        const shouldRegenerate = ((heatCountChanged || scoringSystemChanged || hasUnbalancedHeats) && (!hasAnyRoundResults || isReducingHeats || scoringSystemChanged || hasUnbalancedHeats)) || seedingMethodChanged;
 
         console.log('🔍 Heat regeneration check:', {
           storedConfigHeats: currentHeatManagement.configuration.numberOfHeats,
@@ -722,6 +738,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           isReducingHeats,
           currentHeatSizes,
           hasUnbalancedHeats,
+          seedingMethodChanged,
+          previousSeedingMethod,
+          newSeedingMethod: seedingMethod,
           shouldRegenerate,
           roundsData: currentHeatManagement.rounds.map(r => ({
             round: r.round,
@@ -832,6 +851,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           if (heatCountChanged) reasons.push(`heat count changed (${actualHeatCount} → ${numHeats})`);
           if (scoringSystemChanged) reasons.push(`scoring system changed (${previousScoringSystem} → ${newScoringSystem})`);
           if (hasUnbalancedHeats) reasons.push(`unbalanced heat sizes detected (${currentHeatSizes.join(', ')})`);
+          if (seedingMethodChanged) reasons.push(`initial assignment changed (${previousSeedingMethod} → ${seedingMethod})`);
 
           console.log('⚠️ Regeneration needed:', reasons.join(', '));
           setPendingRegenerateAction(() => executeRegeneration);
@@ -1728,41 +1748,41 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
                           <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-3`}>
                             Number of Races
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {NUM_RACES_OPTIONS.map(num => (
-                              <button
-                                key={num}
-                                type="button"
-                                onClick={() => setCurrentNumRaces(num)}
-                                className={`
-                                  px-4 py-2 rounded-lg text-sm font-medium transition-all
-                                  ${currentNumRaces === num
-                                    ? 'bg-blue-600 text-white shadow-md'
-                                    : darkMode
-                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                  }
-                                `}
-                              >
-                                {num} Races
-                              </button>
-                            ))}
-                            <input
-                              type="number"
-                              value={currentNumRaces}
-                              onChange={(e) => setCurrentNumRaces(parseInt(e.target.value) || 12)}
-                              min="1"
-                              max="50"
-                              className={`
-                                w-20 px-3 py-2 rounded-lg text-sm text-center border
-                                ${darkMode
-                                  ? 'bg-slate-700 border-slate-600 text-white'
-                                  : 'bg-white border-slate-300 text-slate-900'}
-                              `}
-                            />
-                          </div>
-                        </div>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {NUM_RACES_OPTIONS.map(num => (
+                                  <button
+                                    key={num}
+                                    type="button"
+                                    onClick={() => setCurrentNumRaces(num)}
+                                    className={`
+                                      px-4 py-2 rounded-lg text-sm font-medium transition-all
+                                      ${currentNumRaces === num
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : darkMode
+                                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                      }
+                                    `}
+                                  >
+                                    {num} Races
+                                  </button>
+                                ))}
+                                <input
+                                  type="number"
+                                  value={currentNumRaces}
+                                  onChange={(e) => setCurrentNumRaces(parseInt(e.target.value) || 12)}
+                                  min="1"
+                                  max="50"
+                                  className={`
+                                    w-20 px-3 py-2 rounded-lg text-sm text-center border
+                                    ${darkMode
+                                      ? 'bg-slate-700 border-slate-600 text-white'
+                                      : 'bg-white border-slate-300 text-slate-900'}
+                                  `}
+                                />
+                              </div>
+                            </div>
                         )}
 
                         {isSHRS && (
@@ -1770,119 +1790,119 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                             <div>
                               <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-0.5`}>
                                 Qualifying Assignment Method
-                              </div>
-                              <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} mb-2`}>
-                                Select how qualifying heats will be allocated.
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => !hasHeatScores && setShrsAssignmentMode('progressive')}
-                                  disabled={hasHeatScores}
-                                  className={`p-3 rounded-lg border-2 text-left transition-all ${
-                                    hasHeatScores ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-                                  } ${shrsAssignmentMode === 'progressive'
-                                    ? darkMode
-                                      ? 'border-blue-500 bg-blue-500/10'
-                                      : 'border-blue-500 bg-blue-50'
-                                    : darkMode
-                                      ? 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
-                                      : 'border-slate-200 bg-white hover:border-slate-300'
-                                  }`}
-                                >
-                                  <div className={`text-sm font-semibold ${shrsAssignmentMode === 'progressive'
-                                    ? 'text-blue-500'
-                                    : darkMode ? 'text-slate-300' : 'text-slate-700'
-                                  }`}>
-                                    Progressive (SHRS-P)
-                                  </div>
-                                  <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    Round 1 heats are assigned prior to racing. Subsequent heat movements are determined after each round based on heat results using structured Movement Tables.
-                                  </div>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => !hasHeatScores && setShrsAssignmentMode('preset')}
-                                  disabled={hasHeatScores}
-                                  className={`p-3 rounded-lg border-2 text-left transition-all ${
-                                    hasHeatScores ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-                                  } ${shrsAssignmentMode === 'preset'
-                                    ? darkMode
-                                      ? 'border-green-500 bg-green-500/10'
-                                      : 'border-green-500 bg-green-50'
-                                    : darkMode
-                                      ? 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
-                                      : 'border-slate-200 bg-white hover:border-slate-300'
-                                  }`}
-                                >
-                                  <div className={`text-sm font-semibold ${shrsAssignmentMode === 'preset'
-                                    ? 'text-green-600'
-                                    : darkMode ? 'text-slate-300' : 'text-slate-700'
-                                  }`}>
-                                    Pre-Assigned (SHRS-PA)
-                                  </div>
-                                  <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    All qualifying heats for the nominated rounds are pre-assigned before racing. The rotation is structured to balance heat sizes and distribute competitor matchups evenly across the fleet.
-                                  </div>
-                                </button>
-                              </div>
-                            </div>
-
-                            <div>
-                              <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
-                                Race Structure
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1 block`}>
-                                    Qualifying Rounds
-                                  </label>
-                                  <input
-                                    type="number"
-                                    min="2"
-                                    max={Math.max(2, currentNumRaces - 2)}
-                                    value={shrsQualifyingRounds}
-                                    onChange={(e) => {
-                                      const val = Math.max(2, Math.min(parseInt(e.target.value) || 2, currentNumRaces - 2));
-                                      setShrsQualifyingRounds(val);
-                                    }}
+                                </div>
+                                <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} mb-2`}>
+                                  Select how qualifying heats will be allocated.
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => !hasHeatScores && setShrsAssignmentMode('progressive')}
                                     disabled={hasHeatScores}
-                                    className={`w-full px-3 py-2 text-lg font-bold rounded-lg border ${
-                                      hasHeatScores ? 'opacity-50 cursor-not-allowed' : ''
-                                    } ${
-                                      darkMode
-                                        ? 'bg-slate-700 border-slate-600 text-white'
-                                        : 'bg-white border-slate-300 text-slate-900'
+                                    className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                      hasHeatScores ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                    } ${shrsAssignmentMode === 'progressive'
+                                      ? darkMode
+                                        ? 'border-blue-500 bg-blue-500/10'
+                                        : 'border-blue-500 bg-blue-50'
+                                      : darkMode
+                                        ? 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                                        : 'border-slate-200 bg-white hover:border-slate-300'
                                     }`}
-                                  />
+                                  >
+                                    <div className={`text-sm font-semibold ${shrsAssignmentMode === 'progressive'
+                                      ? 'text-blue-500'
+                                      : darkMode ? 'text-slate-300' : 'text-slate-700'
+                                    }`}>
+                                      Progressive (SHRS-P)
+                                    </div>
+                                    <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                      Round 1 heats are assigned prior to racing. Subsequent heat movements are determined after each round based on heat results using structured Movement Tables.
+                                    </div>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => !hasHeatScores && setShrsAssignmentMode('preset')}
+                                    disabled={hasHeatScores}
+                                    className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                      hasHeatScores ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                    } ${shrsAssignmentMode === 'preset'
+                                      ? darkMode
+                                        ? 'border-green-500 bg-green-500/10'
+                                        : 'border-green-500 bg-green-50'
+                                      : darkMode
+                                        ? 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                                        : 'border-slate-200 bg-white hover:border-slate-300'
+                                    }`}
+                                  >
+                                    <div className={`text-sm font-semibold ${shrsAssignmentMode === 'preset'
+                                      ? 'text-green-600'
+                                      : darkMode ? 'text-slate-300' : 'text-slate-700'
+                                    }`}>
+                                      Pre-Assigned (SHRS-PA)
+                                    </div>
+                                    <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                      All qualifying heats for the nominated rounds are pre-assigned before racing. The rotation is structured to balance heat sizes and distribute competitor matchups evenly across the fleet.
+                                    </div>
+                                  </button>
                                 </div>
-                                <div>
-                                  <label className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1 block`}>
-                                    Finals Rounds
-                                  </label>
-                                  <div className={`w-full px-3 py-2 text-lg font-bold rounded-lg border ${
-                                    darkMode
-                                      ? 'bg-slate-700/50 border-slate-600 text-slate-300'
-                                      : 'bg-slate-50 border-slate-300 text-slate-700'
-                                  }`}>
-                                    {Math.max(0, currentNumRaces - shrsQualifyingRounds)}
+                              </div>
+
+                              <div>
+                                <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
+                                  Race Structure
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1 block`}>
+                                      Qualifying Rounds
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="2"
+                                      max={Math.max(2, currentNumRaces - 2)}
+                                      value={shrsQualifyingRounds}
+                                      onChange={(e) => {
+                                        const val = Math.max(2, Math.min(parseInt(e.target.value) || 2, currentNumRaces - 2));
+                                        setShrsQualifyingRounds(val);
+                                      }}
+                                      disabled={hasHeatScores}
+                                      className={`w-full px-3 py-2 text-lg font-bold rounded-lg border ${
+                                        hasHeatScores ? 'opacity-50 cursor-not-allowed' : ''
+                                      } ${
+                                        darkMode
+                                          ? 'bg-slate-700 border-slate-600 text-white'
+                                          : 'bg-white border-slate-300 text-slate-900'
+                                      }`}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1 block`}>
+                                      Finals Rounds
+                                    </label>
+                                    <div className={`w-full px-3 py-2 text-lg font-bold rounded-lg border ${
+                                      darkMode
+                                        ? 'bg-slate-700/50 border-slate-600 text-slate-300'
+                                        : 'bg-slate-50 border-slate-300 text-slate-700'
+                                    }`}>
+                                      {Math.max(0, currentNumRaces - shrsQualifyingRounds)}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
 
-                            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} space-y-1`}>
-                              {shrsAssignmentMode === 'progressive' ? (
-                                <>
-                                  <p>After each race, heat assignments update based on finishing positions using the official SHRS Movement Tables.</p>
-                                  <p>Finals: Skippers split into Gold/Silver{numHeats > 2 ? '/Bronze' : ''} fleets by qualifying rank.</p>
-                                </>
-                              ) : (
-                                <>
-                                  <p>All qualifying round assignments generated before racing. Algorithm maximizes opponent variety across rounds.</p>
-                                  <p>Finals: Skippers split into Gold/Silver{numHeats > 2 ? '/Bronze' : ''} fleets by qualifying rank.</p>
-                                </>
-                              )}
+                              <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} space-y-1`}>
+                                {shrsAssignmentMode === 'progressive' ? (
+                                  <>
+                                    <p>After each race, heat assignments update based on finishing positions using the official SHRS Movement Tables.</p>
+                                    <p>Finals: Skippers split into Gold/Silver{numHeats > 2 ? '/Bronze' : ''} fleets by qualifying rank.</p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p>All qualifying round assignments generated before racing. Algorithm maximizes opponent variety across rounds.</p>
+                                    <p>Finals: Skippers split into Gold/Silver{numHeats > 2 ? '/Bronze' : ''} fleets by qualifying rank.</p>
+                                  </>
+                                )}
                             </div>
                           </div>
                         )}

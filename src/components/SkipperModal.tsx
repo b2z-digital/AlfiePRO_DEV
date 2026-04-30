@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Users, UserPlus, UserCog, CircleAlert as AlertCircle, Check, CircleCheck as CheckCircle, SquarePen as Edit2, Search, ChevronRight, Sailboat, ArrowUpDown, Upload, FileUp, Trash2, ClipboardPaste, ArrowRight, Zap } from 'lucide-react';
+import { X, Plus, Users, UserPlus, UserCog, CircleAlert as AlertCircle, Check, CircleCheck as CheckCircle, SquarePen as Edit2, Search, ChevronRight, Sailboat, ArrowUpDown, Upload, FileUp, Trash2, ClipboardPaste, ArrowRight, Zap, TriangleAlert as AlertTriangle } from 'lucide-react';
 import Papa from 'papaparse';
 import { Skipper } from '../types';
 import { getStoredMembers, isValidUUID, updateMember } from '../utils/storage';
@@ -57,8 +57,11 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   const [importHeaders, setImportHeaders] = useState<string[]>([]);
   const [importMappings, setImportMappings] = useState<Record<string, string>>({});
   const [importAutoDetected, setImportAutoDetected] = useState<Set<string>>(new Set());
-  const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'importing' | 'complete'>('upload');
+  const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'importing' | 'conflicts' | 'complete'>('upload');
+  const [allParsedSkippers, setAllParsedSkippers] = useState<Skipper[]>([]);
+  const [conflictGroups, setConflictGroups] = useState<{ sailNo: string; skippers: { index: number; skipper: Skipper }[] }[]>([]);
   const [pasteText, setPasteText] = useState('');
+  const [nameDisplayFormat, setNameDisplayFormat] = useState<'first_last' | 'last_first'>('first_last');
   const [members, setMembers] = useState<MemberWithValidation[]>([]);
   const [memberAvatars, setMemberAvatars] = useState<{[key: string]: string}>({});
   const [selectedMemberBoats, setSelectedMemberBoats] = useState<Record<string, MemberBoat>>({});
@@ -2198,7 +2201,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       { key: 'full_name', label: 'Full Name (combined)', required: false, aliases: ['name', 'skipper', 'competitor', 'full name', 'full_name', 'fullname', 'skipper name', 'skipper_name', 'competitor name', 'helm', 'helmsman'] },
       { key: 'first_name', label: 'First Name', required: false, aliases: ['first name', 'first_name', 'firstname', 'fname', 'given name', 'given_name'] },
       { key: 'last_name', label: 'Last Name', required: false, aliases: ['last name', 'last_name', 'lastname', 'lname', 'surname', 'family name', 'family_name'] },
-      { key: 'sail_number', label: 'Sail Number', required: true, aliases: ['sail no', 'sail_no', 'sail number', 'sail_number', 'sailno', 'sail', 'sail no.'] },
+      { key: 'sail_number', label: 'Sail Number', required: true, aliases: ['sail no', 'sail_no', 'sail number', 'sail_number', 'sailno', 'sail', 'sail no.', 'sail no.', 'sailnumber', 'sail #'] },
       { key: 'club', label: 'Club', required: false, aliases: ['club', 'club name', 'club_name', 'organisation', 'organization', 'yacht club'] },
       { key: 'boat_type', label: 'Boat Type / Design', required: false, aliases: ['boat design', 'boat_design', 'boat type', 'boat_type', 'class', 'boat class', 'boat_class', 'design'] },
       { key: 'country_code', label: 'Country Code (IOC)', required: false, aliases: ['nat', 'nationality', 'nation', 'ioc', 'country code', 'country_code', 'nat.'] },
@@ -2240,7 +2243,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
         { field: 'first_name', match: h => (h.includes('first') && h.includes('name')) || h === 'fname' },
         { field: 'last_name', match: h => (h.includes('last') && h.includes('name')) || h.includes('surname') || h === 'lname' },
         { field: 'full_name', match: h => h === 'name' || h === 'skipper' || h === 'competitor' || h === 'helm' || h === 'helmsman' || (h.includes('skipper') && h.includes('name')) },
-        { field: 'sail_number', match: h => h.includes('sail') },
+        { field: 'sail_number', match: h => h.includes('sail') || h === 'sail no.' || h === 'sail no' },
         { field: 'club', match: h => h.includes('club') },
         { field: 'boat_type', match: h => (h.includes('boat') && (h.includes('design') || h.includes('type') || h.includes('class'))) || (h === 'class') || (h === 'design') },
         { field: 'country_code', match: h => h === 'nat' || h === 'nat.' || h === 'nationality' || h === 'ioc' || (h.includes('country') && h.includes('code')) },
@@ -2285,7 +2288,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             'boat design', 'boat_design', 'boat type', 'boat_type', 'boat class', 'class', 'design',
             'nat', 'nationality', 'country code', 'country_code', 'ioc',
             'country', 'state', 'state country', 'email', 'phone',
-            'category', 'hull', 'hull reg no', 'hull_reg_no', 'hull number',
+            'category', 'cat', 'cat.', 'hull', 'hull reg no', 'hull_reg_no', 'hull number',
             'competitor id', 'entry date', 'rank', 'pn', 'payment', '2.4 ghz',
           ];
 
@@ -2349,6 +2352,57 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           setImportData(data);
           setImportHeaders(headers);
           const { mappings, autoDetected } = autoDetectSkipperMappings(headers);
+
+          // Content-based validation: verify sail_number column actually contains sail-number-like data
+          const sailColHeader = Object.entries(mappings).find(([, v]) => v === 'sail_number')?.[0];
+          if (sailColHeader && data.length > 0) {
+            const sailSamples = data.slice(0, Math.min(10, data.length)).map(r => (r[sailColHeader] || '').trim());
+            const sailPattern = /^([A-Za-z]{2,3}\s+)?\d+/;
+            const looksLikeSailNumbers = sailSamples.filter(s => s && sailPattern.test(s)).length;
+
+            // If less than half look like sail numbers, try to find a better column
+            if (looksLikeSailNumbers < sailSamples.filter(s => s).length * 0.5) {
+              const currentBoatTypeHeader = Object.entries(mappings).find(([, v]) => v === 'boat_type')?.[0];
+
+              // Check all unmapped headers and the boat_type header for sail-number-like data
+              const candidateHeaders = headers.filter(h => {
+                const mapped = mappings[h];
+                return !mapped || mapped === 'boat_type';
+              });
+
+              let bestCandidate = '';
+              let bestScore = looksLikeSailNumbers;
+
+              for (const candidate of candidateHeaders) {
+                const samples = data.slice(0, Math.min(10, data.length)).map(r => (r[candidate] || '').trim());
+                const matchCount = samples.filter(s => s && sailPattern.test(s)).length;
+                if (matchCount > bestScore) {
+                  bestScore = matchCount;
+                  bestCandidate = candidate;
+                }
+              }
+
+              if (bestCandidate) {
+                // Swap: move old sail_number mapping to boat_type (or remove), assign new one
+                const oldSailMapping = sailColHeader;
+                if (bestCandidate === currentBoatTypeHeader) {
+                  // Swap sail_number and boat_type
+                  mappings[bestCandidate] = 'sail_number';
+                  mappings[oldSailMapping] = 'boat_type';
+                } else {
+                  // Assign the new candidate to sail_number
+                  mappings[bestCandidate] = 'sail_number';
+                  // If old sail col doesn't have a better fit, try assigning it to boat_type
+                  if (!currentBoatTypeHeader) {
+                    mappings[oldSailMapping] = 'boat_type';
+                  } else {
+                    delete mappings[oldSailMapping];
+                  }
+                }
+              }
+            }
+          }
+
           setImportMappings(mappings);
           setImportAutoDetected(autoDetected);
           setImportStep('mapping');
@@ -2375,8 +2429,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
     const handleImport = async () => {
       setImportStep('importing');
-      const newSkippers: Skipper[] = [];
-      const duplicateSailNumbers: string[] = [];
+      const parsedSkippers: Skipper[] = [];
 
       const fieldToColumn: Record<string, string> = {};
       Object.entries(importMappings).forEach(([csvColumn, field]) => {
@@ -2387,6 +2440,48 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
         if (!s) return s;
         return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
       };
+
+      // Pre-detect if country codes are concatenated with names across the dataset
+      // by checking if a majority of sail numbers share a country prefix that also appears at the start of names
+      let detectedNamePrefix = '';
+      if (fieldToColumn['sail_number'] && fieldToColumn['full_name']) {
+        const sailCountryCodes = new Map<string, number>();
+        for (const row of importData.slice(0, Math.min(20, importData.length))) {
+          const sn = (row[fieldToColumn['sail_number']] || '').trim();
+          const match = sn.match(/^([A-Za-z]{2,3})\s+\d+/);
+          if (match) {
+            const code = match[1].toUpperCase();
+            sailCountryCodes.set(code, (sailCountryCodes.get(code) || 0) + 1);
+          }
+        }
+        // Find the dominant country code
+        let dominantCode = '';
+        let dominantCount = 0;
+        sailCountryCodes.forEach((count, code) => {
+          if (count > dominantCount) {
+            dominantCount = count;
+            dominantCode = code;
+          }
+        });
+        // Check if names also start with this code (indicating concatenation)
+        if (dominantCode && dominantCount >= 3) {
+          let nameMatchCount = 0;
+          const nameCol = fieldToColumn['full_name'] || fieldToColumn['last_name'] || fieldToColumn['first_name'];
+          if (nameCol) {
+            for (const row of importData.slice(0, Math.min(20, importData.length))) {
+              const name = (row[nameCol] || '').trim().toUpperCase();
+              if (name.startsWith(dominantCode) && name.length > dominantCode.length) {
+                nameMatchCount++;
+              }
+            }
+            // If more than 60% of names start with the country code, it's a concatenation artifact
+            const sampleSize = Math.min(20, importData.length);
+            if (nameMatchCount > sampleSize * 0.6) {
+              detectedNamePrefix = dominantCode;
+            }
+          }
+        }
+      }
 
       for (const row of importData) {
         let firstName = (row[fieldToColumn['first_name']] || '').trim();
@@ -2437,44 +2532,85 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           sailNo = countryPrefixMatch[2].trim();
         }
 
-        const skipperName = `${firstName} ${lastName}`.trim();
-        if (skipperName && sailNo) {
-          const isDuplicateExisting = skippers.some(s => s.sailNo === sailNo);
-          const isDuplicateNew = newSkippers.some(s => s.sailNo === sailNo);
-          if (isDuplicateExisting) {
-            duplicateSailNumbers.push(sailNo);
-          } else if (isDuplicateNew) {
-            duplicateSailNumbers.push(sailNo);
-          } else {
-            newSkippers.push({
-              name: skipperName,
-              sailNo,
-              club,
-              boatModel: boatType,
-              hull: hullNumber || boatType,
-              startHcap: 0,
-              country_code: countryCode,
-              country: country,
-              category: category,
-              clubState: state,
-              ...(nationalRanking > 0 ? { national_ranking: nationalRanking } : {})
-            });
+        // Strip country code prefix from names if concatenated during paste (e.g. "AUSALLEN" -> "ALLEN")
+        // Only strip if pre-detection confirmed this is a dataset-wide concatenation issue
+        if (detectedNamePrefix && lastName) {
+          const upperLastName = lastName.toUpperCase();
+          if (upperLastName.startsWith(detectedNamePrefix) && upperLastName.length > detectedNamePrefix.length + 1) {
+            lastName = titleCase(lastName.slice(detectedNamePrefix.length));
           }
+        }
+        if (detectedNamePrefix && firstName) {
+          const upperFirstName = firstName.toUpperCase();
+          if (upperFirstName.startsWith(detectedNamePrefix) && upperFirstName.length > detectedNamePrefix.length + 1) {
+            firstName = titleCase(firstName.slice(detectedNamePrefix.length));
+          }
+        }
+
+        let skipperName = '';
+        if (nameDisplayFormat === 'last_first' && firstName && lastName) {
+          skipperName = `${lastName}, ${firstName}`;
+        } else {
+          skipperName = `${firstName} ${lastName}`.trim();
+        }
+        if (skipperName && sailNo) {
+          parsedSkippers.push({
+            name: skipperName,
+            sailNo,
+            club,
+            boatModel: boatType,
+            hull: hullNumber || boatType,
+            startHcap: 0,
+            country_code: countryCode,
+            country: country,
+            category: category,
+            clubState: state,
+            ...(nationalRanking > 0 ? { national_ranking: nationalRanking } : {})
+          });
         }
       }
 
-      onUpdateSkippers([...skippers, ...newSkippers]);
+      // Find duplicate sail numbers within the imported data and against existing skippers
+      const sailNoCounts = new Map<string, number[]>();
+      parsedSkippers.forEach((s, idx) => {
+        const existing = sailNoCounts.get(s.sailNo) || [];
+        existing.push(idx);
+        sailNoCounts.set(s.sailNo, existing);
+      });
+
+      const existingSailNos = new Set(skippers.map(s => s.sailNo));
+      const groups: { sailNo: string; skippers: { index: number; skipper: Skipper }[] }[] = [];
+
+      sailNoCounts.forEach((indices, sailNo) => {
+        if (indices.length > 1 || existingSailNos.has(sailNo)) {
+          const groupSkippers = indices.map(idx => ({ index: idx, skipper: parsedSkippers[idx] }));
+          if (existingSailNos.has(sailNo) && indices.length === 1) {
+            // Single new skipper conflicting with existing - show just the new one
+            groups.push({ sailNo, skippers: groupSkippers });
+          } else {
+            groups.push({ sailNo, skippers: groupSkippers });
+          }
+        }
+      });
+
+      if (groups.length > 0) {
+        setAllParsedSkippers(parsedSkippers);
+        setConflictGroups(groups);
+        setImportStep('conflicts');
+        return;
+      }
+
+      finalizeImport(parsedSkippers);
+    };
+
+    const finalizeImport = async (allNewSkippers: Skipper[]) => {
+      onUpdateSkippers([...skippers, ...allNewSkippers]);
       setError(null);
-      const count = newSkippers.length;
-      const dupCount = duplicateSailNumbers.length;
+      const count = allNewSkippers.length;
 
-      const dupWarning = dupCount > 0
-        ? `. ${dupCount} skipped due to duplicate sail number${dupCount !== 1 ? 's' : ''}: ${[...new Set(duplicateSailNumbers)].join(', ')}`
-        : '';
-
-      if (saveToContacts && isRaceOfficer && newSkippers.length > 0) {
+      if (saveToContacts && isRaceOfficer && allNewSkippers.length > 0) {
         try {
-          const contactRows = newSkippers.map(s => ({
+          const contactRows = allNewSkippers.map(s => ({
             name: s.name,
             sail_number: s.sailNo || '',
             boat_class: s.hull || s.boatModel || '',
@@ -2485,15 +2621,56 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             state: s.clubState || '',
           }));
           const saved = await bulkAddRaceOfficerContacts(contactRows);
-          addNotification(dupCount > 0 ? 'warning' : 'success', `${count} skipper${count !== 1 ? 's' : ''} imported and ${saved.length} saved to contacts${dupWarning}`);
+          addNotification('success', `${count} skipper${count !== 1 ? 's' : ''} imported and ${saved.length} saved to contacts`);
         } catch {
-          addNotification(dupCount > 0 ? 'warning' : 'success', `${count} skipper${count !== 1 ? 's' : ''} imported (contacts save failed)${dupWarning}`);
+          addNotification('success', `${count} skipper${count !== 1 ? 's' : ''} imported (contacts save failed)`);
         }
       } else {
-        addNotification(dupCount > 0 ? 'warning' : 'success', `${count} skipper${count !== 1 ? 's' : ''} imported successfully${dupWarning}`);
+        addNotification('success', `${count} skipper${count !== 1 ? 's' : ''} imported successfully`);
       }
 
       onClose();
+    };
+
+    const handleResolveConflicts = () => {
+      // Check all sail numbers are unique across existing + all parsed skippers
+      const allSailNos = [...skippers.map(s => s.sailNo)];
+      const duplicates: string[] = [];
+
+      for (const s of allParsedSkippers) {
+        if (!s.sailNo.trim()) {
+          setError('All skippers must have a sail number.');
+          return;
+        }
+        if (allSailNos.includes(s.sailNo)) {
+          duplicates.push(s.sailNo);
+        }
+        allSailNos.push(s.sailNo);
+      }
+
+      if (duplicates.length > 0) {
+        setError(`Sail numbers must be unique. Still conflicting: ${[...new Set(duplicates)].join(', ')}`);
+        return;
+      }
+
+      setError(null);
+      finalizeImport(allParsedSkippers);
+    };
+
+    const updateConflictSailNo = (skipperIndex: number, newSailNo: string) => {
+      setAllParsedSkippers(prev => {
+        const updated = [...prev];
+        updated[skipperIndex] = { ...updated[skipperIndex], sailNo: newSailNo };
+        return updated;
+      });
+      // Also update the conflict groups reference
+      setConflictGroups(prev => prev.map(group => ({
+        ...group,
+        skippers: group.skippers.map(s =>
+          s.index === skipperIndex ? { ...s, skipper: { ...s.skipper, sailNo: newSailNo } } : s
+        )
+      })));
+      setError(null);
     };
 
     const importFieldsList = SKIPPER_FIELDS;
@@ -2713,6 +2890,41 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   </div>
                 </div>
 
+                {hasNameField && (
+                  <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/30">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-slate-300">Name Display Format</div>
+                      <div className="flex items-center gap-1 bg-slate-900/60 rounded-lg p-0.5 border border-slate-700/50">
+                        <button
+                          onClick={() => setNameDisplayFormat('first_last')}
+                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                            nameDisplayFormat === 'first_last'
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          First Last
+                        </button>
+                        <button
+                          onClick={() => setNameDisplayFormat('last_first')}
+                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                            nameDisplayFormat === 'last_first'
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Last, First
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1.5">
+                      {nameDisplayFormat === 'first_last'
+                        ? 'Names will appear as "John Smith" in results'
+                        : 'Names will appear as "Smith, John" in results'}
+                    </p>
+                  </div>
+                )}
+
                 {!canImport && (
                   <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
                     <div className="flex items-center gap-2 text-sm text-red-300">
@@ -2724,33 +2936,72 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   </div>
                 )}
 
-                {importData.length > 0 && (
-                  <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Data Preview (first 3 rows)</h4>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-slate-700/50">
-                            {importHeaders.slice(0, 6).map(h => (
-                              <th key={h} className="text-left py-1 px-2 text-slate-400 font-medium truncate max-w-[120px]">{h}</th>
-                            ))}
-                            {importHeaders.length > 6 && <th className="text-slate-500 px-2">...</th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {importData.slice(0, 3).map((row, i) => (
-                            <tr key={i} className="border-b border-slate-800/50">
+                {importData.length > 0 && (() => {
+                  // Detect country code prefix in name column for preview display
+                  const sailColHeader = Object.entries(importMappings).find(([, v]) => v === 'sail_number')?.[0];
+                  const nameColHeader = Object.entries(importMappings).find(([, v]) => v === 'full_name' || v === 'last_name' || v === 'first_name')?.[0];
+                  let previewNamePrefix = '';
+                  if (sailColHeader && nameColHeader) {
+                    const sailCodes = new Map<string, number>();
+                    for (const row of importData.slice(0, 20)) {
+                      const sn = (row[sailColHeader] || '').trim();
+                      const m = sn.match(/^([A-Za-z]{2,3})\s+\d+/);
+                      if (m) sailCodes.set(m[1].toUpperCase(), (sailCodes.get(m[1].toUpperCase()) || 0) + 1);
+                    }
+                    let dominant = '';
+                    let domCount = 0;
+                    sailCodes.forEach((c, code) => { if (c > domCount) { domCount = c; dominant = code; } });
+                    if (dominant && domCount >= 3) {
+                      let nameHits = 0;
+                      for (const row of importData.slice(0, 20)) {
+                        const n = (row[nameColHeader] || '').trim().toUpperCase();
+                        if (n.startsWith(dominant) && n.length > dominant.length) nameHits++;
+                      }
+                      if (nameHits > Math.min(20, importData.length) * 0.6) previewNamePrefix = dominant;
+                    }
+                  }
+
+                  const getPreviewValue = (header: string, value: string) => {
+                    if (!previewNamePrefix || !value) return value;
+                    if (header === nameColHeader) {
+                      const upper = value.toUpperCase();
+                      if (upper.startsWith(previewNamePrefix) && upper.length > previewNamePrefix.length + 1) {
+                        return value.slice(previewNamePrefix.length);
+                      }
+                    }
+                    return value;
+                  };
+
+                  return (
+                    <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-3">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Data Preview (first 3 rows)</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-700/50">
+                              <th className="text-left py-1 px-2 text-slate-500 font-medium">#</th>
                               {importHeaders.slice(0, 6).map(h => (
-                                <td key={h} className="py-1 px-2 text-slate-300 truncate max-w-[120px]">{row[h] || ''}</td>
+                                <th key={h} className="text-left py-1 px-2 text-slate-400 font-medium truncate max-w-[120px]">{h}</th>
                               ))}
-                              {importHeaders.length > 6 && <td className="text-slate-600 px-2">...</td>}
+                              {importHeaders.length > 6 && <th className="text-slate-500 px-2">...</th>}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {importData.slice(0, 3).map((row, i) => (
+                              <tr key={i} className="border-b border-slate-800/50">
+                                <td className="py-1 px-2 text-slate-500">{i + 1}</td>
+                                {importHeaders.slice(0, 6).map(h => (
+                                  <td key={h} className="py-1 px-2 text-slate-300 truncate max-w-[120px]">{getPreviewValue(h, row[h] || '')}</td>
+                                ))}
+                                {importHeaders.length > 6 && <td className="text-slate-600 px-2">...</td>}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
@@ -2758,6 +3009,135 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <p className="text-slate-400">Importing skippers...</p>
+              </div>
+            )}
+
+            {importStep === 'conflicts' && (
+              <div className="py-4 px-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="text-amber-400" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-white">Sail Number Conflicts</h3>
+                    <p className="text-sm text-slate-400">
+                      {conflictGroups.length} sail number{conflictGroups.length !== 1 ? 's are' : ' is'} shared by multiple skippers. Update at least one skipper in each group so all sail numbers are unique.
+                    </p>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-300">
+                    {error}
+                  </div>
+                )}
+
+                <div className="space-y-4 max-h-[40vh] overflow-y-auto">
+                  {conflictGroups.map((group) => {
+                    const existingWithSame = skippers.filter(s => s.sailNo === group.sailNo);
+                    const allSailNosInGroup = group.skippers.map(s => s.skipper.sailNo);
+                    const hasDuplicatesStill = allSailNosInGroup.some((sn, i) => {
+                      if (!sn.trim()) return true;
+                      if (existingWithSame.some(e => e.sailNo === sn)) return true;
+                      return allSailNosInGroup.indexOf(sn) !== i;
+                    });
+
+                    return (
+                      <div
+                        key={group.sailNo}
+                        className={`rounded-xl border p-4 transition-all ${
+                          hasDuplicatesStill
+                            ? 'border-amber-500/40 bg-amber-500/5'
+                            : 'border-emerald-500/40 bg-emerald-500/5'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                            Sail Number
+                          </span>
+                          <span className="text-sm font-bold font-mono text-amber-400">{group.sailNo}</span>
+                          <span className="text-xs text-slate-500">
+                            ({group.skippers.length + existingWithSame.length} skippers)
+                          </span>
+                          {!hasDuplicatesStill && <Check size={14} className="text-emerald-400 ml-auto" />}
+                        </div>
+
+                        {existingWithSame.length > 0 && (
+                          <div className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-700/30 border border-slate-600/30 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm text-white truncate">{existingWithSame[0].name}</span>
+                              {existingWithSame[0].club && (
+                                <span className="text-xs text-slate-500 ml-2">({existingWithSame[0].club})</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-xs text-slate-500 font-mono bg-slate-700/60 px-2 py-1 rounded">{existingWithSame[0].sailNo}</span>
+                              <span className="text-[10px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">Already in event</span>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          {group.skippers.map((entry) => {
+                            const otherSailNos = [
+                              ...skippers.map(s => s.sailNo),
+                              ...allParsedSkippers.filter((_, i) => i !== entry.index).map(s => s.sailNo),
+                            ];
+                            const isUnique = entry.skipper.sailNo.trim() !== '' && !otherSailNos.includes(entry.skipper.sailNo);
+
+                            return (
+                              <div
+                                key={entry.index}
+                                className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-800/50 border border-slate-700/40"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-white truncate">{entry.skipper.name}</span>
+                                    {entry.skipper.club && (
+                                      <span className="text-xs text-slate-500 truncate">({entry.skipper.club})</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <input
+                                    type="text"
+                                    value={entry.skipper.sailNo}
+                                    onChange={(e) => updateConflictSailNo(entry.index, e.target.value)}
+                                    className={`w-20 px-2.5 py-1.5 rounded-lg text-sm font-mono text-center border transition-all outline-none ${
+                                      isUnique
+                                        ? 'bg-slate-700/80 border-emerald-500/50 text-emerald-300 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/30'
+                                        : 'bg-slate-700/80 border-amber-500/50 text-white focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30'
+                                    }`}
+                                  />
+                                  {isUnique && <Check size={14} className="text-emerald-400" />}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 p-3 rounded-lg bg-slate-800/60 border border-slate-700/50">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">
+                      {allParsedSkippers.length} total skippers to import
+                    </span>
+                    <span className="text-slate-400">
+                      {conflictGroups.filter(g => {
+                        const existingWithSame = skippers.filter(s => s.sailNo === g.sailNo);
+                        const allSailNosInGroup = g.skippers.map(s => s.skipper.sailNo);
+                        return !allSailNosInGroup.some((sn, i) => {
+                          if (!sn.trim()) return true;
+                          if (existingWithSame.some(e => e.sailNo === sn)) return true;
+                          return allSailNosInGroup.indexOf(sn) !== i;
+                        });
+                      }).length} of {conflictGroups.length} conflicts resolved
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2784,13 +3164,18 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   setImportMappings({});
                   setImportAutoDetected(new Set());
                   setPasteText('');
+                } else if (importStep === 'conflicts') {
+                  setImportStep('mapping');
+                  setConflictGroups([]);
+                  setAllParsedSkippers([]);
+                  setError(null);
                 } else {
                   setView('initial');
                 }
               }}
               className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
             >
-              {importStep === 'complete' ? 'Close' : importStep === 'mapping' ? 'Upload Different Data' : 'Back'}
+              {importStep === 'complete' ? 'Close' : importStep === 'conflicts' ? 'Back to Mapping' : importStep === 'mapping' ? 'Upload Different Data' : 'Back'}
             </button>
             {importStep === 'mapping' && isRaceOfficer && (
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -2814,6 +3199,14 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                 }`}
               >
                 Import {importData.length} Skipper{importData.length !== 1 ? 's' : ''}
+              </button>
+            )}
+            {importStep === 'conflicts' && (
+              <button
+                onClick={handleResolveConflicts}
+                className="px-5 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                Import All {allParsedSkippers.length} Skippers
               </button>
             )}
             {importStep === 'complete' && (

@@ -44,7 +44,7 @@ function getGaugeLabel(efficiency: number): string {
 
 export function DiversityGauge({ totalSkippers, numberOfHeats, qualifyingRounds, darkMode }: DiversityGaugeProps) {
   const [animatedEfficiency, setAnimatedEfficiency] = useState(0);
-  const [showDetail, setShowDetail] = useState(false);
+  const [showDetail, setShowDetail] = useState(true);
   const animRef = useRef<number | null>(null);
   const prevEfficiency = useRef(0);
 
