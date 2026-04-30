@@ -46,6 +46,8 @@ export interface StartSequence {
   background_music_duck_duration_ms?: number;
   background_music_fade_in_ms?: number;
   background_music_fade_out_ms?: number;
+  follow_on_sequence_id?: string | null;
+  follow_on_sequence?: StartSequence;
   created_by?: string;
   created_at: string;
   updated_at: string;

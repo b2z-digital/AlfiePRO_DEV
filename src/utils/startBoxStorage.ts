@@ -252,7 +252,7 @@ export async function updateSequence(
   updates: Partial<Omit<StartSequence, 'id' | 'created_at' | 'sounds'>>
 ): Promise<StartSequence | null> {
   try {
-    const { minute_callout_sound, ...dbUpdates } = updates as any;
+    const { minute_callout_sound, follow_on_sequence, ...dbUpdates } = updates as any;
     const { data, error } = await supabase
       .from('start_sequences')
       .update({ ...dbUpdates, updated_at: new Date().toISOString() })

@@ -244,7 +244,13 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     }
     completedRef.current = false;
 
-    startSequenceRef.current = currentSequence;
+    // Use the BOTW's configured follow-on sequence, or fall back to current sequence
+    if (seq.follow_on_sequence_id) {
+      const followOn = await getSequence(seq.follow_on_sequence_id);
+      startSequenceRef.current = followOn || currentSequence;
+    } else {
+      startSequenceRef.current = currentSequence;
+    }
     botwPhaseRef.current = true;
     setBotwPhase(true);
 
@@ -295,7 +301,7 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
             <div className={`w-2.5 h-2.5 rounded-full ${stateColor} ${timerState === 'running' ? 'animate-pulse' : ''}`} />
             <Timer size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
             <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Digital StartBox
+              STARTBOX
             </span>
             {lastFiredLabel && (
               <span className="text-xs text-amber-400 animate-pulse font-medium bg-amber-500/10 px-2 py-0.5 rounded-full">

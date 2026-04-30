@@ -431,6 +431,36 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                   </div>
                 )}
 
+                {seq.sequence_type === 'botw' && (!seq.is_system_default || isSuperAdmin) && (
+                  <div className={`mt-3 flex items-center gap-3 p-3 rounded-lg border ${darkMode ? 'bg-slate-800/30 border-green-500/20' : 'bg-green-50/50 border-green-200'}`}>
+                    <SkipForward size={16} className="text-green-400 flex-shrink-0" />
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Follow-on Sequence
+                      </span>
+                      <select
+                        value={seq.follow_on_sequence_id || ''}
+                        onChange={async (e) => {
+                          const val = e.target.value || null;
+                          await updateSequence(seq.id, { follow_on_sequence_id: val });
+                          await loadData();
+                        }}
+                        className={`flex-1 max-w-xs px-2 py-1.5 rounded text-xs border ${
+                          darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      >
+                        <option value="">None (manual)</option>
+                        {sequences.filter(s => s.sequence_type !== 'botw' && s.id !== seq.id).map(s => (
+                          <option key={s.id} value={s.id}>{s.name} ({formatTime(s.total_duration_seconds)})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Auto-starts after BOTW completes
+                    </span>
+                  </div>
+                )}
+
                 {(!seq.use_audio_only) && (!seq.is_system_default || isSuperAdmin) && (
                   <div className={`mt-3 flex flex-col gap-3 p-3 rounded-lg ${darkMode ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
                     <label className="flex items-center gap-2 cursor-pointer">
