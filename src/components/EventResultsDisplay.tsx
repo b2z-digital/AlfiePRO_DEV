@@ -5,7 +5,8 @@ import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { LetterScore } from '../types';
 import { HeatDesignation } from '../types/heat';
-import { getLetterScorePointsForRace } from '../utils/scratchCalculations';
+import { getLetterScorePointsForRace, compareWithCountback } from '../utils/scratchCalculations';
+import { calculateSHRSDiscards } from '../utils/shrsHeatSystem';
 import { SkipperPerformanceInsights } from './SkipperPerformanceInsights';
 import { RaceReportModal } from './RaceReportModal';
 import { ConfirmationModal } from './ConfirmationModal';
@@ -497,41 +498,116 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
     }
   };
 
+  // SHRS same-heat tie-breaking (Rule 5.6)
+  const isShrsEvent = event.heatManagement?.configuration?.scoringSystem === 'shrs';
+  const shrsQualRounds = event.heatManagement?.configuration?.shrsQualifyingRounds || 0;
+
+  // Build heat assignment map for SHRS events (which skipper was in which heat per round)
+  const shrsRoundHeatMap = (() => {
+    if (!isShrsEvent || !event.heatManagement?.rounds) return new Map<number, Map<number, string>>();
+    const map = new Map<number, Map<number, string>>();
+    for (const round of event.heatManagement.rounds) {
+      if (!round.completed) continue;
+      const skipperToHeat = new Map<number, string>();
+      for (const ha of round.heatAssignments) {
+        for (const si of ha.skipperIndices) {
+          skipperToHeat.set(si, ha.heatDesignation);
+        }
+      }
+      map.set(round.round, skipperToHeat);
+    }
+    return map;
+  })();
+
   // Countback comparison function for tied net scores
   const compareSkippersWithCountback = (a: any, b: any): number => {
-    // First compare by net score (lower is better)
     if (a.netTotal !== b.netTotal) {
       return a.netTotal - b.netTotal;
     }
 
-    // If net scores are tied, apply countback rules (excluding dropped races)
-    // Count the number of 1st places, 2nd places, 3rd places, etc.
+    const resultsByRaceMap = groupResultsByRace();
+    const raceNums = Object.keys(resultsByRaceMap).map(Number).sort((x, y) => x - y);
+
+    // SHRS Rule 5.6: Use same-heat scores for tie-breaking
+    if (isShrsEvent && shrsRoundHeatMap.size > 0) {
+      const aSameHeatScores: number[] = [];
+      const bSameHeatScores: number[] = [];
+
+      for (const raceNum of raceNums) {
+        const skipperToHeat = shrsRoundHeatMap.get(raceNum);
+        if (!skipperToHeat) continue;
+        const aHeat = skipperToHeat.get(a.index);
+        const bHeat = skipperToHeat.get(b.index);
+        if (aHeat && bHeat && aHeat === bHeat) {
+          const raceResults = resultsByRaceMap[raceNum] || [];
+          const aResult = raceResults.find((r: any) => r.skipperIndex === a.index);
+          const bResult = raceResults.find((r: any) => r.skipperIndex === b.index);
+          const aScore = aResult?.position ?? (event.skippers?.length || 0) + 1;
+          const bScore = bResult?.position ?? (event.skippers?.length || 0) + 1;
+          aSameHeatScores.push(aScore);
+          bSameHeatScores.push(bScore);
+        }
+      }
+
+      if (aSameHeatScores.length > 0) {
+        // SHRS 5.6(a): Countback with 0 discards on same-heat scores
+        const result = compareWithCountback(aSameHeatScores, bSameHeatScores, 0, 0);
+        if (result !== 0) return result;
+      } else {
+        // SHRS 5.6(b): Never sailed together -> use unmodified RRS A8.1/A8.2
+        const aAll: number[] = [];
+        const bAll: number[] = [];
+        for (const raceNum of raceNums) {
+          const raceResults = resultsByRaceMap[raceNum] || [];
+          const aResult = raceResults.find((r: any) => r.skipperIndex === a.index);
+          const bResult = raceResults.find((r: any) => r.skipperIndex === b.index);
+          aAll.push(aResult?.position ?? (event.skippers?.length || 0) + 1);
+          bAll.push(bResult?.position ?? (event.skippers?.length || 0) + 1);
+        }
+        const aDropCount = Object.keys(drops).filter(k => k.startsWith(`${a.index}-`)).length;
+        const bDropCount = Object.keys(drops).filter(k => k.startsWith(`${b.index}-`)).length;
+        const result = compareWithCountback(aAll, bAll, aDropCount, bDropCount);
+        if (result !== 0) return result;
+      }
+
+      // Final fallback for SHRS: surname, first name, sail number
+      const extractSurname = (name: string): { surname: string; firstName: string } => {
+        const parts = (name || '').trim().split(/\s+/);
+        if (parts.length <= 1) return { surname: parts[0] || '', firstName: '' };
+        return { surname: parts[parts.length - 1], firstName: parts.slice(0, -1).join(' ') };
+      };
+      const aNameParts = extractSurname(event.skippers?.[a.index]?.name || '');
+      const bNameParts = extractSurname(event.skippers?.[b.index]?.name || '');
+      const surnameResult = aNameParts.surname.localeCompare(bNameParts.surname, undefined, { sensitivity: 'base' });
+      if (surnameResult !== 0) return surnameResult;
+      const firstNameResult = aNameParts.firstName.localeCompare(bNameParts.firstName, undefined, { sensitivity: 'base' });
+      if (firstNameResult !== 0) return firstNameResult;
+      const aSail = (event.skippers?.[a.index]?.sailNo || event.skippers?.[a.index]?.sailNumber || '').toUpperCase();
+      const bSail = (event.skippers?.[b.index]?.sailNo || event.skippers?.[b.index]?.sailNumber || '').toUpperCase();
+      return aSail.localeCompare(bSail, undefined, { numeric: true, sensitivity: 'base' });
+    }
+
+    // Standard (non-SHRS) countback: RRS A8.1/A8.2
     const aPositionCounts: number[] = [];
     const bPositionCounts: number[] = [];
     let lastRaceAPosition: number | null = null;
     let lastRaceBPosition: number | null = null;
 
-    const resultsByRaceMap = groupResultsByRace();
-    const raceNums = Object.keys(resultsByRaceMap).map(Number).sort((a, b) => a - b);
-
     for (const raceNum of raceNums) {
       const raceResults = resultsByRaceMap[raceNum] || [];
-      const aResult = raceResults.find(r => r.skipperIndex === a.index);
-      const bResult = raceResults.find(r => r.skipperIndex === b.index);
+      const aResult = raceResults.find((r: any) => r.skipperIndex === a.index);
+      const bResult = raceResults.find((r: any) => r.skipperIndex === b.index);
 
       const aIsDropped = drops[`${a.index}-${raceNum}`];
       const bIsDropped = drops[`${b.index}-${raceNum}`];
 
-      // Only count actual finishing positions (not letter scores) for countback, excluding dropped races
       if (aResult && aResult.position !== null && !aResult.letterScore && !aIsDropped) {
         aPositionCounts.push(aResult.position);
       }
-
       if (bResult && bResult.position !== null && !bResult.letterScore && !bIsDropped) {
         bPositionCounts.push(bResult.position);
       }
 
-      // Track last race positions (including dropped, for final tiebreaker)
       if (aResult && aResult.position !== null && !aResult.letterScore) {
         lastRaceAPosition = aResult.position;
       }
@@ -540,29 +616,20 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
       }
     }
 
-    // Sort positions (best to worst)
     aPositionCounts.sort((x, y) => x - y);
     bPositionCounts.sort((x, y) => x - y);
 
-    // Count how many 1sts, 2nds, 3rds, etc. each skipper has
     const maxPosition = Math.max(...aPositionCounts, ...bPositionCounts, 1);
-
     for (let pos = 1; pos <= maxPosition; pos++) {
       const aCount = aPositionCounts.filter(p => p === pos).length;
       const bCount = bPositionCounts.filter(p => p === pos).length;
-
-      if (aCount !== bCount) {
-        // More of this position is better (so reverse the comparison)
-        return bCount - aCount;
-      }
+      if (aCount !== bCount) return bCount - aCount;
     }
 
-    // If still tied after countback, use last race position as tiebreaker
     if (lastRaceAPosition !== null && lastRaceBPosition !== null && lastRaceAPosition !== lastRaceBPosition) {
       return lastRaceAPosition - lastRaceBPosition;
     }
 
-    // If still tied after last race tiebreaker, maintain original order
     return a.index - b.index;
   };
 
@@ -573,8 +640,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
     netTotal: totals[index]?.net || 0
   })).sort(compareSkippersWithCountback) : [];
 
-  const isShrs = event.heatManagement?.configuration?.scoringSystem === 'shrs';
-  const shrsQualifyingRounds = event.heatManagement?.configuration?.shrsQualifyingRounds || 0;
+  const isShrs = isShrsEvent;
+  const shrsQualifyingRounds = shrsQualRounds;
 
   const shrsFleetMap = (() => {
     if (!isShrs || !event.heatManagement) return new Map<number, HeatDesignation>();
