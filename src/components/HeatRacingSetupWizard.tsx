@@ -22,6 +22,7 @@ interface HeatRacingSetupWizardProps {
       auto_complete_sail?: boolean;
     };
     scoringMode?: 'pro' | 'touch' | 'spreadsheet';
+    pendingSeedingAction?: 'manual' | 'ranking';
   }) => void;
   onSkip: () => void;
   skippers: Skipper[];
@@ -138,6 +139,70 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
   const handleActivate = () => {
     const heatDesignations: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E'];
     let rounds;
+
+    // Determine if this seeding method should defer to a modal
+    const needsManualModal = seedingMethod === 'manual' && (
+      (scoringSystem === 'shrs' && shrsMode === 'progressive') ||
+      (scoringSystem === 'hms' && fleetManagementEnabled)
+    );
+    const needsRankingModal = seedingMethod === 'ranking' && (
+      (scoringSystem === 'shrs' && shrsMode === 'progressive') ||
+      (scoringSystem === 'hms' && fleetManagementEnabled)
+    );
+
+    if (needsManualModal || needsRankingModal) {
+      // Create configuration with empty placeholder round - the modal will provide real assignments
+      const emptyAssignments = Array.from({ length: effectiveHeats }, (_, i) => ({
+        heatDesignation: heatDesignations[i] as HeatDesignation,
+        skipperIndices: [] as number[]
+      }));
+
+      rounds = [{
+        round: 1,
+        heatAssignments: emptyAssignments,
+        results: [],
+        completed: false
+      }];
+
+      const configuration: HeatConfiguration = {
+        enabled: true,
+        numberOfHeats: effectiveHeats,
+        promotionCount: scoringSystem === 'hms' ? promotionCount : 0,
+        seedingMethod,
+        autoAssign: false,
+        scoringSystem,
+        fleetManagementEnabled,
+        heatLabelStyle: 'letters',
+        ...(scoringSystem === 'shrs' ? {
+          shrsAssignmentMode: shrsMode,
+          shrsQualifyingRounds: qualifyingRounds,
+        } : {}),
+      };
+
+      const heatManagement: HeatManagement = {
+        configuration,
+        rounds,
+        currentRound: 1,
+        currentHeat: heatDesignations[effectiveHeats - 1],
+      };
+
+      const dropRules: string = scoringSystem;
+
+      onComplete({
+        numRaces,
+        dropRules,
+        heatManagement,
+        observerSettings: {
+          enable_observers: enableObservers,
+          observers_per_heat: 1,
+          enable_roll_call: enableRollCall,
+          auto_complete_sail: true,
+        },
+        scoringMode,
+        pendingSeedingAction: needsManualModal ? 'manual' : 'ranking',
+      });
+      return;
+    }
 
     // Build ranking data from skippers' national_ranking field
     const rankingData = skippers
@@ -558,7 +623,13 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
                   </div>
                 </div>
                 <button
-                  onClick={() => setFleetManagementEnabled(!fleetManagementEnabled)}
+                  onClick={() => {
+                    const newValue = !fleetManagementEnabled;
+                    setFleetManagementEnabled(newValue);
+                    if (!newValue) {
+                      setScoringMode('spreadsheet');
+                    }
+                  }}
                   className={`relative w-12 h-6 rounded-full transition-all ${
                     fleetManagementEnabled ? 'bg-amber-500' : 'bg-slate-600'
                   }`}

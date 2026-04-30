@@ -34,6 +34,8 @@ import { HmsManualSpreadsheet } from './HmsManualSpreadsheet';
 import { calculateHandicaps } from '../utils/handicapCalculator';
 import { calculateScratchResults } from '../utils/scratchCalculations';
 import { RaceSettingsModal } from './RaceSettingsModal';
+import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
+import { HMSSeedingModal } from './HMSSeedingModal';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { LiveStatusControl } from './LiveStatusControl';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -129,6 +131,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [showRaceSettingsModal, setShowRaceSettingsModal] = useState(false);
   const [autoEnableHeatRacing, setAutoEnableHeatRacing] = useState(false);
   const [showHeatRacingRecommendation, setShowHeatRacingRecommendation] = useState(false);
+  const [showWizardManualAssignModal, setShowWizardManualAssignModal] = useState(false);
+  const [showWizardRankingModal, setShowWizardRankingModal] = useState(false);
   const [heatManagement, setHeatManagement] = useState<HeatManagement | null>(null);
   const [selectedVenueName, setSelectedVenueName] = useState<string | null>(null);
   const [currentNumRaces, setCurrentNumRaces] = useState(12);
@@ -3941,6 +3945,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               }
             }
             await handleSaveRaceSettings(settings);
+            if (settings.pendingSeedingAction === 'manual') {
+              setShowWizardManualAssignModal(true);
+            } else if (settings.pendingSeedingAction === 'ranking') {
+              setShowWizardRankingModal(true);
+            }
           }}
           onSkip={() => {
             setShowHeatRacingRecommendation(false);
@@ -4021,6 +4030,122 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             }
           }}
           onScoringModeChange={(mode) => setScoringMode(mode)}
+        />
+
+        <ManualHeatAssignmentModal
+          isOpen={showWizardManualAssignModal}
+          onClose={() => setShowWizardManualAssignModal(false)}
+          onConfirm={(assignments) => {
+            const config = heatManagement?.configuration;
+            if (!config) return;
+
+            let allRounds;
+            if (config.scoringSystem === 'shrs' && config.shrsAssignmentMode === 'preset' && (config.shrsQualifyingRounds || 1) > 1) {
+              const allQR = generatePreSetQualifyingAssignments(
+                assignments,
+                config.numberOfHeats,
+                config.shrsQualifyingRounds || 1
+              );
+              allRounds = allQR.map((ra, idx) => ({
+                round: idx + 1,
+                heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as HeatDesignation, skipperIndices: a.skipperIndices })),
+                results: [] as HeatResult[],
+                completed: false
+              }));
+            } else {
+              allRounds = [{
+                round: 1,
+                heatAssignments: assignments,
+                results: [] as HeatResult[],
+                completed: false
+              }];
+            }
+
+            const finalHM: HeatManagement = {
+              configuration: { ...config, seedingMethod: 'manual' },
+              currentRound: 1,
+              currentHeat: assignments[assignments.length - 1].heatDesignation,
+              rounds: allRounds
+            };
+            setHeatManagement(finalHM);
+
+            const currentEvent = getCurrentEvent();
+            if (currentEvent) {
+              updateEventResults(
+                currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id,
+                raceResults, skippers, lastCompletedRace, hasDeterminedInitialHcaps,
+                isManualHandicaps, false, currentDay, finalHM, currentNumRaces, currentDropRules as number[]
+              );
+            }
+            setShowWizardManualAssignModal(false);
+          }}
+          skippers={skippers}
+          numHeats={heatManagement?.configuration.numberOfHeats || 3}
+          darkMode={darkMode}
+          heatConfiguration={heatManagement?.configuration}
+          onRankingAssignment={() => {
+            setShowWizardManualAssignModal(false);
+            setShowWizardRankingModal(true);
+          }}
+        />
+
+        <HMSSeedingModal
+          isOpen={showWizardRankingModal}
+          onClose={() => setShowWizardRankingModal(false)}
+          onConfirm={(assignments, rankedSkipperIndices) => {
+            const config = heatManagement?.configuration;
+            if (!config) return;
+
+            let allRounds;
+            if (config.scoringSystem === 'shrs' && config.shrsAssignmentMode === 'preset' && (config.shrsQualifyingRounds || 1) > 1) {
+              const allQR = generatePreSetQualifyingAssignments(
+                assignments,
+                config.numberOfHeats,
+                config.shrsQualifyingRounds || 1
+              );
+              allRounds = allQR.map((ra, idx) => ({
+                round: idx + 1,
+                heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as HeatDesignation, skipperIndices: a.skipperIndices })),
+                results: [] as HeatResult[],
+                completed: false
+              }));
+            } else {
+              allRounds = [{
+                round: 1,
+                heatAssignments: assignments,
+                results: [] as HeatResult[],
+                completed: false
+              }];
+            }
+
+            const finalHM: HeatManagement = {
+              configuration: {
+                ...config,
+                seedingMethod: 'manual',
+                ...(rankedSkipperIndices && rankedSkipperIndices.length > 0 ? { rankedSkipperIndices } : {}),
+              },
+              currentRound: 1,
+              currentHeat: assignments[assignments.length - 1].heatDesignation,
+              rounds: allRounds
+            };
+            setHeatManagement(finalHM);
+
+            const currentEvent = getCurrentEvent();
+            if (currentEvent) {
+              updateEventResults(
+                currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id,
+                raceResults, skippers, lastCompletedRace, hasDeterminedInitialHcaps,
+                isManualHandicaps, false, currentDay, finalHM, currentNumRaces, currentDropRules as number[]
+              );
+            }
+            setShowWizardRankingModal(false);
+          }}
+          skippers={skippers}
+          numHeats={heatManagement?.configuration.numberOfHeats || 3}
+          darkMode={darkMode}
+          currentEvent={getCurrentEvent()}
+          yachtClassName={getCurrentEvent()?.raceClass}
+          heatConfiguration={heatManagement?.configuration}
         />
 
         {showChartsModal && (

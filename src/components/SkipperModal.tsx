@@ -2936,33 +2936,72 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   </div>
                 )}
 
-                {importData.length > 0 && (
-                  <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Data Preview (first 3 rows)</h4>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-slate-700/50">
-                            {importHeaders.slice(0, 6).map(h => (
-                              <th key={h} className="text-left py-1 px-2 text-slate-400 font-medium truncate max-w-[120px]">{h}</th>
-                            ))}
-                            {importHeaders.length > 6 && <th className="text-slate-500 px-2">...</th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {importData.slice(0, 3).map((row, i) => (
-                            <tr key={i} className="border-b border-slate-800/50">
+                {importData.length > 0 && (() => {
+                  // Detect country code prefix in name column for preview display
+                  const sailColHeader = Object.entries(importMappings).find(([, v]) => v === 'sail_number')?.[0];
+                  const nameColHeader = Object.entries(importMappings).find(([, v]) => v === 'full_name' || v === 'last_name' || v === 'first_name')?.[0];
+                  let previewNamePrefix = '';
+                  if (sailColHeader && nameColHeader) {
+                    const sailCodes = new Map<string, number>();
+                    for (const row of importData.slice(0, 20)) {
+                      const sn = (row[sailColHeader] || '').trim();
+                      const m = sn.match(/^([A-Za-z]{2,3})\s+\d+/);
+                      if (m) sailCodes.set(m[1].toUpperCase(), (sailCodes.get(m[1].toUpperCase()) || 0) + 1);
+                    }
+                    let dominant = '';
+                    let domCount = 0;
+                    sailCodes.forEach((c, code) => { if (c > domCount) { domCount = c; dominant = code; } });
+                    if (dominant && domCount >= 3) {
+                      let nameHits = 0;
+                      for (const row of importData.slice(0, 20)) {
+                        const n = (row[nameColHeader] || '').trim().toUpperCase();
+                        if (n.startsWith(dominant) && n.length > dominant.length) nameHits++;
+                      }
+                      if (nameHits > Math.min(20, importData.length) * 0.6) previewNamePrefix = dominant;
+                    }
+                  }
+
+                  const getPreviewValue = (header: string, value: string) => {
+                    if (!previewNamePrefix || !value) return value;
+                    if (header === nameColHeader) {
+                      const upper = value.toUpperCase();
+                      if (upper.startsWith(previewNamePrefix) && upper.length > previewNamePrefix.length + 1) {
+                        return value.slice(previewNamePrefix.length);
+                      }
+                    }
+                    return value;
+                  };
+
+                  return (
+                    <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-3">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Data Preview (first 3 rows)</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-700/50">
+                              <th className="text-left py-1 px-2 text-slate-500 font-medium">#</th>
                               {importHeaders.slice(0, 6).map(h => (
-                                <td key={h} className="py-1 px-2 text-slate-300 truncate max-w-[120px]">{row[h] || ''}</td>
+                                <th key={h} className="text-left py-1 px-2 text-slate-400 font-medium truncate max-w-[120px]">{h}</th>
                               ))}
-                              {importHeaders.length > 6 && <td className="text-slate-600 px-2">...</td>}
+                              {importHeaders.length > 6 && <th className="text-slate-500 px-2">...</th>}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {importData.slice(0, 3).map((row, i) => (
+                              <tr key={i} className="border-b border-slate-800/50">
+                                <td className="py-1 px-2 text-slate-500">{i + 1}</td>
+                                {importHeaders.slice(0, 6).map(h => (
+                                  <td key={h} className="py-1 px-2 text-slate-300 truncate max-w-[120px]">{getPreviewValue(h, row[h] || '')}</td>
+                                ))}
+                                {importHeaders.length > 6 && <td className="text-slate-600 px-2">...</td>}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
