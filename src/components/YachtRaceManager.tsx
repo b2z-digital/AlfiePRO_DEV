@@ -13,7 +13,7 @@ import { RaceTable } from './RaceTable';
 import { ScratchRaceTable } from './ScratchRaceTable';
 import { PerformanceGraphs } from './PerformanceGraphs';
 import { ScratchPerformanceGraphs } from './ScratchPerformanceGraphs';
-import { SkipperModal } from './SkipperModal';
+import { SkipperModal, ImportedAssignmentData } from './SkipperModal';
 import { MembershipManager } from './MembershipManager';
 import { RaceHeader } from './RaceHeader';
 import { RaceManagement } from './RaceManagement';
@@ -3286,6 +3286,94 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     }
   };
 
+  const handleImportSkippersWithAssignments = async (data: ImportedAssignmentData) => {
+    const { skippers: importedSkippers, roundAssignments, numberOfHeats, numberOfRounds } = data;
+
+    // Build sail number -> skipper index lookup (based on imported order)
+    const sailToIndex = new Map<string, number>();
+    importedSkippers.forEach((s, idx) => {
+      sailToIndex.set(s.sailNo.toUpperCase(), idx);
+    });
+
+    // Group assignment rows by round, then by heat
+    const roundMap = new Map<string, Map<string, number[]>>();
+    for (const row of roundAssignments) {
+      if (!roundMap.has(row.round)) roundMap.set(row.round, new Map());
+      const heatMap = roundMap.get(row.round)!;
+      if (!heatMap.has(row.heat)) heatMap.set(row.heat, []);
+      const idx = sailToIndex.get(row.sailNumber.toUpperCase());
+      if (idx !== undefined) {
+        heatMap.get(row.heat)!.push(idx);
+      }
+    }
+
+    // Sort rounds and heats
+    const sortedRounds = Array.from(roundMap.keys()).sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, '')) || 0;
+      const numB = parseInt(b.replace(/\D/g, '')) || 0;
+      return numA - numB;
+    });
+
+    const heatDesignations: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, numberOfHeats) as HeatDesignation[];
+
+    // Build HeatManagement rounds
+    const rounds = sortedRounds.map((roundKey, roundIdx) => {
+      const heatMap = roundMap.get(roundKey)!;
+      const sortedHeats = Array.from(heatMap.keys()).sort((a, b) => {
+        const numA = parseInt(a.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
+      const heatAssignments = sortedHeats.map((heatKey, heatIdx) => ({
+        heatDesignation: heatDesignations[heatIdx] || ('A' as HeatDesignation),
+        skipperIndices: heatMap.get(heatKey) || []
+      }));
+      return {
+        round: roundIdx + 1,
+        heatAssignments,
+        results: [],
+        completed: false
+      };
+    });
+
+    // Create heat management config
+    const newHeatManagement: HeatManagement = {
+      configuration: {
+        enabled: true,
+        numberOfHeats,
+        promotionCount: 4,
+        seedingMethod: 'random' as const,
+        scoringSystem: 'shrs' as const,
+        shrsAssignmentMode: 'preset' as const,
+        shrsQualifyingRounds: numberOfRounds
+      },
+      rounds,
+      currentRound: 1,
+      currentHeat: heatDesignations[0]
+    };
+
+    // Update skippers first
+    setSkippers(importedSkippers);
+    setHeatManagement(newHeatManagement);
+
+    // Save to database
+    const event = getCurrentEvent();
+    if (event?.id) {
+      try {
+        const eventId = event.isSeriesEvent ? event.seriesId : event.id;
+        await supabase
+          .from('quick_races')
+          .update({
+            skippers: importedSkippers,
+            heat_management: newHeatManagement
+          })
+          .eq('id', eventId);
+      } catch (err) {
+        console.error('Error saving imported skippers with assignments:', err);
+      }
+    }
+  };
+
   const showHandicapOptions = !hasDeterminedInitialHcaps && !isManualHandicaps &&
     raceType === 'handicap' &&
     skippers.length > 0 &&
@@ -3953,6 +4041,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           darkMode={darkMode}
           skipperHasResults={skipperHasResults}
           currentEvent={getCurrentEvent()}
+          onImportSkippersWithAssignments={handleImportSkippersWithAssignments}
         />
         
         <MembershipManager

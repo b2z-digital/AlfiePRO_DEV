@@ -17,6 +17,13 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { bulkAddRaceOfficerContacts } from '../utils/raceOfficerContactsStorage';
 
+export interface ImportedAssignmentData {
+  skippers: Skipper[];
+  roundAssignments: { round: string; heat: string; sailNumber: string; skipperName: string; club: string }[];
+  numberOfHeats: number;
+  numberOfRounds: number;
+}
+
 interface SkipperModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -25,6 +32,7 @@ interface SkipperModalProps {
   darkMode: boolean;
   skipperHasResults: (skipperIndex: number) => boolean;
   currentEvent?: RaceEvent;
+  onImportSkippersWithAssignments?: (data: ImportedAssignmentData) => void;
 }
 
 interface MemberWithValidation extends Member {
@@ -46,12 +54,13 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   onUpdateSkippers,
   darkMode,
   skipperHasResults,
-  currentEvent
+  currentEvent,
+  onImportSkippersWithAssignments
 }) => {
   const { addNotification } = useNotifications();
   const { isRaceOfficer } = useAuth();
   const [saveToContacts, setSaveToContacts] = useState(false);
-  const [view, setView] = useState<'initial' | 'members' | 'manual' | 'import' | 'edit'>('initial');
+  const [view, setView] = useState<'initial' | 'members' | 'manual' | 'import' | 'import-assignments' | 'edit'>('initial');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importData, setImportData] = useState<any[]>([]);
   const [importHeaders, setImportHeaders] = useState<string[]>([]);
@@ -1493,6 +1502,25 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   </p>
                 </div>
               </button>
+
+              {onImportSkippersWithAssignments && (
+                <button
+                  onClick={() => setView('import-assignments')}
+                  className="w-full flex items-center gap-4 p-4 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors text-left"
+                >
+                  <div className="p-3 rounded-lg bg-green-600 text-white">
+                    <Upload size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-slate-200">
+                      Import Assignments
+                    </h3>
+                    <p className="text-sm text-slate-400">
+                      Import skippers with SHRS heat assignments from CSV
+                    </p>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
           
@@ -3223,6 +3251,220 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     );
   }
 
+  // Import Assignments view (SHRS heat assignments CSV)
+  if (view === 'import-assignments') {
+    const handleAssignmentFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const text = evt.target?.result as string;
+          const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+          if (lines.length < 2) { setError('CSV file is empty'); return; }
+
+          const headerLine = lines[0].toLowerCase();
+          const hasHeader = headerLine.includes('round') || headerLine.includes('heat') || headerLine.includes('sail');
+          const dataLines = hasHeader ? lines.slice(1) : lines;
+
+          const rows: { round: string; heat: string; sailNumber: string; skipperName: string; club: string }[] = [];
+          const uniqueSkipperMap = new Map<string, { name: string; sailNo: string; club: string }>();
+          const roundSet = new Set<string>();
+          const heatSet = new Set<string>();
+
+          for (const line of dataLines) {
+            const fields = Papa.parse(line, { header: false }).data[0] as string[];
+            if (!fields || fields.length < 4) continue;
+            const round = (fields[0] || '').trim();
+            const heat = (fields[1] || '').trim();
+            const sailNumber = (fields[2] || '').trim();
+            const skipperName = (fields[3] || '').trim();
+            const club = (fields[4] || '').trim();
+            if (!round || !heat || !sailNumber || !skipperName) continue;
+            roundSet.add(round);
+            heatSet.add(heat);
+            rows.push({ round, heat, sailNumber, skipperName, club });
+            if (!uniqueSkipperMap.has(sailNumber)) {
+              uniqueSkipperMap.set(sailNumber, { name: skipperName, sailNo: sailNumber, club });
+            }
+          }
+
+          if (rows.length === 0) { setError('No valid assignment rows found in CSV'); return; }
+
+          const importedSkippers: Skipper[] = Array.from(uniqueSkipperMap.values()).map(s => ({
+            name: s.name,
+            sailNo: s.sailNo,
+            sailNumber: s.sailNo,
+            club: s.club,
+            boatModel: currentEvent?.boatClass || '',
+            boatType: currentEvent?.boatClass || '',
+            startHcap: 0
+          }));
+
+          const data: ImportedAssignmentData = {
+            skippers: importedSkippers,
+            roundAssignments: rows,
+            numberOfHeats: heatSet.size,
+            numberOfRounds: roundSet.size
+          };
+
+          if (onImportSkippersWithAssignments) {
+            onImportSkippersWithAssignments(data);
+            onClose();
+          }
+        } catch (err: any) {
+          setError(err.message || 'Failed to parse assignments CSV');
+        }
+      };
+      reader.readAsText(file);
+    };
+
+    const handleAssignmentPaste = (text: string) => {
+      try {
+        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+        if (lines.length < 2) { setError('Pasted data is empty'); return; }
+
+        const headerLine = lines[0].toLowerCase();
+        const hasHeader = headerLine.includes('round') || headerLine.includes('heat') || headerLine.includes('sail');
+        const dataLines = hasHeader ? lines.slice(1) : lines;
+
+        const rows: { round: string; heat: string; sailNumber: string; skipperName: string; club: string }[] = [];
+        const uniqueSkipperMap = new Map<string, { name: string; sailNo: string; club: string }>();
+        const roundSet = new Set<string>();
+        const heatSet = new Set<string>();
+
+        for (const line of dataLines) {
+          const fields = Papa.parse(line, { header: false }).data[0] as string[];
+          if (!fields || fields.length < 4) continue;
+          const round = (fields[0] || '').trim();
+          const heat = (fields[1] || '').trim();
+          const sailNumber = (fields[2] || '').trim();
+          const skipperName = (fields[3] || '').trim();
+          const club = (fields[4] || '').trim();
+          if (!round || !heat || !sailNumber || !skipperName) continue;
+          roundSet.add(round);
+          heatSet.add(heat);
+          rows.push({ round, heat, sailNumber, skipperName, club });
+          if (!uniqueSkipperMap.has(sailNumber)) {
+            uniqueSkipperMap.set(sailNumber, { name: skipperName, sailNo: sailNumber, club });
+          }
+        }
+
+        if (rows.length === 0) { setError('No valid assignment rows found'); return; }
+
+        const importedSkippers: Skipper[] = Array.from(uniqueSkipperMap.values()).map(s => ({
+          name: s.name,
+          sailNo: s.sailNo,
+          sailNumber: s.sailNo,
+          club: s.club,
+          boatModel: '',
+          boatType: '',
+          startHcap: 0
+        }));
+
+        const data: ImportedAssignmentData = {
+          skippers: importedSkippers,
+          roundAssignments: rows,
+          numberOfHeats: heatSet.size,
+          numberOfRounds: roundSet.size
+        };
+
+        if (onImportSkippersWithAssignments) {
+          onImportSkippersWithAssignments(data);
+          onClose();
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to parse pasted data');
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="w-full max-w-2xl rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700 max-h-[90vh] flex flex-col">
+          <div className="px-6 py-4 flex items-center justify-between border-b border-slate-700">
+            <div className="flex items-center gap-3">
+              <Upload className="text-green-400" size={24} />
+              <div>
+                <h2 className="text-xl font-semibold text-white">Import Assignments</h2>
+                <p className="text-sm text-slate-400">Import skippers with SHRS heat assignments</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setView('initial')}
+              className="rounded-full p-2 text-slate-400 hover:bg-slate-700 transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="border-2 border-dashed border-slate-600 rounded-xl p-8 text-center hover:border-green-500/50 transition-colors">
+              <Upload className="mx-auto mb-3 text-slate-500" size={40} />
+              <h3 className="text-lg font-medium text-slate-200 mb-1">Upload Assignment File</h3>
+              <p className="text-sm text-slate-400 mb-4">
+                CSV with columns: Round, Heat, Sail Number, Skipper Name, Club
+              </p>
+              <label className="inline-block px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium cursor-pointer transition-colors">
+                Choose File
+                <input
+                  type="file"
+                  accept=".csv,.txt"
+                  className="hidden"
+                  onChange={handleAssignmentFileUpload}
+                />
+              </label>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-700"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-slate-800 text-slate-500">or paste data</span>
+              </div>
+            </div>
+
+            <div>
+              <textarea
+                className="w-full h-32 rounded-lg bg-slate-900 border border-slate-600 text-slate-200 p-3 text-sm font-mono placeholder-slate-500 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder="Paste CSV data here...&#10;Round,Heat,Sail Number,Skipper Name,Club&#10;Q1,Heat 1,91,Peter Sherwood,ERYC&#10;Q1,Heat 1,133,Peter Mccully,NSRYS"
+                onPaste={(e) => {
+                  const text = e.clipboardData.getData('text');
+                  if (text.trim()) {
+                    e.preventDefault();
+                    handleAssignmentPaste(text);
+                  }
+                }}
+              />
+            </div>
+
+            <div className={`rounded-lg p-4 ${error ? 'bg-red-900/20 border border-red-700' : 'bg-slate-700/50'}`}>
+              <h4 className="text-sm font-medium text-slate-300 mb-2">Expected CSV Format</h4>
+              <pre className="text-xs text-slate-400 font-mono whitespace-pre-wrap">
+{`Round,Heat,Sail Number,Skipper Name,Club,Observer
+Q1,Heat 1,91,Peter Sherwood,ERYC,
+Q1,Heat 1,133,Peter Mccully,NSRYS,
+Q1,Heat 2,66,Roger Paul,CL,
+Q2,Heat 1,133,Peter Mccully,NSRYS,
+Q2,Heat 2,91,Peter Sherwood,ERYC,`}
+              </pre>
+              {error && <p className="text-sm text-red-400 mt-2">{error}</p>}
+            </div>
+          </div>
+
+          <div className="flex justify-between p-6 border-t border-slate-700">
+            <button
+              onClick={() => { setView('initial'); setError(null); }}
+              className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Members view with list-based selection
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -3513,6 +3755,15 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               <Upload size={16} />
               Import Skippers
             </button>
+            {onImportSkippersWithAssignments && (
+              <button
+                onClick={() => setView('import-assignments')}
+                className="px-4 py-2 rounded-lg font-medium transition-colors text-green-300 hover:text-green-100 hover:bg-green-900/30 flex items-center gap-2"
+              >
+                <Upload size={16} />
+                Import Assignments
+              </button>
+            )}
           </div>
           <button
             onClick={handleAddSelectedMembers}
