@@ -721,7 +721,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         const minSize = Math.min(...currentHeatSizes);
         const hasUnbalancedHeats = currentHeatSizes.length > 0 && maxSize - minSize > 1 && !hasAnyRoundResults;
 
-        const shouldRegenerate = (heatCountChanged || scoringSystemChanged || hasUnbalancedHeats) && (!hasAnyRoundResults || isReducingHeats || scoringSystemChanged || hasUnbalancedHeats);
+        const previousSeedingMethod = currentHeatManagement.configuration.seedingMethod || 'random';
+        const seedingMethodChanged = previousSeedingMethod !== seedingMethod && !hasAnyRoundResults;
+
+        const shouldRegenerate = ((heatCountChanged || scoringSystemChanged || hasUnbalancedHeats) && (!hasAnyRoundResults || isReducingHeats || scoringSystemChanged || hasUnbalancedHeats)) || seedingMethodChanged;
 
         console.log('🔍 Heat regeneration check:', {
           storedConfigHeats: currentHeatManagement.configuration.numberOfHeats,
@@ -735,6 +738,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           isReducingHeats,
           currentHeatSizes,
           hasUnbalancedHeats,
+          seedingMethodChanged,
+          previousSeedingMethod,
+          newSeedingMethod: seedingMethod,
           shouldRegenerate,
           roundsData: currentHeatManagement.rounds.map(r => ({
             round: r.round,
@@ -845,6 +851,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           if (heatCountChanged) reasons.push(`heat count changed (${actualHeatCount} → ${numHeats})`);
           if (scoringSystemChanged) reasons.push(`scoring system changed (${previousScoringSystem} → ${newScoringSystem})`);
           if (hasUnbalancedHeats) reasons.push(`unbalanced heat sizes detected (${currentHeatSizes.join(', ')})`);
+          if (seedingMethodChanged) reasons.push(`initial assignment changed (${previousSeedingMethod} → ${seedingMethod})`);
 
           console.log('⚠️ Regeneration needed:', reasons.join(', '));
           setPendingRegenerateAction(() => executeRegeneration);
