@@ -193,6 +193,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     setCurrentHeatManagement(initialHeatManagement);
     setIsHeatRacingEnabled(initialHeatManagement?.configuration.enabled || false);
     setFleetManagementEnabled(initialHeatManagement?.configuration.fleetManagementEnabled ?? true);
+    setCurrentDropRules(initialDropRules);
+    setCurrentNumRaces(initialNumRaces);
   }, [initialHeatManagement, isOpen]);
 
   // Calculate optimal heats automatically based on skipper count

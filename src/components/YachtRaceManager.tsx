@@ -133,7 +133,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [showHeatRacingRecommendation, setShowHeatRacingRecommendation] = useState(false);
   const [showWizardManualAssignModal, setShowWizardManualAssignModal] = useState(false);
   const [showWizardRankingModal, setShowWizardRankingModal] = useState(false);
-  const pendingWizardConfigRef = useRef<{ configuration: any; numRaces: number; dropRules: number[] | string } | null>(null);
+  const pendingWizardConfigRef = useRef<{ configuration: any; numRaces: number; dropRules: number[] | string; observerSettings?: any } | null>(null);
   const [heatManagement, setHeatManagement] = useState<HeatManagement | null>(null);
   const [selectedVenueName, setSelectedVenueName] = useState<string | null>(null);
   const [currentNumRaces, setCurrentNumRaces] = useState(12);
@@ -3946,11 +3946,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               }
             }
             if (settings.pendingSeedingAction) {
-              // Store config but don't save heat management yet - modal will finalize it
+              // Store full config - modal will finalize heat management then save everything
               pendingWizardConfigRef.current = {
                 configuration: settings.heatManagement?.configuration || null,
                 numRaces: settings.numRaces,
                 dropRules: settings.dropRules,
+                observerSettings: settings.observerSettings,
               };
               setCurrentNumRaces(settings.numRaces);
               setCurrentDropRules(settings.dropRules);
@@ -4088,6 +4089,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               numRaces: pending?.numRaces || currentNumRaces,
               dropRules: pending?.dropRules || currentDropRules,
               heatManagement: finalHM,
+              observerSettings: pending?.observerSettings,
             });
 
             pendingWizardConfigRef.current = null;
@@ -4151,6 +4153,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               numRaces: pending?.numRaces || currentNumRaces,
               dropRules: pending?.dropRules || currentDropRules,
               heatManagement: finalHM,
+              observerSettings: pending?.observerSettings,
             });
 
             pendingWizardConfigRef.current = null;
