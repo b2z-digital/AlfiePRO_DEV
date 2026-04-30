@@ -628,37 +628,33 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
               if (cmp > 0) { confirmed = false; break; }
             }
             if (!confirmed) {
-              // Non-transitive tie: try all-at-once same-heat comparison
-              // Find rounds where ALL remaining boats raced together
-              const allTogetherScores: Map<number, number[]> = new Map();
-              for (let i = 0; i < completedRaces.length; i++) {
-                const roundNum = completedRaces[i];
-                const skipperToHeat = roundHeatMap.get(roundNum);
-                if (!skipperToHeat) continue;
-                const heats = remaining.map(s => skipperToHeat.get(s.skipperIndex));
-                if (heats.every(h => h !== undefined && h === heats[0])) {
-                  remaining.forEach((s, idx) => {
-                    if (!allTogetherScores.has(idx)) allTogetherScores.set(idx, []);
-                    allTogetherScores.get(idx)!.push(s.raceScores[i] ?? 999);
-                  });
+              // Non-transitive tie (circular): per SHRS 5.7(ii)(3), resolve by
+              // best individual same-heat score across all pairwise matchups.
+              // The boat with the best (lowest) individual same-heat result gets the higher place.
+              const bestSameHeatScore = (s: SkipperStanding): number => {
+                let best = 999;
+                for (let i = 0; i < completedRaces.length; i++) {
+                  const roundNum = completedRaces[i];
+                  const skipperToHeat = roundHeatMap.get(roundNum);
+                  if (!skipperToHeat) continue;
+                  const sHeat = skipperToHeat.get(s.skipperIndex);
+                  if (!sHeat) continue;
+                  // Check if any other boat in the remaining group was in the same heat
+                  const inSameHeat = remaining.some(other =>
+                    other !== s && skipperToHeat.get(other.skipperIndex) === sHeat
+                  );
+                  if (inSameHeat) {
+                    const score = s.raceScores[i] ?? 999;
+                    if (score < best) best = score;
+                  }
                 }
-              }
+                return best;
+              };
 
-              if (allTogetherScores.size > 0 && allTogetherScores.get(0)!.length > 0) {
-                // Sort by same-heat scores where ALL raced together
-                const indices = remaining.map((_, idx) => idx);
-                indices.sort((ai, bi) => {
-                  const aScores = allTogetherScores.get(ai) || [];
-                  const bScores = allTogetherScores.get(bi) || [];
-                  return compareWithCountback(aScores, bScores, 0, 0);
-                });
-                const sorted = indices.map(i => remaining[i]);
-                result.push(...sorted);
-                remaining.length = 0;
-              } else {
-                // Fallback: peel off best iteratively using pairwise wins
-                result.push(remaining.splice(bestIdx, 1)[0]);
-              }
+              // Sort remaining by best individual same-heat score
+              remaining.sort((a, b) => bestSameHeatScore(a) - bestSameHeatScore(b));
+              result.push(...remaining);
+              remaining.length = 0;
             } else {
               result.push(remaining.splice(bestIdx, 1)[0]);
             }

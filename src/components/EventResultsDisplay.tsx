@@ -640,6 +640,57 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
     netTotal: totals[index]?.net || 0
   })).sort(compareSkippersWithCountback) : [];
 
+  // SHRS 5.7(ii)(3): Resolve non-transitive multi-way ties by best individual same-heat score
+  const resolveShrsMultiWayTiesForResults = (sorted: any[]): any[] => {
+    if (!isShrsEvent || shrsRoundHeatMap.size === 0 || sorted.length === 0) return sorted;
+    const result: any[] = [];
+    let i = 0;
+    while (i < sorted.length) {
+      let j = i + 1;
+      while (j < sorted.length && sorted[j].netTotal === sorted[i].netTotal) j++;
+      const group = sorted.slice(i, j);
+      if (group.length <= 2) {
+        result.push(...group);
+      } else {
+        // Check if sort produced a consistent ordering
+        let consistent = true;
+        for (let a = 0; a < group.length - 1 && consistent; a++) {
+          if (compareSkippersWithCountback(group[a], group[a + 1]) > 0) consistent = false;
+        }
+        if (!consistent) {
+          // Non-transitive: resolve by best individual same-heat score
+          const bestSameHeatScore = (s: any): number => {
+            let best = 999;
+            const raceNums = Array.from(shrsRoundHeatMap.keys()).sort((x, y) => x - y);
+            for (const raceNum of raceNums) {
+              const skipperToHeat = shrsRoundHeatMap.get(raceNum);
+              if (!skipperToHeat) continue;
+              const sHeat = skipperToHeat.get(s.index);
+              if (!sHeat) continue;
+              const inSameHeat = group.some((other: any) =>
+                other !== s && skipperToHeat.get(other.index) === sHeat
+              );
+              if (inSameHeat) {
+                const resultsByRaceMap = groupResultsByRace();
+                const raceResults = resultsByRaceMap[raceNum] || [];
+                const sResult = raceResults.find((r: any) => r.skipperIndex === s.index);
+                const score = sResult?.position ?? 999;
+                if (score < best) best = score;
+              }
+            }
+            return best;
+          };
+          group.sort((a: any, b: any) => bestSameHeatScore(a) - bestSameHeatScore(b));
+        }
+        result.push(...group);
+      }
+      i = j;
+    }
+    return result;
+  };
+
+  const sortedSkippersResolved = resolveShrsMultiWayTiesForResults(sortedSkippers);
+
   const isShrs = isShrsEvent;
   const shrsQualifyingRounds = shrsQualRounds;
 
@@ -660,15 +711,15 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   const shrsHasFinals = isShrs && shrsFleetMap.size > 0;
 
   const shrsFleetSortedSkippers = shrsHasFinals
-    ? [...sortedSkippers].sort((a, b) => {
+    ? [...sortedSkippersResolved].sort((a, b) => {
         const fleetA = shrsFleetMap.get(a.index) || 'Z';
         const fleetB = shrsFleetMap.get(b.index) || 'Z';
         if (fleetA !== fleetB) return fleetA.localeCompare(fleetB);
         return compareSkippersWithCountback(a, b);
       })
-    : sortedSkippers;
+    : sortedSkippersResolved;
 
-  const displaySkippers = shrsHasFinals ? shrsFleetSortedSkippers : sortedSkippers;
+  const displaySkippers = shrsHasFinals ? shrsFleetSortedSkippers : sortedSkippersResolved;
 
   const SHRS_FLEET_NAMES: Record<string, string> = {
     'A': 'Gold Fleet', 'B': 'Silver Fleet', 'C': 'Bronze Fleet',

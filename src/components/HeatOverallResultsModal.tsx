@@ -388,7 +388,44 @@ const HeatOverallResultsContent: React.FC<HeatOverallResultsModalProps> = ({
               for (let i = 1; i < remaining.length; i++) {
                 if (shrsCountbackCompare(remaining[i], remaining[bestIdx]) < 0) bestIdx = i;
               }
-              result.push(remaining.splice(bestIdx, 1)[0]);
+              // Verify best is consistent (beats all others)
+              let confirmed = true;
+              for (let i = 0; i < remaining.length; i++) {
+                if (i === bestIdx) continue;
+                if (shrsCountbackCompare(remaining[bestIdx], remaining[i]) > 0) { confirmed = false; break; }
+              }
+              if (!confirmed) {
+                // Non-transitive tie: resolve by best individual same-heat score
+                const bestSameHeatScore = (s: any): number => {
+                  let best = 999;
+                  for (const round of (heatManagement?.rounds || [])) {
+                    if (!round.completed) continue;
+                    let sHeat: string | null = null;
+                    for (const ha of round.heatAssignments) {
+                      if (ha.skipperIndices.includes(s.skipperIndex)) { sHeat = ha.heatDesignation; break; }
+                    }
+                    if (!sHeat) continue;
+                    const inSameHeat = remaining.some((other: any) => {
+                      if (other === s) return false;
+                      for (const ha of round.heatAssignments) {
+                        if (ha.heatDesignation === sHeat && ha.skipperIndices.includes(other.skipperIndex)) return true;
+                      }
+                      return false;
+                    });
+                    if (inSameHeat) {
+                      const sResult = round.results.find((r: any) => r.skipperIndex === s.skipperIndex);
+                      const score = sResult?.position ?? 999;
+                      if (score < best) best = score;
+                    }
+                  }
+                  return best;
+                };
+                remaining.sort((a: any, b: any) => bestSameHeatScore(a) - bestSameHeatScore(b));
+                result.push(...remaining);
+                remaining.length = 0;
+              } else {
+                result.push(remaining.splice(bestIdx, 1)[0]);
+              }
             }
             if (remaining.length === 1) result.push(remaining[0]);
           }
