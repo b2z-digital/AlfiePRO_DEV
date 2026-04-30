@@ -63,6 +63,7 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
   const [finalsRounds, setFinalsRounds] = useState<number>(4);
   const [seedingMethod, setSeedingMethod] = useState<SeedingMethod>('random');
   const [enableObservers, setEnableObservers] = useState(false);
+  const [observersPerHeat, setObserversPerHeat] = useState(2);
   const [enableRollCall, setEnableRollCall] = useState(true);
   const [scoringMode, setScoringMode] = useState<ScoringMode>('touch');
   const [fleetManagementEnabled, setFleetManagementEnabled] = useState(true);
@@ -194,7 +195,7 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
         heatManagement,
         observerSettings: {
           enable_observers: enableObservers,
-          observers_per_heat: 1,
+          observers_per_heat: observersPerHeat,
           enable_roll_call: enableRollCall,
           auto_complete_sail: true,
         },
@@ -299,7 +300,7 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
       heatManagement,
       observerSettings: {
         enable_observers: enableObservers,
-        observers_per_heat: 1,
+        observers_per_heat: observersPerHeat,
         enable_roll_call: enableRollCall,
         auto_complete_sail: true,
       },
@@ -936,6 +937,31 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
                 }`} />
               </button>
             </div>
+            {enableObservers && (
+              <div className="mt-3 pt-3 border-t border-slate-700/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm text-slate-300">Observers Per Heat</span>
+                    <p className="text-xs text-slate-500">Number of observers assigned to each heat</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setObserversPerHeat(Math.max(2, observersPerHeat - 1))}
+                      className="w-7 h-7 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-white text-sm font-bold transition-colors"
+                    >
+                      -
+                    </button>
+                    <span className="w-8 text-center text-white font-semibold">{observersPerHeat}</span>
+                    <button
+                      onClick={() => setObserversPerHeat(Math.min(10, observersPerHeat + 1))}
+                      className="w-7 h-7 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-white text-sm font-bold transition-colors"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           )}
 
