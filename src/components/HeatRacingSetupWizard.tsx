@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, ChevronRight, ChevronLeft, Trophy, Users, Zap, Target, Check, Shuffle, ClipboardList, ArrowUpDown, Grid3x2 as Grid3X3, Eye, ClipboardCheck, Hand, Table2, Monitor } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Trophy, Users, Zap, Target, Check, Shuffle, ClipboardList, ArrowUpDown, Grid3x2 as Grid3X3, Eye, ClipboardCheck, Hand, Table2, Monitor, Tag } from 'lucide-react';
 import { Logo } from './Logo';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skipper } from '../types';
@@ -67,6 +67,8 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
   const [enableRollCall, setEnableRollCall] = useState(true);
   const [scoringMode, setScoringMode] = useState<ScoringMode>('touch');
   const [fleetManagementEnabled, setFleetManagementEnabled] = useState(true);
+  const [heatLabelStyle, setHeatLabelStyle] = useState<'letters' | 'numbers'>('letters');
+  const [heatOrder, setHeatOrder] = useState<'ascending' | 'descending'>('ascending');
 
   const totalSkippers = skippers.length;
 
@@ -173,7 +175,8 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
         autoAssign: false,
         scoringSystem,
         fleetManagementEnabled,
-        heatLabelStyle: 'letters',
+        heatLabelStyle,
+        heatOrder,
         ...(scoringSystem === 'shrs' ? {
           shrsAssignmentMode: shrsMode,
           shrsQualifyingRounds: qualifyingRounds,
@@ -278,7 +281,8 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
       autoAssign: false,
       scoringSystem,
       fleetManagementEnabled,
-      heatLabelStyle: 'letters',
+      heatLabelStyle,
+      heatOrder,
       ...(scoringSystem === 'shrs' ? {
         shrsAssignmentMode: shrsMode,
         shrsQualifyingRounds: qualifyingRounds,
@@ -988,6 +992,78 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
                   enableRollCall ? 'left-[26px]' : 'left-0.5'
                 }`} />
               </button>
+            </div>
+          </div>
+          )}
+
+          {/* Heat Identification & Order - SHRS only */}
+          {scoringSystem === 'shrs' && (
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 space-y-4">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-9 h-9 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                <Tag size={18} className="text-teal-400" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-white">Heat Scoring Options</h4>
+                <p className="text-xs text-slate-400">Configure heat labelling and scoring order</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wide">
+                Heat Identification
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setHeatLabelStyle('letters')}
+                  className={`py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                    heatLabelStyle === 'letters'
+                      ? 'bg-teal-500/20 border-2 border-teal-500 text-white'
+                      : 'bg-slate-700/50 border-2 border-slate-700/50 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  Letters (A, B, C)
+                </button>
+                <button
+                  onClick={() => setHeatLabelStyle('numbers')}
+                  className={`py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                    heatLabelStyle === 'numbers'
+                      ? 'bg-teal-500/20 border-2 border-teal-500 text-white'
+                      : 'bg-slate-700/50 border-2 border-slate-700/50 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  Numbers (1, 2, 3)
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wide">
+                Heat Racing Order
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setHeatOrder('ascending')}
+                  className={`py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                    heatOrder === 'ascending'
+                      ? 'bg-teal-500/20 border-2 border-teal-500 text-white'
+                      : 'bg-slate-700/50 border-2 border-slate-700/50 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  {heatLabelStyle === 'letters' ? 'A, B' : '1, 2'}
+                </button>
+                <button
+                  onClick={() => setHeatOrder('descending')}
+                  className={`py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                    heatOrder === 'descending'
+                      ? 'bg-teal-500/20 border-2 border-teal-500 text-white'
+                      : 'bg-slate-700/50 border-2 border-slate-700/50 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  {heatLabelStyle === 'letters' ? 'B, A' : '2, 1'}
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1.5">Sets the display and scoring order of heats</p>
             </div>
           </div>
           )}
