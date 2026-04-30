@@ -3259,7 +3259,34 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     }
   };
 
-  const showHandicapOptions = !hasDeterminedInitialHcaps && !isManualHandicaps && 
+  const handleImportAllRoundAssignments = async (allRoundAssignments: any[][]) => {
+    if (!heatManagement) return;
+    const updatedRounds = allRoundAssignments.map((assignments, idx) => ({
+      round: idx + 1,
+      heatAssignments: assignments,
+      results: [],
+      completed: false
+    }));
+    const updatedHeatManagement = {
+      ...heatManagement,
+      rounds: updatedRounds,
+      currentRound: 1
+    };
+    setHeatManagement(updatedHeatManagement);
+    const event = getCurrentEvent();
+    if (event?.id) {
+      try {
+        await supabase
+          .from('quick_races')
+          .update({ heat_management: updatedHeatManagement })
+          .eq('id', event.isSeriesEvent ? event.seriesId : event.id);
+      } catch (err) {
+        console.error('Error saving imported heat assignments:', err);
+      }
+    }
+  };
+
+  const showHandicapOptions = !hasDeterminedInitialHcaps && !isManualHandicaps &&
     raceType === 'handicap' &&
     skippers.length > 0 &&
     skippers.every((_, index) => {
@@ -3533,6 +3560,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 onAdvanceToNextRound={handleAdvanceToNextRound}
                 onClearHeatRaceResults={handleClearHeatRaceResults}
                 onUpdateHeatAssignments={handleUpdateHeatAssignments}
+                onImportAllRoundAssignments={handleImportAllRoundAssignments}
                 onSelectHeat={handleSelectHeat}
                 onForceRoundComplete={(roundNumber: number) => {
                   setHeatManagement(prevHM => {
