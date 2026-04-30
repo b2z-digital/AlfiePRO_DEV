@@ -55,6 +55,7 @@ interface HeatScoringTableProps {
   onAdvanceToNextRound?: (currentHeat: HeatDesignation) => void;
   onClearHeatRaceResults?: (heatDesignation: HeatDesignation, round: number, race: number, skipperIndices: number[]) => void;
   onUpdateHeatAssignments?: (assignments: any, targetRound?: number) => void;
+  onImportAllRoundAssignments?: (allRoundAssignments: any[][]) => void;
   onSelectHeat?: (heat: HeatDesignation) => void;
   onForceRoundComplete?: (roundNumber: number) => void;
   onFinaliseQualifying?: () => void;
@@ -94,6 +95,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   onAdvanceToNextRound,
   onClearHeatRaceResults,
   onUpdateHeatAssignments,
+  onImportAllRoundAssignments,
   onSelectHeat,
   onForceRoundComplete,
   onFinaliseQualifying,
@@ -2385,6 +2387,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         onManualAssign={handleManualAssign}
         onStartRound={onGoToRound}
         onUpdateAssignments={onUpdateHeatAssignments}
+        onImportAllRoundAssignments={onImportAllRoundAssignments}
         onAdvanceToNextRound={(nextRoundNumber) => {
           console.log('🔄 Advancing to Round', nextRoundNumber, '- keeping modal open to show allocations');
           if (heatManagement.roundJustCompleted) {

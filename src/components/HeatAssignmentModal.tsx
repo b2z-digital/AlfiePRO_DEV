@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, ChevronDown, FileSpreadsheet } from 'lucide-react';
+import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, ChevronDown, FileSpreadsheet, Upload } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound, getHeatDisplayLabel } from '../types/heat';
 import { RaceEvent } from '../types/race';
@@ -23,6 +23,7 @@ interface HeatAssignmentModalProps {
   onUpdateAssignments?: (assignments: HeatAssignment[], targetRound?: number) => void;
   onAdvanceToNextRound?: (nextRoundNumber: number) => void;
   onFinaliseQualifying?: () => void;
+  onImportAllRoundAssignments?: (allRoundAssignments: HeatAssignment[][]) => void;
 }
 
 export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
@@ -37,7 +38,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   onStartRound,
   onUpdateAssignments,
   onAdvanceToNextRound,
-  onFinaliseQualifying
+  onFinaliseQualifying,
+  onImportAllRoundAssignments
 }) => {
   const [editMode, setEditMode] = useState(false);
   const [showFinaliseConfirm, setShowFinaliseConfirm] = useState(false);
@@ -54,7 +56,175 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [localAssignments, setLocalAssignments] = useState<HeatAssignment[] | null>(null);
   const [previewRoundIndex, setPreviewRoundIndex] = useState<number | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
+
+  const handleImportHeatAssignmentsCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImportError(null);
+    setImportSuccess(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        const parsed = parseHeatAssignmentsCsv(text);
+        if (parsed.error) {
+          setImportError(parsed.error);
+          return;
+        }
+        if (onImportAllRoundAssignments && parsed.assignments.length > 0) {
+          onImportAllRoundAssignments(parsed.assignments);
+          setImportSuccess(`Imported heat assignments for ${parsed.assignments.length} rounds (${parsed.matchedCount}/${parsed.totalSailNumbers} sail numbers matched)`);
+          if (parsed.unmatchedSails.length > 0) {
+            setImportError(`Unmatched sail numbers: ${parsed.unmatchedSails.join(', ')}`);
+          }
+        }
+      } catch (err: any) {
+        setImportError(err.message || 'Failed to parse CSV file');
+      }
+    };
+    reader.readAsText(file);
+    if (importFileRef.current) importFileRef.current.value = '';
+  };
+
+  const parseHeatAssignmentsCsv = (text: string): {
+    assignments: HeatAssignment[][];
+    error?: string;
+    matchedCount: number;
+    totalSailNumbers: number;
+    unmatchedSails: string[];
+  } => {
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length < 2) return { assignments: [], error: 'CSV file is empty or has no data rows', matchedCount: 0, totalSailNumbers: 0, unmatchedSails: [] };
+
+    // Parse CSV fields (handle quoted fields)
+    const parseCsvLine = (line: string): string[] => {
+      const fields: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          inQuotes = !inQuotes;
+        } else if (ch === ',' && !inQuotes) {
+          fields.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      fields.push(current.trim());
+      return fields;
+    };
+
+    // Build sail number -> skipper index lookup
+    const sailToIndex = new Map<string, number>();
+    skippers.forEach((s, idx) => {
+      const sail = (s.sailNo || s.sailNumber || '').toString().trim().toUpperCase();
+      if (sail) sailToIndex.set(sail, idx);
+    });
+
+    // Detect format: header row should contain "Heat", "Pos", and round names
+    const headerFields = parseCsvLine(lines[0]);
+    const headerLower = headerFields.map(f => f.toLowerCase().replace(/"/g, ''));
+
+    // Determine number of rounds from header
+    // Format: "Heat","Pos","Qualifying Rd 1","","","Qualifying Rd 2","",""...
+    // Each round has 3 columns: Sail No, Skipper, Pts
+    let numRounds = 0;
+    for (let i = 2; i < headerFields.length; i++) {
+      const f = headerFields[i].replace(/"/g, '').trim();
+      if (f && /qualifying|round|rd|final|race|q\d/i.test(f)) {
+        numRounds++;
+      }
+    }
+    if (numRounds === 0) {
+      // Try alternative detection: count groups of 3 columns after first 2
+      numRounds = Math.floor((headerFields.length - 2) / 3);
+    }
+    if (numRounds === 0) return { assignments: [], error: 'Could not detect rounds from CSV header', matchedCount: 0, totalSailNumbers: 0, unmatchedSails: [] };
+
+    // Parse data rows grouped by heat
+    // Structure: rows start with "Heat 1","1",... or "","2",...
+    // Heat header row has "Heat N" in first column, subsequent rows have "" in first column
+    // "Observers" row marks end of a heat section
+    const numberOfHeats = heatManagement.configuration.numberOfHeats || 2;
+    const heatDesignations: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, numberOfHeats) as HeatDesignation[];
+
+    // For each round, build heat -> skipper indices mapping
+    // roundAssignments[roundIdx][heatIdx] = skipperIndices[]
+    const roundAssignments: number[][][] = Array.from({ length: numRounds }, () =>
+      Array.from({ length: numberOfHeats }, () => [])
+    );
+
+    let currentHeatIdx = -1;
+    let allSailNumbers = new Set<string>();
+    const unmatchedSails = new Set<string>();
+
+    // Skip header row(s) - find first data row
+    let dataStartLine = 1;
+    const secondLine = parseCsvLine(lines[1]);
+    if (secondLine[0]?.toLowerCase().replace(/"/g, '').includes('sail') ||
+        secondLine[2]?.toLowerCase().replace(/"/g, '').includes('sail')) {
+      dataStartLine = 2;
+    }
+
+    for (let lineIdx = dataStartLine; lineIdx < lines.length; lineIdx++) {
+      const fields = parseCsvLine(lines[lineIdx]);
+      if (fields.length < 3) continue;
+
+      const firstField = fields[0].replace(/"/g, '').trim();
+      const secondField = fields[1]?.replace(/"/g, '').trim() || '';
+
+      // Detect heat section start
+      if (/^heat\s*\d+$/i.test(firstField)) {
+        currentHeatIdx++;
+        if (currentHeatIdx >= numberOfHeats) {
+          // Wrapping around - shouldn't happen in normal data but handle gracefully
+          break;
+        }
+      }
+
+      // Skip observer rows or empty rows
+      if (/^observer/i.test(secondField) || /^observer/i.test(firstField)) continue;
+      if (!secondField || isNaN(parseInt(secondField))) continue;
+
+      if (currentHeatIdx < 0) continue;
+
+      // Each round has 3 columns (Sail No, Skipper, Pts) starting at offset 2
+      for (let roundIdx = 0; roundIdx < numRounds; roundIdx++) {
+        const colOffset = 2 + (roundIdx * 3); // Sail No column for this round
+        const sailNo = (fields[colOffset] || '').replace(/"/g, '').trim().toUpperCase();
+        if (!sailNo) continue;
+
+        allSailNumbers.add(sailNo);
+        const skipperIdx = sailToIndex.get(sailNo);
+        if (skipperIdx !== undefined) {
+          roundAssignments[roundIdx][currentHeatIdx].push(skipperIdx);
+        } else {
+          unmatchedSails.add(sailNo);
+        }
+      }
+    }
+
+    if (currentHeatIdx < 0) {
+      return { assignments: [], error: 'No heat sections found in CSV', matchedCount: 0, totalSailNumbers: allSailNumbers.size, unmatchedSails: Array.from(unmatchedSails) };
+    }
+
+    // Convert to HeatAssignment[][] format
+    const result: HeatAssignment[][] = roundAssignments.map(roundHeats =>
+      roundHeats.map((skipperIndices, heatIdx) => ({
+        heatDesignation: heatDesignations[heatIdx],
+        skipperIndices
+      }))
+    );
+
+    const matchedCount = allSailNumbers.size - unmatchedSails.size;
+    return { assignments: result, matchedCount, totalSailNumbers: allSailNumbers.size, unmatchedSails: Array.from(unmatchedSails) };
+  };
 
   const syncObserverEventId = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
   const [resolvedObserverId, setResolvedObserverId] = useState<string | null>(syncObserverEventId);
@@ -1957,6 +2127,38 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   <Edit3 size={18} />
                   Edit Assignments
                 </button>
+              )}
+              {isSHRS && onImportAllRoundAssignments && (
+                <>
+                  <input
+                    ref={importFileRef}
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={handleImportHeatAssignmentsCsv}
+                  />
+                  <button
+                    onClick={() => importFileRef.current?.click()}
+                    className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
+                      darkMode
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-green-500 text-white hover:bg-green-600'
+                    }`}
+                  >
+                    <Upload size={18} />
+                    Import from CSV
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {(importSuccess || importError) && isInitialAllocation && (
+            <div className="flex flex-col gap-1 px-5 pb-2">
+              {importSuccess && (
+                <p className="text-sm text-green-500">{importSuccess}</p>
+              )}
+              {importError && (
+                <p className="text-sm text-amber-500">{importError}</p>
               )}
             </div>
           )}
