@@ -641,8 +641,37 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   })).sort(compareSkippersWithCountback) : [];
 
   // SHRS 5.7(ii)(3): Resolve non-transitive multi-way ties by best individual same-heat score
+  // For SHRS events, pairwise same-heat countback can be circular (A beats B, B beats C, C beats A).
+  // In that case, resolve by best individual same-heat score across all pairwise matchups.
   const resolveShrsMultiWayTiesForResults = (sorted: any[]): any[] => {
     if (!isShrsEvent || shrsRoundHeatMap.size === 0 || sorted.length === 0) return sorted;
+
+    const resultsByRaceMap = groupResultsByRace();
+    const raceNums = Array.from(shrsRoundHeatMap.keys()).sort((x, y) => x - y);
+
+    // Pairwise same-heat countback result (without name/sail fallback) - returns 0 if tied on scores
+    const sameHeatCountbackOnly = (a: any, b: any): number => {
+      const aSameHeatScores: number[] = [];
+      const bSameHeatScores: number[] = [];
+      for (const raceNum of raceNums) {
+        const skipperToHeat = shrsRoundHeatMap.get(raceNum);
+        if (!skipperToHeat) continue;
+        const aHeat = skipperToHeat.get(a.index);
+        const bHeat = skipperToHeat.get(b.index);
+        if (aHeat && bHeat && aHeat === bHeat) {
+          const raceResults = resultsByRaceMap[raceNum] || [];
+          const aResult = raceResults.find((r: any) => r.skipperIndex === a.index);
+          const bResult = raceResults.find((r: any) => r.skipperIndex === b.index);
+          aSameHeatScores.push(aResult?.position ?? 999);
+          bSameHeatScores.push(bResult?.position ?? 999);
+        }
+      }
+      if (aSameHeatScores.length > 0) {
+        return compareWithCountback(aSameHeatScores, bSameHeatScores, 0, 0);
+      }
+      return 0;
+    };
+
     const result: any[] = [];
     let i = 0;
     while (i < sorted.length) {
@@ -652,16 +681,21 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
       if (group.length <= 2) {
         result.push(...group);
       } else {
-        // Check if sort produced a consistent ordering
-        let consistent = true;
-        for (let a = 0; a < group.length - 1 && consistent; a++) {
-          if (compareSkippersWithCountback(group[a], group[a + 1]) > 0) consistent = false;
+        // Check transitivity: does pairwise countback produce a consistent winner?
+        let bestIdx = 0;
+        for (let k = 1; k < group.length; k++) {
+          if (sameHeatCountbackOnly(group[k], group[bestIdx]) < 0) bestIdx = k;
         }
-        if (!consistent) {
-          // Non-transitive: resolve by best individual same-heat score
+        let isTransitive = true;
+        for (let k = 0; k < group.length; k++) {
+          if (k === bestIdx) continue;
+          if (sameHeatCountbackOnly(group[bestIdx], group[k]) > 0) { isTransitive = false; break; }
+        }
+
+        if (!isTransitive) {
+          // Non-transitive (circular): resolve by best individual same-heat score
           const bestSameHeatScore = (s: any): number => {
             let best = 999;
-            const raceNums = Array.from(shrsRoundHeatMap.keys()).sort((x, y) => x - y);
             for (const raceNum of raceNums) {
               const skipperToHeat = shrsRoundHeatMap.get(raceNum);
               if (!skipperToHeat) continue;
@@ -671,9 +705,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 other !== s && skipperToHeat.get(other.index) === sHeat
               );
               if (inSameHeat) {
-                const resultsByRaceMap = groupResultsByRace();
-                const raceResults = resultsByRaceMap[raceNum] || [];
-                const sResult = raceResults.find((r: any) => r.skipperIndex === s.index);
+                const rr = resultsByRaceMap[raceNum] || [];
+                const sResult = rr.find((r: any) => r.skipperIndex === s.index);
                 const score = sResult?.position ?? 999;
                 if (score < best) best = score;
               }
@@ -681,6 +714,20 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
             return best;
           };
           group.sort((a: any, b: any) => bestSameHeatScore(a) - bestSameHeatScore(b));
+        } else {
+          // Transitive: iteratively peel off best using same-heat countback
+          const remaining = [...group];
+          const resolved: any[] = [];
+          while (remaining.length > 1) {
+            let bIdx = 0;
+            for (let k = 1; k < remaining.length; k++) {
+              if (sameHeatCountbackOnly(remaining[k], remaining[bIdx]) < 0) bIdx = k;
+            }
+            resolved.push(remaining.splice(bIdx, 1)[0]);
+          }
+          resolved.push(remaining[0]);
+          group.length = 0;
+          group.push(...resolved);
         }
         result.push(...group);
       }
