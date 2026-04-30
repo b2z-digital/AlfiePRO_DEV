@@ -313,27 +313,143 @@ const HeatOverallResultsContent: React.FC<HeatOverallResultsModalProps> = ({
         }
       };
 
-      if (hasFinals) {
-        return allStandings.sort((a: any, b: any) => {
-          if (a.fleet !== b.fleet) return a.fleet.localeCompare(b.fleet);
-          if (a.net !== b.net) return a.net - b.net;
-          try {
-            return compareWithCountback(a.points, b.points, a.drops, b.drops);
-          } catch {
-            return 0;
-          }
-        });
-      }
-
-      return allStandings.sort((a: any, b: any) => {
-        if (a.net !== b.net) return a.net - b.net;
-        if (isHms) return hmsBreakTieCompare(a, b);
+      // SHRS Rule 5.6 same-heat countback
+      const shrsCountbackCompare = (a: any, b: any): number => {
         try {
-          return compareWithCountback(a.points, b.points, a.drops, b.drops);
+          const aSameHeatScores: number[] = [];
+          const bSameHeatScores: number[] = [];
+
+          for (const round of (heatManagement?.rounds || [])) {
+            if (!round.completed) continue;
+            let aHeat: string | null = null;
+            let bHeat: string | null = null;
+            for (const ha of round.heatAssignments) {
+              if (ha.skipperIndices.includes(a.skipperIndex)) aHeat = ha.heatDesignation;
+              if (ha.skipperIndices.includes(b.skipperIndex)) bHeat = ha.heatDesignation;
+            }
+            if (aHeat && bHeat && aHeat === bHeat) {
+              const aResult = round.results.find((r: any) => r.skipperIndex === a.skipperIndex);
+              const bResult = round.results.find((r: any) => r.skipperIndex === b.skipperIndex);
+              aSameHeatScores.push(aResult?.position ?? 999);
+              bSameHeatScores.push(bResult?.position ?? 999);
+            }
+          }
+
+          if (aSameHeatScores.length > 0) {
+            // SHRS 5.6(a): Countback with 0 discards on same-heat scores
+            const result = compareWithCountback(aSameHeatScores, bSameHeatScores, 0, 0);
+            if (result !== 0) return result;
+          } else {
+            // SHRS 5.6(b): Never sailed together -> use unmodified RRS A8.1/A8.2
+            const result = compareWithCountback(a.points, b.points, a.drops, b.drops);
+            if (result !== 0) return result;
+          }
+
+          // Final fallback: surname, first name, sail number
+          const extractSurname = (name: string) => {
+            const parts = (name || '').trim().split(/\s+/);
+            if (parts.length <= 1) return { surname: parts[0] || '', firstName: '' };
+            return { surname: parts[parts.length - 1], firstName: parts.slice(0, -1).join(' ') };
+          };
+          const aNameParts = extractSurname(a.skipper?.name || '');
+          const bNameParts = extractSurname(b.skipper?.name || '');
+          const surnameResult = aNameParts.surname.localeCompare(bNameParts.surname, undefined, { sensitivity: 'base' });
+          if (surnameResult !== 0) return surnameResult;
+          const firstNameResult = aNameParts.firstName.localeCompare(bNameParts.firstName, undefined, { sensitivity: 'base' });
+          if (firstNameResult !== 0) return firstNameResult;
+          const aSail = (a.skipper?.sailNo || a.skipper?.sailNumber || '').toUpperCase();
+          const bSail = (b.skipper?.sailNo || b.skipper?.sailNumber || '').toUpperCase();
+          return aSail.localeCompare(bSail, undefined, { numeric: true, sensitivity: 'base' });
         } catch {
           return 0;
         }
-      });
+      };
+
+      // SHRS 5.7(ii)(3): Multi-way tie resolution - resolve higher place first
+      const resolveShrsMultiWayTies = (standings: any[]): any[] => {
+        const groupKey = (s: any) => `${s.fleet}|${s.net}`;
+        const groups = new Map<string, any[]>();
+        const order: string[] = [];
+        for (const s of standings) {
+          const key = groupKey(s);
+          if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+          groups.get(key)!.push(s);
+        }
+        const result: any[] = [];
+        for (const key of order) {
+          const group = groups.get(key)!;
+          if (group.length <= 2) {
+            group.sort(shrsCountbackCompare);
+            result.push(...group);
+          } else {
+            const remaining = [...group];
+            while (remaining.length > 1) {
+              let bestIdx = 0;
+              for (let i = 1; i < remaining.length; i++) {
+                if (shrsCountbackCompare(remaining[i], remaining[bestIdx]) < 0) bestIdx = i;
+              }
+              // Verify best is consistent (beats all others)
+              let confirmed = true;
+              for (let i = 0; i < remaining.length; i++) {
+                if (i === bestIdx) continue;
+                if (shrsCountbackCompare(remaining[bestIdx], remaining[i]) > 0) { confirmed = false; break; }
+              }
+              if (!confirmed) {
+                // Non-transitive tie: resolve by best individual same-heat score
+                const bestSameHeatScore = (s: any): number => {
+                  let best = 999;
+                  for (const round of (heatManagement?.rounds || [])) {
+                    if (!round.completed) continue;
+                    let sHeat: string | null = null;
+                    for (const ha of round.heatAssignments) {
+                      if (ha.skipperIndices.includes(s.skipperIndex)) { sHeat = ha.heatDesignation; break; }
+                    }
+                    if (!sHeat) continue;
+                    const inSameHeat = remaining.some((other: any) => {
+                      if (other === s) return false;
+                      for (const ha of round.heatAssignments) {
+                        if (ha.heatDesignation === sHeat && ha.skipperIndices.includes(other.skipperIndex)) return true;
+                      }
+                      return false;
+                    });
+                    if (inSameHeat) {
+                      const sResult = round.results.find((r: any) => r.skipperIndex === s.skipperIndex);
+                      const score = sResult?.position ?? 999;
+                      if (score < best) best = score;
+                    }
+                  }
+                  return best;
+                };
+                remaining.sort((a: any, b: any) => bestSameHeatScore(a) - bestSameHeatScore(b));
+                result.push(...remaining);
+                remaining.length = 0;
+              } else {
+                result.push(remaining.splice(bestIdx, 1)[0]);
+              }
+            }
+            if (remaining.length === 1) result.push(remaining[0]);
+          }
+        }
+        return result;
+      };
+
+      if (hasFinals) {
+        allStandings.sort((a: any, b: any) => {
+          if (a.fleet !== b.fleet) return a.fleet.localeCompare(b.fleet);
+          return a.net - b.net;
+        });
+        return resolveShrsMultiWayTies(allStandings);
+      }
+
+      if (isHms) {
+        return allStandings.sort((a: any, b: any) => {
+          if (a.net !== b.net) return a.net - b.net;
+          return hmsBreakTieCompare(a, b);
+        });
+      }
+
+      allStandings.sort((a: any, b: any) => a.net - b.net);
+      return resolveShrsMultiWayTies(allStandings);
     } catch (e) {
       console.error('Error computing standings:', e);
       return [];

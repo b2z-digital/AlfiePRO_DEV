@@ -583,17 +583,101 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       return sailResult;
     };
 
+    // SHRS 5.7(ii)(3): Multi-way tie resolution - "higher place resolved first"
+    // When 3+ boats are tied, resolve iteratively: find the best boat from the group,
+    // remove it, then resolve the remaining tied boats.
+    const resolveMultiWayTies = (standings: SkipperStanding[]): SkipperStanding[] => {
+      // Group by fleet+net to find tied groups
+      const groupKey = (s: SkipperStanding) => `${s.fleet}|${s.net}`;
+      const groups = new Map<string, SkipperStanding[]>();
+      const order: string[] = [];
+
+      for (const s of standings) {
+        const key = groupKey(s);
+        if (!groups.has(key)) {
+          groups.set(key, []);
+          order.push(key);
+        }
+        groups.get(key)!.push(s);
+      }
+
+      const result: SkipperStanding[] = [];
+      for (const key of order) {
+        const group = groups.get(key)!;
+        if (group.length <= 2) {
+          // 1 or 2 boats: standard pairwise sort is fine
+          group.sort((a, b) => {
+            try { return shrsCountback(a, b); } catch { return 0; }
+          });
+          result.push(...group);
+        } else {
+          // 3+ boats: resolve iteratively per SHRS 5.7(ii)(3)
+          const remaining = [...group];
+          while (remaining.length > 1) {
+            // Find the "best" boat from the remaining group
+            let bestIdx = 0;
+            for (let i = 1; i < remaining.length; i++) {
+              const cmp = shrsCountback(remaining[i], remaining[bestIdx]);
+              if (cmp < 0) bestIdx = i;
+            }
+            // Verify best is consistent (beats all others or at least isn't beaten by all)
+            let confirmed = true;
+            for (let i = 0; i < remaining.length; i++) {
+              if (i === bestIdx) continue;
+              const cmp = shrsCountback(remaining[bestIdx], remaining[i]);
+              if (cmp > 0) { confirmed = false; break; }
+            }
+            if (!confirmed) {
+              // Non-transitive tie (circular): per SHRS 5.7(ii)(3), resolve by
+              // best individual same-heat score across all pairwise matchups.
+              // The boat with the best (lowest) individual same-heat result gets the higher place.
+              const bestSameHeatScore = (s: SkipperStanding): number => {
+                let best = 999;
+                for (let i = 0; i < completedRaces.length; i++) {
+                  const roundNum = completedRaces[i];
+                  const skipperToHeat = roundHeatMap.get(roundNum);
+                  if (!skipperToHeat) continue;
+                  const sHeat = skipperToHeat.get(s.skipperIndex);
+                  if (!sHeat) continue;
+                  // Check if any other boat in the remaining group was in the same heat
+                  const inSameHeat = remaining.some(other =>
+                    other !== s && skipperToHeat.get(other.skipperIndex) === sHeat
+                  );
+                  if (inSameHeat) {
+                    const score = s.raceScores[i] ?? 999;
+                    if (score < best) best = score;
+                  }
+                }
+                return best;
+              };
+
+              // Sort remaining by best individual same-heat score
+              remaining.sort((a, b) => bestSameHeatScore(a) - bestSameHeatScore(b));
+              result.push(...remaining);
+              remaining.length = 0;
+            } else {
+              result.push(remaining.splice(bestIdx, 1)[0]);
+            }
+          }
+          if (remaining.length === 1) result.push(remaining[0]);
+        }
+      }
+      return result;
+    };
+
     if (hasFinals) {
       allStandings.sort((a, b) => {
         if (a.fleet !== b.fleet) return a.fleet.localeCompare(b.fleet);
-        if (a.net !== b.net) return a.net - b.net;
-        try { return shrsCountback(a, b); } catch { return 0; }
+        return a.net - b.net;
       });
+      const resolved = resolveMultiWayTies(allStandings);
+      allStandings.length = 0;
+      allStandings.push(...resolved);
     } else {
-      allStandings.sort((a, b) => {
-        if (a.net !== b.net) return a.net - b.net;
-        try { return shrsCountback(a, b); } catch { return 0; }
-      });
+      allStandings.sort((a, b) => a.net - b.net);
+      const resolved = resolveMultiWayTies(allStandings);
+      allStandings.length = 0;
+      allStandings.push(...resolved);
     }
 
     let currentFleet = '';
