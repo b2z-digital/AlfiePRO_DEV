@@ -16,6 +16,9 @@ import type { ObserverAssignment } from '../utils/observerUtils';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { LiveStatusControl } from './LiveStatusControl';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Video } from 'lucide-react';
+import { LivestreamControlPanel } from './livestream/LivestreamControlPanel';
 
 
 interface TouchModeScoringProps {
@@ -88,6 +91,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   const [showProgressionModal, setShowProgressionModal] = useState(false);
   const [selectedSkipperForProgression, setSelectedSkipperForProgression] = useState<number | null>(null);
   const [isHandicapViewerOpen, setIsHandicapViewerOpen] = useState(false);
+  const [isLivestreamPanelOpen, setIsLivestreamPanelOpen] = useState(false);
   const [showStartBoxModal, setShowStartBoxModal] = useState(false);
   const [raceTimerRunning, setRaceTimerRunning] = useState(false);
   const [storedHandicaps, setStoredHandicaps] = useState<StoredHandicapData[]>([]);
@@ -1485,6 +1489,66 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         storedHandicaps={storedHandicaps}
         onUsePreviousHandicaps={handleUsePreviousHandicaps}
       />}
+
+      {/* Floating Livestream Panel - only for events with livestream enabled */}
+      {currentEvent?.enableLiveStream && currentEvent?.clubId && (
+        <>
+          {!isLivestreamPanelOpen && (
+            <motion.button
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsLivestreamPanelOpen(true)}
+              className="fixed right-1 top-[35%] -translate-y-1/2 z-30 rounded-l-xl shadow-2xl flex flex-col items-center gap-2 px-2 py-3 bg-gradient-to-b from-rose-600 to-red-700 text-white hover:from-rose-500 hover:to-red-600 transition-all duration-200"
+            >
+              <Video size={18} />
+              <div className="flex flex-col items-center">
+                {'STREAM'.split('').map((letter, index) => (
+                  <span key={index} className="text-[10px] font-semibold leading-tight">
+                    {letter}
+                  </span>
+                ))}
+              </div>
+            </motion.button>
+          )}
+
+          <AnimatePresence>
+            {isLivestreamPanelOpen && (
+              <motion.div
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed right-0 top-0 bottom-0 w-[75vw] max-w-[1200px] shadow-2xl z-[9995] flex flex-col bg-slate-900 text-white"
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/50 bg-gradient-to-r from-rose-900/50 to-slate-900 flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-red-600/20 flex items-center justify-center">
+                      <Video size={18} className="text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-white">Livestream Console</h3>
+                      <p className="text-xs text-slate-400">{currentEvent?.eventName || 'Live Broadcast'}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsLivestreamPanelOpen(false)}
+                    className="p-2 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-auto">
+                  <LivestreamControlPanel
+                    clubId={currentEvent.clubId}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
 
       {/* Post-Race Handicap Modal */}
       {isHandicapEvent && (
