@@ -14,14 +14,21 @@ import { ConfirmationModal } from '../ConfirmationModal';
 import { OverlaysManager } from './OverlaysManager';
 import { LivestreamOverlayRenderer } from './LivestreamOverlayRenderer';
 import { CameraFeedGridRef } from './CameraFeedGrid';
+import { AdvancedStreamConsole } from './AdvancedStreamConsole';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useCanvasCompositor } from '../../hooks/useCanvasCompositor';
 import { subscribeToRaceStatus } from '../../utils/liveTrackingStorage';
 import type { LivestreamRaceSegment } from '../../types/livestream';
 
+interface AutoCreateEventInfo {
+  eventId: string;
+  eventName: string;
+}
+
 interface LivestreamControlPanelProps {
   clubId: string;
   sessionId?: string;
+  autoCreateForEvent?: AutoCreateEventInfo;
 }
 
 interface SessionWithVenue extends LivestreamSession {
@@ -29,7 +36,7 @@ interface SessionWithVenue extends LivestreamSession {
   venueName?: string;
 }
 
-export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlPanelProps) {
+export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }: LivestreamControlPanelProps) {
   const { user } = useAuth();
   const { addNotification } = useNotification();
   const [activeSession, setActiveSession] = useState<LivestreamSession | null>(null);
@@ -1078,7 +1085,97 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     }
   };
 
-  const createNewSession = () => setShowSetupWizard(true);
+  const createNewSession = () => {
+    if (autoCreateForEvent) {
+      activateStreamForEvent();
+    } else {
+      setShowSetupWizard(true);
+    }
+  };
+
+  const [activatingStream, setActivatingStream] = useState(false);
+  const autoStartPreviewRef = useRef(false);
+
+  useEffect(() => {
+    if (autoStartPreviewRef.current && activeSession && streamStatus === 'offline') {
+      autoStartPreviewRef.current = false;
+      startTestStream();
+    }
+  }, [activeSession]);
+
+  const activateStreamForEvent = async () => {
+    if (!user || !autoCreateForEvent) return;
+    setActivatingStream(true);
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession) throw new Error('Not authenticated');
+
+      const headers = {
+        'Authorization': `Bearer ${authSession.access_token}`,
+        'Content-Type': 'application/json',
+      };
+
+      const sessionData: Partial<LivestreamSession> = {
+        club_id: clubId,
+        created_by: user.id,
+        title: autoCreateForEvent.eventName,
+        description: `Live broadcast for ${autoCreateForEvent.eventName}`,
+        event_id: autoCreateForEvent.eventId,
+        status: 'draft',
+        enable_chat: true,
+        enable_overlays: true,
+        is_public: true,
+        streaming_mode: 'cloudflare_relay',
+        overlay_config: {
+          showHeatNumber: true,
+          showSkippers: true,
+          showStandings: true,
+          showWeather: true,
+          showHandicaps: false,
+          position: 'bottom',
+          theme: 'dark',
+        },
+      };
+
+      const cfResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'createLiveInput',
+          clubId,
+          sessionData: {
+            title: autoCreateForEvent.eventName,
+            recording: true
+          }
+        })
+      });
+
+      const cfData = await cfResponse.json();
+
+      if (cfResponse.ok && cfData.liveInput) {
+        sessionData.cloudflare_live_input_id = cfData.liveInput.uid;
+        sessionData.cloudflare_whip_url = cfData.liveInput.webRTC?.url;
+        sessionData.cloudflare_whip_playback_url = cfData.liveInput.webRTCPlayback?.url;
+        const playbackUrl = cfData.liveInput.webRTCPlayback?.url || cfData.liveInput.rtmpsPlayback?.url || '';
+        const customerMatch = playbackUrl.match(/customer-([a-z0-9]+)\./);
+        if (customerMatch) {
+          sessionData.cloudflare_customer_code = customerMatch[1];
+        }
+      }
+
+      const session = await livestreamStorage.createSession(sessionData);
+      addNotification('success', 'Stream activated - starting preview...', 3000);
+      autoStartPreviewRef.current = true;
+      setActiveSession(session);
+      setSessions([session, ...sessions]);
+      await loadCameras(session.id);
+    } catch (error) {
+      console.error('Error activating stream:', error);
+      addNotification('error', 'Failed to activate stream. Please try again.');
+    } finally {
+      setActivatingStream(false);
+    }
+  };
 
   const handleWizardComplete = async (session: LivestreamSession) => {
     setShowSetupWizard(false);
@@ -1426,13 +1523,27 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
             <Video className="w-8 h-8 text-red-400" />
           </div>
           <h3 className="text-xl font-bold text-white mb-2">Start Broadcasting</h3>
-          <p className="text-slate-400 mb-6 max-w-md mx-auto text-sm">Create a new livestream session to broadcast your races live</p>
+          <p className="text-slate-400 mb-6 max-w-md mx-auto text-sm">
+            {autoCreateForEvent
+              ? `Activate a livestream for ${autoCreateForEvent.eventName}`
+              : 'Create a new livestream session to broadcast your races live'}
+          </p>
           <button
             onClick={createNewSession}
-            className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-semibold inline-flex items-center gap-2.5 transition-all shadow-lg shadow-red-500/20 hover:shadow-red-500/30"
+            disabled={activatingStream}
+            className="px-6 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:cursor-wait text-white rounded-xl font-semibold inline-flex items-center gap-2.5 transition-all shadow-lg shadow-red-500/20 hover:shadow-red-500/30"
           >
-            <Plus className="w-4 h-4" />
-            New Stream
+            {activatingStream ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Activating...
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                {autoCreateForEvent ? 'Activate Stream' : 'New Stream'}
+              </>
+            )}
           </button>
         </div>
 
@@ -2042,104 +2153,17 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                 </div>
               )}
 
-              {inspectorTab === 'output' && (
-                <div className="p-4 space-y-4">
-                  <div>
-                    <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Stream Info</h4>
-                    <div className="space-y-1.5">
-                      <InfoRow label="Mode" value={activeSession?.streaming_mode === 'cloudflare_relay' ? 'Cloud Relay' : 'Direct'} />
-                      <InfoRow label="Quality" value="720p HD" />
-                      <InfoRow label="Est. Data/Hour" value="~1.1 GB" />
-                    </div>
-                  </div>
-
-                  {/* Connection Status */}
-                  <div>
-                    <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Status</h4>
-                    <div className="space-y-1.5">
-                      {streamStatus === 'live' && activeSession?.streaming_mode === 'cloudflare_relay' && (
-                        <div className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs font-medium ${
-                          whipStatus === 'connected' ? 'bg-green-500/5 border-green-500/20 text-green-400' :
-                          whipStatus === 'connecting' ? 'bg-amber-500/5 border-amber-500/20 text-amber-400' :
-                          'bg-red-500/5 border-red-500/20 text-red-400'
-                        }`}>
-                          {whipStatus === 'connected' ? <Cloud className="w-3.5 h-3.5" /> :
-                           whipStatus === 'connecting' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
-                           <CloudOff className="w-3.5 h-3.5" />}
-                          {whipStatus === 'connected' ? 'Streaming to Cloud' : whipStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
-                        </div>
-                      )}
-                      {streamStatus !== 'live' && (
-                        <div className="flex items-center gap-2 p-2.5 bg-slate-900 border border-slate-700/50 rounded-lg text-xs text-slate-500">
-                          <Wifi className="w-3.5 h-3.5" />
-                          Ready to stream
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Streaming Destinations */}
-                  <div>
-                    <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Destinations</h4>
-                    <div className="space-y-1.5">
-                      {/* AlfieTV - Primary Destination */}
-                      <div className="flex items-center gap-2.5 p-2.5 bg-slate-900 border border-sky-500/30 rounded-lg">
-                        <Radio className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <span className="text-xs text-white font-medium block">AlfieTV</span>
-                          <span className="text-[10px] text-slate-500">
-                            {whipStatus === 'connected' ? 'Live on AlfieTV' :
-                             whipStatus === 'connecting' ? 'Connecting...' :
-                             streamStatus === 'live' ? 'Streaming via Cloudflare' : 'Ready'}
-                          </span>
-                        </div>
-                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                          (whipStatus === 'connected' || streamStatus === 'live') ? 'bg-green-400' :
-                          whipStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
-                        }`} />
-                      </div>
-
-                      {/* Cloudflare Stream relay */}
-                      {activeSession?.streaming_mode === 'cloudflare_relay' && (
-                        <div className="flex items-center gap-2.5 p-2.5 bg-slate-900 border border-slate-700/50 rounded-lg">
-                          <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-                          <div className="min-w-0">
-                            <span className="text-xs text-white font-medium block">Cloudflare Stream</span>
-                            <span className="text-[10px] text-slate-500">Cloud relay active</span>
-                          </div>
-                          <div className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                            whipStatus === 'connected' ? 'bg-green-400' :
-                            whipStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
-                          }`} />
-                        </div>
-                      )}
-
-                    </div>
-                  </div>
-
-                  {/* Advanced: RTMP Credentials (collapsible) */}
-                  {(activeSession as any)?.cloudflare_rtmps_url && (
-                    <div>
-                      <button
-                        onClick={() => setShowStreamKey(!showStreamKey)}
-                        className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2 hover:text-slate-400 transition-colors"
-                      >
-                        {showStreamKey ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                        Advanced Credentials
-                      </button>
-                      {showStreamKey && (
-                        <div className="space-y-3 pl-1">
-                          <div className="space-y-2">
-                            <span className="text-[10px] text-slate-500 font-medium">Cloudflare RTMPS (for OBS)</span>
-                            <CredentialField label="RTMP URL" value={(activeSession as any).cloudflare_rtmps_url} field="cf-url" copiedField={copiedField} onCopy={copyToClipboard} />
-                            {(activeSession as any)?.cloudflare_rtmps_stream_key && (
-                              <CredentialField label="Stream Key" value={(activeSession as any).cloudflare_rtmps_stream_key} field="cf-key" copiedField={copiedField} onCopy={copyToClipboard} isSecret showSecret={true} onToggleSecret={() => {}} />
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+              {inspectorTab === 'output' && activeSession && (
+                <div className="p-4">
+                  <AdvancedStreamConsole
+                    session={activeSession}
+                    streamStatus={streamStatus}
+                    whipStatus={whipStatus}
+                    onUpdateSession={async (updates) => {
+                      setActiveSession({ ...activeSession, ...updates });
+                      await livestreamStorage.updateSession(activeSession.id, updates);
+                    }}
+                  />
                 </div>
               )}
             </div>

@@ -383,6 +383,8 @@ export function LivestreamSetupWizard({
       sessionData.cloudflare_live_input_id = cfData.liveInput.uid;
       sessionData.cloudflare_whip_url = cfData.liveInput.webRTC?.url;
       sessionData.cloudflare_whip_playback_url = cfData.liveInput.webRTCPlayback?.url;
+      (sessionData as any).cloudflare_rtmps_url = cfData.liveInput.rtmps?.url;
+      (sessionData as any).cloudflare_rtmps_stream_key = cfData.liveInput.rtmps?.streamKey;
 
       const playbackUrl = cfData.liveInput.webRTCPlayback?.url || cfData.liveInput.rtmpsPlayback?.url || '';
       const customerMatch = playbackUrl.match(/customer-([a-z0-9]+)\./);
