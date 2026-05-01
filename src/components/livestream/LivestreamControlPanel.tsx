@@ -19,9 +19,15 @@ import { useCanvasCompositor } from '../../hooks/useCanvasCompositor';
 import { subscribeToRaceStatus } from '../../utils/liveTrackingStorage';
 import type { LivestreamRaceSegment } from '../../types/livestream';
 
+interface AutoCreateEventInfo {
+  eventId: string;
+  eventName: string;
+}
+
 interface LivestreamControlPanelProps {
   clubId: string;
   sessionId?: string;
+  autoCreateForEvent?: AutoCreateEventInfo;
 }
 
 interface SessionWithVenue extends LivestreamSession {
@@ -29,7 +35,7 @@ interface SessionWithVenue extends LivestreamSession {
   venueName?: string;
 }
 
-export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlPanelProps) {
+export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }: LivestreamControlPanelProps) {
   const { user } = useAuth();
   const { addNotification } = useNotification();
   const [activeSession, setActiveSession] = useState<LivestreamSession | null>(null);
@@ -1078,7 +1084,88 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     }
   };
 
-  const createNewSession = () => setShowSetupWizard(true);
+  const createNewSession = () => {
+    if (autoCreateForEvent) {
+      activateStreamForEvent();
+    } else {
+      setShowSetupWizard(true);
+    }
+  };
+
+  const [activatingStream, setActivatingStream] = useState(false);
+
+  const activateStreamForEvent = async () => {
+    if (!user || !autoCreateForEvent) return;
+    setActivatingStream(true);
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession) throw new Error('Not authenticated');
+
+      const headers = {
+        'Authorization': `Bearer ${authSession.access_token}`,
+        'Content-Type': 'application/json',
+      };
+
+      const sessionData: Partial<LivestreamSession> = {
+        club_id: clubId,
+        created_by: user.id,
+        title: autoCreateForEvent.eventName,
+        description: `Live broadcast for ${autoCreateForEvent.eventName}`,
+        event_id: autoCreateForEvent.eventId,
+        status: 'draft',
+        enable_chat: true,
+        enable_overlays: true,
+        is_public: true,
+        streaming_mode: 'cloudflare_relay',
+        overlay_config: {
+          showHeatNumber: true,
+          showSkippers: true,
+          showStandings: true,
+          showWeather: true,
+          showHandicaps: false,
+          position: 'bottom',
+          theme: 'dark',
+        },
+      };
+
+      const cfResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'createLiveInput',
+          clubId,
+          sessionData: {
+            title: autoCreateForEvent.eventName,
+            recording: true
+          }
+        })
+      });
+
+      const cfData = await cfResponse.json();
+
+      if (cfResponse.ok && cfData.liveInput) {
+        sessionData.cloudflare_live_input_id = cfData.liveInput.uid;
+        sessionData.cloudflare_whip_url = cfData.liveInput.webRTC?.url;
+        sessionData.cloudflare_whip_playback_url = cfData.liveInput.webRTCPlayback?.url;
+        const playbackUrl = cfData.liveInput.webRTCPlayback?.url || cfData.liveInput.rtmpsPlayback?.url || '';
+        const customerMatch = playbackUrl.match(/customer-([a-z0-9]+)\./);
+        if (customerMatch) {
+          sessionData.cloudflare_customer_code = customerMatch[1];
+        }
+      }
+
+      const session = await livestreamStorage.createSession(sessionData);
+      addNotification('success', 'Stream activated successfully', 3000);
+      setActiveSession(session);
+      setSessions([session, ...sessions]);
+      await loadCameras(session.id);
+    } catch (error) {
+      console.error('Error activating stream:', error);
+      addNotification('error', 'Failed to activate stream. Please try again.');
+    } finally {
+      setActivatingStream(false);
+    }
+  };
 
   const handleWizardComplete = async (session: LivestreamSession) => {
     setShowSetupWizard(false);
@@ -1426,13 +1513,27 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
             <Video className="w-8 h-8 text-red-400" />
           </div>
           <h3 className="text-xl font-bold text-white mb-2">Start Broadcasting</h3>
-          <p className="text-slate-400 mb-6 max-w-md mx-auto text-sm">Create a new livestream session to broadcast your races live</p>
+          <p className="text-slate-400 mb-6 max-w-md mx-auto text-sm">
+            {autoCreateForEvent
+              ? `Activate a livestream for ${autoCreateForEvent.eventName}`
+              : 'Create a new livestream session to broadcast your races live'}
+          </p>
           <button
             onClick={createNewSession}
-            className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-semibold inline-flex items-center gap-2.5 transition-all shadow-lg shadow-red-500/20 hover:shadow-red-500/30"
+            disabled={activatingStream}
+            className="px-6 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:cursor-wait text-white rounded-xl font-semibold inline-flex items-center gap-2.5 transition-all shadow-lg shadow-red-500/20 hover:shadow-red-500/30"
           >
-            <Plus className="w-4 h-4" />
-            New Stream
+            {activatingStream ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Activating...
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                {autoCreateForEvent ? 'Activate Stream' : 'New Stream'}
+              </>
+            )}
           </button>
         </div>
 

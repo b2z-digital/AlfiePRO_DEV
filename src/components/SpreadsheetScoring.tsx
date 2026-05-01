@@ -1812,7 +1812,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsLivestreamPanelOpen(true)}
-              className="fixed right-1 top-[35%] -translate-y-1/2 z-30 rounded-l-xl shadow-2xl flex flex-col items-center gap-2 px-2 py-3 bg-gradient-to-b from-rose-600 to-red-700 text-white hover:from-rose-500 hover:to-red-600 transition-all duration-200"
+              className="fixed right-1 top-[calc(50%+60px)] z-30 rounded-l-xl shadow-2xl flex flex-col items-center gap-2 px-2 py-3 bg-gradient-to-b from-rose-600 to-red-700 text-white hover:from-rose-500 hover:to-red-600 transition-all duration-200"
             >
               <Video size={18} />
               <div className="flex flex-col items-center">
@@ -1854,6 +1854,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                 <div className="flex-1 overflow-auto">
                   <LivestreamControlPanel
                     clubId={currentEvent.clubId}
+                    autoCreateForEvent={currentEvent?.id ? { eventId: currentEvent.id, eventName: currentEvent.eventName || 'Live Broadcast' } : undefined}
                   />
                 </div>
               </motion.div>
