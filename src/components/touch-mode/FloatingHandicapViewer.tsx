@@ -405,7 +405,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed right-0 top-[calc(50%-55px)] z-40 rounded-l-xl shadow-2xl flex flex-col items-center gap-2 px-2 py-4 transition-all duration-200 ${
+        className={`fixed right-0 top-[calc(50%-120px)] z-40 rounded-l-xl shadow-2xl flex flex-col items-center gap-2 px-2 py-4 transition-all duration-200 ${
           canEditHandicaps && allHandicapsZero && hasStoredHandicaps
             ? 'bg-gradient-to-b from-green-500 to-emerald-600 text-white animate-pulse'
             : canEditHandicaps && allHandicapsZero
