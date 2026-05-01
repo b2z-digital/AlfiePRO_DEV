@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Timer } from 'lucide-react';
+import { X, Minus } from 'lucide-react';
 import type { StartSequence, StartBoxState } from '../../types/startBox';
 import type { TimerTickData } from '../../utils/startBoxAudio';
 import { getStartBoxEngine, destroyStartBoxEngine } from '../../utils/startBoxAudio';
@@ -18,6 +18,13 @@ interface StartBoxModalProps {
 
 const WHISTLE_SOUND_ID = 'a0000001-0000-0000-0000-000000000003';
 const BELL_SOUND_ID = 'a0000001-0000-0000-0000-000000000004';
+
+const AlfieLogo: React.FC<{ size?: number }> = ({ size = 24 }) => (
+  <svg width={size} height={size * 1.56} viewBox="0 0 129.43 201.4" xmlns="http://www.w3.org/2000/svg">
+    <path fill="#0066b4" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
+    <path fill="#0078d3" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
+  </svg>
+);
 
 export const StartBoxModal: React.FC<StartBoxModalProps> = ({
   isOpen,
@@ -45,6 +52,7 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
   const [autoCloseTimer, setAutoCloseTimer] = useState<number | null>(null);
   const [botwSequences, setBotwSequences] = useState<StartSequence[]>([]);
   const [botwPhase, setBotwPhase] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   const engineRef = useRef(getStartBoxEngine());
   const cleanupRef = useRef<(() => void)[]>([]);
@@ -159,7 +167,6 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     const currentId = selectedSeqId || sequenceId;
     const hasValidSelection = currentId && nonBotw.some(s => s.id === currentId);
     if (!hasValidSelection && nonBotw.length > 0) {
-      // Default to "2 Minute Scratch" if available
       const twoMinScratch = nonBotw.find(s =>
         s.name.toLowerCase().includes('2 minute') && s.name.toLowerCase().includes('scratch')
       );
@@ -258,7 +265,6 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     }
     completedRef.current = false;
 
-    // Use the BOTW's configured follow-on sequence, or fall back to current sequence
     if (seq.follow_on_sequence_id) {
       const followOn = await getSequence(seq.follow_on_sequence_id);
       startSequenceRef.current = followOn || currentSequence;
@@ -275,6 +281,25 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     await engine.initialize();
     engine.arm(seq);
   }, [autoCloseTimer, currentSequence]);
+
+  const handleCancelBotw = useCallback(async () => {
+    botwPhaseRef.current = false;
+    setBotwPhase(false);
+    engineRef.current.stop();
+
+    const restoreSeq = startSequenceRef.current;
+    startSequenceRef.current = null;
+    if (restoreSeq) {
+      setCurrentSequence(restoreSeq);
+      setTotalDuration(restoreSeq.total_duration_seconds);
+      setRemainingMs(restoreSeq.total_duration_seconds * 1000);
+      const engine = engineRef.current;
+      await engine.initialize();
+      engine.arm(restoreSeq);
+    } else if (selectedSeqId) {
+      await loadSequence(selectedSeqId);
+    }
+  }, [selectedSeqId]);
 
   const handleSelectSequence = (id: string) => {
     setSelectedSeqId(id);
@@ -299,6 +324,41 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     timerState === 'completed' ? 'bg-red-500' :
     'bg-slate-600';
 
+  const remainingSec = Math.ceil(Math.max(0, remainingMs) / 1000);
+
+  // Minimized floating bar view
+  if (isMinimized) {
+    return (
+      <div className="fixed bottom-4 left-0 right-0 z-[100] flex justify-center pointer-events-none">
+        <div
+          className={`pointer-events-auto flex items-center gap-3 px-5 py-3 rounded-xl border shadow-2xl cursor-pointer animate-slideUp transition-all hover:scale-105 active:scale-95 ${
+            darkMode
+              ? 'bg-slate-900 border-slate-700/60 hover:border-slate-600'
+              : 'bg-white border-slate-200 hover:border-slate-300'
+          }`}
+          onClick={() => setIsMinimized(false)}
+        >
+          <div className={`w-2.5 h-2.5 rounded-full ${stateColor} ${timerState === 'running' ? 'animate-pulse' : ''}`} />
+          <AlfieLogo size={14} />
+          <span className={`font-bold tabular-nums text-lg ${
+            timerState === 'running' && remainingSec <= 5 ? 'text-red-500' :
+            timerState === 'running' && remainingSec <= 10 ? 'text-orange-500' :
+            timerState === 'running' && remainingSec <= 30 ? 'text-amber-400' :
+            timerState === 'running' ? 'text-cyan-400' :
+            timerState === 'paused' ? 'text-amber-400' :
+            darkMode ? 'text-white' : 'text-slate-900'
+          }`}>
+            {timerState === 'completed' ? 'GO!' : `${Math.floor(remainingSec / 60)}:${(remainingSec % 60).toString().padStart(2, '0')}`}
+          </span>
+          <span className={`text-xs uppercase tracking-wider font-medium ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+            {botwPhase ? 'BOTW' : currentSequence?.name || 'StartBox'}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Full modal view
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       <div
@@ -306,7 +366,7 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
         onClick={handleCloseModal}
       />
 
-      <div className={`relative w-full max-w-2xl mx-4 rounded-2xl border shadow-2xl overflow-hidden ${
+      <div className={`relative w-full max-w-2xl mx-4 rounded-2xl border shadow-2xl overflow-hidden animate-slideDown ${
         darkMode ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
         <div className={`flex items-center justify-between px-5 py-3 border-b ${
@@ -314,9 +374,9 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
         }`}>
           <div className="flex items-center gap-3">
             <div className={`w-2.5 h-2.5 rounded-full ${stateColor} ${timerState === 'running' ? 'animate-pulse' : ''}`} />
-            <Timer size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
-            <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              STARTBOX
+            <AlfieLogo size={16} />
+            <span className={darkMode ? 'text-white' : 'text-slate-900'}>
+              <span className="font-extrabold">Start</span><span className="font-thin">Box</span>
             </span>
             {lastFiredLabel && (
               <span className="text-xs text-amber-400 animate-pulse font-medium bg-amber-500/10 px-2 py-0.5 rounded-full">
@@ -324,17 +384,28 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
               </span>
             )}
           </div>
-          <button
-            onClick={handleCloseModal}
-            disabled={timerState === 'running'}
-            className={`p-1.5 rounded-lg transition-colors ${
-              timerState === 'running'
-                ? 'opacity-30 cursor-not-allowed'
-                : darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-500'
-            }`}
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setIsMinimized(true)}
+              className={`p-1.5 rounded-lg transition-colors ${
+                darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-500'
+              }`}
+              title="Minimize"
+            >
+              <Minus size={18} />
+            </button>
+            <button
+              onClick={handleCloseModal}
+              disabled={timerState === 'running'}
+              className={`p-1.5 rounded-lg transition-colors ${
+                timerState === 'running'
+                  ? 'opacity-30 cursor-not-allowed'
+                  : darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-500'
+              }`}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="p-5 space-y-5">
@@ -364,12 +435,24 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
           />
 
           {botwPhase && startSequenceRef.current && (timerState === 'armed' || timerState === 'running') && (
-            <div className={`text-center py-2 rounded-lg text-sm font-medium ${
+            <div className={`flex items-center justify-between px-4 py-2 rounded-lg text-sm font-medium ${
               timerState === 'armed'
                 ? darkMode ? 'bg-cyan-500/10 text-cyan-400' : 'bg-cyan-50 text-cyan-600'
                 : darkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
             }`}>
-              {timerState === 'armed' ? 'BOTW ready' : 'BOTW in progress'} — {startSequenceRef.current.name} will start automatically
+              <span>
+                {timerState === 'armed' ? 'BOTW ready' : 'BOTW in progress'} — {startSequenceRef.current.name} will start automatically
+              </span>
+              <button
+                onClick={handleCancelBotw}
+                className={`ml-3 px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                  darkMode
+                    ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                    : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                }`}
+              >
+                Cancel
+              </button>
             </div>
           )}
 

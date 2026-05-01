@@ -5,11 +5,21 @@ export default {
     extend: {
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
+        'slideUp': 'slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+        'slideDown': 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
       },
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0', transform: 'translateY(4px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideUp: {
+          '0%': { opacity: '0', transform: 'translateY(100%) scale(0.8)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        slideDown: {
+          '0%': { opacity: '0', transform: 'scale(0.95) translateY(-20px)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
         },
       },
       colors: {
