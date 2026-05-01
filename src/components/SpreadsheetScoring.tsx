@@ -1812,7 +1812,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsLivestreamPanelOpen(true)}
-              className="fixed right-[6px] top-[calc(50%+90px)] z-30 rounded-l-xl shadow-2xl flex flex-col items-center gap-2 px-2 py-3 bg-gradient-to-b from-rose-600 to-red-700 text-white hover:from-rose-500 hover:to-red-600 transition-all duration-200"
+              className="fixed right-[6px] top-[calc(50%+12px)] z-30 rounded-l-xl shadow-2xl flex flex-col items-center gap-2 px-2 py-3 bg-gradient-to-b from-rose-600 to-red-700 text-white hover:from-rose-500 hover:to-red-600 transition-all duration-200"
             >
               <Video size={18} />
               <div className="flex flex-col items-center">
