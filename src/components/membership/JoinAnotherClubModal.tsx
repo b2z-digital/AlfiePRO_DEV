@@ -58,6 +58,8 @@ export const JoinAnotherClubModal: React.FC<JoinAnotherClubModalProps> = ({
   const [selectedClub, setSelectedClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentMemberships, setCurrentMemberships] = useState<string[]>([]);
+  const [existingAccess, setExistingAccess] = useState<string[]>([]);
+  const [pendingApplications, setPendingApplications] = useState<string[]>([]);
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
   const [selectedMembershipType, setSelectedMembershipType] = useState<string>('');
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
@@ -108,14 +110,28 @@ export const JoinAnotherClubModal: React.FC<JoinAnotherClubModalProps> = ({
   const fetchCurrentMemberships = async () => {
     if (!user) return;
     try {
-      const { data, error } = await supabase
-        .from('club_memberships')
-        .select('club_id')
-        .eq('member_id', user.id)
-        .eq('status', 'active');
+      const [membershipsResult, userClubsResult, applicationsResult] = await Promise.all([
+        supabase
+          .from('club_memberships')
+          .select('club_id')
+          .eq('member_id', user.id)
+          .in('status', ['active', 'pending']),
+        supabase.rpc('get_user_club_roles', { p_user_id: user.id }),
+        supabase
+          .from('membership_applications')
+          .select('club_id')
+          .eq('user_id', user.id)
+          .eq('status', 'pending')
+      ]);
 
-      if (error) throw error;
-      setCurrentMemberships(data?.map(m => m.club_id) || []);
+      const membershipClubIds = membershipsResult.data?.map(m => m.club_id) || [];
+      setCurrentMemberships(membershipClubIds);
+
+      const userClubIds = (userClubsResult.data || []).map((r: any) => r.club_id);
+      setExistingAccess(userClubIds);
+
+      const pendingClubIds = applicationsResult.data?.map(a => a.club_id) || [];
+      setPendingApplications(pendingClubIds);
     } catch (err) {
       console.error('Error fetching memberships:', err);
     }
@@ -381,16 +397,19 @@ export const JoinAnotherClubModal: React.FC<JoinAnotherClubModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {filteredClubs.map((club) => {
                     const alreadyMember = currentMemberships.includes(club.id);
+                    const hasAccess = existingAccess.includes(club.id) && !alreadyMember;
+                    const hasPending = pendingApplications.includes(club.id);
+                    const isDisabled = alreadyMember || hasPending;
                     return (
                       <button
                         key={club.id}
-                        disabled={alreadyMember}
+                        disabled={isDisabled}
                         className={`p-4 rounded-xl border text-left transition-all duration-200 ${
-                          alreadyMember
+                          isDisabled
                             ? 'border-slate-700/50 bg-slate-800/30 opacity-50 cursor-not-allowed'
                             : 'border-slate-700 bg-slate-800/40 hover:border-blue-500/50 hover:bg-slate-700/40 cursor-pointer'
                         }`}
-                        onClick={() => !alreadyMember && handleSelectClub(club)}
+                        onClick={() => !isDisabled && handleSelectClub(club)}
                       >
                         <div className="flex items-start gap-3">
                           {club.logo ? (
@@ -415,6 +434,18 @@ export const JoinAnotherClubModal: React.FC<JoinAnotherClubModalProps> = ({
                               <div className="flex items-center mt-2 text-green-400 text-xs font-medium">
                                 <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                                 Already a member
+                              </div>
+                            )}
+                            {hasPending && !alreadyMember && (
+                              <div className="flex items-center mt-2 text-yellow-400 text-xs font-medium">
+                                <AlertCircle className="w-3.5 h-3.5 mr-1" />
+                                Application pending
+                              </div>
+                            )}
+                            {hasAccess && !hasPending && (
+                              <div className="flex items-center mt-2 text-blue-400 text-xs font-medium">
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                                Admin access via association
                               </div>
                             )}
                           </div>
