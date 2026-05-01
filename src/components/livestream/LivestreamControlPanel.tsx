@@ -1093,6 +1093,14 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
   };
 
   const [activatingStream, setActivatingStream] = useState(false);
+  const autoStartPreviewRef = useRef(false);
+
+  useEffect(() => {
+    if (autoStartPreviewRef.current && activeSession && streamStatus === 'offline') {
+      autoStartPreviewRef.current = false;
+      startTestStream();
+    }
+  }, [activeSession]);
 
   const activateStreamForEvent = async () => {
     if (!user || !autoCreateForEvent) return;
@@ -1155,7 +1163,8 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
       }
 
       const session = await livestreamStorage.createSession(sessionData);
-      addNotification('success', 'Stream activated successfully', 3000);
+      addNotification('success', 'Stream activated - starting preview...', 3000);
+      autoStartPreviewRef.current = true;
       setActiveSession(session);
       setSessions([session, ...sessions]);
       await loadCameras(session.id);
