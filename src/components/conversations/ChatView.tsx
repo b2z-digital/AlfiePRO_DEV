@@ -210,17 +210,19 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
   const createConversation = async (): Promise<string | null> => {
     if (!currentUserId) return null;
     try {
-      const { data: conv, error: convErr } = await supabase
+      // Generate a UUID client-side so we can reference it without needing SELECT
+      const convId = crypto.randomUUID();
+
+      const { error: convErr } = await supabase
         .from('conversations')
         .insert({
+          id: convId,
           last_message_text: '',
           last_message_sender_id: currentUserId,
           last_message_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
+        });
 
-      if (convErr || !conv) {
+      if (convErr) {
         console.error('Failed to create conversation:', convErr);
         return null;
       }
@@ -228,8 +230,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
       const { error: partErr } = await supabase
         .from('conversation_participants')
         .insert([
-          { conversation_id: conv.id, user_id: currentUserId },
-          { conversation_id: conv.id, user_id: recipientId },
+          { conversation_id: convId, user_id: currentUserId },
+          { conversation_id: convId, user_id: recipientId },
         ]);
 
       if (partErr) {
@@ -237,7 +239,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
         return null;
       }
 
-      return conv.id;
+      return convId;
     } catch (err) {
       console.error('Error creating conversation:', err);
       return null;

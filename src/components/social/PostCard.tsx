@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, MessageCircle, Share2, MoreHorizontal, Globe, Users, Lock, Trash2, Flag, MapPin, Smile, ExternalLink, ShieldAlert } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoveHorizontal as MoreHorizontal, Globe, Users, Lock, Trash2, Flag, MapPin, Smile, ExternalLink, ShieldAlert } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { SocialPost } from '../../utils/socialStorage';
 import { socialStorage } from '../../utils/socialStorage';
@@ -8,6 +8,9 @@ import { ConfirmationModal } from '../ConfirmationModal';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import ReportPostModal from './ReportPostModal';
+import Lightbox from 'yet-another-react-lightbox';
+import 'yet-another-react-lightbox/styles.css';
+import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 
 const extractYouTubeId = (url: string): string | null => {
   const patterns = [
@@ -42,6 +45,8 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const isPostOwner = user?.id === post.author_id;
   const isClubAdmin = currentClub?.role === 'admin' || currentClub?.role === 'super_admin';
@@ -242,8 +247,14 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
                     <img
                       src={attachment.file_url}
                       alt={`Attachment ${index + 1}`}
-                      className="w-full rounded-xl object-cover shadow-lg"
+                      className="w-full rounded-xl object-cover shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
                       style={{ maxHeight: post.attachments!.length === 1 ? '500px' : '300px' }}
+                      onClick={() => {
+                        const imageAttachments = post.attachments!.filter(a => a.file_type === 'image' && !a.file_url?.startsWith('blob:'));
+                        const imageIndex = imageAttachments.findIndex(a => a.id === attachment.id);
+                        setLightboxIndex(imageIndex >= 0 ? imageIndex : 0);
+                        setLightboxOpen(true);
+                      }}
                       onError={(e) => {
                         const target = e.currentTarget;
                         target.style.display = 'none';
@@ -353,6 +364,18 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
         onReported={() => {
           addNotification('Post reported. Club admins have been notified.', 'success');
         }}
+      />
+
+      <Lightbox
+        open={lightboxOpen}
+        close={() => setLightboxOpen(false)}
+        index={lightboxIndex}
+        slides={
+          (post.attachments || [])
+            .filter(a => a.file_type === 'image' && !a.file_url?.startsWith('blob:'))
+            .map(a => ({ src: a.file_url }))
+        }
+        plugins={[Zoom]}
       />
     </div>
   );
