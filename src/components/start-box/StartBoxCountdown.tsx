@@ -29,6 +29,7 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
   } = useMemo(() => {
     const totalMs = Math.max(0, remainingMs);
     const totalSec = Math.ceil(totalMs / 1000);
+    const displayMs = totalSec * 1000;
 
     let hex = '#22d3ee'; // cyan
     let cls = 'text-cyan-400';
@@ -78,7 +79,7 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
     }
 
     const fraction = totalDurationSeconds > 0
-      ? totalMs / (totalDurationSeconds * 1000)
+      ? displayMs / (totalDurationSeconds * 1000)
       : 1;
 
     return {

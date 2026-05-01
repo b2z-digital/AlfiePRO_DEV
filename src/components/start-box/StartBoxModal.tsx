@@ -29,7 +29,11 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
 }) => {
   const [currentSequence, setCurrentSequence] = useState<StartSequence | null>(null);
   const [availableSequences, setAvailableSequences] = useState<StartSequence[]>([]);
-  const [selectedSeqId, setSelectedSeqId] = useState<string | null>(sequenceId || null);
+  const [selectedSeqId, setSelectedSeqId] = useState<string | null>(() => {
+    if (sequenceId) return sequenceId;
+    const saved = localStorage.getItem('startbox-last-sequence');
+    return saved || null;
+  });
   const [timerState, setTimerState] = useState<StartBoxState>('idle');
   const [remainingMs, setRemainingMs] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
@@ -152,8 +156,15 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     setAvailableSequences(nonBotw);
     setBotwSequences(seqs.filter(s => s.sequence_type === 'botw'));
 
-    if (!selectedSeqId && !sequenceId && nonBotw.length > 0) {
-      setSelectedSeqId(nonBotw[0].id);
+    const currentId = selectedSeqId || sequenceId;
+    const hasValidSelection = currentId && nonBotw.some(s => s.id === currentId);
+    if (!hasValidSelection && nonBotw.length > 0) {
+      // Default to "2 Minute Scratch" if available
+      const twoMinScratch = nonBotw.find(s =>
+        s.name.toLowerCase().includes('2 minute') && s.name.toLowerCase().includes('scratch')
+      );
+      const defaultId = twoMinScratch?.id || nonBotw[0].id;
+      setSelectedSeqId(defaultId);
     }
   };
 
@@ -181,6 +192,9 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
       engine.arm(currentSequence);
     }
     engine.start();
+    if (currentSequence && !botwPhaseRef.current) {
+      localStorage.setItem('startbox-last-sequence', currentSequence.id);
+    }
   }, [currentSequence, autoCloseTimer]);
 
   const handleStop = useCallback(() => {
@@ -264,6 +278,7 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
 
   const handleSelectSequence = (id: string) => {
     setSelectedSeqId(id);
+    localStorage.setItem('startbox-last-sequence', id);
   };
 
   const handleCloseModal = () => {
