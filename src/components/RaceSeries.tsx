@@ -23,8 +23,10 @@ import { RaceSeries as RaceSeriesType, RaceEvent } from '../types/race';
 import { storeRaceSeries, getStoredRaceSeries, deleteRaceSeries, setCurrentEvent } from '../utils/raceStorage';
 import { getStoredClubs } from '../utils/clubStorage';
 import { getStoredVenues } from '../utils/venueStorage';
+import { getBoatClasses } from '../utils/boatClassStorage';
 import { Club } from '../types/club';
 import { Venue } from '../types/venue';
+import { BoatClass } from '../types/boatClass';
 import { formatDate } from '../utils/date';
 import { ConfirmationModal } from './ConfirmationModal';
 import { SeriesLeaderboard } from './SeriesLeaderboard';
@@ -223,6 +225,7 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
   const [series, setSeries] = useState<RaceSeriesType[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
+  const [allBoatClasses, setAllBoatClasses] = useState<BoatClass[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [seriesToDelete, setSeriesToDelete] = useState<RaceSeriesType | null>(null);
   const [showRoundDeleteConfirm, setShowRoundDeleteConfirm] = useState(false);
@@ -275,16 +278,18 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [storedSeries, storedClubs, storedVenues] = await Promise.all([
+        const [storedSeries, storedClubs, storedVenues, fetchedBoatClasses] = await Promise.all([
           getStoredRaceSeries(),
           getStoredClubs(),
-          getStoredVenues()
+          getStoredVenues(),
+          getBoatClasses()
         ]);
-        
+
         console.log('Fetched series data:', storedSeries);
         setSeries(storedSeries);
         setClubs(storedClubs);
         setVenues(storedVenues);
+        setAllBoatClasses(fetchedBoatClasses);
         
         // If editing a series, find and set it
         if (editingSeries) {
@@ -698,13 +703,9 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
                       `}
                     >
                       <option value="">Select race class</option>
-                      <option value="DF65">Dragon Force 65</option>
-                      <option value="DF95">Dragon Force 95</option>
-                      <option value="10R">10 Rater</option>
-                      <option value="IOM">IOM</option>
-                      <option value="Marblehead">Marblehead</option>
-                      <option value="A Class">A Class</option>
-                      <option value="RC Laser">RC Laser</option>
+                      {allBoatClasses.map(bc => (
+                        <option key={bc.id} value={bc.name}>{bc.name}</option>
+                      ))}
                     </select>
                   </div>
 
