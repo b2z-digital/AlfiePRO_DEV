@@ -120,10 +120,9 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({
 
       if (error) throw error;
 
+      onClose();
       if (onSuccess) {
         onSuccess();
-      } else {
-        onClose();
       }
     } catch (err) {
       console.error('Error saving member data:', err);
