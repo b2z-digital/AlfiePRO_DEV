@@ -38,6 +38,16 @@ export interface StartSequence {
   minute_callout_sound?: StartBoxSound;
   audio_start_ms?: number;
   audio_end_ms?: number | null;
+  use_background_music?: boolean;
+  background_music_url?: string | null;
+  background_music_path?: string | null;
+  background_music_volume?: number;
+  background_music_duck_volume?: number;
+  background_music_duck_duration_ms?: number;
+  background_music_fade_in_ms?: number;
+  background_music_fade_out_ms?: number;
+  follow_on_sequence_id?: string | null;
+  follow_on_sequence?: StartSequence;
   created_by?: string;
   created_at: string;
   updated_at: string;
@@ -47,13 +57,16 @@ export interface StartSequence {
 export interface StartSequenceSound {
   id: string;
   sequence_id: string;
-  sound_id: string;
+  sound_id: string | null;
   trigger_time_seconds: number;
   label?: string;
   repeat_count: number;
   repeat_interval_ms?: number;
   volume_override?: number;
   sort_order: number;
+  custom_sound_url?: string | null;
+  custom_sound_path?: string | null;
+  custom_sound_name?: string | null;
   created_at: string;
   sound?: StartBoxSound;
 }

@@ -39,6 +39,10 @@ class StartBoxAudioEngine {
   private audioStopScheduled = false;
   private audioStopTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  private bgMusicSource: AudioBufferSourceNode | null = null;
+  private bgMusicGain: GainNode | null = null;
+  private bgMusicDuckTimeout: ReturnType<typeof setTimeout> | null = null;
+
   private stateCallbacks: StateChangeCallback[] = [];
   private tickCallbacks: TickCallback[] = [];
   private soundFiredCallbacks: SoundFiredCallback[] = [];
@@ -65,7 +69,7 @@ class StartBoxAudioEngine {
     const urls = new Set<string>();
     if (sequence.sounds?.length) {
       for (const ss of sequence.sounds) {
-        const url = ss.sound?.file_url;
+        const url = ss.custom_sound_url || ss.sound?.file_url;
         if (url && !this.audioBuffers.has(url)) {
           urls.add(url);
         }
@@ -78,6 +82,10 @@ class StartBoxAudioEngine {
 
     if (sequence.minute_callout_sound?.file_url && !this.audioBuffers.has(sequence.minute_callout_sound.file_url)) {
       urls.add(sequence.minute_callout_sound.file_url);
+    }
+
+    if (sequence.use_background_music && sequence.background_music_url && !this.audioBuffers.has(sequence.background_music_url)) {
+      urls.add(sequence.background_music_url);
     }
 
     await Promise.allSettled(
@@ -178,6 +186,10 @@ class StartBoxAudioEngine {
       this.setState('running');
       this.startTimer();
 
+      if (this.currentSequence?.use_background_music && this.currentSequence.background_music_url && this.audioContext && this.gainNode) {
+        this.startBackgroundMusic(wasArmed);
+      }
+
       if (this.currentSequence?.audio_file_url && this.audioContext && this.gainNode) {
         this.stopCountdownAudio();
         const buffer = this.audioBuffers.get(this.currentSequence.audio_file_url);
@@ -238,6 +250,7 @@ class StartBoxAudioEngine {
     this.pausedElapsedMs = performance.now() - this.startTimestamp;
     this.stopTimer();
     this.stopCountdownAudio();
+    this.stopBackgroundMusic();
     this.setState('paused');
     this.emitTick();
   }
@@ -250,6 +263,7 @@ class StartBoxAudioEngine {
   stop(): void {
     this.stopTimer();
     this.stopCountdownAudio();
+    this.stopBackgroundMusic();
     this.firedSoundIds.clear();
     this.pausedElapsedMs = 0;
     this.startTimestamp = 0;
@@ -338,16 +352,89 @@ class StartBoxAudioEngine {
   destroy(): void {
     this.stopTimer();
     this.stopCountdownAudio();
+    this.stopBackgroundMusic();
     if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close().catch(() => {});
     }
     this.audioContext = null;
     this.gainNode = null;
+    this.bgMusicGain = null;
     this.audioBuffers.clear();
     this.stateCallbacks = [];
     this.tickCallbacks = [];
     this.soundFiredCallbacks = [];
     this.audioEndedCallbacks = [];
+  }
+
+  private startBackgroundMusic(fromBeginning: boolean): void {
+    if (!this.audioContext || !this.gainNode || !this.currentSequence?.background_music_url) return;
+    this.stopBackgroundMusic();
+
+    const buffer = this.audioBuffers.get(this.currentSequence.background_music_url);
+    if (!buffer) return;
+
+    const bgGain = this.audioContext.createGain();
+    const normalVol = this.currentSequence.background_music_volume ?? 0.6;
+    const fadeInMs = this.currentSequence.background_music_fade_in_ms ?? 2000;
+
+    if (fromBeginning && fadeInMs > 0) {
+      bgGain.gain.value = 0;
+      bgGain.gain.linearRampToValueAtTime(normalVol, this.audioContext.currentTime + fadeInMs / 1000);
+    } else {
+      bgGain.gain.value = normalVol;
+    }
+
+    bgGain.connect(this.gainNode);
+
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(bgGain);
+
+    const offsetSec = fromBeginning ? 0 : this.pausedElapsedMs / 1000;
+    source.start(0, offsetSec % buffer.duration);
+
+    this.bgMusicSource = source;
+    this.bgMusicGain = bgGain;
+  }
+
+  private stopBackgroundMusic(): void {
+    if (this.bgMusicDuckTimeout) {
+      clearTimeout(this.bgMusicDuckTimeout);
+      this.bgMusicDuckTimeout = null;
+    }
+    if (this.bgMusicSource) {
+      try { this.bgMusicSource.stop(); } catch {}
+      this.bgMusicSource = null;
+    }
+    this.bgMusicGain = null;
+  }
+
+  private duckBackgroundMusic(): void {
+    if (!this.bgMusicGain || !this.audioContext || !this.currentSequence) return;
+
+    const duckVol = this.currentSequence.background_music_duck_volume ?? 0.15;
+    const duckDurationMs = this.currentSequence.background_music_duck_duration_ms ?? 3000;
+    const normalVol = this.currentSequence.background_music_volume ?? 0.6;
+
+    this.bgMusicGain.gain.cancelScheduledValues(this.audioContext.currentTime);
+    this.bgMusicGain.gain.linearRampToValueAtTime(duckVol, this.audioContext.currentTime + 0.15);
+
+    if (this.bgMusicDuckTimeout) clearTimeout(this.bgMusicDuckTimeout);
+    this.bgMusicDuckTimeout = setTimeout(() => {
+      if (this.bgMusicGain && this.audioContext) {
+        this.bgMusicGain.gain.linearRampToValueAtTime(normalVol, this.audioContext.currentTime + 0.8);
+      }
+      this.bgMusicDuckTimeout = null;
+    }, duckDurationMs);
+  }
+
+  private fadeOutBackgroundMusic(): void {
+    if (!this.bgMusicGain || !this.audioContext || !this.currentSequence) return;
+    const fadeOutMs = this.currentSequence.background_music_fade_out_ms ?? 3000;
+    this.bgMusicGain.gain.cancelScheduledValues(this.audioContext.currentTime);
+    this.bgMusicGain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + fadeOutMs / 1000);
+    setTimeout(() => this.stopBackgroundMusic(), fadeOutMs + 200);
   }
 
   private setState(state: StartBoxState): void {
@@ -394,6 +481,9 @@ class StartBoxAudioEngine {
 
     if (remainingMs <= 0) {
       this.stopTimer();
+      if (this.currentSequence?.use_background_music && this.bgMusicGain) {
+        this.fadeOutBackgroundMusic();
+      }
       this.setState('completed');
       this.emitTick();
     }
@@ -446,10 +536,14 @@ class StartBoxAudioEngine {
   }
 
   private async fireSoundEvent(ss: StartSequenceSound): Promise<void> {
-    const url = ss.sound?.file_url;
+    const url = ss.custom_sound_url || ss.sound?.file_url;
 
     for (const cb of this.soundFiredCallbacks) {
       try { cb(ss); } catch {}
+    }
+
+    if (this.currentSequence?.use_background_music && this.bgMusicGain) {
+      this.duckBackgroundMusic();
     }
 
     if (url) {

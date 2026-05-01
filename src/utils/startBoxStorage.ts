@@ -252,7 +252,7 @@ export async function updateSequence(
   updates: Partial<Omit<StartSequence, 'id' | 'created_at' | 'sounds'>>
 ): Promise<StartSequence | null> {
   try {
-    const { minute_callout_sound, ...dbUpdates } = updates as any;
+    const { minute_callout_sound, follow_on_sequence, ...dbUpdates } = updates as any;
     const { data, error } = await supabase
       .from('start_sequences')
       .update({ ...dbUpdates, updated_at: new Date().toISOString() })
@@ -485,6 +485,144 @@ export async function removeSequenceAudio(sequenceId: string): Promise<boolean> 
     return true;
   } catch (err) {
     console.error('Error removing sequence audio:', err);
+    return false;
+  }
+}
+
+export async function uploadBackgroundMusic(
+  sequenceId: string,
+  clubId: string | null,
+  file: File
+): Promise<{ background_music_path: string; background_music_url: string } | null> {
+  try {
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'mp3';
+    const prefix = clubId || 'global';
+    const fileName = `${prefix}/bgmusic/${sequenceId}-${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('start-box-sounds')
+      .upload(fileName, file, {
+        contentType: file.type || 'audio/mpeg',
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('start-box-sounds')
+      .getPublicUrl(fileName);
+
+    const { error } = await supabase
+      .from('start_sequences')
+      .update({
+        background_music_path: fileName,
+        background_music_url: publicUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', sequenceId);
+
+    if (error) throw error;
+    return { background_music_path: fileName, background_music_url: publicUrl };
+  } catch (err) {
+    console.error('Error uploading background music:', err);
+    return null;
+  }
+}
+
+export async function removeBackgroundMusic(sequenceId: string): Promise<boolean> {
+  try {
+    const { data: seq } = await supabase
+      .from('start_sequences')
+      .select('background_music_path')
+      .eq('id', sequenceId)
+      .maybeSingle();
+
+    if (seq?.background_music_path) {
+      await supabase.storage.from('start-box-sounds').remove([seq.background_music_path]);
+    }
+
+    const { error } = await supabase
+      .from('start_sequences')
+      .update({
+        background_music_path: null,
+        background_music_url: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', sequenceId);
+
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error('Error removing background music:', err);
+    return false;
+  }
+}
+
+export async function uploadCustomEventSound(
+  sequenceSoundId: string,
+  clubId: string | null,
+  file: File
+): Promise<{ custom_sound_url: string; custom_sound_path: string } | null> {
+  try {
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'mp3';
+    const prefix = clubId || 'global';
+    const fileName = `${prefix}/event-sounds/${sequenceSoundId}-${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('start-box-sounds')
+      .upload(fileName, file, {
+        contentType: file.type || 'audio/mpeg',
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('start-box-sounds')
+      .getPublicUrl(fileName);
+
+    const { error } = await supabase
+      .from('start_sequence_sounds')
+      .update({
+        custom_sound_url: publicUrl,
+        custom_sound_path: fileName,
+        custom_sound_name: file.name,
+      })
+      .eq('id', sequenceSoundId);
+
+    if (error) throw error;
+    return { custom_sound_url: publicUrl, custom_sound_path: fileName };
+  } catch (err) {
+    console.error('Error uploading custom event sound:', err);
+    return null;
+  }
+}
+
+export async function removeCustomEventSound(sequenceSoundId: string): Promise<boolean> {
+  try {
+    const { data: ss } = await supabase
+      .from('start_sequence_sounds')
+      .select('custom_sound_path')
+      .eq('id', sequenceSoundId)
+      .maybeSingle();
+
+    if (ss?.custom_sound_path) {
+      await supabase.storage.from('start-box-sounds').remove([ss.custom_sound_path]);
+    }
+
+    const { error } = await supabase
+      .from('start_sequence_sounds')
+      .update({
+        custom_sound_url: null,
+        custom_sound_path: null,
+        custom_sound_name: null,
+      })
+      .eq('id', sequenceSoundId);
+
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error('Error removing custom event sound:', err);
     return false;
   }
 }

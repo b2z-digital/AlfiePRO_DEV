@@ -351,22 +351,22 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
         const assocTable = effectiveAssocType === 'state' ? 'user_state_associations' : 'user_national_associations';
         const assocIdCol = effectiveAssocType === 'state' ? 'state_association_id' : 'national_association_id';
 
+        const accessLevel = position.access_level || 'editor';
+        let role = 'member';
+        if (accessLevel === 'admin') {
+          role = effectiveAssocType === 'state' ? 'state_admin' : 'national_admin';
+        } else if (accessLevel === 'editor') {
+          role = 'editor';
+        }
+
         const { data: existing } = await supabase
           .from(assocTable)
-          .select('id')
+          .select('id, role')
           .eq('user_id', member.user_id)
           .eq(assocIdCol, effectiveAssocId)
           .maybeSingle();
 
         if (!existing) {
-          const accessLevel = position.access_level || 'editor';
-          let role = 'member';
-          if (accessLevel === 'admin') {
-            role = effectiveAssocType === 'state' ? 'state_admin' : 'national_admin';
-          } else if (accessLevel === 'editor') {
-            role = 'editor';
-          }
-
           const accessData: Record<string, any> = {
             user_id: member.user_id,
             role,
@@ -376,6 +376,11 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
           await supabase
             .from(assocTable)
             .insert(accessData);
+        } else if (existing.role !== role) {
+          await supabase
+            .from(assocTable)
+            .update({ role, updated_at: new Date().toISOString() })
+            .eq('id', existing.id);
         }
       }
 
