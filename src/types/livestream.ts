@@ -67,6 +67,41 @@ export interface LivestreamYouTubePlaylist {
   created_at: string;
 }
 
+export type StreamInputMode = 'browser' | 'rtmp_external';
+export type RecordingMode = 'auto' | 'manual' | 'both';
+
+export interface StreamHealthMetrics {
+  bitrate_kbps?: number;
+  fps?: number;
+  resolution?: string;
+  connection_quality?: 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
+  dropped_frames?: number;
+  uptime_seconds?: number;
+  last_updated?: string;
+}
+
+export interface EncodingConfig {
+  recommended_resolution?: string;
+  recommended_fps?: number;
+  recommended_bitrate_kbps?: number;
+  recommended_keyframe_interval?: number;
+  recommended_audio_bitrate_kbps?: number;
+  detected_resolution?: string;
+  detected_fps?: number;
+  detected_bitrate_kbps?: number;
+  detected_codec?: string;
+  encoding_warnings?: string[];
+}
+
+export interface NetworkConfig {
+  min_upload_mbps?: number;
+  recommended_upload_mbps?: number;
+  detected_upload_mbps?: number;
+  connection_type?: string;
+  using_bonded?: boolean;
+  failover_enabled?: boolean;
+}
+
 export interface LivestreamSession {
   id: string;
   club_id: string;
@@ -82,8 +117,11 @@ export interface LivestreamSession {
   cloudflare_whip_playback_url?: string;
   cloudflare_output_id?: string;
   cloudflare_customer_code?: string;
+  cloudflare_rtmps_url?: string;
+  cloudflare_rtmps_stream_key?: string;
 
   streaming_mode: 'direct_youtube' | 'cloudflare_relay';
+  stream_input_mode: StreamInputMode;
 
   title: string;
   description?: string;
@@ -98,6 +136,7 @@ export interface LivestreamSession {
   status: LivestreamStatus;
 
   enable_overlays: boolean;
+  enable_alfie_overlay: boolean;
   enable_chat: boolean;
   enable_sponsor_rotation: boolean;
   sponsor_rotation_interval: number;
@@ -114,9 +153,19 @@ export interface LivestreamSession {
   peak_viewers: number;
 
   auto_segment_enabled: boolean;
+  auto_record: boolean;
+  recording_mode: RecordingMode;
   current_race_number: number;
   current_segment_start?: string;
   youtube_playlist_id?: string;
+
+  signal_detected: boolean;
+  signal_detected_at?: string;
+  last_signal_at?: string;
+  reconnect_attempts: number;
+  stream_health: StreamHealthMetrics;
+  encoding_config: EncodingConfig;
+  network_config: NetworkConfig;
 
   created_at: string;
   updated_at: string;
