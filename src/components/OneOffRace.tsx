@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Calendar, Building, Sailboat, X, FileText, CalendarRange, Upload, DollarSign, Users, Plus, Globe, Clock, AlertTriangle } from 'lucide-react';
+import { Trophy, Calendar, Building, Sailboat, X, FileText, CalendarRange, Upload, DollarSign, Users, Plus, Globe, Clock, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { RaceType, BoatType } from '../types';
 import { RaceEvent } from '../types/race';
 import { storeRaceEvent, setCurrentEvent } from '../utils/raceStorage';
 import { getStoredClubs } from '../utils/clubStorage';
 import { getStoredVenues } from '../utils/venueStorage';
+import { getBoatClasses } from '../utils/boatClassStorage';
 import { Club } from '../types/club';
 import { Venue } from '../types/venue';
+import { BoatClass } from '../types/boatClass';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -49,6 +51,7 @@ export const OneOffRace: React.FC<OneOffRaceProps> = ({
 
   const [clubs, setClubs] = useState<Club[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
+  const [allBoatClasses, setAllBoatClasses] = useState<BoatClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,12 +65,14 @@ export const OneOffRace: React.FC<OneOffRaceProps> = ({
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [fetchedClubs, fetchedVenues] = await Promise.all([
+      const [fetchedClubs, fetchedVenues, fetchedBoatClasses] = await Promise.all([
         getStoredClubs(),
-        getStoredVenues()
+        getStoredVenues(),
+        getBoatClasses()
       ]);
       setClubs(fetchedClubs);
       setVenues(fetchedVenues);
+      setAllBoatClasses(fetchedBoatClasses);
 
       // Fetch all clubs from the database
       const { data: allClubsData, error: allClubsError } = await supabase
@@ -784,13 +789,9 @@ export const OneOffRace: React.FC<OneOffRaceProps> = ({
                 `}
               >
                 <option value="">Select race class</option>
-                <option value="DF65">Dragon Force 65</option>
-                <option value="DF95">Dragon Force 95</option>
-                <option value="10R">10 Rater</option>
-                <option value="IOM">IOM</option>
-                <option value="Marblehead">Marblehead</option>
-                <option value="A Class">A Class</option>
-                <option value="RC Laser">RC Laser</option>
+                {allBoatClasses.map(bc => (
+                  <option key={bc.id} value={bc.name}>{bc.name}</option>
+                ))}
               </select>
             </div>
           </div>

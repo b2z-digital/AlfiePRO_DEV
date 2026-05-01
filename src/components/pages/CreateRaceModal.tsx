@@ -2203,12 +2203,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       `}
                     >
                       {formData.raceClass
-                        ? (raceClassOptions.find(o => o.value === formData.raceClass)?.label || formData.raceClass)
+                        ? (formData.boatClassName || allBoatClasses.find(bc => bc.name === formData.raceClass)?.name || formData.raceClass)
                         : 'Select race class'}
                     </button>
                     {(() => {
-                      const opt = formData.raceClass ? raceClassOptions.find(o => o.value === formData.raceClass) : null;
-                      const bc = opt ? findBoatClassForOption(opt) : null;
+                      const bc = formData.raceClass ? allBoatClasses.find(b => b.name === formData.raceClass) : null;
                       return bc?.class_image ? (
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg overflow-hidden border-2 border-slate-600">
                           <img src={bc.class_image} alt="" className="w-full h-full object-cover" />
@@ -2224,26 +2223,24 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                         absolute bottom-full left-0 right-0 mb-1 max-h-60 overflow-auto rounded-lg shadow-xl z-50 border
                         ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200'}
                       `}>
-                        {raceClassOptions.map(opt => {
-                          const bc = findBoatClassForOption(opt);
-                          return (
+                        {allBoatClasses.map(bc => (
                             <button
-                              key={opt.value}
+                              key={bc.id}
                               type="button"
                               onClick={() => {
                                 setFormData(prev => ({
                                   ...prev,
-                                  raceClass: opt.value as BoatType,
-                                  boatClassName: opt.label
+                                  raceClass: bc.name as BoatType,
+                                  boatClassName: bc.name
                                 }));
                                 setShowClassDropdown(false);
                               }}
                               className={`
                                 w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-500/10 transition-colors
-                                ${formData.raceClass === opt.value ? 'bg-blue-500/20' : ''}
+                                ${formData.raceClass === bc.name ? 'bg-blue-500/20' : ''}
                               `}
                             >
-                              {bc?.class_image ? (
+                              {bc.class_image ? (
                                 <img src={bc.class_image} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border-2 border-slate-600" />
                               ) : (
                                 <div className="w-10 h-10 rounded-lg bg-slate-600 flex items-center justify-center flex-shrink-0">
@@ -2251,11 +2248,10 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                                 </div>
                               )}
                               <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                {opt.label}
+                                {bc.name}
                               </span>
                             </button>
-                          );
-                        })}
+                          ))}
                       </div>
                     )}
                   </div>
