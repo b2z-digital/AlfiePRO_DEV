@@ -443,10 +443,9 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
       }
 
       addNotification('success', 'Member updated successfully');
+      onClose();
       if (onSuccess) {
         onSuccess();
-      } else {
-        onClose();
       }
     } catch (error: any) {
       console.error('Error updating member:', error);
