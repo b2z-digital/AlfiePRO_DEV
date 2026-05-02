@@ -5,6 +5,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ImpersonationProvider } from './contexts/ImpersonationContext';
 import { ScoringContextProvider } from './contexts/ScoringContext';
+import { VoiceCallProvider } from './contexts/VoiceCallContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import App from './App';
 import MobileStreamPage from './pages/MobileStreamPage';
@@ -48,11 +49,13 @@ function Root() {
       <AuthProvider>
         <ImpersonationProvider>
           <NotificationProvider>
-            <ScoringContextProvider>
-              <BrowserRouter>
-                <App />
-              </BrowserRouter>
-            </ScoringContextProvider>
+            <VoiceCallProvider>
+              <ScoringContextProvider>
+                <BrowserRouter>
+                  <App />
+                </BrowserRouter>
+              </ScoringContextProvider>
+            </VoiceCallProvider>
           </NotificationProvider>
         </ImpersonationProvider>
       </AuthProvider>
