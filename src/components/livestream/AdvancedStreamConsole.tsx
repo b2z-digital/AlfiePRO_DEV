@@ -226,78 +226,33 @@ export function AdvancedStreamConsole({
       {/* RTMP Credentials Panel (Advanced Mode) */}
       {isRtmpMode && (
         <div className="bg-slate-900/80 border border-slate-700/50 rounded-xl p-3">
-          <button
-            onClick={() => toggleSection('connection')}
-            className="flex items-center justify-between w-full mb-2"
-          >
-            <div className="flex items-center gap-2">
-              <Wifi className="w-3.5 h-3.5 text-blue-400" />
-              <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">Connection</span>
-            </div>
-            {expandedSection === 'connection' ? (
-              <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
-            ) : (
-              <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
-            )}
-          </button>
+          <div className="flex items-center gap-2 mb-3">
+            <Wifi className="w-3.5 h-3.5 text-blue-400" />
+            <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">Connection</span>
+          </div>
 
-          {expandedSection === 'connection' && (
-            <div className="space-y-3 mt-3">
-              {/* Signal Status Indicator */}
-              <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-                signalStatus === 'detected'
-                  ? 'bg-green-500/10 border-green-500/30'
-                  : signalStatus === 'lost'
-                  ? 'bg-red-500/10 border-red-500/30'
-                  : 'bg-slate-800/50 border-slate-700/50'
-              }`}>
-                <div className={`w-3 h-3 rounded-full ${
-                  signalStatus === 'detected'
-                    ? 'bg-green-400 animate-pulse'
-                    : signalStatus === 'lost'
-                    ? 'bg-red-400 animate-pulse'
-                    : 'bg-slate-600'
-                }`} />
-                <div className="flex-1">
-                  <span className={`text-xs font-medium ${
-                    signalStatus === 'detected' ? 'text-green-300' :
-                    signalStatus === 'lost' ? 'text-red-300' : 'text-slate-400'
-                  }`}>
-                    {signalStatus === 'detected' ? 'Signal Detected' :
-                     signalStatus === 'lost' ? 'Signal Lost' : 'Waiting for Signal...'}
-                  </span>
-                  {signalStatus === 'detected' && healthMetrics.resolution && (
-                    <span className="text-[10px] text-slate-500 ml-2">
-                      {healthMetrics.resolution} @ {healthMetrics.fps}fps
-                    </span>
-                  )}
-                </div>
-                {signalPolling && signalStatus === 'waiting' && (
-                  <RefreshCw className="w-3 h-3 text-slate-500 animate-spin" />
-                )}
-              </div>
-
+          {/* RTMP Credentials - always visible */}
+          {session.cloudflare_rtmps_url ? (
+            <div className="space-y-3">
               {/* RTMP URL */}
-              {session.cloudflare_rtmps_url && (
-                <div>
-                  <label className="text-[10px] text-slate-500 font-medium mb-1.5 block">RTMP Server URL</label>
-                  <div className="flex items-center gap-1.5">
-                    <div className="flex-1 bg-slate-950 border border-slate-700/50 rounded-lg px-3 py-2 text-[11px] text-slate-300 font-mono truncate">
-                      {session.cloudflare_rtmps_url}
-                    </div>
-                    <button
-                      onClick={() => copyToClipboard(session.cloudflare_rtmps_url!, 'rtmp-url')}
-                      className="p-2 bg-slate-800 border border-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
-                    >
-                      {copiedField === 'rtmp-url' ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5 text-slate-400" />
-                      )}
-                    </button>
+              <div>
+                <label className="text-[10px] text-slate-500 font-medium mb-1.5 block">Server URL</label>
+                <div className="flex items-center gap-1.5">
+                  <div className="flex-1 bg-slate-950 border border-slate-700/50 rounded-lg px-3 py-2 text-[11px] text-slate-300 font-mono truncate">
+                    {session.cloudflare_rtmps_url}
                   </div>
+                  <button
+                    onClick={() => copyToClipboard(session.cloudflare_rtmps_url!, 'rtmp-url')}
+                    className="p-2 bg-slate-800 border border-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
+                  >
+                    {copiedField === 'rtmp-url' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                  </button>
                 </div>
-              )}
+              </div>
 
               {/* Stream Key */}
               {session.cloudflare_rtmps_stream_key && (
@@ -331,18 +286,50 @@ export function AdvancedStreamConsole({
                 </div>
               )}
 
-              {/* Quick Setup Guide */}
-              <div className="bg-slate-800/40 border border-slate-700/30 rounded-lg p-2.5">
-                <div className="flex items-start gap-2">
-                  <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
-                  <div className="text-[10px] text-slate-400 space-y-1">
-                    <p className="font-medium text-slate-300">OBS Quick Setup:</p>
-                    <p>Settings &gt; Stream &gt; Service: Custom</p>
-                    <p>Paste Server URL and Stream Key above</p>
-                    <p>Click "Start Streaming" in OBS</p>
+              {/* Signal Status - shown when stream is active */}
+              {(streamStatus === 'testing' || streamStatus === 'live' || streamStatus === 'connecting') && (
+                <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${
+                  signalStatus === 'detected'
+                    ? 'bg-green-500/10 border-green-500/30'
+                    : signalStatus === 'lost'
+                    ? 'bg-red-500/10 border-red-500/30'
+                    : 'bg-slate-800/50 border-slate-700/50'
+                }`}>
+                  <div className={`w-2.5 h-2.5 rounded-full ${
+                    signalStatus === 'detected'
+                      ? 'bg-green-400 animate-pulse'
+                      : signalStatus === 'lost'
+                      ? 'bg-red-400 animate-pulse'
+                      : 'bg-slate-600'
+                  }`} />
+                  <div className="flex-1">
+                    <span className={`text-[11px] font-medium ${
+                      signalStatus === 'detected' ? 'text-green-300' :
+                      signalStatus === 'lost' ? 'text-red-300' : 'text-slate-400'
+                    }`}>
+                      {signalStatus === 'detected' ? 'Signal Detected' :
+                       signalStatus === 'lost' ? 'Signal Lost' : 'Waiting for Signal...'}
+                    </span>
+                    {signalStatus === 'detected' && healthMetrics.resolution && (
+                      <span className="text-[10px] text-slate-500 ml-2">
+                        {healthMetrics.resolution} @ {healthMetrics.fps}fps
+                      </span>
+                    )}
                   </div>
+                  {signalPolling && signalStatus === 'waiting' && (
+                    <RefreshCw className="w-3 h-3 text-slate-500 animate-spin" />
+                  )}
                 </div>
-              </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-3 bg-slate-800/40 border border-slate-700/30 rounded-lg">
+              <p className="text-[11px] text-slate-400 text-center">
+                RTMP credentials will appear here once the stream session is created.
+              </p>
+              <p className="text-[10px] text-slate-500 text-center mt-1">
+                Click "Go Live" or start testing to generate your connection details.
+              </p>
             </div>
           )}
         </div>
@@ -473,6 +460,35 @@ export function AdvancedStreamConsole({
                   <div className="flex justify-between text-[10px]">
                     <span className="text-slate-500">Recommended Upload</span>
                     <span className="text-green-400 font-medium">10+ Mbps</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* How to Connect Guide */}
+              <div className="bg-slate-800/40 border border-slate-700/30 rounded-lg p-2.5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="w-3 h-3 text-cyan-400" />
+                  <span className="text-[10px] font-medium text-slate-300">How to Connect</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-[10px] text-slate-400 space-y-1.5">
+                    <p className="font-medium text-slate-300">OBS Studio:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 pl-1 text-[9.5px]">
+                      <li>Go to Settings &gt; Stream</li>
+                      <li>Service: <span className="text-slate-300">Custom</span></li>
+                      <li>Paste the <span className="text-cyan-400">Server URL</span> from above</li>
+                      <li>Paste the <span className="text-cyan-400">Stream Key</span> from above</li>
+                      <li>Click "Start Streaming"</li>
+                    </ol>
+                  </div>
+                  <div className="text-[10px] text-slate-400 space-y-1.5">
+                    <p className="font-medium text-slate-300">ATEM Mini / Hardware Encoders:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 pl-1 text-[9.5px]">
+                      <li>Open ATEM Software Control &gt; Output</li>
+                      <li>Platform: <span className="text-slate-300">Custom RTMP</span></li>
+                      <li>Enter the Server URL and Stream Key</li>
+                      <li>Press "On Air"</li>
+                    </ol>
                   </div>
                 </div>
               </div>
