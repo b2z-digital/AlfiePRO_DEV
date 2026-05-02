@@ -49,6 +49,7 @@ import { EventWebsiteDashboardPage } from './pages/EventWebsiteDashboardPage';
 import { EventCommandCenterPage } from './pages/EventCommandCenterPage';
 import { ConnectionMonitor } from './components/ConnectionMonitor';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import { VoiceCallModal } from './components/conversations/VoiceCallModal';
 import { useDataPreloader } from './hooks/useDataPreloader';
 import { SubdomainPublicSite } from './components/SubdomainPublicSite';
 import { SubdomainProvider } from './contexts/SubdomainContext';
@@ -207,6 +208,7 @@ function App() {
     <ModalProvider>
       <ConnectionMonitor />
       <PWAInstallPrompt />
+      <VoiceCallModal />
       <NotificationSystem
         notifications={notifications}
         onRemove={removeNotification}

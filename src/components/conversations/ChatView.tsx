@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, Phone } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
+import { useVoiceCall } from '../../contexts/VoiceCallContext';
 
 interface ChatMessage {
   id: string;
@@ -41,6 +42,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
   const { user } = useAuth();
   const { isImpersonating, effectiveUserId } = useImpersonation();
   const currentUserId = isImpersonating && effectiveUserId ? effectiveUserId : user?.id;
+  const { startCall, callState } = useVoiceCall();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -361,6 +363,20 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
           <div className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>{recipientName}</div>
           <div className={`text-xs ${recipientOnline ? 'text-green-500' : darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{recipientOnline ? 'Online' : 'Offline'}</div>
         </div>
+        <button
+          onClick={() => startCall(recipientId, recipientName, recipientAvatar, conversationId || undefined)}
+          disabled={!!callState}
+          className={`p-2 rounded-lg transition-colors ${
+            callState
+              ? 'opacity-40 cursor-not-allowed'
+              : darkMode
+                ? 'hover:bg-slate-700 text-slate-300 hover:text-green-400'
+                : 'hover:bg-gray-100 text-gray-600 hover:text-green-600'
+          }`}
+          title="Voice call"
+        >
+          <Phone size={20} />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
