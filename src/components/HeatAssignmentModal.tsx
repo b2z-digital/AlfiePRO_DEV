@@ -127,11 +127,97 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       if (sail) sailToIndex.set(sail, idx);
     });
 
-    // Detect format: header row should contain "Heat", "Pos", and round names
+    // Detect format from header row
     const headerFields = parseCsvLine(lines[0]);
-    const headerLower = headerFields.map(f => f.toLowerCase().replace(/"/g, ''));
+    const headerLower = headerFields.map(f => f.toLowerCase().replace(/"/g, '').trim());
 
-    // Determine number of rounds from header
+    const numberOfHeats = heatManagement.configuration.numberOfHeats || 2;
+    const heatDesignations: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, numberOfHeats) as HeatDesignation[];
+
+    // --- Row-based format detection ---
+    // Format: "Round,Heat,Sail Number,Skipper Name" where each row is one skipper assignment
+    const isRowBasedFormat = (
+      (headerLower.includes('round') || headerLower.some(h => /^round/.test(h))) &&
+      (headerLower.includes('heat') || headerLower.some(h => /^heat/.test(h))) &&
+      (headerLower.includes('sail number') || headerLower.includes('sail no') || headerLower.includes('sail'))
+    );
+
+    if (isRowBasedFormat) {
+      // Determine column indices
+      const roundCol = headerLower.findIndex(h => /^round/.test(h));
+      const heatCol = headerLower.findIndex(h => /^heat/.test(h));
+      const sailCol = headerLower.findIndex(h => /sail/.test(h));
+
+      if (roundCol < 0 || heatCol < 0 || sailCol < 0) {
+        return { assignments: [], error: 'Could not identify Round, Heat, and Sail columns', matchedCount: 0, totalSailNumbers: 0, unmatchedSails: [] };
+      }
+
+      // Parse all data rows to discover rounds and heats
+      const roundHeatData = new Map<string, Map<number, number[]>>(); // roundName -> heatIdx -> skipperIndices[]
+      const allSailNumbers = new Set<string>();
+      const unmatchedSails = new Set<string>();
+
+      for (let lineIdx = 1; lineIdx < lines.length; lineIdx++) {
+        const fields = parseCsvLine(lines[lineIdx]);
+        if (fields.length <= Math.max(roundCol, heatCol, sailCol)) continue;
+
+        const roundName = fields[roundCol].replace(/"/g, '').trim();
+        const heatName = fields[heatCol].replace(/"/g, '').trim();
+        const sailNo = fields[sailCol].replace(/"/g, '').trim().toUpperCase();
+
+        if (!roundName || !heatName || !sailNo) continue;
+
+        allSailNumbers.add(sailNo);
+
+        // Extract heat number from "Heat 1", "Heat 2", etc.
+        const heatMatch = heatName.match(/(\d+)/);
+        const heatIdx = heatMatch ? parseInt(heatMatch[1]) - 1 : 0;
+        if (heatIdx < 0 || heatIdx >= numberOfHeats) continue;
+
+        if (!roundHeatData.has(roundName)) {
+          roundHeatData.set(roundName, new Map());
+        }
+        const roundMap = roundHeatData.get(roundName)!;
+        if (!roundMap.has(heatIdx)) {
+          roundMap.set(heatIdx, []);
+        }
+
+        const skipperIdx = sailToIndex.get(sailNo);
+        if (skipperIdx !== undefined) {
+          roundMap.get(heatIdx)!.push(skipperIdx);
+        } else {
+          unmatchedSails.add(sailNo);
+        }
+      }
+
+      if (roundHeatData.size === 0) {
+        return { assignments: [], error: 'No valid heat assignment data found in CSV', matchedCount: 0, totalSailNumbers: allSailNumbers.size, unmatchedSails: Array.from(unmatchedSails) };
+      }
+
+      // Sort rounds naturally (Q1, Q2, ..., Q10, F1, F2, etc.)
+      const roundNames = Array.from(roundHeatData.keys()).sort((a, b) => {
+        const aNum = parseInt(a.replace(/\D/g, '') || '0');
+        const bNum = parseInt(b.replace(/\D/g, '') || '0');
+        const aPrefix = a.replace(/\d/g, '').toLowerCase();
+        const bPrefix = b.replace(/\d/g, '').toLowerCase();
+        if (aPrefix !== bPrefix) return aPrefix.localeCompare(bPrefix);
+        return aNum - bNum;
+      });
+
+      // Convert to HeatAssignment[][] format
+      const result: HeatAssignment[][] = roundNames.map(roundName => {
+        const roundMap = roundHeatData.get(roundName)!;
+        return heatDesignations.map((_, heatIdx) => ({
+          heatDesignation: heatDesignations[heatIdx],
+          skipperIndices: roundMap.get(heatIdx) || []
+        }));
+      });
+
+      const matchedCount = allSailNumbers.size - unmatchedSails.size;
+      return { assignments: result, matchedCount, totalSailNumbers: allSailNumbers.size, unmatchedSails: Array.from(unmatchedSails) };
+    }
+
+    // --- Columnar format detection (original) ---
     // Format: "Heat","Pos","Qualifying Rd 1","","","Qualifying Rd 2","",""...
     // Each round has 3 columns: Sail No, Skipper, Pts
     let numRounds = 0;
@@ -145,14 +231,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       // Try alternative detection: count groups of 3 columns after first 2
       numRounds = Math.floor((headerFields.length - 2) / 3);
     }
-    if (numRounds === 0) return { assignments: [], error: 'Could not detect rounds from CSV header', matchedCount: 0, totalSailNumbers: 0, unmatchedSails: [] };
-
-    // Parse data rows grouped by heat
-    // Structure: rows start with "Heat 1","1",... or "","2",...
-    // Heat header row has "Heat N" in first column, subsequent rows have "" in first column
-    // "Observers" row marks end of a heat section
-    const numberOfHeats = heatManagement.configuration.numberOfHeats || 2;
-    const heatDesignations: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, numberOfHeats) as HeatDesignation[];
+    if (numRounds === 0) return { assignments: [], error: 'Could not detect rounds from CSV header. Expected either row format (Round, Heat, Sail Number, Skipper Name) or columnar format with round names in header.', matchedCount: 0, totalSailNumbers: 0, unmatchedSails: [] };
 
     // For each round, build heat -> skipper indices mapping
     // roundAssignments[roundIdx][heatIdx] = skipperIndices[]
@@ -183,7 +262,6 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       if (/^heat\s*\d+$/i.test(firstField)) {
         currentHeatIdx++;
         if (currentHeatIdx >= numberOfHeats) {
-          // Wrapping around - shouldn't happen in normal data but handle gracefully
           break;
         }
       }
@@ -196,7 +274,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
       // Each round has 3 columns (Sail No, Skipper, Pts) starting at offset 2
       for (let roundIdx = 0; roundIdx < numRounds; roundIdx++) {
-        const colOffset = 2 + (roundIdx * 3); // Sail No column for this round
+        const colOffset = 2 + (roundIdx * 3);
         const sailNo = (fields[colOffset] || '').replace(/"/g, '').trim().toUpperCase();
         if (!sailNo) continue;
 
