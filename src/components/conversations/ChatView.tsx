@@ -369,11 +369,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
           className={`p-2 rounded-lg transition-colors ${
             callState
               ? 'opacity-40 cursor-not-allowed'
-              : darkMode
-                ? 'hover:bg-slate-700 text-slate-300 hover:text-green-400'
-                : 'hover:bg-gray-100 text-gray-600 hover:text-green-600'
+              : recipientOnline
+                ? 'text-green-500 hover:bg-green-500/10 hover:text-green-400'
+                : darkMode
+                  ? 'text-slate-500 hover:bg-slate-700 hover:text-slate-300'
+                  : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
           }`}
-          title="Voice call"
+          title={recipientOnline ? 'Voice call - Online' : 'Voice call - Offline'}
         >
           <Phone size={20} />
         </button>
