@@ -1188,6 +1188,18 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
     if (!activeSession) return;
     try {
       setStreamStatus('connecting');
+
+      const isRtmpMode = activeSession.stream_input_mode === 'rtmp_external';
+
+      if (isRtmpMode) {
+        // RTMP mode: skip local camera - just mark as testing and wait for external signal
+        await livestreamStorage.updateSessionStatus(activeSession.id, 'testing');
+        setStreamStatus('testing');
+        addNotification('info', 'Ready for RTMP input - start streaming from your encoder.', 4000);
+        return;
+      }
+
+      // Browser mode: request local camera
       const stream = await requestCameraAccess();
       if (!stream) { setStreamStatus('offline'); return; }
       const existingCameras = await livestreamStorage.getCameras(activeSession.id);
@@ -1210,6 +1222,40 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
       const actualStartTime = new Date().toISOString();
+
+      const isRtmpMode = activeSession.stream_input_mode === 'rtmp_external';
+
+      if (isRtmpMode) {
+        // RTMP mode: OBS/ATEM handles video ingest - just mark as live and wait for signal
+        if (activeSession.cloudflare_live_input_id) {
+          try {
+            const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`;
+            await fetch(apiUrl, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'ensureRecording',
+                clubId: activeSession.club_id,
+                sessionData: { liveInputId: activeSession.cloudflare_live_input_id },
+              }),
+            });
+          } catch (e) { console.warn('Could not verify recording mode:', e); }
+        }
+
+        const { data: updatedSession, error: updateError } = await supabase
+          .from('livestream_sessions').update({ status: 'live', actual_start_time: actualStartTime }).eq('id', activeSession.id).select().single();
+        if (updateError) throw updateError;
+        setActiveSession(updatedSession);
+        setStreamStatus('live');
+        addNotification('success', 'Stream is live - waiting for RTMP signal from your encoder...', 6000);
+
+        if (autoSegmentEnabled && updatedSession.event_id) {
+          setTimeout(() => startFirstSegment(), 1000);
+        }
+        return;
+      }
+
+      // Browser/WHIP mode: use local camera
       let rawStream = activePreviewStream || mediaStream;
       if (!rawStream) { addNotification('error', 'No video source available.', 5000); setStreamStatus('testing'); return; }
 
