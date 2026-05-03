@@ -15,7 +15,7 @@ const aiStates = new Map<string, AIState>();
 function getAIState(boat: Boat): AIState {
   if (!aiStates.has(boat.id)) {
     aiStates.set(boat.id, {
-      lastTackTime: -10,
+      lastTackTime: 0,
       preferredSide: Math.random() > 0.5 ? 1 : -1,
       initialized: false,
     });
@@ -70,18 +70,24 @@ export function isHeadingDownwind(rounding: number): boolean {
 }
 
 function getCloseHauledHeading(windDir: number, tack: 'starboard' | 'port'): number {
+  // Upwind direction = opposite of wind flow
   const upwindDir = normalizeAngle(windDir + 180);
+  // Starboard tack: wind over starboard side = boat points LEFT of wind = subtract tack angle
+  // Port tack: wind over port side = boat points RIGHT of wind = add tack angle
   if (tack === 'starboard') {
-    return normalizeAngle(upwindDir + TACK_ANGLE);
+    return normalizeAngle(upwindDir - TACK_ANGLE);
   }
-  return normalizeAngle(upwindDir - TACK_ANGLE);
+  return normalizeAngle(upwindDir + TACK_ANGLE);
 }
 
 function getDownwindHeading(windDir: number, gybe: 'starboard' | 'port'): number {
+  const gybeOffset = 180 - GYBE_ANGLE; // 35 degrees off dead downwind
+  // Starboard gybe (positive TWA): heading slightly right of downwind direction
   if (gybe === 'starboard') {
-    return normalizeAngle(windDir + GYBE_ANGLE);
+    return normalizeAngle(windDir + gybeOffset);
   }
-  return normalizeAngle(windDir - GYBE_ANGLE);
+  // Port gybe (negative TWA): heading slightly left of downwind direction
+  return normalizeAngle(windDir - gybeOffset);
 }
 
 function smoothTurnToward(boat: Boat, desiredHeading: number): void {

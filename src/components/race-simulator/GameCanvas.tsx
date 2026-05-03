@@ -96,10 +96,10 @@ function drawWaterRipples(ctx: CanvasRenderingContext2D, time: number, width: nu
 
 function drawWindIndicators(ctx: CanvasRenderingContext2D, wind: Wind, time: number, width: number, height: number, darkMode: boolean) {
   const currentWind = getWindAtTime(wind, time);
-  // Wind direction in our system = direction wind blows TO (compass heading)
-  // We draw arrows pointing in the direction wind blows (downwind direction)
-  // This makes it intuitive: arrows flow away from windward mark
-  const windBlowsToRad = degToRad(currentWind.direction);
+  // Wind direction = compass heading wind blows TO. We want arrows pointing that direction.
+  // Canvas rotation uses same convention as boat headings: rotate(degToRad(heading))
+  // with bow drawn at (0, -length) points in the compass heading direction.
+  const windRad = degToRad(currentWind.direction);
 
   ctx.save();
   ctx.globalAlpha = darkMode ? 0.15 : 0.2;
@@ -114,16 +114,17 @@ function drawWindIndicators(ctx: CanvasRenderingContext2D, wind: Wind, time: num
 
       ctx.save();
       ctx.translate(x + offset, y);
-      ctx.rotate(windBlowsToRad);
+      ctx.rotate(windRad);
 
-      // Arrow shaft from top to bottom (in rotated frame), arrowhead at bottom
+      // Arrow pointing in heading direction: tip at (0, -arrowLen) = "bow" direction
       ctx.beginPath();
+      ctx.moveTo(0, arrowLen);
+      ctx.lineTo(0, -arrowLen);
+      // Arrowhead chevron at the tip
       ctx.moveTo(0, -arrowLen);
-      ctx.lineTo(0, arrowLen);
-      ctx.moveTo(0, arrowLen);
-      ctx.lineTo(-3, arrowLen - 6);
-      ctx.moveTo(0, arrowLen);
-      ctx.lineTo(3, arrowLen - 6);
+      ctx.lineTo(-3, -arrowLen + 6);
+      ctx.moveTo(0, -arrowLen);
+      ctx.lineTo(3, -arrowLen + 6);
       ctx.stroke();
 
       ctx.restore();

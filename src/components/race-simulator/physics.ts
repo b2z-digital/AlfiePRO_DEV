@@ -120,7 +120,7 @@ export function getDirtyAirFactor(boat: Boat, allBoats: Boat[], windDirection: n
 export function updateBoatPosition(boat: Boat, dt: number, wind: { direction: number; speed: number }, allBoats: Boat[]): void {
   if (boat.finished) return;
 
-  // Handle tacking/gybing animation
+  // Handle tacking/gybing animation - boat still moves but at reduced speed
   if (boat.isTacking || boat.isGybing) {
     boat.tackTimer -= dt;
     if (boat.tackTimer <= 0) {
@@ -128,7 +128,11 @@ export function updateBoatPosition(boat: Boat, dt: number, wind: { direction: nu
       boat.isGybing = false;
       boat.tackTimer = 0;
     }
-    boat.speed *= 0.7; // speed loss during maneuver
+    // Move at 40% speed during maneuver (don't compound - use flat multiplier)
+    const headingRad = degToRad(boat.heading);
+    const maneuverSpeed = Math.max(boat.speed * 0.4, 2);
+    boat.position.x += Math.sin(headingRad) * maneuverSpeed * dt * 6;
+    boat.position.y -= Math.cos(headingRad) * maneuverSpeed * dt * 6;
     return;
   }
 
@@ -144,7 +148,7 @@ export function updateBoatPosition(boat: Boat, dt: number, wind: { direction: nu
   const twa = getTrueWindAngle(boat.heading, wind.direction);
   const baseSpeed = getBoatSpeed(twa, wind.speed);
   const dirtyAir = getDirtyAirFactor(boat, allBoats, wind.direction);
-  const targetSpeed = baseSpeed * dirtyAir;
+  const targetSpeed = baseSpeed * dirtyAir * (boat.skillLevel || 1.0);
 
   // Smooth speed changes
   boat.speed += (targetSpeed - boat.speed) * dt * 2;

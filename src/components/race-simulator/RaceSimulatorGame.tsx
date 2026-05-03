@@ -57,6 +57,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
   }, [scenario]);
 
   // Initialize StartBox audio engine with real sequence from database
+  const startBoxReady = useRef(false);
   useEffect(() => {
     if (startBoxInitialized.current) return;
     startBoxInitialized.current = true;
@@ -70,6 +71,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           await engine.preloadSequence(seq);
           engine.arm(seq);
           engine.start();
+          startBoxReady.current = true;
         }
       } catch {
         // Audio may fail on first interaction - will retry on restart
@@ -172,9 +174,15 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
         const next = { ...prev, boats: prev.boats.map(b => ({ ...b, position: { ...b.position } })) };
         const currentWind = getWindAtTime(next.wind, next.time);
 
-        // Update countdown/time
+        // Update countdown/time - sync with StartBox engine when available
         if (next.phase === 'countdown') {
-          next.countdown -= dt;
+          if (startBoxReady.current) {
+            const engine = getStartBoxEngine();
+            const remainingMs = engine.getRemainingMs();
+            next.countdown = remainingMs / 1000;
+          } else {
+            next.countdown -= dt;
+          }
 
           if (next.countdown <= 0) {
             next.phase = 'racing';
@@ -201,10 +209,13 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
         }
 
         // Update AI headings first, then move all boats
-        const aiTime = next.phase === 'countdown' ? -next.countdown : next.time;
+        // Use a monotonically increasing time for AI (total elapsed since game started)
+        const totalElapsed = next.phase === 'countdown'
+          ? (60 - next.countdown) // seconds elapsed since game began
+          : (60 + next.time);     // countdown duration + racing time
         for (const boat of next.boats) {
           if (!boat.isPlayer) {
-            updateAIBoat(boat, next.course, currentWind, aiTime, next.boats);
+            updateAIBoat(boat, next.course, currentWind, totalElapsed, next.boats);
           }
         }
 
@@ -360,6 +371,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
     resetAIStates();
     setGameState(scenario.setup(canvasSize.width, canvasSize.height));
     lastTimeRef.current = 0;
+    startBoxReady.current = false;
     // Restart the start box audio
     const engine = getStartBoxEngine();
     engine.stop();
@@ -370,6 +382,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           await engine.preloadSequence(seq);
           engine.arm(seq);
           engine.start();
+          startBoxReady.current = true;
         }
       } catch {
         // Ignore audio errors

@@ -29,6 +29,7 @@ export interface Boat {
   finishTime: number;
   rounding: number; // which mark they're heading to next (0 = start, 1 = windward, 2 = leeward, 3 = finish)
   laps: number;
+  skillLevel: number; // 0.7 to 1.0 - affects speed and tactics (1.0 = expert)
 }
 
 export interface Mark {

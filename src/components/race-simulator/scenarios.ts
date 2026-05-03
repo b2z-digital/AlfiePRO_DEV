@@ -14,14 +14,14 @@ const AI_NAMES = [
   'Aquila', 'Tempest', 'Zephyr',
 ];
 
-function createBoat(id: string, name: string, sailNumber: string, position: { x: number; y: number }, heading: number, isPlayer: boolean, color: string): Boat {
+function createBoat(id: string, name: string, sailNumber: string, position: { x: number; y: number }, heading: number, isPlayer: boolean, color: string, skillLevel = 1.0): Boat {
   return {
     id,
     name,
     sailNumber,
     position: { ...position },
     heading,
-    speed: isPlayer ? 2 : 1.5 + Math.random() * 1.5,
+    speed: isPlayer ? 3 : 2 + Math.random() * 2,
     isPlayer,
     isTacking: false,
     isGybing: false,
@@ -33,6 +33,7 @@ function createBoat(id: string, name: string, sailNumber: string, position: { x:
     finishTime: 0,
     rounding: 0,
     laps: 0,
+    skillLevel,
   };
 }
 
@@ -56,6 +57,9 @@ function createFleet(numBoats: number, linePortX: number, lineStbdX: number, lin
       ? heading + (Math.random() - 0.5) * 20
       : normalizeAngle(360 - heading + (Math.random() - 0.5) * 20);
 
+    // Assign decreasing skill levels: first boats are strongest competitors
+    const skillLevel = Math.max(0.7, 0.97 - i * 0.03 + (Math.random() - 0.5) * 0.04);
+
     boats.push(createBoat(
       `ai-${i}`,
       AI_NAMES[i % AI_NAMES.length],
@@ -63,7 +67,8 @@ function createFleet(numBoats: number, linePortX: number, lineStbdX: number, lin
       { x, y },
       boatHeading,
       false,
-      COLORS[(i + 1) % COLORS.length]
+      COLORS[(i + 1) % COLORS.length],
+      skillLevel
     ));
   }
 
