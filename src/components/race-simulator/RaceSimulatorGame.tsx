@@ -5,7 +5,46 @@ import { GameHUD } from './GameHUD';
 import { updateBoatPosition, getWindAtTime, normalizeAngle, normalizeDeg, hasPassedLine, hasRoundedMark, distance } from './physics';
 import { updateAIBoat, resetAIStates } from './ai';
 import { checkRules, checkMarkRounding } from './rules';
-import { Pause, Play, RotateCcw, ArrowLeft, Keyboard } from 'lucide-react';
+import { Pause, Play, RotateCcw, ArrowLeft, Keyboard, Volume2, VolumeX } from 'lucide-react';
+
+// Simple audio context for countdown beeps
+let audioCtx: AudioContext | null = null;
+function getAudioCtx(): AudioContext {
+  if (!audioCtx) audioCtx = new AudioContext();
+  return audioCtx;
+}
+function playBeep(freq: number, duration: number) {
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = freq;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration / 1000);
+    osc.start();
+    osc.stop(ctx.currentTime + duration / 1000);
+  } catch {}
+}
+function playHorn() {
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 440;
+    osc.type = 'sawtooth';
+    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.2);
+    osc.start();
+    osc.stop(ctx.currentTime + 1.2);
+  } catch {}
+}
 
 interface RaceSimulatorGameProps {
   scenario: Scenario;
@@ -16,11 +55,13 @@ interface RaceSimulatorGameProps {
 export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorGameProps) {
   const [gameState, setGameState] = useState<GameState>(() => scenario.setup());
   const [showControls, setShowControls] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const gameRef = useRef<GameState>(gameState);
   const animFrameRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
   const keysRef = useRef<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastBeepSecond = useRef<number>(-1);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 700 });
 
   // Keep ref in sync
@@ -128,11 +169,25 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
         // Update countdown/time
         if (next.phase === 'countdown') {
           next.countdown -= dt;
+
+          // Countdown beeps
+          if (soundEnabled) {
+            const sec = Math.ceil(next.countdown);
+            if (sec !== lastBeepSecond.current && sec > 0) {
+              lastBeepSecond.current = sec;
+              if (sec <= 10) {
+                playBeep(sec <= 3 ? 1200 : 1000, 80);
+              } else if (sec === 30 || sec === 60) {
+                playBeep(800, 200);
+              }
+            }
+          }
+
           if (next.countdown <= 0) {
             next.phase = 'racing';
             next.countdown = 0;
             next.time = 0;
-            // Set all boats to rounding 1 (heading to windward mark) when race starts
+            if (soundEnabled) playHorn();
             next.boats.forEach(b => {
               if (b.rounding === 0) b.rounding = 1;
             });
@@ -141,10 +196,10 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           next.time += dt;
         }
 
-        // Handle player steering
+        // Handle player steering (allowed during countdown for positioning)
         const player = next.boats.find(b => b.isPlayer);
         if (player && !player.isTacking && !player.isGybing && player.penaltyTurns === 0) {
-          const turnRate = 80 * dt; // degrees per second
+          const turnRate = 80 * dt;
           if (keysRef.current.has('arrowleft') || keysRef.current.has('a')) {
             player.heading = normalizeAngle(player.heading - turnRate);
           }
@@ -153,73 +208,123 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           }
         }
 
-        // Update all boats
+        // Update boat physics - during countdown, boats move slowly (maneuvering only)
+        const speedMultiplier = next.phase === 'countdown' ? 0.3 : 1.0;
         for (const boat of next.boats) {
-          updateBoatPosition(boat, dt, currentWind, next.boats);
+          updateBoatPosition(boat, dt * speedMultiplier, currentWind, next.boats);
           if (!boat.isPlayer) {
-            updateAIBoat(boat, next.course, currentWind, next.time, next.boats);
+            updateAIBoat(boat, next.course, currentWind, next.phase === 'countdown' ? -next.countdown : next.time, next.boats);
           }
         }
 
-        // Check mark roundings
+        // Keep boats within canvas bounds
+        for (const boat of next.boats) {
+          boat.position.x = Math.max(20, Math.min(canvasSize.width - 20, boat.position.x));
+          boat.position.y = Math.max(20, Math.min(canvasSize.height - 20, boat.position.y));
+        }
+
+        // Check mark roundings during racing
         if (next.phase === 'racing') {
           const windwardMark = next.course.marks.find(m => m.type === 'windward');
-          const leewardMark = next.course.marks.find(m => m.type === 'leeward');
+          const offsetMark = next.course.marks.find(m => m.label === 'Offset Mark');
+          const gatePort = next.course.marks.find(m => m.type === 'gate-port');
+          const gateStbd = next.course.marks.find(m => m.type === 'gate-starboard');
+          const totalLaps = next.course.legs;
 
           for (const boat of next.boats) {
             if (boat.finished) continue;
 
-            // Check start line crossing
-            if (boat.rounding === 1 && next.time < 2) {
-              // Just started, mark as past start
-            }
+            const roundingRadius = 20;
 
-            // Check windward mark
+            // Rounding progression:
+            // 1 = heading to windward, 2 = heading to offset, 3 = heading to gate
+            // 4 = windward (lap 2), 5 = offset (lap 2), 6 = gate (lap 2)
+            // 7 = heading to finish
+
+            // Windward mark (lap 1)
             if (boat.rounding === 1 && windwardMark) {
-              if (hasRoundedMark(boat, windwardMark.position, windwardMark.radius)) {
+              if (hasRoundedMark(boat, windwardMark.position, roundingRadius)) {
                 boat.rounding = 2;
               }
             }
 
-            // Check leeward mark
-            if (boat.rounding === 2 && leewardMark) {
-              if (hasRoundedMark(boat, leewardMark.position, leewardMark.radius)) {
+            // Offset mark (lap 1)
+            if (boat.rounding === 2 && offsetMark) {
+              if (hasRoundedMark(boat, offsetMark.position, roundingRadius)) {
                 boat.rounding = 3;
               }
             }
 
-            // Check finish
-            if (boat.rounding >= 3) {
+            // Gate (lap 1)
+            if (boat.rounding === 3 && (gatePort || gateStbd)) {
+              const gateTarget = gatePort || gateStbd;
+              const gateOther = gateStbd || gatePort;
+              if (hasRoundedMark(boat, gateTarget!.position, roundingRadius) ||
+                  hasRoundedMark(boat, gateOther!.position, roundingRadius)) {
+                boat.laps++;
+                if (boat.laps >= totalLaps) {
+                  boat.rounding = 7; // head to finish
+                } else {
+                  boat.rounding = 4; // lap 2 - back upwind
+                }
+              }
+            }
+
+            // Windward mark (lap 2)
+            if (boat.rounding === 4 && windwardMark) {
+              if (hasRoundedMark(boat, windwardMark.position, roundingRadius)) {
+                boat.rounding = 5;
+              }
+            }
+
+            // Offset mark (lap 2)
+            if (boat.rounding === 5 && offsetMark) {
+              if (hasRoundedMark(boat, offsetMark.position, roundingRadius)) {
+                boat.rounding = 6;
+              }
+            }
+
+            // Gate (lap 2)
+            if (boat.rounding === 6 && (gatePort || gateStbd)) {
+              const gateTarget = gatePort || gateStbd;
+              const gateOther = gateStbd || gatePort;
+              if (hasRoundedMark(boat, gateTarget!.position, roundingRadius) ||
+                  hasRoundedMark(boat, gateOther!.position, roundingRadius)) {
+                boat.laps++;
+                boat.rounding = 7;
+              }
+            }
+
+            // Finish
+            if (boat.rounding === 7) {
               if (hasPassedLine(boat, next.course.finishLine.port, next.course.finishLine.starboard, 'upward')) {
                 boat.finished = true;
                 boat.finishTime = next.time;
+                if (boat.isPlayer && soundEnabled) playHorn();
               }
             }
           }
 
-          // Check if all boats finished
+          // All finished?
           if (next.boats.every(b => b.finished)) {
             next.phase = 'finished';
           }
 
-          // Check rules (throttled to every ~0.5s for performance)
+          // Check rules (throttled)
           if (Math.floor(next.time * 2) !== Math.floor((next.time - dt) * 2)) {
             const violation = checkRules(next.boats, currentWind.direction, next.time);
             if (violation) {
               next.violations = [...next.violations, violation];
-              // Only pause for player violations
               const playerBoat = next.boats.find(b => b.isPlayer);
               if (violation.offendingBoat === playerBoat?.id || violation.rightOfWayBoat === playerBoat?.id) {
                 next.currentViolation = violation;
               }
-              // Apply penalty to offending boat
               const offender = next.boats.find(b => b.id === violation.offendingBoat);
               if (offender && !offender.isPlayer) {
                 offender.penaltyTurns = 2;
               }
             }
 
-            // Check mark room
             if (windwardMark) {
               const markViolation = checkMarkRounding(next.boats, windwardMark.position, windwardMark.radius, currentWind.direction, next.time);
               if (markViolation && !next.currentViolation) {
@@ -243,7 +348,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, []);
+  }, [soundEnabled, canvasSize]);
 
   const handleDismissViolation = () => {
     setGameState(prev => {
@@ -283,6 +388,13 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             title="Show controls"
           >
             <Keyboard size={16} />
+          </button>
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`p-2 rounded-lg ${darkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-gray-100 text-gray-600'}`}
+            title={soundEnabled ? 'Mute sounds' : 'Enable sounds'}
+          >
+            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
           </button>
           <button
             onClick={() => setGameState(prev => ({ ...prev, paused: !prev.paused }))}

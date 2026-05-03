@@ -241,6 +241,22 @@ function drawCourse(ctx: CanvasRenderingContext2D, course: Course, darkMode: boo
 
     ctx.restore();
   }
+
+  // Draw gate line between gate marks
+  const gatePort = course.marks.find(m => m.type === 'gate-port');
+  const gateStbd = course.marks.find(m => m.type === 'gate-starboard');
+  if (gatePort && gateStbd) {
+    ctx.save();
+    ctx.strokeStyle = darkMode ? 'rgba(245, 158, 11, 0.4)' : 'rgba(217, 119, 6, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(gatePort.position.x, gatePort.position.y);
+    ctx.lineTo(gateStbd.position.x, gateStbd.position.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
 }
 
 function drawTrail(ctx: CanvasRenderingContext2D, boat: Boat) {

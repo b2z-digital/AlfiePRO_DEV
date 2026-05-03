@@ -1,4 +1,4 @@
-import { GameState, Boat, Course, Wind, Mark, Scenario } from './types';
+import { GameState, Boat, Course, Scenario } from './types';
 
 const COLORS = [
   '#3b82f6', // player - blue
@@ -37,20 +37,17 @@ function createBoat(id: string, name: string, sailNumber: string, position: { x:
 
 function createFleet(numBoats: number, startX: number, startY: number, heading: number, spread: number): Boat[] {
   const boats: Boat[] = [];
-
-  // Player boat
   boats.push(createBoat('player', 'You', '01', { x: startX, y: startY }, heading, true, COLORS[0]));
 
-  // AI boats
   for (let i = 0; i < numBoats - 1; i++) {
     const offsetX = (Math.random() - 0.5) * spread;
-    const offsetY = (Math.random() - 0.5) * spread * 0.5;
+    const offsetY = (Math.random() - 0.5) * 30;
     boats.push(createBoat(
       `ai-${i}`,
       AI_NAMES[i % AI_NAMES.length],
       String(i + 2).padStart(2, '0'),
       { x: startX + offsetX, y: startY + offsetY },
-      heading + (Math.random() - 0.5) * 20,
+      heading + (Math.random() - 0.5) * 10,
       false,
       COLORS[(i + 1) % COLORS.length]
     ));
@@ -59,21 +56,32 @@ function createFleet(numBoats: number, startX: number, startY: number, heading: 
   return boats;
 }
 
+// Standard windward-leeward course:
+// - Start/Finish line at bottom
+// - Windward mark at top
+// - Offset mark (clearance) just below-left of windward mark
+// - Leeward gate (two marks) at bottom above start line
+// Boats do 2 laps: Start -> Windward -> Offset -> Gate -> Windward -> Offset -> Gate -> Finish
 function createStandardCourse(canvasWidth: number, canvasHeight: number): Course {
   const centerX = canvasWidth / 2;
-  const startY = canvasHeight * 0.8;
-  const windwardY = canvasHeight * 0.15;
-  const lineWidth = 80;
+  const startY = canvasHeight * 0.82;
+  const gateY = canvasHeight * 0.72;
+  const windwardY = canvasHeight * 0.12;
+  const offsetY = windwardY + 60;
+  const lineWidth = 90;
+  const gateWidth = 50;
 
   return {
     marks: [
       { position: { x: centerX, y: windwardY }, radius: 8, type: 'windward', label: 'Windward Mark' },
-      { position: { x: centerX - 30, y: startY - 20 }, radius: 8, type: 'leeward', label: 'Leeward Mark' },
-      { position: { x: centerX - lineWidth, y: startY }, radius: 6, type: 'start-port', label: 'Port End' },
-      { position: { x: centerX + lineWidth, y: startY }, radius: 6, type: 'start-starboard', label: 'Starboard End' },
+      { position: { x: centerX - 50, y: offsetY }, radius: 6, type: 'leeward', label: 'Offset Mark' },
+      { position: { x: centerX - gateWidth, y: gateY }, radius: 7, type: 'gate-port', label: 'Gate (Port)' },
+      { position: { x: centerX + gateWidth, y: gateY }, radius: 7, type: 'gate-starboard', label: 'Gate (Stbd)' },
+      { position: { x: centerX - lineWidth, y: startY }, radius: 5, type: 'start-port', label: 'Pin End' },
+      { position: { x: centerX + lineWidth, y: startY }, radius: 5, type: 'start-starboard', label: 'Committee' },
     ],
     startLine: { port: { x: centerX - lineWidth, y: startY }, starboard: { x: centerX + lineWidth, y: startY } },
-    finishLine: { port: { x: centerX - lineWidth, y: startY - 30 }, starboard: { x: centerX + lineWidth, y: startY - 30 } },
+    finishLine: { port: { x: centerX - lineWidth, y: startY }, starboard: { x: centerX + lineWidth, y: startY } },
     legs: 2,
   };
 }
@@ -88,7 +96,7 @@ export const scenarios: Scenario[] = [
     icon: 'flag',
     setup: (): GameState => {
       const course = createStandardCourse(800, 700);
-      const startY = course.startLine.port.y + 50;
+      const startY = course.startLine.port.y + 40;
       const boats = createFleet(8, 400, startY, 0, 120);
       boats.forEach(b => { b.rounding = 0; });
 
@@ -114,7 +122,8 @@ export const scenarios: Scenario[] = [
     icon: 'wind',
     setup: (): GameState => {
       const course = createStandardCourse(800, 700);
-      const boats = createFleet(6, 400, course.startLine.port.y - 10, 340, 100);
+      const startY = course.startLine.port.y - 5;
+      const boats = createFleet(6, 400, startY, 340, 100);
       boats.forEach(b => { b.rounding = 1; });
 
       return {
@@ -133,15 +142,15 @@ export const scenarios: Scenario[] = [
   {
     id: 'downwind-strategy',
     name: 'Downwind Strategy',
-    description: 'Sail downwind from the windward mark to the leeward gate. Master the art of gybing angles, riding gusts, and choosing the fast lane downwind.',
+    description: 'Sail downwind from the offset mark to the leeward gate. Master the art of gybing angles, riding gusts, and choosing the fast lane downwind.',
     difficulty: 'intermediate',
     category: 'downwind',
     icon: 'arrow-down',
     setup: (): GameState => {
       const course = createStandardCourse(800, 700);
-      const windwardMark = course.marks.find(m => m.type === 'windward')!;
-      const boats = createFleet(6, windwardMark.position.x, windwardMark.position.y + 40, 180, 80);
-      boats.forEach(b => { b.rounding = 2; });
+      const offsetMark = course.marks.find(m => m.label === 'Offset Mark')!;
+      const boats = createFleet(6, offsetMark.position.x + 30, offsetMark.position.y + 30, 170, 60);
+      boats.forEach(b => { b.rounding = 3; }); // heading to gate
 
       return {
         boats,
@@ -166,8 +175,7 @@ export const scenarios: Scenario[] = [
     setup: (): GameState => {
       const course = createStandardCourse(800, 700);
       const windwardMark = course.marks.find(m => m.type === 'windward')!;
-      // Position boats approaching the mark on starboard tack
-      const boats = createFleet(5, windwardMark.position.x - 60, windwardMark.position.y + 80, 350, 40);
+      const boats = createFleet(5, windwardMark.position.x - 50, windwardMark.position.y + 100, 350, 30);
       boats.forEach(b => { b.rounding = 1; });
 
       return {
@@ -216,13 +224,13 @@ export const scenarios: Scenario[] = [
   {
     id: 'full-race',
     name: 'Full Race',
-    description: 'Race a complete windward-leeward course. Start, beat to the windward mark, run downwind, and finish. Use all your tactical knowledge to win.',
+    description: 'Race a complete 2-lap windward-leeward course. Start, beat to the windward mark, round the offset, run to the gate, and repeat. Use all your tactical knowledge to win.',
     difficulty: 'advanced',
     category: 'full-race',
     icon: 'trophy',
     setup: (): GameState => {
       const course = createStandardCourse(800, 700);
-      const startY = course.startLine.port.y + 60;
+      const startY = course.startLine.port.y + 40;
       const boats = createFleet(10, 400, startY, 0, 140);
       boats.forEach(b => { b.rounding = 0; });
 
@@ -231,7 +239,7 @@ export const scenarios: Scenario[] = [
         wind: { direction: 180, speed: 13, gustFactor: 0.15, shiftAmplitude: 10, shiftPeriod: 35 },
         course,
         time: 0,
-        countdown: 120,
+        countdown: 60,
         phase: 'countdown',
         violations: [],
         currentViolation: null,
