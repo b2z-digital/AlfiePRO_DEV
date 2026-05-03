@@ -219,8 +219,8 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           }
         }
 
-        // Update boat physics - during countdown boats move at 70% speed (maneuvering into position)
-        const speedMultiplier = next.phase === 'countdown' ? 0.7 : 1.0;
+        // Update boat physics - during countdown boats move at reduced speed (maneuvering into position)
+        const speedMultiplier = next.phase === 'countdown' ? 0.5 : 1.0;
         for (const boat of next.boats) {
           updateBoatPosition(boat, dt * speedMultiplier, currentWind, next.boats);
         }
@@ -242,58 +242,43 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           for (const boat of next.boats) {
             if (boat.finished) continue;
 
-            const roundingRadius = 30;
+            const roundingRadius = 45;
 
             // Rounding progression:
             // 1 = heading to windward, 2 = heading to offset, 3 = heading to gate
             // 4 = windward (lap 2), 5 = offset (lap 2), 6 = gate (lap 2)
             // 7 = heading to finish
 
-            // Windward mark (lap 1)
+            // Only advance one rounding per frame to prevent chain-skipping
             if (boat.rounding === 1 && windwardMark) {
               if (hasRoundedMark(boat, windwardMark.position, roundingRadius)) {
                 boat.rounding = 2;
               }
-            }
-
-            // Offset mark (lap 1)
-            if (boat.rounding === 2 && offsetMark) {
+            } else if (boat.rounding === 2 && offsetMark) {
               if (hasRoundedMark(boat, offsetMark.position, roundingRadius)) {
                 boat.rounding = 3;
               }
-            }
-
-            // Gate (lap 1)
-            if (boat.rounding === 3 && (gatePort || gateStbd)) {
+            } else if (boat.rounding === 3 && (gatePort || gateStbd)) {
               const gateTarget = gatePort || gateStbd;
               const gateOther = gateStbd || gatePort;
               if (hasRoundedMark(boat, gateTarget!.position, roundingRadius) ||
                   hasRoundedMark(boat, gateOther!.position, roundingRadius)) {
                 boat.laps++;
                 if (boat.laps >= totalLaps) {
-                  boat.rounding = 7; // head to finish
+                  boat.rounding = 7;
                 } else {
-                  boat.rounding = 4; // lap 2 - back upwind
+                  boat.rounding = 4;
                 }
               }
-            }
-
-            // Windward mark (lap 2)
-            if (boat.rounding === 4 && windwardMark) {
+            } else if (boat.rounding === 4 && windwardMark) {
               if (hasRoundedMark(boat, windwardMark.position, roundingRadius)) {
                 boat.rounding = 5;
               }
-            }
-
-            // Offset mark (lap 2)
-            if (boat.rounding === 5 && offsetMark) {
+            } else if (boat.rounding === 5 && offsetMark) {
               if (hasRoundedMark(boat, offsetMark.position, roundingRadius)) {
                 boat.rounding = 6;
               }
-            }
-
-            // Gate (lap 2)
-            if (boat.rounding === 6 && (gatePort || gateStbd)) {
+            } else if (boat.rounding === 6 && (gatePort || gateStbd)) {
               const gateTarget = gatePort || gateStbd;
               const gateOther = gateStbd || gatePort;
               if (hasRoundedMark(boat, gateTarget!.position, roundingRadius) ||
@@ -301,10 +286,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
                 boat.laps++;
                 boat.rounding = 7;
               }
-            }
-
-            // Finish
-            if (boat.rounding === 7) {
+            } else if (boat.rounding === 7) {
               if (hasPassedLine(boat, next.course.finishLine.port, next.course.finishLine.starboard, 'upward')) {
                 boat.finished = true;
                 boat.finishTime = next.time;
