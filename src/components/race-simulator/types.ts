@@ -74,7 +74,7 @@ export interface Scenario {
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   category: 'start' | 'upwind' | 'downwind' | 'mark-rounding' | 'rules' | 'full-race';
   icon: string;
-  setup: () => GameState;
+  setup: (canvasWidth?: number, canvasHeight?: number) => GameState;
 }
 
 export type Tack = 'port' | 'starboard';

@@ -7,69 +7,58 @@ import { updateAIBoat, resetAIStates } from './ai';
 import { checkRules, checkMarkRounding } from './rules';
 import { Pause, Play, RotateCcw, ArrowLeft, Keyboard, Volume2, VolumeX } from 'lucide-react';
 
-// Start box audio system - replicates the 1-minute scratch start sequence pattern
-let audioCtx: AudioContext | null = null;
-function getAudioCtx(): AudioContext {
-  if (!audioCtx) audioCtx = new AudioContext();
-  return audioCtx;
-}
+import { getStartBoxEngine } from '../../utils/startBoxAudio';
+import type { StartSequence } from '../../types/startBox';
 
-function playBeep(freq: number, durationMs: number, volume = 0.4) {
-  try {
-    const ctx = getAudioCtx();
-    if (ctx.state === 'suspended') ctx.resume();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = freq;
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(volume, ctx.currentTime);
-    gain.gain.setTargetAtTime(0, ctx.currentTime + durationMs / 1000 - 0.02, 0.01);
-    osc.start();
-    osc.stop(ctx.currentTime + durationMs / 1000);
-  } catch {}
-}
-
-function playHorn(durationMs = 1500) {
-  try {
-    const ctx = getAudioCtx();
-    if (ctx.state === 'suspended') ctx.resume();
-    // Layer two oscillators for a richer horn sound
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc1.connect(gain);
-    osc2.connect(gain);
-    gain.connect(ctx.destination);
-    osc1.frequency.value = 440;
-    osc1.type = 'sawtooth';
-    osc2.frequency.value = 442;
-    osc2.type = 'sawtooth';
-    gain.gain.setValueAtTime(0.35, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + durationMs / 1000);
-    osc1.start();
-    osc2.start();
-    osc1.stop(ctx.currentTime + durationMs / 1000);
-    osc2.stop(ctx.currentTime + durationMs / 1000);
-  } catch {}
-}
-
-// Plays the appropriate sound for the 1-minute start sequence at a given countdown second
-function playStartSequenceSound(secondsRemaining: number) {
-  if (secondsRemaining === 60) {
-    // 1 minute signal - long horn
-    playHorn(1200);
-  } else if (secondsRemaining === 30) {
-    // 30 second warning - short horn
-    playHorn(600);
-  } else if (secondsRemaining <= 10 && secondsRemaining > 3) {
-    // Final 10 seconds - steady beeps (1000 Hz, 80ms)
-    playBeep(1000, 80, 0.5);
-  } else if (secondsRemaining <= 3 && secondsRemaining > 0) {
-    // Last 3 seconds - higher pitch rapid beeps (1200 Hz, 60ms)
-    playBeep(1200, 60, 0.6);
-  }
+// Build a virtual 60-second scratch start sequence for the StartBox engine
+function buildScratchStartSequence(): StartSequence {
+  const now = new Date().toISOString();
+  return {
+    id: 'race-sim-scratch-60',
+    club_id: null,
+    name: '1 Minute Scratch Start',
+    sequence_type: 'standard',
+    total_duration_seconds: 60,
+    is_system_default: true,
+    is_active: true,
+    race_type_default: 'scratch',
+    sort_order: 0,
+    enable_countdown_beep: true,
+    created_at: now,
+    updated_at: now,
+    sounds: [
+      {
+        id: 'sim-horn-60',
+        sequence_id: 'race-sim-scratch-60',
+        sound_id: null,
+        trigger_time_seconds: 60,
+        label: '1 Minute Horn',
+        repeat_count: 1,
+        sort_order: 0,
+        created_at: now,
+      },
+      {
+        id: 'sim-horn-30',
+        sequence_id: 'race-sim-scratch-60',
+        sound_id: null,
+        trigger_time_seconds: 30,
+        label: '30 Second Horn',
+        repeat_count: 1,
+        sort_order: 1,
+        created_at: now,
+      },
+      {
+        id: 'sim-horn-0',
+        sequence_id: 'race-sim-scratch-60',
+        sound_id: null,
+        trigger_time_seconds: 0.5,
+        label: 'Start Horn',
+        repeat_count: 1,
+        sort_order: 2,
+        created_at: now,
+      },
+    ],
+  };
 }
 
 interface RaceSimulatorGameProps {
@@ -79,7 +68,8 @@ interface RaceSimulatorGameProps {
 }
 
 export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorGameProps) {
-  const [gameState, setGameState] = useState<GameState>(() => scenario.setup());
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 700 });
+  const [gameState, setGameState] = useState<GameState>(() => scenario.setup(800, 700));
   const [showControls, setShowControls] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const gameRef = useRef<GameState>(gameState);
@@ -87,26 +77,57 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
   const lastTimeRef = useRef<number>(0);
   const keysRef = useRef<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
-  const lastBeepSecond = useRef<number>(-1);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 700 });
+  const startBoxInitialized = useRef(false);
+  const initializedSize = useRef(false);
+  const soundEnabledRef = useRef(soundEnabled);
 
   // Keep ref in sync
   useEffect(() => {
     gameRef.current = gameState;
   }, [gameState]);
 
-  // Canvas sizing
+  // Canvas sizing - recreate game state when size is first measured
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        setCanvasSize({ width: rect.width, height: rect.height });
+        const newSize = { width: Math.floor(rect.width), height: Math.floor(rect.height) };
+        if (newSize.width > 100 && newSize.height > 100) {
+          setCanvasSize(newSize);
+          if (!initializedSize.current) {
+            initializedSize.current = true;
+            resetAIStates();
+            setGameState(scenario.setup(newSize.width, newSize.height));
+          }
+        }
       }
     };
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
+  }, [scenario]);
+
+  // Initialize StartBox audio engine
+  useEffect(() => {
+    if (startBoxInitialized.current) return;
+    startBoxInitialized.current = true;
+    const engine = getStartBoxEngine();
+    const seq = buildScratchStartSequence();
+    engine.initialize().then(() => {
+      engine.arm(seq);
+      engine.start();
+    }).catch(() => {});
+    return () => {
+      engine.stop();
+    };
   }, []);
+
+  // Sync sound toggle with StartBox engine volume
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+    const engine = getStartBoxEngine();
+    engine.setVolume(soundEnabled ? 0.8 : 0);
+  }, [soundEnabled]);
 
   // Keyboard input
   useEffect(() => {
@@ -196,20 +217,10 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
         if (next.phase === 'countdown') {
           next.countdown -= dt;
 
-          // Start sequence sounds (replicates the StartBox 1-minute pattern)
-          if (soundEnabled) {
-            const sec = Math.ceil(next.countdown);
-            if (sec !== lastBeepSecond.current && sec > 0) {
-              lastBeepSecond.current = sec;
-              playStartSequenceSound(sec);
-            }
-          }
-
           if (next.countdown <= 0) {
             next.phase = 'racing';
             next.countdown = 0;
             next.time = 0;
-            if (soundEnabled) playHorn(1500);
             next.boats.forEach(b => {
               if (b.rounding === 0) b.rounding = 1;
             });
@@ -230,8 +241,8 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           }
         }
 
-        // Update boat physics - during countdown, boats move slowly (maneuvering only)
-        const speedMultiplier = next.phase === 'countdown' ? 0.3 : 1.0;
+        // Update boat physics - during countdown boats move at 60% speed (maneuvering into position)
+        const speedMultiplier = next.phase === 'countdown' ? 0.6 : 1.0;
         for (const boat of next.boats) {
           updateBoatPosition(boat, dt * speedMultiplier, currentWind, next.boats);
           if (!boat.isPlayer) {
@@ -322,7 +333,9 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
               if (hasPassedLine(boat, next.course.finishLine.port, next.course.finishLine.starboard, 'upward')) {
                 boat.finished = true;
                 boat.finishTime = next.time;
-                if (boat.isPlayer && soundEnabled) playHorn();
+                if (boat.isPlayer && soundEnabledRef.current) {
+                  getStartBoxEngine().playSynthBeep(440, 1500);
+                }
               }
             }
           }
@@ -332,8 +345,8 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             next.phase = 'finished';
           }
 
-          // Check rules (throttled)
-          if (Math.floor(next.time * 2) !== Math.floor((next.time - dt) * 2)) {
+          // Check rules (throttled) - only after boats have spread out (15 seconds in)
+          if (next.time > 15 && Math.floor(next.time * 2) !== Math.floor((next.time - dt) * 2)) {
             const violation = checkRules(next.boats, currentWind.direction, next.time);
             if (violation) {
               next.violations = [...next.violations, violation];
@@ -341,10 +354,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
               if (violation.offendingBoat === playerBoat?.id || violation.rightOfWayBoat === playerBoat?.id) {
                 next.currentViolation = violation;
               }
-              const offender = next.boats.find(b => b.id === violation.offendingBoat);
-              if (offender && !offender.isPlayer) {
-                offender.penaltyTurns = 2;
-              }
+              // AI boats do NOT get penalty turns - they just avoid (no spinning)
             }
 
             if (windwardMark) {
@@ -370,7 +380,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [soundEnabled, canvasSize]);
+  }, [canvasSize]);
 
   const handleDismissViolation = () => {
     setGameState(prev => {
@@ -384,8 +394,14 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
 
   const handleRestart = () => {
     resetAIStates();
-    setGameState(scenario.setup());
+    setGameState(scenario.setup(canvasSize.width, canvasSize.height));
     lastTimeRef.current = 0;
+    // Restart the start box audio
+    const engine = getStartBoxEngine();
+    engine.stop();
+    const seq = buildScratchStartSequence();
+    engine.arm(seq);
+    engine.start();
   };
 
   return (

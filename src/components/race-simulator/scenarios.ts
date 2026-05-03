@@ -21,7 +21,7 @@ function createBoat(id: string, name: string, sailNumber: string, position: { x:
     sailNumber,
     position: { ...position },
     heading,
-    speed: 0,
+    speed: isPlayer ? 2 : 1.5 + Math.random() * 1.5,
     isPlayer,
     isTacking: false,
     isGybing: false,
@@ -36,22 +36,31 @@ function createBoat(id: string, name: string, sailNumber: string, position: { x:
   };
 }
 
-function createFleet(numBoats: number, startX: number, startY: number, heading: number, spread: number): Boat[] {
+function createFleet(numBoats: number, linePortX: number, lineStbdX: number, lineY: number, heading: number): Boat[] {
   const boats: Boat[] = [];
-  boats.push(createBoat('player', 'You', '01', { x: startX, y: startY }, heading, true, COLORS[0]));
+  const lineWidth = lineStbdX - linePortX;
 
+  // Player starts near the middle of the line, slightly below
+  const playerX = linePortX + lineWidth * 0.5;
+  const playerY = lineY + 40;
+  boats.push(createBoat('player', 'You', '01', { x: playerX, y: playerY }, heading, true, COLORS[0]));
+
+  // AI boats spread along the line below it, maneuvering into position
   for (let i = 0; i < numBoats - 1; i++) {
-    const offsetX = (Math.random() - 0.5) * spread;
-    const offsetY = (Math.random() - 0.5) * 40;
-    // Alternate between starboard (heading) and port tack (heading mirrored)
+    const fraction = (i + 0.5) / (numBoats - 1);
+    const x = linePortX + fraction * lineWidth;
+    const y = lineY + 30 + Math.random() * 60;
+
+    // Alternate between port and starboard tack approaches
     const boatHeading = i % 2 === 0
-      ? heading + (Math.random() - 0.5) * 15
-      : normalizeAngle(360 - heading + (Math.random() - 0.5) * 15);
+      ? heading + (Math.random() - 0.5) * 20
+      : normalizeAngle(360 - heading + (Math.random() - 0.5) * 20);
+
     boats.push(createBoat(
       `ai-${i}`,
       AI_NAMES[i % AI_NAMES.length],
       String(i + 2).padStart(2, '0'),
-      { x: startX + offsetX, y: startY + offsetY },
+      { x, y },
       boatHeading,
       false,
       COLORS[(i + 1) % COLORS.length]
@@ -61,32 +70,36 @@ function createFleet(numBoats: number, startX: number, startY: number, heading: 
   return boats;
 }
 
-// Standard windward-leeward course:
-// Wind blows from TOP (0 degrees). Coordinate system: Y increases downward.
-// Layout (top to bottom):
-//   - Windward mark (top, ~15% from top)
-//   - Offset/clearance mark (just below-left of windward)
-//   - Start/Finish line (middle, ~45%)
-//   - Leeward gate (bottom, ~75%)
-// Boats start at the line, beat UPWIND to windward mark, reach to offset,
-// then run DOWNWIND to the gate, and repeat for 2 laps.
+// Course fills the canvas vertically with margins.
+// Wind blows TO 180 (south) so upwind = north (top of screen).
+// Layout (from top to bottom):
+//   - Windward mark (~8% from top)
+//   - Offset mark (~18% from top)
+//   - Start/Finish line (~48%)
+//   - Leeward gate (~90%)
 function createStandardCourse(canvasWidth: number, canvasHeight: number): Course {
   const centerX = canvasWidth / 2;
-  const startY = canvasHeight * 0.45;
-  const windwardY = canvasHeight * 0.12;
-  const offsetY = windwardY + 55;
-  const gateY = canvasHeight * 0.78;
-  const lineWidth = 90;
-  const gateWidth = 50;
+  const topMargin = canvasHeight * 0.06;
+  const bottomMargin = canvasHeight * 0.06;
+  const courseHeight = canvasHeight - topMargin - bottomMargin;
+
+  const windwardY = topMargin + courseHeight * 0.05;
+  const offsetY = topMargin + courseHeight * 0.15;
+  const startY = topMargin + courseHeight * 0.48;
+  const gateY = topMargin + courseHeight * 0.92;
+
+  const lineWidth = Math.min(canvasWidth * 0.15, 160);
+  const gateWidth = Math.min(canvasWidth * 0.08, 80);
+  const offsetX = Math.min(canvasWidth * 0.06, 60);
 
   return {
     marks: [
-      { position: { x: centerX, y: windwardY }, radius: 8, type: 'windward', label: 'Windward Mark' },
-      { position: { x: centerX - 50, y: offsetY }, radius: 6, type: 'leeward', label: 'Offset Mark' },
-      { position: { x: centerX - gateWidth, y: gateY }, radius: 7, type: 'gate-port', label: 'Gate (Port)' },
-      { position: { x: centerX + gateWidth, y: gateY }, radius: 7, type: 'gate-starboard', label: 'Gate (Stbd)' },
-      { position: { x: centerX - lineWidth, y: startY }, radius: 5, type: 'start-port', label: 'Pin End' },
-      { position: { x: centerX + lineWidth, y: startY }, radius: 5, type: 'start-starboard', label: 'Committee' },
+      { position: { x: centerX, y: windwardY }, radius: 10, type: 'windward', label: 'Windward Mark' },
+      { position: { x: centerX - offsetX, y: offsetY }, radius: 7, type: 'leeward', label: 'Offset Mark' },
+      { position: { x: centerX - gateWidth, y: gateY }, radius: 8, type: 'gate-port', label: 'Gate (Port)' },
+      { position: { x: centerX + gateWidth, y: gateY }, radius: 8, type: 'gate-starboard', label: 'Gate (Stbd)' },
+      { position: { x: centerX - lineWidth, y: startY }, radius: 6, type: 'start-port', label: 'Pin End' },
+      { position: { x: centerX + lineWidth, y: startY }, radius: 6, type: 'start-starboard', label: 'Committee' },
     ],
     startLine: { port: { x: centerX - lineWidth, y: startY }, starboard: { x: centerX + lineWidth, y: startY } },
     finishLine: { port: { x: centerX - lineWidth, y: startY }, starboard: { x: centerX + lineWidth, y: startY } },
@@ -102,10 +115,9 @@ export const scenarios: Scenario[] = [
     difficulty: 'beginner',
     category: 'start',
     icon: 'flag',
-    setup: (): GameState => {
-      const course = createStandardCourse(800, 700);
-      const startY = course.startLine.port.y + 30;
-      const boats = createFleet(8, 400, startY, 315, 120);
+    setup: (w = 800, h = 700): GameState => {
+      const course = createStandardCourse(w, h);
+      const boats = createFleet(8, course.startLine.port.x, course.startLine.starboard.x, course.startLine.port.y, 315);
       boats.forEach(b => { b.rounding = 0; });
 
       return {
@@ -128,10 +140,9 @@ export const scenarios: Scenario[] = [
     difficulty: 'intermediate',
     category: 'upwind',
     icon: 'wind',
-    setup: (): GameState => {
-      const course = createStandardCourse(800, 700);
-      const startY = course.startLine.port.y + 5;
-      const boats = createFleet(6, 400, startY, 315, 100);
+    setup: (w = 800, h = 700): GameState => {
+      const course = createStandardCourse(w, h);
+      const boats = createFleet(6, course.startLine.port.x, course.startLine.starboard.x, course.startLine.port.y, 315);
       boats.forEach(b => { b.rounding = 1; });
 
       return {
@@ -154,11 +165,11 @@ export const scenarios: Scenario[] = [
     difficulty: 'intermediate',
     category: 'downwind',
     icon: 'arrow-down',
-    setup: (): GameState => {
-      const course = createStandardCourse(800, 700);
+    setup: (w = 800, h = 700): GameState => {
+      const course = createStandardCourse(w, h);
       const offsetMark = course.marks.find(m => m.label === 'Offset Mark')!;
-      const boats = createFleet(6, offsetMark.position.x + 30, offsetMark.position.y + 30, 180, 60);
-      boats.forEach(b => { b.rounding = 3; }); // heading to gate
+      const boats = createFleet(6, offsetMark.position.x - 80, offsetMark.position.x + 80, offsetMark.position.y, 160);
+      boats.forEach(b => { b.rounding = 3; });
 
       return {
         boats,
@@ -180,10 +191,12 @@ export const scenarios: Scenario[] = [
     difficulty: 'intermediate',
     category: 'mark-rounding',
     icon: 'rotate-cw',
-    setup: (): GameState => {
-      const course = createStandardCourse(800, 700);
+    setup: (w = 800, h = 700): GameState => {
+      const course = createStandardCourse(w, h);
       const windwardMark = course.marks.find(m => m.type === 'windward')!;
-      const boats = createFleet(5, windwardMark.position.x - 50, windwardMark.position.y + 80, 315, 30);
+      const cx = windwardMark.position.x;
+      const cy = windwardMark.position.y + 120;
+      const boats = createFleet(5, cx - 60, cx + 60, cy, 315);
       boats.forEach(b => { b.rounding = 1; });
 
       return {
@@ -206,13 +219,15 @@ export const scenarios: Scenario[] = [
     difficulty: 'beginner',
     category: 'rules',
     icon: 'shuffle',
-    setup: (): GameState => {
-      const course = createStandardCourse(800, 700);
+    setup: (w = 800, h = 700): GameState => {
+      const course = createStandardCourse(w, h);
+      const cx = w / 2;
+      const cy = h * 0.5;
       const boats: Boat[] = [
-        createBoat('player', 'You', '01', { x: 350, y: 450 }, 340, true, COLORS[0]),
-        createBoat('ai-0', 'Crosser 1', '02', { x: 500, y: 400 }, 280, false, COLORS[1]),
-        createBoat('ai-1', 'Crosser 2', '03', { x: 520, y: 350 }, 270, false, COLORS[2]),
-        createBoat('ai-2', 'Crosser 3', '04', { x: 480, y: 320 }, 285, false, COLORS[3]),
+        createBoat('player', 'You', '01', { x: cx - 80, y: cy + 40 }, 340, true, COLORS[0]),
+        createBoat('ai-0', 'Crosser 1', '02', { x: cx + 100, y: cy - 20 }, 280, false, COLORS[1]),
+        createBoat('ai-1', 'Crosser 2', '03', { x: cx + 120, y: cy - 80 }, 270, false, COLORS[2]),
+        createBoat('ai-2', 'Crosser 3', '04', { x: cx + 80, y: cy - 120 }, 285, false, COLORS[3]),
       ];
       boats.forEach(b => { b.rounding = 1; });
 
@@ -236,10 +251,9 @@ export const scenarios: Scenario[] = [
     difficulty: 'advanced',
     category: 'full-race',
     icon: 'trophy',
-    setup: (): GameState => {
-      const course = createStandardCourse(800, 700);
-      const startY = course.startLine.port.y + 30;
-      const boats = createFleet(10, 400, startY, 315, 140);
+    setup: (w = 800, h = 700): GameState => {
+      const course = createStandardCourse(w, h);
+      const boats = createFleet(10, course.startLine.port.x, course.startLine.starboard.x, course.startLine.port.y, 315);
       boats.forEach(b => { b.rounding = 0; });
 
       return {

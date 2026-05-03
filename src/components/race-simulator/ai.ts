@@ -6,7 +6,7 @@ const GYBE_ANGLE = 145;
 
 interface AIState {
   lastTackTime: number;
-  preferredSide: number; // -1 left, 1 right
+  preferredSide: number;
   initialized: boolean;
 }
 
@@ -34,24 +34,24 @@ export function getTargetForRounding(rounding: number, course: Course): Vec2 | n
   const gateStbd = course.marks.find(m => m.type === 'gate-starboard');
 
   switch (rounding) {
-    case 0: // pre-start: hold near start line
+    case 0:
       return {
         x: (course.startLine.port.x + course.startLine.starboard.x) / 2,
-        y: course.startLine.port.y + 10,
+        y: course.startLine.port.y - 5,
       };
-    case 1: // windward mark (lap 1)
-    case 4: // windward mark (lap 2)
+    case 1:
+    case 4:
       return windward?.position || null;
-    case 2: // offset mark (lap 1)
-    case 5: // offset mark (lap 2)
+    case 2:
+    case 5:
       return offset?.position || null;
-    case 3: // gate (lap 1)
-    case 6: // gate (lap 2)
+    case 3:
+    case 6:
       if (gatePort && gateStbd) {
         return { x: (gatePort.position.x + gateStbd.position.x) / 2, y: gatePort.position.y };
       }
       return gatePort?.position || null;
-    case 7: // finish line
+    case 7:
       return {
         x: (course.finishLine.port.x + course.finishLine.starboard.x) / 2,
         y: course.finishLine.port.y,
@@ -69,46 +69,62 @@ export function isHeadingDownwind(rounding: number): boolean {
   return rounding === 3 || rounding === 6;
 }
 
-function getCloseHauledHeading(wind: { direction: number }, tack: 'starboard' | 'port'): number {
-  // wind.direction = direction wind blows TO
-  // upwind = opposite of wind direction
-  const upwindDir = normalizeAngle(wind.direction + 180);
+function getCloseHauledHeading(windDir: number, tack: 'starboard' | 'port'): number {
+  const upwindDir = normalizeAngle(windDir + 180);
   if (tack === 'starboard') {
     return normalizeAngle(upwindDir + TACK_ANGLE);
   }
   return normalizeAngle(upwindDir - TACK_ANGLE);
 }
 
-function getDownwindHeading(wind: { direction: number }, gybe: 'starboard' | 'port'): number {
+function getDownwindHeading(windDir: number, gybe: 'starboard' | 'port'): number {
   if (gybe === 'starboard') {
-    return normalizeAngle(wind.direction + GYBE_ANGLE);
+    return normalizeAngle(windDir + GYBE_ANGLE);
   }
-  return normalizeAngle(wind.direction - GYBE_ANGLE);
+  return normalizeAngle(windDir - GYBE_ANGLE);
+}
+
+function smoothTurnToward(boat: Boat, desiredHeading: number): void {
+  const headingDiff = normalizeDeg(desiredHeading - boat.heading);
+  const turnRate = 120;
+  const maxTurn = turnRate * 0.016;
+  if (Math.abs(headingDiff) > maxTurn) {
+    boat.heading = normalizeAngle(boat.heading + Math.sign(headingDiff) * maxTurn);
+  } else {
+    boat.heading = normalizeAngle(desiredHeading);
+  }
 }
 
 export function updateAIBoat(boat: Boat, course: Course, wind: { direction: number; speed: number }, time: number, allBoats: Boat[]): void {
   if (boat.isPlayer || boat.finished || boat.isTacking || boat.isGybing) return;
-  if (boat.penaltyTurns > 0) return;
+
+  // Never let AI spin with penalty turns
+  if (boat.penaltyTurns > 0) {
+    boat.penaltyTurns = 0;
+  }
 
   const state = getAIState(boat);
-  const target = getTargetForRounding(boat.rounding, course);
-  if (!target) return;
 
-  // On first update, immediately set a valid heading so boats don't start in irons
+  // On first update, ensure boat is on a valid heading (not in irons)
   if (!state.initialized) {
     state.initialized = true;
-    const currentTwa = getTrueWindAngle(boat.heading, wind.direction);
-    const absTwa = Math.abs(currentTwa);
-    if (absTwa < TACK_ANGLE - 5) {
-      // Boat is in irons - set to close-hauled immediately
-      boat.heading = getCloseHauledHeading(wind, state.preferredSide > 0 ? 'starboard' : 'port');
+    const currentTwa = Math.abs(getTrueWindAngle(boat.heading, wind.direction));
+    if (currentTwa < TACK_ANGLE - 5) {
+      boat.heading = getCloseHauledHeading(wind.direction, state.preferredSide > 0 ? 'starboard' : 'port');
     }
   }
 
+  // Pre-start behavior: sail back and forth near the start line
+  if (boat.rounding === 0) {
+    updatePreStart(boat, course, wind, time, state);
+    return;
+  }
+
+  const target = getTargetForRounding(boat.rounding, course);
+  if (!target) return;
+
   const angleToTarget = angleBetween(boat.position, target);
   const distToTarget = distance(boat.position, target);
-
-  // What would TWA be if we could point directly at the target?
   const twaToTarget = getTrueWindAngle(angleToTarget, wind.direction);
   const absTwaToTarget = Math.abs(twaToTarget);
 
@@ -118,92 +134,130 @@ export function updateAIBoat(boat: Boat, course: Course, wind: { direction: numb
   let desiredHeading: number;
 
   if (headingUpwind && absTwaToTarget < 55) {
-    // Target is upwind - need to beat/tack
+    // Beat upwind - sail close-hauled and tack toward the mark
     const currentTwa = getTrueWindAngle(boat.heading, wind.direction);
     const currentTack: 'starboard' | 'port' = currentTwa > 0 ? 'starboard' : 'port';
 
-    const stbdHeading = getCloseHauledHeading(wind, 'starboard');
-    const portHeading = getCloseHauledHeading(wind, 'port');
+    const stbdHeading = getCloseHauledHeading(wind.direction, 'starboard');
+    const portHeading = getCloseHauledHeading(wind.direction, 'port');
 
-    // Check if we're on the layline (can fetch the mark)
+    // Check if on layline (can fetch the mark directly)
     const onLayline = absTwaToTarget >= TACK_ANGLE - 8 && distToTarget < 100;
 
     if (onLayline || distToTarget < 25) {
-      // Try to point at the mark directly
       desiredHeading = angleToTarget;
       const dTwa = Math.abs(getTrueWindAngle(desiredHeading, wind.direction));
       if (dTwa < TACK_ANGLE - 3) {
         desiredHeading = currentTack === 'starboard' ? stbdHeading : portHeading;
       }
     } else {
-      // Sail close-hauled on current tack
       desiredHeading = currentTack === 'starboard' ? stbdHeading : portHeading;
 
-      // Check if we should tack (sailing too far from the mark bearing)
+      // Should we tack? (sailing too far away from the mark bearing)
       const headingDiffToTarget = Math.abs(normalizeDeg(angleToTarget - boat.heading));
-      const minTackInterval = 5 + Math.random() * 3;
-      if (headingDiffToTarget > 85 && time - state.lastTackTime > minTackInterval) {
-        // Tack to the other side
+      const minTackInterval = 4 + Math.random() * 2;
+      if (headingDiffToTarget > 80 && time - state.lastTackTime > minTackInterval) {
         desiredHeading = currentTack === 'starboard' ? portHeading : stbdHeading;
         state.lastTackTime = time;
         boat.isTacking = true;
-        boat.tackTimer = 1.5;
+        boat.tackTimer = 1.2;
         return;
       }
     }
   } else if (headingDownwind && absTwaToTarget > 130) {
-    // Target is downwind - need to run/gybe
+    // Run downwind with gybing angles
     const currentTwa = getTrueWindAngle(boat.heading, wind.direction);
     const currentGybe: 'starboard' | 'port' = currentTwa > 0 ? 'starboard' : 'port';
 
-    const stbdHeading = getDownwindHeading(wind, 'starboard');
-    const portHeading = getDownwindHeading(wind, 'port');
+    const stbdHeading = getDownwindHeading(wind.direction, 'starboard');
+    const portHeading = getDownwindHeading(wind.direction, 'port');
 
     desiredHeading = currentGybe === 'starboard' ? stbdHeading : portHeading;
 
-    // Check if we should gybe
+    // Should we gybe?
     const headingDiffToTarget = Math.abs(normalizeDeg(angleToTarget - boat.heading));
-    if (headingDiffToTarget > 60 && time - state.lastTackTime > 4 + Math.random() * 3) {
+    if (headingDiffToTarget > 55 && time - state.lastTackTime > 3.5 + Math.random() * 2) {
       desiredHeading = currentGybe === 'starboard' ? portHeading : stbdHeading;
       state.lastTackTime = time;
       boat.isGybing = true;
-      boat.tackTimer = 1.0;
+      boat.tackTimer = 0.8;
       return;
     }
   } else {
-    // Reaching or target is reachable directly - just aim at it
+    // Reaching - aim directly at target
     desiredHeading = angleToTarget;
-
-    // Clamp to avoid no-go zone
     const dTwa = Math.abs(getTrueWindAngle(desiredHeading, wind.direction));
     if (dTwa < TACK_ANGLE - 3) {
       const currentTwa = getTrueWindAngle(boat.heading, wind.direction);
       desiredHeading = currentTwa > 0
-        ? getCloseHauledHeading(wind, 'starboard')
-        : getCloseHauledHeading(wind, 'port');
+        ? getCloseHauledHeading(wind.direction, 'starboard')
+        : getCloseHauledHeading(wind.direction, 'port');
     }
   }
 
-  // Smooth heading change - faster turn rate for responsiveness
-  const headingDiff = normalizeDeg(desiredHeading - boat.heading);
-  const turnRate = 90;
-  const maxTurn = turnRate * 0.016;
-  if (Math.abs(headingDiff) > maxTurn) {
-    boat.heading = normalizeAngle(boat.heading + Math.sign(headingDiff) * maxTurn);
-  } else {
-    boat.heading = desiredHeading;
-  }
+  smoothTurnToward(boat, desiredHeading);
 
-  // Minimal random variation
-  boat.heading = normalizeAngle(boat.heading + (Math.random() - 0.5) * 0.1);
-
-  // Gentle collision avoidance (only very close boats)
+  // Minimal collision avoidance (only very close)
   for (const other of allBoats) {
     if (other.id === boat.id || other.finished) continue;
     const dist = distance(boat.position, other.position);
-    if (dist < 10) {
+    if (dist < 12) {
       const away = angleBetween(other.position, boat.position);
-      boat.heading = normalizeAngle(boat.heading + normalizeDeg(away - boat.heading) * 0.03);
+      boat.heading = normalizeAngle(boat.heading + normalizeDeg(away - boat.heading) * 0.02);
     }
   }
+}
+
+function updatePreStart(boat: Boat, course: Course, wind: { direction: number; speed: number }, time: number, state: AIState): void {
+  const lineCenter = {
+    x: (course.startLine.port.x + course.startLine.starboard.x) / 2,
+    y: course.startLine.port.y,
+  };
+  const lineWidth = course.startLine.starboard.x - course.startLine.port.x;
+
+  // If boat drifted above the start line, turn back down
+  if (boat.position.y < lineCenter.y - 5) {
+    const downwindHeading = normalizeAngle(wind.direction + 30 * state.preferredSide);
+    smoothTurnToward(boat, downwindHeading);
+    return;
+  }
+
+  // If too far below the line area, head back up
+  if (boat.position.y > lineCenter.y + 120) {
+    const upwindHeading = getCloseHauledHeading(wind.direction, state.preferredSide > 0 ? 'starboard' : 'port');
+    smoothTurnToward(boat, upwindHeading);
+    return;
+  }
+
+  // If too far from center laterally, turn back
+  const distFromCenter = boat.position.x - lineCenter.x;
+  if (Math.abs(distFromCenter) > lineWidth * 0.55) {
+    const targetHeading = distFromCenter > 0
+      ? getCloseHauledHeading(wind.direction, 'port')
+      : getCloseHauledHeading(wind.direction, 'starboard');
+    smoothTurnToward(boat, targetHeading);
+
+    if (time - state.lastTackTime > 3) {
+      state.lastTackTime = time;
+      boat.isTacking = true;
+      boat.tackTimer = 1.0;
+    }
+    return;
+  }
+
+  // Normal pre-start: sail close-hauled on current tack, periodically tack
+  const currentTwa = getTrueWindAngle(boat.heading, wind.direction);
+  const onStarboard = currentTwa > 0;
+
+  const timeSinceTack = time - state.lastTackTime;
+  if (timeSinceTack > 5 + Math.random() * 4) {
+    state.lastTackTime = time;
+    state.preferredSide *= -1;
+    boat.isTacking = true;
+    boat.tackTimer = 1.0;
+    return;
+  }
+
+  const desiredHeading = getCloseHauledHeading(wind.direction, onStarboard ? 'starboard' : 'port');
+  smoothTurnToward(boat, desiredHeading);
 }

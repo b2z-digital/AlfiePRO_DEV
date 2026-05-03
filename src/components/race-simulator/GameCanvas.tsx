@@ -96,30 +96,31 @@ function drawWaterRipples(ctx: CanvasRenderingContext2D, time: number, width: nu
 
 function drawWindIndicators(ctx: CanvasRenderingContext2D, wind: Wind, time: number, width: number, height: number, darkMode: boolean) {
   const currentWind = getWindAtTime(wind, time);
-  const windRad = degToRad(currentWind.direction);
+  // Show wind FROM direction (arrows point the direction wind is coming FROM = toward windward mark)
+  const windFromRad = degToRad(currentWind.direction + 180);
 
   ctx.save();
-  ctx.globalAlpha = darkMode ? 0.25 : 0.3;
+  ctx.globalAlpha = darkMode ? 0.15 : 0.2;
   ctx.strokeStyle = darkMode ? '#94a3b8' : '#64748b';
   ctx.lineWidth = 1;
 
-  const spacing = 60;
+  const spacing = 70;
   for (let x = spacing; x < width; x += spacing) {
     for (let y = spacing; y < height; y += spacing) {
-      const offset = Math.sin((x + y) * 0.01 + time) * 5;
-      const arrowLen = 12 + Math.sin(time * 2 + x * 0.1) * 3;
+      const offset = Math.sin((x + y) * 0.01 + time) * 3;
+      const arrowLen = 10;
 
       ctx.save();
       ctx.translate(x + offset, y);
-      ctx.rotate(windRad);
+      ctx.rotate(windFromRad);
 
       ctx.beginPath();
+      ctx.moveTo(0, arrowLen);
+      ctx.lineTo(0, -arrowLen);
       ctx.moveTo(0, -arrowLen);
-      ctx.lineTo(0, arrowLen);
-      ctx.moveTo(0, arrowLen);
-      ctx.lineTo(-3, arrowLen - 6);
-      ctx.moveTo(0, arrowLen);
-      ctx.lineTo(3, arrowLen - 6);
+      ctx.lineTo(-3, -arrowLen + 6);
+      ctx.moveTo(0, -arrowLen);
+      ctx.lineTo(3, -arrowLen + 6);
       ctx.stroke();
 
       ctx.restore();
