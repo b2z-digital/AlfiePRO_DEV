@@ -36,7 +36,7 @@ export function GameHUD({ gameState, darkMode, onDismissViolation }: GameHUDProp
           <div className="flex items-center gap-1.5">
             <Compass size={14} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
             <span className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-gray-600'}`}>
-              {currentWind.direction.toFixed(0)}°
+              {((currentWind.direction + 180) % 360).toFixed(0)}°
             </span>
           </div>
         </div>

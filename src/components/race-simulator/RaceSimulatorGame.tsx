@@ -7,13 +7,14 @@ import { updateAIBoat, resetAIStates } from './ai';
 import { checkRules, checkMarkRounding } from './rules';
 import { Pause, Play, RotateCcw, ArrowLeft, Keyboard, Volume2, VolumeX } from 'lucide-react';
 
-// Simple audio context for countdown beeps
+// Start box audio system - replicates the 1-minute scratch start sequence pattern
 let audioCtx: AudioContext | null = null;
 function getAudioCtx(): AudioContext {
   if (!audioCtx) audioCtx = new AudioContext();
   return audioCtx;
 }
-function playBeep(freq: number, duration: number) {
+
+function playBeep(freq: number, durationMs: number, volume = 0.4) {
   try {
     const ctx = getAudioCtx();
     if (ctx.state === 'suspended') ctx.resume();
@@ -23,27 +24,52 @@ function playBeep(freq: number, duration: number) {
     gain.connect(ctx.destination);
     osc.frequency.value = freq;
     osc.type = 'sine';
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration / 1000);
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.setTargetAtTime(0, ctx.currentTime + durationMs / 1000 - 0.02, 0.01);
     osc.start();
-    osc.stop(ctx.currentTime + duration / 1000);
+    osc.stop(ctx.currentTime + durationMs / 1000);
   } catch {}
 }
-function playHorn() {
+
+function playHorn(durationMs = 1500) {
   try {
     const ctx = getAudioCtx();
     if (ctx.state === 'suspended') ctx.resume();
-    const osc = ctx.createOscillator();
+    // Layer two oscillators for a richer horn sound
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.connect(gain);
+    osc1.connect(gain);
+    osc2.connect(gain);
     gain.connect(ctx.destination);
-    osc.frequency.value = 440;
-    osc.type = 'sawtooth';
-    gain.gain.setValueAtTime(0.4, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.2);
-    osc.start();
-    osc.stop(ctx.currentTime + 1.2);
+    osc1.frequency.value = 440;
+    osc1.type = 'sawtooth';
+    osc2.frequency.value = 442;
+    osc2.type = 'sawtooth';
+    gain.gain.setValueAtTime(0.35, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + durationMs / 1000);
+    osc1.start();
+    osc2.start();
+    osc1.stop(ctx.currentTime + durationMs / 1000);
+    osc2.stop(ctx.currentTime + durationMs / 1000);
   } catch {}
+}
+
+// Plays the appropriate sound for the 1-minute start sequence at a given countdown second
+function playStartSequenceSound(secondsRemaining: number) {
+  if (secondsRemaining === 60) {
+    // 1 minute signal - long horn
+    playHorn(1200);
+  } else if (secondsRemaining === 30) {
+    // 30 second warning - short horn
+    playHorn(600);
+  } else if (secondsRemaining <= 10 && secondsRemaining > 3) {
+    // Final 10 seconds - steady beeps (1000 Hz, 80ms)
+    playBeep(1000, 80, 0.5);
+  } else if (secondsRemaining <= 3 && secondsRemaining > 0) {
+    // Last 3 seconds - higher pitch rapid beeps (1200 Hz, 60ms)
+    playBeep(1200, 60, 0.6);
+  }
 }
 
 interface RaceSimulatorGameProps {
@@ -170,16 +196,12 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
         if (next.phase === 'countdown') {
           next.countdown -= dt;
 
-          // Countdown beeps
+          // Start sequence sounds (replicates the StartBox 1-minute pattern)
           if (soundEnabled) {
             const sec = Math.ceil(next.countdown);
             if (sec !== lastBeepSecond.current && sec > 0) {
               lastBeepSecond.current = sec;
-              if (sec <= 10) {
-                playBeep(sec <= 3 ? 1200 : 1000, 80);
-              } else if (sec === 30 || sec === 60) {
-                playBeep(800, 200);
-              }
+              playStartSequenceSound(sec);
             }
           }
 
@@ -187,7 +209,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             next.phase = 'racing';
             next.countdown = 0;
             next.time = 0;
-            if (soundEnabled) playHorn();
+            if (soundEnabled) playHorn(1500);
             next.boats.forEach(b => {
               if (b.rounding === 0) b.rounding = 1;
             });
