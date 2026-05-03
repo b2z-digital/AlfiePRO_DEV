@@ -242,7 +242,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           for (const boat of next.boats) {
             if (boat.finished) continue;
 
-            const roundingRadius = 20;
+            const roundingRadius = 30;
 
             // Rounding progression:
             // 1 = heading to windward, 2 = heading to offset, 3 = heading to gate

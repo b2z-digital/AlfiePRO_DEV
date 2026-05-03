@@ -17,11 +17,11 @@ const POLAR_DATA: BoatPolar[] = [
   { twa: 110, speed: 0.88 },
   { twa: 120, speed: 0.82 },
   { twa: 130, speed: 0.75 },
-  { twa: 140, speed: 0.68 },
-  { twa: 150, speed: 0.60 },
-  { twa: 160, speed: 0.50 },
-  { twa: 170, speed: 0.40 },
-  { twa: 180, speed: 0.35 },
+  { twa: 140, speed: 0.72 },
+  { twa: 150, speed: 0.70 },
+  { twa: 160, speed: 0.68 },
+  { twa: 170, speed: 0.66 },
+  { twa: 180, speed: 0.65 },
 ];
 
 export function getBoatSpeed(twa: number, windSpeed: number): number {

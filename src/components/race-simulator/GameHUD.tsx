@@ -58,7 +58,7 @@ export function GameHUD({ gameState, darkMode, onDismissViolation }: GameHUDProp
               : darkMode ? 'text-white' : 'text-gray-900'
           }`}>
             {gameState.phase === 'countdown'
-              ? `-${formatTime(gameState.countdown)}`
+              ? formatCountdown(gameState.countdown)
               : formatTime(gameState.time)
             }
           </span>
@@ -151,6 +151,14 @@ export function GameHUD({ gameState, darkMode, onDismissViolation }: GameHUDProp
 function formatTime(seconds: number): string {
   const mins = Math.floor(Math.abs(seconds) / 60);
   const secs = Math.floor(Math.abs(seconds) % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function formatCountdown(seconds: number): string {
+  // Use ceil so the display matches the audio (when audio says "60", display shows 1:00)
+  const rounded = Math.ceil(seconds);
+  const mins = Math.floor(rounded / 60);
+  const secs = rounded % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
