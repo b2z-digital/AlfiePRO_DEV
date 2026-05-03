@@ -86,7 +86,7 @@ function getDownwindHeading(windDir: number, gybe: 'starboard' | 'port'): number
 
 function smoothTurnToward(boat: Boat, desiredHeading: number): void {
   const headingDiff = normalizeDeg(desiredHeading - boat.heading);
-  const turnRate = 120;
+  const turnRate = 150;
   const maxTurn = turnRate * 0.016;
   if (Math.abs(headingDiff) > maxTurn) {
     boat.heading = normalizeAngle(boat.heading + Math.sign(headingDiff) * maxTurn);
@@ -95,13 +95,28 @@ function smoothTurnToward(boat: Boat, desiredHeading: number): void {
   }
 }
 
+function doTack(boat: Boat, windDir: number, newTack: 'starboard' | 'port'): void {
+  boat.heading = getCloseHauledHeading(windDir, newTack);
+  boat.isTacking = true;
+  boat.tackTimer = 0.8;
+}
+
+function doGybe(boat: Boat, windDir: number, newGybe: 'starboard' | 'port'): void {
+  boat.heading = getDownwindHeading(windDir, newGybe);
+  boat.isGybing = true;
+  boat.tackTimer = 0.6;
+}
+
 export function updateAIBoat(boat: Boat, course: Course, wind: { direction: number; speed: number }, time: number, allBoats: Boat[]): void {
-  if (boat.isPlayer || boat.finished || boat.isTacking || boat.isGybing) return;
+  if (boat.isPlayer || boat.finished) return;
 
   // Never let AI spin with penalty turns
   if (boat.penaltyTurns > 0) {
     boat.penaltyTurns = 0;
   }
+
+  // Skip AI heading control while tacking/gybing (heading was already set)
+  if (boat.isTacking || boat.isGybing) return;
 
   const state = getAIState(boat);
 
@@ -155,12 +170,11 @@ export function updateAIBoat(boat: Boat, course: Course, wind: { direction: numb
 
       // Should we tack? (sailing too far away from the mark bearing)
       const headingDiffToTarget = Math.abs(normalizeDeg(angleToTarget - boat.heading));
-      const minTackInterval = 4 + Math.random() * 2;
+      const minTackInterval = 3 + Math.random() * 2;
       if (headingDiffToTarget > 80 && time - state.lastTackTime > minTackInterval) {
-        desiredHeading = currentTack === 'starboard' ? portHeading : stbdHeading;
+        const newTack = currentTack === 'starboard' ? 'port' : 'starboard';
         state.lastTackTime = time;
-        boat.isTacking = true;
-        boat.tackTimer = 1.2;
+        doTack(boat, wind.direction, newTack);
         return;
       }
     }
@@ -176,11 +190,10 @@ export function updateAIBoat(boat: Boat, course: Course, wind: { direction: numb
 
     // Should we gybe?
     const headingDiffToTarget = Math.abs(normalizeDeg(angleToTarget - boat.heading));
-    if (headingDiffToTarget > 55 && time - state.lastTackTime > 3.5 + Math.random() * 2) {
-      desiredHeading = currentGybe === 'starboard' ? portHeading : stbdHeading;
+    if (headingDiffToTarget > 55 && time - state.lastTackTime > 3 + Math.random() * 2) {
+      const newGybe = currentGybe === 'starboard' ? 'port' : 'starboard';
       state.lastTackTime = time;
-      boat.isGybing = true;
-      boat.tackTimer = 0.8;
+      doGybe(boat, wind.direction, newGybe);
       return;
     }
   } else {
@@ -197,13 +210,13 @@ export function updateAIBoat(boat: Boat, course: Course, wind: { direction: numb
 
   smoothTurnToward(boat, desiredHeading);
 
-  // Minimal collision avoidance (only very close)
+  // Minimal collision avoidance
   for (const other of allBoats) {
     if (other.id === boat.id || other.finished) continue;
     const dist = distance(boat.position, other.position);
     if (dist < 12) {
       const away = angleBetween(other.position, boat.position);
-      boat.heading = normalizeAngle(boat.heading + normalizeDeg(away - boat.heading) * 0.02);
+      boat.heading = normalizeAngle(boat.heading + normalizeDeg(away - boat.heading) * 0.03);
     }
   }
 }
@@ -223,24 +236,19 @@ function updatePreStart(boat: Boat, course: Course, wind: { direction: number; s
   }
 
   // If too far below the line area, head back up
-  if (boat.position.y > lineCenter.y + 120) {
+  if (boat.position.y > lineCenter.y + 150) {
     const upwindHeading = getCloseHauledHeading(wind.direction, state.preferredSide > 0 ? 'starboard' : 'port');
     smoothTurnToward(boat, upwindHeading);
     return;
   }
 
-  // If too far from center laterally, turn back
+  // If too far from center laterally, tack back
   const distFromCenter = boat.position.x - lineCenter.x;
-  if (Math.abs(distFromCenter) > lineWidth * 0.55) {
-    const targetHeading = distFromCenter > 0
-      ? getCloseHauledHeading(wind.direction, 'port')
-      : getCloseHauledHeading(wind.direction, 'starboard');
-    smoothTurnToward(boat, targetHeading);
-
-    if (time - state.lastTackTime > 3) {
+  if (Math.abs(distFromCenter) > lineWidth * 0.6) {
+    const newTack: 'starboard' | 'port' = distFromCenter > 0 ? 'port' : 'starboard';
+    if (time - state.lastTackTime > 2) {
       state.lastTackTime = time;
-      boat.isTacking = true;
-      boat.tackTimer = 1.0;
+      doTack(boat, wind.direction, newTack);
     }
     return;
   }
@@ -250,11 +258,11 @@ function updatePreStart(boat: Boat, course: Course, wind: { direction: number; s
   const onStarboard = currentTwa > 0;
 
   const timeSinceTack = time - state.lastTackTime;
-  if (timeSinceTack > 5 + Math.random() * 4) {
+  if (timeSinceTack > 4 + Math.random() * 3) {
     state.lastTackTime = time;
     state.preferredSide *= -1;
-    boat.isTacking = true;
-    boat.tackTimer = 1.0;
+    const newTack: 'starboard' | 'port' = onStarboard ? 'port' : 'starboard';
+    doTack(boat, wind.direction, newTack);
     return;
   }
 

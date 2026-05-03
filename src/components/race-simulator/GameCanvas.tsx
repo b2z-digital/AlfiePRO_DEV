@@ -96,8 +96,10 @@ function drawWaterRipples(ctx: CanvasRenderingContext2D, time: number, width: nu
 
 function drawWindIndicators(ctx: CanvasRenderingContext2D, wind: Wind, time: number, width: number, height: number, darkMode: boolean) {
   const currentWind = getWindAtTime(wind, time);
-  // Show wind FROM direction (arrows point the direction wind is coming FROM = toward windward mark)
-  const windFromRad = degToRad(currentWind.direction + 180);
+  // Wind direction in our system = direction wind blows TO (compass heading)
+  // We draw arrows pointing in the direction wind blows (downwind direction)
+  // This makes it intuitive: arrows flow away from windward mark
+  const windBlowsToRad = degToRad(currentWind.direction);
 
   ctx.save();
   ctx.globalAlpha = darkMode ? 0.15 : 0.2;
@@ -112,15 +114,16 @@ function drawWindIndicators(ctx: CanvasRenderingContext2D, wind: Wind, time: num
 
       ctx.save();
       ctx.translate(x + offset, y);
-      ctx.rotate(windFromRad);
+      ctx.rotate(windBlowsToRad);
 
+      // Arrow shaft from top to bottom (in rotated frame), arrowhead at bottom
       ctx.beginPath();
+      ctx.moveTo(0, -arrowLen);
+      ctx.lineTo(0, arrowLen);
       ctx.moveTo(0, arrowLen);
-      ctx.lineTo(0, -arrowLen);
-      ctx.moveTo(0, -arrowLen);
-      ctx.lineTo(-3, -arrowLen + 6);
-      ctx.moveTo(0, -arrowLen);
-      ctx.lineTo(3, -arrowLen + 6);
+      ctx.lineTo(-3, arrowLen - 6);
+      ctx.moveTo(0, arrowLen);
+      ctx.lineTo(3, arrowLen - 6);
       ctx.stroke();
 
       ctx.restore();

@@ -8,58 +8,7 @@ import { checkRules, checkMarkRounding } from './rules';
 import { Pause, Play, RotateCcw, ArrowLeft, Keyboard, Volume2, VolumeX } from 'lucide-react';
 
 import { getStartBoxEngine } from '../../utils/startBoxAudio';
-import type { StartSequence } from '../../types/startBox';
-
-// Build a virtual 60-second scratch start sequence for the StartBox engine
-function buildScratchStartSequence(): StartSequence {
-  const now = new Date().toISOString();
-  return {
-    id: 'race-sim-scratch-60',
-    club_id: null,
-    name: '1 Minute Scratch Start',
-    sequence_type: 'standard',
-    total_duration_seconds: 60,
-    is_system_default: true,
-    is_active: true,
-    race_type_default: 'scratch',
-    sort_order: 0,
-    enable_countdown_beep: true,
-    created_at: now,
-    updated_at: now,
-    sounds: [
-      {
-        id: 'sim-horn-60',
-        sequence_id: 'race-sim-scratch-60',
-        sound_id: null,
-        trigger_time_seconds: 60,
-        label: '1 Minute Horn',
-        repeat_count: 1,
-        sort_order: 0,
-        created_at: now,
-      },
-      {
-        id: 'sim-horn-30',
-        sequence_id: 'race-sim-scratch-60',
-        sound_id: null,
-        trigger_time_seconds: 30,
-        label: '30 Second Horn',
-        repeat_count: 1,
-        sort_order: 1,
-        created_at: now,
-      },
-      {
-        id: 'sim-horn-0',
-        sequence_id: 'race-sim-scratch-60',
-        sound_id: null,
-        trigger_time_seconds: 0.5,
-        label: 'Start Horn',
-        repeat_count: 1,
-        sort_order: 2,
-        created_at: now,
-      },
-    ],
-  };
-}
+import { getDefaultSequenceForRaceType } from '../../utils/startBoxStorage';
 
 interface RaceSimulatorGameProps {
   scenario: Scenario;
@@ -107,16 +56,26 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
     return () => window.removeEventListener('resize', updateSize);
   }, [scenario]);
 
-  // Initialize StartBox audio engine
+  // Initialize StartBox audio engine with real sequence from database
   useEffect(() => {
     if (startBoxInitialized.current) return;
     startBoxInitialized.current = true;
     const engine = getStartBoxEngine();
-    const seq = buildScratchStartSequence();
-    engine.initialize().then(() => {
-      engine.arm(seq);
-      engine.start();
-    }).catch(() => {});
+
+    (async () => {
+      try {
+        await engine.initialize();
+        const seq = await getDefaultSequenceForRaceType(null, 'scratch');
+        if (seq) {
+          await engine.preloadSequence(seq);
+          engine.arm(seq);
+          engine.start();
+        }
+      } catch {
+        // Audio may fail on first interaction - will retry on restart
+      }
+    })();
+
     return () => {
       engine.stop();
     };
@@ -241,13 +200,18 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           }
         }
 
-        // Update boat physics - during countdown boats move at 60% speed (maneuvering into position)
-        const speedMultiplier = next.phase === 'countdown' ? 0.6 : 1.0;
+        // Update AI headings first, then move all boats
+        const aiTime = next.phase === 'countdown' ? -next.countdown : next.time;
+        for (const boat of next.boats) {
+          if (!boat.isPlayer) {
+            updateAIBoat(boat, next.course, currentWind, aiTime, next.boats);
+          }
+        }
+
+        // Update boat physics - during countdown boats move at 70% speed (maneuvering into position)
+        const speedMultiplier = next.phase === 'countdown' ? 0.7 : 1.0;
         for (const boat of next.boats) {
           updateBoatPosition(boat, dt * speedMultiplier, currentWind, next.boats);
-          if (!boat.isPlayer) {
-            updateAIBoat(boat, next.course, currentWind, next.phase === 'countdown' ? -next.countdown : next.time, next.boats);
-          }
         }
 
         // Keep boats within canvas bounds
@@ -399,9 +363,18 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
     // Restart the start box audio
     const engine = getStartBoxEngine();
     engine.stop();
-    const seq = buildScratchStartSequence();
-    engine.arm(seq);
-    engine.start();
+    (async () => {
+      try {
+        const seq = await getDefaultSequenceForRaceType(null, 'scratch');
+        if (seq) {
+          await engine.preloadSequence(seq);
+          engine.arm(seq);
+          engine.start();
+        }
+      } catch {
+        // Ignore audio errors
+      }
+    })();
   };
 
   return (

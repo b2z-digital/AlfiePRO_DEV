@@ -151,8 +151,8 @@ export function updateBoatPosition(boat: Boat, dt: number, wind: { direction: nu
 
   // Update position
   const headingRad = degToRad(boat.heading);
-  boat.position.x += Math.sin(headingRad) * boat.speed * dt * 3;
-  boat.position.y -= Math.cos(headingRad) * boat.speed * dt * 3;
+  boat.position.x += Math.sin(headingRad) * boat.speed * dt * 6;
+  boat.position.y -= Math.cos(headingRad) * boat.speed * dt * 6;
 
   // Add trail point periodically
   if (boat.trail.length === 0 || distance(boat.position, boat.trail[boat.trail.length - 1]) > 8) {
