@@ -1,5 +1,8 @@
-import { Boat, RuleViolation, Vec2, Wind } from './types';
+import { Boat, RuleViolation, Vec2, Course } from './types';
 import { distance, getTack, getTrueWindAngle, normalizeDeg, angleBetween } from './physics';
+
+const BOAT_RADIUS = 8;
+const CONTACT_DISTANCE = 14;
 
 interface BoatPair {
   boat1: Boat;
@@ -22,10 +25,7 @@ function getClosePairs(boats: Boat[], threshold: number): BoatPair[] {
 }
 
 function isOverlapped(boat1: Boat, boat2: Boat): boolean {
-  // Simplified overlap: boats are overlapped if the trailing boat's bow
-  // is forward of the leading boat's stern
-  const dist = distance(boat1.position, boat2.position);
-  return dist < 25; // roughly 2 boat lengths
+  return distance(boat1.position, boat2.position) < 25;
 }
 
 function isWindward(boat: Boat, other: Boat, windDirection: number): boolean {
@@ -34,104 +34,125 @@ function isWindward(boat: Boat, other: Boat, windDirection: number): boolean {
   return Math.abs(relAngle) < 90;
 }
 
-function isClear(boat1: Boat, boat2: Boat): boolean {
-  return distance(boat1.position, boat2.position) > 30;
-}
+export function checkBoatContact(boats: Boat[], windDirection: number, time: number): RuleViolation | null {
+  const contactPairs = getClosePairs(boats, CONTACT_DISTANCE);
 
-export function checkRules(boats: Boat[], windDirection: number, time: number): RuleViolation | null {
-  const closePairs = getClosePairs(boats, 25);
-
-  for (const pair of closePairs) {
+  for (const pair of contactPairs) {
     const { boat1, boat2 } = pair;
-
-    // Don't check rules for boats doing penalty turns
     if (boat1.penaltyTurns > 0 || boat2.penaltyTurns > 0) continue;
+    if (boat1.isTacking || boat2.isTacking) continue;
 
+    // Boats are in contact - determine who is at fault using RRS
     const tack1 = getTack(boat1.heading, windDirection);
     const tack2 = getTack(boat2.heading, windDirection);
 
-    // Rule 10 - Port/Starboard
+    let offender: Boat;
+    let rightOfWay: Boat;
+    let rule: string;
+    let ruleNumber: string;
+    let description: string;
+
     if (tack1 !== tack2) {
+      // RRS 10: Port/Starboard - port tack boat must keep clear
       const portBoat = tack1 === 'port' ? boat1 : boat2;
       const stbdBoat = tack1 === 'starboard' ? boat1 : boat2;
-
-      // Check if port boat is converging on starboard boat
-      const relAngle = angleBetween(portBoat.position, stbdBoat.position);
-      const convergence = Math.abs(normalizeDeg(portBoat.heading - relAngle));
-
-      if (convergence < 60 && pair.distance < 18) {
-        return {
-          rule: 'Port/Starboard',
-          ruleNumber: 'RRS 10',
-          description: `When boats are on opposite tacks, the port-tack boat shall keep clear of the starboard-tack boat. ${portBoat.name} (port) must give way to ${stbdBoat.name} (starboard).`,
-          offendingBoat: portBoat.id,
-          rightOfWayBoat: stbdBoat.id,
-          timestamp: time,
-          position: { x: (boat1.position.x + boat2.position.x) / 2, y: (boat1.position.y + boat2.position.y) / 2 },
-        };
-      }
-    }
-
-    // Rule 11 - Windward/Leeward (same tack, overlapped)
-    if (tack1 === tack2 && isOverlapped(boat1, boat2)) {
+      offender = portBoat;
+      rightOfWay = stbdBoat;
+      rule = 'Contact - Port/Starboard';
+      ruleNumber = 'RRS 10';
+      description = `CONTACT! When boats are on opposite tacks, the port-tack boat shall keep clear. ${portBoat.name} (port) hit ${stbdBoat.name} (starboard). Penalty turn required.`;
+    } else if (isOverlapped(boat1, boat2)) {
+      // RRS 11: Windward/Leeward
       const windwardBoat = isWindward(boat1, boat2, windDirection) ? boat1 : boat2;
       const leewardBoat = windwardBoat === boat1 ? boat2 : boat1;
-
-      // Check if windward boat is too close
-      if (pair.distance < 15) {
-        return {
-          rule: 'Windward/Leeward',
-          ruleNumber: 'RRS 11',
-          description: `When boats are on the same tack and overlapped, the windward boat shall keep clear of the leeward boat. ${windwardBoat.name} (windward) must keep clear of ${leewardBoat.name} (leeward).`,
-          offendingBoat: windwardBoat.id,
-          rightOfWayBoat: leewardBoat.id,
-          timestamp: time,
-          position: { x: (boat1.position.x + boat2.position.x) / 2, y: (boat1.position.y + boat2.position.y) / 2 },
-        };
-      }
-    }
-
-    // Rule 12 - Same tack, not overlapped (clear astern keeps clear)
-    if (tack1 === tack2 && !isOverlapped(boat1, boat2)) {
-      // Determine which is ahead based on progress toward wind
-      const angleToWind1 = Math.abs(normalizeDeg(angleBetween({ x: 0, y: 0 }, boat1.position) - windDirection));
-      const angleToWind2 = Math.abs(normalizeDeg(angleBetween({ x: 0, y: 0 }, boat2.position) - windDirection));
-
-      // The boat further from start (more upwind in beating) or further along course
+      offender = windwardBoat;
+      rightOfWay = leewardBoat;
+      rule = 'Contact - Windward/Leeward';
+      ruleNumber = 'RRS 11';
+      description = `CONTACT! When overlapped on the same tack, the windward boat shall keep clear. ${windwardBoat.name} (windward) hit ${leewardBoat.name} (leeward). Penalty turn required.`;
+    } else {
+      // RRS 12: Clear astern keeps clear
       const ahead = boat1.position.y < boat2.position.y ? boat1 : boat2;
       const astern = ahead === boat1 ? boat2 : boat1;
-
-      if (pair.distance < 12) {
-        return {
-          rule: 'Clear Astern/Clear Ahead',
-          ruleNumber: 'RRS 12',
-          description: `When boats are on the same tack and not overlapped, the boat clear astern shall keep clear of the boat clear ahead. ${astern.name} must keep clear of ${ahead.name}.`,
-          offendingBoat: astern.id,
-          rightOfWayBoat: ahead.id,
-          timestamp: time,
-          position: { x: (boat1.position.x + boat2.position.x) / 2, y: (boat1.position.y + boat2.position.y) / 2 },
-        };
-      }
+      offender = astern;
+      rightOfWay = ahead;
+      rule = 'Contact - Clear Astern';
+      ruleNumber = 'RRS 12';
+      description = `CONTACT! A boat clear astern shall keep clear of a boat clear ahead. ${astern.name} hit ${ahead.name} from behind. Penalty turn required.`;
     }
 
-    // Rule 13 - While tacking
-    if (boat1.isTacking || boat2.isTacking) {
-      const tackingBoat = boat1.isTacking ? boat1 : boat2;
-      const otherBoat = tackingBoat === boat1 ? boat2 : boat1;
+    return {
+      rule,
+      ruleNumber,
+      description,
+      offendingBoat: offender.id,
+      rightOfWayBoat: rightOfWay.id,
+      timestamp: time,
+      position: { x: (boat1.position.x + boat2.position.x) / 2, y: (boat1.position.y + boat2.position.y) / 2 },
+    };
+  }
 
-      if (pair.distance < 15) {
+  return null;
+}
+
+export function checkMarkTouching(boats: Boat[], course: Course, time: number): RuleViolation | null {
+  // RRS 31: Touching a Mark - a boat that touches a mark shall take a penalty
+  for (const boat of boats) {
+    if (boat.finished || boat.penaltyTurns > 0) continue;
+
+    for (const mark of course.marks) {
+      const dist = distance(boat.position, mark.position);
+      const touchThreshold = mark.radius + BOAT_RADIUS;
+
+      if (dist < touchThreshold) {
         return {
-          rule: 'While Tacking',
-          ruleNumber: 'RRS 13',
-          description: `After passing head to wind, a boat shall keep clear of other boats until she is on a close-hauled course. ${tackingBoat.name} is tacking and must keep clear of ${otherBoat.name}.`,
-          offendingBoat: tackingBoat.id,
-          rightOfWayBoat: otherBoat.id,
+          rule: 'Touching a Mark',
+          ruleNumber: 'RRS 31',
+          description: `${boat.name} touched ${mark.label}! A boat that touches a mark while racing shall take a One-Turn Penalty (one tack and one gybe, RRS 44.2).`,
+          offendingBoat: boat.id,
+          rightOfWayBoat: '',
           timestamp: time,
-          position: { x: (boat1.position.x + boat2.position.x) / 2, y: (boat1.position.y + boat2.position.y) / 2 },
+          position: mark.position,
         };
       }
     }
   }
+
+  return null;
+}
+
+export function checkOCS(boats: Boat[], course: Course, time: number): RuleViolation | null {
+  // RRS 30.1 (I Flag Rule) / Rule 29.1: Over the start line early
+  // Only check boats whose rounding just changed to 1 (they crossed the line at the gun)
+  // Actually check if any boat is above the start line while phase is still countdown
+  // This is called from the game loop during the transition moment
+
+  const lineY = course.startLine.port.y;
+
+  for (const boat of boats) {
+    if (boat.finished || boat.penaltyTurns > 0) continue;
+
+    // Boat is OCS if it's above (north of) the start line when the gun fires
+    if (boat.position.y < lineY - 5) {
+      return {
+        rule: 'Over the Line (OCS)',
+        ruleNumber: 'RRS 29.1',
+        description: `${boat.name} was over the start line at the starting signal! You must return to the pre-start side of the line and restart.`,
+        offendingBoat: boat.id,
+        rightOfWayBoat: '',
+        timestamp: time,
+        position: { x: boat.position.x, y: lineY },
+      };
+    }
+  }
+
+  return null;
+}
+
+export function checkRules(boats: Boat[], windDirection: number, time: number): RuleViolation | null {
+  // Check boat-to-boat contact (highest priority)
+  const contactViolation = checkBoatContact(boats, windDirection, time);
+  if (contactViolation) return contactViolation;
 
   return null;
 }
@@ -145,10 +166,10 @@ export function checkMarkRounding(boats: Boat[], markPosition: Vec2, markRadius:
     for (let j = i + 1; j < boatsNearMark.length; j++) {
       const b1 = boatsNearMark[i];
       const b2 = boatsNearMark[j];
+      if (b1.penaltyTurns > 0 || b2.penaltyTurns > 0) continue;
       const dist = distance(b1.position, b2.position);
 
       if (dist < 20) {
-        // Inside boat has right to room
         const distToMark1 = distance(b1.position, markPosition);
         const distToMark2 = distance(b2.position, markPosition);
         const insideBoat = distToMark1 < distToMark2 ? b1 : b2;

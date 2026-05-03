@@ -4,7 +4,7 @@ import { GameCanvas } from './GameCanvas';
 import { GameHUD } from './GameHUD';
 import { updateBoatPosition, getWindAtTime, normalizeAngle, normalizeDeg, hasPassedLine, hasRoundedMark, distance } from './physics';
 import { updateAIBoat, resetAIStates } from './ai';
-import { checkRules, checkMarkRounding } from './rules';
+import { checkRules, checkMarkRounding, checkMarkTouching, checkOCS } from './rules';
 import { Pause, Play, RotateCcw, ArrowLeft, Keyboard, Volume2, VolumeX } from 'lucide-react';
 
 import { getStartBoxEngine } from '../../utils/startBoxAudio';
@@ -188,6 +188,23 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             next.phase = 'racing';
             next.countdown = 0;
             next.time = 0;
+
+            // Check OCS - any boat over the line at the gun
+            const ocsViolation = checkOCS(next.boats, next.course, 0);
+            if (ocsViolation) {
+              const playerBoat = next.boats.find(b => b.isPlayer);
+              if (ocsViolation.offendingBoat === playerBoat?.id) {
+                next.currentViolation = ocsViolation;
+                next.violations = [...next.violations, ocsViolation];
+              }
+              // OCS boats: push them back below the line
+              const ocsBoat = next.boats.find(b => b.id === ocsViolation.offendingBoat);
+              if (ocsBoat && !ocsBoat.isPlayer) {
+                ocsBoat.position.y = next.course.startLine.port.y + 30;
+                ocsBoat.heading = normalizeAngle(180);
+              }
+            }
+
             next.boats.forEach(b => {
               if (b.rounding === 0) b.rounding = 1;
             });
@@ -244,47 +261,79 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
 
             const roundingRadius = 45;
 
+            // Port rounding validation: boat must pass to the RIGHT of the mark
+            // (leaving mark on its port/left side).
+            // For windward/offset marks: boat.x > mark.x (passed to the right)
+            // AND boat.y > mark.y (has gone past/below the mark after rounding)
+            // For gate: boat must pass BETWEEN the two gate marks first,
+            // then boat.y < gateMark.y (has gone above/north after rounding)
+
+            const hasPortRounded = (boat: { position: { x: number; y: number } }, markPos: { x: number; y: number }, type: 'windward' | 'offset' | 'gate'): boolean => {
+              const dist = distance(boat.position, markPos);
+              if (dist > roundingRadius) return false;
+
+              if (type === 'windward' || type === 'offset') {
+                // Must be to the right of the mark AND below/past it
+                return boat.position.x > markPos.x - 10 && boat.position.y > markPos.y;
+              } else {
+                // Gate: must be above the gate mark (heading back upwind)
+                return boat.position.y < markPos.y;
+              }
+            };
+
             // Rounding progression:
             // 1 = heading to windward, 2 = heading to offset, 3 = heading to gate
             // 4 = windward (lap 2), 5 = offset (lap 2), 6 = gate (lap 2)
             // 7 = heading to finish
 
-            // Only advance one rounding per frame to prevent chain-skipping
             if (boat.rounding === 1 && windwardMark) {
-              if (hasRoundedMark(boat, windwardMark.position, roundingRadius)) {
+              if (hasPortRounded(boat, windwardMark.position, 'windward')) {
                 boat.rounding = 2;
               }
             } else if (boat.rounding === 2 && offsetMark) {
-              if (hasRoundedMark(boat, offsetMark.position, roundingRadius)) {
+              if (hasPortRounded(boat, offsetMark.position, 'offset')) {
                 boat.rounding = 3;
               }
             } else if (boat.rounding === 3 && (gatePort || gateStbd)) {
-              const gateTarget = gatePort || gateStbd;
-              const gateOther = gateStbd || gatePort;
-              if (hasRoundedMark(boat, gateTarget!.position, roundingRadius) ||
-                  hasRoundedMark(boat, gateOther!.position, roundingRadius)) {
-                boat.laps++;
-                if (boat.laps >= totalLaps) {
-                  boat.rounding = 7;
-                } else {
-                  boat.rounding = 4;
+              // Gate: boat must first sail BETWEEN the marks (below the gate line)
+              // then round one mark to port (go past and above it)
+              const gP = gatePort!.position;
+              const gS = gateStbd!.position;
+              const betweenX = boat.position.x > Math.min(gP.x, gS.x) - 10 &&
+                               boat.position.x < Math.max(gP.x, gS.x) + 10;
+              const nearGateY = Math.abs(boat.position.y - gP.y) < roundingRadius;
+
+              if (betweenX && nearGateY) {
+                // Check if boat has rounded one of the gate marks to port
+                if (hasPortRounded(boat, gP, 'gate') || hasPortRounded(boat, gS, 'gate')) {
+                  boat.laps++;
+                  if (boat.laps >= totalLaps) {
+                    boat.rounding = 7;
+                  } else {
+                    boat.rounding = 4;
+                  }
                 }
               }
             } else if (boat.rounding === 4 && windwardMark) {
-              if (hasRoundedMark(boat, windwardMark.position, roundingRadius)) {
+              if (hasPortRounded(boat, windwardMark.position, 'windward')) {
                 boat.rounding = 5;
               }
             } else if (boat.rounding === 5 && offsetMark) {
-              if (hasRoundedMark(boat, offsetMark.position, roundingRadius)) {
+              if (hasPortRounded(boat, offsetMark.position, 'offset')) {
                 boat.rounding = 6;
               }
             } else if (boat.rounding === 6 && (gatePort || gateStbd)) {
-              const gateTarget = gatePort || gateStbd;
-              const gateOther = gateStbd || gatePort;
-              if (hasRoundedMark(boat, gateTarget!.position, roundingRadius) ||
-                  hasRoundedMark(boat, gateOther!.position, roundingRadius)) {
-                boat.laps++;
-                boat.rounding = 7;
+              const gP = gatePort!.position;
+              const gS = gateStbd!.position;
+              const betweenX = boat.position.x > Math.min(gP.x, gS.x) - 10 &&
+                               boat.position.x < Math.max(gP.x, gS.x) + 10;
+              const nearGateY = Math.abs(boat.position.y - gP.y) < roundingRadius;
+
+              if (betweenX && nearGateY) {
+                if (hasPortRounded(boat, gP, 'gate') || hasPortRounded(boat, gS, 'gate')) {
+                  boat.laps++;
+                  boat.rounding = 7;
+                }
               }
             } else if (boat.rounding === 7) {
               if (hasPassedLine(boat, next.course.finishLine.port, next.course.finishLine.starboard, 'upward')) {
@@ -302,25 +351,46 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             next.phase = 'finished';
           }
 
-          // Check rules (throttled) - only after boats have spread out (15 seconds in)
-          if (next.time > 15 && Math.floor(next.time * 2) !== Math.floor((next.time - dt) * 2)) {
-            const violation = checkRules(next.boats, currentWind.direction, next.time);
-            if (violation) {
-              next.violations = [...next.violations, violation];
+          // Check rules every few frames (throttled to ~4 Hz)
+          if (!next.currentViolation && Math.floor(next.time * 4) !== Math.floor((next.time - dt) * 4)) {
+            // 1. Check mark touching (RRS 31) - any boat touching any mark
+            const markViolation = checkMarkTouching(next.boats, next.course, next.time);
+            if (markViolation) {
+              next.violations = [...next.violations, markViolation];
               const playerBoat = next.boats.find(b => b.isPlayer);
-              if (violation.offendingBoat === playerBoat?.id || violation.rightOfWayBoat === playerBoat?.id) {
-                next.currentViolation = violation;
+              if (markViolation.offendingBoat === playerBoat?.id) {
+                next.currentViolation = markViolation;
+              } else {
+                // AI boat touched a mark - give them a penalty turn
+                const aiBoat = next.boats.find(b => b.id === markViolation.offendingBoat);
+                if (aiBoat) aiBoat.penaltyTurns = 1.5;
               }
-              // AI boats do NOT get penalty turns - they just avoid (no spinning)
             }
 
-            if (windwardMark) {
-              const markViolation = checkMarkRounding(next.boats, windwardMark.position, windwardMark.radius, currentWind.direction, next.time);
-              if (markViolation && !next.currentViolation) {
-                next.violations = [...next.violations, markViolation];
+            // 2. Check boat-to-boat contact (RRS 10, 11, 12)
+            if (!next.currentViolation) {
+              const contactViolation = checkRules(next.boats, currentWind.direction, next.time);
+              if (contactViolation) {
+                next.violations = [...next.violations, contactViolation];
                 const playerBoat = next.boats.find(b => b.isPlayer);
-                if (markViolation.offendingBoat === playerBoat?.id || markViolation.rightOfWayBoat === playerBoat?.id) {
-                  next.currentViolation = markViolation;
+                if (contactViolation.offendingBoat === playerBoat?.id || contactViolation.rightOfWayBoat === playerBoat?.id) {
+                  next.currentViolation = contactViolation;
+                } else {
+                  // AI boat collision - offender gets penalty
+                  const aiBoat = next.boats.find(b => b.id === contactViolation.offendingBoat);
+                  if (aiBoat) aiBoat.penaltyTurns = 2;
+                }
+              }
+            }
+
+            // 3. Check mark room (RRS 18) at windward mark
+            if (!next.currentViolation && windwardMark) {
+              const markRoomViolation = checkMarkRounding(next.boats, windwardMark.position, windwardMark.radius, currentWind.direction, next.time);
+              if (markRoomViolation) {
+                next.violations = [...next.violations, markRoomViolation];
+                const playerBoat = next.boats.find(b => b.isPlayer);
+                if (markRoomViolation.offendingBoat === playerBoat?.id || markRoomViolation.rightOfWayBoat === playerBoat?.id) {
+                  next.currentViolation = markRoomViolation;
                 }
               }
             }
@@ -343,7 +413,17 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
     setGameState(prev => {
       const player = prev.boats.find(b => b.isPlayer);
       if (player && prev.currentViolation?.offendingBoat === player.id) {
-        player.penaltyTurns = 2;
+        if (prev.currentViolation.ruleNumber === 'RRS 29.1') {
+          // OCS: push player back below the line
+          player.position.y = prev.course.startLine.port.y + 40;
+          player.heading = normalizeAngle(0);
+        } else if (prev.currentViolation.ruleNumber === 'RRS 31') {
+          // Mark touching: one-turn penalty (shorter)
+          player.penaltyTurns = 1.5;
+        } else {
+          // Contact / other: two-turn penalty (360 degree)
+          player.penaltyTurns = 2;
+        }
       }
       return { ...prev, currentViolation: null };
     });

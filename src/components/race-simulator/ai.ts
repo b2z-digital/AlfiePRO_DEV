@@ -1,5 +1,5 @@
 import { Boat, Course, Vec2 } from './types';
-import { normalizeAngle, normalizeDeg, distance, angleBetween, getTrueWindAngle } from './physics';
+import { normalizeAngle, normalizeDeg, distance, angleBetween, getTrueWindAngle, degToRad } from './physics';
 
 const TACK_ANGLE = 45;
 
@@ -8,7 +8,9 @@ interface AIState {
   preferredSide: number;
   initialized: boolean;
   gateChoice: 'port' | 'starboard';
-  roundingPhase: 'approach' | 'rounding' | 'depart';
+  roundingPhase: 'approach' | 'arc' | 'depart';
+  roundingWaypoint: Vec2 | null;
+  preStartAnchor: Vec2;
 }
 
 const aiStates = new Map<string, AIState>();
@@ -21,6 +23,8 @@ function getAIState(boat: Boat): AIState {
       initialized: false,
       gateChoice: Math.random() > 0.5 ? 'port' : 'starboard',
       roundingPhase: 'approach',
+      roundingWaypoint: null,
+      preStartAnchor: { ...boat.position },
     });
   }
   return aiStates.get(boat.id)!;
@@ -57,12 +61,8 @@ export function getTargetForRounding(rounding: number, course: Course, boat?: Bo
         return gatePort?.position || null;
       }
       const state = getAIState(boat);
-      if (state.gateChoice === 'port' && gatePort) {
-        return gatePort.position;
-      }
-      if (state.gateChoice === 'starboard' && gateStbd) {
-        return gateStbd.position;
-      }
+      if (state.gateChoice === 'port' && gatePort) return gatePort.position;
+      if (state.gateChoice === 'starboard' && gateStbd) return gateStbd.position;
       return gatePort?.position || gateStbd?.position || null;
     }
     case 7:
@@ -85,16 +85,14 @@ export function isHeadingDownwind(rounding: number): boolean {
 
 function getCloseHauledHeading(windDir: number, tack: 'starboard' | 'port'): number {
   const upwindDir = normalizeAngle(windDir + 180);
-  if (tack === 'starboard') {
-    return normalizeAngle(upwindDir - TACK_ANGLE);
-  }
+  if (tack === 'starboard') return normalizeAngle(upwindDir - TACK_ANGLE);
   return normalizeAngle(upwindDir + TACK_ANGLE);
 }
 
-function smoothTurnToward(boat: Boat, desiredHeading: number): void {
+function smoothTurnToward(boat: Boat, desiredHeading: number, dt = 0.016): void {
   const headingDiff = normalizeDeg(desiredHeading - boat.heading);
-  const turnRate = 200;
-  const maxTurn = turnRate * 0.016;
+  const turnRate = 180;
+  const maxTurn = turnRate * dt;
   if (Math.abs(headingDiff) > maxTurn) {
     boat.heading = normalizeAngle(boat.heading + Math.sign(headingDiff) * maxTurn);
   } else {
@@ -110,24 +108,17 @@ function doTack(boat: Boat, windDir: number, newTack: 'starboard' | 'port'): voi
 
 export function updateAIBoat(boat: Boat, course: Course, wind: { direction: number; speed: number }, time: number, allBoats: Boat[]): void {
   if (boat.isPlayer || boat.finished) return;
-
-  if (boat.penaltyTurns > 0) {
-    boat.penaltyTurns = 0;
-  }
-
+  if (boat.penaltyTurns > 0) return;
   if (boat.isTacking || boat.isGybing) return;
 
   const state = getAIState(boat);
 
   if (!state.initialized) {
     state.initialized = true;
-    const currentTwa = Math.abs(getTrueWindAngle(boat.heading, wind.direction));
-    if (currentTwa < TACK_ANGLE - 5) {
-      boat.heading = getCloseHauledHeading(wind.direction, state.preferredSide > 0 ? 'starboard' : 'port');
-    }
+    state.preStartAnchor = { ...boat.position };
   }
 
-  // Pre-start behavior
+  // Pre-start behavior: stay near the line
   if (boat.rounding === 0) {
     updatePreStart(boat, course, wind, time, state);
     return;
@@ -136,54 +127,107 @@ export function updateAIBoat(boat: Boat, course: Course, wind: { direction: numb
   const target = getTargetForRounding(boat.rounding, course, boat);
   if (!target) return;
 
-  const angleToTarget = angleBetween(boat.position, target);
-  const distToTarget = distance(boat.position, target);
-
   const headingUpwind = isHeadingUpwind(boat.rounding);
   const headingDownwind = isHeadingDownwind(boat.rounding);
 
-  let desiredHeading: number;
+  // Port rounding: when approaching a mark, steer to pass to the RIGHT of it
+  // then arc around leaving it on the port (left) side
+  if (headingUpwind || boat.rounding === 2 || boat.rounding === 5) {
+    updateUpwindOrReaching(boat, course, wind, time, state, target, headingUpwind);
+  } else if (headingDownwind) {
+    updateDownwind(boat, target, wind);
+  } else {
+    // Finish leg - aim directly
+    smoothTurnToward(boat, angleBetween(boat.position, target));
+  }
 
-  if (headingUpwind) {
-    // Upwind: tack toward the mark
+  // Collision avoidance
+  avoidCollisions(boat, allBoats);
+}
+
+function updateUpwindOrReaching(boat: Boat, course: Course, wind: { direction: number; speed: number }, time: number, state: AIState, target: Vec2, isUpwind: boolean): void {
+  const distToTarget = distance(boat.position, target);
+  const angleToTarget = angleBetween(boat.position, target);
+
+  // Port rounding logic: when close to the mark, steer to pass to the RIGHT
+  // then arc around it (leaving mark on port/left side)
+  if (distToTarget < 80 && state.roundingPhase === 'approach') {
+    // Create a waypoint to the RIGHT of the mark (port rounding)
+    // "Right of mark" means: looking from boat toward mark, go to the starboard side
+    // For windward mark (top of course), passing to the right means going to the mark's right (higher X)
+    const offsetDist = 35;
+    // Waypoint: to the right of the mark relative to the wind direction
+    // Wind blows TO 180 (south), so upwind is 0 (north). Right of the mark = east = +X
+    state.roundingWaypoint = {
+      x: target.x + offsetDist,
+      y: target.y,
+    };
+    state.roundingPhase = 'arc';
+  }
+
+  if (state.roundingPhase === 'arc' && state.roundingWaypoint) {
+    const distToWaypoint = distance(boat.position, state.roundingWaypoint);
+    if (distToWaypoint < 25) {
+      // Reached the waypoint, now depart - aim for next target
+      state.roundingPhase = 'depart';
+      state.roundingWaypoint = null;
+    } else {
+      // Steer toward the waypoint
+      smoothTurnToward(boat, angleBetween(boat.position, state.roundingWaypoint));
+      return;
+    }
+  }
+
+  if (state.roundingPhase === 'depart') {
+    // Head toward the mark center (which we should now be passing)
+    // Once rounding is detected by game loop, this will advance to next target
+    smoothTurnToward(boat, angleBetween(boat.position, target));
+    // Reset for next mark
+    if (distToTarget < 30) {
+      state.roundingPhase = 'approach';
+    }
+    return;
+  }
+
+  // Normal upwind tacking logic
+  if (isUpwind) {
     const twaToTarget = Math.abs(getTrueWindAngle(angleToTarget, wind.direction));
 
-    if (twaToTarget >= TACK_ANGLE - 5 || distToTarget < 50) {
-      // Can lay the mark or very close - aim directly
-      desiredHeading = angleToTarget;
+    if (twaToTarget >= TACK_ANGLE - 5 || distToTarget < 60) {
+      smoothTurnToward(boat, angleToTarget);
     } else {
-      // Need to tack - sail close-hauled
       const currentTwa = getTrueWindAngle(boat.heading, wind.direction);
       const currentTack: 'starboard' | 'port' = currentTwa > 0 ? 'starboard' : 'port';
-      desiredHeading = getCloseHauledHeading(wind.direction, currentTack);
+      const desiredHeading = getCloseHauledHeading(wind.direction, currentTack);
+      smoothTurnToward(boat, desiredHeading);
 
-      // Tack when sailing too far from mark bearing
       const headingDiffToTarget = Math.abs(normalizeDeg(angleToTarget - boat.heading));
       if (headingDiffToTarget > 85 && time - state.lastTackTime > 3 + Math.random() * 2) {
         const newTack = currentTack === 'starboard' ? 'port' : 'starboard';
         state.lastTackTime = time;
         doTack(boat, wind.direction, newTack);
-        return;
       }
     }
-  } else if (headingDownwind) {
-    // Downwind: RC boats sail STRAIGHT at the target (dead downwind or near it)
-    // Aim directly at the gate mark they chose
-    desiredHeading = angleToTarget;
   } else {
-    // Reaching (offset mark leg) - aim directly at target
-    desiredHeading = angleToTarget;
+    // Reaching leg (to offset mark) - aim directly
+    smoothTurnToward(boat, angleToTarget);
   }
+}
 
-  smoothTurnToward(boat, desiredHeading);
+function updateDownwind(boat: Boat, target: Vec2, wind: { direction: number; speed: number }): void {
+  // RC boats sail STRAIGHT DOWNWIND - aim directly at target
+  const angleToTarget = angleBetween(boat.position, target);
+  smoothTurnToward(boat, angleToTarget);
+}
 
-  // Collision avoidance
+function avoidCollisions(boat: Boat, allBoats: Boat[]): void {
   for (const other of allBoats) {
     if (other.id === boat.id || other.finished) continue;
     const dist = distance(boat.position, other.position);
-    if (dist < 15) {
+    if (dist < 20 && dist > 0) {
       const away = angleBetween(other.position, boat.position);
-      boat.heading = normalizeAngle(boat.heading + normalizeDeg(away - boat.heading) * 0.05);
+      const nudge = normalizeDeg(away - boat.heading) * 0.08;
+      boat.heading = normalizeAngle(boat.heading + nudge);
     }
   }
 }
@@ -195,51 +239,50 @@ function updatePreStart(boat: Boat, course: Course, wind: { direction: number; s
   };
   const halfLineWidth = (course.startLine.starboard.x - course.startLine.port.x) / 2;
 
-  // HARD boundary: if boat goes past the start line endpoints laterally, force turn back
-  const distFromCenter = boat.position.x - lineCenter.x;
-  if (distFromCenter > halfLineWidth * 0.7) {
-    // Too far right - head port tack (NE heading points left)
-    smoothTurnToward(boat, getCloseHauledHeading(wind.direction, 'port'));
-    if (time - state.lastTackTime > 1) {
-      state.lastTackTime = time;
-    }
+  // KEY FIX: During pre-start, AI boats sail on REACHING courses (perpendicular to wind)
+  // which moves them LATERALLY along the line rather than away from it.
+  // Wind is 180 (blows south), so beam reach headings are ~90 (east) or ~270 (west).
+
+  // Containment: keep boats within the start area
+  const maxXFromCenter = halfLineWidth * 0.6;
+  const maxYBelowLine = 70;
+  const minYAboveLine = -10;
+
+  const dx = boat.position.x - lineCenter.x;
+  const dy = boat.position.y - lineCenter.y;
+
+  // If too far right, head left (west = ~270)
+  if (dx > maxXFromCenter) {
+    smoothTurnToward(boat, 270);
     return;
   }
-  if (distFromCenter < -halfLineWidth * 0.7) {
-    // Too far left - head starboard tack (NW heading points right)
-    smoothTurnToward(boat, getCloseHauledHeading(wind.direction, 'starboard'));
-    if (time - state.lastTackTime > 1) {
-      state.lastTackTime = time;
-    }
+  // If too far left, head right (east = ~90)
+  if (dx < -maxXFromCenter) {
+    smoothTurnToward(boat, 90);
+    return;
+  }
+  // If above the start line, head down (south = 180)
+  if (dy < minYAboveLine) {
+    smoothTurnToward(boat, 160 + Math.random() * 40);
+    return;
+  }
+  // If too far below line, head up (north-ish)
+  if (dy > maxYBelowLine) {
+    smoothTurnToward(boat, 340 + (Math.random() - 0.5) * 40);
     return;
   }
 
-  // If above the start line, bear away
-  if (boat.position.y < lineCenter.y - 5) {
-    smoothTurnToward(boat, wind.direction);
-    return;
-  }
-
-  // If too far below line, head upwind
-  if (boat.position.y > lineCenter.y + 80) {
-    smoothTurnToward(boat, getCloseHauledHeading(wind.direction, state.preferredSide > 0 ? 'starboard' : 'port'));
-    return;
-  }
-
-  // Normal pre-start: short tacks near the line
-  const currentTwa = getTrueWindAngle(boat.heading, wind.direction);
-  const onStarboard = currentTwa > 0;
-
+  // Normal pre-start maneuvering: sail on beam reach back and forth
+  // Change direction periodically
   const timeSinceTack = time - state.lastTackTime;
-  // Very short tack intervals to keep boats contained
-  if (timeSinceTack > 1.5 + Math.random() * 1.5) {
+  if (timeSinceTack > 2 + Math.random() * 2) {
     state.lastTackTime = time;
     state.preferredSide *= -1;
-    const newTack: 'starboard' | 'port' = onStarboard ? 'port' : 'starboard';
-    doTack(boat, wind.direction, newTack);
-    return;
   }
 
-  const desiredHeading = getCloseHauledHeading(wind.direction, onStarboard ? 'starboard' : 'port');
-  smoothTurnToward(boat, desiredHeading);
+  // Beam reach: heading 90 (east) or 270 (west) - moves laterally along line
+  const targetHeading = state.preferredSide > 0 ? 90 : 270;
+  // Add slight upwind bias to keep them drifting toward the line
+  const biasedHeading = normalizeAngle(targetHeading + (dy > 30 ? -20 : 10));
+  smoothTurnToward(boat, biasedHeading);
 }
