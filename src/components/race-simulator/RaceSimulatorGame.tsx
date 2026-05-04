@@ -259,26 +259,22 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           for (const boat of next.boats) {
             if (boat.finished) continue;
 
-            const roundingRadius = 45;
+            const roundingRadius = 40;
 
-            // Port rounding validation: boat must pass to the RIGHT of the mark
-            // (leaving mark on its port/left side).
-            // For windward/offset marks: boat.x > mark.x (passed to the right)
-            // AND boat.y > mark.y (has gone past/below the mark after rounding)
-            // For gate: boat must pass BETWEEN the two gate marks first,
-            // then boat.y < gateMark.y (has gone above/north after rounding)
+            // Port rounding: boat passes to the RIGHT (east) of the mark.
+            // Detection: within radius AND boat.x >= mark.x (on the right side)
+            const isNearAndRight = (boatPos: { x: number; y: number }, markPos: { x: number; y: number }): boolean => {
+              const dist = distance(boatPos, markPos);
+              return dist < roundingRadius && boatPos.x >= markPos.x - 5;
+            };
 
-            const hasPortRounded = (boat: { position: { x: number; y: number } }, markPos: { x: number; y: number }, type: 'windward' | 'offset' | 'gate'): boolean => {
-              const dist = distance(boat.position, markPos);
-              if (dist > roundingRadius) return false;
-
-              if (type === 'windward' || type === 'offset') {
-                // Must be to the right of the mark AND below/past it
-                return boat.position.x > markPos.x - 10 && boat.position.y > markPos.y;
-              } else {
-                // Gate: must be above the gate mark (heading back upwind)
-                return boat.position.y < markPos.y;
-              }
+            // Gate rounding: boat passes between marks then goes above (north of) the gate
+            const hasPassedGate = (boatPos: { x: number; y: number }, gP: { x: number; y: number }, gS: { x: number; y: number }): boolean => {
+              const dist1 = distance(boatPos, gP);
+              const dist2 = distance(boatPos, gS);
+              const nearGate = dist1 < roundingRadius || dist2 < roundingRadius;
+              // Must be above (north of) the gate marks to have passed through
+              return nearGate && boatPos.y < gP.y + 5;
             };
 
             // Rounding progression:
@@ -287,53 +283,34 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             // 7 = heading to finish
 
             if (boat.rounding === 1 && windwardMark) {
-              if (hasPortRounded(boat, windwardMark.position, 'windward')) {
+              if (isNearAndRight(boat.position, windwardMark.position)) {
                 boat.rounding = 2;
               }
             } else if (boat.rounding === 2 && offsetMark) {
-              if (hasPortRounded(boat, offsetMark.position, 'offset')) {
+              if (isNearAndRight(boat.position, offsetMark.position)) {
                 boat.rounding = 3;
               }
-            } else if (boat.rounding === 3 && (gatePort || gateStbd)) {
-              // Gate: boat must first sail BETWEEN the marks (below the gate line)
-              // then round one mark to port (go past and above it)
-              const gP = gatePort!.position;
-              const gS = gateStbd!.position;
-              const betweenX = boat.position.x > Math.min(gP.x, gS.x) - 10 &&
-                               boat.position.x < Math.max(gP.x, gS.x) + 10;
-              const nearGateY = Math.abs(boat.position.y - gP.y) < roundingRadius;
-
-              if (betweenX && nearGateY) {
-                // Check if boat has rounded one of the gate marks to port
-                if (hasPortRounded(boat, gP, 'gate') || hasPortRounded(boat, gS, 'gate')) {
-                  boat.laps++;
-                  if (boat.laps >= totalLaps) {
-                    boat.rounding = 7;
-                  } else {
-                    boat.rounding = 4;
-                  }
+            } else if (boat.rounding === 3 && gatePort && gateStbd) {
+              if (hasPassedGate(boat.position, gatePort.position, gateStbd.position)) {
+                boat.laps++;
+                if (boat.laps >= totalLaps) {
+                  boat.rounding = 7;
+                } else {
+                  boat.rounding = 4;
                 }
               }
             } else if (boat.rounding === 4 && windwardMark) {
-              if (hasPortRounded(boat, windwardMark.position, 'windward')) {
+              if (isNearAndRight(boat.position, windwardMark.position)) {
                 boat.rounding = 5;
               }
             } else if (boat.rounding === 5 && offsetMark) {
-              if (hasPortRounded(boat, offsetMark.position, 'offset')) {
+              if (isNearAndRight(boat.position, offsetMark.position)) {
                 boat.rounding = 6;
               }
-            } else if (boat.rounding === 6 && (gatePort || gateStbd)) {
-              const gP = gatePort!.position;
-              const gS = gateStbd!.position;
-              const betweenX = boat.position.x > Math.min(gP.x, gS.x) - 10 &&
-                               boat.position.x < Math.max(gP.x, gS.x) + 10;
-              const nearGateY = Math.abs(boat.position.y - gP.y) < roundingRadius;
-
-              if (betweenX && nearGateY) {
-                if (hasPortRounded(boat, gP, 'gate') || hasPortRounded(boat, gS, 'gate')) {
-                  boat.laps++;
-                  boat.rounding = 7;
-                }
+            } else if (boat.rounding === 6 && gatePort && gateStbd) {
+              if (hasPassedGate(boat.position, gatePort.position, gateStbd.position)) {
+                boat.laps++;
+                boat.rounding = 7;
               }
             } else if (boat.rounding === 7) {
               if (hasPassedLine(boat, next.course.finishLine.port, next.course.finishLine.starboard, 'upward')) {

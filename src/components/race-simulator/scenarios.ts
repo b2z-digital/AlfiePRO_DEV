@@ -41,16 +41,16 @@ function createFleet(numBoats: number, linePortX: number, lineStbdX: number, lin
   const boats: Boat[] = [];
   const lineWidth = lineStbdX - linePortX;
 
-  // Player starts near the middle of the line, slightly below
+  // Player starts near the middle of the line, just below it
   const playerX = linePortX + lineWidth * 0.5;
-  const playerY = lineY + 40;
+  const playerY = lineY + 15;
   boats.push(createBoat('player', 'You', '01', { x: playerX, y: playerY }, heading, true, COLORS[0]));
 
-  // AI boats spread along the line below it, maneuvering into position
+  // AI boats spread along the line just below it (within ~20px)
   for (let i = 0; i < numBoats - 1; i++) {
     const fraction = (i + 0.5) / (numBoats - 1);
     const x = linePortX + fraction * lineWidth;
-    const y = lineY + 30 + Math.random() * 60;
+    const y = lineY + 10 + Math.random() * 20;
 
     // Alternate between port and starboard tack approaches
     const boatHeading = i % 2 === 0

@@ -97,12 +97,16 @@ export function checkBoatContact(boats: Boat[], windDirection: number, time: num
 
 export function checkMarkTouching(boats: Boat[], course: Course, time: number): RuleViolation | null {
   // RRS 31: Touching a Mark - a boat that touches a mark shall take a penalty
+  // Only check marks that are currently relevant (not start line marks during racing)
+  const racingMarks = course.marks.filter(m => m.type !== 'start-port' && m.type !== 'start-starboard');
+
   for (const boat of boats) {
     if (boat.finished || boat.penaltyTurns > 0) continue;
 
-    for (const mark of course.marks) {
+    for (const mark of racingMarks) {
       const dist = distance(boat.position, mark.position);
-      const touchThreshold = mark.radius + BOAT_RADIUS;
+      // Tight threshold - actual contact with the mark body
+      const touchThreshold = mark.radius + 4;
 
       if (dist < touchThreshold) {
         return {
