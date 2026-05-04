@@ -552,9 +552,10 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           onSheetChange={setSheetAngle}
           darkMode={darkMode}
           optimalSheet={(() => {
-            if (!player) return 0.5;
+            const p = gameState.boats.find(b => b.isPlayer);
+            if (!p) return 0.5;
             const w = getWindAtTime(gameState.wind, gameState.time);
-            const twa = getTrueWindAngle(player.heading, w.direction);
+            const twa = getTrueWindAngle(p.heading, w.direction);
             return getOptimalSheet(twa);
           })()}
         />
