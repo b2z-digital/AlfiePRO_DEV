@@ -127,7 +127,7 @@ export const scenarios: Scenario[] = [
 
       return {
         boats,
-        wind: { direction: 180, speed: 12, gustFactor: 0.1, shiftAmplitude: 5, shiftPeriod: 30 },
+        wind: { direction: 0, speed: 12, gustFactor: 0.1, shiftAmplitude: 8, shiftPeriod: 30 },
         course,
         time: 0,
         countdown: 60,
@@ -152,7 +152,7 @@ export const scenarios: Scenario[] = [
 
       return {
         boats,
-        wind: { direction: 180, speed: 14, gustFactor: 0.15, shiftAmplitude: 12, shiftPeriod: 25 },
+        wind: { direction: 0, speed: 14, gustFactor: 0.15, shiftAmplitude: 12, shiftPeriod: 25 },
         course,
         time: 0,
         countdown: 5,
@@ -178,7 +178,7 @@ export const scenarios: Scenario[] = [
 
       return {
         boats,
-        wind: { direction: 180, speed: 14, gustFactor: 0.2, shiftAmplitude: 8, shiftPeriod: 20 },
+        wind: { direction: 0, speed: 14, gustFactor: 0.2, shiftAmplitude: 8, shiftPeriod: 20 },
         course,
         time: 0,
         countdown: 5,
@@ -206,7 +206,7 @@ export const scenarios: Scenario[] = [
 
       return {
         boats,
-        wind: { direction: 180, speed: 12, gustFactor: 0.1, shiftAmplitude: 3, shiftPeriod: 40 },
+        wind: { direction: 0, speed: 12, gustFactor: 0.1, shiftAmplitude: 3, shiftPeriod: 40 },
         course,
         time: 0,
         countdown: 5,
@@ -238,7 +238,7 @@ export const scenarios: Scenario[] = [
 
       return {
         boats,
-        wind: { direction: 180, speed: 12, gustFactor: 0.05, shiftAmplitude: 3, shiftPeriod: 60 },
+        wind: { direction: 0, speed: 12, gustFactor: 0.05, shiftAmplitude: 3, shiftPeriod: 60 },
         course,
         time: 0,
         countdown: 3,
@@ -263,7 +263,7 @@ export const scenarios: Scenario[] = [
 
       return {
         boats,
-        wind: { direction: 180, speed: 13, gustFactor: 0.15, shiftAmplitude: 10, shiftPeriod: 35 },
+        wind: { direction: 0, speed: 13, gustFactor: 0.15, shiftAmplitude: 10, shiftPeriod: 35 },
         course,
         time: 0,
         countdown: 60,

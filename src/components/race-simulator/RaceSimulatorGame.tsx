@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GameState, Scenario } from './types';
 import { GameCanvas } from './GameCanvas';
 import { GameHUD } from './GameHUD';
-import { updateBoatPosition, getWindAtTime, normalizeAngle, normalizeDeg, hasPassedLine, hasRoundedMark, distance } from './physics';
+import { TransmitterSticks } from './TransmitterSticks';
+import { updateBoatPosition, getWindAtTime, getOptimalSheet, getTrueWindAngle, normalizeAngle, normalizeDeg, hasPassedLine, hasRoundedMark, distance } from './physics';
 import { updateAIBoat, resetAIStates } from './ai';
 import { checkRules, checkMarkRounding, checkMarkTouching, checkOCS } from './rules';
 import { Pause, Play, RotateCcw, ArrowLeft, Keyboard, Volume2, VolumeX } from 'lucide-react';
@@ -21,6 +22,8 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
   const [gameState, setGameState] = useState<GameState>(() => scenario.setup(800, 700));
   const [showControls, setShowControls] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [sheetAngle, setSheetAngle] = useState(0.7);
+  const [rudderInput, setRudderInput] = useState(0);
   const gameRef = useRef<GameState>(gameState);
   const animFrameRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
@@ -29,11 +32,13 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
   const startBoxInitialized = useRef(false);
   const initializedSize = useRef(false);
   const soundEnabledRef = useRef(soundEnabled);
+  const sheetAngleRef = useRef(sheetAngle);
+  const rudderInputRef = useRef(rudderInput);
 
-  // Keep ref in sync
-  useEffect(() => {
-    gameRef.current = gameState;
-  }, [gameState]);
+  // Keep refs in sync
+  useEffect(() => { gameRef.current = gameState; }, [gameState]);
+  useEffect(() => { sheetAngleRef.current = sheetAngle; }, [sheetAngle]);
+  useEffect(() => { rudderInputRef.current = rudderInput; }, [rudderInput]);
 
   // Canvas sizing - recreate game state when size is first measured
   useEffect(() => {
@@ -217,11 +222,23 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
         const player = next.boats.find(b => b.isPlayer);
         if (player && !player.isTacking && !player.isGybing && player.penaltyTurns === 0) {
           const turnRate = 80 * dt;
+          // Keyboard rudder
           if (keysRef.current.has('arrowleft') || keysRef.current.has('a')) {
             player.heading = normalizeAngle(player.heading - turnRate);
           }
           if (keysRef.current.has('arrowright') || keysRef.current.has('d')) {
             player.heading = normalizeAngle(player.heading + turnRate);
+          }
+          // Transmitter stick rudder
+          if (Math.abs(rudderInputRef.current) > 0.05) {
+            player.heading = normalizeAngle(player.heading + rudderInputRef.current * turnRate);
+          }
+          // Keyboard sheeting (W = sheet in, S = ease out)
+          if (keysRef.current.has('arrowup') || keysRef.current.has('w')) {
+            setSheetAngle(prev => Math.min(1, prev + 1.5 * dt));
+          }
+          if (keysRef.current.has('arrowdown') || keysRef.current.has('s')) {
+            setSheetAngle(prev => Math.max(0, prev - 1.5 * dt));
           }
         }
 
@@ -239,7 +256,11 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
         // Update boat physics - during countdown boats move at reduced speed (maneuvering into position)
         const speedMultiplier = next.phase === 'countdown' ? 0.5 : 1.0;
         for (const boat of next.boats) {
-          updateBoatPosition(boat, dt * speedMultiplier, currentWind, next.boats);
+          if (boat.isPlayer) {
+            updateBoatPosition(boat, dt * speedMultiplier, currentWind, next.boats, sheetAngleRef.current);
+          } else {
+            updateBoatPosition(boat, dt * speedMultiplier, currentWind, next.boats);
+          }
         }
 
         // Keep boats within canvas bounds
@@ -486,6 +507,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           gameState={gameState}
           darkMode={darkMode}
           onDismissViolation={handleDismissViolation}
+          sheetAngle={sheetAngle}
         />
 
         {/* Controls help overlay */}
@@ -494,11 +516,15 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             <div className={`pointer-events-auto p-5 rounded-xl ${darkMode ? 'bg-slate-900/95 border border-slate-700' : 'bg-white/95 border border-gray-200'} backdrop-blur-md shadow-xl max-w-sm`}>
               <h3 className={`text-lg font-bold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Controls</h3>
               <div className="space-y-2">
-                <ControlRow keys={['←', '→']} label="Steer left / right" alt="A / D" darkMode={darkMode} />
+                <ControlRow keys={['←', '→']} label="Rudder (steer)" alt="A / D" darkMode={darkMode} />
+                <ControlRow keys={['↑', '↓']} label="Sheet in / out" alt="W / S" darkMode={darkMode} />
                 <ControlRow keys={['T']} label="Tack (turn through wind)" darkMode={darkMode} />
                 <ControlRow keys={['G']} label="Gybe (turn downwind)" darkMode={darkMode} />
                 <ControlRow keys={['Space']} label="Pause / Resume" darkMode={darkMode} />
               </div>
+              <p className={`mt-3 text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                Use the transmitter sticks below the race area, or keyboard controls. The green line on the sail stick shows optimal trim.
+              </p>
               <button
                 onClick={() => setShowControls(false)}
                 className={`mt-4 w-full px-4 py-2 rounded-lg text-sm font-medium ${darkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
@@ -518,35 +544,20 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           </div>
         )}
 
-        {/* Mobile touch controls */}
-        <div className="absolute bottom-16 right-3 flex flex-col gap-2 md:hidden">
-          <button
-            onTouchStart={() => keysRef.current.add('arrowleft')}
-            onTouchEnd={() => keysRef.current.delete('arrowleft')}
-            className="w-14 h-14 rounded-full bg-blue-500/80 text-white flex items-center justify-center text-xl font-bold active:bg-blue-600"
-          >
-            ←
-          </button>
-          <button
-            onTouchStart={() => keysRef.current.add('arrowright')}
-            onTouchEnd={() => keysRef.current.delete('arrowright')}
-            className="w-14 h-14 rounded-full bg-blue-500/80 text-white flex items-center justify-center text-xl font-bold active:bg-blue-600"
-          >
-            →
-          </button>
-          <button
-            onClick={handleTack}
-            className="w-14 h-14 rounded-full bg-amber-500/80 text-white flex items-center justify-center text-xs font-bold active:bg-amber-600"
-          >
-            TACK
-          </button>
-          <button
-            onClick={handleGybe}
-            className="w-14 h-14 rounded-full bg-emerald-500/80 text-white flex items-center justify-center text-xs font-bold active:bg-emerald-600"
-          >
-            GYBE
-          </button>
-        </div>
+        {/* Transmitter stick controls */}
+        <TransmitterSticks
+          rudderInput={rudderInput}
+          sheetAngle={sheetAngle}
+          onRudderChange={setRudderInput}
+          onSheetChange={setSheetAngle}
+          darkMode={darkMode}
+          optimalSheet={(() => {
+            if (!player) return 0.5;
+            const w = getWindAtTime(gameState.wind, gameState.time);
+            const twa = getTrueWindAngle(player.heading, w.direction);
+            return getOptimalSheet(twa);
+          })()}
+        />
       </div>
     </div>
   );

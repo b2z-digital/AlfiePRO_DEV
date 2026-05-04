@@ -96,10 +96,9 @@ function drawWaterRipples(ctx: CanvasRenderingContext2D, time: number, width: nu
 
 function drawWindIndicators(ctx: CanvasRenderingContext2D, wind: Wind, time: number, width: number, height: number, darkMode: boolean) {
   const currentWind = getWindAtTime(wind, time);
-  // Wind direction = compass heading wind blows TO. We want arrows pointing that direction.
-  // Canvas rotation uses same convention as boat headings: rotate(degToRad(heading))
-  // with bow drawn at (0, -length) points in the compass heading direction.
-  const windRad = degToRad(currentWind.direction);
+  // Wind direction = compass heading wind blows FROM. Arrows show the direction
+  // wind is GOING (downwind), which is windDir + 180.
+  const windRad = degToRad(currentWind.direction + 180);
 
   ctx.save();
   ctx.globalAlpha = darkMode ? 0.15 : 0.2;
@@ -139,15 +138,17 @@ function drawLaylines(ctx: CanvasRenderingContext2D, gameState: GameState, darkM
 
   const currentWind = getWindAtTime(gameState.wind, gameState.time);
   const tackAngle = 45;
+  // Upwind direction (where boats sail TO) is windDir + 180
+  const upwindDir = currentWind.direction + 180;
 
   ctx.save();
   ctx.globalAlpha = 0.2;
   ctx.setLineDash([8, 8]);
   ctx.lineWidth = 1.5;
 
-  // Port layline
+  // Port layline (extends from mark toward the bottom-left)
   ctx.strokeStyle = '#ef4444';
-  const portAngle = degToRad(currentWind.direction + tackAngle);
+  const portAngle = degToRad(upwindDir + tackAngle + 180);
   ctx.beginPath();
   ctx.moveTo(windwardMark.position.x, windwardMark.position.y);
   ctx.lineTo(
@@ -156,9 +157,9 @@ function drawLaylines(ctx: CanvasRenderingContext2D, gameState: GameState, darkM
   );
   ctx.stroke();
 
-  // Starboard layline
+  // Starboard layline (extends from mark toward the bottom-right)
   ctx.strokeStyle = '#22c55e';
-  const stbdAngle = degToRad(currentWind.direction - tackAngle);
+  const stbdAngle = degToRad(upwindDir - tackAngle + 180);
   ctx.beginPath();
   ctx.moveTo(windwardMark.position.x, windwardMark.position.y);
   ctx.lineTo(

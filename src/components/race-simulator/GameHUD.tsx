@@ -7,9 +7,10 @@ interface GameHUDProps {
   gameState: GameState;
   darkMode: boolean;
   onDismissViolation: () => void;
+  sheetAngle?: number;
 }
 
-export function GameHUD({ gameState, darkMode, onDismissViolation }: GameHUDProps) {
+export function GameHUD({ gameState, darkMode, onDismissViolation, sheetAngle }: GameHUDProps) {
   const player = gameState.boats.find(b => b.isPlayer);
   if (!player) return null;
 
@@ -36,7 +37,7 @@ export function GameHUD({ gameState, darkMode, onDismissViolation }: GameHUDProp
           <div className="flex items-center gap-1.5">
             <Compass size={14} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
             <span className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-gray-600'}`}>
-              {((currentWind.direction + 180) % 360).toFixed(0)}°
+              {currentWind.direction.toFixed(0)}° from
             </span>
           </div>
         </div>
@@ -100,6 +101,14 @@ export function GameHUD({ gameState, darkMode, onDismissViolation }: GameHUDProp
         <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
           {pointOfSail}
         </span>
+        {sheetAngle !== undefined && (
+          <>
+            <div className={`w-px h-4 ${darkMode ? 'bg-slate-700' : 'bg-gray-200'}`} />
+            <span className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-gray-600'}`}>
+              Sheet {Math.round(sheetAngle * 100)}%
+            </span>
+          </>
+        )}
       </div>
 
       {/* Rule violation overlay */}
