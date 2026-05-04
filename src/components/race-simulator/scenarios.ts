@@ -87,7 +87,7 @@ function createStandardCourse(canvasWidth: number, canvasHeight: number): Course
   const courseHeight = canvasHeight - topMargin - bottomMargin;
 
   const windwardY = topMargin + courseHeight * 0.05;
-  const offsetY = topMargin + courseHeight * 0.15;
+  const offsetY = topMargin + courseHeight * 0.10;
   const startY = topMargin + courseHeight * 0.48;
   const gateY = topMargin + courseHeight * 0.92;
 
@@ -133,6 +133,7 @@ export const scenarios: Scenario[] = [
         violations: [],
         currentViolation: null,
         paused: false,
+        markHits: [],
       };
     },
   },
@@ -158,6 +159,7 @@ export const scenarios: Scenario[] = [
         violations: [],
         currentViolation: null,
         paused: false,
+        markHits: [],
       };
     },
   },
@@ -184,6 +186,7 @@ export const scenarios: Scenario[] = [
         violations: [],
         currentViolation: null,
         paused: false,
+        markHits: [],
       };
     },
   },
@@ -212,6 +215,7 @@ export const scenarios: Scenario[] = [
         violations: [],
         currentViolation: null,
         paused: false,
+        markHits: [],
       };
     },
   },
@@ -244,6 +248,7 @@ export const scenarios: Scenario[] = [
         violations: [],
         currentViolation: null,
         paused: false,
+        markHits: [],
       };
     },
   },
@@ -269,6 +274,7 @@ export const scenarios: Scenario[] = [
         violations: [],
         currentViolation: null,
         paused: false,
+        markHits: [],
       };
     },
   },

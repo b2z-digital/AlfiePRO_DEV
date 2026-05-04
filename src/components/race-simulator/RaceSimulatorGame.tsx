@@ -370,6 +370,11 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             }
           }
 
+          // Clean up expired mark hit animations
+          if (next.markHits && next.markHits.length > 0) {
+            next.markHits = next.markHits.filter(h => next.time - h.startTime < 2);
+          }
+
           // All finished?
           if (next.boats.every(b => b.finished)) {
             next.phase = 'finished';
@@ -381,6 +386,15 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             const markViolation = checkMarkTouching(next.boats, next.course, next.time);
             if (markViolation) {
               next.violations = [...next.violations, markViolation];
+              // Find which mark was hit and add spin animation
+              const hitMarkIdx = next.course.marks.findIndex(m =>
+                m.type !== 'start-port' && m.type !== 'start-starboard' &&
+                Math.abs(m.position.x - markViolation.position.x) < 20 &&
+                Math.abs(m.position.y - markViolation.position.y) < 20
+              );
+              if (hitMarkIdx >= 0) {
+                next.markHits = [...(next.markHits || []).filter(h => next.time - h.startTime < 2), { markIndex: hitMarkIdx, startTime: next.time }];
+              }
               const playerBoat = next.boats.find(b => b.isPlayer);
               if (markViolation.offendingBoat === playerBoat?.id) {
                 next.currentViolation = markViolation;

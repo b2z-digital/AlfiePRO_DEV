@@ -18,7 +18,7 @@ export function TransmitterSticks({
   optimalSheet,
 }: TransmitterSticksProps) {
   return (
-    <div className="absolute bottom-16 left-3 flex items-end gap-6 pointer-events-auto">
+    <div className="absolute bottom-16 right-3 flex items-end gap-6 pointer-events-auto">
       {/* Left stick - Sail sheeting (vertical only) */}
       {/* DOWN on stick = sheet in (value 1), UP on stick = ease out (value 0) */}
       <StickControl

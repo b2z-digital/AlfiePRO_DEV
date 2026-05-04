@@ -56,6 +56,11 @@ export interface RuleViolation {
   position: Vec2;
 }
 
+export interface MarkHitAnimation {
+  markIndex: number;
+  startTime: number;
+}
+
 export interface GameState {
   boats: Boat[];
   wind: Wind;
@@ -66,6 +71,7 @@ export interface GameState {
   violations: RuleViolation[];
   currentViolation: RuleViolation | null;
   paused: boolean;
+  markHits: MarkHitAnimation[];
 }
 
 export interface Scenario {

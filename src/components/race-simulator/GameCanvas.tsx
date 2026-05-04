@@ -9,6 +9,21 @@ interface GameCanvasProps {
   darkMode: boolean;
 }
 
+// Wind variation: compute local wind strength at a given position and time
+function getLocalWindStrength(x: number, y: number, time: number, width: number, height: number): number {
+  // Multiple overlapping noise-like patterns that shift over time
+  const nx = x / width;
+  const ny = y / height;
+  const t = time * 0.03;
+
+  const wave1 = Math.sin((nx * 3 + t) * Math.PI * 2) * Math.cos((ny * 2 + t * 0.7) * Math.PI * 2);
+  const wave2 = Math.sin((nx * 1.5 - t * 0.5 + ny * 2.5) * Math.PI * 2) * 0.5;
+  const wave3 = Math.cos((nx * 4 + ny * 3 - t * 1.2) * Math.PI * 2) * 0.3;
+
+  // Normalize to 0.6..1.4 range (wind strength multiplier)
+  return 1.0 + (wave1 + wave2 + wave3) * 0.15;
+}
+
 export function GameCanvas({ gameState, width, height, darkMode }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -32,21 +47,24 @@ export function GameCanvas({ gameState, width, height, darkMode }: GameCanvasPro
     ctx.fillStyle = waterGradient;
     ctx.fillRect(0, 0, width, height);
 
+    // Draw wind variation overlay (gradient patches showing wind strength)
+    drawWindVariation(ctx, gameState.time, width, height, darkMode);
+
     // Draw water ripples
     drawWaterRipples(ctx, gameState.time, width, height, darkMode);
 
-    // Draw wind indicators
-    drawWindIndicators(ctx, gameState.wind, gameState.time, width, height, darkMode);
+    // Draw animated wind arrows flowing downscreen
+    drawAnimatedWindArrows(ctx, gameState.wind, gameState.time, width, height, darkMode);
 
     // Draw laylines (if beating)
     drawLaylines(ctx, gameState, darkMode);
 
     // Draw course
-    drawCourse(ctx, gameState.course, darkMode);
+    drawCourse(ctx, gameState.course, gameState.time, gameState.markHits, darkMode);
 
-    // Draw boat trails
+    // Draw boat trails with pulsing water effect
     for (const boat of gameState.boats) {
-      drawTrail(ctx, boat);
+      drawWakeTrail(ctx, boat, gameState.time);
     }
 
     // Draw boats
@@ -58,6 +76,9 @@ export function GameCanvas({ gameState, width, height, darkMode }: GameCanvasPro
     if (gameState.currentViolation) {
       drawViolationIndicator(ctx, gameState.currentViolation.position);
     }
+
+    // Draw wind direction indicator in top-right
+    drawWindDirectionIndicator(ctx, gameState.wind, gameState.time, width, darkMode);
   }, [gameState, width, height, darkMode]);
 
   useEffect(() => {
@@ -75,17 +96,36 @@ export function GameCanvas({ gameState, width, height, darkMode }: GameCanvasPro
   );
 }
 
+function drawWindVariation(ctx: CanvasRenderingContext2D, time: number, width: number, height: number, darkMode: boolean) {
+  ctx.save();
+  const cellSize = 40;
+  for (let x = 0; x < width; x += cellSize) {
+    for (let y = 0; y < height; y += cellSize) {
+      const strength = getLocalWindStrength(x + cellSize / 2, y + cellSize / 2, time, width, height);
+      // Stronger wind = darker overlay (simulating darker water in gusts)
+      const intensity = (strength - 0.6) / 0.8; // normalize 0.6..1.4 to 0..1
+      if (darkMode) {
+        ctx.fillStyle = `rgba(0, 80, 160, ${intensity * 0.12})`;
+      } else {
+        ctx.fillStyle = `rgba(0, 60, 120, ${intensity * 0.08})`;
+      }
+      ctx.fillRect(x, y, cellSize, cellSize);
+    }
+  }
+  ctx.restore();
+}
+
 function drawWaterRipples(ctx: CanvasRenderingContext2D, time: number, width: number, height: number, darkMode: boolean) {
   ctx.save();
-  ctx.globalAlpha = darkMode ? 0.08 : 0.12;
+  ctx.globalAlpha = darkMode ? 0.06 : 0.10;
   ctx.strokeStyle = darkMode ? '#60a5fa' : '#0369a1';
   ctx.lineWidth = 0.5;
 
-  for (let i = 0; i < 15; i++) {
-    const y = ((i * 60 + time * 8) % (height + 60)) - 30;
+  for (let i = 0; i < 12; i++) {
+    const y = ((i * 70 + time * 6) % (height + 60)) - 30;
     ctx.beginPath();
     for (let x = 0; x < width; x += 4) {
-      const offset = Math.sin((x + time * 20 + i * 40) * 0.02) * 3;
+      const offset = Math.sin((x + time * 15 + i * 40) * 0.02) * 3;
       if (x === 0) ctx.moveTo(x, y + offset);
       else ctx.lineTo(x, y + offset);
     }
@@ -94,41 +134,129 @@ function drawWaterRipples(ctx: CanvasRenderingContext2D, time: number, width: nu
   ctx.restore();
 }
 
-function drawWindIndicators(ctx: CanvasRenderingContext2D, wind: Wind, time: number, width: number, height: number, darkMode: boolean) {
+function drawAnimatedWindArrows(ctx: CanvasRenderingContext2D, wind: Wind, time: number, width: number, height: number, darkMode: boolean) {
   const currentWind = getWindAtTime(wind, time);
-  // Wind direction = compass heading wind blows FROM. Arrows show the direction
-  // wind is GOING (downwind), which is windDir + 180.
-  const windRad = degToRad(currentWind.direction + 180);
+  const baseWindRad = degToRad(currentWind.direction + 180);
 
   ctx.save();
-  ctx.globalAlpha = darkMode ? 0.15 : 0.2;
-  ctx.strokeStyle = darkMode ? '#94a3b8' : '#64748b';
-  ctx.lineWidth = 1;
+  ctx.lineCap = 'round';
 
-  const spacing = 70;
-  for (let x = spacing; x < width; x += spacing) {
-    for (let y = spacing; y < height; y += spacing) {
-      const offset = Math.sin((x + y) * 0.01 + time) * 3;
-      const arrowLen = 10;
+  const spacingX = 60;
+  const spacingY = 50;
+  const travelSpeed = 40; // pixels per second the arrows drift downward
+
+  for (let col = 0; col < Math.ceil(width / spacingX) + 1; col++) {
+    for (let row = -2; row < Math.ceil(height / spacingY) + 3; row++) {
+      const baseX = col * spacingX + (row % 2 === 0 ? 0 : spacingX * 0.5);
+      // Arrows drift down the screen in wind direction
+      const drift = (time * travelSpeed) % spacingY;
+      const baseY = row * spacingY + drift;
+
+      if (baseY < -20 || baseY > height + 20 || baseX < -20 || baseX > width + 20) continue;
+
+      // Per-arrow direction variation (slight local wind shift)
+      const localVariation = Math.sin((baseX * 0.01 + baseY * 0.008 + time * 0.5)) * 0.15;
+      const arrowRad = baseWindRad + localVariation;
+
+      // Local wind strength affects arrow opacity
+      const localStrength = getLocalWindStrength(baseX, baseY, time, width, height);
+      const alpha = (darkMode ? 0.12 : 0.18) * Math.min(1.2, localStrength);
+
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = darkMode ? '#94a3b8' : '#64748b';
+      ctx.lineWidth = 1;
+
+      const arrowLen = 8 + localStrength * 3;
 
       ctx.save();
-      ctx.translate(x + offset, y);
-      ctx.rotate(windRad);
+      ctx.translate(baseX, baseY);
+      ctx.rotate(arrowRad);
 
-      // Arrow pointing in heading direction: tip at (0, -arrowLen) = "bow" direction
       ctx.beginPath();
       ctx.moveTo(0, arrowLen);
       ctx.lineTo(0, -arrowLen);
-      // Arrowhead chevron at the tip
       ctx.moveTo(0, -arrowLen);
-      ctx.lineTo(-3, -arrowLen + 6);
+      ctx.lineTo(-2.5, -arrowLen + 5);
       ctx.moveTo(0, -arrowLen);
-      ctx.lineTo(3, -arrowLen + 6);
+      ctx.lineTo(2.5, -arrowLen + 5);
       ctx.stroke();
 
       ctx.restore();
     }
   }
+  ctx.restore();
+}
+
+function drawWindDirectionIndicator(ctx: CanvasRenderingContext2D, wind: Wind, time: number, width: number, darkMode: boolean) {
+  const currentWind = getWindAtTime(wind, time);
+  const cx = width - 45;
+  const cy = 45;
+  const radius = 28;
+
+  ctx.save();
+  // Background circle
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = darkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = darkMode ? '#475569' : '#cbd5e1';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Compass rose marks
+  ctx.fillStyle = darkMode ? '#64748b' : '#94a3b8';
+  ctx.font = '8px system-ui';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('N', cx, cy - radius + 2);
+  ctx.fillText('S', cx, cy + radius - 2);
+  ctx.fillText('E', cx + radius - 2, cy);
+  ctx.fillText('W', cx - radius + 2, cy);
+
+  // Wind arrow (pointing in direction wind is going)
+  const windGoingRad = degToRad(currentWind.direction + 180);
+  const arrowLen = radius - 8;
+
+  ctx.strokeStyle = darkMode ? '#38bdf8' : '#0284c7';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+
+  // Animate a pulsing glow
+  const pulse = 0.7 + Math.sin(time * 3) * 0.3;
+  ctx.globalAlpha = pulse;
+
+  ctx.beginPath();
+  const startX = cx - Math.sin(windGoingRad) * arrowLen * 0.4;
+  const startY = cy + Math.cos(windGoingRad) * arrowLen * 0.4;
+  const endX = cx + Math.sin(windGoingRad) * arrowLen;
+  const endY = cy - Math.cos(windGoingRad) * arrowLen;
+  ctx.moveTo(startX, startY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+
+  // Arrowhead
+  ctx.beginPath();
+  ctx.moveTo(endX, endY);
+  ctx.lineTo(
+    endX - Math.sin(windGoingRad - 0.4) * 8,
+    endY + Math.cos(windGoingRad - 0.4) * 8
+  );
+  ctx.moveTo(endX, endY);
+  ctx.lineTo(
+    endX - Math.sin(windGoingRad + 0.4) * 8,
+    endY + Math.cos(windGoingRad + 0.4) * 8
+  );
+  ctx.stroke();
+
+  // Speed label
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = darkMode ? '#e2e8f0' : '#1e293b';
+  ctx.font = 'bold 9px system-ui';
+  ctx.fillText(`${currentWind.speed.toFixed(0)}kn`, cx, cy + radius + 12);
+
   ctx.restore();
 }
 
@@ -138,7 +266,6 @@ function drawLaylines(ctx: CanvasRenderingContext2D, gameState: GameState, darkM
 
   const currentWind = getWindAtTime(gameState.wind, gameState.time);
   const tackAngle = 45;
-  // Upwind direction (where boats sail TO) is windDir + 180
   const upwindDir = currentWind.direction + 180;
 
   ctx.save();
@@ -146,7 +273,7 @@ function drawLaylines(ctx: CanvasRenderingContext2D, gameState: GameState, darkM
   ctx.setLineDash([8, 8]);
   ctx.lineWidth = 1.5;
 
-  // Port layline (extends from mark toward the bottom-left)
+  // Port layline
   ctx.strokeStyle = '#ef4444';
   const portAngle = degToRad(upwindDir + tackAngle + 180);
   ctx.beginPath();
@@ -157,7 +284,7 @@ function drawLaylines(ctx: CanvasRenderingContext2D, gameState: GameState, darkM
   );
   ctx.stroke();
 
-  // Starboard layline (extends from mark toward the bottom-right)
+  // Starboard layline
   ctx.strokeStyle = '#22c55e';
   const stbdAngle = degToRad(upwindDir - tackAngle + 180);
   ctx.beginPath();
@@ -171,7 +298,7 @@ function drawLaylines(ctx: CanvasRenderingContext2D, gameState: GameState, darkM
   ctx.restore();
 }
 
-function drawCourse(ctx: CanvasRenderingContext2D, course: Course, darkMode: boolean) {
+function drawCourse(ctx: CanvasRenderingContext2D, course: Course, time: number, markHits: { markIndex: number; startTime: number }[], darkMode: boolean) {
   // Draw start line
   ctx.save();
   ctx.strokeStyle = darkMode ? '#fbbf24' : '#d97706';
@@ -184,7 +311,7 @@ function drawCourse(ctx: CanvasRenderingContext2D, course: Course, darkMode: boo
   ctx.setLineDash([]);
 
   // Draw finish line
-  ctx.strokeStyle = darkMode ? '#a78bfa' : '#7c3aed';
+  ctx.strokeStyle = darkMode ? '#60a5fa' : '#2563eb';
   ctx.lineWidth = 2;
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
@@ -194,9 +321,32 @@ function drawCourse(ctx: CanvasRenderingContext2D, course: Course, darkMode: boo
   ctx.setLineDash([]);
   ctx.restore();
 
+  // Mark numbering
+  const markNumbers: Record<string, string> = {
+    'windward': '1',
+    'leeward': '2',
+    'gate-port': '3P',
+    'gate-starboard': '3S',
+    'start-port': 'SP',
+    'start-starboard': 'SC',
+  };
+
   // Draw marks
-  for (const mark of course.marks) {
+  for (let i = 0; i < course.marks.length; i++) {
+    const mark = course.marks[i];
     ctx.save();
+
+    // Check if this mark has a hit animation
+    const hitAnim = markHits.find(h => h.markIndex === i);
+    let spinAngle = 0;
+    let scaleEffect = 1;
+    if (hitAnim) {
+      const elapsed = time - hitAnim.startTime;
+      if (elapsed < 2) {
+        spinAngle = elapsed * Math.PI * 4; // 2 full rotations over 2 seconds
+        scaleEffect = 1 + Math.sin(elapsed * Math.PI) * 0.3; // pulse up then back
+      }
+    }
 
     // Mark glow
     const gradient = ctx.createRadialGradient(
@@ -228,10 +378,15 @@ function drawCourse(ctx: CanvasRenderingContext2D, course: Course, darkMode: boo
     ctx.arc(mark.position.x, mark.position.y, mark.radius * 2.5, 0, Math.PI * 2);
     ctx.fill();
 
+    // Apply spin and scale for hit animation
+    ctx.translate(mark.position.x, mark.position.y);
+    ctx.rotate(spinAngle);
+    ctx.scale(scaleEffect, scaleEffect);
+
     // Mark body
     ctx.fillStyle = markColor;
     ctx.beginPath();
-    ctx.arc(mark.position.x, mark.position.y, mark.radius, 0, Math.PI * 2);
+    ctx.arc(0, 0, mark.radius, 0, Math.PI * 2);
     ctx.fill();
 
     // Mark outline
@@ -239,12 +394,21 @@ function drawCourse(ctx: CanvasRenderingContext2D, course: Course, darkMode: boo
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Mark label
-    ctx.fillStyle = darkMode ? '#e2e8f0' : '#1e293b';
-    ctx.font = '10px system-ui';
+    // Mark number in center
+    ctx.fillStyle = darkMode ? '#000000' : '#ffffff';
+    ctx.font = `bold ${mark.radius > 7 ? 9 : 7}px system-ui`;
     ctx.textAlign = 'center';
-    ctx.fillText(mark.label, mark.position.x, mark.position.y - mark.radius - 8);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(markNumbers[mark.type] || '', 0, 0);
 
+    ctx.restore();
+
+    // Mark label above
+    ctx.save();
+    ctx.fillStyle = darkMode ? '#e2e8f0' : '#1e293b';
+    ctx.font = '9px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(mark.label, mark.position.x, mark.position.y - mark.radius - 10);
     ctx.restore();
   }
 
@@ -265,21 +429,41 @@ function drawCourse(ctx: CanvasRenderingContext2D, course: Course, darkMode: boo
   }
 }
 
-function drawTrail(ctx: CanvasRenderingContext2D, boat: Boat) {
+function drawWakeTrail(ctx: CanvasRenderingContext2D, boat: Boat, time: number) {
   if (boat.trail.length < 2) return;
 
   ctx.save();
-  ctx.lineWidth = 1.5;
   ctx.lineCap = 'round';
 
   for (let i = 1; i < boat.trail.length; i++) {
-    const alpha = (i / boat.trail.length) * 0.4;
+    const progress = i / boat.trail.length;
+    // Pulsing effect: opacity oscillates based on position in trail and time
+    const pulse = 0.5 + Math.sin(time * 4 + i * 0.3) * 0.2;
+    const alpha = progress * 0.5 * pulse;
+
+    // Width varies with pulse
+    const baseWidth = 1.5 + progress * 1.5;
+    const width = baseWidth + Math.sin(time * 3 + i * 0.5) * 0.4;
+
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = boat.color;
+    ctx.lineWidth = width;
     ctx.beginPath();
     ctx.moveTo(boat.trail[i - 1].x, boat.trail[i - 1].y);
     ctx.lineTo(boat.trail[i].x, boat.trail[i].y);
     ctx.stroke();
+
+    // Add a subtle white wake line alongside (simulating foam)
+    if (progress > 0.7) {
+      ctx.globalAlpha = alpha * 0.3;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = width * 0.4;
+      ctx.beginPath();
+      const offset = Math.sin(i * 0.8) * 2;
+      ctx.moveTo(boat.trail[i - 1].x + offset, boat.trail[i - 1].y);
+      ctx.lineTo(boat.trail[i].x + offset, boat.trail[i].y);
+      ctx.stroke();
+    }
   }
 
   ctx.restore();
@@ -351,7 +535,7 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
     ctx.fillStyle = '#ef4444';
     ctx.font = 'bold 10px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText('360°', x, y - 24);
+    ctx.fillText('360', x, y - 24);
     ctx.restore();
   }
 
@@ -376,9 +560,9 @@ function drawViolationIndicator(ctx: CanvasRenderingContext2D, position: Vec2) {
   ctx.stroke();
 
   ctx.fillStyle = '#ef4444';
-  ctx.font = 'bold 18px system-ui';
+  ctx.font = 'bold 16px system-ui';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('⚠', position.x, position.y - 35);
+  ctx.fillText('!', position.x, position.y - 35);
   ctx.restore();
 }
