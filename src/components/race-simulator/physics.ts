@@ -82,7 +82,7 @@ export function angleBetween(from: Vec2, to: Vec2): number {
  * TWA = 180/-180 means running dead downwind.
  */
 export function getTrueWindAngle(boatHeading: number, windDirection: number): number {
-  return normalizeDeg(windDirection - boatHeading + 180);
+  return normalizeDeg(windDirection - boatHeading);
 }
 
 /**

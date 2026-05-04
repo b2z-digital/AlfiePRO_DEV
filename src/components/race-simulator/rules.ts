@@ -4,6 +4,14 @@ import { distance, getTack, getTrueWindAngle, normalizeDeg, angleBetween } from 
 const BOAT_RADIUS = 8;
 const CONTACT_DISTANCE = 14;
 
+// Grace period: track when each boat last received a mark-touch penalty
+const lastMarkPenaltyTime = new Map<string, number>();
+const MARK_PENALTY_GRACE_SECONDS = 4;
+
+export function resetPenaltyTracking(): void {
+  lastMarkPenaltyTime.clear();
+}
+
 interface BoatPair {
   boat1: Boat;
   boat2: Boat;
@@ -103,12 +111,16 @@ export function checkMarkTouching(boats: Boat[], course: Course, time: number): 
   for (const boat of boats) {
     if (boat.finished || boat.penaltyTurns > 0) continue;
 
+    // Grace period: skip if this boat was recently penalized for mark touch
+    const lastPenalty = lastMarkPenaltyTime.get(boat.id) ?? -999;
+    if (time - lastPenalty < MARK_PENALTY_GRACE_SECONDS) continue;
+
     for (const mark of racingMarks) {
       const dist = distance(boat.position, mark.position);
-      // Tight threshold - actual contact with the mark body
       const touchThreshold = mark.radius + 4;
 
       if (dist < touchThreshold) {
+        lastMarkPenaltyTime.set(boat.id, time);
         return {
           rule: 'Touching a Mark',
           ruleNumber: 'RRS 31',

@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback } from 'react';
 
 interface TransmitterSticksProps {
   rudderInput: number; // -1 (left) to +1 (right)
@@ -18,17 +18,19 @@ export function TransmitterSticks({
   optimalSheet,
 }: TransmitterSticksProps) {
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-end gap-8 pointer-events-auto">
+    <div className="absolute bottom-16 left-3 flex items-end gap-6 pointer-events-auto">
       {/* Left stick - Sail sheeting (vertical only) */}
+      {/* DOWN on stick = sheet in (value 1), UP on stick = ease out (value 0) */}
       <StickControl
         label="SAIL"
         value={sheetAngle}
         axis="vertical"
+        inverted
         onChange={onSheetChange}
         darkMode={darkMode}
         showOptimal={optimalSheet}
-        labelTop="IN"
-        labelBottom="OUT"
+        labelTop="OUT"
+        labelBottom="IN"
       />
 
       {/* Right stick - Rudder (horizontal only) */}
@@ -49,6 +51,7 @@ interface StickControlProps {
   label: string;
   value: number;
   axis: 'horizontal' | 'vertical';
+  inverted?: boolean;
   onChange: (value: number) => void;
   darkMode: boolean;
   showOptimal?: number;
@@ -62,6 +65,7 @@ function StickControl({
   label,
   value,
   axis,
+  inverted,
   onChange,
   darkMode,
   showOptimal,
@@ -72,7 +76,6 @@ function StickControl({
 }: StickControlProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
-  const touchId = useRef<number | null>(null);
 
   const getValueFromEvent = useCallback(
     (clientX: number, clientY: number) => {
@@ -85,10 +88,15 @@ function StickControl({
         return Math.max(-1, Math.min(1, (x - 0.5) * 2));
       } else {
         const y = (clientY - rect.top) / rect.height;
+        // When inverted: top of track = 0 (eased), bottom = 1 (sheeted in)
+        // So dragging DOWN gives higher value
+        if (inverted) {
+          return Math.max(0, Math.min(1, y));
+        }
         return Math.max(0, Math.min(1, 1 - y));
       }
     },
-    [axis, value],
+    [axis, inverted, value],
   );
 
   const handlePointerDown = useCallback(
@@ -134,7 +142,9 @@ function StickControl({
     const pct = (value + 1) / 2; // -1..1 -> 0..1
     knobStyle = { left: `${pct * 100}%`, top: '50%', transform: 'translate(-50%, -50%)' };
   } else {
-    const pct = 1 - value; // 0..1 -> 1..0 (0=bottom, 1=top)
+    // When inverted: value 0 (eased) = top, value 1 (sheeted in) = bottom
+    // When not inverted: value 0 = bottom, value 1 = top
+    const pct = inverted ? value : (1 - value);
     knobStyle = { top: `${pct * 100}%`, left: '50%', transform: 'translate(-50%, -50%)' };
   }
 
@@ -168,7 +178,7 @@ function StickControl({
           {axis === 'vertical' && showOptimal !== undefined && (
             <div
               className="absolute left-0 right-0 h-1 bg-emerald-400/60 rounded"
-              style={{ top: `${(1 - showOptimal) * 100}%`, transform: 'translateY(-50%)' }}
+              style={{ top: `${(inverted ? showOptimal : (1 - showOptimal)) * 100}%`, transform: 'translateY(-50%)' }}
             />
           )}
 

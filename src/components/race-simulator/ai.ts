@@ -12,10 +12,10 @@ const TACK_ANGLE = 45;
 const MIN_TACK_INTERVAL = 2.5;
 
 /** Distance (px) at which we switch to mark-approach steering. */
-const MARK_APPROACH_DIST = 60;
+const MARK_APPROACH_DIST = 45;
 
 /** Lateral offset (px) to the RIGHT of a mark for port rounding waypoint. */
-const MARK_ROUNDING_OFFSET = 30;
+const MARK_ROUNDING_OFFSET = 25;
 
 // ---------------------------------------------------------------------------
 // Per-boat AI memory
@@ -135,15 +135,14 @@ export function isHeadingDownwind(rounding: number): boolean {
 /**
  * Compute a close-hauled heading for a given tack relative to the wind.
  *
- * Wind direction = direction wind comes FROM.
- * Upwind direction = windDir + 180 (the direction we want to GO).
- *   - Starboard tack (wind from starboard/right): heading = upwind - TACK_ANGLE
- *   - Port tack (wind from port/left): heading = upwind + TACK_ANGLE
+ * Wind direction = direction wind comes FROM (compass heading of wind source).
+ * Upwind heading = windDir (sailing toward the source).
+ *   - Starboard tack (wind from starboard/right): heading = windDir - TACK_ANGLE
+ *   - Port tack (wind from port/left): heading = windDir + TACK_ANGLE
  */
 function getCloseHauledHeading(windDir: number, tack: 'starboard' | 'port'): number {
-  const upwindDir = normalizeAngle(windDir + 180);
-  if (tack === 'starboard') return normalizeAngle(upwindDir - TACK_ANGLE);
-  return normalizeAngle(upwindDir + TACK_ANGLE);
+  if (tack === 'starboard') return normalizeAngle(windDir - TACK_ANGLE);
+  return normalizeAngle(windDir + TACK_ANGLE);
 }
 
 /**
@@ -283,8 +282,8 @@ function updatePreStart(
     return;
   }
   if (dy < minYAbove) {
-    // Above the line -- head downwind to drop back below
-    snapHeading(boat, normalizeAngle(wind.direction + (Math.random() - 0.5) * 30));
+    // Above the line -- head downwind (opposite of wind source) to drop back below
+    snapHeading(boat, normalizeAngle(wind.direction + 180 + (Math.random() - 0.5) * 30));
     return;
   }
   if (dy > maxYBelow) {

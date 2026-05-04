@@ -5,7 +5,7 @@ import { GameHUD } from './GameHUD';
 import { TransmitterSticks } from './TransmitterSticks';
 import { updateBoatPosition, getWindAtTime, getOptimalSheet, getTrueWindAngle, normalizeAngle, normalizeDeg, hasPassedLine, hasRoundedMark, distance } from './physics';
 import { updateAIBoat, resetAIStates } from './ai';
-import { checkRules, checkMarkRounding, checkMarkTouching, checkOCS } from './rules';
+import { checkRules, checkMarkRounding, checkMarkTouching, checkOCS, resetPenaltyTracking } from './rules';
 import { Pause, Play, RotateCcw, ArrowLeft, Keyboard, Volume2, VolumeX } from 'lucide-react';
 
 import { getStartBoxEngine } from '../../utils/startBoxAudio';
@@ -51,6 +51,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           if (!initializedSize.current) {
             initializedSize.current = true;
             resetAIStates();
+            resetPenaltyTracking();
             setGameState(scenario.setup(newSize.width, newSize.height));
           }
         }
@@ -130,13 +131,12 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
       if (!player || player.isTacking || player.isGybing || player.penaltyTurns > 0) return prev;
 
       const currentWind = getWindAtTime(prev.wind, prev.time);
-      const twa = normalizeDeg(currentWind.direction - player.heading + 180);
+      const twa = getTrueWindAngle(player.heading, currentWind.direction);
 
       if (Math.abs(twa) < 90) {
         // Tacking (going through head to wind)
         player.isTacking = true;
         player.tackTimer = 1.5;
-        // Set new heading on opposite tack
         player.heading = normalizeAngle(player.heading + (twa > 0 ? -90 : 90));
       }
       return { ...prev, boats };
@@ -150,7 +150,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
       if (!player || player.isTacking || player.isGybing || player.penaltyTurns > 0) return prev;
 
       const currentWind = getWindAtTime(prev.wind, prev.time);
-      const twa = normalizeDeg(currentWind.direction - player.heading + 180);
+      const twa = getTrueWindAngle(player.heading, currentWind.direction);
 
       if (Math.abs(twa) > 90) {
         // Gybing (going through dead downwind)
@@ -222,15 +222,21 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
         const player = next.boats.find(b => b.isPlayer);
         if (player && !player.isTacking && !player.isGybing && player.penaltyTurns === 0) {
           const turnRate = 80 * dt;
-          // Keyboard rudder
-          if (keysRef.current.has('arrowleft') || keysRef.current.has('a')) {
+          // Keyboard rudder - also sync the rudder stick visual
+          const leftHeld = keysRef.current.has('arrowleft') || keysRef.current.has('a');
+          const rightHeld = keysRef.current.has('arrowright') || keysRef.current.has('d');
+          if (leftHeld) {
             player.heading = normalizeAngle(player.heading - turnRate);
-          }
-          if (keysRef.current.has('arrowright') || keysRef.current.has('d')) {
+            setRudderInput(-0.8);
+          } else if (rightHeld) {
             player.heading = normalizeAngle(player.heading + turnRate);
+            setRudderInput(0.8);
+          } else if (Math.abs(rudderInputRef.current) < 0.1) {
+            // Only spring back if no touch/mouse drag is active
+            setRudderInput(0);
           }
-          // Transmitter stick rudder
-          if (Math.abs(rudderInputRef.current) > 0.05) {
+          // Transmitter stick rudder (from touch/mouse)
+          if (!leftHeld && !rightHeld && Math.abs(rudderInputRef.current) > 0.05) {
             player.heading = normalizeAngle(player.heading + rudderInputRef.current * turnRate);
           }
           // Keyboard sheeting (W = sheet in, S = ease out)
@@ -280,22 +286,33 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           for (const boat of next.boats) {
             if (boat.finished) continue;
 
-            const roundingRadius = 40;
+            const roundingRadius = 35;
 
-            // Port rounding: boat passes to the RIGHT (east) of the mark.
-            // Detection: within radius AND boat.x >= mark.x (on the right side)
-            const isNearAndRight = (boatPos: { x: number; y: number }, markPos: { x: number; y: number }): boolean => {
+            // Port rounding: boat passes to the RIGHT of the mark then exits
+            // on the far side. For windward marks (approaching from below),
+            // "rounded" means the boat has passed to the right AND gone past
+            // the mark's Y (is above it). For offset marks, same logic.
+            const hasRoundedWindward = (boatPos: { x: number; y: number }, markPos: { x: number; y: number }): boolean => {
               const dist = distance(boatPos, markPos);
-              return dist < roundingRadius && boatPos.x >= markPos.x - 5;
+              // Must be close to the mark AND have passed it (boat Y < mark Y = above it)
+              // AND be to the right of the mark (port rounding)
+              return dist < roundingRadius && boatPos.y < markPos.y && boatPos.x >= markPos.x - 10;
             };
 
-            // Gate rounding: boat passes between marks then goes above (north of) the gate
+            const hasRoundedOffset = (boatPos: { x: number; y: number }, markPos: { x: number; y: number }): boolean => {
+              const dist = distance(boatPos, markPos);
+              // Offset mark: approaching from above (north), rounding to the right,
+              // exiting below (south). Boat must be below the mark AND to the right.
+              return dist < roundingRadius && boatPos.y > markPos.y && boatPos.x >= markPos.x - 10;
+            };
+
+            // Gate rounding: boat passes between/around marks then goes above (north of) the gate
             const hasPassedGate = (boatPos: { x: number; y: number }, gP: { x: number; y: number }, gS: { x: number; y: number }): boolean => {
               const dist1 = distance(boatPos, gP);
               const dist2 = distance(boatPos, gS);
               const nearGate = dist1 < roundingRadius || dist2 < roundingRadius;
               // Must be above (north of) the gate marks to have passed through
-              return nearGate && boatPos.y < gP.y + 5;
+              return nearGate && boatPos.y < gP.y - 5;
             };
 
             // Rounding progression:
@@ -304,11 +321,11 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             // 7 = heading to finish
 
             if (boat.rounding === 1 && windwardMark) {
-              if (isNearAndRight(boat.position, windwardMark.position)) {
+              if (hasRoundedWindward(boat.position, windwardMark.position)) {
                 boat.rounding = 2;
               }
             } else if (boat.rounding === 2 && offsetMark) {
-              if (isNearAndRight(boat.position, offsetMark.position)) {
+              if (hasRoundedOffset(boat.position, offsetMark.position)) {
                 boat.rounding = 3;
               }
             } else if (boat.rounding === 3 && gatePort && gateStbd) {
@@ -321,11 +338,11 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
                 }
               }
             } else if (boat.rounding === 4 && windwardMark) {
-              if (isNearAndRight(boat.position, windwardMark.position)) {
+              if (hasRoundedWindward(boat.position, windwardMark.position)) {
                 boat.rounding = 5;
               }
             } else if (boat.rounding === 5 && offsetMark) {
-              if (isNearAndRight(boat.position, offsetMark.position)) {
+              if (hasRoundedOffset(boat.position, offsetMark.position)) {
                 boat.rounding = 6;
               }
             } else if (boat.rounding === 6 && gatePort && gateStbd) {
@@ -429,6 +446,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
 
   const handleRestart = () => {
     resetAIStates();
+    resetPenaltyTracking();
     setGameState(scenario.setup(canvasSize.width, canvasSize.height));
     lastTimeRef.current = 0;
     startBoxReady.current = false;
