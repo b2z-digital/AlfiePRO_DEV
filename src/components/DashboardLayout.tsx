@@ -1063,13 +1063,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/venues',
           featureKey: 'venues'
         },
-        {
+        ...(isSuperAdmin ? [{
           id: 'race-simulator',
           label: 'Race Simulator',
           icon: Rocket,
           description: 'Interactive sailing race simulator',
           path: '/race-simulator'
-        },
+        }] : []),
         ...(!isMember && !isAssociationViewer ? [{
           id: 'event-websites',
           label: 'Event Websites',
@@ -2039,7 +2039,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/results" element={<ResultsPage />} />
               <Route path="/results/:id" element={<ResultsPage />} />
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
-              <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} />} />
+              {isSuperAdmin && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} />} />}
               <Route path="/support" element={<SupportPage darkMode={darkMode} />} />
               <Route path="/settings" element={<SettingsPage darkMode={darkMode} />} />
               <Route path="/settings/race-documents/form-builder" element={
