@@ -46,16 +46,14 @@ function createFleet(numBoats: number, linePortX: number, lineStbdX: number, lin
   const playerY = lineY + 15;
   boats.push(createBoat('player', 'You', '01', { x: playerX, y: playerY }, heading, true, COLORS[0]));
 
-  // AI boats spread along the line just below it (within ~20px)
+  // AI boats spread along the line, positioned 15-35px below it
   for (let i = 0; i < numBoats - 1; i++) {
     const fraction = (i + 0.5) / (numBoats - 1);
     const x = linePortX + fraction * lineWidth;
-    const y = lineY + 10 + Math.random() * 20;
+    const y = lineY + 15 + Math.random() * 20;
 
-    // Alternate between port and starboard tack approaches
-    const boatHeading = i % 2 === 0
-      ? heading + (Math.random() - 0.5) * 20
-      : normalizeAngle(360 - heading + (Math.random() - 0.5) * 20);
+    // Start heading roughly east or west (beam reaching to hold position)
+    const boatHeading = i % 2 === 0 ? 90 + (Math.random() - 0.5) * 30 : 270 + (Math.random() - 0.5) * 30;
 
     // Assign decreasing skill levels: first boats are strongest competitors
     const skillLevel = Math.max(0.7, 0.97 - i * 0.03 + (Math.random() - 0.5) * 0.04);

@@ -112,9 +112,25 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
         e.preventDefault();
         handleGybe();
       }
+      // Sync rudder stick visual with keyboard
+      if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+        setRudderInput(-0.7);
+      }
+      if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+        setRudderInput(0.7);
+      }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       keysRef.current.delete(e.key.toLowerCase());
+      // Spring rudder back to center when steering keys released
+      if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a' || e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+        // Only reset if the OTHER direction isn't still held
+        const leftStillHeld = keysRef.current.has('arrowleft') || keysRef.current.has('a');
+        const rightStillHeld = keysRef.current.has('arrowright') || keysRef.current.has('d');
+        if (!leftStillHeld && !rightStillHeld) {
+          setRudderInput(0);
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -222,20 +238,15 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
         const player = next.boats.find(b => b.isPlayer);
         if (player && !player.isTacking && !player.isGybing && player.penaltyTurns === 0) {
           const turnRate = 80 * dt;
-          // Keyboard rudder - also sync the rudder stick visual
+          // Keyboard rudder
           const leftHeld = keysRef.current.has('arrowleft') || keysRef.current.has('a');
           const rightHeld = keysRef.current.has('arrowright') || keysRef.current.has('d');
           if (leftHeld) {
             player.heading = normalizeAngle(player.heading - turnRate);
-            setRudderInput(-0.8);
           } else if (rightHeld) {
             player.heading = normalizeAngle(player.heading + turnRate);
-            setRudderInput(0.8);
-          } else if (Math.abs(rudderInputRef.current) < 0.1) {
-            // Only spring back if no touch/mouse drag is active
-            setRudderInput(0);
           }
-          // Transmitter stick rudder (from touch/mouse)
+          // Transmitter stick rudder (from touch/mouse drag)
           if (!leftHeld && !rightHeld && Math.abs(rudderInputRef.current) > 0.05) {
             player.heading = normalizeAngle(player.heading + rudderInputRef.current * turnRate);
           }
@@ -286,32 +297,30 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           for (const boat of next.boats) {
             if (boat.finished) continue;
 
-            const roundingRadius = 35;
+            const roundingRadius = 50;
 
-            // Port rounding: boat passes to the RIGHT of the mark then exits
-            // on the far side. For windward marks (approaching from below),
-            // "rounded" means the boat has passed to the right AND gone past
-            // the mark's Y (is above it). For offset marks, same logic.
+            // Port rounding: boat must pass to the RIGHT of the mark and exit on the far side.
+            // For windward marks (approaching from below/south):
+            //   "rounded" = boat is above the mark (passed it going north) and near it
             const hasRoundedWindward = (boatPos: { x: number; y: number }, markPos: { x: number; y: number }): boolean => {
               const dist = distance(boatPos, markPos);
-              // Must be close to the mark AND have passed it (boat Y < mark Y = above it)
-              // AND be to the right of the mark (port rounding)
-              return dist < roundingRadius && boatPos.y < markPos.y && boatPos.x >= markPos.x - 10;
+              // Boat must be near the mark AND above it (y < mark.y in screen coords)
+              return dist < roundingRadius && boatPos.y < markPos.y;
             };
 
+            // Offset mark: approaching from above (coming from windward mark), rounding to the right,
+            // exiting below. "rounded" = boat is below the mark and near it.
             const hasRoundedOffset = (boatPos: { x: number; y: number }, markPos: { x: number; y: number }): boolean => {
               const dist = distance(boatPos, markPos);
-              // Offset mark: approaching from above (north), rounding to the right,
-              // exiting below (south). Boat must be below the mark AND to the right.
-              return dist < roundingRadius && boatPos.y > markPos.y && boatPos.x >= markPos.x - 10;
+              return dist < roundingRadius && boatPos.y > markPos.y + 5;
             };
 
-            // Gate rounding: boat passes between/around marks then goes above (north of) the gate
+            // Gate rounding: boat sails down to the gate marks then heads back up.
+            // "rounded" = boat was near a gate mark and is now above (north of) it.
             const hasPassedGate = (boatPos: { x: number; y: number }, gP: { x: number; y: number }, gS: { x: number; y: number }): boolean => {
               const dist1 = distance(boatPos, gP);
               const dist2 = distance(boatPos, gS);
               const nearGate = dist1 < roundingRadius || dist2 < roundingRadius;
-              // Must be above (north of) the gate marks to have passed through
               return nearGate && boatPos.y < gP.y - 5;
             };
 
