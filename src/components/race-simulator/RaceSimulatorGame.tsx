@@ -383,9 +383,9 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             //   "rounded" = boat is above the mark (passed it going north) and near it
             const hasRoundedWindward = (boatPos: { x: number; y: number }, markPos: { x: number; y: number }): boolean => {
               const dist = distance(boatPos, markPos);
-              // Port rounding: boat passes to the RIGHT of the mark and ends up near it.
-              // Considered rounded when boat is close to the mark and has passed above OR to the right.
-              return dist < roundingRadius && (boatPos.y < markPos.y || boatPos.x > markPos.x + 10);
+              // Port rounding: boat passes to the RIGHT then above the mark.
+              // Rounded = near the mark AND above it (y < mark.y in screen coords).
+              return dist < roundingRadius && boatPos.y < markPos.y;
             };
 
             // Offset mark: approaching from above (coming from windward mark), rounding to the right,
@@ -395,14 +395,14 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
               return dist < roundingRadius && boatPos.y > markPos.y + 5;
             };
 
-            // Gate passage: boat sails down THROUGH the gate (between the two marks).
-            // "passed" = boat is below the gate line AND between the two marks horizontally.
+            // Gate rounding: boat sails down past one gate mark and rounds it.
+            // "passed" = boat is near either gate mark AND below the gate line.
             const hasPassedGate = (boatPos: { x: number; y: number }, gP: { x: number; y: number }, gS: { x: number; y: number }): boolean => {
-              const leftX = Math.min(gP.x, gS.x);
-              const rightX = Math.max(gP.x, gS.x);
-              const betweenMarks = boatPos.x > leftX - 15 && boatPos.x < rightX + 15;
+              const dist1 = distance(boatPos, gP);
+              const dist2 = distance(boatPos, gS);
+              const nearGate = dist1 < roundingRadius || dist2 < roundingRadius;
               const belowGate = boatPos.y > gP.y + 5;
-              return betweenMarks && belowGate;
+              return nearGate && belowGate;
             };
 
             // Rounding progression:

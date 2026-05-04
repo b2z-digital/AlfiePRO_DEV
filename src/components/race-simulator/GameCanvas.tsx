@@ -148,13 +148,20 @@ function drawAnimatedWindArrows(ctx: CanvasRenderingContext2D, wind: Wind, time:
 
   const spacingX = 60;
   const spacingY = 50;
-  const travelSpeed = 40; // pixels per second the arrows drift downward
+  const baseSpeed = 30; // base pixels per second
 
   for (let col = 0; col < Math.ceil(width / spacingX) + 1; col++) {
     for (let row = -2; row < Math.ceil(height / spacingY) + 3; row++) {
       const baseX = col * spacingX + (row % 2 === 0 ? 0 : spacingX * 0.5);
-      // Arrows drift down the screen in wind direction
-      const drift = (time * travelSpeed) % spacingY;
+
+      // Each arrow has a unique speed based on its position in the wind field.
+      // Stronger wind areas (gusts/shadows) = faster movement.
+      const localStrength = getLocalWindStrength(baseX, row * spacingY, time, width, height);
+      // Speed varies from 20 (light) to 60 (gust) px/s
+      const arrowSpeed = baseSpeed * localStrength * (0.7 + (col * 7 + row * 13) % 5 * 0.1);
+
+      // Each arrow drifts at its own speed
+      const drift = (time * arrowSpeed) % spacingY;
       const baseY = row * spacingY + drift;
 
       if (baseY < -20 || baseY > height + 20 || baseX < -20 || baseX > width + 20) continue;
@@ -163,15 +170,15 @@ function drawAnimatedWindArrows(ctx: CanvasRenderingContext2D, wind: Wind, time:
       const localVariation = Math.sin((baseX * 0.01 + baseY * 0.008 + time * 0.5)) * 0.15;
       const arrowRad = baseWindRad + localVariation;
 
-      // Local wind strength affects arrow opacity
-      const localStrength = getLocalWindStrength(baseX, baseY, time, width, height);
-      const alpha = (darkMode ? 0.12 : 0.18) * Math.min(1.2, localStrength);
+      // Gusts (stronger wind) = more opaque + larger arrows
+      const strengthNow = getLocalWindStrength(baseX, baseY, time, width, height);
+      const alpha = (darkMode ? 0.08 : 0.12) + strengthNow * (darkMode ? 0.08 : 0.1);
 
-      ctx.globalAlpha = alpha;
+      ctx.globalAlpha = Math.min(0.3, alpha);
       ctx.strokeStyle = darkMode ? '#94a3b8' : '#64748b';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 0.8 + strengthNow * 0.4;
 
-      const arrowLen = 8 + localStrength * 3;
+      const arrowLen = 6 + strengthNow * 5;
 
       ctx.save();
       ctx.translate(baseX, baseY);
@@ -440,31 +447,36 @@ function drawWakeTrail(ctx: CanvasRenderingContext2D, boat: Boat, time: number) 
   ctx.save();
   ctx.lineCap = 'round';
 
-  for (let i = 1; i < boat.trail.length; i++) {
-    const progress = i / boat.trail.length;
-    // Pulsing effect: opacity oscillates based on position in trail and time
-    const pulse = 0.5 + Math.sin(time * 4 + i * 0.3) * 0.2;
-    const alpha = progress * 0.5 * pulse;
+  // Only draw the last N points of the trail (fading wake effect)
+  const MAX_VISIBLE = 40;
+  const startIdx = Math.max(0, boat.trail.length - MAX_VISIBLE);
+  const visibleCount = boat.trail.length - startIdx;
 
-    // Width varies with pulse
-    const baseWidth = 1.5 + progress * 1.5;
-    const width = baseWidth + Math.sin(time * 3 + i * 0.5) * 0.4;
+  for (let i = startIdx + 1; i < boat.trail.length; i++) {
+    // Progress: 0 = oldest visible point (faded), 1 = newest (bright)
+    const progress = (i - startIdx) / visibleCount;
+
+    // Fade: oldest points are transparent, newest are opaque
+    const alpha = progress * progress * 0.6;
+
+    // Width: thin at the start, thicker near the boat
+    const lineWidth = 0.5 + progress * 2;
 
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = boat.color;
-    ctx.lineWidth = width;
+    ctx.lineWidth = lineWidth;
     ctx.beginPath();
     ctx.moveTo(boat.trail[i - 1].x, boat.trail[i - 1].y);
     ctx.lineTo(boat.trail[i].x, boat.trail[i].y);
     ctx.stroke();
 
-    // Add a subtle white wake line alongside (simulating foam)
-    if (progress > 0.7) {
+    // Subtle white wake foam near the boat end
+    if (progress > 0.8) {
       ctx.globalAlpha = alpha * 0.3;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.lineWidth = width * 0.4;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.lineWidth = lineWidth * 0.4;
       ctx.beginPath();
-      const offset = Math.sin(i * 0.8) * 2;
+      const offset = Math.sin(i * 0.8) * 1.5;
       ctx.moveTo(boat.trail[i - 1].x + offset, boat.trail[i - 1].y);
       ctx.lineTo(boat.trail[i].x + offset, boat.trail[i].y);
       ctx.stroke();

@@ -418,7 +418,7 @@ function addTrailPoint(boat: Boat): void {
     distance(boat.position, boat.trail[boat.trail.length - 1]) > 8
   ) {
     boat.trail.push({ x: boat.position.x, y: boat.position.y });
-    if (boat.trail.length > 200) boat.trail.shift();
+    if (boat.trail.length > 60) boat.trail.shift();
   }
 }
 
