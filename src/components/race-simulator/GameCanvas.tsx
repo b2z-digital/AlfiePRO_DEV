@@ -33,6 +33,11 @@ export function GameCanvas({ gameState, width, height, darkMode }: GameCanvasPro
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Use a continuously advancing animation time (not game time which is 0 during countdown)
+    const animTime = gameState.phase === 'countdown'
+      ? (60 - gameState.countdown) // seconds elapsed since start
+      : (60 + gameState.time);
+
     ctx.clearRect(0, 0, width, height);
 
     // Background water
@@ -48,23 +53,23 @@ export function GameCanvas({ gameState, width, height, darkMode }: GameCanvasPro
     ctx.fillRect(0, 0, width, height);
 
     // Draw wind variation overlay (gradient patches showing wind strength)
-    drawWindVariation(ctx, gameState.time, width, height, darkMode);
+    drawWindVariation(ctx, animTime, width, height, darkMode);
 
     // Draw water ripples
-    drawWaterRipples(ctx, gameState.time, width, height, darkMode);
+    drawWaterRipples(ctx, animTime, width, height, darkMode);
 
     // Draw animated wind arrows flowing downscreen
-    drawAnimatedWindArrows(ctx, gameState.wind, gameState.time, width, height, darkMode);
+    drawAnimatedWindArrows(ctx, gameState.wind, animTime, width, height, darkMode);
 
     // Draw laylines (if beating)
     drawLaylines(ctx, gameState, darkMode);
 
     // Draw course
-    drawCourse(ctx, gameState.course, gameState.time, gameState.markHits, darkMode);
+    drawCourse(ctx, gameState.course, animTime, gameState.markHits, darkMode);
 
     // Draw boat trails with pulsing water effect
     for (const boat of gameState.boats) {
-      drawWakeTrail(ctx, boat, gameState.time);
+      drawWakeTrail(ctx, boat, animTime);
     }
 
     // Draw boats

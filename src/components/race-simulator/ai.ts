@@ -12,10 +12,10 @@ const TACK_ANGLE = 45;
 const MIN_TACK_INTERVAL = 2.5;
 
 /** Distance (px) at which we switch to mark-approach steering. */
-const MARK_APPROACH_DIST = 22;
+const MARK_APPROACH_DIST = 35;
 
 /** Lateral offset (px) to the RIGHT of a mark for port rounding waypoint. */
-const MARK_ROUNDING_OFFSET = 20;
+const MARK_ROUNDING_OFFSET = 25;
 
 // ---------------------------------------------------------------------------
 // Per-boat AI memory
@@ -92,18 +92,13 @@ export function getTargetForRounding(
 
     case 3:
     case 6: {
-      if (!boat) {
-        if (gatePort && gateStbd) {
-          return {
-            x: (gatePort.position.x + gateStbd.position.x) / 2,
-            y: gatePort.position.y,
-          };
-        }
-        return gatePort?.position ?? null;
+      // Always target the CENTER of the gate - boats must pass THROUGH
+      if (gatePort && gateStbd) {
+        return {
+          x: (gatePort.position.x + gateStbd.position.x) / 2,
+          y: gatePort.position.y,
+        };
       }
-      const state = getAIState(boat);
-      if (state.gateChoice === 'port' && gatePort) return gatePort.position;
-      if (state.gateChoice === 'starboard' && gateStbd) return gateStbd.position;
       return gatePort?.position ?? gateStbd?.position ?? null;
     }
 
@@ -201,6 +196,7 @@ export function updateAIBoat(
   wind: { direction: number; speed: number },
   time: number,
   allBoats: Boat[],
+  countdownRemaining?: number,
 ): void {
   if (boat.isPlayer || boat.finished) return;
   if (boat.penaltyTurns > 0) return;
@@ -215,7 +211,7 @@ export function updateAIBoat(
 
   // --- Pre-start behaviour ---
   if (boat.rounding === 0) {
-    updatePreStart(boat, course, wind, time, state);
+    updatePreStart(boat, course, wind, time, state, allBoats, countdownRemaining ?? 60);
     state.prevWindDir = wind.direction;
     return;
   }
@@ -253,6 +249,8 @@ function updatePreStart(
   wind: { direction: number; speed: number },
   time: number,
   state: AIState,
+  allBoats: Boat[],
+  countdownRemaining: number,
 ): void {
   const lineCenter: Vec2 = {
     x: (course.startLine.port.x + course.startLine.starboard.x) / 2,
@@ -261,28 +259,37 @@ function updatePreStart(
   const halfLineWidth =
     Math.abs(course.startLine.starboard.x - course.startLine.port.x) / 2;
 
-  // Containment: boats stay 10-30px below the start line
-  const maxXFromCenter = halfLineWidth * 0.6;
-  const maxYBelow = 30;
-  const lineThreshold = 5;
+  const maxXFromCenter = halfLineWidth * 0.7;
+
+  // Target distance below line depends on time remaining.
+  // Early: 40-70px below. Final 15s: gradually approach. Final 3s: rush the line.
+  const skillFactor = boat.skillLevel || 0.85;
+  let targetYBelow: number;
+  if (countdownRemaining > 30) {
+    targetYBelow = 50 + (1 - skillFactor) * 30; // better boats slightly closer
+  } else if (countdownRemaining > 15) {
+    // Gradually close from 50 to 30
+    const t = (30 - countdownRemaining) / 15;
+    targetYBelow = 50 - t * 25 + (1 - skillFactor) * 15;
+  } else if (countdownRemaining > 3) {
+    // Final approach: 30 down to 10
+    const t = (15 - countdownRemaining) / 12;
+    targetYBelow = 30 - t * 22 + (1 - skillFactor) * 8;
+  } else {
+    // Final 3 seconds: charge for the line
+    targetYBelow = Math.max(0, countdownRemaining * 2);
+  }
 
   const dx = boat.position.x - lineCenter.x;
   const dy = boat.position.y - lineCenter.y; // positive = below line
 
-  // --- Hard boundary corrections ---
-
-  if (dy < lineThreshold) {
-    // Above the line: head south
+  // --- Hard boundary: never cross the line early ---
+  if (dy < 3) {
     snapHeading(boat, 180);
     return;
   }
 
-  if (dy > maxYBelow) {
-    // Too far below: head north
-    snapHeading(boat, 0);
-    return;
-  }
-
+  // --- Hard boundary: don't go too far off laterally ---
   if (dx > maxXFromCenter) {
     snapHeading(boat, 270);
     return;
@@ -292,29 +299,68 @@ function updatePreStart(
     return;
   }
 
-  // --- Within bounds: jockey for position ---
-  // Heading: predominantly lateral (east/west) with a slight northward bias
-  // to keep boats hovering near the line without sailing away
-  const timeSinceTack = time - state.lastTackTime;
-  const tackInterval = 2.0 + Math.random() * 1.5;
-
-  if (timeSinceTack > tackInterval) {
-    state.lastTackTime = time;
-    state.preferredSide = (state.preferredSide * -1) as 1 | -1;
+  // --- Collision avoidance: steer away from nearby boats ---
+  let avoidX = 0;
+  let avoidY = 0;
+  for (const other of allBoats) {
+    if (other.id === boat.id || other.finished) continue;
+    const dist = distance(boat.position, other.position);
+    if (dist < 30 && dist > 0) {
+      const awayX = boat.position.x - other.position.x;
+      const awayY = boat.position.y - other.position.y;
+      const strength = (30 - dist) / 30;
+      avoidX += (awayX / dist) * strength * 40;
+      avoidY += (awayY / dist) * strength * 20;
+    }
   }
 
-  // Base heading is mostly lateral. Add slight upwind bias (toward 0/north)
-  // when boat drifts too far from the line, or downwind when too close.
+  // --- Determine desired heading ---
   let desiredHeading: number;
-  if (dy > 20) {
-    // A bit far below line: angle slightly upward (NE or NW)
-    desiredHeading = state.preferredSide > 0 ? 60 : 300;
-  } else if (dy < 10) {
-    // Too close to line: angle slightly downward (SE or SW)
-    desiredHeading = state.preferredSide > 0 ? 120 : 240;
+
+  if (countdownRemaining <= 3) {
+    // Final rush: head north (toward line) with slight lateral adjustment
+    desiredHeading = 0;
+    // Add lateral correction if too far from preferred position
+    if (Math.abs(dx) > halfLineWidth * 0.4) {
+      desiredHeading = dx > 0 ? 340 : 20;
+    }
   } else {
-    // In the sweet spot: pure lateral
-    desiredHeading = state.preferredSide > 0 ? 90 : 270;
+    // Normal maneuvering: sail laterally with vertical corrections
+    const timeSinceTack = time - state.lastTackTime;
+    const tackInterval = 3.0 + Math.random() * 2.0;
+
+    if (timeSinceTack > tackInterval) {
+      state.lastTackTime = time;
+      state.preferredSide = (state.preferredSide * -1) as 1 | -1;
+    }
+
+    // Vertical correction: steer toward target distance below line
+    const yError = dy - targetYBelow; // positive = too far below target, negative = too close to line
+
+    if (yError < -5) {
+      // Too close to line: head south-east or south-west
+      desiredHeading = state.preferredSide > 0 ? 140 : 220;
+    } else if (yError > 10) {
+      // Too far below target: head north-east or north-west
+      desiredHeading = state.preferredSide > 0 ? 40 : 320;
+    } else {
+      // In the target zone: sail mostly lateral
+      desiredHeading = state.preferredSide > 0 ? 80 : 280;
+    }
+  }
+
+  // Apply collision avoidance as heading adjustment
+  if (Math.abs(avoidX) > 5 || Math.abs(avoidY) > 5) {
+    const avoidAngle = angleBetween(boat.position, {
+      x: boat.position.x + avoidX,
+      y: boat.position.y + avoidY,
+    });
+    // Blend avoidance with desired heading
+    const avoidWeight = Math.min(0.6, (Math.abs(avoidX) + Math.abs(avoidY)) / 60);
+    const desiredRad = desiredHeading * Math.PI / 180;
+    const avoidRad = avoidAngle * Math.PI / 180;
+    const blendedRad = desiredRad * (1 - avoidWeight) + avoidRad * avoidWeight;
+    desiredHeading = normalizeAngle(blendedRad * 180 / Math.PI);
   }
 
   smoothTurnToward(boat, desiredHeading);
@@ -335,24 +381,29 @@ function updateUpwind(
   const distToTarget = distance(boat.position, target);
   const angleToTarget = angleBetween(boat.position, target);
 
-  // ------ Mark approach: steer through a rounding arc ------
-  // Port rounding: boat must sail PAST the mark then turn around it to the right.
-  // Only engage rounding logic when very close. Until then, keep sailing straight at the mark.
+  // ------ Mark approach: port rounding ------
+  // Port rounding means mark is left to PORT side, boat passes to the RIGHT of the mark.
+  // Approaching from below (upwind), boat must:
+  // 1. Sail up to the mark
+  // 2. Pass to the RIGHT side of it
+  // 3. Bear away downwind after passing
   if (distToTarget < MARK_APPROACH_DIST) {
     const boatAboveMark = boat.position.y < target.y;
     const boatRightOfMark = boat.position.x > target.x;
 
     let waypoint: Vec2;
-    if (!boatAboveMark) {
-      // Still below the mark: keep sailing STRAIGHT toward a point just above and right of the mark.
-      // This ensures the boat passes the mark before turning.
-      waypoint = { x: target.x + MARK_ROUNDING_OFFSET * 0.5, y: target.y - 10 };
-    } else if (!boatRightOfMark) {
-      // Above the mark but on the left side: steer right past it
-      waypoint = { x: target.x + MARK_ROUNDING_OFFSET + 10, y: target.y + 5 };
+    if (!boatAboveMark && !boatRightOfMark) {
+      // Below and left: aim for a point to the RIGHT of the mark, slightly above
+      waypoint = { x: target.x + MARK_ROUNDING_OFFSET, y: target.y - 5 };
+    } else if (!boatAboveMark && boatRightOfMark) {
+      // Below and right: sail past the mark on its right side
+      waypoint = { x: target.x + MARK_ROUNDING_OFFSET, y: target.y - 10 };
+    } else if (boatAboveMark && !boatRightOfMark) {
+      // Above but left: swing to the right to clear the mark
+      waypoint = { x: target.x + MARK_ROUNDING_OFFSET + 15, y: target.y };
     } else {
-      // Above and to the right: we've rounded, head toward next target (down)
-      waypoint = { x: target.x + 10, y: target.y + 40 };
+      // Above and to the right: we've cleared the mark, bear away southward
+      waypoint = { x: target.x, y: target.y + 50 };
     }
 
     smoothTurnToward(boat, angleBetween(boat.position, waypoint));
@@ -438,27 +489,30 @@ function updateDownwind(
   wind: { direction: number; speed: number },
   state: AIState,
   target: Vec2,
+  course?: Course,
 ): void {
   const distToTarget = distance(boat.position, target);
   const angleToTarget = angleBetween(boat.position, target);
 
-  // Near the gate mark, steer to pass through then round up
-  if (distToTarget < MARK_APPROACH_DIST) {
-    const boatBelowMark = boat.position.y > target.y;
+  // The target is the CENTER of the gate. Boats must sail THROUGH (between the two marks).
+  // Gate approach distance is larger than regular marks since we need to line up properly.
+  const GATE_APPROACH_DIST = 50;
 
-    let waypoint: Vec2;
-    if (!boatBelowMark) {
-      // Still above the gate: sail PAST the mark to a point below and slightly right
-      waypoint = { x: target.x + MARK_ROUNDING_OFFSET * 0.5, y: target.y + 12 };
+  if (distToTarget < GATE_APPROACH_DIST) {
+    const boatBelowGate = boat.position.y > target.y;
+
+    if (!boatBelowGate) {
+      // Still above the gate: aim directly at the center point to pass through
+      smoothTurnToward(boat, angleToTarget);
     } else {
-      // Below the gate: round up and head upwind
-      waypoint = { x: target.x, y: target.y - 40 };
+      // Below the gate: we've passed through, now round up and head upwind
+      const waypoint: Vec2 = { x: target.x, y: target.y - 50 };
+      smoothTurnToward(boat, angleBetween(boat.position, waypoint));
     }
-    smoothTurnToward(boat, angleBetween(boat.position, waypoint));
     return;
   }
 
-  // RC boats sail straight downwind. Aim directly at the target which
+  // RC boats sail straight downwind. Aim directly at the gate center which
   // naturally produces a heading near 180 (south) with lateral corrections.
   smoothTurnToward(boat, angleToTarget);
 }
@@ -475,22 +529,26 @@ function updateReaching(
 ): void {
   const distToTarget = distance(boat.position, target);
 
-  // Near the offset mark: port rounding means pass to the RIGHT.
-  // Approaching from above (coming from windward), boat must sail PAST then turn.
+  // Offset mark: port rounding (pass to RIGHT of mark).
+  // Approaching from above (coming from windward mark), boat sails down and
+  // to the right of the offset mark, then continues downwind.
   if (distToTarget < MARK_APPROACH_DIST) {
     const boatBelowMark = boat.position.y > target.y;
     const boatRightOfMark = boat.position.x > target.x;
 
     let waypoint: Vec2;
-    if (!boatBelowMark) {
-      // Still above: sail past the mark to a point below and right
-      waypoint = { x: target.x + MARK_ROUNDING_OFFSET * 0.5, y: target.y + 12 };
-    } else if (!boatRightOfMark) {
-      // Below but to the left: swing right past the mark
-      waypoint = { x: target.x + MARK_ROUNDING_OFFSET + 10, y: target.y + 5 };
+    if (!boatBelowMark && !boatRightOfMark) {
+      // Above and left: aim for a point to the RIGHT of the mark, slightly below
+      waypoint = { x: target.x + MARK_ROUNDING_OFFSET, y: target.y + 5 };
+    } else if (!boatBelowMark && boatRightOfMark) {
+      // Above and right: sail past the mark on its right side heading down
+      waypoint = { x: target.x + MARK_ROUNDING_OFFSET, y: target.y + 15 };
+    } else if (boatBelowMark && !boatRightOfMark) {
+      // Below but left: swing right to clear the mark
+      waypoint = { x: target.x + MARK_ROUNDING_OFFSET + 10, y: target.y + 10 };
     } else {
-      // Below and right: we've rounded, head toward gate (further down)
-      waypoint = { x: target.x, y: target.y + 50 };
+      // Below and right: we've cleared the mark, continue downwind
+      waypoint = { x: target.x, y: target.y + 60 };
     }
     smoothTurnToward(boat, angleBetween(boat.position, waypoint));
     return;

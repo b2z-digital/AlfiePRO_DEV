@@ -41,19 +41,19 @@ function createFleet(numBoats: number, linePortX: number, lineStbdX: number, lin
   const boats: Boat[] = [];
   const lineWidth = lineStbdX - linePortX;
 
-  // Player starts near the middle of the line, just below it
+  // Player starts near the middle of the line, well below it
   const playerX = linePortX + lineWidth * 0.5;
-  const playerY = lineY + 15;
+  const playerY = lineY + 50;
   boats.push(createBoat('player', 'You', '01', { x: playerX, y: playerY }, heading, true, COLORS[0]));
 
-  // AI boats spread along the line, positioned 15-35px below it
+  // AI boats spread across the line width, positioned 40-70px below (start far back)
   for (let i = 0; i < numBoats - 1; i++) {
-    const fraction = (i + 0.5) / (numBoats - 1);
+    const fraction = (i + 1) / numBoats;
     const x = linePortX + fraction * lineWidth;
-    const y = lineY + 15 + Math.random() * 20;
+    const y = lineY + 40 + Math.random() * 30;
 
     // Start heading roughly east or west (beam reaching to hold position)
-    const boatHeading = i % 2 === 0 ? 90 + (Math.random() - 0.5) * 30 : 270 + (Math.random() - 0.5) * 30;
+    const boatHeading = i % 2 === 0 ? 80 + (Math.random() - 0.5) * 20 : 280 + (Math.random() - 0.5) * 20;
 
     // Assign decreasing skill levels: first boats are strongest competitors
     const skillLevel = Math.max(0.7, 0.97 - i * 0.03 + (Math.random() - 0.5) * 0.04);

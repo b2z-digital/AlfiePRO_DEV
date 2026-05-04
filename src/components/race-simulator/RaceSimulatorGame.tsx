@@ -6,7 +6,7 @@ import { TransmitterSticks } from './TransmitterSticks';
 import { updateBoatPosition, getWindAtTime, getOptimalSheet, getTrueWindAngle, normalizeAngle, normalizeDeg, hasPassedLine, hasRoundedMark, distance } from './physics';
 import { updateAIBoat, resetAIStates } from './ai';
 import { checkRules, checkMarkRounding, checkMarkTouching, checkOCS, resetPenaltyTracking } from './rules';
-import { Pause, Play, RotateCcw, ArrowLeft, Keyboard, Volume2, VolumeX } from 'lucide-react';
+import { Pause, Play, RotateCcw, ArrowLeft, Keyboard, Volume2, VolumeX, Gamepad2 } from 'lucide-react';
 
 import { getStartBoxEngine } from '../../utils/startBoxAudio';
 import { getDefaultSequenceForRaceType } from '../../utils/startBoxStorage';
@@ -17,6 +17,34 @@ interface RaceSimulatorGameProps {
   onBack: () => void;
 }
 
+interface GamepadMapping {
+  rudderAxis: number;
+  sheetAxis: number;
+  rudderInverted: boolean;
+  sheetInverted: boolean;
+  deadzone: number;
+}
+
+const DEFAULT_GAMEPAD_MAPPING: GamepadMapping = {
+  rudderAxis: 0, // Right stick X
+  sheetAxis: 3,  // Left stick Y
+  rudderInverted: false,
+  sheetInverted: false,
+  deadzone: 0.08,
+};
+
+function loadGamepadMapping(): GamepadMapping {
+  try {
+    const saved = localStorage.getItem('race-sim-gamepad-mapping');
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return DEFAULT_GAMEPAD_MAPPING;
+}
+
+function saveGamepadMapping(mapping: GamepadMapping): void {
+  localStorage.setItem('race-sim-gamepad-mapping', JSON.stringify(mapping));
+}
+
 export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorGameProps) {
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 700 });
   const [gameState, setGameState] = useState<GameState>(() => scenario.setup(800, 700));
@@ -24,6 +52,9 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [sheetAngle, setSheetAngle] = useState(0.7);
   const [rudderInput, setRudderInput] = useState(0);
+  const [showGamepadSettings, setShowGamepadSettings] = useState(false);
+  const [gamepadConnected, setGamepadConnected] = useState(false);
+  const [gamepadMapping, setGamepadMapping] = useState<GamepadMapping>(loadGamepadMapping);
   const gameRef = useRef<GameState>(gameState);
   const animFrameRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
@@ -34,11 +65,32 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
   const soundEnabledRef = useRef(soundEnabled);
   const sheetAngleRef = useRef(sheetAngle);
   const rudderInputRef = useRef(rudderInput);
+  const gamepadMappingRef = useRef(gamepadMapping);
 
   // Keep refs in sync
   useEffect(() => { gameRef.current = gameState; }, [gameState]);
   useEffect(() => { sheetAngleRef.current = sheetAngle; }, [sheetAngle]);
   useEffect(() => { rudderInputRef.current = rudderInput; }, [rudderInput]);
+  useEffect(() => { gamepadMappingRef.current = gamepadMapping; }, [gamepadMapping]);
+
+  // Gamepad connection listeners
+  useEffect(() => {
+    const onConnect = () => setGamepadConnected(true);
+    const onDisconnect = () => {
+      const gamepads = navigator.getGamepads();
+      const hasGamepad = Array.from(gamepads).some(gp => gp !== null);
+      setGamepadConnected(hasGamepad);
+    };
+    window.addEventListener('gamepadconnected', onConnect);
+    window.addEventListener('gamepaddisconnected', onDisconnect);
+    // Check if already connected
+    const gamepads = navigator.getGamepads();
+    if (Array.from(gamepads).some(gp => gp !== null)) setGamepadConnected(true);
+    return () => {
+      window.removeEventListener('gamepadconnected', onConnect);
+      window.removeEventListener('gamepaddisconnected', onDisconnect);
+    };
+  }, []);
 
   // Canvas sizing - recreate game state when size is first measured
   useEffect(() => {
@@ -250,12 +302,39 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           if (!leftHeld && !rightHeld && Math.abs(rudderInputRef.current) > 0.05) {
             player.heading = normalizeAngle(player.heading + rudderInputRef.current * turnRate);
           }
-          // Keyboard sheeting (W = sheet in, S = ease out)
+          // Keyboard sheeting (UP = ease out, DOWN = sheet in)
           if (keysRef.current.has('arrowup') || keysRef.current.has('w')) {
-            setSheetAngle(prev => Math.min(1, prev + 1.5 * dt));
+            setSheetAngle(prev => Math.max(0, prev - 1.5 * dt));
           }
           if (keysRef.current.has('arrowdown') || keysRef.current.has('s')) {
-            setSheetAngle(prev => Math.max(0, prev - 1.5 * dt));
+            setSheetAngle(prev => Math.min(1, prev + 1.5 * dt));
+          }
+
+          // Gamepad / USB transmitter input
+          const gamepads = navigator.getGamepads();
+          const gp = Array.from(gamepads).find(g => g !== null);
+          if (gp) {
+            const mapping = gamepadMappingRef.current;
+            const dz = mapping.deadzone;
+
+            // Rudder axis
+            if (mapping.rudderAxis < gp.axes.length) {
+              let rudderVal = gp.axes[mapping.rudderAxis];
+              if (mapping.rudderInverted) rudderVal = -rudderVal;
+              if (Math.abs(rudderVal) > dz) {
+                player.heading = normalizeAngle(player.heading + rudderVal * turnRate);
+              }
+            }
+
+            // Sheet axis
+            if (mapping.sheetAxis < gp.axes.length) {
+              let sheetVal = gp.axes[mapping.sheetAxis];
+              if (mapping.sheetInverted) sheetVal = -sheetVal;
+              if (Math.abs(sheetVal) > dz) {
+                // Positive axis value = sheet in (increase), negative = ease out (decrease)
+                setSheetAngle(prev => Math.max(0, Math.min(1, prev + sheetVal * 1.5 * dt)));
+              }
+            }
           }
         }
 
@@ -266,7 +345,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
           : (60 + next.time);     // countdown duration + racing time
         for (const boat of next.boats) {
           if (!boat.isPlayer) {
-            updateAIBoat(boat, next.course, currentWind, totalElapsed, next.boats);
+            updateAIBoat(boat, next.course, currentWind, totalElapsed, next.boats, next.phase === 'countdown' ? next.countdown : undefined);
           }
         }
 
@@ -304,8 +383,9 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             //   "rounded" = boat is above the mark (passed it going north) and near it
             const hasRoundedWindward = (boatPos: { x: number; y: number }, markPos: { x: number; y: number }): boolean => {
               const dist = distance(boatPos, markPos);
-              // Boat must be near the mark AND above it (y < mark.y in screen coords)
-              return dist < roundingRadius && boatPos.y < markPos.y;
+              // Port rounding: boat passes to the RIGHT of the mark and ends up near it.
+              // Considered rounded when boat is close to the mark and has passed above OR to the right.
+              return dist < roundingRadius && (boatPos.y < markPos.y || boatPos.x > markPos.x + 10);
             };
 
             // Offset mark: approaching from above (coming from windward mark), rounding to the right,
@@ -315,13 +395,14 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
               return dist < roundingRadius && boatPos.y > markPos.y + 5;
             };
 
-            // Gate rounding: boat sails down to the gate marks then heads back up.
-            // "rounded" = boat was near a gate mark and is now above (north of) it.
+            // Gate passage: boat sails down THROUGH the gate (between the two marks).
+            // "passed" = boat is below the gate line AND between the two marks horizontally.
             const hasPassedGate = (boatPos: { x: number; y: number }, gP: { x: number; y: number }, gS: { x: number; y: number }): boolean => {
-              const dist1 = distance(boatPos, gP);
-              const dist2 = distance(boatPos, gS);
-              const nearGate = dist1 < roundingRadius || dist2 < roundingRadius;
-              return nearGate && boatPos.y < gP.y - 5;
+              const leftX = Math.min(gP.x, gS.x);
+              const rightX = Math.max(gP.x, gS.x);
+              const betweenMarks = boatPos.x > leftX - 15 && boatPos.x < rightX + 15;
+              const belowGate = boatPos.y > gP.y + 5;
+              return betweenMarks && belowGate;
             };
 
             // Rounding progression:
@@ -515,6 +596,13 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             <Keyboard size={16} />
           </button>
           <button
+            onClick={() => setShowGamepadSettings(true)}
+            className={`p-2 rounded-lg ${gamepadConnected ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : (darkMode ? 'text-slate-300' : 'text-gray-600')} ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}
+            title={gamepadConnected ? 'Transmitter connected - Settings' : 'Transmitter settings (no device detected)'}
+          >
+            <Gamepad2 size={16} />
+          </button>
+          <button
             onClick={() => setSoundEnabled(!soundEnabled)}
             className={`p-2 rounded-lg ${darkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-gray-100 text-gray-600'}`}
             title={soundEnabled ? 'Mute sounds' : 'Enable sounds'}
@@ -558,7 +646,7 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
               <h3 className={`text-lg font-bold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Controls</h3>
               <div className="space-y-2">
                 <ControlRow keys={['←', '→']} label="Rudder (steer)" alt="A / D" darkMode={darkMode} />
-                <ControlRow keys={['↑', '↓']} label="Sheet in / out" alt="W / S" darkMode={darkMode} />
+                <ControlRow keys={['↑', '↓']} label="Ease out / Sheet in" alt="W / S" darkMode={darkMode} />
                 <ControlRow keys={['T']} label="Tack (turn through wind)" darkMode={darkMode} />
                 <ControlRow keys={['G']} label="Gybe (turn downwind)" darkMode={darkMode} />
                 <ControlRow keys={['Space']} label="Pause / Resume" darkMode={darkMode} />
@@ -600,6 +688,17 @@ export function RaceSimulatorGame({ scenario, darkMode, onBack }: RaceSimulatorG
             return getOptimalSheet(twa);
           })()}
         />
+
+        {/* Gamepad / Transmitter settings modal */}
+        {showGamepadSettings && (
+          <GamepadSettingsModal
+            darkMode={darkMode}
+            mapping={gamepadMapping}
+            connected={gamepadConnected}
+            onSave={(m) => { setGamepadMapping(m); saveGamepadMapping(m); }}
+            onClose={() => setShowGamepadSettings(false)}
+          />
+        )}
       </div>
     </div>
   );
@@ -624,6 +723,177 @@ function ControlRow({ keys, label, alt, darkMode }: { keys: string[]; label: str
         )}
       </div>
       <span className={`text-sm ${darkMode ? 'text-slate-300' : 'text-gray-600'}`}>{label}</span>
+    </div>
+  );
+}
+
+function GamepadSettingsModal({
+  darkMode,
+  mapping,
+  connected,
+  onSave,
+  onClose,
+}: {
+  darkMode: boolean;
+  mapping: GamepadMapping;
+  connected: boolean;
+  onSave: (m: GamepadMapping) => void;
+  onClose: () => void;
+}) {
+  const [local, setLocal] = useState<GamepadMapping>({ ...mapping });
+  const [liveAxes, setLiveAxes] = useState<number[]>([]);
+  const [gamepadName, setGamepadName] = useState('');
+  const pollRef = useRef<number>(0);
+
+  useEffect(() => {
+    const poll = () => {
+      const gamepads = navigator.getGamepads();
+      const gp = Array.from(gamepads).find(g => g !== null);
+      if (gp) {
+        setLiveAxes([...gp.axes]);
+        setGamepadName(gp.id);
+      } else {
+        setLiveAxes([]);
+        setGamepadName('');
+      }
+      pollRef.current = requestAnimationFrame(poll);
+    };
+    pollRef.current = requestAnimationFrame(poll);
+    return () => cancelAnimationFrame(pollRef.current);
+  }, []);
+
+  const bg = darkMode ? 'bg-slate-900/95 border-slate-700' : 'bg-white/95 border-gray-200';
+  const text = darkMode ? 'text-white' : 'text-gray-900';
+  const subtext = darkMode ? 'text-slate-400' : 'text-gray-500';
+  const inputBg = darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-gray-50 border-gray-300 text-gray-900';
+
+  return (
+    <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-auto">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className={`relative ${bg} border rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 backdrop-blur-md`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className={`text-lg font-bold ${text}`}>Transmitter Settings</h3>
+          <button onClick={onClose} className={`p-1 rounded ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`}>
+            <span className={`text-xl leading-none ${subtext}`}>&times;</span>
+          </button>
+        </div>
+
+        {/* Connection status */}
+        <div className={`flex items-center gap-2 mb-4 p-3 rounded-lg ${darkMode ? 'bg-slate-800' : 'bg-gray-50'}`}>
+          <div className={`w-2.5 h-2.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-red-400'}`} />
+          <div>
+            <p className={`text-sm font-medium ${text}`}>
+              {connected ? 'Transmitter Connected' : 'No Transmitter Detected'}
+            </p>
+            {gamepadName && (
+              <p className={`text-xs ${subtext} truncate max-w-[280px]`}>{gamepadName}</p>
+            )}
+            {!connected && (
+              <p className={`text-xs ${subtext}`}>Connect a USB transmitter and set it to joystick mode</p>
+            )}
+          </div>
+        </div>
+
+        {/* Live axis readout */}
+        {liveAxes.length > 0 && (
+          <div className={`mb-4 p-3 rounded-lg ${darkMode ? 'bg-slate-800' : 'bg-gray-50'}`}>
+            <p className={`text-xs font-medium mb-2 ${subtext}`}>Live Axis Values</p>
+            <div className="grid grid-cols-4 gap-1.5">
+              {liveAxes.slice(0, 8).map((val, i) => (
+                <div key={i} className="text-center">
+                  <div className={`text-[10px] ${subtext}`}>Axis {i}</div>
+                  <div className={`text-xs font-mono ${Math.abs(val) > 0.1 ? (darkMode ? 'text-emerald-400' : 'text-emerald-600') : text}`}>
+                    {val.toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Axis mapping */}
+        <div className="space-y-3">
+          <div>
+            <label className={`text-sm font-medium ${text}`}>Rudder Axis (Right Stick)</label>
+            <div className="flex items-center gap-2 mt-1">
+              <select
+                value={local.rudderAxis}
+                onChange={e => setLocal({ ...local, rudderAxis: Number(e.target.value) })}
+                className={`flex-1 px-3 py-1.5 rounded-lg border text-sm ${inputBg}`}
+              >
+                {Array.from({ length: Math.max(liveAxes.length, 4) }, (_, i) => (
+                  <option key={i} value={i}>Axis {i}</option>
+                ))}
+              </select>
+              <label className={`flex items-center gap-1.5 text-xs ${subtext}`}>
+                <input
+                  type="checkbox"
+                  checked={local.rudderInverted}
+                  onChange={e => setLocal({ ...local, rudderInverted: e.target.checked })}
+                  className="rounded"
+                />
+                Invert
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className={`text-sm font-medium ${text}`}>Sail Axis (Left Stick)</label>
+            <div className="flex items-center gap-2 mt-1">
+              <select
+                value={local.sheetAxis}
+                onChange={e => setLocal({ ...local, sheetAxis: Number(e.target.value) })}
+                className={`flex-1 px-3 py-1.5 rounded-lg border text-sm ${inputBg}`}
+              >
+                {Array.from({ length: Math.max(liveAxes.length, 4) }, (_, i) => (
+                  <option key={i} value={i}>Axis {i}</option>
+                ))}
+              </select>
+              <label className={`flex items-center gap-1.5 text-xs ${subtext}`}>
+                <input
+                  type="checkbox"
+                  checked={local.sheetInverted}
+                  onChange={e => setLocal({ ...local, sheetInverted: e.target.checked })}
+                  className="rounded"
+                />
+                Invert
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className={`text-sm font-medium ${text}`}>Deadzone</label>
+            <div className="flex items-center gap-3 mt-1">
+              <input
+                type="range"
+                min={0}
+                max={0.3}
+                step={0.01}
+                value={local.deadzone}
+                onChange={e => setLocal({ ...local, deadzone: Number(e.target.value) })}
+                className="flex-1"
+              />
+              <span className={`text-xs font-mono w-10 ${subtext}`}>{local.deadzone.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={onClose}
+            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium border ${darkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-800' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onSave(local); onClose(); }}
+            className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Save Mapping
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
