@@ -167,6 +167,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({
       await fetchMemberBoats();
       setEditingBoat(null);
       setShowAddBoat(false);
+      onSuccess?.();
     } catch (err) {
       console.error('Error saving boat:', err);
       setError(err instanceof Error ? err.message : 'Failed to save boat');
@@ -187,6 +188,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({
       if (error) throw error;
 
       await fetchMemberBoats();
+      onSuccess?.();
     } catch (err) {
       console.error('Error deleting boat:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete boat');
