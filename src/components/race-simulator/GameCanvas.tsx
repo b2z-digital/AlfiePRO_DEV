@@ -141,47 +141,65 @@ function drawWaterRipples(ctx: CanvasRenderingContext2D, time: number, width: nu
 
 function drawAnimatedWindArrows(ctx: CanvasRenderingContext2D, wind: Wind, time: number, width: number, height: number, darkMode: boolean) {
   const currentWind = getWindAtTime(wind, time);
-  const baseWindRad = degToRad(currentWind.direction + 180);
+  // Wind blows FROM this direction, arrows flow in the opposite direction (where wind goes)
+  const windGoingRad = degToRad(currentWind.direction + 180);
+  // Wind flow vector (direction arrows move)
+  const flowDx = Math.sin(windGoingRad);
+  const flowDy = -Math.cos(windGoingRad);
 
   ctx.save();
   ctx.lineCap = 'round';
 
-  const spacingX = 60;
-  const spacingY = 50;
-  const baseSpeed = 30; // base pixels per second
+  const spacingX = 55;
+  const spacingY = 45;
+  const cols = Math.ceil(width / spacingX) + 2;
+  const rows = Math.ceil(height / spacingY) + 4;
 
-  for (let col = 0; col < Math.ceil(width / spacingX) + 1; col++) {
-    for (let row = -2; row < Math.ceil(height / spacingY) + 3; row++) {
-      const baseX = col * spacingX + (row % 2 === 0 ? 0 : spacingX * 0.5);
+  // Global drift: all arrows move continuously in the wind direction.
+  // Using a large tile period so the modulo "wrap" happens far off-screen.
+  const tilePeriodX = cols * spacingX;
+  const tilePeriodY = rows * spacingY;
+  const baseSpeed = 25;
 
-      // Each arrow has a unique speed based on its position in the wind field.
-      // Stronger wind areas (gusts/shadows) = faster movement.
-      const localStrength = getLocalWindStrength(baseX, row * spacingY, time, width, height);
-      // Speed varies from 20 (light) to 60 (gust) px/s
-      const arrowSpeed = baseSpeed * localStrength * (0.7 + (col * 7 + row * 13) % 5 * 0.1);
+  for (let col = -1; col < cols; col++) {
+    for (let row = -2; row < rows; row++) {
+      // Static grid position (staggered)
+      const gridX = col * spacingX + ((row & 1) ? spacingX * 0.5 : 0);
+      const gridY = row * spacingY;
 
-      // Each arrow drifts at its own speed
-      const drift = (time * arrowSpeed) % spacingY;
-      const baseY = row * spacingY + drift;
+      // Each arrow drifts at a speed influenced by local wind strength at its grid position
+      const localStrength = getLocalWindStrength(gridX, gridY, time * 0.5, width, height);
+      const arrowSpeed = baseSpeed * localStrength;
 
-      if (baseY < -20 || baseY > height + 20 || baseX < -20 || baseX > width + 20) continue;
+      // Continuous drift offset in the wind direction
+      const driftAmount = time * arrowSpeed;
+      // Wrap using the tile period (much larger than visible area, so wrap is invisible)
+      const wrappedDriftX = ((driftAmount * flowDx) % tilePeriodX + tilePeriodX) % tilePeriodX;
+      const wrappedDriftY = ((driftAmount * flowDy) % tilePeriodY + tilePeriodY) % tilePeriodY;
 
-      // Per-arrow direction variation (slight local wind shift)
-      const localVariation = Math.sin((baseX * 0.01 + baseY * 0.008 + time * 0.5)) * 0.15;
-      const arrowRad = baseWindRad + localVariation;
+      // Final arrow position = grid + drift, wrapped to stay in visible region
+      let arrowX = ((gridX + wrappedDriftX) % tilePeriodX + tilePeriodX) % tilePeriodX - spacingX;
+      let arrowY = ((gridY + wrappedDriftY) % tilePeriodY + tilePeriodY) % tilePeriodY - spacingY * 2;
 
-      // Gusts (stronger wind) = more opaque + larger arrows
-      const strengthNow = getLocalWindStrength(baseX, baseY, time, width, height);
-      const alpha = (darkMode ? 0.08 : 0.12) + strengthNow * (darkMode ? 0.08 : 0.1);
+      // Skip if outside visible area with margin
+      if (arrowX < -30 || arrowX > width + 30 || arrowY < -30 || arrowY > height + 30) continue;
 
-      ctx.globalAlpha = Math.min(0.3, alpha);
+      // Per-arrow direction variation (gentle local wind shift for realism)
+      const localVariation = Math.sin((arrowX * 0.008 + arrowY * 0.006 + time * 0.3)) * 0.12;
+      const arrowRad = windGoingRad + localVariation;
+
+      // Current strength at this arrow's actual position (for opacity/size)
+      const strengthNow = getLocalWindStrength(arrowX, arrowY, time, width, height);
+      const alpha = (darkMode ? 0.1 : 0.14) + (strengthNow - 0.8) * (darkMode ? 0.1 : 0.12);
+
+      ctx.globalAlpha = Math.max(0.04, Math.min(0.32, alpha));
       ctx.strokeStyle = darkMode ? '#94a3b8' : '#64748b';
-      ctx.lineWidth = 0.8 + strengthNow * 0.4;
+      ctx.lineWidth = 0.7 + strengthNow * 0.5;
 
-      const arrowLen = 6 + strengthNow * 5;
+      const arrowLen = 5 + strengthNow * 6;
 
       ctx.save();
-      ctx.translate(baseX, baseY);
+      ctx.translate(arrowX, arrowY);
       ctx.rotate(arrowRad);
 
       ctx.beginPath();
