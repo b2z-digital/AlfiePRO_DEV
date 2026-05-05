@@ -239,6 +239,13 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     round.results && round.results.length > 0 && round.results.some(r => r.position !== null)
   ) || false;
 
+  // Check if finals rounds have been scored (rounds beyond the qualifying count)
+  const hasFinalsScores = currentHeatManagement?.rounds.some(round => {
+    const roundNumber = round.roundNumber || 0;
+    return roundNumber > shrsQualifyingRounds &&
+      round.results && round.results.length > 0 && round.results.some(r => r.position !== null);
+  }) || false;
+
   // Check if ANY scores exist (heat or regular races)
   const hasAnyScores = hasHeatScores || hasRaceResults;
 
@@ -1866,9 +1873,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                         const val = Math.max(2, Math.min(parseInt(e.target.value) || 2, currentNumRaces - 2));
                                         setShrsQualifyingRounds(val);
                                       }}
-                                      disabled={hasHeatScores}
+                                      disabled={hasFinalsScores}
                                       className={`w-full px-3 py-2 text-lg font-bold rounded-lg border ${
-                                        hasHeatScores ? 'opacity-50 cursor-not-allowed' : ''
+                                        hasFinalsScores ? 'opacity-50 cursor-not-allowed' : ''
                                       } ${
                                         darkMode
                                           ? 'bg-slate-700 border-slate-600 text-white'
@@ -1889,6 +1896,20 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                     </div>
                                   </div>
                                 </div>
+                                {hasHeatScores && !hasFinalsScores && (
+                                  <div className={`mt-2 p-2 rounded-lg text-xs ${
+                                    darkMode ? 'bg-amber-900/30 border border-amber-700/50 text-amber-300' : 'bg-amber-50 border border-amber-200 text-amber-700'
+                                  }`}>
+                                    Qualifying rounds are in progress. You can still adjust this value, but previously scored rounds will retain their results. Ensure consistency before finalising qualifying.
+                                  </div>
+                                )}
+                                {hasFinalsScores && (
+                                  <div className={`mt-2 p-2 rounded-lg text-xs ${
+                                    darkMode ? 'bg-red-900/30 border border-red-700/50 text-red-300' : 'bg-red-50 border border-red-200 text-red-700'
+                                  }`}>
+                                    Finals have been scored. Qualifying round count is now locked.
+                                  </div>
+                                )}
                               </div>
 
                               <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} space-y-1`}>
