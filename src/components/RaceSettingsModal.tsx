@@ -880,13 +880,14 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           };
 
           const hasResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
-          const needsPreAssignments = currentDropRules === 'shrs' &&
+          const existingRoundCount = currentHeatManagement.rounds.length;
+          const needsMoreRounds = currentDropRules === 'shrs' &&
             shrsAssignmentMode === 'preset' &&
             shrsQualifyingRounds > 1 &&
-            !hasResults &&
-            currentHeatManagement.rounds.length < shrsQualifyingRounds;
+            existingRoundCount < shrsQualifyingRounds;
 
-          if (needsPreAssignments) {
+          if (needsMoreRounds && !hasResults) {
+            // No results yet - regenerate all qualifying rounds from scratch
             const firstRoundAssignments = currentHeatManagement.rounds[0]?.heatAssignments || [];
             const allQualifyingRounds = generatePreSetQualifyingAssignments(
               firstRoundAssignments.map(a => ({
@@ -909,6 +910,32 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               ...currentHeatManagement,
               configuration: updatedConfig,
               rounds: allRounds
+            };
+          } else if (needsMoreRounds && hasResults) {
+            // Results exist - preserve existing rounds, generate only the new ones
+            const firstRoundAssignments = currentHeatManagement.rounds[0]?.heatAssignments || [];
+            const allQualifyingRounds = generatePreSetQualifyingAssignments(
+              firstRoundAssignments.map(a => ({
+                heatDesignation: a.heatDesignation as string,
+                skipperIndices: [...a.skipperIndices]
+              })),
+              numHeats,
+              shrsQualifyingRounds
+            );
+            // Take only the new rounds (from existingRoundCount onward)
+            const newRounds = allQualifyingRounds.slice(existingRoundCount).map((roundAssignments, idx) => ({
+              round: existingRoundCount + idx + 1,
+              heatAssignments: roundAssignments.map(a => ({
+                heatDesignation: a.heatDesignation as any,
+                skipperIndices: a.skipperIndices
+              })),
+              results: [],
+              completed: false
+            }));
+            finalHeatManagement = {
+              ...currentHeatManagement,
+              configuration: updatedConfig,
+              rounds: [...currentHeatManagement.rounds, ...newRounds]
             };
           } else {
             finalHeatManagement = {
