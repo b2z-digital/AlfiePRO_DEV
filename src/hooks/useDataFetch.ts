@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../utils/supabase';
+import { onDataChange } from '../utils/dataEvents';
 
 interface UseDataFetchOptions<T> {
   fetchFn: () => Promise<T>;
@@ -7,6 +8,8 @@ interface UseDataFetchOptions<T> {
   timeout?: number;
   autoRetry?: boolean;
   maxRetries?: number;
+  /** Tables to watch - auto-refetches when any listed table is mutated */
+  invalidateOn?: string[];
 }
 
 interface UseDataFetchReturn<T> {
@@ -22,6 +25,7 @@ export function useDataFetch<T>({
   timeout = 10000,
   autoRetry = true,
   maxRetries = 2,
+  invalidateOn,
 }: UseDataFetchOptions<T>): UseDataFetchReturn<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -118,6 +122,30 @@ export function useDataFetch<T>({
       isMounted.current = false;
     };
   }, dependencies);
+
+  // Auto-refetch when watched tables are mutated
+  useEffect(() => {
+    if (!invalidateOn || invalidateOn.length === 0) return;
+
+    const debounceRef = { current: null as ReturnType<typeof setTimeout> | null };
+
+    const unsubscribe = onDataChange((table) => {
+      if (invalidateOn.includes(table)) {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+          if (isMounted.current) {
+            retryCount.current = 0;
+            fetchData();
+          }
+        }, 150);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [invalidateOn, fetchData]);
 
   return { data, loading, error, refetch };
 }
