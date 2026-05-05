@@ -1321,9 +1321,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   if (view === 'initial') {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="w-full max-w-lg rounded-xl shadow-xl overflow-hidden flex flex-col backdrop-blur-sm bg-slate-800/95 border border-slate-700">
+        <div className="w-full max-w-lg max-h-[90vh] rounded-xl shadow-xl overflow-hidden flex flex-col backdrop-blur-sm bg-slate-800/95 border border-slate-700">
           {/* Blue gradient header */}
-          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
               <Users className="text-white" size={24} />
               <div>
@@ -1344,7 +1344,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             </button>
           </div>
 
-          <div className="p-6">
+          <div className="p-6 overflow-y-auto flex-1 min-h-0">
             {error && (
               <div className="mb-4 p-3 rounded-md bg-red-900/20 border border-red-900/30 text-red-400 text-sm">
                 <div className="flex">
@@ -1534,7 +1534,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             </div>
           </div>
           
-          <div className="flex justify-end gap-3 p-6 border-t border-slate-700">
+          <div className="flex justify-end gap-3 p-6 border-t border-slate-700 flex-shrink-0">
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
@@ -3480,7 +3480,7 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] backdrop-blur-sm bg-slate-800/95 border border-slate-700">
         {/* Blue gradient header */}
-        <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+        <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <Users className="text-white" size={24} />
             <div>
@@ -3743,8 +3743,8 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
           )}
         </div>
 
-        <div className="flex justify-between gap-3 p-6 border-t border-slate-700">
-          <div className="flex gap-2">
+        <div className="flex flex-wrap justify-between gap-3 p-4 sm:p-6 border-t border-slate-700 flex-shrink-0">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setView('initial')}
               className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
