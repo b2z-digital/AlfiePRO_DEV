@@ -515,6 +515,47 @@ export async function cachedQuery<T>(
   return { ...result, fromCache: false };
 }
 
+// --- Universal mutation detection ---
+// Intercepts all Supabase REST mutations (POST/PATCH/DELETE) and emits data change events
+// so that subscribed components auto-refetch without manual wiring.
+import { emitDataChange } from './dataEvents';
+
+function clearLocalStorageQueryCache() {
+  try {
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.startsWith('query_cache_')) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (_) { /* ignore storage errors */ }
+}
+
+const originalFetch = window.fetch;
+const supabaseRestBase = supabaseUrl + '/rest/v1/';
+
+window.fetch = async function patchedFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const response = await originalFetch.call(window, input, init);
+
+  // Only intercept successful Supabase REST mutations
+  if (response.ok && init?.method && ['POST', 'PATCH', 'DELETE', 'PUT'].includes(init.method)) {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
+    if (url.startsWith(supabaseRestBase)) {
+      const path = url.slice(supabaseRestBase.length);
+      const table = path.split('?')[0];
+      if (table && !table.includes('/')) {
+        const op = init.method === 'POST' ? 'insert'
+          : init.method === 'DELETE' ? 'delete' : 'update';
+        invalidateCache(table);
+        clearLocalStorageQueryCache();
+        emitDataChange(table, op as any);
+      }
+    }
+  }
+
+  return response;
+};
+
 // Start health check automatically
 startConnectionHealthCheck();
 
