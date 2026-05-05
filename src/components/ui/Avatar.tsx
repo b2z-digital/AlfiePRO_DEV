@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface AvatarProps {
   firstName?: string;
@@ -19,8 +19,9 @@ export const Avatar: React.FC<AvatarProps> = ({
   size = 'md',
   className = ''
 }) => {
+  const [imgFailed, setImgFailed] = useState(false);
+
   const getInitials = () => {
-    // If name prop is provided, use it
     if (name) {
       const parts = name.trim().split(' ');
       const first = parts[0]?.charAt(0).toUpperCase() || '';
@@ -28,7 +29,6 @@ export const Avatar: React.FC<AvatarProps> = ({
       return parts.length > 1 ? first + last : first || '?';
     }
 
-    // Otherwise use firstName and lastName
     const first = firstName?.trim().charAt(0).toUpperCase() || '';
     const last = lastName?.trim().charAt(0).toUpperCase() || '';
     return first + last || '?';
@@ -43,7 +43,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   };
 
   const initials = getInitials();
-  const avatarImage = src || imageUrl;
+  const avatarImage = (src || imageUrl) && !imgFailed ? (src || imageUrl) : null;
   const displayName = name || `${firstName} ${lastName}`.trim();
 
   return (
@@ -64,6 +64,7 @@ export const Avatar: React.FC<AvatarProps> = ({
           src={avatarImage}
           alt={displayName}
           className="w-full h-full object-cover"
+          onError={() => setImgFailed(true)}
         />
       ) : (
         <span>{initials}</span>
