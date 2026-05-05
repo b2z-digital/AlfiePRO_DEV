@@ -3809,6 +3809,32 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                     };
                   });
                 }}
+                onUpdateRoundResults={async (roundNumber: number, updatedResults: any[]) => {
+                  setHeatManagement(prevHM => {
+                    if (!prevHM) return prevHM;
+                    const updatedRounds = prevHM.rounds.map(r => {
+                      if (r.round !== roundNumber) return r;
+                      return { ...r, results: updatedResults };
+                    });
+                    return { ...prevHM, rounds: updatedRounds };
+                  });
+                  const event = getCurrentEvent();
+                  if (event?.id && heatManagement) {
+                    const updatedRounds = heatManagement.rounds.map(r => {
+                      if (r.round !== roundNumber) return r;
+                      return { ...r, results: updatedResults };
+                    });
+                    const updatedHM = { ...heatManagement, rounds: updatedRounds };
+                    try {
+                      await supabase
+                        .from('quick_races')
+                        .update({ heat_management: updatedHM })
+                        .eq('id', event.isSeriesEvent ? event.seriesId : event.id);
+                    } catch (err) {
+                      console.error('Error saving updated results:', err);
+                    }
+                  }
+                }}
                 isFullscreen={isFullscreenScoring}
                 scoringMode={scoringMode}
               />
