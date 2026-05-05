@@ -17,6 +17,19 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { bulkAddRaceOfficerContacts } from '../utils/raceOfficerContactsStorage';
 
+function boatTypeMatchesClass(boatType: string | undefined | null, raceClass: string | undefined | null): boolean {
+  if (!boatType || !raceClass) return false;
+  if (boatType === raceClass) return true;
+  const boatLower = boatType.toLowerCase();
+  const classLower = raceClass.toLowerCase();
+  if (boatLower === classLower) return true;
+  const classAbbr = raceClass.match(/\(([^)]+)\)/)?.[1];
+  if (classAbbr && classAbbr.toLowerCase() === boatLower) return true;
+  const boatAbbr = boatType.match(/\(([^)]+)\)/)?.[1];
+  if (boatAbbr && boatAbbr.toLowerCase() === classLower) return true;
+  return false;
+}
+
 export interface ImportedAssignmentData {
   skippers: Skipper[];
   roundAssignments: { round: string; heat: string; sailNumber: string; skipperName: string; club: string }[];
@@ -186,19 +199,18 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               const validatedMember = { ...member };
               if (member.boats) {
                 validatedMember.boats = member.boats.map(boat => {
-                  // Check if this boat matches the event class and has all required data
-                  const isValid = 
-                    boat.boat_type === currentEvent.raceClass && 
-                    !!boat.sail_number && 
-                    !!boat.hull && 
+                  const isValid =
+                    boatTypeMatchesClass(boat.boat_type, currentEvent.raceClass) &&
+                    !!boat.sail_number &&
+                    !!boat.hull &&
                     !!member.club;
-                  
+
                   return { ...boat, isValid };
                 });
               }
               return validatedMember;
             });
-            
+
             setMembers(validatedMembers);
 
             // Build avatar map using member.id as key, prioritizing member's own avatar_url
@@ -250,19 +262,18 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               const validatedMember = { ...member };
               if (member.boats) {
                 validatedMember.boats = member.boats.map(boat => {
-                  // Check if this boat matches the event class and has all required data
-                  const isValid = 
-                    boat.boat_type === currentEvent.raceClass && 
-                    !!boat.sail_number && 
-                    !!boat.hull && 
+                  const isValid =
+                    boatTypeMatchesClass(boat.boat_type, currentEvent.raceClass) &&
+                    !!boat.sail_number &&
+                    !!boat.hull &&
                     !!member.club;
-                  
+
                   return { ...boat, isValid };
                 });
               }
               return validatedMember;
             });
-            
+
             setMembers(validatedMembers);
 
             // Build avatar map using member.id as key, prioritizing member's own avatar_url
@@ -360,7 +371,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           if (member.boats) {
             m.boats = member.boats.map((boat: any) => ({
               ...boat,
-              isValid: boat.boat_type === currentEvent.raceClass && !!boat.sail_number && !!boat.hull && !!member.club
+              isValid: boatTypeMatchesClass(boat.boat_type, currentEvent.raceClass) && !!boat.sail_number && !!boat.hull && !!member.club
             }));
           }
           return m;
@@ -500,7 +511,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     members.forEach(member => {
       if (member.user_id && attendingMembers.includes(member.user_id)) {
         const validBoat = member.boats?.find(boat =>
-          boat.boat_type === currentEvent?.raceClass &&
+          boatTypeMatchesClass(boat.boat_type, currentEvent?.raceClass) &&
           boat.sail_number &&
           boat.hull
         );
@@ -525,7 +536,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   const handleMemberBoatSelect = (member: Member, boat: MemberBoat) => {
     // Check if the boat has all required data
     const isValid =
-      boat.boat_type === currentEvent?.raceClass &&
+      boatTypeMatchesClass(boat.boat_type, currentEvent?.raceClass) &&
       !!boat.sail_number &&
       !!boat.hull &&
       !!member.club;
@@ -662,7 +673,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             const validatedBoat = {
               ...newBoat,
               isValid:
-                newBoat.boat_type === currentEvent?.raceClass &&
+                boatTypeMatchesClass(newBoat.boat_type, currentEvent?.raceClass) &&
                 !!newBoat.sail_number &&
                 !!newBoat.hull &&
                 !!member.club
@@ -835,7 +846,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
     for (const boat of Object.values(selectedMemberBoats)) {
       const member = members.find(m => m.id === boat.member_id) || otherClubMembers.find(m => m.id === boat.member_id);
-      if (member && boat.boat_type === currentEvent?.raceClass) {
+      if (member && boatTypeMatchesClass(boat.boat_type, currentEvent?.raceClass)) {
         if (!boat.sail_number || !boat.hull || !member.club) {
           setError(`Cannot add ${member.first_name} ${member.last_name} - missing required information`);
           continue;
@@ -965,9 +976,8 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
         const { data: boats } = await supabase
           .from('member_boats')
           .select('*')
-          .eq('member_id', skipper.memberId)
-          .eq('boat_type', currentEvent?.raceClass || '');
-        setEditMemberBoats(boats || []);
+          .eq('member_id', skipper.memberId);
+        setEditMemberBoats((boats || []).filter(b => boatTypeMatchesClass(b.boat_type, currentEvent?.raceClass)));
       } catch {
         setEditMemberBoats([]);
       }
@@ -1134,7 +1144,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
   // Get matching boats for a member
   const getMatchingBoats = (member: MemberWithValidation) => {
-    return member.boats?.filter(boat => boat.boat_type === currentEvent?.raceClass) || [];
+    return member.boats?.filter(boat => boatTypeMatchesClass(boat.boat_type, currentEvent?.raceClass)) || [];
   };
 
   // Check if a member has any matching boats
@@ -1311,9 +1321,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   if (view === 'initial') {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="w-full max-w-lg rounded-xl shadow-xl overflow-hidden flex flex-col backdrop-blur-sm bg-slate-800/95 border border-slate-700">
+        <div className="w-full max-w-lg max-h-[90vh] rounded-xl shadow-xl overflow-hidden flex flex-col backdrop-blur-sm bg-slate-800/95 border border-slate-700">
           {/* Blue gradient header */}
-          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
               <Users className="text-white" size={24} />
               <div>
@@ -1334,7 +1344,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             </button>
           </div>
 
-          <div className="p-6">
+          <div className="p-6 overflow-y-auto flex-1 min-h-0">
             {error && (
               <div className="mb-4 p-3 rounded-md bg-red-900/20 border border-red-900/30 text-red-400 text-sm">
                 <div className="flex">
@@ -1524,7 +1534,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             </div>
           </div>
           
-          <div className="flex justify-end gap-3 p-6 border-t border-slate-700">
+          <div className="flex justify-end gap-3 p-6 border-t border-slate-700 flex-shrink-0">
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
@@ -3470,7 +3480,7 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] backdrop-blur-sm bg-slate-800/95 border border-slate-700">
         {/* Blue gradient header */}
-        <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+        <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <Users className="text-white" size={24} />
             <div>
@@ -3733,8 +3743,8 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
           )}
         </div>
 
-        <div className="flex justify-between gap-3 p-6 border-t border-slate-700">
-          <div className="flex gap-2">
+        <div className="flex flex-wrap justify-between gap-3 p-4 sm:p-6 border-t border-slate-700 flex-shrink-0">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setView('initial')}
               className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"

@@ -263,11 +263,13 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     }
   }, [initialRace]);
 
+  const hasAutoOpenedHandicapPanel = useRef(false);
   useEffect(() => {
-    if (!isLoadingPreferences) {
+    if (!isLoadingPreferences && !hasAutoOpenedHandicapPanel.current) {
       const isHcapEvent = currentEvent?.raceFormat === 'handicap' ||
         (!currentEvent?.raceFormat && skippers.some(s => s.startHcap !== undefined && s.startHcap > 0));
       if (isHcapEvent && skippers.length > 0) {
+        hasAutoOpenedHandicapPanel.current = true;
         setIsHandicapViewerOpen(true);
       }
     }

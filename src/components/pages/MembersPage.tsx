@@ -20,6 +20,7 @@ import { ManageFiltersModal } from '../membership/ManageFiltersModal';
 import { MemberFilterConfig, FilterPreset } from '../../types/memberFilters';
 import { filterMembers, createEmptyFilter } from '../../utils/memberFilters';
 import { activateMembers, ActivationResponse } from '../../utils/memberActivation';
+import { Avatar } from '../ui/Avatar';
 
 interface MembersPageProps {
   darkMode: boolean;
@@ -1301,17 +1302,12 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
                           <div className="relative flex-shrink-0">
-                            {(member as any).avatar_url ? (
-                              <img
-                                src={(member as any).avatar_url}
-                                alt={`${member.first_name} ${member.last_name}`}
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
-                                {member.first_name?.[0]}{member.last_name?.[0]}
-                              </div>
-                            )}
+                            <Avatar
+                              firstName={member.first_name}
+                              lastName={member.last_name}
+                              src={(member as any).avatar_url}
+                              size="md"
+                            />
                             {member.user_id && (() => {
                               const isOnline = (member as any).last_seen && (Date.now() - new Date((member as any).last_seen).getTime()) < 15 * 60 * 1000;
                               return (

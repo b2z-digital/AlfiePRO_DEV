@@ -302,7 +302,7 @@ Deno.serve(async (req: Request) => {
         const webAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
 
         const activationToken = crypto.randomUUID() + "-" + crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
         await supabase
           .from("member_activation_tokens")
