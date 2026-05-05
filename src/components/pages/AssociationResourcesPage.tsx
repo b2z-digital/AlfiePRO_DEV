@@ -164,7 +164,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   const [resourceSaving, setResourceSaving] = useState(false);
 
   useEffect(() => {
-    if (organizationId) loadAll();
+    if (organizationId) loadAll(true);
   }, [organizationId, organizationType, currentClub?.clubId]);
 
   useEffect(() => {
@@ -198,8 +198,8 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     return () => window.removeEventListener('click', handler);
   }, []);
 
-  const loadAll = async () => {
-    setLoading(true);
+  const loadAll = async (showSpinner = false) => {
+    if (showSpinner) setLoading(true);
     try {
       const cats = await ResourceStorage.fetchResourceCategories(organizationId!, organizationType);
       setCategories(cats);
@@ -811,7 +811,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     setUploading(false);
     if (uploaded > 0) {
       addNotification(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''}`, 'success');
-      loadAll();
+      await loadAll();
     }
   };
 
@@ -839,7 +839,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       }
       setShowCategoryModal(false);
       resetCategoryForm();
-      loadAll();
+      await loadAll();
     } catch {
       addNotification('Failed to save folder', 'error');
     } finally {
@@ -866,7 +866,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
           await ResourceStorage.deleteResourceCategory(catId);
           if (activeSection === catId) setActiveSection('all');
           addNotification('Folder deleted', 'success');
-          loadAll();
+          await loadAll();
         } catch {
           addNotification('Failed to delete folder', 'error');
         }
@@ -912,7 +912,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       }
       setShowResourceModal(false);
       resetResourceForm();
-      loadAll();
+      await loadAll();
     } catch {
       addNotification('Failed to save resource', 'error');
     } finally {
@@ -939,7 +939,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
           if (resource.file_url) await ResourceStorage.deleteResourceFile(resource.file_url);
           await ResourceStorage.deleteResource(resource.id);
           addNotification('Resource deleted', 'success');
-          loadAll();
+          await loadAll();
         } catch {
           addNotification('Failed to delete resource', 'error');
         }
@@ -1475,6 +1475,13 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 onOpenDrive={handleOpenDrive}
                 onOpenDropbox={handleOpenDropbox}
                 onNewFolder={() => { resetCategoryForm(); setShowCategoryModal(true); }}
+                onEditCategory={(cat) => {
+                  setEditingCategory(cat);
+                  setCategoryName(cat.name);
+                  setCategoryDescription(cat.description || '');
+                  setShowCategoryModal(true);
+                }}
+                onDeleteCategory={handleDeleteCategory}
                 getFileIcon={getFileIcon}
                 getFileIconColor={getFileIconColor}
                 getFileBgColor={getFileBgColor}
@@ -1885,6 +1892,8 @@ const AllFilesView: React.FC<{
   onOpenDrive: () => void;
   onOpenDropbox?: () => void;
   onNewFolder: () => void;
+  onEditCategory: (cat: ResourceStorage.ResourceCategory) => void;
+  onDeleteCategory: (catId: string) => void;
   getFileIcon: (m?: string, f?: boolean) => React.ElementType;
   getFileIconColor: (m?: string, f?: boolean) => string;
   getFileBgColor: (m?: string, f?: boolean) => string;
@@ -1898,7 +1907,7 @@ const AllFilesView: React.FC<{
   dropTargetCatId: string | null;
   onDropOnCategory: (catId: string) => void;
   onDragOverCategory: (catId: string | null) => void;
-}> = ({ categories, resources, filteredResources, viewMode, hasGoogleDrive, hasDropbox, sharedCount, isClubContext, onSetSection, onOpenDrive, onOpenDropbox, onNewFolder, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, onEditResource, onDeleteResource, draggedResource, onDragStartResource, onDragEndResource, dropTargetCatId, onDropOnCategory, onDragOverCategory }) => {
+}> = ({ categories, resources, filteredResources, viewMode, hasGoogleDrive, hasDropbox, sharedCount, isClubContext, onSetSection, onOpenDrive, onOpenDropbox, onNewFolder, onEditCategory, onDeleteCategory, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, onEditResource, onDeleteResource, draggedResource, onDragStartResource, onDragEndResource, dropTargetCatId, onDropOnCategory, onDragOverCategory }) => {
   return (
     <div className="space-y-6">
       {/* Storage sources */}
@@ -1995,18 +2004,39 @@ const AllFilesView: React.FC<{
                   onDrop={e => { e.preventDefault(); onDropOnCategory(cat.id); }}
                   className={`rounded-xl transition-all ${isTarget ? 'ring-2 ring-amber-400/60' : ''}`}
                 >
-                  <button
-                    onClick={() => onSetSection(cat.id)}
-                    className={`flex items-center gap-3 px-4 py-3 border rounded-xl transition-all group w-full text-left ${
+                  <div
+                    className={`flex items-center gap-3 px-4 py-3 border rounded-xl transition-all group w-full ${
                       isTarget ? 'bg-amber-500/10 border-amber-400/50' : 'bg-slate-800/40 border-slate-700/40 hover:border-slate-600/60 hover:bg-slate-700/30'
                     }`}
                   >
-                    <FolderOpen size={18} className={`flex-shrink-0 ${isTarget ? 'text-amber-300' : 'text-amber-400'}`} />
-                    <span className="flex-1 text-sm text-slate-300 group-hover:text-white font-medium">{cat.name}</span>
-                    {cat.description && <span className="text-xs text-slate-500 hidden sm:block">{cat.description}</span>}
-                    <span className="text-xs text-slate-500">{count} item{count !== 1 ? 's' : ''}</span>
-                    <ChevronRight size={13} className="text-slate-600 group-hover:text-slate-400" />
-                  </button>
+                    <button
+                      onClick={() => onSetSection(cat.id)}
+                      className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                    >
+                      <FolderOpen size={18} className={`flex-shrink-0 ${isTarget ? 'text-amber-300' : 'text-amber-400'}`} />
+                      <span className="flex-1 text-sm text-slate-300 group-hover:text-white font-medium truncate">{cat.name}</span>
+                    </button>
+                    <span className="text-xs text-slate-500 group-hover:hidden">{count} item{count !== 1 ? 's' : ''}</span>
+                    <div className="hidden group-hover:flex items-center gap-1">
+                      <button
+                        onClick={e => { e.stopPropagation(); onEditCategory(cat); }}
+                        className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+                        title="Rename folder"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                      <button
+                        onClick={e => { e.stopPropagation(); onDeleteCategory(cat.id); }}
+                        className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-red-900/20 transition-colors"
+                        title="Delete folder"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    <button onClick={() => onSetSection(cat.id)} className="flex-shrink-0">
+                      <ChevronRight size={13} className="text-slate-600 group-hover:text-slate-400" />
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -2108,7 +2138,7 @@ const FolderView: React.FC<{
               </div>
               <p className="text-xs font-medium text-slate-300 group-hover:text-white text-center line-clamp-2 w-full">{r.title}</p>
               {r.file_size && <p className="text-xs text-slate-600">{formatFileSize(r.file_size)}</p>}
-              <div className="absolute top-2 right-2 hidden group-hover:flex gap-1">
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={e => { e.stopPropagation(); onEditResource(r); }} className="p-1 bg-slate-700/90 rounded hover:bg-slate-600 transition-colors">
                   <Edit2 size={10} className="text-slate-300" />
                 </button>
@@ -2195,7 +2225,7 @@ const ResourceTable: React.FC<{
               </td>
               {!readOnly && (
                 <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                  <div className="hidden group-hover:flex items-center justify-end gap-1">
+                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {url && (
                       <button onClick={() => window.open(url, '_blank')} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Open">
                         <Eye size={12} />
