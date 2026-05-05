@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Upload, Download, Search, MoreVertical, Edit, Trash2, X, Mail, MailX, UserPlus } from 'lucide-react';
+import { Plus, Users, Upload, Download, Search, MoveVertical as MoreVertical, CreditCard as Edit, Trash2, X, Mail, MailX, UserPlus } from 'lucide-react';
 import Papa from 'papaparse';
 import { ImportListMembersModal } from '../components/marketing/ImportListMembersModal';
 import {
@@ -131,8 +131,12 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
 
     try {
       if (list.list_type === 'all_members') {
-        // Load actual club members for the All Members list
-        const members = await getStoredMembers();
+        // Load actual club members for the All Members list - only active financial members
+        const allMembers = await getStoredMembers();
+        const members = allMembers.filter(m =>
+          m.is_financial === true &&
+          ((m as any).membership_status === 'active' || !(m as any).membership_status)
+        );
         setClubMembers(members);
         setListMembers([]);
 
@@ -212,7 +216,11 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
       let csvData: any[] = [];
 
       if (list.list_type === 'all_members') {
-        const members = await getStoredMembers();
+        const allMembers = await getStoredMembers();
+        const members = allMembers.filter(m =>
+          m.is_financial === true &&
+          ((m as any).membership_status === 'active' || !(m as any).membership_status)
+        );
         csvData = members.map(m => ({
           'First Name': m.firstName || '',
           'Last Name': m.lastName || '',
