@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, Inbox, Send, FileText, Star, MessageCircle, X, MessageSquare, Trash2, UserPlus } from 'lucide-react';
+import { Search, Plus, Inbox, Send, FileText, Star, MessageCircle, X, MessageSquare, Trash2, UserPlus, SquareCheck as CheckSquare, Square } from 'lucide-react';
 
 export type SidebarTab = 'inbox' | 'sent' | 'starred' | 'drafts';
 export type TopLevelTab = 'inbox' | 'chats';
@@ -51,6 +51,7 @@ interface ConversationsSidebarProps {
   onCompose: () => void;
   onNewChat: () => void;
   onDeleteChat: (chatId: string) => void;
+  onBulkDelete?: (ids: string[], isSent: boolean) => void;
   unreadCount: number;
   darkMode: boolean;
   chatConversations: ChatConversation[];
@@ -126,6 +127,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
   onCompose,
   onNewChat,
   onDeleteChat,
+  onBulkDelete,
   unreadCount,
   darkMode,
   chatConversations,
@@ -134,6 +136,8 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
   unreadChatsCount,
 }) => {
   const [swipedChatId, setSwipedChatId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
   const starredNotifications = notifications.filter(n => n.is_starred);
 
   const getDisplayList = () => {
@@ -172,6 +176,38 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
     } else {
       onCompose();
     }
+  };
+
+  const toggleSelection = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      if (next.size === 0) setSelectionMode(false);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === displayList.length) {
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+    } else {
+      setSelectedIds(new Set(displayList.map(n => n.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0 || !onBulkDelete) return;
+    onBulkDelete(Array.from(selectedIds), activeTab === 'sent');
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  };
+
+  const cancelSelection = () => {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
   };
 
   return (
@@ -392,74 +428,141 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
             subtitle={searchTerm ? 'Try a different search term' : activeTab === 'inbox' ? 'New messages will appear here' : undefined}
           />
         ) : (
-          <div className="space-y-0.5">
-            {displayList.map(notification => {
-              const isSent = activeTab === 'sent';
-              const displayName = isSent
-                ? (notification.recipient_name || 'Unknown')
-                : (notification.sender_name || 'System');
-              const displayAvatar = isSent
-                ? notification.recipient_avatar_url
-                : notification.sender_avatar_url;
-              const isSelected = selectedId === notification.id;
-              const isUnread = !notification.read && activeTab === 'inbox';
-
-              return (
+          <>
+            {selectionMode && (
+              <div className="flex items-center gap-2 px-2 py-2 mb-1 rounded-xl bg-blue-600/10 border border-blue-500/20">
                 <button
-                  key={notification.id}
-                  onClick={() => onSelect(notification)}
-                  className={`w-full text-left p-3 rounded-xl transition-all group relative ${
-                    isSelected
-                      ? 'bg-blue-600/15 border border-blue-500/30'
-                      : isUnread
-                        ? 'bg-slate-700/30 hover:bg-slate-700/50 border border-transparent'
-                        : 'hover:bg-slate-700/30 border border-transparent'
-                  }`}
+                  onClick={toggleSelectAll}
+                  className="p-1 rounded hover:bg-slate-700/50 transition-colors"
+                  title={selectedIds.size === displayList.length ? 'Deselect all' : 'Select all'}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <UserAvatar
-                        name={displayName}
-                        avatarUrl={displayAvatar}
-                        size={44}
-                      />
-                      {isUnread && (
-                        <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-[#131c31]" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className={`text-sm truncate ${isUnread ? 'font-semibold text-white' : 'font-medium text-slate-300'}`}>
-                          {displayName}
-                        </p>
-                        <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
-                          {notification.is_starred && (
-                            <Star size={12} className="fill-amber-400 text-amber-400" />
-                          )}
-                          <span className={`text-[11px] ${isUnread ? 'text-blue-400 font-medium' : 'text-slate-600'}`}>
-                            {formatTimeAgo(notification.sent_at)}
-                          </span>
-                        </div>
-                      </div>
-                      <p className={`text-xs truncate mt-0.5 ${isUnread ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>
-                        {notification.subject}
-                      </p>
-                      <p className="text-[11px] text-slate-600 truncate mt-0.5">
-                        {notification.body.replace(/<[^>]*>/g, '').slice(0, 60)}
-                      </p>
-                    </div>
-                  </div>
-                  {notification.club_name && (
-                    <div className="mt-2 ml-[56px]">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded-md text-[10px] text-cyan-400 font-medium">
-                        {notification.club_name}
-                      </span>
-                    </div>
+                  {selectedIds.size === displayList.length ? (
+                    <CheckSquare size={16} className="text-blue-400" />
+                  ) : (
+                    <Square size={16} className="text-slate-400" />
                   )}
                 </button>
-              );
-            })}
-          </div>
+                <span className="text-xs text-blue-400 font-medium flex-1">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-medium transition-colors"
+                >
+                  <Trash2 size={12} />
+                  Delete
+                </button>
+                <button
+                  onClick={cancelSelection}
+                  className="p-1 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            <div className="space-y-0.5">
+              {displayList.map(notification => {
+                const isSent = activeTab === 'sent';
+                const displayName = isSent
+                  ? (notification.recipient_name || 'Unknown')
+                  : (notification.sender_name || 'System');
+                const displayAvatar = isSent
+                  ? notification.recipient_avatar_url
+                  : notification.sender_avatar_url;
+                const isSelected = selectedId === notification.id;
+                const isChecked = selectedIds.has(notification.id);
+                const isUnread = !notification.read && activeTab === 'inbox';
+
+                return (
+                  <div
+                    key={notification.id}
+                    className={`relative flex items-center rounded-xl transition-all group ${
+                      isChecked
+                        ? 'bg-blue-600/10 border border-blue-500/20'
+                        : isSelected
+                          ? 'bg-blue-600/15 border border-blue-500/30'
+                          : isUnread
+                            ? 'bg-slate-700/30 hover:bg-slate-700/50 border border-transparent'
+                            : 'hover:bg-slate-700/30 border border-transparent'
+                    }`}
+                  >
+                    <button
+                      onClick={(e) => {
+                        if (!selectionMode) setSelectionMode(true);
+                        toggleSelection(notification.id, e);
+                      }}
+                      className={`flex-shrink-0 p-2 pl-2.5 rounded-l-xl transition-all ${
+                        selectionMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                    >
+                      {isChecked ? (
+                        <CheckSquare size={16} className="text-blue-400" />
+                      ) : (
+                        <Square size={16} className="text-slate-600 hover:text-slate-400" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (selectionMode) {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev);
+                            if (next.has(notification.id)) next.delete(notification.id);
+                            else next.add(notification.id);
+                            if (next.size === 0) setSelectionMode(false);
+                            return next;
+                          });
+                        } else {
+                          onSelect(notification);
+                        }
+                      }}
+                      className="flex-1 text-left p-3 pl-1 min-w-0"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <UserAvatar
+                            name={displayName}
+                            avatarUrl={displayAvatar}
+                            size={44}
+                          />
+                          {isUnread && (
+                            <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-[#131c31]" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className={`text-sm truncate ${isUnread ? 'font-semibold text-white' : 'font-medium text-slate-300'}`}>
+                              {displayName}
+                            </p>
+                            <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                              {notification.is_starred && (
+                                <Star size={12} className="fill-amber-400 text-amber-400" />
+                              )}
+                              <span className={`text-[11px] ${isUnread ? 'text-blue-400 font-medium' : 'text-slate-600'}`}>
+                                {formatTimeAgo(notification.sent_at)}
+                              </span>
+                            </div>
+                          </div>
+                          <p className={`text-xs truncate mt-0.5 ${isUnread ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>
+                            {notification.subject}
+                          </p>
+                          <p className="text-[11px] text-slate-600 truncate mt-0.5">
+                            {notification.body.replace(/<[^>]*>/g, '').slice(0, 60)}
+                          </p>
+                        </div>
+                      </div>
+                      {notification.club_name && (
+                        <div className="mt-2 ml-[56px]">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded-md text-[10px] text-cyan-400 font-medium">
+                            {notification.club_name}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 

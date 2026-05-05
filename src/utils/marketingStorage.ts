@@ -209,6 +209,57 @@ export async function ensureClubMembersList(clubId: string): Promise<void> {
       if (rpcError) {
         console.error('Error ensuring Club Members list via RPC:', rpcError);
       }
+    } else if (existing) {
+      // Re-sync: remove non-active/non-financial members and update totals
+      const { data: activeMembers } = await supabase
+        .from('members')
+        .select('id')
+        .eq('club_id', clubId)
+        .eq('is_financial', true)
+        .or('membership_status.eq.active,membership_status.is.null')
+        .not('email', 'is', null)
+        .neq('email', '');
+
+      const activeIdSet = new Set((activeMembers || []).map(m => m.id));
+
+      // Get current list members to find stale ones
+      const { data: currentListMembers } = await supabase
+        .from('marketing_list_members')
+        .select('id, member_id')
+        .eq('list_id', existing.id)
+        .not('member_id', 'is', null);
+
+      const staleIds = (currentListMembers || [])
+        .filter(lm => lm.member_id && !activeIdSet.has(lm.member_id))
+        .map(lm => lm.id);
+
+      // Remove stale entries
+      if (staleIds.length > 0) {
+        await supabase
+          .from('marketing_list_members')
+          .delete()
+          .in('id', staleIds);
+      }
+
+      // Update counts
+      const { count } = await supabase
+        .from('marketing_list_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('list_id', existing.id);
+
+      const { count: activeCount } = await supabase
+        .from('marketing_list_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('list_id', existing.id)
+        .eq('status', 'subscribed');
+
+      await supabase
+        .from('marketing_subscriber_lists')
+        .update({
+          total_contacts: count || 0,
+          active_subscriber_count: activeCount || 0,
+        })
+        .eq('id', existing.id);
     }
   } catch (err) {
     console.error('ensureClubMembersList unexpected error:', err);
