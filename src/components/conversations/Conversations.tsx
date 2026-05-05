@@ -754,6 +754,24 @@ export const Conversations: React.FC<ConversationsProps> = ({
     }
   };
 
+  const handleBulkDelete = async (ids: string[], isSent: boolean) => {
+    if (ids.length === 0) return;
+    const confirmMsg = `Delete ${ids.length} message${ids.length > 1 ? 's' : ''}?`;
+    if (!confirm(confirmMsg)) return;
+    try {
+      const { error } = await supabase.from('notifications').delete().in('id', ids);
+      if (error) throw error;
+      if (isSent) setSentNotifications(prev => prev.filter(n => !ids.includes(n.id)));
+      else setNotifications(prev => prev.filter(n => !ids.includes(n.id)));
+      if (selectedNotification && ids.includes(selectedNotification.id)) {
+        setSelectedNotification(null);
+      }
+      addNotification('success', `${ids.length} message${ids.length > 1 ? 's' : ''} deleted`);
+    } catch (err) {
+      addNotification('error', 'Failed to delete messages');
+    }
+  };
+
   const handleReply = (notification: Notification) => {
     if (!notification.sender_id) return;
     setComposeForm({
@@ -890,6 +908,7 @@ export const Conversations: React.FC<ConversationsProps> = ({
           onCompose={() => setShowCompose(true)}
           onNewChat={() => setShowNewChat(true)}
           onDeleteChat={handleDeleteChat}
+          onBulkDelete={handleBulkDelete}
           unreadCount={unreadCount}
           darkMode={darkMode}
           chatConversations={chatConversations}
