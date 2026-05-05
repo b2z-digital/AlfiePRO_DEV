@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, MessageSquare } from 'lucide-react';
+import { X, Search, MessageSquare, UserPlus, Users, Clock } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
@@ -10,6 +10,14 @@ interface Connection {
   avatar?: string;
   isConnection?: boolean;
 }
+
+interface DiscoverUser {
+  id: string;
+  name: string;
+  avatar?: string;
+}
+
+type ModalTab = 'chat' | 'connect';
 
 interface NewChatModalProps {
   onClose: () => void;
@@ -23,13 +31,25 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
   const currentUserId = isImpersonating && effectiveUserId ? effectiveUserId : user?.id;
   const contextId = currentOrganization?.id || currentClub?.clubId;
 
+  const [activeTab, setActiveTab] = useState<ModalTab>('chat');
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [discoverUsers, setDiscoverUsers] = useState<DiscoverUser[]>([]);
+  const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set());
+  const [pendingSentIds, setPendingSentIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingDiscover, setLoadingDiscover] = useState(false);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentUserId) fetchPeople();
   }, [currentUserId]);
+
+  useEffect(() => {
+    if (activeTab === 'connect' && currentUserId && discoverUsers.length === 0) {
+      fetchDiscoverUsers();
+    }
+  }, [activeTab, currentUserId]);
 
   const fetchPeople = async () => {
     if (!currentUserId) return;
@@ -48,6 +68,8 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
           connectionUserIds.add(otherId);
         });
       }
+
+      setConnectedIds(connectionUserIds);
 
       const allUserIds = new Set<string>(connectionUserIds);
 
@@ -96,8 +118,67 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
     }
   };
 
+  const fetchDiscoverUsers = async () => {
+    if (!currentUserId) return;
+    setLoadingDiscover(true);
+    try {
+      const { data: pendingSent } = await supabase
+        .from('social_connections')
+        .select('connected_user_id')
+        .eq('user_id', currentUserId)
+        .eq('status', 'pending');
+
+      setPendingSentIds(new Set(pendingSent?.map(p => p.connected_user_id) || []));
+
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, first_name, last_name, avatar_url')
+        .neq('id', currentUserId)
+        .limit(200);
+
+      const users = (profiles || [])
+        .map(p => ({
+          id: p.id,
+          name: p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown',
+          avatar: p.avatar_url || undefined,
+        }))
+        .filter(u => u.name && u.name.trim().length > 0 && u.name !== 'Unknown');
+
+      setDiscoverUsers(users);
+    } catch (err) {
+      console.error('Error fetching discover users:', err);
+    } finally {
+      setLoadingDiscover(false);
+    }
+  };
+
+  const handleConnect = async (userId: string) => {
+    if (!currentUserId) return;
+    setConnectingId(userId);
+    try {
+      await supabase
+        .from('social_connections')
+        .insert({
+          user_id: currentUserId,
+          connected_user_id: userId,
+          connection_type: 'friend',
+          status: 'pending',
+        });
+      setPendingSentIds(prev => new Set([...prev, userId]));
+    } catch (err) {
+      console.error('Error sending connection request:', err);
+    } finally {
+      setConnectingId(null);
+    }
+  };
+
   const filtered = connections.filter(c =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredDiscover = discoverUsers.filter(u =>
+    !connectedIds.has(u.id) &&
+    u.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -125,12 +206,37 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
           </button>
         </div>
 
+        <div className={`flex border-b ${darkMode ? 'border-slate-700/50' : 'border-gray-200'}`}>
+          <button
+            onClick={() => { setActiveTab('chat'); setSearchTerm(''); }}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'chat'
+                ? 'text-blue-500 border-b-2 border-blue-500'
+                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Users size={16} />
+            Club & Connections
+          </button>
+          <button
+            onClick={() => { setActiveTab('connect'); setSearchTerm(''); }}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'connect'
+                ? 'text-blue-500 border-b-2 border-blue-500'
+                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <UserPlus size={16} />
+            Find People
+          </button>
+        </div>
+
         <div className="p-4">
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
             <input
               type="text"
-              placeholder="Search connections..."
+              placeholder={activeTab === 'chat' ? 'Search connections...' : 'Search people to connect...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               autoFocus
@@ -143,51 +249,119 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
           </div>
 
           <div className="max-h-[360px] overflow-y-auto -mx-1 px-1">
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-7 h-7 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                  {searchTerm ? 'No matching people' : 'No people found'}
-                </p>
-                <p className={`text-xs mt-1 ${darkMode ? 'text-slate-600' : 'text-gray-400'}`}>
-                  {searchTerm ? 'Try a different search' : 'Connect with people in the Community page'}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                {filtered.map(conn => (
-                  <button
-                    key={conn.id}
-                    onClick={() => {
-                      onSelectUser(conn.id, conn.name, conn.avatar);
-                      onClose();
-                    }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
-                      darkMode ? 'hover:bg-slate-700/60' : 'hover:bg-gray-100'
-                    }`}
-                  >
-                    {conn.avatar ? (
-                      <img src={conn.avatar} alt={conn.name} className="w-10 h-10 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">
-                        {conn.name.charAt(0)}
+            {activeTab === 'chat' ? (
+              loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-7 h-7 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                    {searchTerm ? 'No matching people' : 'No people found'}
+                  </p>
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-slate-600' : 'text-gray-400'}`}>
+                    {searchTerm ? 'Try a different search' : 'Use "Find People" to connect with other members'}
+                  </p>
+                  {!searchTerm && (
+                    <button
+                      onClick={() => setActiveTab('connect')}
+                      className="mt-3 flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-colors"
+                    >
+                      <UserPlus size={14} />
+                      Find People
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {filtered.map(conn => (
+                    <button
+                      key={conn.id}
+                      onClick={() => {
+                        onSelectUser(conn.id, conn.name, conn.avatar);
+                        onClose();
+                      }}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+                        darkMode ? 'hover:bg-slate-700/60' : 'hover:bg-gray-100'
+                      }`}
+                    >
+                      {conn.avatar ? (
+                        <img src={conn.avatar} alt={conn.name} className="w-10 h-10 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">
+                          {conn.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="flex-1 text-left">
+                        <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {conn.name}
+                        </p>
+                        <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                          {conn.isConnection ? 'Connection' : 'Club Member'}
+                        </p>
                       </div>
-                    )}
-                    <div className="flex-1 text-left">
-                      <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {conn.name}
-                      </p>
-                      <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
-                        {conn.isConnection ? 'Connection' : 'Club Member'}
-                      </p>
-                    </div>
-                    <MessageSquare size={16} className={darkMode ? 'text-slate-600' : 'text-gray-300'} />
-                  </button>
-                ))}
-              </div>
+                      <MessageSquare size={16} className={darkMode ? 'text-slate-600' : 'text-gray-300'} />
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : (
+              loadingDiscover ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-7 h-7 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                </div>
+              ) : filteredDiscover.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                    {searchTerm ? 'No matching people' : 'No new people to connect with'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {filteredDiscover.map(person => {
+                    const isPending = pendingSentIds.has(person.id);
+                    const isConnecting = connectingId === person.id;
+                    return (
+                      <div
+                        key={person.id}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl ${
+                          darkMode ? 'hover:bg-slate-700/60' : 'hover:bg-gray-100'
+                        }`}
+                      >
+                        {person.avatar ? (
+                          <img src={person.avatar} alt={person.name} className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">
+                            {person.name.charAt(0)}
+                          </div>
+                        )}
+                        <div className="flex-1 text-left min-w-0">
+                          <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {person.name}
+                          </p>
+                        </div>
+                        {isPending ? (
+                          <span className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                            darkMode ? 'bg-slate-700 text-slate-400' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            <Clock size={12} />
+                            Pending
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleConnect(person.id)}
+                            disabled={isConnecting}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+                          >
+                            <UserPlus size={12} />
+                            {isConnecting ? '...' : 'Connect'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )
             )}
           </div>
         </div>
