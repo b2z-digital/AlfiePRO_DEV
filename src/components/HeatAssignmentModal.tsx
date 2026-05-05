@@ -58,6 +58,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [showQualifyingCompletePrompt, setShowQualifyingCompletePrompt] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -337,10 +338,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     return new Set<number>(Array.isArray(indices) ? indices : []);
   }, [heatManagement.configuration]);
 
-  const shrsHasPreAssignments = heatManagement.configuration.scoringSystem === 'shrs' &&
+  const shrsIsPresetMode = heatManagement.configuration.scoringSystem === 'shrs' &&
     heatManagement.configuration.shrsAssignmentMode === 'preset' &&
-    heatManagement.rounds.length > 1 &&
-    !heatManagement.rounds.some(r => r.results && r.results.length > 0);
+    heatManagement.rounds.length > 1;
+
+  // Show round navigator for pre-assigned SHRS even after scoring has started
+  const shrsHasPreAssignments = shrsIsPresetMode;
 
   const totalPreAssignedRounds = shrsHasPreAssignments ? heatManagement.rounds.length : 0;
 
@@ -1049,6 +1052,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   // Check if this is Round 1 with no scores (initial allocation)
   const isInitialAllocation = round === 1 && (!results || results.length === 0);
 
+  // Check if this is any unplayed round (no results yet) - allows editing future rounds
+  const isUnplayedRound = !completed && (!results || results.length === 0);
+
   // Check if any heat has scoring in progress (partial results)
   const anyScoringInProgress = !completed && heatAssignments.some(assignment => {
     const heatResults = (results || []).filter(r => r.heatDesignation === assignment.heatDesignation);
@@ -1292,22 +1298,35 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             >
               <ChevronLeft size={20} />
             </button>
-            <div className="flex items-center gap-1.5">
-              {heatManagement.rounds.map((rd, idx) => (
-                <button
-                  key={rd.round}
-                  onClick={() => setPreviewRoundIndex(idx)}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
-                    (previewRoundIndex ?? 0) === idx
-                      ? 'bg-blue-500 text-white'
-                      : darkMode
-                        ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                  }`}
-                >
-                  {getSHRSRoundLabel(rd.round, heatManagement.configuration)}
-                </button>
-              ))}
+            <div className="flex items-center gap-1.5 flex-wrap justify-center">
+              {heatManagement.rounds.map((rd, idx) => {
+                const isSelected = (previewRoundIndex ?? 0) === idx;
+                const hasResults = rd.results && rd.results.length > 0;
+                const isCompleted = rd.completed;
+                return (
+                  <button
+                    key={rd.round}
+                    onClick={() => setPreviewRoundIndex(idx)}
+                    className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                      isSelected
+                        ? 'bg-blue-500 text-white'
+                        : isCompleted
+                          ? darkMode
+                            ? 'bg-green-800/50 text-green-300 hover:bg-green-700/60'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : hasResults
+                            ? darkMode
+                              ? 'bg-amber-800/50 text-amber-300 hover:bg-amber-700/60'
+                              : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                            : darkMode
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                    }`}
+                  >
+                    {getSHRSRoundLabel(rd.round, heatManagement.configuration)}
+                  </button>
+                );
+              })}
             </div>
             <button
               onClick={() => setPreviewRoundIndex(prev => Math.min(totalPreAssignedRounds - 1, (prev ?? 0) + 1))}
@@ -2140,7 +2159,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       alert('Heat assignment issues:\n' + problems.join('\n'));
                       return;
                     }
-                    onUpdateAssignments(localAssignments, 1);
+                    onUpdateAssignments(localAssignments, round);
                   }
                   setInitialEditMode(false);
                   setSelectedSkipperToMove(null);
@@ -2241,6 +2260,28 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             </div>
           )}
 
+          {/* Edit button for any unplayed future round in SHRS preset mode */}
+          {!isInitialAllocation && isUnplayedRound && shrsIsPresetMode && !initialEditMode && onUpdateAssignments && (
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setInitialEditMode(true);
+                  setLocalAssignments([...heatAssignments].map(a => ({
+                    ...a,
+                    skipperIndices: [...a.skipperIndices]
+                  })));
+                }}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
+                  darkMode
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+              >
+                <Edit3 size={18} />
+                Edit Round {round} Assignments
+              </button>
+            </div>
+          )}
 
           {/* Edit mode controls for mid-round only (when at least one heat complete but round not finished) */}
           {/* Allow manual override of promotions/relegations */}
@@ -2419,9 +2460,58 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             )
           )}
 
+          {/* Qualifying Complete Prompt - shown when last qualifying round is completed */}
+          {!initialEditMode && isSHRS && completed && !isFinalsPhase && round === (configuration.shrsQualifyingRounds || 0) && showQualifyingCompletePrompt && (
+            <div className={`flex flex-col gap-2 p-3 rounded-lg border ${
+              darkMode ? 'bg-slate-800 border-slate-600' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                All {configuration.shrsQualifyingRounds} qualifying rounds complete
+              </p>
+              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Would you like to proceed to finals or extend qualifying?
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowQualifyingCompletePrompt(false);
+                    if (onFinaliseQualifying) {
+                      onFinaliseQualifying();
+                      onClose();
+                    }
+                  }}
+                  className="flex-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-gradient-to-r from-amber-600 to-yellow-600 text-white hover:from-amber-700 hover:to-yellow-700 transition-colors"
+                >
+                  Proceed to Finals
+                </button>
+                <button
+                  onClick={() => {
+                    setShowQualifyingCompletePrompt(false);
+                    onClose();
+                  }}
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    darkMode
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  Extend Qualifying
+                </button>
+              </div>
+              <p className={`text-xs italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                To extend, close this and increase qualifying rounds in Race Settings.
+              </p>
+            </div>
+          )}
+
           {!initialEditMode && <button
             onClick={() => {
               if (!isInitialAllocation) {
+                // Check if this is the last qualifying round being completed - show prompt
+                if (isSHRS && completed && !isFinalsPhase && round === (configuration.shrsQualifyingRounds || 0) && onFinaliseQualifying) {
+                  setShowQualifyingCompletePrompt(true);
+                  return;
+                }
                 if (completed && (nextRound || shouldAllowProgression)) {
                   const targetRound = nextRound ? nextRound.round : round + 1;
                   console.log('Advancing to next round:', targetRound);
@@ -2438,16 +2528,18 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               }
               onClose();
             }}
-            disabled={loadingObservers}
+            disabled={loadingObservers || showQualifyingCompletePrompt}
             className={`px-4 py-1.5 rounded-lg transition-all font-medium text-sm ${
-              loadingObservers
+              loadingObservers || showQualifyingCompletePrompt
                 ? 'bg-slate-400 text-slate-200 cursor-not-allowed'
                 : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 shadow-lg'
             }`}
           >
             {completed && shouldAllowProgression
                 ? isSHRS
-                  ? `Progress to ${isSHRSFinalsRound(round + 1, configuration) ? `Final ${(round + 1) - (configuration.shrsQualifyingRounds || 0)}` : `Qualifying Rd ${round + 1}`}`
+                  ? round === (configuration.shrsQualifyingRounds || 0) && !isFinalsPhase
+                    ? 'Qualifying Complete'
+                    : `Progress to ${isSHRSFinalsRound(round + 1, configuration) ? `Final ${(round + 1) - (configuration.shrsQualifyingRounds || 0)}` : `Qualifying Rd ${round + 1}`}`
                   : `Progress to Race ${round + 1}`
                 : completed && nextRound
                 ? isSHRS
