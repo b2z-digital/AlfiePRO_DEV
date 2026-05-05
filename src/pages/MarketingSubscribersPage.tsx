@@ -222,8 +222,8 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
           ((m as any).membership_status === 'active' || !(m as any).membership_status)
         );
         csvData = members.map(m => ({
-          'First Name': m.firstName || '',
-          'Last Name': m.lastName || '',
+          'First Name': m.first_name || '',
+          'Last Name': m.last_name || '',
           'Email': m.email || '',
           'Phone': m.phone || '',
           'Membership Level': m.membership_level || ''
@@ -299,7 +299,7 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
 
   const filteredClubMembers = clubMembers.filter(member =>
     member.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    `${member.firstName} ${member.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
+    `${member.first_name} ${member.last_name}`.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading) {
@@ -686,14 +686,14 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
                       >
                         <div className="flex items-center gap-3 flex-1">
                           <Avatar
-                            firstName={member.firstName}
-                            lastName={member.lastName}
+                            firstName={member.first_name}
+                            lastName={member.last_name}
                             src={member.avatar_url}
                             size="md"
                           />
                           <div className="flex-1">
                             <div className={`font-medium ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
-                              {member.firstName} {member.lastName}
+                              {member.first_name} {member.last_name}
                             </div>
                             <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-600'}`}>
                               {member.email}
