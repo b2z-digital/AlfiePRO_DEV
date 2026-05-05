@@ -3761,6 +3761,54 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                     return updatedHM;
                   });
                 }}
+                onExtendQualifying={(newQualifyingRounds: number) => {
+                  setHeatManagement(prevHM => {
+                    if (!prevHM) return prevHM;
+                    const currentConfig = prevHM.configuration;
+                    const oldQualifyingRounds = currentConfig.shrsQualifyingRounds || 0;
+                    if (newQualifyingRounds <= oldQualifyingRounds) return prevHM;
+
+                    const updatedConfig = {
+                      ...currentConfig,
+                      shrsQualifyingRounds: newQualifyingRounds
+                    };
+
+                    const existingRoundCount = prevHM.rounds.length;
+
+                    if (currentConfig.shrsAssignmentMode === 'preset' && existingRoundCount < newQualifyingRounds) {
+                      const firstRoundAssignments = prevHM.rounds[0]?.heatAssignments || [];
+                      const numHeats = currentConfig.numberOfHeats || 2;
+                      const allQualifyingRounds = generatePreSetQualifyingAssignments(
+                        firstRoundAssignments.map(a => ({
+                          heatDesignation: a.heatDesignation as string,
+                          skipperIndices: [...a.skipperIndices]
+                        })),
+                        numHeats,
+                        newQualifyingRounds
+                      );
+                      const newRounds = allQualifyingRounds.slice(existingRoundCount).map((roundAssignments, idx) => ({
+                        round: existingRoundCount + idx + 1,
+                        heatAssignments: roundAssignments.map(a => ({
+                          heatDesignation: a.heatDesignation as any,
+                          skipperIndices: a.skipperIndices
+                        })),
+                        results: [],
+                        completed: false
+                      }));
+
+                      return {
+                        ...prevHM,
+                        configuration: updatedConfig,
+                        rounds: [...prevHM.rounds, ...newRounds]
+                      };
+                    }
+
+                    return {
+                      ...prevHM,
+                      configuration: updatedConfig
+                    };
+                  });
+                }}
                 isFullscreen={isFullscreenScoring}
                 scoringMode={scoringMode}
               />
