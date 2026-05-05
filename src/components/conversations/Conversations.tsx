@@ -192,19 +192,56 @@ export const Conversations: React.FC<ConversationsProps> = ({
   useEffect(() => {
     if (!viewingUserId) return;
     const channelName = `chats-list-${viewingUserId}`;
+    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetchChats = () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => { fetchChatConversations(); }, 300);
+    };
     getOrCreateChannel(channelName, (ch) =>
       ch.on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'conversations',
       }, () => {
-        fetchChatConversations();
+        debouncedFetchChats();
       }).on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'conversation_messages',
       }, () => {
-        fetchChatConversations();
+        debouncedFetchChats();
+      }).on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'conversation_participants',
+      }, () => {
+        debouncedFetchChats();
+      }).subscribe()
+    );
+    return () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      removeChannelByName(channelName);
+    };
+  }, [viewingUserId]);
+
+  useEffect(() => {
+    if (!viewingUserId) return;
+    const channelName = `inbox-notifications-${viewingUserId}`;
+    getOrCreateChannel(channelName, (ch) =>
+      ch.on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${viewingUserId}`,
+      }, () => {
+        fetchNotifications();
+      }).on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${viewingUserId}`,
+      }, () => {
+        fetchNotifications();
       }).subscribe()
     );
     return () => { removeChannelByName(channelName); };
@@ -778,7 +815,7 @@ export const Conversations: React.FC<ConversationsProps> = ({
     if (!notification.read && activeTab === 'inbox') markAsRead(notification.id);
   };
 
-  const handleSelectChat = (chat: ChatConversation) => {
+  const handleSelectChat = async (chat: ChatConversation) => {
     setSelectedChat(chat);
     setDirectChatTarget(null);
     setSelectedNotification(null);
@@ -786,6 +823,13 @@ export const Conversations: React.FC<ConversationsProps> = ({
       setChatConversations(prev => prev.map(c =>
         c.id === chat.id ? { ...c, is_unread: false } : c
       ));
+      if (viewingUserId) {
+        await supabase
+          .from('conversation_participants')
+          .update({ last_read_at: new Date().toISOString() })
+          .eq('conversation_id', chat.id)
+          .eq('user_id', viewingUserId);
+      }
     }
   };
 
