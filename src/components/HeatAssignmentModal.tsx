@@ -2539,11 +2539,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             </div>
           )}
 
-          {/* Finalise Qualifying button - shown when in qualifying phase and round is completed */}
-          {!initialEditMode && isSHRS && !isFinalsPhase && !isTransitionRound && completed && onFinaliseQualifying && round >= 1 && (
+          {/* Finalise Qualifying button - shown when in qualifying phase and at least one round has been completed */}
+          {!initialEditMode && isSHRS && !isFinalsPhase && !isTransitionRound && onFinaliseQualifying && round >= 1 && rounds.some(r => r.completed) && (
             showFinaliseConfirm ? (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-amber-400">End qualifying after Rd {round}?</span>
+                <span className="text-xs text-amber-400">End qualifying after Rd {Math.max(...rounds.filter(r => r.completed).map(r => r.round))}?</span>
                 <button
                   onClick={() => {
                     onFinaliseQualifying();
