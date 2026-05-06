@@ -196,7 +196,11 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
           allMembers.push(m);
         }
       }
-      allMembers.sort((a, b) => (a.last_name || '').localeCompare(b.last_name || ''));
+      allMembers.sort((a, b) => {
+        const firstNameCompare = (a.first_name || '').localeCompare(b.first_name || '');
+        if (firstNameCompare !== 0) return firstNameCompare;
+        return (a.last_name || '').localeCompare(b.last_name || '');
+      });
 
       const formattedMembers = allMembers.map((m: any) => {
         const club = clubsData?.find(c => c.id === m.club_id);
