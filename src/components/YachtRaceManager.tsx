@@ -892,6 +892,16 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       return;
     }
 
+    // CRITICAL: Don't auto-save if state has fewer results than what's stored in the event
+    // This prevents overwriting good data when state hasn't fully loaded yet
+    if (currentEvent.raceResults && currentEvent.raceResults.length > 0 && raceResults.length < currentEvent.raceResults.length) {
+      console.warn('⚠️ Skipping auto-save: State has fewer results than stored event data (possible data loading issue)', {
+        stateResults: raceResults.length,
+        storedResults: currentEvent.raceResults.length
+      });
+      return;
+    }
+
     // CRITICAL: Don't auto-save if we should have race results but state is empty
     // This prevents overwriting database when continuing to score a multi-day event
     if (currentEvent.multiDay && currentEvent.dayResults && Object.keys(currentEvent.dayResults).length > 0 && raceResults.length === 0) {
@@ -1804,6 +1814,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         if (isComplete) {
           highestConsecutiveRace = r;
         } else {
+          // For handicap races, also accept a race as complete if it has results
+          // with positions for at least half the skippers (handles late-added skippers)
+          if (raceType === 'handicap') {
+            const raceResultsForR = newResults.filter(res => res.race === r && (res.position !== null || res.letterScore));
+            if (raceResultsForR.length >= Math.ceil(skippers.length * 0.5) && raceResultsForR.length >= 2) {
+              highestConsecutiveRace = r;
+              continue;
+            }
+          }
           break;
         }
       }
@@ -3868,6 +3887,14 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                       if (isComplete) {
                         highestConsecutiveRace = r;
                       } else {
+                        // For handicap races, accept if at least half the skippers have results
+                        if (raceType === 'handicap') {
+                          const raceResultsForR = latestResults.filter(res => res.race === r && (res.position !== null || res.letterScore));
+                          if (raceResultsForR.length >= Math.ceil(skippers.length * 0.5) && raceResultsForR.length >= 2) {
+                            highestConsecutiveRace = r;
+                            continue;
+                          }
+                        }
                         break;
                       }
                     }

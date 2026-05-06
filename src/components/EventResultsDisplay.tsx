@@ -277,11 +277,23 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
     // Filter to only include COMPLETED races (where all active skippers have results)
     // This prevents phantom races like R13 from being included in scoring
+    const eventLastCompleted = enrichedEvent?.lastCompletedRace || 0;
+    const eventIsCompleted = enrichedEvent?.completed || false;
+
     const raceNumbers = allRaceNumbers.filter(raceNum => {
-      const raceResults = resultsByRace[raceNum] || [];
+      const raceResultsForRace = resultsByRace[raceNum] || [];
+
+      // If event is marked completed or this race is within lastCompletedRace,
+      // include it as long as it has at least 2 results with positions
+      if (eventIsCompleted || raceNum <= eventLastCompleted) {
+        const resultsWithPositions = raceResultsForRace.filter(r => r.position !== null && r.position !== undefined).length;
+        if (resultsWithPositions >= 2) {
+          return true;
+        }
+      }
 
       // Count how many active skippers have results for this race
-      const activeSkipperResultsCount = raceResults.filter(result => {
+      const activeSkipperResultsCount = raceResultsForRace.filter(result => {
         const skipper = skippers[result.skipperIndex];
         if (!skipper) return false;
 
@@ -292,8 +304,19 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
         return isActive;
       }).length;
 
-      // Only include races where ALL active skippers have results
-      return activeSkipperResultsCount >= activeSkipperCount;
+      // Include race if ALL active skippers have results (strict check)
+      if (activeSkipperResultsCount >= activeSkipperCount) {
+        return true;
+      }
+
+      // Also include race if it has at least 2 results with positions assigned
+      // This handles handicap races where not all registered skippers participated
+      const resultsWithPositions = raceResultsForRace.filter(r => r.position !== null && r.position !== undefined).length;
+      if (resultsWithPositions >= 2 && activeSkipperResultsCount >= Math.ceil(activeSkipperCount * 0.5)) {
+        return true;
+      }
+
+      return false;
     });
     
     // Prepare results with race numbers if missing
@@ -355,6 +378,33 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
           }
         });
       }
+    });
+
+    // For completed races, ensure ALL active skippers have an entry (inject DNC for missing ones)
+    // This handles the case where not all skippers participated but the race was marked complete
+    raceNumbers.forEach(raceNum => {
+      skippers.forEach((skipper, skipperIndex) => {
+        // Skip withdrawn skippers for races after withdrawal
+        if (skipper.withdrawnFromRace && typeof skipper.withdrawnFromRace === 'number' && raceNum >= skipper.withdrawnFromRace) {
+          return;
+        }
+
+        if (!skipperGroups[skipperIndex]) {
+          skipperGroups[skipperIndex] = [];
+        }
+
+        const hasResult = skipperGroups[skipperIndex].some(r => r.race === raceNum);
+        if (!hasResult) {
+          // Inject DNC (Did Not Compete) result
+          skipperGroups[skipperIndex].push({
+            skipperIndex,
+            race: raceNum,
+            position: null,
+            letterScore: null,
+            isDNC: true
+          });
+        }
+      });
     });
 
     // Calculate drops and totals
