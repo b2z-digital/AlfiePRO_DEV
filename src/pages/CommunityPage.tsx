@@ -617,7 +617,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                           {activeUser.full_name?.charAt(0)}
                         </div>
                       )}
-                      <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white"></div>
+                      <div className={`absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 ${lightMode ? 'border-white' : 'border-slate-700'}`}></div>
                     </div>
                   ))}
                 </div>
