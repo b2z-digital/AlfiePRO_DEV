@@ -512,14 +512,14 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       return matchesSearch;
     });
 
-    // Step 4: Sort by name
+    // Step 4: Sort by first name
     return filtered.sort((a, b) => {
-      const lastNameCompare = (a.last_name || '').localeCompare(b.last_name || '');
-      if (lastNameCompare !== 0) {
-        return sortDirection === 'asc' ? lastNameCompare : -lastNameCompare;
-      }
       const firstNameCompare = (a.first_name || '').localeCompare(b.first_name || '');
-      return sortDirection === 'asc' ? firstNameCompare : -firstNameCompare;
+      if (firstNameCompare !== 0) {
+        return sortDirection === 'asc' ? firstNameCompare : -firstNameCompare;
+      }
+      const lastNameCompare = (a.last_name || '').localeCompare(b.last_name || '');
+      return sortDirection === 'asc' ? lastNameCompare : -lastNameCompare;
     });
   })();
 
