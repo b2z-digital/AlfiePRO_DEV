@@ -148,6 +148,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   };
 
   const isInQualifyingRound = isShrs && shrsQualifyingRounds > 0 && heatManagement.currentRound <= shrsQualifyingRounds;
+  const isInFinals = isShrs && shrsQualifyingRounds > 0 && heatManagement.currentRound > shrsQualifyingRounds;
 
   const availableHeats = useMemo(() => {
     if (!currentRound) return [];
@@ -203,6 +204,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [raceTimerRunning, setRaceTimerRunning] = useState(false);
   const [showShareRollCall, setShowShareRollCall] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showFinalsFleetSelector, setShowFinalsFleetSelector] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -451,6 +453,25 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         return;
       }
 
+      // In SHRS finals, show fleet selector instead of auto-advancing
+      if (isInFinals) {
+        lastAutoAdvancedHeat.current = selectedHeat;
+        setTouchModeResultsConfirmed(false);
+        // Check if all heats are complete for this round
+        const allComplete = availableHeats.every(h => {
+          const p = getHeatProgress(h);
+          return p.scored >= p.total && p.total > 0;
+        });
+        if (allComplete) {
+          console.log('✅ All finals heats complete! Waiting for user to click Progress to Next Round.');
+          setShowHeatAssignments(true);
+        } else {
+          console.log(`✅ Finals heat ${selectedHeat} complete! Showing fleet selector.`);
+          setShowFinalsFleetSelector(true);
+        }
+        return;
+      }
+
       const currentHeatIndex = availableHeats.indexOf(selectedHeat);
       if (currentHeatIndex === -1) return;
 
@@ -480,7 +501,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         console.log('✅ All heats complete! Waiting for user to click Progress to Next Round.');
       }
     }
-  }, [currentRound?.results, manualSelection, selectedHeat, availableHeats, touchModeResultsConfirmed, onAdvanceToNextRound, currentRound, heatScoringMode]);
+  }, [currentRound?.results, manualSelection, selectedHeat, availableHeats, touchModeResultsConfirmed, onAdvanceToNextRound, currentRound, heatScoringMode, isInFinals]);
 
   // Handle manual heat selection
   const handleHeatSelection = (heat: HeatDesignation) => {
@@ -832,8 +853,6 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     'E': 'bg-teal-600',
     'F': 'bg-green-600',
   };
-
-  const isInFinals = isShrs && shrsQualifyingRounds > 0 && heatManagement.currentRound > shrsQualifyingRounds;
 
   const getHeatColor = (heat: HeatDesignation): string => {
     if (isInFinals) {
@@ -1566,7 +1585,10 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
                   let canScore = false;
 
-                  if (index === 0) {
+                  if (isInFinals) {
+                    // In finals, all fleets are always selectable (flexible scoring order)
+                    canScore = true;
+                  } else if (index === 0) {
                     canScore = !isComplete;
                   } else {
                     const allPriorHeatsComplete = availableHeats
@@ -2231,16 +2253,22 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               });
 
               const currentHeatIndex = availableHeats.indexOf(heat);
-              const nextIncomplete = availableHeats.find((h, idx) => {
-                if (idx <= currentHeatIndex) return false;
-                const hRoundKey = `${heatManagement.currentRound}-${h}`;
-                if (updatedVerified.has(hRoundKey)) return false;
-                const progress = getHeatProgress(h);
-                return progress.scored < progress.total || progress.total === 0;
-              });
 
-              if (nextIncomplete) {
-                pendingSpreadsheetAdvance.current = { nextHeat: nextIncomplete, fromHeat: heat };
+              if (isInFinals && !allHeatsNowVerified) {
+                // In finals, show fleet selector instead of auto-advancing
+                setShowFinalsFleetSelector(true);
+              } else {
+                const nextIncomplete = availableHeats.find((h, idx) => {
+                  if (idx <= currentHeatIndex) return false;
+                  const hRoundKey = `${heatManagement.currentRound}-${h}`;
+                  if (updatedVerified.has(hRoundKey)) return false;
+                  const progress = getHeatProgress(h);
+                  return progress.scored < progress.total || progress.total === 0;
+                });
+
+                if (nextIncomplete) {
+                  pendingSpreadsheetAdvance.current = { nextHeat: nextIncomplete, fromHeat: heat };
+                }
               }
 
               onCompleteHeat(heat);
@@ -2411,6 +2439,67 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         onExtendQualifying={onExtendQualifying}
         onUpdateRoundResults={onUpdateRoundResults}
       />
+
+      {/* Finals Fleet Selector Modal */}
+      {showFinalsFleetSelector && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+          <div className={`rounded-2xl shadow-2xl max-w-md w-full overflow-hidden ${
+            darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'
+          }`}>
+            <div className={`px-6 py-4 border-b ${
+              darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                Score Next Fleet
+              </h3>
+              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                Select which fleet to score next
+              </p>
+            </div>
+            <div className="p-6 flex flex-col gap-3">
+              {availableHeats.map((heat) => {
+                const progress = getHeatProgress(heat);
+                const isComplete = progress.scored >= progress.total && progress.total > 0;
+                return (
+                  <button
+                    key={heat}
+                    onClick={() => {
+                      setShowFinalsFleetSelector(false);
+                      lastAutoAdvancedHeat.current = null;
+                      setSelectedHeat(heat);
+                      setShowHeatAssignments(true);
+                    }}
+                    className={`
+                      flex items-center justify-between px-5 py-4 rounded-xl font-semibold text-white transition-all
+                      ${SHRS_FLEET_BUTTON_COLORS[heat] || 'bg-slate-600'}
+                      hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]
+                    `}
+                  >
+                    <span className="text-lg">{SHRS_FLEET_FULL_NAMES[heat] || `Fleet ${heat}`}</span>
+                    <span className="text-sm opacity-80">
+                      {isComplete ? 'Complete' : `${progress.scored}/${progress.total} scored`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className={`px-6 py-4 border-t ${
+              darkMode ? 'border-slate-700' : 'border-slate-200'
+            }`}>
+              <button
+                onClick={() => setShowFinalsFleetSelector(false)}
+                className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  darkMode
+                    ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Manual Heat Assignment Modal */}
       {showManualAssignModal && (
