@@ -233,6 +233,44 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
     }
   }, [raceResults, skippers]);
 
+  const hasScrolledToEmpty = useRef(false);
+  useEffect(() => {
+    if (hasScrolledToEmpty.current || singleFleetMode || !scrollContainerRef.current || activeTab !== 'races') return;
+    const timer = setTimeout(() => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      // Find the active race: first race where at least one heat has entries but not all heats do
+      let activeRace = 1;
+      for (let race = 1; race <= displayRaceCount; race++) {
+        const heatsWithEntries = heats.filter(heat => cells[getCellKey(heat, 1, race)]?.sailNumber?.trim());
+        if (heatsWithEntries.length > 0 && heatsWithEntries.length < heats.length) {
+          activeRace = race;
+          break;
+        }
+        if (heatsWithEntries.length === 0) {
+          activeRace = race;
+          break;
+        }
+      }
+      // Scroll to first empty heat in the active race
+      for (const heat of heats) {
+        const hasEntry = cells[getCellKey(heat, 1, activeRace)]?.sailNumber?.trim();
+        if (!hasEntry) {
+          const heatRow = container.querySelector(`[data-heat-header="${heat}"]`) as HTMLElement;
+          if (heatRow) {
+            heatRow.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            const firstInput = container.querySelector(`input[data-heat-input="${heat}-1-${activeRace}"]`) as HTMLInputElement;
+            if (firstInput) setTimeout(() => firstInput.focus(), 100);
+          }
+          hasScrolledToEmpty.current = true;
+          return;
+        }
+      }
+      hasScrolledToEmpty.current = true;
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [cells, heats, activeTab, singleFleetMode, displayRaceCount]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -1093,7 +1131,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
               return (
                 <React.Fragment key={heat}>
                   {!singleFleetMode && (
-                  <tr style={{ height: 14 }}>
+                  <tr style={{ height: 14 }} data-heat-header={heat}>
                     <td
                       className="sticky left-0 z-10 px-1 py-0 border-b border-r border-slate-400 font-bold text-[11px] text-black whitespace-nowrap text-center"
                       style={{ backgroundColor: '#FF00FF' }}
@@ -1178,6 +1216,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                               >
                                 <input
                                   ref={el => { inputRefs.current[`${key}-sail`] = el; }}
+                                  data-heat-input={`${heat}-${position}-${race}`}
                                   type="text"
                                   value={cell?.sailNumber || ''}
                                   onChange={e => handleSailNumberInput(heat, position, race, e.target.value)}

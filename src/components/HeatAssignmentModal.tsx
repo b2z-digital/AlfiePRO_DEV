@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, ChevronDown, FileSpreadsheet, Upload, Plus, Minus, GripVertical } from 'lucide-react';
 import { Skipper } from '../types';
@@ -73,6 +73,14 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [localResults, setLocalResults] = useState<any[] | null>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
+
+  const sortBySailNumber = useCallback((indices: number[]) => {
+    return [...indices].sort((a, b) => {
+      const sailA = parseInt(skippers[a]?.sailNo || '0', 10) || 0;
+      const sailB = parseInt(skippers[b]?.sailNo || '0', 10) || 0;
+      return sailA - sailB;
+    });
+  }, [skippers]);
 
   const handleImportHeatAssignmentsCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
     setImportError(null);
@@ -1582,7 +1590,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 }
                 if (aHasResult && !bHasResult) return -1;
                 if (!aHasResult && bHasResult) return 1;
-                return 0;
+                const sailA = parseInt(skippers[a]?.sailNo || '0', 10) || 0;
+                const sailB = parseInt(skippers[b]?.sailNo || '0', 10) || 0;
+                return sailA - sailB;
               });
 
               const heatIndex = heatIdx;
@@ -1629,7 +1639,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                           return { ...a, skipperIndices: a.skipperIndices.filter(i => i !== selectedSkipperToMove) };
                         }
                         if (a.heatDesignation === heatDesignation) {
-                          return { ...a, skipperIndices: [...a.skipperIndices, selectedSkipperToMove] };
+                          return { ...a, skipperIndices: sortBySailNumber([...a.skipperIndices, selectedSkipperToMove]) };
                         }
                         return a;
                       });
@@ -1826,7 +1836,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                     if (a.heatDesignation === targetHeat.heatDesignation) {
                                       return {
                                         ...a,
-                                        skipperIndices: [...a.skipperIndices, selectedSkipperToMove]
+                                        skipperIndices: sortBySailNumber([...a.skipperIndices, selectedSkipperToMove])
                                       };
                                     }
                                     return a;
