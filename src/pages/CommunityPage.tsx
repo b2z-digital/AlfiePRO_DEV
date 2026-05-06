@@ -600,26 +600,36 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
               <h3 className={`font-bold text-lg mb-4 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Active Now</h3>
               {activeUsers.length > 0 ? (
                 <div className="flex flex-wrap -space-x-2">
-                  {activeUsers.slice(0, 15).map(activeUser => (
-                    <div key={activeUser.id} className="relative group">
-                      {activeUser.avatar_url ? (
-                        <img
-                          src={activeUser.avatar_url}
-                          alt={activeUser.full_name}
-                          className={`w-10 h-10 rounded-full border-2 object-cover ${lightMode ? 'border-white' : 'border-slate-700'}`}
-                          title={activeUser.full_name}
-                        />
-                      ) : (
-                        <div
-                          className={`w-10 h-10 rounded-full border-2 bg-blue-500 flex items-center justify-center text-white text-xs font-bold ${lightMode ? 'border-white' : 'border-slate-700'}`}
-                          title={activeUser.full_name}
-                        >
-                          {activeUser.full_name?.charAt(0)}
+                  {activeUsers.slice(0, 15).map(activeUser => {
+                    const initials = activeUser.full_name
+                      ?.split(' ')
+                      .filter(Boolean)
+                      .map((n: string) => n[0])
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase() || '?';
+                    return (
+                      <div key={activeUser.id} className="relative group">
+                        {activeUser.avatar_url ? (
+                          <img
+                            src={activeUser.avatar_url}
+                            alt={activeUser.full_name}
+                            className={`w-10 h-10 rounded-full border-2 object-cover ${lightMode ? 'border-white' : 'border-slate-700'}`}
+                          />
+                        ) : (
+                          <div
+                            className={`w-10 h-10 rounded-full border-2 bg-blue-500 flex items-center justify-center text-white text-xs font-bold ${lightMode ? 'border-white' : 'border-slate-700'}`}
+                          >
+                            {initials}
+                          </div>
+                        )}
+                        <div className={`absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 ${lightMode ? 'border-white' : 'border-slate-700'}`}></div>
+                        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-slate-900 text-white text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          {activeUser.full_name}
                         </div>
-                      )}
-                      <div className={`absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 ${lightMode ? 'border-white' : 'border-slate-700'}`}></div>
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className={`text-sm text-center py-4 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>No one is active right now</p>
