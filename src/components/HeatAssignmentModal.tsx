@@ -359,6 +359,18 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
   const totalPreAssignedRounds = shrsHasPreAssignments ? heatManagement.rounds.length : 0;
 
+  // Heat balance checking for initialEditMode
+  const heatBalanceInfo = useMemo(() => {
+    if (!localAssignments || !initialEditMode) return null;
+    const sizes = localAssignments.map(a => a.skipperIndices.length);
+    const minSize = Math.min(...sizes);
+    const maxSize = Math.max(...sizes);
+    const isBalanced = maxSize - minSize <= 1;
+    return { isBalanced, sizes, minSize, maxSize };
+  }, [localAssignments, initialEditMode]);
+
+  const heatsAreBalanced = !heatBalanceInfo || heatBalanceInfo.isBalanced;
+
   const downloadCsv = (content: string, filename: string) => {
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -1223,7 +1235,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 {' '} • {heatAssignments.length} heats
                 {editMode && <span className="ml-2 text-amber-500 font-semibold">• Edit Mode</span>}
                 {!editMode && hasAppliedChanges && <span className="ml-2 text-green-500 font-semibold">• Changes Applied</span>}
-                {initialEditMode && <span className="ml-2 text-amber-500 font-semibold">• Tap unranked skippers to swap between heats</span>}
+                {initialEditMode && <span className="ml-2 text-amber-500 font-semibold">• Tap skipper then tap heat to move - balance heats before saving</span>}
               </p>
             </div>
           </div>
@@ -1581,6 +1593,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               const lowerHeatCompleted = lowerCompleted;
 
               const isDropTarget = initialEditMode && selectedSkipperToMove !== null && !skipperIndices.includes(selectedSkipperToMove);
+              const isOverfull = initialEditMode && heatBalanceInfo && !heatBalanceInfo.isBalanced && skipperIndices.length > heatBalanceInfo.minSize + 1;
+              const isUnderfull = initialEditMode && heatBalanceInfo && !heatBalanceInfo.isBalanced && skipperIndices.length < heatBalanceInfo.maxSize - 1;
 
               return (
                 <div
@@ -1588,9 +1602,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   className={`rounded-lg border-2 overflow-hidden flex flex-col flex-1 min-w-0 relative ${
                     isDropTarget
                       ? 'border-amber-400 ring-2 ring-amber-400/50'
-                      : heatCompleted
-                        ? 'border-emerald-500/60'
-                        : darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
+                      : isOverfull
+                        ? 'border-red-400 ring-1 ring-red-400/30'
+                        : isUnderfull
+                          ? 'border-amber-400 ring-1 ring-amber-400/30'
+                          : heatCompleted
+                            ? 'border-emerald-500/60'
+                            : darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
                   }`}
                 >
                   {heatCompleted && (
@@ -1605,15 +1623,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       if (!isDropTarget || selectedSkipperToMove === null || !localAssignments) return;
                       const targetAssignment = localAssignments.find(a => a.heatDesignation === heatDesignation);
                       if (!targetAssignment) return;
-                      const unrankedInTarget = targetAssignment.skipperIndices.filter(i => !rankedSkipperIndices.has(i));
-                      if (unrankedInTarget.length === 0) return;
-                      const swapWith = unrankedInTarget[unrankedInTarget.length - 1];
+                      // Move skipper to target heat without auto-swapping
                       const updated = localAssignments.map(a => {
-                        if (a.skipperIndices.includes(selectedSkipperToMove)) {
-                          return { ...a, skipperIndices: a.skipperIndices.map(i => i === selectedSkipperToMove ? swapWith : i) };
+                        if (a.skipperIndices.includes(selectedSkipperToMove) && a.heatDesignation !== heatDesignation) {
+                          return { ...a, skipperIndices: a.skipperIndices.filter(i => i !== selectedSkipperToMove) };
                         }
                         if (a.heatDesignation === heatDesignation) {
-                          return { ...a, skipperIndices: a.skipperIndices.map(i => i === swapWith ? selectedSkipperToMove : i) };
+                          return { ...a, skipperIndices: [...a.skipperIndices, selectedSkipperToMove] };
                         }
                         return a;
                       });
@@ -1627,7 +1643,21 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         {(isSHRS ? getSHRSHeatLabel(heatDesignation, round, configuration) : `Heat ${getHeatDisplayLabel(heatDesignation, configuration)}`).toUpperCase()}
                       </h3>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-white opacity-80">{skippersToDisplay.length} skippers</span>
+                        {initialEditMode && heatBalanceInfo && !heatBalanceInfo.isBalanced ? (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            skipperIndices.length > heatBalanceInfo.minSize + 1
+                              ? 'bg-red-500/80 text-white'
+                              : skipperIndices.length < heatBalanceInfo.maxSize - 1
+                                ? 'bg-amber-500/80 text-white'
+                                : 'text-white opacity-80'
+                          }`}>
+                            {skipperIndices.length} skippers
+                            {skipperIndices.length > heatBalanceInfo.minSize + 1 && ' (overfull)'}
+                            {skipperIndices.length < heatBalanceInfo.maxSize - 1 && ' (needs more)'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-white opacity-80">{skippersToDisplay.length} skippers</span>
+                        )}
                         {heatCompleted ? (
                           <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/20 text-white backdrop-blur-sm">
                             <Check size={10} className="text-white" />
@@ -1643,7 +1673,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     {isDropTarget && (
                       <div className="flex items-center gap-1 mt-1 text-xs font-semibold text-amber-200">
                         <ArrowRight size={12} />
-                        Swap skipper here
+                        Move skipper here
                       </div>
                     )}
                   </div>
@@ -1785,17 +1815,18 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 const sourceHeat = localAssignments.find(a => a.skipperIndices.includes(selectedSkipperToMove));
                                 const targetHeat = localAssignments.find(a => a.skipperIndices.includes(skipperIndex));
                                 if (sourceHeat && targetHeat && sourceHeat.heatDesignation !== targetHeat.heatDesignation) {
+                                  // Move selected skipper to the target heat without auto-swapping
                                   const updated = localAssignments.map(a => {
                                     if (a.heatDesignation === sourceHeat.heatDesignation) {
                                       return {
                                         ...a,
-                                        skipperIndices: a.skipperIndices.map(i => i === selectedSkipperToMove ? skipperIndex : i)
+                                        skipperIndices: a.skipperIndices.filter(i => i !== selectedSkipperToMove)
                                       };
                                     }
                                     if (a.heatDesignation === targetHeat.heatDesignation) {
                                       return {
                                         ...a,
-                                        skipperIndices: a.skipperIndices.map(i => i === skipperIndex ? selectedSkipperToMove : i)
+                                        skipperIndices: [...a.skipperIndices, selectedSkipperToMove]
                                       };
                                     }
                                     return a;
@@ -2037,7 +2068,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               )}
                               {isSelectedForMove && (
                                 <span className="flex-shrink-0 text-[9px] font-semibold text-amber-600 dark:text-amber-400">
-                                  Tap to swap
+                                  Tap heat to move
                                 </span>
                               )}
                             </div>
@@ -2247,7 +2278,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         }`}>
           {/* Initial edit mode controls */}
           {initialEditMode && (
-            <div className="flex gap-3">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => {
                   setInitialEditMode(false);
@@ -2262,6 +2293,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               >
                 Cancel
               </button>
+              {!heatsAreBalanced && (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
+                  <AlertCircle size={14} />
+                  Heats unbalanced - move skippers to balance before saving
+                </span>
+              )}
               <button
                 onClick={() => {
                   if (localAssignments && onUpdateAssignments) {
@@ -2275,7 +2312,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   setInitialEditMode(false);
                   setSelectedSkipperToMove(null);
                 }}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm text-white"
+                disabled={!heatsAreBalanced}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm text-white ${
+                  !heatsAreBalanced
+                    ? 'bg-slate-500 cursor-not-allowed opacity-50'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
                 <Check size={18} />
                 Apply Changes
