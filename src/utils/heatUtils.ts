@@ -76,8 +76,12 @@ export const completeHeat = (
   const heatIndex = availableHeats.indexOf(heat);
   if (heatIndex === -1) return heatManagement;
 
+  // Determine if we're in SHRS finals (flexible fleet ordering)
+  const shrsQualRounds = configuration?.shrsQualifyingRounds || 0;
+  const isShrsFinalsRound = isShrs && shrsQualRounds > 0 && currentRound > shrsQualRounds;
+
   let nextHeat: HeatDesignation | null = null;
-  if (heatIndex < availableHeats.length - 1) {
+  if (!isShrsFinalsRound && heatIndex < availableHeats.length - 1) {
     nextHeat = availableHeats[heatIndex + 1];
   }
 

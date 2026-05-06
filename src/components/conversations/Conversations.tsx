@@ -158,6 +158,18 @@ export const Conversations: React.FC<ConversationsProps> = ({
   }, [initialRecipientId, initialShowCompose]);
 
   useEffect(() => {
+    if (!loading && topLevelTab === 'inbox' && !selectedNotification && !showCompose && notifications.length > 0) {
+      setSelectedNotification(notifications[0]);
+    }
+  }, [loading, notifications, topLevelTab]);
+
+  useEffect(() => {
+    if (!loading && topLevelTab === 'chats' && !selectedChat && !directChatTarget && chatConversations.length > 0) {
+      setSelectedChat(chatConversations[0]);
+    }
+  }, [loading, chatConversations, topLevelTab]);
+
+  useEffect(() => {
     if (initialChatWith && initialChatName) {
       setTopLevelTab('chats');
       setDirectChatTarget({ id: initialChatWith, name: initialChatName, avatar: initialChatAvatar });

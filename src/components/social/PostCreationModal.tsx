@@ -45,10 +45,17 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
       loadProfile();
       if (propGroups && propGroups.length > 0) {
         setUserGroups(propGroups);
+        if (!groupId && currentClub?.clubId) {
+          const clubGroup = propGroups.find(g => g.club_id === currentClub.clubId && g.group_type === 'club');
+          if (clubGroup) setSelectedGroupId(clubGroup.id);
+          else setSelectedGroupId(undefined);
+        } else {
+          setSelectedGroupId(groupId);
+        }
       } else {
         loadUserGroups();
       }
-      setSelectedGroupId(groupId);
+      if (groupId) setSelectedGroupId(groupId);
     }
   }, [isOpen, user, groupId]);
 
@@ -56,6 +63,11 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
     try {
       const data = await socialStorage.getGroups({ userId: user?.id });
       setUserGroups(data || []);
+      // Default to the user's club group if no specific group was passed
+      if (!groupId && currentClub?.clubId && data) {
+        const clubGroup = data.find(g => g.club_id === currentClub.clubId && g.group_type === 'club');
+        if (clubGroup) setSelectedGroupId(clubGroup.id);
+      }
     } catch (error) {
       console.error('Error loading groups:', error);
     }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, MessageCircle, Share2, MoveHorizontal as MoreHorizontal, Globe, Users, Lock, Trash2, Flag, MapPin, Smile, ExternalLink, ShieldAlert } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Ellipsis, Globe, Users, Lock, Trash2, Flag, MapPin, Smile, ExternalLink, ShieldAlert } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { SocialPost } from '../../utils/socialStorage';
 import { socialStorage } from '../../utils/socialStorage';
@@ -144,7 +144,7 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
               onClick={() => setShowMenu(!showMenu)}
               className={`p-2 rounded-full transition-colors ${lightMode ? 'hover:bg-gray-100' : 'hover:bg-slate-700/50'}`}
             >
-              <MoreHorizontal className={`w-5 h-5 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`} />
+              <Ellipsis className={`w-5 h-5 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`} />
             </button>
 
             {showMenu && (
