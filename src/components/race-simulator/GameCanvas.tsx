@@ -7,6 +7,7 @@ interface GameCanvasProps {
   width: number;
   height: number;
   darkMode: boolean;
+  playerSheetAngle?: number;
 }
 
 // Wind variation: compute local wind strength at a given position and time
@@ -24,7 +25,7 @@ function getLocalWindStrength(x: number, y: number, time: number, width: number,
   return 1.0 + (wave1 + wave2 + wave3) * 0.15;
 }
 
-export function GameCanvas({ gameState, width, height, darkMode }: GameCanvasProps) {
+export function GameCanvas({ gameState, width, height, darkMode, playerSheetAngle }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const draw = useCallback(() => {
@@ -74,7 +75,7 @@ export function GameCanvas({ gameState, width, height, darkMode }: GameCanvasPro
 
     // Draw boats
     for (const boat of gameState.boats) {
-      drawBoat(ctx, boat, gameState.wind, darkMode);
+      drawBoat(ctx, boat, gameState.wind, darkMode, boat.isPlayer ? playerSheetAngle : undefined);
     }
 
     // Draw rule violation indicator
@@ -84,7 +85,7 @@ export function GameCanvas({ gameState, width, height, darkMode }: GameCanvasPro
 
     // Draw wind direction indicator in top-right
     drawWindDirectionIndicator(ctx, gameState.wind, gameState.time, width, darkMode);
-  }, [gameState, width, height, darkMode]);
+  }, [gameState, width, height, darkMode, playerSheetAngle]);
 
   useEffect(() => {
     draw();
@@ -504,7 +505,7 @@ function drawWakeTrail(ctx: CanvasRenderingContext2D, boat: Boat, time: number) 
   ctx.restore();
 }
 
-function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMode: boolean) {
+function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMode: boolean, sheetAngle?: number) {
   if (boat.finished) return;
 
   const { x, y } = boat.position;
@@ -514,35 +515,158 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
   ctx.translate(x, y);
   ctx.rotate(headingRad);
 
-  const boatLength = boat.isPlayer ? 16 : 14;
-  const boatWidth = boat.isPlayer ? 5 : 4;
+  const boatLength = boat.isPlayer ? 20 : 16;
+  const boatWidth = boat.isPlayer ? 4.5 : 3.5;
 
-  // Hull
+  // Compute sail deflection based on wind angle and sheet trim
+  const windAngleRel = normalizeAngle(wind.direction - boat.heading);
+  const windSide = Math.sin(degToRad(windAngleRel)); // positive = wind from starboard
+  const absWindAngle = Math.abs(windAngleRel > 180 ? windAngleRel - 360 : windAngleRel);
+
+  // Sheet angle determines how far out the sail can go
+  // sheetAngle: 0 = fully eased (sails out), 1 = fully sheeted in (sails close to centerline)
+  const sheet = sheetAngle !== undefined ? sheetAngle : 0.7;
+  const maxSailDeflection = (1 - sheet) * 1.2; // radians - how far sails can swing out
+  // Sail swings to leeward (away from wind)
+  const sailDeflect = windSide > 0
+    ? -Math.min(maxSailDeflection, absWindAngle * 0.008)
+    : Math.min(maxSailDeflection, absWindAngle * 0.008);
+
+  // Hull - sleek yacht shape with defined bow and transom stern
   ctx.fillStyle = boat.color;
   ctx.strokeStyle = darkMode ? '#ffffff' : '#1e293b';
-  ctx.lineWidth = boat.isPlayer ? 2 : 1;
+  ctx.lineWidth = boat.isPlayer ? 1.8 : 1.2;
 
   ctx.beginPath();
-  ctx.moveTo(0, -boatLength);
-  ctx.bezierCurveTo(boatWidth, -boatLength * 0.3, boatWidth, boatLength * 0.5, 0, boatLength);
-  ctx.bezierCurveTo(-boatWidth, boatLength * 0.5, -boatWidth, -boatLength * 0.3, 0, -boatLength);
+  // Bow (pointed, front of boat = negative Y since heading is up)
+  ctx.moveTo(0, -boatLength * 0.9);
+  // Starboard gunwale (right side)
+  ctx.bezierCurveTo(
+    boatWidth * 0.6, -boatLength * 0.6,
+    boatWidth, -boatLength * 0.1,
+    boatWidth * 0.9, boatLength * 0.3
+  );
+  // Transom (flat stern)
+  ctx.bezierCurveTo(
+    boatWidth * 0.7, boatLength * 0.5,
+    boatWidth * 0.3, boatLength * 0.55,
+    0, boatLength * 0.55
+  );
+  ctx.bezierCurveTo(
+    -boatWidth * 0.3, boatLength * 0.55,
+    -boatWidth * 0.7, boatLength * 0.5,
+    -boatWidth * 0.9, boatLength * 0.3
+  );
+  // Port gunwale (left side)
+  ctx.bezierCurveTo(
+    -boatWidth, -boatLength * 0.1,
+    -boatWidth * 0.6, -boatLength * 0.6,
+    0, -boatLength * 0.9
+  );
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
-  // Sail
-  const windAngleRel = normalizeAngle(wind.direction - boat.heading);
-  const sailAngle = Math.sin(degToRad(windAngleRel)) * 0.6;
+  // Deck detail - centerline
+  ctx.strokeStyle = darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -boatLength * 0.7);
+  ctx.lineTo(0, boatLength * 0.4);
+  ctx.stroke();
 
-  ctx.strokeStyle = darkMode ? '#f8fafc' : '#f1f5f9';
-  ctx.fillStyle = boat.isPlayer ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.2)';
+  // Mast position (slightly forward of center)
+  const mastY = -boatLength * 0.15;
+
+  // Mast dot
+  ctx.fillStyle = darkMode ? '#94a3b8' : '#475569';
+  ctx.beginPath();
+  ctx.arc(0, mastY, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Boom/mainsail - attached to mast, swings with sail angle
+  const mainSailLength = boatLength * 0.6;
+  const mainSailBoom = mainSailLength * 0.85;
+
+  ctx.save();
+  ctx.translate(0, mastY);
+  ctx.rotate(sailDeflect);
+
+  // Mainsail shape (triangular with curve/belly)
+  ctx.fillStyle = boat.isPlayer
+    ? 'rgba(255, 255, 255, 0.85)'
+    : 'rgba(255, 255, 255, 0.6)';
+  ctx.strokeStyle = boat.isPlayer
+    ? (darkMode ? '#e2e8f0' : '#cbd5e1')
+    : (darkMode ? '#94a3b8' : '#94a3b8');
+  ctx.lineWidth = 1;
+
+  const bellyCurve = (1 - sheet) * 3 + 1.5; // sail belly increases when eased
+  ctx.beginPath();
+  ctx.moveTo(0, -mainSailLength * 0.85); // Head (top of sail, along mast)
+  // Leech (trailing edge) with belly
+  ctx.quadraticCurveTo(
+    bellyCurve, -mainSailLength * 0.3,
+    0, mainSailBoom * 0.95 // Clew (back corner)
+  );
+  // Foot (bottom edge along boom)
+  ctx.lineTo(0, 0); // Tack (mast base)
+  // Luff (leading edge along mast)
+  ctx.lineTo(0, -mainSailLength * 0.85);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Boom line
+  ctx.strokeStyle = darkMode ? '#64748b' : '#94a3b8';
   ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, mainSailBoom * 0.95);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Jib (foresail) - attached ahead of mast
+  const jibAttachY = -boatLength * 0.75; // forestay attachment point
+  const jibLength = boatLength * 0.5;
+  const jibDeflect = sailDeflect * 0.85; // jib deflects slightly less than main
+
+  ctx.save();
+  ctx.translate(0, jibAttachY);
+  ctx.rotate(jibDeflect);
+
+  const jibBelly = (1 - sheet) * 2.5 + 1;
+  ctx.fillStyle = boat.isPlayer
+    ? 'rgba(240, 248, 255, 0.8)'
+    : 'rgba(255, 255, 255, 0.5)';
+  ctx.strokeStyle = boat.isPlayer
+    ? (darkMode ? '#bfdbfe' : '#93c5fd')
+    : (darkMode ? '#94a3b8' : '#94a3b8');
+  ctx.lineWidth = 0.8;
 
   ctx.beginPath();
-  ctx.moveTo(0, -boatLength * 0.6);
-  ctx.quadraticCurveTo(sailAngle * boatLength, 0, 0, boatLength * 0.3);
-  ctx.stroke();
+  ctx.moveTo(0, 0); // Head (top)
+  // Leech with belly
+  ctx.quadraticCurveTo(
+    jibBelly, jibLength * 0.4,
+    0, jibLength // Clew
+  );
+  // Foot
+  ctx.lineTo(0, 0);
+  ctx.closePath();
   ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Forestay line (mast to bow)
+  ctx.strokeStyle = darkMode ? 'rgba(148,163,184,0.4)' : 'rgba(71,85,105,0.3)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(0, mastY);
+  ctx.lineTo(0, -boatLength * 0.85);
+  ctx.stroke();
 
   ctx.restore();
 
@@ -565,12 +689,12 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
     ctx.strokeStyle = '#ef4444';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(x, y, 20, 0, Math.PI * 2);
+    ctx.arc(x, y, 22, 0, Math.PI * 2);
     ctx.stroke();
     ctx.fillStyle = '#ef4444';
     ctx.font = 'bold 10px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText('360', x, y - 24);
+    ctx.fillText('360', x, y - 26);
     ctx.restore();
   }
 
@@ -579,7 +703,7 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
   ctx.fillStyle = darkMode ? '#cbd5e1' : '#475569';
   ctx.font = '9px system-ui';
   ctx.textAlign = 'center';
-  ctx.fillText(boat.sailNumber, x, y + boatLength + 12);
+  ctx.fillText(boat.sailNumber, x, y + boatLength * 0.55 + 14);
   ctx.restore();
 }
 
