@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, ChevronDown, FileSpreadsheet, Upload } from 'lucide-react';
+import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, ChevronDown, FileSpreadsheet, Upload, Plus, Minus, GripVertical } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound, getHeatDisplayLabel } from '../types/heat';
 import { RaceEvent } from '../types/race';
@@ -9,6 +9,8 @@ import { selectObservers, saveObserverAssignments, getObserverAssignments, getOb
 import { supabase } from '../utils/supabase';
 import { exportSingleRoundPdf, exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 import { validateHeatAssignments } from '../utils/hmsHeatSystem';
+import { DiversityGauge } from './DiversityGauge';
+import { estimateDiversityMetrics } from '../utils/shrsHeatSystem';
 
 interface HeatAssignmentModalProps {
   isOpen: boolean;
@@ -23,6 +25,8 @@ interface HeatAssignmentModalProps {
   onUpdateAssignments?: (assignments: HeatAssignment[], targetRound?: number) => void;
   onAdvanceToNextRound?: (nextRoundNumber: number) => void;
   onFinaliseQualifying?: () => void;
+  onExtendQualifying?: (newQualifyingRounds: number) => void;
+  onUpdateRoundResults?: (roundNumber: number, updatedResults: any[]) => void;
   onImportAllRoundAssignments?: (allRoundAssignments: HeatAssignment[][]) => void;
 }
 
@@ -39,6 +43,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   onUpdateAssignments,
   onAdvanceToNextRound,
   onFinaliseQualifying,
+  onExtendQualifying,
+  onUpdateRoundResults,
   onImportAllRoundAssignments
 }) => {
   const [editMode, setEditMode] = useState(false);
@@ -59,6 +65,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const [showQualifyingCompletePrompt, setShowQualifyingCompletePrompt] = useState(false);
+  const [showExtendSettings, setShowExtendSettings] = useState(false);
+  const [extendRoundCount, setExtendRoundCount] = useState(0);
+  const [editResultsMode, setEditResultsMode] = useState(false);
+  const [draggedSkipper, setDraggedSkipper] = useState<{ skipperIndex: number; heatDesignation: string; fromPosition: number } | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<{ skipperIndex: number; heatDesignation: string } | null>(null);
+  const [localResults, setLocalResults] = useState<any[] | null>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -669,6 +681,24 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       setInitialEditMode(false);
       setSelectedSkipperToMove(null);
       setLocalAssignments(null);
+
+      // Set previewRoundIndex to match the round that will actually be displayed
+      const isSHRSPreset = heatManagement.configuration.scoringSystem === 'shrs' &&
+        heatManagement.configuration.shrsAssignmentMode === 'preset' &&
+        heatManagement.rounds.length > 1;
+      if (isSHRSPreset) {
+        const rjc = heatManagement.roundJustCompleted;
+        let displayIdx: number;
+        if (rjc) {
+          displayIdx = heatManagement.rounds.findIndex(r => r.round === rjc);
+        } else {
+          const firstIncomplete = heatManagement.rounds.findIndex(r => !r.completed);
+          displayIdx = firstIncomplete >= 0 ? firstIncomplete : heatManagement.rounds.findIndex(r => r.round === heatManagement.currentRound);
+        }
+        setPreviewRoundIndex(displayIdx >= 0 ? displayIdx : 0);
+      } else {
+        setPreviewRoundIndex(null);
+      }
     } else {
       resolvedObserverSettings.current = null;
     }
@@ -711,6 +741,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     if (!isOpen) {
       preAllocationDone.current = false;
       setShowFinaliseConfirm(false);
+      setShowQualifyingCompletePrompt(false);
+      setShowExtendSettings(false);
     }
   }, [isOpen]);
 
@@ -1054,6 +1086,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
   // Check if this is any unplayed round (no results yet) - allows editing future rounds
   const isUnplayedRound = !completed && (!results || results.length === 0);
+
+  // Check if viewing a previously-scored historical round (not the active round)
+  const isHistoricalRound = completed && round !== roundJustCompleted && previewRoundIndex !== null && (() => {
+    const firstIncompleteRound = rounds.find(r => !r.completed);
+    return firstIncompleteRound ? round < firstIncompleteRound.round : false;
+  })();
 
   // Check if any heat has scoring in progress (partial results)
   const anyScoringInProgress = !completed && heatAssignments.some(assignment => {
@@ -1501,6 +1539,15 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               }
 
               const sortedSkippers = [...skippersToDisplay].sort((a, b) => {
+                // In edit results mode, sort by localResults positions
+                if (editResultsMode && localResults) {
+                  const localA = localResults.find(r => r.skipperIndex === a && r.heatDesignation === heatDesignation);
+                  const localB = localResults.find(r => r.skipperIndex === b && r.heatDesignation === heatDesignation);
+                  const posA = localA?.position ?? 999;
+                  const posB = localB?.position ?? 999;
+                  return posA - posB;
+                }
+
                 const resultA = heatResults.find(r => r.skipperIndex === a);
                 const resultB = heatResults.find(r => r.skipperIndex === b);
 
@@ -1603,7 +1650,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
                   {/* Skipper List - Vertical scroll within column */}
                   <div className={`flex-1 p-2 flex flex-col gap-1.5 overflow-y-auto relative ${
-                    heatCompleted && !editMode ? 'opacity-75' : ''
+                    heatCompleted && !editMode && !editResultsMode ? 'opacity-75' : ''
                   }`}>
                     {sortedSkippers.map((skipperIndex, idx) => {
                       const skipper = skippers[skipperIndex];
@@ -1848,7 +1895,63 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               });
                             }
                           }}
+                          draggable={editResultsMode && isHistoricalRound}
+                          onDragStart={(e) => {
+                            if (!editResultsMode || !isHistoricalRound) return;
+                            e.dataTransfer.effectAllowed = 'move';
+                            const localResult = localResults?.find(r => r.skipperIndex === skipperIndex && r.heatDesignation === heatDesignation);
+                            setDraggedSkipper({ skipperIndex, heatDesignation, fromPosition: localResult?.position ?? idx + 1 });
+                          }}
+                          onDragEnd={() => {
+                            setDraggedSkipper(null);
+                            setDragOverTarget(null);
+                          }}
+                          onDragOver={(e) => {
+                            if (!editResultsMode || !draggedSkipper || draggedSkipper.heatDesignation !== heatDesignation) return;
+                            if (draggedSkipper.skipperIndex === skipperIndex) return;
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                            setDragOverTarget({ skipperIndex, heatDesignation });
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverTarget?.skipperIndex === skipperIndex) {
+                              setDragOverTarget(null);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (!editResultsMode || !draggedSkipper || !localResults) return;
+                            if (draggedSkipper.heatDesignation !== heatDesignation) return;
+                            if (draggedSkipper.skipperIndex === skipperIndex) return;
+
+                            // Swap positions between dragged and target within same heat
+                            const updatedResults = localResults.map(r => {
+                              if (r.heatDesignation !== heatDesignation) return r;
+                              if (r.skipperIndex === draggedSkipper.skipperIndex) {
+                                const targetResult = localResults.find(lr => lr.skipperIndex === skipperIndex && lr.heatDesignation === heatDesignation);
+                                return { ...r, position: targetResult?.position ?? r.position };
+                              }
+                              if (r.skipperIndex === skipperIndex) {
+                                const dragResult = localResults.find(lr => lr.skipperIndex === draggedSkipper.skipperIndex && lr.heatDesignation === heatDesignation);
+                                return { ...r, position: dragResult?.position ?? r.position };
+                              }
+                              return r;
+                            });
+                            setLocalResults(updatedResults);
+                            setDraggedSkipper(null);
+                            setDragOverTarget(null);
+                          }}
                           className={`p-1.5 rounded border-2 transition-all ${
+                            editResultsMode && isHistoricalRound ? 'cursor-grab active:cursor-grabbing' : ''
+                          } ${
+                            editResultsMode && dragOverTarget?.skipperIndex === skipperIndex && dragOverTarget?.heatDesignation === heatDesignation
+                              ? 'ring-2 ring-blue-400 border-blue-400 scale-[1.02]'
+                              : ''
+                          } ${
+                            editResultsMode && draggedSkipper?.skipperIndex === skipperIndex
+                              ? 'opacity-50 scale-95'
+                              : ''
+                          } ${
                             isSelectedForMove
                               ? 'ring-2 ring-amber-400 cursor-pointer'
                               : isMovable
@@ -1871,17 +1974,25 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                           }`}
                         >
                           <div className="flex items-center gap-1.5">
-                            {result && result.position !== null && (
-                              <span className={`
-                                flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold
-                                ${result.position === 1 ? 'bg-yellow-500 text-yellow-900' :
-                                  result.position === 2 ? 'bg-slate-300 text-slate-900' :
-                                  result.position === 3 ? 'bg-amber-600 text-white' :
-                                  darkMode ? 'bg-slate-600 text-white' : 'bg-slate-200 text-slate-900'}
-                              `}>
-                                {result.position}
-                              </span>
+                            {editResultsMode && isHistoricalRound && (
+                              <GripVertical size={14} className={`flex-shrink-0 ${darkMode ? 'text-slate-400' : 'text-slate-400'}`} />
                             )}
+                            {result && result.position !== null && (() => {
+                              const displayPos = editResultsMode && localResults
+                                ? (localResults.find(r => r.skipperIndex === skipperIndex && r.heatDesignation === heatDesignation)?.position ?? result.position)
+                                : result.position;
+                              return (
+                                <span className={`
+                                  flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold
+                                  ${displayPos === 1 ? 'bg-yellow-500 text-yellow-900' :
+                                    displayPos === 2 ? 'bg-slate-300 text-slate-900' :
+                                    displayPos === 3 ? 'bg-amber-600 text-white' :
+                                    darkMode ? 'bg-slate-600 text-white' : 'bg-slate-200 text-slate-900'}
+                                `}>
+                                  {displayPos}
+                                </span>
+                              );
+                            })()}
 
                             <div className={`flex-shrink-0 min-w-[3rem] px-1.5 py-0.5 text-xs rounded font-bold text-center ${
                               darkMode ? 'bg-slate-600 text-white' : 'bg-slate-200 text-slate-900'
@@ -2462,49 +2573,183 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
           {/* Qualifying Complete Prompt - shown when last qualifying round is completed */}
           {!initialEditMode && isSHRS && completed && !isFinalsPhase && round === (configuration.shrsQualifyingRounds || 0) && showQualifyingCompletePrompt && (
-            <div className={`flex flex-col gap-2 p-3 rounded-lg border ${
+            <div className={`flex flex-col gap-3 p-4 rounded-lg border ${
               darkMode ? 'bg-slate-800 border-slate-600' : 'bg-slate-50 border-slate-200'
             }`}>
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                All {configuration.shrsQualifyingRounds} qualifying rounds complete
-              </p>
-              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Would you like to proceed to finals or extend qualifying?
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setShowQualifyingCompletePrompt(false);
-                    if (onFinaliseQualifying) {
-                      onFinaliseQualifying();
-                      onClose();
-                    }
-                  }}
-                  className="flex-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-gradient-to-r from-amber-600 to-yellow-600 text-white hover:from-amber-700 hover:to-yellow-700 transition-colors"
-                >
-                  Proceed to Finals
-                </button>
-                <button
-                  onClick={() => {
-                    setShowQualifyingCompletePrompt(false);
-                    onClose();
-                  }}
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    darkMode
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-blue-500 text-white hover:bg-blue-600'
-                  }`}
-                >
-                  Extend Qualifying
-                </button>
-              </div>
-              <p className={`text-xs italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                To extend, close this and increase qualifying rounds in Race Settings.
-              </p>
+              {!showExtendSettings ? (
+                <>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                    All {configuration.shrsQualifyingRounds} qualifying rounds complete
+                  </p>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Would you like to proceed to finals or extend qualifying with additional rounds?
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setShowQualifyingCompletePrompt(false);
+                        if (onFinaliseQualifying) {
+                          onFinaliseQualifying();
+                          onClose();
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-amber-600 to-yellow-600 text-white hover:from-amber-700 hover:to-yellow-700 transition-colors"
+                    >
+                      Proceed to Finals
+                    </button>
+                    <button
+                      onClick={() => {
+                        setExtendRoundCount((configuration.shrsQualifyingRounds || 0) + 2);
+                        setShowExtendSettings(true);
+                      }}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        darkMode
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-blue-500 text-white hover:bg-blue-600'
+                      }`}
+                    >
+                      Extend Qualifying
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                    Extend Qualifying Rounds
+                  </p>
+                  <div className={`flex items-center gap-3 p-3 rounded-lg ${
+                    darkMode ? 'bg-slate-700/50' : 'bg-white border border-slate-200'
+                  }`}>
+                    <span className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                      Qualifying Rounds:
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setExtendRoundCount(prev => Math.max((configuration.shrsQualifyingRounds || 0) + 1, prev - 1))}
+                        disabled={extendRoundCount <= (configuration.shrsQualifyingRounds || 0) + 1}
+                        className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                          extendRoundCount <= (configuration.shrsQualifyingRounds || 0) + 1
+                            ? 'opacity-30 cursor-not-allowed'
+                            : darkMode ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                        }`}
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <span className={`text-lg font-bold min-w-[2rem] text-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {extendRoundCount}
+                      </span>
+                      <button
+                        onClick={() => setExtendRoundCount(prev => Math.min((configuration.numberOfRounds || 12) - 2, prev + 1))}
+                        disabled={extendRoundCount >= (configuration.numberOfRounds || 12) - 2}
+                        className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                          extendRoundCount >= (configuration.numberOfRounds || 12) - 2
+                            ? 'opacity-30 cursor-not-allowed'
+                            : darkMode ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                        }`}
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                    <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      (+{extendRoundCount - (configuration.shrsQualifyingRounds || 0)} rounds)
+                    </span>
+                  </div>
+                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Finals rounds: {Math.max(0, (configuration.numberOfRounds || 12) - extendRoundCount)}
+                  </div>
+
+                  {/* Diversity Gauge Preview */}
+                  <div className={`rounded-lg overflow-hidden ${darkMode ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
+                    <DiversityGauge
+                      totalSkippers={skippers.length}
+                      numberOfHeats={configuration.numberOfHeats || 2}
+                      qualifyingRounds={extendRoundCount}
+                      darkMode={darkMode}
+                    />
+                  </div>
+
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={() => setShowExtendSettings(false)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (onExtendQualifying) {
+                          onExtendQualifying(extendRoundCount);
+                        }
+                        setShowQualifyingCompletePrompt(false);
+                        setShowExtendSettings(false);
+                      }}
+                      className="flex-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 transition-colors"
+                    >
+                      Apply & Continue Qualifying
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
-          {!initialEditMode && <button
+          {/* Edit Results button for historical (already scored) rounds */}
+          {!initialEditMode && isHistoricalRound && !editResultsMode && onUpdateRoundResults && (
+            <button
+              onClick={() => {
+                setEditResultsMode(true);
+                setLocalResults(results ? [...results] : []);
+              }}
+              className={`px-4 py-1.5 rounded-lg transition-all font-medium text-sm ${
+                darkMode
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Edit3 size={16} />
+                Edit Results
+              </span>
+            </button>
+          )}
+
+          {/* Save/Cancel for edit results mode */}
+          {editResultsMode && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setEditResultsMode(false);
+                  setLocalResults(null);
+                  setDraggedSkipper(null);
+                  setDragOverTarget(null);
+                }}
+                className={`px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
+                  darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (localResults && onUpdateRoundResults) {
+                    onUpdateRoundResults(round, localResults);
+                  }
+                  setEditResultsMode(false);
+                  setLocalResults(null);
+                  setDraggedSkipper(null);
+                  setDragOverTarget(null);
+                }}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700"
+              >
+                <Check size={16} />
+                Save Results
+              </button>
+            </div>
+          )}
+
+          {!initialEditMode && !isHistoricalRound && !editResultsMode && <button
             onClick={() => {
               if (!isInitialAllocation) {
                 // Check if this is the last qualifying round being completed - show prompt
