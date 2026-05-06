@@ -398,6 +398,11 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
             opening_balance: financeSettingsData.opening_balance || 0,
             opening_balance_date: financeSettingsData.opening_balance_date || null
           });
+          setBankDetails({
+            bank_name: financeSettingsData.bank_name || '',
+            bsb: financeSettingsData.bsb || '',
+            account_number: financeSettingsData.account_number || '',
+          });
         }
       } else if (currentClub?.clubId) {
         // Load from club_finance_settings for clubs
@@ -732,21 +737,10 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
   };
 
   const handleSaveBankDetails = async () => {
-    if (!currentClub?.clubId) return;
+    if (!isAssociation && !currentClub?.clubId) return;
     try {
       setSaving(true);
       setError(null);
-
-      const { error } = await supabase
-        .from('clubs')
-        .update({
-          bank_name: bankDetails.bank_name,
-          bsb: bankDetails.bsb,
-          account_number: bankDetails.account_number,
-        })
-        .eq('id', currentClub.clubId);
-
-      if (error) throw error;
 
       const formatted = [
         bankDetails.bank_name,
@@ -754,16 +748,40 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
         bankDetails.account_number ? `Account: ${bankDetails.account_number}` : '',
       ].filter(Boolean).join('\n');
 
-      const updatedPaymentInfo = formatted;
-      setTransactionSettings(prev => ({ ...prev, payment_information: updatedPaymentInfo }));
+      if (isAssociation) {
+        const { error } = await supabase
+          .from('association_finance_settings')
+          .upsert({
+            association_id: associationId,
+            association_type: associationType,
+            bank_name: bankDetails.bank_name,
+            bsb: bankDetails.bsb,
+            account_number: bankDetails.account_number,
+            payment_information: formatted,
+          }, { onConflict: 'association_id,association_type' });
 
-      await supabase
-        .from('club_finance_settings')
-        .upsert({
-          club_id: currentClub.clubId,
-          payment_information: updatedPaymentInfo,
-        }, { onConflict: 'club_id' });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('clubs')
+          .update({
+            bank_name: bankDetails.bank_name,
+            bsb: bankDetails.bsb,
+            account_number: bankDetails.account_number,
+          })
+          .eq('id', currentClub!.clubId);
 
+        if (error) throw error;
+
+        await supabase
+          .from('club_finance_settings')
+          .upsert({
+            club_id: currentClub!.clubId,
+            payment_information: formatted,
+          }, { onConflict: 'club_id' });
+      }
+
+      setTransactionSettings(prev => ({ ...prev, payment_information: formatted }));
       addNotification('success', 'Bank details saved successfully');
       if (onSaveComplete) {
         setTimeout(() => onSaveComplete(), 500);
