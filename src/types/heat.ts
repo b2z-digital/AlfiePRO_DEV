@@ -399,12 +399,59 @@ export const generateNextRoundAssignments = (
       allSkipperScores.set(idx, kept.reduce((sum, s) => sum + s, 0));
     });
 
+    // SHRS 5.7: Build round-to-heat map for same-heat countback tiebreaking
+    const roundHeatMap = new Map<number, Map<number, HeatDesignation>>();
+    for (const r of heatManagement.rounds) {
+      if (r.round > currentRound.round) continue;
+      const skipperToHeat = new Map<number, HeatDesignation>();
+      for (const ha of r.heatAssignments) {
+        for (const si of ha.skipperIndices) {
+          skipperToHeat.set(si, ha.heatDesignation);
+        }
+      }
+      roundHeatMap.set(r.round, skipperToHeat);
+    }
+
+    const completedRoundNums = heatManagement.rounds
+      .filter(r => r.completed && r.round <= currentRound.round)
+      .map(r => r.round)
+      .sort((a, b) => a - b);
+
     const rankedSkippers = Array.from(allSkipperScores.entries())
       .sort(([idxA, scoreA], [idxB, scoreB]) => {
         if (scoreA !== scoreB) return scoreA - scoreB;
+
+        // SHRS 5.7/5.6: Same-heat countback tiebreaker
         const aScores = allSkipperRaceScores.get(idxA) || [];
         const bScores = allSkipperRaceScores.get(idxB) || [];
-        return compareWithCountback(aScores, bScores, fleetRankingDiscards, fleetRankingDiscards);
+
+        const aSameHeatScores: number[] = [];
+        const bSameHeatScores: number[] = [];
+
+        for (let i = 0; i < completedRoundNums.length; i++) {
+          const roundNum = completedRoundNums[i];
+          const skipperToHeat = roundHeatMap.get(roundNum);
+          if (!skipperToHeat) continue;
+          const aHeat = skipperToHeat.get(idxA);
+          const bHeat = skipperToHeat.get(idxB);
+          if (aHeat && bHeat && aHeat === bHeat) {
+            aSameHeatScores.push(aScores[i] ?? 999);
+            bSameHeatScores.push(bScores[i] ?? 999);
+          }
+        }
+
+        if (aSameHeatScores.length > 0) {
+          // SHRS 5.6(a): Use same-heat scores with no discards
+          const result = compareWithCountback(aSameHeatScores, bSameHeatScores, 0, 0);
+          if (result !== 0) return result;
+        } else {
+          // SHRS 5.6(b): Never sailed together - use unmodified RRS A8.1/A8.2
+          const result = compareWithCountback(aScores, bScores, fleetRankingDiscards, fleetRankingDiscards);
+          if (result !== 0) return result;
+        }
+
+        // Final fallback: sail number (numeric comparison)
+        return idxA - idxB;
       });
 
     const fleetSizes: number[] = [];

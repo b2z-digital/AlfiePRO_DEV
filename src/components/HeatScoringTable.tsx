@@ -180,6 +180,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     heatManagement.rounds.every(r => r.completed && r.results && r.results.length > 0)
   );
   const [showOverallResultsView, setShowOverallResultsView] = useState(isFullSHRSImport.current);
+  const [shrsResultsTab, setShrsResultsTab] = useState<'race' | 'overall'>(isFullSHRSImport.current ? 'overall' : 'race');
   const [showRaceResults, setShowRaceResults] = useState(false);
   const [showHeatAssignments, setShowHeatAssignments] = useState(false);
   const [observerReloadTrigger, setObserverReloadTrigger] = useState(0);
@@ -1160,17 +1161,78 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   if (showOverallResultsView && heatManagement.configuration?.scoringSystem === 'shrs') {
     return (
       <div className={`${isFullscreen ? 'h-full' : 'h-[calc(100vh-200px)]'} flex flex-col no-select`}>
-        <SHRSOverallResultsView
-          skippers={skippers}
-          heatManagement={heatManagement}
-          darkMode={darkMode}
-          onBack={() => {
-            if (!isFullSHRSImport.current) {
-              setShowOverallResultsView(false);
-            }
-          }}
-          isSimulated={currentEvent?.is_simulated}
-        />
+        {/* Shared tab header for SHRS results views */}
+        <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${
+          darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            {!isFullSHRSImport.current && (
+              <button
+                onClick={() => setShowOverallResultsView(false)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </button>
+            )}
+            <div className={`flex rounded-lg overflow-hidden border ${
+              darkMode ? 'border-slate-600' : 'border-slate-300'
+            }`}>
+              <button
+                onClick={() => setShrsResultsTab('race')}
+                className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                  shrsResultsTab === 'race'
+                    ? darkMode ? 'bg-emerald-600 text-white' : 'bg-emerald-600 text-white'
+                    : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Race Results
+              </button>
+              <button
+                onClick={() => setShrsResultsTab('overall')}
+                className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                  shrsResultsTab === 'overall'
+                    ? darkMode ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'
+                    : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Overall Results
+              </button>
+            </div>
+          </div>
+        </div>
+        {/* Tab content */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {shrsResultsTab === 'overall' ? (
+            <SHRSOverallResultsView
+              skippers={skippers}
+              heatManagement={heatManagement}
+              darkMode={darkMode}
+              onBack={() => {
+                if (!isFullSHRSImport.current) {
+                  setShowOverallResultsView(false);
+                }
+              }}
+              isSimulated={currentEvent?.is_simulated}
+              hideHeader={true}
+            />
+          ) : (
+            <HeatRaceResultsModal
+              isOpen={true}
+              onClose={() => {
+                if (!isFullSHRSImport.current) {
+                  setShowOverallResultsView(false);
+                }
+              }}
+              skippers={skippers}
+              heatManagement={heatManagement}
+              darkMode={darkMode}
+              currentEvent={currentEvent}
+              embedded={true}
+            />
+          )}
+        </div>
       </div>
     );
   }
@@ -1792,7 +1854,10 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               </div>
               <button
                 onClick={() => {
-                  if (heatManagement.configuration?.scoringSystem === 'hms' && fleetManagementEnabled) {
+                  if (heatManagement.configuration?.scoringSystem === 'shrs') {
+                    setShrsResultsTab('race');
+                    setShowOverallResultsView(true);
+                  } else if (heatManagement.configuration?.scoringSystem === 'hms' && fleetManagementEnabled) {
                     setShowHmsRaceResults(true);
                   } else {
                     setShowRaceResults(true);
@@ -1809,6 +1874,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               <button
                 onClick={() => {
                   if (heatManagement.configuration?.scoringSystem === 'shrs') {
+                    setShrsResultsTab('overall');
                     setShowOverallResultsView(true);
                   } else if (heatManagement.configuration?.scoringSystem === 'hms' && fleetManagementEnabled) {
                     setShowHmsScoreSheet(true);
