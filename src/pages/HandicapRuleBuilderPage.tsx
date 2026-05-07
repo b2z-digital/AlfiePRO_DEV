@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Plus, Trash2, CreditCard as Edit3, Play, Save, Wand as Wand2, ChevronRight, ChevronDown, GripVertical, Settings2, Zap, Target, TrendingUp, TrendingDown, Minus, Equal, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, RotateCcw, Copy, Send, Loader as Loader2, MessageSquare, X } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ArrowLeft, Plus, Trash2, CreditCard as Edit3, Play, Save, Wand as Wand2, ChevronRight, ChevronDown, GripVertical, Settings2, Zap, Target, TrendingUp, TrendingDown, Minus, Equal, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, RotateCcw, Copy, Send, Loader as Loader2, MessageSquare, X, Mic, MicOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 
@@ -131,12 +131,24 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
   const [alfieMessages, setAlfieMessages] = useState<AlfieMessage[]>([
     { role: 'assistant', content: 'Hi! I can help you build custom handicap rules for your club. Tell me how your club calculates handicaps after each race - describe it however feels natural. For example:\n\n"First place gets 10 seconds added, last place gets 20 seconds removed, and everyone else stays the same."\n\nOr ask me questions about how different rules would work!' }
   ]);
+  const alfieMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Voice input state
+  const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const recognitionRef = useRef<any>(null);
+  const pendingVoiceSubmitRef = useRef<string | null>(null);
+  const hasSpeechRecognition = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
   const [alfieInput, setAlfieInput] = useState('');
   const [alfieLoading, setAlfieLoading] = useState(false);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    alfieMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [alfieMessages, alfieLoading]);
 
   const loadData = async () => {
     setLoading(true);
@@ -435,64 +447,122 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
     setSimResults(results);
   }, [simBoats, adjustmentRules, config]);
 
-  const sendAlfieMessage = async () => {
-    if (!alfieInput.trim() || alfieLoading) return;
+  const sendAlfieMessage = async (overrideText?: string) => {
+    const messageText = overrideText || alfieInput.trim();
+    if (!messageText || alfieLoading) return;
 
-    const userMessage = alfieInput.trim();
-    setAlfieInput('');
-    setAlfieMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    if (!overrideText) setAlfieInput('');
+    setAlfieMessages(prev => [...prev, { role: 'user', content: messageText }]);
     setAlfieLoading(true);
 
     try {
-      const systemPrompt = `You are Alfie, an AI assistant that helps yacht club administrators build custom handicap rules for radio-controlled yacht racing.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
 
-The current DEFAULT handicap system works as follows:
-- SEEDING: First race with all boats on 0 handicap seeds positions (1st=0s, 2nd=10s, 3rd=20s, etc.)
-- ADJUSTMENTS after each race:
-  - 1st place: -30 seconds
-  - 2nd place: -20 seconds
-  - 3rd place: -10 seconds
-  - 4th place onwards: no change (unless last place bonus enabled)
-  - Scratch boat (0 handicap) wins: all other boats get +30 seconds
-  - Consecutive Streak: Scratch boat finishes last 3 races in a row gets +30 seconds (configurable: position, count, and bonus are all adjustable)
-- CAP: Handicaps cannot exceed 150 seconds or go below 0
-- LAST PLACE BONUS (optional): Last place non-scratch boat gets +30 seconds
+      const handicapContext = `[HANDICAP RULE BUILDER CONTEXT] The user is in the custom handicap rule builder. They want to create custom rules for how handicaps are calculated after each race. The current DEFAULT system: Seeding race (1st=0s, 2nd=10s, 3rd=20s...), then per-race adjustments (1st=-30s, 2nd=-20s, 3rd=-10s), scratch boat wins bonus (+30s to all others), consecutive last place streak (+30s after 3 times), cap at 150s. Help them describe and build their own custom rules. When you understand their rules, format them as a numbered list with: Rule name, Condition (when it triggers), Action (add/subtract seconds), Who it applies to. Keep responses focused on handicap rule building.`;
 
-The user wants to create CUSTOM rules. Help them by:
-1. Understanding their current club's handicap system (ask clarifying questions)
-2. Translating their rules into structured adjustment rules
-3. Suggesting test scenarios to validate the rules work correctly
+      const conversationHistory = alfieMessages.slice(-10).map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
 
-When you understand their rules, format them as a clear numbered list with:
-- Rule name
-- When it triggers (condition)
-- What it does (action and value)
-- Who it applies to
-
-Keep responses concise and focused. Use plain language, not technical jargon.`;
-
-      const { data, error } = await supabase.functions.invoke('ask-alfie-chat', {
-        body: {
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...alfieMessages.map(m => ({ role: m.role, content: m.content })),
-            { role: 'user', content: userMessage }
-          ],
-          model: 'gpt-4o-mini'
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ask-alfie-chat`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            Apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            message: `${handicapContext}\n\nUser message: ${messageText}`,
+            conversationHistory,
+            clubId: clubId || null,
+            source: 'handicap_rule_builder',
+          }),
         }
-      });
+      );
 
-      if (data?.content) {
-        setAlfieMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
-      } else if (error) {
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+      const data = await response.json();
+
+      if (data?.message) {
+        setAlfieMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+      } else {
         setAlfieMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I had trouble processing that. Could you try rephrasing your question?' }]);
       }
     } catch (err) {
+      console.error('Alfie handicap chat error:', err);
       setAlfieMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
     } finally {
       setAlfieLoading(false);
     }
   };
+
+  const startListening = useCallback(() => {
+    if (!hasSpeechRecognition || isListening) return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-AU';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 1;
+
+    setAlfieInput('');
+    setInterimTranscript('');
+
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      let final = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          final += result[0].transcript;
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+      if (final) {
+        setAlfieInput(final);
+        setInterimTranscript('');
+        pendingVoiceSubmitRef.current = final;
+      } else {
+        setInterimTranscript(interim);
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      setInterimTranscript('');
+      recognitionRef.current = null;
+      const textToSubmit = pendingVoiceSubmitRef.current;
+      pendingVoiceSubmitRef.current = null;
+      if (textToSubmit?.trim()) {
+        setTimeout(() => {
+          sendAlfieMessage(textToSubmit.trim());
+        }, 100);
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+      setInterimTranscript('');
+      recognitionRef.current = null;
+      pendingVoiceSubmitRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }, [hasSpeechRecognition, isListening]);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+  }, []);
 
   const addNewRule = (rule: Partial<AdjustmentRule>) => {
     const newRule: AdjustmentRule = {
@@ -1041,21 +1111,44 @@ Keep responses concise and focused. Use plain language, not technical jargon.`;
                     </div>
                   </div>
                 )}
+                <div ref={alfieMessagesEndRef} />
               </div>
 
               {/* Input */}
               <div className="p-4 border-t border-slate-700/50 bg-slate-800/80">
+                {isListening && (
+                  <div className="mb-2 flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    <span className="text-xs text-red-300">Listening...</span>
+                    {interimTranscript && (
+                      <span className="text-xs text-slate-400 italic truncate flex-1">{interimTranscript}</span>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={alfieInput}
                     onChange={(e) => setAlfieInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && sendAlfieMessage()}
-                    placeholder="Describe your handicap rules..."
+                    placeholder={isListening ? 'Listening...' : 'Describe your handicap rules...'}
                     className="flex-1 bg-slate-900/50 border border-slate-600/50 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-teal-500 placeholder-slate-500"
                   />
+                  {hasSpeechRecognition && (
+                    <button
+                      onClick={isListening ? stopListening : startListening}
+                      className={`p-2.5 rounded-lg transition-colors ${
+                        isListening
+                          ? 'bg-red-600 text-white hover:bg-red-500 animate-pulse'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
+                      }`}
+                      title={isListening ? 'Stop listening' : 'Voice input'}
+                    >
+                      {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                    </button>
+                  )}
                   <button
-                    onClick={sendAlfieMessage}
+                    onClick={() => sendAlfieMessage()}
                     disabled={!alfieInput.trim() || alfieLoading}
                     className="p-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-500 transition-colors disabled:opacity-50"
                   >
