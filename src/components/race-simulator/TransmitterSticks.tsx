@@ -249,11 +249,17 @@ function SailPositionIndicator({
     ? -Math.min(maxDeflection, absWindAngle * 0.4)
     : Math.min(maxDeflection, absWindAngle * 0.4);
 
+  // Belly curves to leeward (same direction as sail deflection)
+  const bellySide = sailAngleDeg < 0 ? -1 : 1;
+  const mainBelly = (2.5 + (1 - sheetAngle) * 2.5) * bellySide;
+
   // Goose-wing: jib goes opposite when deep downwind with sails fully out
   const isDeepDownwind = absWindAngle > 150;
   const isFullyEased = sheetAngle < 0.15;
   const gooseWing = isDeepDownwind && isFullyEased;
   const jibAngleDeg = gooseWing ? -sailAngleDeg : sailAngleDeg * 0.85;
+  const jibBellySide = gooseWing ? -bellySide : bellySide;
+  const jibBelly = (2 + (1 - sheetAngle) * 2) * jibBellySide;
   const rudderAngleDeg = rudderInput * 25;
 
   return (
@@ -285,22 +291,22 @@ function SailPositionIndicator({
         {/* Mast (centre) */}
         <circle cx="0" cy="-2" r="1" fill={darkMode ? '#94a3b8' : '#475569'} />
 
-        {/* Mainsail - pivots from mast at centre */}
+        {/* Mainsail - luff along mast, belly to leeward */}
         <g transform={`rotate(${sailAngleDeg}, 0, -2)`}>
           <path
-            d={`M 0,-12 Q ${2.5 + (1 - sheetAngle) * 2.5},-2 0.3,14`}
+            d={`M 0,-12 L 0,12 Q ${mainBelly},0 0,-12 Z`}
             fill="rgba(255,255,255,0.85)"
             stroke={darkMode ? '#f1f5f9' : '#64748b'}
             strokeWidth="0.8"
           />
           {/* Boom */}
-          <line x1="0" y1="-2" x2="0.3" y2="14" stroke={darkMode ? '#94a3b8' : '#64748b'} strokeWidth="1" />
+          <line x1="0" y1="0" x2="0" y2="12" stroke={darkMode ? '#94a3b8' : '#64748b'} strokeWidth="1" />
         </g>
 
-        {/* Jib - pivots from bow (nose) */}
+        {/* Jib - luff along forestay, belly to leeward */}
         <g transform={`rotate(${jibAngleDeg}, 0, -20)`}>
           <path
-            d={`M 0,-20 Q ${2 + (1 - sheetAngle) * 2},-12 0,-3`}
+            d={`M 0,-20 L 0,-5 Q ${jibBelly},-12.5 0,-20 Z`}
             fill="rgba(220,240,255,0.8)"
             stroke={darkMode ? '#93c5fd' : '#60a5fa'}
             strokeWidth="0.7"
