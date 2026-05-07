@@ -71,7 +71,7 @@ const DEFAULT_RULES: AdjustmentRule[] = [
   { id: 'default-2', ruleset_id: '', priority: 2, name: 'Second place adjustment', condition_type: 'position', condition_value: { position: 2 }, action: 'subtract', action_value: 20, applies_to: 'self', description: '2nd place loses 20 seconds from their handicap' },
   { id: 'default-3', ruleset_id: '', priority: 3, name: 'Third place adjustment', condition_type: 'position', condition_value: { position: 3 }, action: 'subtract', action_value: 10, applies_to: 'self', description: '3rd place loses 10 seconds from their handicap' },
   { id: 'default-4', ruleset_id: '', priority: 4, name: 'Scratch boat wins bonus', condition_type: 'scratch_boat_wins', condition_value: {}, action: 'add', action_value: 30, applies_to: 'all_others', description: 'When scratch boat wins, all other boats get 30 seconds added' },
-  { id: 'default-5', ruleset_id: '', priority: 5, name: 'Scratch boat streak', condition_type: 'streak', condition_value: { consecutive_last: 3 }, action: 'add', action_value: 30, applies_to: 'scratch_only', description: 'Scratch boat finishing last 3 times in a row gets 30 seconds added' },
+  { id: 'default-5', ruleset_id: '', priority: 5, name: 'Scratch boat streak', condition_type: 'streak', condition_value: { streak_position: 'last', streak_count: 3 }, action: 'add', action_value: 30, applies_to: 'scratch_only', description: 'Scratch boat finishing last 3 times in a row gets 30 seconds added' },
 ];
 
 const CONDITION_TYPES = [
@@ -80,7 +80,7 @@ const CONDITION_TYPES = [
   { value: 'last_place', label: 'Last Place', description: 'Triggers for the last finishing boat' },
   { value: 'scratch_boat_wins', label: 'Scratch Boat Wins', description: 'Triggers when a boat on 0 handicap wins' },
   { value: 'scratch_boat', label: 'Is Scratch Boat', description: 'Applies only to boats on 0 handicap' },
-  { value: 'streak', label: 'Consecutive Streak', description: 'Triggers after consecutive results (e.g. 3 last places)' },
+  { value: 'streak', label: 'Consecutive Streak', description: 'Triggers after finishing in the same position for N consecutive races' },
   { value: 'mid_fleet', label: 'Mid Fleet', description: 'Applies to boats not in top 3 and not last' },
 ];
 
@@ -464,7 +464,7 @@ The current DEFAULT handicap system works as follows:
   - 3rd place: -10 seconds
   - 4th place onwards: no change (unless last place bonus enabled)
   - Scratch boat (0 handicap) wins: all other boats get +30 seconds
-  - Scratch boat finishes last 3 races in a row: gets +30 seconds
+  - Consecutive Streak: Scratch boat finishes last 3 races in a row gets +30 seconds (configurable: position, count, and bonus are all adjustable)
 - CAP: Handicaps cannot exceed 150 seconds or go below 0
 - LAST PLACE BONUS (optional): Last place non-scratch boat gets +30 seconds
 
@@ -1154,7 +1154,7 @@ function NewRuleModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rule: P
                 setConditionType(e.target.value);
                 if (e.target.value === 'position') setConditionValue({ position: 1 });
                 else if (e.target.value === 'position_range') setConditionValue({ from: 1, to: 3 });
-                else if (e.target.value === 'streak') setConditionValue({ consecutive_last: 3 });
+                else if (e.target.value === 'streak') setConditionValue({ streak_position: 'last', streak_count: 3 });
                 else setConditionValue({});
               }}
               className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
@@ -1204,15 +1204,44 @@ function NewRuleModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rule: P
           )}
 
           {conditionType === 'streak' && (
-            <div>
-              <label className="text-xs font-medium text-slate-400 mb-1 block">Consecutive last places</label>
-              <input
-                type="number"
-                value={conditionValue.consecutive_last || 3}
-                onChange={(e) => setConditionValue({ consecutive_last: parseInt(e.target.value) || 3 })}
-                className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
-                min={2}
-              />
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Streak Position (what triggers)</label>
+                <select
+                  value={conditionValue.streak_position || 'last'}
+                  onChange={(e) => setConditionValue({ ...conditionValue, streak_position: e.target.value, ...(e.target.value === 'specific' ? { specific_position: conditionValue.specific_position || 1 } : {}) })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                >
+                  <option value="last">Last place</option>
+                  <option value="first">First place</option>
+                  <option value="specific">Specific position</option>
+                </select>
+              </div>
+              {conditionValue.streak_position === 'specific' && (
+                <div>
+                  <label className="text-xs font-medium text-slate-400 mb-1 block">Position number</label>
+                  <input
+                    type="number"
+                    value={conditionValue.specific_position || 1}
+                    onChange={(e) => setConditionValue({ ...conditionValue, specific_position: parseInt(e.target.value) || 1 })}
+                    className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                    min={1}
+                  />
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Consecutive count (how many times in a row)</label>
+                <input
+                  type="number"
+                  value={conditionValue.streak_count || 3}
+                  onChange={(e) => setConditionValue({ ...conditionValue, streak_count: parseInt(e.target.value) || 3 })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                  min={2}
+                />
+              </div>
+              <p className="text-xs text-slate-500">
+                e.g. "If boat finishes {conditionValue.streak_position === 'specific' ? `in position ${conditionValue.specific_position || 1}` : conditionValue.streak_position === 'first' ? 'first' : 'last'} for {conditionValue.streak_count || 3} consecutive races, THEN apply the action"
+              </p>
             </div>
           )}
 
@@ -1330,6 +1359,73 @@ function EditRuleModal({ rule, onClose, onSave }: { rule: AdjustmentRule; onClos
                 className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
                 min={1}
               />
+            </div>
+          )}
+
+          {editedRule.condition_type === 'position_range' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">From Position</label>
+                <input
+                  type="number"
+                  value={editedRule.condition_value.from || 1}
+                  onChange={(e) => setEditedRule({ ...editedRule, condition_value: { ...editedRule.condition_value, from: parseInt(e.target.value) || 1 } })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                  min={1}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">To Position</label>
+                <input
+                  type="number"
+                  value={editedRule.condition_value.to || 3}
+                  onChange={(e) => setEditedRule({ ...editedRule, condition_value: { ...editedRule.condition_value, to: parseInt(e.target.value) || 3 } })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                  min={1}
+                />
+              </div>
+            </div>
+          )}
+
+          {editedRule.condition_type === 'streak' && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Streak Position (what triggers)</label>
+                <select
+                  value={editedRule.condition_value.streak_position || 'last'}
+                  onChange={(e) => setEditedRule({ ...editedRule, condition_value: { ...editedRule.condition_value, streak_position: e.target.value, ...(e.target.value === 'specific' ? { specific_position: editedRule.condition_value.specific_position || 1 } : {}) } })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                >
+                  <option value="last">Last place</option>
+                  <option value="first">First place</option>
+                  <option value="specific">Specific position</option>
+                </select>
+              </div>
+              {(editedRule.condition_value.streak_position === 'specific') && (
+                <div>
+                  <label className="text-xs font-medium text-slate-400 mb-1 block">Position number</label>
+                  <input
+                    type="number"
+                    value={editedRule.condition_value.specific_position || 1}
+                    onChange={(e) => setEditedRule({ ...editedRule, condition_value: { ...editedRule.condition_value, specific_position: parseInt(e.target.value) || 1 } })}
+                    className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                    min={1}
+                  />
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Consecutive count (how many times in a row)</label>
+                <input
+                  type="number"
+                  value={editedRule.condition_value.streak_count || editedRule.condition_value.consecutive_last || 3}
+                  onChange={(e) => setEditedRule({ ...editedRule, condition_value: { ...editedRule.condition_value, streak_count: parseInt(e.target.value) || 3 } })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                  min={2}
+                />
+              </div>
+              <p className="text-xs text-slate-500">
+                e.g. "If boat finishes {editedRule.condition_value.streak_position === 'specific' ? `in position ${editedRule.condition_value.specific_position || 1}` : (editedRule.condition_value.streak_position || 'last') === 'first' ? 'first' : 'last'} for {editedRule.condition_value.streak_count || editedRule.condition_value.consecutive_last || 3} consecutive races, THEN apply the action"
+              </p>
             </div>
           )}
 
