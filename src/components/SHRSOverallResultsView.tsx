@@ -13,6 +13,7 @@ interface SHRSOverallResultsViewProps {
   darkMode: boolean;
   onBack: () => void;
   isSimulated?: boolean;
+  hideHeader?: boolean;
 }
 
 const FLEET_NAMES: Record<string, string> = {
@@ -70,6 +71,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
   darkMode,
   onBack,
   isSimulated,
+  hideHeader,
 }) => {
   const isShrs = heatManagement?.configuration?.scoringSystem === 'shrs';
   const shrsQualifyingRounds = heatManagement?.configuration?.shrsQualifyingRounds || 0;
@@ -787,6 +789,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
+      {!hideHeader && (
       <div className={`flex items-center justify-between px-6 py-4 border-b flex-shrink-0 ${
         darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'
       }`}>
@@ -818,6 +821,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
           {standings.length} skippers
         </div>
       </div>
+      )}
 
       {/* SHRS Import Verification Banner */}
       {shrsVerification && (
@@ -1431,6 +1435,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       </div>
 
       {/* Footer */}
+      {!hideHeader && (
       <div className={`flex items-center justify-between px-6 py-3 border-t flex-shrink-0 ${
         darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'
       }`}>
@@ -1454,6 +1459,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
           </button>
         )}
       </div>
+      )}
     </div>
   );
 };

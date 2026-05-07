@@ -16,6 +16,7 @@ interface HeatRaceResultsModalProps {
   heatManagement: HeatManagement;
   darkMode: boolean;
   currentEvent?: RaceEvent | null;
+  embedded?: boolean;
 }
 
 export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
@@ -24,7 +25,8 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
   skippers,
   heatManagement,
   darkMode,
-  currentEvent
+  currentEvent,
+  embedded
 }) => {
   const tableRef = useRef<HTMLDivElement>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -46,7 +48,7 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
 
   useEffect(() => {
     const fetchObservers = async () => {
-      if (!isOpen || !currentEvent?.id) return;
+      if (!isOpen || !currentEvent?.id || !currentEvent?.enable_observers) return;
 
       const resolvedEventId = await resolveObserverEventId(currentEvent as RaceEvent) || currentEvent.id;
       const observersMap = new Map<string, ObserverAssignment[]>();
@@ -380,13 +382,46 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`
-        w-full max-w-7xl max-h-[90vh] rounded-xl shadow-xl overflow-hidden flex flex-col
-        ${darkMode ? 'bg-slate-800' : 'bg-white'}
-      `}>
-        {/* Header */}
+  const contentSection = (
+    <>
+      {/* Legend - only show for HMS (promotion/relegation system) */}
+      {!isShrs && !embedded && (
+        <div className={`px-6 py-3 border-b ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
+          <div className="flex flex-wrap gap-6 text-xs">
+            <div className="flex items-center gap-2">
+              <div className={`w-6 h-6 rounded ${darkMode ? 'bg-emerald-500/20 border-2 border-emerald-500' : 'bg-emerald-50 border-2 border-emerald-400'}`} />
+              <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Promotion Zone (Top {promotionCount})</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SHRS Fleet Legend */}
+      {isShrs && hasFinalRounds && (
+        <div className={`px-6 py-3 border-b ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
+          <div className="flex flex-wrap gap-4 text-xs items-center">
+            <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Fleet Finals:</span>
+            {heats.map(h => {
+              const fleet = getShrsFleetInfo(h);
+              return (
+                <div key={h} className="flex items-center gap-1.5">
+                  <div className={`w-3 h-3 rounded-full ${fleet.bgClass}`} />
+                  <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
+                    Heat {getHeatDisplayLabel(h, heatManagement.configuration)} = {fleet.name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  const innerContent = (
+    <div className={`flex flex-col h-full ${embedded ? '' : 'max-h-[90vh]'} ${darkMode ? 'bg-slate-800' : 'bg-white'} ${embedded ? '' : 'w-full max-w-7xl rounded-xl shadow-xl overflow-hidden'}`}>
+      {/* Header - only in modal mode */}
+      {!embedded && (
         <div className={`
           flex items-center justify-between p-6 border-b
           ${darkMode ? 'border-slate-700' : 'border-slate-200'}
@@ -475,40 +510,11 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
             </button>
           </div>
         </div>
+      )}
 
-        {/* Legend - only show for HMS (promotion/relegation system) */}
-        {!isShrs && (
-          <div className={`px-6 py-3 border-b ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
-            <div className="flex flex-wrap gap-6 text-xs">
-              <div className="flex items-center gap-2">
-                <div className={`w-6 h-6 rounded ${darkMode ? 'bg-emerald-500/20 border-2 border-emerald-500' : 'bg-emerald-50 border-2 border-emerald-400'}`} />
-                <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Promotion Zone (Top {promotionCount})</span>
-              </div>
-            </div>
-          </div>
-        )}
+      {contentSection}
 
-        {/* SHRS Fleet Legend */}
-        {isShrs && hasFinalRounds && (
-          <div className={`px-6 py-3 border-b ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
-            <div className="flex flex-wrap gap-4 text-xs items-center">
-              <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Fleet Finals:</span>
-              {heats.map(h => {
-                const fleet = getShrsFleetInfo(h);
-                return (
-                  <div key={h} className="flex items-center gap-1.5">
-                    <div className={`w-3 h-3 rounded-full ${fleet.bgClass}`} />
-                    <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                      Heat {getHeatDisplayLabel(h, heatManagement.configuration)} = {fleet.name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Results Table */}
+      {/* Results Table */}
         <div className="flex-1 overflow-auto">
           {completedRounds.length === 0 ? (
             <div className={`text-center py-12 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -762,8 +768,8 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                       );
                     });
 
-                    // Add observer row for this heat
-                    const observerRow = (
+                    // Add observer row for this heat (only when observers enabled)
+                    const observerRow = !currentEvent?.enable_observers ? null : (
                       <tr key={`${heat}-observers`} className={`
                         border-b-4 ${darkMode ? 'border-slate-700' : 'border-slate-300'}
                         ${darkMode ? 'bg-purple-900/20' : 'bg-purple-50'}
@@ -826,7 +832,7 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                     );
 
                     // Return all rows for this heat (positions + observers)
-                    return [...positionRows, observerRow];
+                    return observerRow ? [...positionRows, observerRow] : positionRows;
                   })}
                 </tbody>
               </table>
@@ -834,7 +840,8 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
           )}
         </div>
 
-        {/* Footer */}
+      {/* Footer - only in modal mode */}
+      {!embedded && (
         <div className={`px-6 py-4 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
           <button
             onClick={onClose}
@@ -848,7 +855,17 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
             Close
           </button>
         </div>
-      </div>
+      )}
+    </div>
+  );
+
+  if (embedded) {
+    return innerContent;
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      {innerContent}
     </div>
   );
 };
