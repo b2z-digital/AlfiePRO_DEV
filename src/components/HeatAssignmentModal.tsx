@@ -592,10 +592,15 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const handleExportCurrentRoundPdf = () => {
     const roundIdx = previewRoundIndex ?? heatManagement.rounds.findIndex(r => r.round === round);
     if (roundIdx < 0) return;
-    exportSingleRoundPdf(heatManagement, roundIdx, skippers, getExportOptions(), buildObserverMap());
+    const obsMap = currentEvent?.enable_observers ? buildObserverMap() : undefined;
+    exportSingleRoundPdf(heatManagement, roundIdx, skippers, getExportOptions(), obsMap);
   };
 
   const handleExportAllRoundsPdf = async () => {
+    if (!currentEvent?.enable_observers) {
+      exportAllRoundsPdf(heatManagement, skippers, getExportOptions(), undefined);
+      return;
+    }
     const stateObsMap = buildObserverMap();
     let obsMap = new Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]>();
     if (observerEventId) {
@@ -2747,8 +2752,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             </div>
           )}
 
-          {/* Edit Results button for historical (already scored) rounds */}
-          {!initialEditMode && isHistoricalRound && !editResultsMode && onUpdateRoundResults && (
+          {/* Edit Results button for completed rounds (historical or just-completed) */}
+          {!initialEditMode && (isHistoricalRound || (completed && round === roundJustCompleted)) && !editResultsMode && onUpdateRoundResults && (
             <button
               onClick={() => {
                 setEditResultsMode(true);
