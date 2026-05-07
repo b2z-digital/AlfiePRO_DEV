@@ -321,6 +321,58 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
     }
   };
 
+  const duplicateRuleset = async (source: HandicapRuleset) => {
+    if (!clubId) return;
+
+    const { data: newRuleset, error } = await supabase
+      .from('handicap_rulesets')
+      .insert({
+        club_id: clubId,
+        name: `${source.name} (Copy)`,
+        description: source.description,
+        is_default: false,
+        is_active: true,
+        created_by: user?.id,
+      })
+      .select()
+      .single();
+
+    if (!newRuleset || error) return;
+
+    // Copy config
+    const { data: srcConfig } = await supabase.from('handicap_ruleset_config').select('*').eq('ruleset_id', source.id).maybeSingle();
+    if (srcConfig) {
+      await supabase.from('handicap_ruleset_config').insert({
+        ruleset_id: newRuleset.id,
+        cap_limit: srcConfig.cap_limit,
+        last_place_bonus_enabled: srcConfig.last_place_bonus_enabled,
+        last_place_bonus_value: srcConfig.last_place_bonus_value,
+        scratch_boat_win_bonus: srcConfig.scratch_boat_win_bonus,
+        scratch_streak_threshold: srcConfig.scratch_streak_threshold,
+        scratch_streak_bonus: srcConfig.scratch_streak_bonus,
+      });
+    }
+
+    // Copy seeding rules
+    const { data: srcSeeding } = await supabase.from('handicap_seeding_rules').select('*').eq('ruleset_id', source.id);
+    if (srcSeeding && srcSeeding.length > 0) {
+      await supabase.from('handicap_seeding_rules').insert(
+        srcSeeding.map(s => ({ ruleset_id: newRuleset.id, method: s.method, base_value: s.base_value, increment_per_position: s.increment_per_position, description: s.description }))
+      );
+    }
+
+    // Copy adjustment rules
+    const { data: srcAdj } = await supabase.from('handicap_adjustment_rules').select('*').eq('ruleset_id', source.id).order('priority');
+    if (srcAdj && srcAdj.length > 0) {
+      await supabase.from('handicap_adjustment_rules').insert(
+        srcAdj.map(r => ({ ruleset_id: newRuleset.id, priority: r.priority, name: r.name, condition_type: r.condition_type, condition_value: r.condition_value, action: r.action, action_value: r.action_value, applies_to: r.applies_to, description: r.description }))
+      );
+    }
+
+    setRulesets(prev => [newRuleset, ...prev]);
+    loadRuleset(newRuleset);
+  };
+
   const runSimulation = useCallback(() => {
     const capLimit = config?.cap_limit ?? 150;
     const results: SimulationResult[] = [];
@@ -486,7 +538,7 @@ Keep responses concise and focused. Use plain language, not technical jargon.`;
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
@@ -507,15 +559,15 @@ Keep responses concise and focused. Use plain language, not technical jargon.`;
       </div>
 
       <div className="grid grid-cols-12 gap-6">
-        {/* Left sidebar - Rulesets list */}
-        <div className="col-span-3">
+        {/* Left sidebar - Rule Sets list */}
+        <div className="col-span-12 lg:col-span-3">
           <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-300">Rulesets</h3>
+              <h3 className="text-sm font-semibold text-slate-300">Rule Sets</h3>
               <button
                 onClick={createNewRuleset}
                 className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
-                title="Create new ruleset"
+                title="Create new rule set"
               >
                 <Plus size={16} />
               </button>
@@ -538,35 +590,52 @@ Keep responses concise and focused. Use plain language, not technical jargon.`;
                   <Zap size={14} className="text-blue-400" />
                   <span className="text-sm font-medium text-white">AlfiePRO Default</span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Standard handicap rules</p>
+                <p className="text-[11px] text-slate-400 mt-1">Standard handicap rules (system)</p>
               </button>
 
               {rulesets.filter(r => !r.is_default).map(ruleset => (
-                <button
+                <div
                   key={ruleset.id}
                   onClick={() => loadRuleset(ruleset)}
-                  className={`w-full text-left p-3 rounded-lg transition-colors group ${
+                  className={`w-full text-left p-3 rounded-lg transition-colors group cursor-pointer ${
                     selectedRuleset?.id === ruleset.id ? 'bg-blue-500/20 border border-blue-500/40' : 'hover:bg-slate-700/50'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-white">{ruleset.name}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteRuleset(ruleset.id); }}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-red-400 transition-all"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    <span className="text-sm font-medium text-white truncate">{ruleset.name}</span>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); duplicateRuleset(ruleset); }}
+                        className="p-1 rounded hover:bg-slate-600/50 text-slate-400 hover:text-white transition-colors"
+                        title="Duplicate"
+                      >
+                        <Copy size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); loadRuleset(ruleset); }}
+                        className="p-1 rounded hover:bg-slate-600/50 text-slate-400 hover:text-white transition-colors"
+                        title="Edit"
+                      >
+                        <Edit3 size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteRuleset(ruleset.id); }}
+                        className="p-1 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1 truncate">{ruleset.description || 'Custom ruleset'}</p>
-                </button>
+                  <p className="text-[11px] text-slate-400 mt-1 truncate">{ruleset.description || 'Custom rule set'}</p>
+                </div>
               ))}
             </div>
           </div>
         </div>
 
         {/* Main content */}
-        <div className="col-span-9">
+        <div className="col-span-12 lg:col-span-9">
           {/* Tabs */}
           <div className="flex items-center gap-1 mb-6 bg-slate-800/30 rounded-xl p-1 border border-slate-700/50">
             <button

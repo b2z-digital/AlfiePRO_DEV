@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay, SlidersHorizontal } from 'lucide-react';
+import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -92,7 +92,6 @@ import MarketingAutomationFlowsPage from '../pages/MarketingAutomationFlowsPage'
 import MarketingAutomationFlowEditorPage from '../pages/MarketingAutomationFlowEditorPage';
 import LivestreamPage from '../pages/LivestreamPage';
 import RaceSimulatorPage from './race-simulator/RaceSimulatorPage';
-import HandicapRuleBuilderPage from '../pages/HandicapRuleBuilderPage';
 import SuperAdminDashboard from '../pages/SuperAdminDashboard';
 import AskAlfieManagementPage from '../pages/AskAlfieManagementPage';
 import HelpSupportPage from './help-support/HelpSupportPage';
@@ -1072,13 +1071,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/race-simulator'
         }] : []),
         ...(!isMember && !isAssociationViewer ? [{
-          id: 'handicap-rule-builder',
-          label: 'Handicap Rules',
-          icon: SlidersHorizontal,
-          description: 'Build custom handicap calculation rules',
-          path: '/handicap-rule-builder'
-        }] : []),
-        ...(!isMember && !isAssociationViewer ? [{
           id: 'event-websites',
           label: 'Event Websites',
           icon: Globe,
@@ -2048,7 +2040,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/results/:id" element={<ResultsPage />} />
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
               {isSuperAdmin && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} />} />}
-              <Route path="/handicap-rule-builder" element={<HandicapRuleBuilderPage darkMode={darkMode} />} />
               <Route path="/support" element={<SupportPage darkMode={darkMode} />} />
               <Route path="/settings" element={<SettingsPage darkMode={darkMode} />} />
               <Route path="/settings/race-documents/form-builder" element={
