@@ -515,8 +515,8 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
   ctx.translate(x, y);
   ctx.rotate(headingRad);
 
-  const boatLength = boat.isPlayer ? 20 : 16;
-  const boatWidth = boat.isPlayer ? 4.5 : 3.5;
+  const boatLength = boat.isPlayer ? 22 : 18;
+  const boatWidth = boat.isPlayer ? 5 : 4;
 
   // Compute sail deflection based on wind angle and sheet trim
   const windAngleRel = normalizeAngle(wind.direction - boat.heading);
@@ -526,41 +526,50 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
   // Sheet angle determines how far out the sail can go
   // sheetAngle: 0 = fully eased (sails out), 1 = fully sheeted in (sails close to centerline)
   const sheet = sheetAngle !== undefined ? sheetAngle : 0.7;
-  const maxSailDeflection = (1 - sheet) * 1.2; // radians - how far sails can swing out
+  // Max 80% out (about 72 degrees / 1.26 radians)
+  const maxSailDeflection = (1 - sheet) * 1.26;
   // Sail swings to leeward (away from wind)
   const sailDeflect = windSide > 0
     ? -Math.min(maxSailDeflection, absWindAngle * 0.008)
     : Math.min(maxSailDeflection, absWindAngle * 0.008);
 
-  // Hull - sleek yacht shape with defined bow and transom stern
+  // Detect deep downwind sailing for goose-wing (wing-on-wing)
+  const isDeepDownwind = absWindAngle > 150;
+  const isFullyEased = sheet < 0.15;
+  const gooseWing = isDeepDownwind && isFullyEased;
+
+  // Hull - race yacht shape with pointed bow, flat transom, rounded sides
   ctx.fillStyle = boat.color;
   ctx.strokeStyle = darkMode ? '#ffffff' : '#1e293b';
   ctx.lineWidth = boat.isPlayer ? 1.8 : 1.2;
 
   ctx.beginPath();
-  // Bow (pointed, front of boat = negative Y since heading is up)
+  // Bow (sharp pointed front)
   ctx.moveTo(0, -boatLength * 0.9);
-  // Starboard gunwale (right side)
+  // Starboard gunwale - curved sides
   ctx.bezierCurveTo(
-    boatWidth * 0.6, -boatLength * 0.6,
-    boatWidth, -boatLength * 0.1,
-    boatWidth * 0.9, boatLength * 0.3
+    boatWidth * 0.5, -boatLength * 0.6,
+    boatWidth * 1.05, -boatLength * 0.15,
+    boatWidth, boatLength * 0.2
   );
-  // Transom (flat stern)
+  // Starboard quarter - round into flat transom
   ctx.bezierCurveTo(
-    boatWidth * 0.7, boatLength * 0.5,
-    boatWidth * 0.3, boatLength * 0.55,
-    0, boatLength * 0.55
+    boatWidth * 0.95, boatLength * 0.35,
+    boatWidth * 0.85, boatLength * 0.42,
+    boatWidth * 0.75, boatLength * 0.45
   );
+  // Flat transom (stern)
+  ctx.lineTo(-boatWidth * 0.75, boatLength * 0.45);
+  // Port quarter - round out from flat transom
   ctx.bezierCurveTo(
-    -boatWidth * 0.3, boatLength * 0.55,
-    -boatWidth * 0.7, boatLength * 0.5,
-    -boatWidth * 0.9, boatLength * 0.3
+    -boatWidth * 0.85, boatLength * 0.42,
+    -boatWidth * 0.95, boatLength * 0.35,
+    -boatWidth, boatLength * 0.2
   );
-  // Port gunwale (left side)
+  // Port gunwale - curved sides
   ctx.bezierCurveTo(
-    -boatWidth, -boatLength * 0.1,
-    -boatWidth * 0.6, -boatLength * 0.6,
+    -boatWidth * 1.05, -boatLength * 0.15,
+    -boatWidth * 0.5, -boatLength * 0.6,
     0, -boatLength * 0.9
   );
   ctx.closePath();
@@ -568,91 +577,92 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
   ctx.stroke();
 
   // Deck detail - centerline
-  ctx.strokeStyle = darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
+  ctx.strokeStyle = darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)';
   ctx.lineWidth = 0.5;
   ctx.beginPath();
   ctx.moveTo(0, -boatLength * 0.7);
-  ctx.lineTo(0, boatLength * 0.4);
+  ctx.lineTo(0, boatLength * 0.35);
   ctx.stroke();
 
-  // Mast position (slightly forward of center)
-  const mastY = -boatLength * 0.15;
+  // Mast position (centre of boat)
+  const mastY = -boatLength * 0.05;
 
   // Mast dot
   ctx.fillStyle = darkMode ? '#94a3b8' : '#475569';
   ctx.beginPath();
-  ctx.arc(0, mastY, 1.2, 0, Math.PI * 2);
+  ctx.arc(0, mastY, 1.5, 0, Math.PI * 2);
   ctx.fill();
 
-  // Boom/mainsail - attached to mast, swings with sail angle
-  const mainSailLength = boatLength * 0.6;
-  const mainSailBoom = mainSailLength * 0.85;
+  // Mainsail - pivots from mast (centre of boat)
+  const mainSailLength = boatLength * 0.7;
 
   ctx.save();
   ctx.translate(0, mastY);
   ctx.rotate(sailDeflect);
 
-  // Mainsail shape (triangular with curve/belly)
+  // Mainsail shape - triangular with belly for visibility
   ctx.fillStyle = boat.isPlayer
-    ? 'rgba(255, 255, 255, 0.85)'
-    : 'rgba(255, 255, 255, 0.6)';
+    ? 'rgba(255, 255, 255, 0.9)'
+    : 'rgba(255, 255, 255, 0.7)';
   ctx.strokeStyle = boat.isPlayer
-    ? (darkMode ? '#e2e8f0' : '#cbd5e1')
-    : (darkMode ? '#94a3b8' : '#94a3b8');
-  ctx.lineWidth = 1;
+    ? (darkMode ? '#f1f5f9' : '#94a3b8')
+    : (darkMode ? '#cbd5e1' : '#94a3b8');
+  ctx.lineWidth = 1.2;
 
-  const bellyCurve = (1 - sheet) * 3 + 1.5; // sail belly increases when eased
+  const bellyCurve = (1 - sheet) * 4 + 2; // pronounced belly for visibility
   ctx.beginPath();
-  ctx.moveTo(0, -mainSailLength * 0.85); // Head (top of sail, along mast)
-  // Leech (trailing edge) with belly
+  ctx.moveTo(0, -mainSailLength * 0.4); // Head (top of sail along mast above pivot)
+  // Leech (trailing edge) with belly curve
   ctx.quadraticCurveTo(
-    bellyCurve, -mainSailLength * 0.3,
-    0, mainSailBoom * 0.95 // Clew (back corner)
+    bellyCurve * 1.2, mainSailLength * 0.1,
+    0.5, mainSailLength * 0.55 // Clew (back corner of boom)
   );
   // Foot (bottom edge along boom)
-  ctx.lineTo(0, 0); // Tack (mast base)
+  ctx.lineTo(0, 0); // Tack (mast)
   // Luff (leading edge along mast)
-  ctx.lineTo(0, -mainSailLength * 0.85);
+  ctx.lineTo(0, -mainSailLength * 0.4);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
   // Boom line
-  ctx.strokeStyle = darkMode ? '#64748b' : '#94a3b8';
+  ctx.strokeStyle = darkMode ? '#94a3b8' : '#64748b';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(0, mainSailBoom * 0.95);
+  ctx.lineTo(0.5, mainSailLength * 0.55);
   ctx.stroke();
 
   ctx.restore();
 
-  // Jib (foresail) - attached ahead of mast
-  const jibAttachY = -boatLength * 0.75; // forestay attachment point
-  const jibLength = boatLength * 0.5;
-  const jibDeflect = sailDeflect * 0.85; // jib deflects slightly less than main
+  // Jib (foresail) - pivots from bow (nose of boat)
+  const jibAttachY = -boatLength * 0.85; // bow attachment
+  const jibLength = boatLength * 0.55;
+
+  // Goose-wing: jib goes to opposite side of main when deep downwind
+  const jibDeflect = gooseWing ? -sailDeflect : sailDeflect * 0.85;
 
   ctx.save();
   ctx.translate(0, jibAttachY);
   ctx.rotate(jibDeflect);
 
-  const jibBelly = (1 - sheet) * 2.5 + 1;
+  const jibBelly = (1 - sheet) * 3.5 + 1.5;
   ctx.fillStyle = boat.isPlayer
-    ? 'rgba(240, 248, 255, 0.8)'
-    : 'rgba(255, 255, 255, 0.5)';
+    ? 'rgba(220, 240, 255, 0.9)'
+    : 'rgba(255, 255, 255, 0.65)';
   ctx.strokeStyle = boat.isPlayer
-    ? (darkMode ? '#bfdbfe' : '#93c5fd')
+    ? (darkMode ? '#93c5fd' : '#60a5fa')
     : (darkMode ? '#94a3b8' : '#94a3b8');
-  ctx.lineWidth = 0.8;
+  ctx.lineWidth = 1;
 
   ctx.beginPath();
-  ctx.moveTo(0, 0); // Head (top)
-  // Leech with belly
+  ctx.moveTo(0, 0); // Head (top at bow)
+  // Leech with belly - wider for visibility
   ctx.quadraticCurveTo(
-    jibBelly, jibLength * 0.4,
+    jibBelly * 1.1, jibLength * 0.4,
     0, jibLength // Clew
   );
-  // Foot
+  // Foot back to tack
   ctx.lineTo(0, 0);
   ctx.closePath();
   ctx.fill();
