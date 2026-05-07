@@ -594,20 +594,19 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
   ctx.fill();
 
   // Mainsail - pivots from mast (centre of boat)
-  // The mast is the pivot point. The boom extends AFT (positive Y in boat coords).
-  // The sail rotates around the mast, and the belly curves to leeward.
+  // After rotation by sailDeflect, wind comes from the "negative X" side in the sail's
+  // local frame, pushing the belly to "positive X". But we need to account for the
+  // fact that the rotation direction flips this: when sailDeflect is negative (sail to port),
+  // in the sail's rotated frame the wind pushes belly to +X local. When sailDeflect is
+  // positive (sail to starboard), wind pushes belly to -X local.
+  // Simpler: belly always goes OPPOSITE to sailDeflect direction in the sail's local frame.
   const mainSailLength = boatLength * 0.7;
-  // Determine which side the belly should curve to (leeward = away from wind)
-  // sailDeflect is negative when wind from starboard, positive when from port
-  // belly should go same direction as sailDeflect (leeward)
-  const bellySide = sailDeflect < 0 ? -1 : 1;
+  const bellySide = sailDeflect <= 0 ? 1 : -1;
 
   ctx.save();
   ctx.translate(0, mastY);
   ctx.rotate(sailDeflect);
 
-  // Mainsail shape - the luff (leading edge) runs along the mast from head to tack (Y axis)
-  // The leech (trailing edge) curves out to leeward with belly
   ctx.fillStyle = boat.isPlayer
     ? 'rgba(255, 255, 255, 0.9)'
     : 'rgba(255, 255, 255, 0.7)';
@@ -618,14 +617,13 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
 
   const bellyCurve = ((1 - sheet) * 4 + 2) * bellySide;
   ctx.beginPath();
-  // Luff runs along Y axis (mast line) - this is the leading edge
+  // Luff (leading edge) runs straight along Y axis (the mast)
   ctx.moveTo(0, -mainSailLength * 0.45); // Head (top of sail)
-  // Luff down the mast to tack
-  ctx.lineTo(0, mainSailLength * 0.5); // Clew/end of boom
-  // Leech (trailing edge) curves back up with belly to leeward
+  ctx.lineTo(0, mainSailLength * 0.5); // Clew (end of boom)
+  // Leech (trailing edge) curves back to head with belly
   ctx.quadraticCurveTo(
     bellyCurve * 1.3, mainSailLength * 0.05,
-    0, -mainSailLength * 0.45 // back to head
+    0, -mainSailLength * 0.45
   );
   ctx.closePath();
   ctx.fill();
@@ -647,7 +645,8 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
 
   // Goose-wing: jib goes to opposite side of main when deep downwind
   const jibDeflect = gooseWing ? -sailDeflect : sailDeflect * 0.85;
-  const jibBellySide = gooseWing ? -bellySide : bellySide;
+  // Jib belly: same logic — opposite to its own deflection direction
+  const jibBellySide = jibDeflect <= 0 ? 1 : -1;
 
   ctx.save();
   ctx.translate(0, jibAttachY);
@@ -663,13 +662,12 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
   ctx.lineWidth = 1;
 
   ctx.beginPath();
-  // Luff runs along Y axis from head (tack at bow) down to clew
-  ctx.moveTo(0, 0); // Head (top at bow)
+  ctx.moveTo(0, 0); // Head (tack at bow)
   ctx.lineTo(0, jibLength); // Clew (bottom)
-  // Leech curves back up with belly to leeward
+  // Leech curves back to head with belly
   ctx.quadraticCurveTo(
     jibBelly * 1.2, jibLength * 0.4,
-    0, 0 // back to head
+    0, 0
   );
   ctx.closePath();
   ctx.fill();

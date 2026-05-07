@@ -249,8 +249,8 @@ function SailPositionIndicator({
     ? -Math.min(maxDeflection, absWindAngle * 0.4)
     : Math.min(maxDeflection, absWindAngle * 0.4);
 
-  // Belly curves to leeward (same direction as sail deflection)
-  const bellySide = sailAngleDeg < 0 ? -1 : 1;
+  // Belly curves opposite to sail deflection direction (wind pushes belly out)
+  const bellySide = sailAngleDeg <= 0 ? 1 : -1;
   const mainBelly = (2.5 + (1 - sheetAngle) * 2.5) * bellySide;
 
   // Goose-wing: jib goes opposite when deep downwind with sails fully out
@@ -258,7 +258,7 @@ function SailPositionIndicator({
   const isFullyEased = sheetAngle < 0.15;
   const gooseWing = isDeepDownwind && isFullyEased;
   const jibAngleDeg = gooseWing ? -sailAngleDeg : sailAngleDeg * 0.85;
-  const jibBellySide = gooseWing ? -bellySide : bellySide;
+  const jibBellySide = jibAngleDeg <= 0 ? 1 : -1;
   const jibBelly = (2 + (1 - sheetAngle) * 2) * jibBellySide;
   const rudderAngleDeg = rudderInput * 25;
 
