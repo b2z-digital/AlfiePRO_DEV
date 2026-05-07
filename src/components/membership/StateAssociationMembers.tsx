@@ -951,43 +951,59 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                       </td>
                       <td className="px-4 py-4">
                         {member.clubMemberships.length > 1 ? (
-                          <div className="space-y-1">
-                            {member.clubMemberships.filter(cm => cm.club_id).map(cm => (
-                              <span key={cm.id} className="block text-sm text-slate-300">{cm.membership_level || 'Standard'}</span>
-                            ))}
+                          <div className="space-y-1.5">
+                            {member.clubMemberships.filter(cm => cm.club_id).map(cm => {
+                              const club = clubs.find(c => c.id === cm.club_id);
+                              const abbr = club?.abbreviation || cm.club_name?.split(' ').map((w: string) => w[0]).join('').slice(0, 4);
+                              return (
+                                <div key={cm.id} className="flex items-center gap-2">
+                                  <span className="text-sm text-slate-300">{cm.membership_level || 'Standard'}</span>
+                                  <span className="text-[11px] text-slate-500">{abbr}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : (
                           <span className="text-sm text-slate-300">{member.membership_level || 'Standard'}</span>
                         )}
                       </td>
                       <td className="px-4 py-4">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {member.clubMemberships.length > 1 ? (
-                            member.clubMemberships.filter(cm => cm.club_id).map(cm => (
-                              <span key={cm.id} className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                cm.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
-                              }`}>
-                                {cm.is_financial ? 'Fin' : 'Unfin'}
-                              </span>
-                            ))
-                          ) : (
+                        {member.clubMemberships.length > 1 ? (
+                          <div className="space-y-1.5">
+                            {member.clubMemberships.filter(cm => cm.club_id).map(cm => {
+                              const club = clubs.find(c => c.id === cm.club_id);
+                              const abbr = club?.abbreviation || cm.club_name?.split(' ').map((w: string) => w[0]).join('').slice(0, 4);
+                              return (
+                                <div key={cm.id} className="flex items-center gap-2">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    cm.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+                                  }`}>
+                                    {cm.is_financial ? 'Financial' : 'Unfinancial'}
+                                  </span>
+                                  <span className="text-[11px] text-slate-500">{abbr}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               member.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
                             }`}>
                               {member.is_financial ? 'Financial' : 'Unfinancial'}
                             </span>
-                          )}
-                          {member.memberIds.some(id => memberRemittanceStatus[id]?.statePaid) && (
-                            <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400" title="State Paid">
-                              <CheckCircle2 size={14} />
-                            </div>
-                          )}
-                          {member.memberIds.some(id => memberRemittanceStatus[id]?.nationalPaid) && (
-                            <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400" title="National Paid">
-                              <CheckCircle2 size={14} />
-                            </div>
-                          )}
-                        </div>
+                            {member.memberIds.some(id => memberRemittanceStatus[id]?.statePaid) && (
+                              <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400" title="State Paid">
+                                <CheckCircle2 size={14} />
+                              </div>
+                            )}
+                            {member.memberIds.some(id => memberRemittanceStatus[id]?.nationalPaid) && (
+                              <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400" title="National Paid">
+                                <CheckCircle2 size={14} />
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-4">
                         {(() => {
