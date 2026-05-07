@@ -244,12 +244,22 @@ function SailPositionIndicator({
   // Compute sail deflection similar to drawBoat logic
   const windSide = Math.sin((windAngleRelative * Math.PI) / 180);
   const absWindAngle = Math.abs(windAngleRelative > 180 ? windAngleRelative - 360 : windAngleRelative);
-  const maxDeflection = (1 - sheetAngle) * 55; // degrees visual
+  const maxDeflection = (1 - sheetAngle) * 55; // max 80% out visually
   const sailAngleDeg = windSide > 0
     ? -Math.min(maxDeflection, absWindAngle * 0.4)
     : Math.min(maxDeflection, absWindAngle * 0.4);
 
-  const jibAngleDeg = sailAngleDeg * 0.85;
+  // Belly always to leeward: windSide > 0 means wind from starboard, leeward is port (-X)
+  const leeSide = windSide > 0 ? -1 : 1;
+  const mainBelly = (2.5 + (1 - sheetAngle) * 2.5) * leeSide;
+
+  // Goose-wing: jib goes opposite when deep downwind with sails fully out
+  const isDeepDownwind = absWindAngle > 150;
+  const isFullyEased = sheetAngle < 0.15;
+  const gooseWing = isDeepDownwind && isFullyEased;
+  const jibAngleDeg = gooseWing ? -sailAngleDeg : sailAngleDeg * 0.85;
+  const jibLeeSide = gooseWing ? -leeSide : leeSide;
+  const jibBelly = (2 + (1 - sheetAngle) * 2) * jibLeeSide;
   const rudderAngleDeg = rudderInput * 25;
 
   return (
@@ -270,42 +280,59 @@ function SailPositionIndicator({
           <polygon points="0,-38 -2,-34 2,-34" fill={darkMode ? '#60a5fa' : '#3b82f6'} opacity="0.7" />
         </g>
 
-        {/* Hull */}
+        {/* Hull - race yacht with flat transom */}
         <path
-          d="M 0,-22 C 3,-16 3.5,-2 3,8 C 2.5,12 1,14 0,14 C -1,14 -2.5,12 -3,8 C -3.5,-2 -3,-16 0,-22 Z"
+          d="M 0,-22 C 3,-16 4,-4 3.8,6 L 3.5,10 L -3.5,10 L -3.8,6 C -4,-4 -3,-16 0,-22 Z"
           fill={darkMode ? '#3b82f6' : '#2563eb'}
           stroke={darkMode ? '#e2e8f0' : '#1e293b'}
           strokeWidth="0.8"
         />
 
-        {/* Mast */}
-        <circle cx="0" cy="-4" r="1" fill={darkMode ? '#94a3b8' : '#475569'} />
+        {/* Mast (centre) */}
+        <circle cx="0" cy="-2" r="1" fill={darkMode ? '#94a3b8' : '#475569'} />
 
-        {/* Mainsail */}
-        <g transform={`rotate(${sailAngleDeg}, 0, -4)`}>
-          <path
-            d={`M 0,-18 Q ${2 + (1 - sheetAngle) * 2},-8 0,12`}
-            fill="rgba(255,255,255,0.7)"
-            stroke={darkMode ? '#e2e8f0' : '#64748b'}
-            strokeWidth="0.7"
-          />
-          {/* Boom */}
-          <line x1="0" y1="-4" x2="0" y2="12" stroke={darkMode ? '#64748b' : '#94a3b8'} strokeWidth="1" />
-        </g>
+        {/* Mainsail - drawn in boat frame with belly to leeward */}
+        {(() => {
+          const rad = sailAngleDeg * Math.PI / 180;
+          const headX = Math.sin(rad) * (-10);
+          const headY = -2 + Math.cos(rad) * (-10);
+          const boomX = Math.sin(rad) * 12;
+          const boomY = -2 + Math.cos(rad) * 12;
+          const cpX = (headX + boomX) / 2 + mainBelly;
+          const cpY = (headY + boomY) / 2;
+          return (
+            <>
+              <path
+                d={`M ${headX},${headY} L 0,-2 L ${boomX},${boomY} Q ${cpX},${cpY} ${headX},${headY} Z`}
+                fill="rgba(255,255,255,0.85)"
+                stroke={darkMode ? '#f1f5f9' : '#64748b'}
+                strokeWidth="0.8"
+              />
+              <line x1="0" y1="-2" x2={boomX} y2={boomY} stroke={darkMode ? '#94a3b8' : '#64748b'} strokeWidth="1" />
+            </>
+          );
+        })()}
 
-        {/* Jib */}
-        <g transform={`rotate(${jibAngleDeg}, 0, -20)`}>
-          <path
-            d={`M 0,-20 Q ${1.5 + (1 - sheetAngle) * 1.5},-12 0,-4`}
-            fill="rgba(240,248,255,0.6)"
-            stroke={darkMode ? '#93c5fd' : '#60a5fa'}
-            strokeWidth="0.6"
-          />
-        </g>
+        {/* Jib - drawn in boat frame with belly to leeward */}
+        {(() => {
+          const rad = jibAngleDeg * Math.PI / 180;
+          const clewX = Math.sin(rad) * 14;
+          const clewY = -20 + Math.cos(rad) * 14;
+          const cpX = clewX / 2 + jibBelly;
+          const cpY = -20 + (clewY + 20) / 2;
+          return (
+            <path
+              d={`M 0,-20 Q ${cpX},${cpY} ${clewX},${clewY} L 0,-20 Z`}
+              fill="rgba(220,240,255,0.8)"
+              stroke={darkMode ? '#93c5fd' : '#60a5fa'}
+              strokeWidth="0.7"
+            />
+          );
+        })()}
 
         {/* Rudder */}
-        <g transform={`rotate(${rudderAngleDeg}, 0, 14)`}>
-          <line x1="0" y1="14" x2="0" y2="20" stroke={darkMode ? '#f59e0b' : '#d97706'} strokeWidth="1.2" strokeLinecap="round" />
+        <g transform={`rotate(${rudderAngleDeg}, 0, 10)`}>
+          <line x1="0" y1="10" x2="0" y2="16" stroke={darkMode ? '#f59e0b' : '#d97706'} strokeWidth="1.2" strokeLinecap="round" />
         </g>
       </svg>
       <span className={`text-[9px] font-bold tracking-wider uppercase ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>

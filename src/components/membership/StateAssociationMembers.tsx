@@ -41,6 +41,21 @@ interface MemberWithClub {
   activation_status?: string;
 }
 
+interface ClubMembership {
+  id: string;
+  club_id: string;
+  club_name: string;
+  membership_level: string;
+  is_financial: boolean;
+  date_joined: string;
+  renewal_date: string;
+}
+
+interface ConsolidatedMember extends MemberWithClub {
+  clubMemberships: ClubMembership[];
+  memberIds: string[];
+}
+
 export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = ({
   darkMode,
   stateAssociationId: propStateAssociationId
@@ -52,6 +67,8 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<MemberWithClub[]>([]);
   const [filteredMembers, setFilteredMembers] = useState<MemberWithClub[]>([]);
+  const [consolidatedMembers, setConsolidatedMembers] = useState<ConsolidatedMember[]>([]);
+  const [isConsolidatedView, setIsConsolidatedView] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClub, setSelectedClub] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -196,7 +213,11 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
           allMembers.push(m);
         }
       }
-      allMembers.sort((a, b) => (a.last_name || '').localeCompare(b.last_name || ''));
+      allMembers.sort((a, b) => {
+        const firstNameCompare = (a.first_name || '').localeCompare(b.first_name || '');
+        if (firstNameCompare !== 0) return firstNameCompare;
+        return (a.last_name || '').localeCompare(b.last_name || '');
+      });
 
       const formattedMembers = allMembers.map((m: any) => {
         const club = clubsData?.find(c => c.id === m.club_id);
@@ -220,6 +241,51 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
     } finally {
       setLoading(false);
     }
+  };
+
+  const consolidateMembers = (membersList: MemberWithClub[]): ConsolidatedMember[] => {
+    const groupMap = new Map<string, MemberWithClub[]>();
+
+    for (const m of membersList) {
+      // Group by user_id if linked, otherwise by lowercase email+name combo
+      const key = m.user_id
+        ? `uid:${m.user_id}`
+        : m.email
+          ? `email:${m.email.toLowerCase()}`
+          : `id:${m.id}`;
+
+      const group = groupMap.get(key);
+      if (group) {
+        group.push(m);
+      } else {
+        groupMap.set(key, [m]);
+      }
+    }
+
+    const consolidated: ConsolidatedMember[] = [];
+    for (const group of groupMap.values()) {
+      // Use the first member as the "primary" record
+      const primary = group[0];
+      const clubMemberships: ClubMembership[] = group.map(m => ({
+        id: m.id,
+        club_id: m.club_id,
+        club_name: m.club_name,
+        membership_level: m.membership_level,
+        is_financial: m.is_financial,
+        date_joined: m.date_joined,
+        renewal_date: m.renewal_date,
+      }));
+
+      consolidated.push({
+        ...primary,
+        // Overall financial = financial at any club
+        is_financial: group.some(m => m.is_financial),
+        clubMemberships,
+        memberIds: group.map(m => m.id),
+      });
+    }
+
+    return consolidated;
   };
 
   const filterMembers = () => {
@@ -252,6 +318,15 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       }
     }
     setFilteredMembers(filtered);
+
+    // Consolidate when viewing all clubs (no specific club filter)
+    const showConsolidated = selectedClub === 'all' || selectedClub === 'unassigned' ? true : false;
+    setIsConsolidatedView(showConsolidated && selectedClub === 'all');
+    if (showConsolidated && selectedClub === 'all') {
+      setConsolidatedMembers(consolidateMembers(filtered));
+    } else {
+      setConsolidatedMembers([]);
+    }
   };
 
   const unassignedCount = members.filter(m => !m.club_id).length;
@@ -266,10 +341,13 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   };
 
   const toggleSelectAll = () => {
-    if (selectedMemberIds.size === filteredMembers.length) {
+    const allIds = isConsolidatedView
+      ? consolidatedMembers.flatMap(m => m.memberIds)
+      : filteredMembers.map(m => m.id);
+    if (selectedMemberIds.size === allIds.length) {
       setSelectedMemberIds(new Set());
     } else {
-      setSelectedMemberIds(new Set(filteredMembers.map(m => m.id)));
+      setSelectedMemberIds(new Set(allIds));
     }
   };
 
@@ -473,11 +551,13 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
     a.click();
   };
 
+  const uniqueMemberCount = consolidateMembers(members).length;
   const stats = {
     totalMembers: members.length,
+    uniqueMembers: uniqueMemberCount,
     financialMembers: members.filter((m) => m.is_financial).length,
     totalClubs: clubs.length,
-    filteredCount: filteredMembers.length
+    filteredCount: isConsolidatedView ? consolidatedMembers.length : filteredMembers.length
   };
 
   if (loading) {
@@ -511,7 +591,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
             <div>
               <h1 className="text-3xl font-bold text-white">Members</h1>
               <p className="text-sm text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span>{stats.totalMembers} total across {stats.totalClubs} clubs</span>
+                <span>{stats.uniqueMembers} members across {stats.totalClubs} clubs{stats.totalMembers !== stats.uniqueMembers ? ` (${stats.totalMembers} memberships)` : ''}</span>
                 {unassignedCount > 0 && <span className="text-amber-400">({unassignedCount} unassigned)</span>}
                 <span className="hidden sm:inline text-slate-600">|</span>
                 <span className="flex items-center gap-1.5 text-green-400">
@@ -540,8 +620,8 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                 <Users className="text-white" size={24} />
               </div>
               <div>
-                <p className="text-sm text-slate-400">Total Members</p>
-                <p className="text-3xl font-bold text-white mt-1">{stats.totalMembers}</p>
+                <p className="text-sm text-slate-400">Unique Members</p>
+                <p className="text-3xl font-bold text-white mt-1">{stats.uniqueMembers}</p>
               </div>
             </div>
           </div>
@@ -772,13 +852,18 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                   <th className="px-3 py-3 text-left w-10">
                     <input
                       type="checkbox"
-                      checked={filteredMembers.length > 0 && selectedMemberIds.size === filteredMembers.length}
+                      checked={(() => {
+                        const totalIds = isConsolidatedView
+                          ? consolidatedMembers.flatMap(m => m.memberIds).length
+                          : filteredMembers.length;
+                        return totalIds > 0 && selectedMemberIds.size === totalIds;
+                      })()}
                       onChange={toggleSelectAll}
                       className="rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
                     />
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Member</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Club</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">{isConsolidatedView ? 'Club(s)' : 'Club'}</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Contact</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Membership</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Financial Status</th>
@@ -788,12 +873,245 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
-                {filteredMembers.length === 0 ? (
+                {(isConsolidatedView ? consolidatedMembers.length === 0 : filteredMembers.length === 0) ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
                       No members found
                     </td>
                   </tr>
+                ) : isConsolidatedView ? (
+                  consolidatedMembers.map((member) => (
+                    <tr key={member.memberIds.join('-')} className={`hover:bg-slate-700/30 ${member.memberIds.some(id => selectedMemberIds.has(id)) ? 'bg-blue-900/20' : ''}`}>
+                      <td className="px-3 py-4">
+                        <input
+                          type="checkbox"
+                          checked={member.memberIds.every(id => selectedMemberIds.has(id))}
+                          onChange={() => {
+                            const allSelected = member.memberIds.every(id => selectedMemberIds.has(id));
+                            setSelectedMemberIds(prev => {
+                              const next = new Set(prev);
+                              member.memberIds.forEach(id => {
+                                if (allSelected) next.delete(id);
+                                else next.add(id);
+                              });
+                              return next;
+                            });
+                          }}
+                          className="rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                        />
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          {member.avatar_url ? (
+                            <img src={member.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                              {member.first_name?.[0]}{member.last_name?.[0]}
+                            </div>
+                          )}
+                          <span className="text-white font-medium">{member.first_name} {member.last_name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {member.clubMemberships.length === 0 || (!member.clubMemberships[0].club_id && member.clubMemberships.length === 1) ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">
+                            Unassigned
+                          </span>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {member.clubMemberships.filter(cm => cm.club_id).map((cm) => (
+                              <div key={cm.id} className="flex items-center gap-2">
+                                <Building2 size={14} className="text-slate-400 flex-shrink-0" />
+                                <span className="text-sm text-slate-300">{cm.club_name}</span>
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  cm.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+                                }`}>
+                                  {cm.membership_level || 'Standard'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="space-y-1">
+                          {member.email && (
+                            <div className="flex items-center gap-2 text-sm text-slate-300">
+                              <Mail size={14} className="text-slate-400" />
+                              {member.email}
+                            </div>
+                          )}
+                          {member.phone && (
+                            <div className="flex items-center gap-2 text-sm text-slate-300">
+                              <Phone size={14} className="text-slate-400" />
+                              {member.phone}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {member.clubMemberships.length > 1 ? (
+                          <div className="space-y-1.5">
+                            {member.clubMemberships.filter(cm => cm.club_id).map(cm => {
+                              const club = clubs.find(c => c.id === cm.club_id);
+                              const abbr = club?.abbreviation || cm.club_name?.split(' ').map((w: string) => w[0]).join('').slice(0, 4);
+                              return (
+                                <div key={cm.id} className="flex items-center gap-2">
+                                  <span className="text-sm text-slate-300">{cm.membership_level || 'Standard'}</span>
+                                  <span className="text-[11px] text-slate-500">{abbr}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-slate-300">{member.membership_level || 'Standard'}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        {member.clubMemberships.length > 1 ? (
+                          <div className="space-y-1.5">
+                            {member.clubMemberships.filter(cm => cm.club_id).map(cm => {
+                              const club = clubs.find(c => c.id === cm.club_id);
+                              const abbr = club?.abbreviation || cm.club_name?.split(' ').map((w: string) => w[0]).join('').slice(0, 4);
+                              return (
+                                <div key={cm.id} className="flex items-center gap-2">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    cm.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+                                  }`}>
+                                    {cm.is_financial ? 'Financial' : 'Unfinancial'}
+                                  </span>
+                                  <span className="text-[11px] text-slate-500">{abbr}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              member.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+                            }`}>
+                              {member.is_financial ? 'Financial' : 'Unfinancial'}
+                            </span>
+                            {member.memberIds.some(id => memberRemittanceStatus[id]?.statePaid) && (
+                              <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400" title="State Paid">
+                                <CheckCircle2 size={14} />
+                              </div>
+                            )}
+                            {member.memberIds.some(id => memberRemittanceStatus[id]?.nationalPaid) && (
+                              <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400" title="National Paid">
+                                <CheckCircle2 size={14} />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        {(() => {
+                          const hasUserId = !!member.user_id;
+                          const activationStatus = member.activation_status;
+                          const invitation = memberInvitations[member.id];
+
+                          if (hasUserId && activationStatus === 'activated') {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                                <CheckCircle2 size={12} />
+                                Active
+                              </span>
+                            );
+                          }
+                          if (hasUserId && activationStatus === 'pending') {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-900/30 text-sky-400">
+                                <Smartphone size={12} />
+                                Awaiting Setup
+                              </span>
+                            );
+                          }
+                          if (hasUserId) {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                                <Link size={12} />
+                                Connected
+                              </span>
+                            );
+                          }
+                          if (invitation?.status === 'pending' || activationStatus === 'pending') {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-900/30 text-orange-400">
+                                <Clock size={12} />
+                                Invite Sent
+                              </span>
+                            );
+                          }
+                          if (invitation?.status === 'expired') {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-900/30 text-red-400">
+                                <Clock size={12} />
+                                Expired
+                              </span>
+                            );
+                          }
+                          if (member.email) {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-700/50 text-slate-400">
+                                <Smartphone size={12} />
+                                Not Invited
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800/50 text-slate-500">
+                              No Email
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="space-y-1 text-sm">
+                          {member.date_joined && (
+                            <div className="text-slate-400">
+                              <span className="text-slate-500">Joined</span> {formatDate(member.date_joined)}
+                            </div>
+                          )}
+                          {member.renewal_date && (
+                            <div className="text-slate-400">
+                              <span className="text-slate-500">Renewal</span> {formatDate(member.renewal_date)}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {!isImpersonating && member.user_id && (
+                            <button
+                              onClick={() => startImpersonation(member.id)}
+                              className="p-2 rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 transition"
+                              title={`View as ${member.first_name} ${member.last_name}`}
+                            >
+                              <Eye size={16} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setEditingMemberId(member.id);
+                              setEditingMemberClubId(member.club_id || '');
+                            }}
+                            className="p-2 rounded-lg hover:bg-slate-600/50 text-slate-400 hover:text-white transition"
+                            title="Edit member"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            onClick={() => setDeletingMember(member)}
+                            className="p-2 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition"
+                            title="Delete member"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 ) : (
                   filteredMembers.map((member) => (
                     <tr key={member.id} className={`hover:bg-slate-700/30 ${selectedMemberIds.has(member.id) ? 'bg-blue-900/20' : ''}`}>
@@ -1003,7 +1321,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
         }}
         initialConfig={advancedFilterConfig || undefined}
         boatClasses={boatClasses}
-        memberCount={filteredMembers.length}
+        memberCount={isConsolidatedView ? consolidatedMembers.length : filteredMembers.length}
         darkMode={darkMode}
       />
 
