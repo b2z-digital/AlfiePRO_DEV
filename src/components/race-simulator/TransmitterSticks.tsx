@@ -249,17 +249,17 @@ function SailPositionIndicator({
     ? -Math.min(maxDeflection, absWindAngle * 0.4)
     : Math.min(maxDeflection, absWindAngle * 0.4);
 
-  // Belly curves opposite to sail deflection direction (wind pushes belly out)
-  const bellySide = sailAngleDeg <= 0 ? 1 : -1;
-  const mainBelly = (2.5 + (1 - sheetAngle) * 2.5) * bellySide;
+  // Belly always to leeward: windSide > 0 means wind from starboard, leeward is port (-X)
+  const leeSide = windSide > 0 ? -1 : 1;
+  const mainBelly = (2.5 + (1 - sheetAngle) * 2.5) * leeSide;
 
   // Goose-wing: jib goes opposite when deep downwind with sails fully out
   const isDeepDownwind = absWindAngle > 150;
   const isFullyEased = sheetAngle < 0.15;
   const gooseWing = isDeepDownwind && isFullyEased;
   const jibAngleDeg = gooseWing ? -sailAngleDeg : sailAngleDeg * 0.85;
-  const jibBellySide = jibAngleDeg <= 0 ? 1 : -1;
-  const jibBelly = (2 + (1 - sheetAngle) * 2) * jibBellySide;
+  const jibLeeSide = gooseWing ? -leeSide : leeSide;
+  const jibBelly = (2 + (1 - sheetAngle) * 2) * jibLeeSide;
   const rudderAngleDeg = rudderInput * 25;
 
   return (
@@ -291,27 +291,44 @@ function SailPositionIndicator({
         {/* Mast (centre) */}
         <circle cx="0" cy="-2" r="1" fill={darkMode ? '#94a3b8' : '#475569'} />
 
-        {/* Mainsail - luff along mast, belly to leeward */}
-        <g transform={`rotate(${sailAngleDeg}, 0, -2)`}>
-          <path
-            d={`M 0,-12 L 0,12 Q ${mainBelly},0 0,-12 Z`}
-            fill="rgba(255,255,255,0.85)"
-            stroke={darkMode ? '#f1f5f9' : '#64748b'}
-            strokeWidth="0.8"
-          />
-          {/* Boom */}
-          <line x1="0" y1="0" x2="0" y2="12" stroke={darkMode ? '#94a3b8' : '#64748b'} strokeWidth="1" />
-        </g>
+        {/* Mainsail - drawn in boat frame with belly to leeward */}
+        {(() => {
+          const rad = sailAngleDeg * Math.PI / 180;
+          const headX = Math.sin(rad) * (-10);
+          const headY = -2 + Math.cos(rad) * (-10);
+          const boomX = Math.sin(rad) * 12;
+          const boomY = -2 + Math.cos(rad) * 12;
+          const cpX = (headX + boomX) / 2 + mainBelly;
+          const cpY = (headY + boomY) / 2;
+          return (
+            <>
+              <path
+                d={`M ${headX},${headY} L 0,-2 L ${boomX},${boomY} Q ${cpX},${cpY} ${headX},${headY} Z`}
+                fill="rgba(255,255,255,0.85)"
+                stroke={darkMode ? '#f1f5f9' : '#64748b'}
+                strokeWidth="0.8"
+              />
+              <line x1="0" y1="-2" x2={boomX} y2={boomY} stroke={darkMode ? '#94a3b8' : '#64748b'} strokeWidth="1" />
+            </>
+          );
+        })()}
 
-        {/* Jib - luff along forestay, belly to leeward */}
-        <g transform={`rotate(${jibAngleDeg}, 0, -20)`}>
-          <path
-            d={`M 0,-20 L 0,-5 Q ${jibBelly},-12.5 0,-20 Z`}
-            fill="rgba(220,240,255,0.8)"
-            stroke={darkMode ? '#93c5fd' : '#60a5fa'}
-            strokeWidth="0.7"
-          />
-        </g>
+        {/* Jib - drawn in boat frame with belly to leeward */}
+        {(() => {
+          const rad = jibAngleDeg * Math.PI / 180;
+          const clewX = Math.sin(rad) * 14;
+          const clewY = -20 + Math.cos(rad) * 14;
+          const cpX = clewX / 2 + jibBelly;
+          const cpY = -20 + (clewY + 20) / 2;
+          return (
+            <path
+              d={`M 0,-20 Q ${cpX},${cpY} ${clewX},${clewY} L 0,-20 Z`}
+              fill="rgba(220,240,255,0.8)"
+              stroke={darkMode ? '#93c5fd' : '#60a5fa'}
+              strokeWidth="0.7"
+            />
+          );
+        })()}
 
         {/* Rudder */}
         <g transform={`rotate(${rudderAngleDeg}, 0, 10)`}>

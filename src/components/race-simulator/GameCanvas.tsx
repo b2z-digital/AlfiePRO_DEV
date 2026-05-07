@@ -594,18 +594,21 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
   ctx.fill();
 
   // Mainsail - pivots from mast (centre of boat)
-  // After rotation by sailDeflect, wind comes from the "negative X" side in the sail's
-  // local frame, pushing the belly to "positive X". But we need to account for the
-  // fact that the rotation direction flips this: when sailDeflect is negative (sail to port),
-  // in the sail's rotated frame the wind pushes belly to +X local. When sailDeflect is
-  // positive (sail to starboard), wind pushes belly to -X local.
-  // Simpler: belly always goes OPPOSITE to sailDeflect direction in the sail's local frame.
+  // Draw sail WITHOUT rotation, using sailDeflect to position the boom/clew,
+  // and belly always curves to leeward in boat coordinates.
   const mainSailLength = boatLength * 0.7;
-  const bellySide = sailDeflect <= 0 ? 1 : -1;
+  // Leeward side: wind from starboard (windSide>0) means leeward is port (-X)
+  const leeSide = windSide > 0 ? -1 : 1;
+
+  // Boom end position (rotated from mast)
+  const boomEndX = Math.sin(sailDeflect) * mainSailLength * 0.5;
+  const boomEndY = Math.cos(sailDeflect) * mainSailLength * 0.5;
+  // Head (top of sail on mast, above pivot)
+  const headX = Math.sin(sailDeflect) * (-mainSailLength * 0.45);
+  const headY = Math.cos(sailDeflect) * (-mainSailLength * 0.45);
 
   ctx.save();
   ctx.translate(0, mastY);
-  ctx.rotate(sailDeflect);
 
   ctx.fillStyle = boat.isPlayer
     ? 'rgba(255, 255, 255, 0.9)'
@@ -615,44 +618,51 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
     : (darkMode ? '#cbd5e1' : '#94a3b8');
   ctx.lineWidth = 1.2;
 
-  const bellyCurve = ((1 - sheet) * 4 + 2) * bellySide;
+  // Belly offset perpendicular to the sail, always to leeward
+  const bellyAmount = (1 - sheet) * 4 + 2.5;
+  const bellyCpX = (headX + boomEndX) / 2 + leeSide * bellyAmount;
+  const bellyCpY = (headY + boomEndY) / 2;
+
   ctx.beginPath();
-  // Luff (leading edge) runs straight along Y axis (the mast)
-  ctx.moveTo(0, -mainSailLength * 0.45); // Head (top of sail)
-  ctx.lineTo(0, mainSailLength * 0.5); // Clew (end of boom)
-  // Leech (trailing edge) curves back to head with belly
-  ctx.quadraticCurveTo(
-    bellyCurve * 1.3, mainSailLength * 0.05,
-    0, -mainSailLength * 0.45
-  );
+  ctx.moveTo(headX, headY); // Head (top)
+  // Luff: straight line from head to mast (tack), then to boom end
+  ctx.lineTo(0, 0); // Tack at mast
+  ctx.lineTo(boomEndX, boomEndY); // Clew (end of boom)
+  // Leech: curve from clew back to head with belly to leeward
+  ctx.quadraticCurveTo(bellyCpX, bellyCpY, headX, headY);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
-  // Boom line (mast to end of boom)
+  // Boom line
   ctx.strokeStyle = darkMode ? '#94a3b8' : '#64748b';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(0, mainSailLength * 0.5);
+  ctx.lineTo(boomEndX, boomEndY);
   ctx.stroke();
 
   ctx.restore();
 
   // Jib (foresail) - pivots from bow (nose of boat)
-  const jibAttachY = -boatLength * 0.85; // bow attachment
+  const jibAttachY = -boatLength * 0.85;
   const jibLength = boatLength * 0.55;
 
   // Goose-wing: jib goes to opposite side of main when deep downwind
   const jibDeflect = gooseWing ? -sailDeflect : sailDeflect * 0.85;
-  // Jib belly: same logic — opposite to its own deflection direction
-  const jibBellySide = jibDeflect <= 0 ? 1 : -1;
+  const jibLeeSide = gooseWing ? -leeSide : leeSide;
+
+  // Jib clew position (rotated from bow attachment)
+  const jibEndX = Math.sin(jibDeflect) * jibLength;
+  const jibEndY = Math.cos(jibDeflect) * jibLength;
 
   ctx.save();
   ctx.translate(0, jibAttachY);
-  ctx.rotate(jibDeflect);
 
-  const jibBelly = ((1 - sheet) * 3.5 + 1.5) * jibBellySide;
+  const jibBellyAmount = (1 - sheet) * 3.5 + 1.5;
+  const jibCpX = jibEndX / 2 + jibLeeSide * jibBellyAmount;
+  const jibCpY = jibEndY / 2;
+
   ctx.fillStyle = boat.isPlayer
     ? 'rgba(220, 240, 255, 0.9)'
     : 'rgba(255, 255, 255, 0.65)';
@@ -663,12 +673,10 @@ function drawBoat(ctx: CanvasRenderingContext2D, boat: Boat, wind: Wind, darkMod
 
   ctx.beginPath();
   ctx.moveTo(0, 0); // Head (tack at bow)
-  ctx.lineTo(0, jibLength); // Clew (bottom)
-  // Leech curves back to head with belly
-  ctx.quadraticCurveTo(
-    jibBelly * 1.2, jibLength * 0.4,
-    0, 0
-  );
+  // Leech with belly to leeward
+  ctx.quadraticCurveTo(jibCpX, jibCpY, jibEndX, jibEndY); // Clew
+  // Luff straight back
+  ctx.lineTo(0, 0);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
