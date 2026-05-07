@@ -447,6 +447,40 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
     setSimResults(results);
   }, [simBoats, adjustmentRules, config]);
 
+  const formatMessageContent = (content: string) => {
+    const parts = content.split(/(\*\*.*?\*\*|\n)/g);
+    return parts.map((part, i) => {
+      if (part === '\n') return <br key={i} />;
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
+  const parseRulesFromResponse = (message: string): AdjustmentRule[] | null => {
+    const jsonMatch = message.match(/```json\s*([\s\S]*?)```/);
+    if (!jsonMatch) return null;
+    try {
+      const parsed = JSON.parse(jsonMatch[1]);
+      if (!Array.isArray(parsed)) return null;
+      return parsed.map((rule: any, i: number) => ({
+        id: `alfie-${Date.now()}-${i}`,
+        ruleset_id: selectedRuleset?.id || '',
+        priority: i + 1,
+        name: rule.name || `Rule ${i + 1}`,
+        condition_type: rule.condition_type || 'position',
+        condition_value: rule.condition_value || {},
+        action: rule.action || 'add',
+        action_value: Number(rule.action_value) || 0,
+        applies_to: rule.applies_to || 'self',
+        description: rule.description || '',
+      }));
+    } catch {
+      return null;
+    }
+  };
+
   const sendAlfieMessage = async (overrideText?: string) => {
     const messageText = overrideText || alfieInput.trim();
     if (!messageText || alfieLoading) return;
@@ -459,7 +493,44 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Not authenticated');
 
-      const handicapContext = `[HANDICAP RULE BUILDER CONTEXT] The user is in the custom handicap rule builder. They want to create custom rules for how handicaps are calculated after each race. The current DEFAULT system: Seeding race (1st=0s, 2nd=10s, 3rd=20s...), then per-race adjustments (1st=-30s, 2nd=-20s, 3rd=-10s), scratch boat wins bonus (+30s to all others), consecutive last place streak (+30s after 3 times), cap at 150s. Help them describe and build their own custom rules. When you understand their rules, format them as a numbered list with: Rule name, Condition (when it triggers), Action (add/subtract seconds), Who it applies to. Keep responses focused on handicap rule building.`;
+      const handicapContext = `[HANDICAP RULE BUILDER CONTEXT]
+You are helping the user build custom handicap rules for their yacht racing club. You are in the Handicap Rule Builder section of AlfiePRO.
+
+BACKGROUND: The default AlfiePRO handicap system works as follows:
+- Seeding race: 1st place = 0s, 2nd = 10s, 3rd = 20s, etc.
+- Per-race adjustments: 1st = -30s, 2nd = -20s, 3rd = -10s, last = +30s
+- Scratch boat wins: all others get +30s bonus
+- Consecutive last place (3 times in a row): +30s
+- Cap at 150s maximum handicap
+
+YOUR ROLE: Help the user describe and build their own custom rules in plain conversational English.
+
+FORMATTING RULES - CRITICAL:
+- NEVER use markdown formatting (no ** symbols, no ## headers)
+- Write in plain conversational English
+- Use simple numbered lists when listing rules
+- Keep it clean, professional and easy to read
+
+FLOW:
+1. Ask what rules they want (or listen to their description)
+2. Summarise the rules back in plain English for confirmation
+3. When the user confirms (says yes, looks good, that's right, no changes, etc.) — output the rules as a JSON code block that the system will parse automatically. Format:
+
+\`\`\`json
+[
+  {"name": "Rule Name", "condition_type": "position|position_range|streak|scratch|dnf|all", "condition_value": {}, "action": "add|subtract|set|no_change", "action_value": 30, "applies_to": "self|all_others|non_scratch|scratch_only", "description": "Plain English description"}
+]
+\`\`\`
+
+condition_type options:
+- "position" with condition_value: {"position": 1} for specific position
+- "position_range" with condition_value: {"from": 1, "to": 3} for a range
+- "streak" with condition_value: {"streak_position": "last", "streak_count": 3}
+- "scratch" (no condition_value needed — triggers for scratch/0s boat)
+- "dnf" (no condition_value needed — triggers for DNF/DNS)
+- "all" (applies every race to everyone)
+
+IMPORTANT: When the user says "no" to further changes, or confirms the rules, you MUST output the JSON block immediately. Do NOT repeat the rules in plain text again. Just say something brief like "Done! I've created those rules for you." followed by the JSON block.`;
 
       const conversationHistory = alfieMessages.slice(-10).map(m => ({
         role: m.role,
@@ -489,7 +560,19 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
       const data = await response.json();
 
       if (data?.message) {
-        setAlfieMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+        const parsedRules = parseRulesFromResponse(data.message);
+        const cleanMessage = data.message.replace(/```json[\s\S]*?```/g, '').trim();
+
+        if (parsedRules && parsedRules.length > 0) {
+          setAdjustmentRules(parsedRules);
+          setAlfieMessages(prev => [...prev, {
+            role: 'assistant',
+            content: cleanMessage || `Done! I've created ${parsedRules.length} rules for you. Switch to the "Rules & Flow" tab to review and fine-tune them.`
+          }]);
+          setTimeout(() => setActiveTab('rules'), 1500);
+        } else {
+          setAlfieMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
+        }
       } else {
         setAlfieMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I had trouble processing that. Could you try rephrasing your question?' }]);
       }
@@ -1095,12 +1178,12 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {alfieMessages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] px-4 py-3 rounded-xl text-sm ${
+                    <div className={`max-w-[80%] px-4 py-3 rounded-xl text-sm leading-relaxed ${
                       msg.role === 'user'
                         ? 'bg-blue-600/30 text-white border border-blue-500/30'
                         : 'bg-slate-700/50 text-slate-200 border border-slate-600/30'
                     }`}>
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      <div>{formatMessageContent(msg.content)}</div>
                     </div>
                   </div>
                 ))}
