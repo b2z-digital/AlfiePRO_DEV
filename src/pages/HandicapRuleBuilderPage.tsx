@@ -117,6 +117,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
   const [clubId, setClubId] = useState<string | null>(null);
 
   // Simulation state
+  const [simMode, setSimMode] = useState<'seeding' | 'handicap'>('handicap');
   const [simBoats, setSimBoats] = useState<SimulationBoat[]>([
     { name: 'Boat A', startHcap: 0, position: 1 },
     { name: 'Boat B', startHcap: 20, position: 2 },
@@ -126,6 +127,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
     { name: 'Boat F', startHcap: 100, position: 6 },
   ]);
   const [simResults, setSimResults] = useState<SimulationResult[]>([]);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Alfie chat state
   const [alfieMessages, setAlfieMessages] = useState<AlfieMessage[]>([
@@ -252,18 +254,19 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
   const saveRuleset = async () => {
     if (!selectedRuleset) return;
     setSaving(true);
+    setSaveSuccess(false);
 
     try {
-      // Update ruleset name/description
-      await supabase
+      const { error: updateError } = await supabase
         .from('handicap_rulesets')
         .update({ name: selectedRuleset.name, description: selectedRuleset.description, updated_at: new Date().toISOString() })
         .eq('id', selectedRuleset.id);
 
-      // Update config
+      if (updateError) throw updateError;
+
       if (config) {
         if (config.id) {
-          await supabase.from('handicap_ruleset_config').update({
+          const { error } = await supabase.from('handicap_ruleset_config').update({
             cap_limit: config.cap_limit,
             last_place_bonus_enabled: config.last_place_bonus_enabled,
             last_place_bonus_value: config.last_place_bonus_value,
@@ -271,29 +274,33 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
             scratch_streak_threshold: config.scratch_streak_threshold,
             scratch_streak_bonus: config.scratch_streak_bonus,
           }).eq('id', config.id);
+          if (error) throw error;
         } else {
-          await supabase.from('handicap_ruleset_config').insert({ ...config, ruleset_id: selectedRuleset.id });
+          const { error } = await supabase.from('handicap_ruleset_config').insert({ ...config, ruleset_id: selectedRuleset.id });
+          if (error) throw error;
         }
       }
 
-      // Update seeding rule
       if (seedingRule) {
         if (seedingRule.id) {
-          await supabase.from('handicap_seeding_rules').update({
+          const { error } = await supabase.from('handicap_seeding_rules').update({
             method: seedingRule.method,
             base_value: seedingRule.base_value,
             increment_per_position: seedingRule.increment_per_position,
             description: seedingRule.description,
           }).eq('id', seedingRule.id);
+          if (error) throw error;
         } else {
-          await supabase.from('handicap_seeding_rules').insert({ ...seedingRule, ruleset_id: selectedRuleset.id });
+          const { error } = await supabase.from('handicap_seeding_rules').insert({ ...seedingRule, ruleset_id: selectedRuleset.id });
+          if (error) throw error;
         }
       }
 
-      // Delete and re-insert adjustment rules
-      await supabase.from('handicap_adjustment_rules').delete().eq('ruleset_id', selectedRuleset.id);
+      const { error: deleteError } = await supabase.from('handicap_adjustment_rules').delete().eq('ruleset_id', selectedRuleset.id);
+      if (deleteError) throw deleteError;
+
       if (adjustmentRules.length > 0) {
-        await supabase.from('handicap_adjustment_rules').insert(
+        const { error: insertError } = await supabase.from('handicap_adjustment_rules').insert(
           adjustmentRules.map((r, i) => ({
             ruleset_id: selectedRuleset.id,
             priority: i + 1,
@@ -306,9 +313,14 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
             description: r.description,
           }))
         );
+        if (insertError) throw insertError;
       }
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       console.error('Error saving ruleset:', err);
+      alert('Failed to save ruleset. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -379,73 +391,94 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
     const capLimit = config?.cap_limit ?? 150;
     const results: SimulationResult[] = [];
 
-    const finishers = simBoats.filter(b => b.position !== null).sort((a, b) => (a.position || 0) - (b.position || 0));
-    const maxPosition = Math.max(...finishers.map(b => b.position || 0));
-    const scratchBoatWins = finishers.length > 0 && finishers[0].startHcap === 0;
+    if (simMode === 'seeding') {
+      const baseValue = seedingRule?.base_value ?? 0;
+      const increment = seedingRule?.increment_per_position ?? 10;
 
-    for (const boat of simBoats) {
-      let totalAdj = 0;
-      const rulesApplied: string[] = [];
+      const finishers = simBoats.filter(b => b.position !== null).sort((a, b) => (a.position || 0) - (b.position || 0));
 
-      if (boat.position === null) {
-        results.push({ ...boat, adjustment: 0, newHcap: boat.startHcap, rulesApplied: ['No result'] });
-        continue;
+      for (const boat of simBoats) {
+        if (boat.position === null) {
+          results.push({ ...boat, adjustment: 0, newHcap: 0, rulesApplied: ['No result'] });
+          continue;
+        }
+        const seedHcap = baseValue + ((boat.position - 1) * increment);
+        const cappedHcap = Math.min(capLimit, seedHcap);
+        results.push({
+          ...boat,
+          startHcap: 0,
+          adjustment: cappedHcap,
+          newHcap: cappedHcap,
+          rulesApplied: [`Seeding: pos ${boat.position} = ${baseValue} + ${(boat.position - 1)} x ${increment}`],
+        });
       }
+    } else {
+      const finishers = simBoats.filter(b => b.position !== null).sort((a, b) => (a.position || 0) - (b.position || 0));
+      const maxPosition = Math.max(...finishers.map(b => b.position || 0));
+      const scratchBoatWins = finishers.length > 0 && finishers[0].startHcap === 0;
 
-      for (const rule of adjustmentRules) {
-        let applies = false;
+      for (const boat of simBoats) {
+        let totalAdj = 0;
+        const rulesApplied: string[] = [];
 
-        // Check applies_to filter
-        if (rule.applies_to === 'scratch_only' && boat.startHcap !== 0) continue;
-        if (rule.applies_to === 'non_scratch' && boat.startHcap === 0) continue;
-
-        // Check condition
-        switch (rule.condition_type) {
-          case 'position':
-            applies = boat.position === rule.condition_value.position;
-            break;
-          case 'position_range':
-            applies = boat.position >= (rule.condition_value.from || 1) && boat.position <= (rule.condition_value.to || maxPosition);
-            break;
-          case 'last_place':
-            applies = boat.position === maxPosition;
-            break;
-          case 'scratch_boat_wins':
-            applies = scratchBoatWins && boat.startHcap !== 0;
-            break;
-          case 'scratch_boat':
-            applies = boat.startHcap === 0;
-            break;
-          case 'mid_fleet':
-            applies = boat.position > 3 && boat.position < maxPosition;
-            break;
-          case 'streak':
-            applies = false; // Streaks need multi-race data
-            break;
+        if (boat.position === null) {
+          results.push({ ...boat, adjustment: 0, newHcap: boat.startHcap, rulesApplied: ['No result'] });
+          continue;
         }
 
-        if (applies) {
-          switch (rule.action) {
-            case 'add':
-              totalAdj += rule.action_value;
+        for (const rule of adjustmentRules) {
+          let applies = false;
+
+          if (rule.applies_to === 'scratch_only' && boat.startHcap !== 0) continue;
+          if (rule.applies_to === 'non_scratch' && boat.startHcap === 0) continue;
+
+          switch (rule.condition_type) {
+            case 'position':
+              applies = boat.position === rule.condition_value.position;
               break;
-            case 'subtract':
-              totalAdj -= rule.action_value;
+            case 'position_range':
+              applies = boat.position >= (rule.condition_value.from || 1) && boat.position <= (rule.condition_value.to || maxPosition);
               break;
-            case 'set':
-              totalAdj = rule.action_value - boat.startHcap;
+            case 'last_place':
+              applies = boat.position === maxPosition;
+              break;
+            case 'scratch_boat_wins':
+              applies = scratchBoatWins && boat.startHcap !== 0;
+              break;
+            case 'scratch_boat':
+              applies = boat.startHcap === 0;
+              break;
+            case 'mid_fleet':
+              applies = boat.position > 3 && boat.position < maxPosition;
+              break;
+            case 'streak':
+              applies = false;
               break;
           }
-          rulesApplied.push(rule.name);
-        }
-      }
 
-      const newHcap = Math.max(0, Math.min(capLimit, boat.startHcap + totalAdj));
-      results.push({ ...boat, adjustment: totalAdj, newHcap, rulesApplied });
+          if (applies) {
+            switch (rule.action) {
+              case 'add':
+                totalAdj += rule.action_value;
+                break;
+              case 'subtract':
+                totalAdj -= rule.action_value;
+                break;
+              case 'set':
+                totalAdj = rule.action_value - boat.startHcap;
+                break;
+            }
+            rulesApplied.push(rule.name);
+          }
+        }
+
+        const newHcap = Math.max(0, Math.min(capLimit, boat.startHcap + totalAdj));
+        results.push({ ...boat, adjustment: totalAdj, newHcap, rulesApplied });
+      }
     }
 
     setSimResults(results);
-  }, [simBoats, adjustmentRules, config]);
+  }, [simBoats, adjustmentRules, config, simMode, seedingRule]);
 
   const formatMessageContent = (content: string) => {
     const parts = content.split(/(\*\*.*?\*\*|\n)/g);
@@ -1021,14 +1054,22 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
 
               {/* Save button */}
               {selectedRuleset && (
-                <div className="flex justify-end">
+                <div className="flex items-center justify-end gap-3">
+                  {saveSuccess && (
+                    <span className="flex items-center gap-1.5 text-xs text-green-400">
+                      <CheckCircle2 size={14} />
+                      Saved successfully
+                    </span>
+                  )}
                   <button
                     onClick={saveRuleset}
                     disabled={saving}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-500 transition-colors disabled:opacity-50"
+                    className={`flex items-center gap-2 px-5 py-2.5 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+                      saveSuccess ? 'bg-green-600 hover:bg-green-500' : 'bg-blue-600 hover:bg-blue-500'
+                    }`}
                   >
-                    {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                    Save Ruleset
+                    {saving ? <Loader2 size={16} className="animate-spin" /> : saveSuccess ? <CheckCircle2 size={16} /> : <Save size={16} />}
+                    {saving ? 'Saving...' : saveSuccess ? 'Saved' : 'Save Ruleset'}
                   </button>
                 </div>
               )}
@@ -1039,17 +1080,42 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
           {activeTab === 'simulate' && (
             <div className="space-y-6">
               <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-5">
-                <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                  <Play size={16} className="text-green-400" />
-                  Race Simulation
-                </h3>
-                <p className="text-xs text-slate-400 mb-4">Set up a test race scenario and see how your rules calculate handicap changes.</p>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    <Play size={16} className="text-green-400" />
+                    Race Simulation
+                  </h3>
+                  <div className="flex items-center bg-slate-900/50 rounded-lg border border-slate-600/50 p-0.5">
+                    <button
+                      onClick={() => { setSimMode('seeding'); setSimResults([]); }}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        simMode === 'seeding' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Seeding Round
+                    </button>
+                    <button
+                      onClick={() => { setSimMode('handicap'); setSimResults([]); }}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        simMode === 'handicap' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Handicap Race
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400 mb-4">
+                  {simMode === 'seeding'
+                    ? 'Simulate a seeding round to see how initial handicaps are assigned based on finishing position.'
+                    : 'Set up a test race scenario and see how your rules calculate handicap adjustments.'
+                  }
+                </p>
 
                 {/* Boat setup */}
                 <div className="space-y-2 mb-4">
                   <div className="grid grid-cols-12 gap-2 text-xs font-medium text-slate-400 px-2">
                     <div className="col-span-3">Boat Name</div>
-                    <div className="col-span-3">Starting Handicap (sec)</div>
+                    <div className="col-span-3">{simMode === 'seeding' ? 'Starting Hcap (ignored)' : 'Starting Handicap (sec)'}</div>
                     <div className="col-span-3">Finishing Position</div>
                     <div className="col-span-3"></div>
                   </div>
@@ -1124,10 +1190,10 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                         <tr className="border-b border-slate-700/50">
                           <th className="text-left py-2 px-3 text-slate-400 font-medium">Boat</th>
                           <th className="text-center py-2 px-3 text-slate-400 font-medium">Position</th>
-                          <th className="text-center py-2 px-3 text-slate-400 font-medium">Start Hcap</th>
-                          <th className="text-center py-2 px-3 text-slate-400 font-medium">Adjustment</th>
-                          <th className="text-center py-2 px-3 text-slate-400 font-medium">New Hcap</th>
-                          <th className="text-left py-2 px-3 text-slate-400 font-medium">Rules Applied</th>
+                          {simMode === 'handicap' && <th className="text-center py-2 px-3 text-slate-400 font-medium">Start Hcap</th>}
+                          <th className="text-center py-2 px-3 text-slate-400 font-medium">{simMode === 'seeding' ? 'Calculation' : 'Adjustment'}</th>
+                          <th className="text-center py-2 px-3 text-slate-400 font-medium">{simMode === 'seeding' ? 'Assigned Hcap' : 'New Hcap'}</th>
+                          <th className="text-left py-2 px-3 text-slate-400 font-medium">{simMode === 'seeding' ? 'Formula' : 'Rules Applied'}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1135,17 +1201,17 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                           <tr key={i} className="border-b border-slate-700/30">
                             <td className="py-2.5 px-3 text-white font-medium">{result.name}</td>
                             <td className="py-2.5 px-3 text-center text-slate-300">{result.position || 'DNF'}</td>
-                            <td className="py-2.5 px-3 text-center text-slate-300">{result.startHcap}s</td>
+                            {simMode === 'handicap' && <td className="py-2.5 px-3 text-center text-slate-300">{result.startHcap}s</td>}
                             <td className={`py-2.5 px-3 text-center font-medium ${
-                              result.adjustment > 0 ? 'text-green-400' : result.adjustment < 0 ? 'text-red-400' : 'text-slate-400'
+                              simMode === 'seeding' ? 'text-teal-400' : result.adjustment > 0 ? 'text-green-400' : result.adjustment < 0 ? 'text-red-400' : 'text-slate-400'
                             }`}>
-                              {result.adjustment > 0 ? '+' : ''}{result.adjustment}s
+                              {simMode === 'seeding' ? `${result.newHcap}s` : `${result.adjustment > 0 ? '+' : ''}${result.adjustment}s`}
                             </td>
                             <td className="py-2.5 px-3 text-center text-white font-medium">{result.newHcap}s</td>
                             <td className="py-2.5 px-3">
                               <div className="flex flex-wrap gap-1">
                                 {result.rulesApplied.map((rule, ri) => (
-                                  <span key={ri} className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-[10px]">{rule}</span>
+                                  <span key={ri} className={`px-2 py-0.5 rounded text-[10px] ${simMode === 'seeding' ? 'bg-teal-500/20 text-teal-300' : 'bg-blue-500/20 text-blue-300'}`}>{rule}</span>
                                 ))}
                               </div>
                             </td>
