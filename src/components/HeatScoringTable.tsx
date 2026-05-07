@@ -1280,12 +1280,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const handleExportCurrentHeatPdf = async () => {
     const roundIdx = heatManagement.rounds.findIndex(r => r.round === safeCurrentRound);
     if (roundIdx < 0) return;
-    const obsMap = await buildFullObserverMap();
+    const obsMap = currentEvent?.enable_observers ? await buildFullObserverMap() : undefined;
     exportSingleRoundPdf(heatManagement, roundIdx, skippers, getExportOptions(), obsMap);
   };
 
   const handleExportAllHeatsPdf = async () => {
-    const obsMap = await buildFullObserverMap();
+    const obsMap = currentEvent?.enable_observers ? await buildFullObserverMap() : undefined;
     exportAllRoundsPdf(heatManagement, skippers, getExportOptions(), obsMap);
   };
 

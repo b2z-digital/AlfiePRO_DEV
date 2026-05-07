@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark } from 'lucide-react';
+import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark, Flag, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { updateUserProfile } from '../../utils/auth';
@@ -23,6 +23,7 @@ import { BackupRestoreSection } from './BackupRestoreSection';
 import { AdvertisingManagement } from '../advertising/AdvertisingManagement';
 import { StartBoxBuilder } from '../start-box/StartBoxBuilder';
 import { ClubFeaturesAccess } from './ClubFeaturesAccess';
+import HandicapRuleBuilderPage from '../../pages/HandicapRuleBuilderPage';
 import { ClubYachtClassesSelector } from '../ClubYachtClassesSelector';
 import { formatDate } from '../../utils/date';
 import { supabase } from '../../utils/supabase';
@@ -38,7 +39,7 @@ interface SettingsPageProps {
 type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'club-features' | 'team' | 'subscriptions' | 'integrations' |
   'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' | 'finance-payment-settings' | 'finance-opening-balance' |
   'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' |
-  'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system';
+  'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system' | 'handicap-rules';
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const { user, currentClub, currentOrganization } = useAuth();
@@ -75,12 +76,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const [expandedSections, setExpandedSections] = useState<{
     account: boolean;
     club: boolean;
+    raceManagement: boolean;
     finance: boolean;
     membership: boolean;
     system: boolean;
   }>({
     account: true,  // Default to first section expanded
     club: false,
+    raceManagement: false,
     finance: false,
     membership: false,
     system: false,
@@ -228,6 +231,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
     const newExpandedSections = {
       account: false,
       club: false,
+      raceManagement: false,
       finance: false,
       membership: false,
       system: false,
@@ -785,6 +789,40 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </button>
                 )}
 
+              </div>
+            </div>
+          )}
+
+          {/* Race Management Settings Section */}
+          {(can('settings.documents') || can('settings.startbox')) && (
+            <div>
+              <button
+                onClick={() => toggleSection('raceManagement')}
+                className={`w-full flex items-center justify-between p-4 rounded-lg mb-4 transition-all ${
+                  lightMode
+                    ? 'bg-white border border-gray-200 hover:bg-gray-50'
+                    : 'bg-slate-800/50 border border-slate-700 hover:bg-slate-800/70'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Flag size={20} className={lightMode ? 'text-blue-600' : 'text-blue-400'} />
+                  <h2 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>
+                    Race Management
+                  </h2>
+                </div>
+                <ChevronDown
+                  size={20}
+                  className={`transition-transform duration-200 ${
+                    expandedSections.raceManagement ? 'rotate-180' : ''
+                  } ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}
+                />
+              </button>
+              <div
+                className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200 overflow-hidden ${
+                  expandedSections.raceManagement ? 'opacity-100 max-h-[2000px]' : 'opacity-0 max-h-0'
+                }`}
+              >
+
                 {/* Race Documents Card */}
                 {can('settings.documents') && (
                   <button
@@ -799,8 +837,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                     `}
                   >
                     <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-emerald-50' : 'bg-emerald-500/20'}`}>
-                        <FileText size={20} className="text-emerald-400" />
+                      <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-blue-50' : 'bg-blue-500/20'}`}>
+                        <FileText size={20} className="text-blue-400" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Race documents</h3>
@@ -812,7 +850,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </button>
                 )}
 
-                {/* Start System Card - Super Admin Only */}
+                {/* Start System Card */}
                 {can('settings.startbox') && (
                   <button
                     onClick={() => setActiveTab('start-system')}
@@ -837,6 +875,33 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                       </div>
                     </div>
                   </button>
+                )}
+
+                {/* Handicap Rules Card - Super Admin Only */}
+                {user?.user_metadata?.is_super_admin && (
+                <button
+                  onClick={() => setActiveTab('handicap-rules')}
+                  className={`
+                    group p-6 rounded-xl text-left transition-all border
+                    ${activeTab === 'handicap-rules'
+                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : lightMode
+                      ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                      : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
+                      <SlidersHorizontal size={20} className="text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Handicap Rules</h3>
+                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                        Build and test custom handicap calculation rules
+                      </p>
+                    </div>
+                  </div>
+                </button>
                 )}
 
               </div>
@@ -1826,6 +1891,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
           {activeTab === 'start-system' && can('settings.startbox') && (
             <StartBoxBuilder darkMode={darkMode} onBack={() => setActiveTab(null)} />
+          )}
+
+          {activeTab === 'handicap-rules' && (
+            <HandicapRuleBuilderPage darkMode={darkMode} />
           )}
 
           {activeTab === 'import-export' && (
