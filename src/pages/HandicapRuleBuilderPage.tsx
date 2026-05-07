@@ -197,8 +197,8 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
       .from('handicap_rulesets')
       .insert({
         club_id: clubId,
-        name: 'New Custom Ruleset',
-        description: 'Custom handicap rules for our club',
+        name: 'New Custom Rule Set',
+        description: '',
         is_default: false,
         is_active: true,
         created_by: user?.id,
@@ -207,7 +207,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
       .single();
 
     if (data && !error) {
-      // Create default config
+      // Create config with sensible defaults but NO pre-populated rules
       await supabase.from('handicap_ruleset_config').insert({
         ruleset_id: data.id,
         cap_limit: 150,
@@ -218,7 +218,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
         scratch_streak_bonus: 30,
       });
 
-      // Create default seeding rule
+      // Create default seeding rule (needed as a baseline)
       await supabase.from('handicap_seeding_rules').insert({
         ruleset_id: data.id,
         method: 'position_based',
@@ -227,23 +227,13 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
         description: 'First race seeds handicaps from positions (1st=0, 2nd=10, 3rd=20...)',
       });
 
-      // Create default adjustment rules
-      await supabase.from('handicap_adjustment_rules').insert(
-        DEFAULT_RULES.map((r, i) => ({
-          ruleset_id: data.id,
-          priority: i + 1,
-          name: r.name,
-          condition_type: r.condition_type,
-          condition_value: r.condition_value,
-          action: r.action,
-          action_value: r.action_value,
-          applies_to: r.applies_to,
-          description: r.description,
-        }))
-      );
-
+      // NO adjustment rules pre-populated - start empty
       setRulesets(prev => [data, ...prev]);
-      loadRuleset(data);
+      setSelectedRuleset(data);
+      setAdjustmentRules([]);
+      setSeedingRule({ id: '', ruleset_id: data.id, method: 'position_based', base_value: 0, increment_per_position: 10, description: 'First race seeds handicaps from positions (1st=0, 2nd=10, 3rd=20...)' });
+      setConfig({ id: '', ruleset_id: data.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30 });
+      setActiveTab('rules');
     }
   };
 
@@ -819,7 +809,47 @@ Keep responses concise and focused. Use plain language, not technical jargon.`;
                     </button>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 mb-4">Rules are evaluated in order from top to bottom. Multiple rules can apply to the same skipper.</p>
+                {adjustmentRules.length > 0 && (
+                  <p className="text-xs text-slate-400 mb-4">Rules are evaluated in order from top to bottom. Multiple rules can apply to the same skipper.</p>
+                )}
+
+                {/* Empty state for new rule sets */}
+                {adjustmentRules.length === 0 && selectedRuleset && (
+                  <div className="border-2 border-dashed border-slate-600/50 rounded-xl p-8 text-center">
+                    <div className="max-w-md mx-auto">
+                      <div className="w-12 h-12 rounded-full bg-slate-700/50 flex items-center justify-center mx-auto mb-4">
+                        <Zap size={24} className="text-slate-400" />
+                      </div>
+                      <h4 className="text-white font-medium mb-2">No rules yet</h4>
+                      <p className="text-sm text-slate-400 mb-6">
+                        Start building your custom handicap rules. Choose how you'd like to get started:
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          onClick={() => setActiveTab('alfie')}
+                          className="flex flex-col items-center gap-2 p-4 rounded-xl border border-teal-500/30 bg-teal-500/10 hover:bg-teal-500/20 transition-colors group"
+                        >
+                          <Wand2 size={20} className="text-teal-400" />
+                          <span className="text-sm font-medium text-teal-300">Build with Alfie</span>
+                          <span className="text-[11px] text-slate-400">Describe your rules in plain English and let AI build them</span>
+                        </button>
+                        <button
+                          onClick={() => setShowNewRuleModal(true)}
+                          className="flex flex-col items-center gap-2 p-4 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-colors group"
+                        >
+                          <Plus size={20} className="text-blue-400" />
+                          <span className="text-sm font-medium text-blue-300">Build Manually</span>
+                          <span className="text-[11px] text-slate-400">Add rules one at a time using the rule builder</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state when viewing default (read-only) and no custom selected */}
+                {adjustmentRules.length === 0 && !selectedRuleset && (
+                  <p className="text-xs text-slate-400 mb-4">Select or create a rule set to get started.</p>
+                )}
 
                 <div className="space-y-3">
                   {adjustmentRules.map((rule, index) => (

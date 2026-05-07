@@ -877,7 +877,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </button>
                 )}
 
-                {/* Handicap Rules Card */}
+                {/* Handicap Rules Card - Super Admin Only */}
+                {user?.user_metadata?.is_super_admin && (
                 <button
                   onClick={() => setActiveTab('handicap-rules')}
                   className={`
@@ -894,13 +895,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                       <SlidersHorizontal size={20} className="text-amber-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Handicap rules</h3>
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Handicap Rules</h3>
                       <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
                         Build and test custom handicap calculation rules
                       </p>
                     </div>
                   </div>
                 </button>
+                )}
 
               </div>
             </div>
