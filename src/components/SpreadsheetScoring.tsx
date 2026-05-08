@@ -276,7 +276,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     return availableHeats.map(h => {
       const results = allHeatRaceResults[h] || [];
       const roundResults = results.filter(r => r.race === currentRound);
-      return `${h}:${roundResults.length}`;
+      return `${h}:${roundResults.map(r => `${r.skipperIndex}:${r.position}:${r.letterScore || ''}`).join(',')}`;
     }).join('|');
   }, [isMultiHeatMode, allHeatRaceResults, availableHeats, currentRound]);
 
@@ -284,11 +284,12 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     if (!isMultiHeatMode || !heatSkipperIndicesMap) return '';
     return availableHeats.map(h => {
       const indices = heatSkipperIndicesMap[h] || [];
-      return `${h}:${indices.length}`;
+      return `${h}:${indices.join(',')}`;
     }).join('|');
   }, [isMultiHeatMode, heatSkipperIndicesMap, availableHeats]);
 
   const prevActualRoundRef = useRef<number>(actualCurrentRound);
+  const prevMultiHeatModeRef = useRef<boolean>(isMultiHeatMode);
   useEffect(() => {
     if (prevActualRoundRef.current !== actualCurrentRound) {
       setEditingRound(null);
@@ -299,6 +300,10 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   useEffect(() => {
     if (prevRoundRef.current !== null && prevRoundRef.current !== currentRound) {
       verifiedCellsRef.current = {} as any;
+    }
+    if (prevMultiHeatModeRef.current !== isMultiHeatMode) {
+      verifiedCellsRef.current = {} as any;
+      prevMultiHeatModeRef.current = isMultiHeatMode;
     }
     prevRoundRef.current = currentRound;
 
@@ -449,7 +454,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
     setCells(newAllCells as any);
     setLocalVerifiedHeats(alreadyVerified);
-  }, [isMultiHeatMode, availableHeats, currentRound, skippers, initialRace, raceResults, heatResultsKey, heatAssignmentKey, completedRounds, editingRoundData]);
+  }, [isMultiHeatMode, availableHeats, currentRound, skippers, initialRace, raceResults, heatResultsKey, heatAssignmentKey, completedRounds, editingRoundData, getHeatSkippers, getRacingSkippersForHeat, getHeatRaceResults]);
 
   useEffect(() => {
     if (!isMultiHeatMode || !currentScoringHeat) return;
