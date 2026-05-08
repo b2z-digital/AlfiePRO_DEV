@@ -47,6 +47,51 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
   const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const groupChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
+  const handledCallIdsRef = useRef<Set<string>>(new Set());
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const handleIncomingCallRecord = useCallback(async (call: any) => {
+    if (!user) return;
+    if (handledCallIdsRef.current.has(call.id)) return;
+    if (call.status !== 'ringing') return;
+    if (call.is_group_call) return;
+    if (call.callee_id !== user.id) return;
+
+    handledCallIdsRef.current.add(call.id);
+
+    // Look up caller name from members table first (more reliable than profiles)
+    const { data: member } = await supabase
+      .from('members')
+      .select('first_name, last_name, avatar_url')
+      .eq('user_id', call.caller_id)
+      .limit(1)
+      .maybeSingle();
+
+    let callerName = 'Unknown';
+    let callerAvatar: string | undefined;
+
+    if (member) {
+      callerName = [member.first_name, member.last_name].filter(Boolean).join(' ').trim() || 'Unknown';
+      callerAvatar = member.avatar_url || undefined;
+    } else {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', call.caller_id)
+        .maybeSingle();
+      callerName = profile?.full_name || 'Unknown';
+      callerAvatar = profile?.avatar_url || undefined;
+    }
+
+    voiceCallEngine.handleIncomingCall(
+      call.id,
+      call.caller_id,
+      callerName,
+      callerAvatar,
+      call.is_video || false
+    );
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -62,7 +107,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // Listen for incoming 1:1 calls
+    // Listen for incoming 1:1 calls via realtime
     const channel = supabase.channel(`voice-calls-${user.id}`)
       .on(
         'postgres_changes',
@@ -73,28 +118,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
           filter: `callee_id=eq.${user.id}`,
         },
         async (payload) => {
-          const call = payload.new as any;
-          if (call.status !== 'ringing') return;
-
-          // If it's a group call, handle via group signaling instead
-          if (call.is_group_call) return;
-
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name, avatar_url')
-            .eq('id', call.caller_id)
-            .maybeSingle();
-
-          const callerName = profile?.full_name || 'Unknown';
-          const callerAvatar = profile?.avatar_url || undefined;
-
-          voiceCallEngine.handleIncomingCall(
-            call.id,
-            call.caller_id,
-            callerName,
-            callerAvatar,
-            call.is_video || false
-          );
+          await handleIncomingCallRecord(payload.new);
         }
       )
       .on(
@@ -116,6 +140,26 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
 
     subscriptionRef.current = channel;
+
+    // Polling fallback: check for ringing calls every 3 seconds
+    // This catches cases where realtime subscription misses the event
+    pollingRef.current = setInterval(async () => {
+      const currentState = voiceCallEngine.getCallState();
+      if (currentState) return; // Already in a call
+
+      const { data: ringingCalls } = await supabase
+        .from('voice_calls')
+        .select('*')
+        .eq('callee_id', user.id)
+        .eq('status', 'ringing')
+        .eq('is_group_call', false)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (ringingCalls && ringingCalls.length > 0) {
+        await handleIncomingCallRecord(ringingCalls[0]);
+      }
+    }, 3000);
 
     // Listen for incoming group calls
     const groupChannel = supabase.channel(`group-calls-incoming-${user.id}`)
@@ -183,8 +227,12 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
         supabase.removeChannel(groupChannelRef.current);
         groupChannelRef.current = null;
       }
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
     };
-  }, [user?.id]);
+  }, [user?.id, handleIncomingCallRecord]);
 
   const startCall = useCallback(async (peerId: string, peerName: string, peerAvatar?: string, conversationId?: string, clubId?: string, isVideo = false): Promise<boolean> => {
     if (!user) return false;
