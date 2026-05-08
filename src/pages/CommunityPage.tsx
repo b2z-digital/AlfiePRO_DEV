@@ -8,6 +8,7 @@ import PostCreationModal from '../components/social/PostCreationModal';
 import ActivityFeed from '../components/social/ActivityFeed';
 import ConnectionsModal from '../components/social/ConnectionsModal';
 import GroupManagementModal from '../components/social/GroupManagementModal';
+import MemberProfileCard from '../components/social/MemberProfileCard';
 import { ChatView } from '../components/conversations/ChatView';
 import { socialStorage, SocialGroup, SocialConnection } from '../utils/socialStorage';
 
@@ -39,6 +40,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
   const [connectionSearchTerm, setConnectionSearchTerm] = useState('');
   const [chatTarget, setChatTarget] = useState<{ id: string; name: string; avatar?: string } | null>(null);
   const [viewingProfile, setViewingProfile] = useState<{ id: string; name: string; avatar?: string } | null>(null);
+  const [profileCardTarget, setProfileCardTarget] = useState<{ id: string; name: string; avatar?: string } | null>(null);
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -309,7 +311,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                     </button>
                   </div>
                 </div>
-                <ActivityFeed key={viewingProfile.id} darkMode={darkMode} authorId={viewingProfile.id} />
+                <ActivityFeed key={viewingProfile.id} darkMode={darkMode} authorId={viewingProfile.id} onAuthorClick={setProfileCardTarget} />
               </>
             ) : selectedGroup ? (
               <>
@@ -360,7 +362,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                     </div>
                   </div>
                 </div>
-                <ActivityFeed darkMode={darkMode} groupId={selectedGroup.id} privacy={['group']} />
+                <ActivityFeed darkMode={darkMode} groupId={selectedGroup.id} privacy={['group']} onAuthorClick={setProfileCardTarget} />
               </>
             ) : (
               <>
@@ -385,7 +387,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                     </div>
                   </div>
                 </div>
-                <ActivityFeed darkMode={darkMode} privacy={['public', 'friends', 'group']} />
+                <ActivityFeed darkMode={darkMode} privacy={['public', 'friends', 'group']} onAuthorClick={setProfileCardTarget} />
               </>
             )}
           </div>
@@ -682,6 +684,25 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
             />
           </div>
         </div>
+      )}
+
+      {profileCardTarget && (
+        <MemberProfileCard
+          userId={profileCardTarget.id}
+          name={profileCardTarget.name}
+          avatar={profileCardTarget.avatar}
+          darkMode={darkMode}
+          onClose={() => setProfileCardTarget(null)}
+          onMessage={(target) => {
+            setChatTarget(target);
+            setProfileCardTarget(null);
+          }}
+          onViewProfile={(target) => {
+            setViewingProfile(target);
+            setSelectedGroup(null);
+            setProfileCardTarget(null);
+          }}
+        />
       )}
     </div>
   );

@@ -135,6 +135,8 @@ export const socialStorage = {
   } = {}) {
     const { limit = 20, offset = 0, groupId, privacy = ['public'], authorId } = options;
 
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+
     let query = supabase
       .from('social_posts')
       .select(`
@@ -150,6 +152,46 @@ export const socialStorage = {
       query = query.eq('author_id', authorId);
     } else if (groupId) {
       query = query.eq('group_id', groupId);
+    } else if (userId) {
+      // Fetch user's group memberships and connections to filter the feed
+      const [groupsResult, connectionsResult1, connectionsResult2] = await Promise.all([
+        supabase
+          .from('social_group_members')
+          .select('group_id')
+          .eq('user_id', userId)
+          .eq('status', 'approved'),
+        supabase
+          .from('social_connections')
+          .select('connected_user_id')
+          .eq('user_id', userId)
+          .eq('status', 'accepted'),
+        supabase
+          .from('social_connections')
+          .select('user_id')
+          .eq('connected_user_id', userId)
+          .eq('status', 'accepted'),
+      ]);
+
+      const myGroupIds = (groupsResult.data || []).map(g => g.group_id);
+      const connectionIds = new Set([
+        ...(connectionsResult1.data || []).map(c => c.connected_user_id),
+        ...(connectionsResult2.data || []).map(c => c.user_id),
+      ]);
+      const myConnectionIds = Array.from(connectionIds);
+
+      // Build a filtered query: show posts that the user should see
+      // - Group posts: only from groups the user is a member of
+      // - Friends posts: only from connections
+      // - Public posts: from anyone (visible to all)
+      // - Own posts: always show
+      query = query.or(
+        [
+          `author_id.eq.${userId}`,
+          myGroupIds.length > 0 ? `and(privacy.eq.group,group_id.in.(${myGroupIds.join(',')}))` : '',
+          myConnectionIds.length > 0 ? `and(privacy.eq.friends,author_id.in.(${myConnectionIds.join(',')}))` : '',
+          'privacy.eq.public',
+        ].filter(Boolean).join(',')
+      );
     } else {
       query = query.in('privacy', privacy);
     }
@@ -157,9 +199,9 @@ export const socialStorage = {
     const { data, error } = await query;
     if (error) throw error;
 
-    const userId = (await supabase.auth.getUser()).data.user?.id;
     if (userId && data) {
       const postIds = data.map(p => p.id);
+      if (postIds.length === 0) return data;
       const { data: reactions } = await supabase
         .from('social_reactions')
         .select('post_id, reaction_type')

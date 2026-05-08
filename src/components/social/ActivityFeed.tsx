@@ -8,9 +8,10 @@ interface ActivityFeedProps {
   privacy?: string[];
   darkMode?: boolean;
   authorId?: string;
+  onAuthorClick?: (author: { id: string; name: string; avatar?: string }) => void;
 }
 
-export default function ActivityFeed({ groupId, privacy, darkMode = false, authorId }: ActivityFeedProps) {
+export default function ActivityFeed({ groupId, privacy, darkMode = false, authorId, onAuthorClick }: ActivityFeedProps) {
   const lightMode = !darkMode;
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -155,6 +156,7 @@ export default function ActivityFeed({ groupId, privacy, darkMode = false, autho
           post={post}
           onUpdate={() => loadPosts(true)}
           darkMode={darkMode}
+          onAuthorClick={onAuthorClick}
         />
       ))}
 

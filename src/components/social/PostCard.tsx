@@ -32,9 +32,10 @@ interface PostCardProps {
   post: SocialPost;
   onUpdate?: () => void;
   darkMode?: boolean;
+  onAuthorClick?: (author: { id: string; name: string; avatar?: string }) => void;
 }
 
-export default function PostCard({ post, onUpdate, darkMode = false }: PostCardProps) {
+export default function PostCard({ post, onUpdate, darkMode = false, onAuthorClick }: PostCardProps) {
   const lightMode = !darkMode;
   const { addNotification } = useNotification();
   const { user, currentClub, isSuperAdmin, isStateOrgAdmin } = useAuth();
@@ -110,20 +111,28 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
       <div className="p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-3 flex-1">
-            {post.author?.avatar_url ? (
-              <img
-                src={post.author.avatar_url}
-                alt={post.author.full_name}
-                className="w-12 h-12 rounded-full object-cover shadow-lg"
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg">
-                {post.author?.full_name?.charAt(0) || 'U'}
-              </div>
-            )}
+            <div
+              className={onAuthorClick ? 'cursor-pointer' : ''}
+              onClick={() => onAuthorClick && post.author && onAuthorClick({ id: post.author_id, name: post.author.full_name, avatar: post.author.avatar_url })}
+            >
+              {post.author?.avatar_url ? (
+                <img
+                  src={post.author.avatar_url}
+                  alt={post.author.full_name}
+                  className="w-12 h-12 rounded-full object-cover shadow-lg"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg">
+                  {post.author?.full_name?.charAt(0) || 'U'}
+                </div>
+              )}
+            </div>
 
             <div className="flex-1">
-              <div className={`font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>
+              <div
+                className={`font-semibold ${lightMode ? 'text-gray-900' : 'text-white'} ${onAuthorClick ? 'cursor-pointer hover:underline' : ''}`}
+                onClick={() => onAuthorClick && post.author && onAuthorClick({ id: post.author_id, name: post.author.full_name, avatar: post.author.avatar_url })}
+              >
                 {post.author?.full_name || 'Unknown User'}
               </div>
               <div className={`flex items-center space-x-2 text-sm ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>
