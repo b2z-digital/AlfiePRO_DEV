@@ -13,6 +13,7 @@
 
 import { Skipper } from '../types';
 import { LetterScore } from '../types/letterScores';
+import { compareWithCountback } from './scratchCalculations';
 
 export interface SHRSConfig {
   numberOfHeats: number;
@@ -190,6 +191,71 @@ export function compareSailNumbers(a: string, b: string): number {
 }
 
 /**
+ * SHRS 5.5/5.7 ranking tiebreaker.
+ * When two skippers have equal net scores, resolve using:
+ * 1. Same-heat countback (SHRS 5.7): compare scores only from rounds where both
+ *    sailed in the same heat, using RRS A8.1/A8.2 with 0 discards.
+ * 2. If never in same heat: standard RRS A8.1/A8.2 on all race scores with discards.
+ * 3. If still tied: surname, first name, then sail number alphabetically.
+ */
+export function compareSHRSWithCountback<T extends string | number>(
+  roundHeatAssignments: Map<T, string>[],
+  aId: T,
+  bId: T,
+  aRaceScores: number[],
+  bRaceScores: number[],
+  aDiscards: number,
+  bDiscards: number,
+  aName?: string,
+  bName?: string,
+  aSailNo?: string,
+  bSailNo?: string
+): number {
+  const aSameHeatScores: number[] = [];
+  const bSameHeatScores: number[] = [];
+
+  for (let i = 0; i < roundHeatAssignments.length; i++) {
+    const skipperToHeat = roundHeatAssignments[i];
+    const aHeat = skipperToHeat.get(aId);
+    const bHeat = skipperToHeat.get(bId);
+    if (aHeat && bHeat && aHeat === bHeat) {
+      aSameHeatScores.push(aRaceScores[i] ?? 999);
+      bSameHeatScores.push(bRaceScores[i] ?? 999);
+    }
+  }
+
+  if (aSameHeatScores.length > 0) {
+    const result = compareWithCountback(aSameHeatScores, bSameHeatScores, 0, 0);
+    if (result !== 0) return result;
+  } else {
+    const aAll = aRaceScores.map(s => s ?? 999);
+    const bAll = bRaceScores.map(s => s ?? 999);
+    const fallbackResult = compareWithCountback(aAll, bAll, aDiscards, bDiscards);
+    if (fallbackResult !== 0) return fallbackResult;
+  }
+
+  if (aName || bName) {
+    const extractSurname = (name: string): { surname: string; firstName: string } => {
+      const parts = (name || '').trim().split(/\s+/);
+      if (parts.length <= 1) return { surname: parts[0] || '', firstName: '' };
+      const surname = parts[parts.length - 1];
+      const firstName = parts.slice(0, -1).join(' ');
+      return { surname, firstName };
+    };
+    const aNameParts = extractSurname(aName || '');
+    const bNameParts = extractSurname(bName || '');
+    const surnameResult = aNameParts.surname.localeCompare(bNameParts.surname, undefined, { sensitivity: 'base' });
+    if (surnameResult !== 0) return surnameResult;
+    const firstNameResult = aNameParts.firstName.localeCompare(bNameParts.firstName, undefined, { sensitivity: 'base' });
+    if (firstNameResult !== 0) return firstNameResult;
+  }
+
+  const sailA = aSailNo || (typeof aId === 'string' ? aId : '');
+  const sailB = bSailNo || (typeof bId === 'string' ? bId : '');
+  return compareSailNumbers(sailA, sailB);
+}
+
+/**
  * SHR Rule 3.1.ii: Get next heat assignment using Heat Movement Tables.
  * Position is the boat's finishing position (or virtual position for non-finishers).
  * lastRaceHeat is the heat the boat was in for the last race.
@@ -272,6 +338,7 @@ export function calculateFinalFleetSizes(totalBoats: number, numberOfFleets: num
  * Best ranked boats to Gold Fleet. Withdrawn boats to lowest fleet.
  * Rule 4.3: If qualifying has 5-7 completed races, temporarily exclude
  * 2nd worst score for the purpose of fleet ranking only.
+ * Rule 5.7: Tiebreaker uses same-heat countback when heat assignments provided.
  */
 export function assignToFinalFleets(
   skippers: Skipper[],
@@ -279,7 +346,8 @@ export function assignToFinalFleets(
   numberOfFleets: number,
   qualifyingRacesCompleted?: number,
   allRaceScores?: Map<string, number[]>,
-  withdrawnSailNumbers?: Set<string>
+  withdrawnSailNumbers?: Set<string>,
+  roundHeatAssignments?: Map<string, string>[]
 ): Map<string, Skipper[]> {
   const fleets = new Map<string, Skipper[]>();
   const fleetNames = ['Gold', 'Silver', 'Bronze', 'Copper'];
@@ -288,6 +356,7 @@ export function assignToFinalFleets(
   }
 
   let rankingScores = new Map(qualifyingScores);
+  const numDiscards = qualifyingRacesCompleted ? calculateSHRSDiscards(qualifyingRacesCompleted) : 0;
 
   if (
     qualifyingRacesCompleted !== undefined &&
@@ -313,10 +382,31 @@ export function assignToFinalFleets(
   });
 
   const sortedActive = [...activeSkippers].sort((a, b) => {
-    const scoreA = rankingScores.get(a.sailNo || a.sailNumber || '') || 999999;
-    const scoreB = rankingScores.get(b.sailNo || b.sailNumber || '') || 999999;
+    const sailA = a.sailNo || a.sailNumber || '';
+    const sailB = b.sailNo || b.sailNumber || '';
+    const scoreA = rankingScores.get(sailA) || 999999;
+    const scoreB = rankingScores.get(sailB) || 999999;
     if (scoreA !== scoreB) return scoreA - scoreB;
-    return compareSailNumbers(a.sailNo || a.sailNumber || '', b.sailNo || b.sailNumber || '');
+
+    if (roundHeatAssignments && allRaceScores) {
+      const aScores = allRaceScores.get(sailA) || [];
+      const bScores = allRaceScores.get(sailB) || [];
+      return compareSHRSWithCountback(
+        roundHeatAssignments,
+        sailA,
+        sailB,
+        aScores,
+        bScores,
+        numDiscards,
+        numDiscards,
+        a.name,
+        b.name,
+        sailA,
+        sailB
+      );
+    }
+
+    return compareSailNumbers(sailA, sailB);
   });
 
   const fleetSizes = calculateFinalFleetSizes(skippers.length, numberOfFleets);

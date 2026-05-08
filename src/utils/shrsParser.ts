@@ -10,8 +10,8 @@ import {
   calculateNonFinisherScore,
   getNonFinisherPriority,
   compareSailNumbers,
+  compareSHRSWithCountback,
 } from './shrsHeatSystem';
-import { compareWithCountback } from './scratchCalculations';
 import { LetterScore } from '../types/letterScores';
 
 export type SHRSImportMode = 'shrs-progressive' | 'shrs-balanced';
@@ -717,13 +717,36 @@ export function reconstructSHRSHeats(
         });
       });
     } else {
-      // Fall back to ranking by qualifying net score with RRS A8.1 countback
+      // Build round heat assignments for SHRS 5.7 same-heat countback
+      const roundHeatMaps: Map<number, string>[] = rounds.map(round => {
+        const skipperToHeat = new Map<number, string>();
+        for (const ha of round.heatAssignments) {
+          for (const si of ha.skipperIndices) {
+            skipperToHeat.set(si, ha.heatDesignation);
+          }
+        }
+        return skipperToHeat;
+      });
+
+      // Rank by qualifying net score with SHRS 5.7 same-heat countback tiebreaker
       const rankedSkippers = Array.from(qualScores.entries())
         .sort(([idxA, a], [idxB, b]) => {
           if (a !== b) return a - b;
           const aScores = qualRaceScores.get(idxA) || [];
           const bScores = qualRaceScores.get(idxB) || [];
-          return compareWithCountback(aScores, bScores, numDiscards, numDiscards);
+          return compareSHRSWithCountback(
+            roundHeatMaps,
+            idxA,
+            idxB,
+            aScores,
+            bScores,
+            numDiscards,
+            numDiscards,
+            skippers[idxA]?.name,
+            skippers[idxB]?.name,
+            skippers[idxA]?.sailNumber,
+            skippers[idxB]?.sailNumber
+          );
         });
 
       let idx = 0;
