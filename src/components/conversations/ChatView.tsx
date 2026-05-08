@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Send, Phone, Video, PhoneOff } from 'lucide-react';
+import { ArrowLeft, Send, Phone, Video, PhoneOff, Users } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
@@ -43,7 +43,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
   const { user } = useAuth();
   const { isImpersonating, effectiveUserId } = useImpersonation();
   const currentUserId = isImpersonating && effectiveUserId ? effectiveUserId : user?.id;
-  const { startCall, callState } = useVoiceCall();
+  const { startCall, startGroupCall, callState } = useVoiceCall();
+  const [showGroupCallPicker, setShowGroupCallPicker] = useState(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -396,6 +397,20 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
         >
           <Video size={20} />
         </button>
+        <button
+          onClick={() => setShowGroupCallPicker(true)}
+          disabled={!!callState}
+          className={`p-2 rounded-lg transition-colors ${
+            callState
+              ? 'opacity-40 cursor-not-allowed'
+              : darkMode
+                ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+          }`}
+          title="Group call"
+        >
+          <Users size={20} />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -528,8 +543,172 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
           </button>
         </div>
       </div>
+      {showGroupCallPicker && (
+        <GroupCallPickerModal
+          currentRecipient={{ userId: recipientId, name: recipientName, avatar: recipientAvatar }}
+          conversationId={conversationId || undefined}
+          onClose={() => setShowGroupCallPicker(false)}
+          onStartGroupCall={startGroupCall}
+          darkMode={darkMode}
+        />
+      )}
     </div>
   );
 };
+
+function GroupCallPickerModal({
+  currentRecipient,
+  conversationId,
+  onClose,
+  onStartGroupCall,
+  darkMode,
+}: {
+  currentRecipient: { userId: string; name: string; avatar?: string };
+  conversationId?: string;
+  onClose: () => void;
+  onStartGroupCall: (participants: { userId: string; name: string; avatar?: string }[], isVideo: boolean, conversationId?: string) => Promise<boolean>;
+  darkMode: boolean;
+}) {
+  const { user } = useAuth();
+  const [search, setSearch] = useState('');
+  const [members, setMembers] = useState<{ id: string; name: string; avatar?: string }[]>([]);
+  const [selected, setSelected] = useState<{ userId: string; name: string; avatar?: string }[]>([currentRecipient]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchMembers();
+  }, []);
+
+  const fetchMembers = async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url')
+      .neq('id', user.id)
+      .order('full_name');
+    setMembers((data || []).map(p => ({ id: p.id, name: p.full_name || 'Unknown', avatar: p.avatar_url || undefined })));
+    setLoading(false);
+  };
+
+  const toggleMember = (member: { id: string; name: string; avatar?: string }) => {
+    if (selected.find(s => s.userId === member.id)) {
+      if (member.id === currentRecipient.userId) return;
+      setSelected(selected.filter(s => s.userId !== member.id));
+    } else {
+      if (selected.length >= 5) return; // max 5 others + self = 6
+      setSelected([...selected, { userId: member.id, name: member.name, avatar: member.avatar }]);
+    }
+  };
+
+  const handleStart = async (isVideo: boolean) => {
+    if (selected.length < 1) return;
+    const success = await onStartGroupCall(selected, isVideo, conversationId);
+    if (success) onClose();
+  };
+
+  const filteredMembers = members.filter(m => {
+    if (m.id === user?.id) return false;
+    if (!search) return true;
+    return m.name.toLowerCase().includes(search.toLowerCase());
+  });
+
+  const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+  return (
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className={`rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
+        <div className={`flex items-center justify-between p-4 border-b ${darkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+          <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Start Group Call</h3>
+          <button onClick={onClose} className={`p-1 rounded ${darkMode ? 'text-slate-400 hover:text-white' : 'text-gray-400 hover:text-gray-600'}`}>
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Selected participants */}
+        {selected.length > 0 && (
+          <div className={`px-4 py-3 border-b ${darkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+            <p className={`text-xs mb-2 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+              Participants ({selected.length + 1}/6 including you)
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {selected.map(s => (
+                <span key={s.userId} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${darkMode ? 'bg-blue-900/40 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
+                  {s.name}
+                  {s.userId !== currentRecipient.userId && (
+                    <button onClick={() => toggleMember({ id: s.userId, name: s.name, avatar: s.avatar })} className="ml-0.5 hover:text-red-400">&times;</button>
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="p-4">
+          <input
+            type="text"
+            placeholder="Search members to add..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={`w-full px-3 py-2 rounded-lg text-sm border-0 mb-3 ${darkMode ? 'bg-slate-700 text-white placeholder-slate-400' : 'bg-gray-100 text-gray-900 placeholder-gray-500'}`}
+          />
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {loading ? (
+              <p className={`text-center py-4 text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Loading...</p>
+            ) : (
+              filteredMembers.slice(0, 20).map(member => {
+                const isSelected = selected.some(s => s.userId === member.id);
+                return (
+                  <button
+                    key={member.id}
+                    onClick={() => toggleMember(member)}
+                    className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left ${
+                      isSelected
+                        ? darkMode ? 'bg-blue-900/30' : 'bg-blue-50'
+                        : darkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    {member.avatar ? (
+                      <img src={member.avatar} alt={member.name} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${darkMode ? 'bg-slate-600 text-slate-300' : 'bg-blue-100 text-blue-600'}`}>
+                        {getInitials(member.name)}
+                      </div>
+                    )}
+                    <span className={`text-sm flex-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{member.name}</span>
+                    {isSelected && (
+                      <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                        <span className="text-white text-xs">&#10003;</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className={`flex items-center gap-3 p-4 border-t ${darkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+          <button
+            onClick={() => handleStart(false)}
+            disabled={selected.length < 1}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
+          >
+            <Phone size={16} />
+            Audio Call
+          </button>
+          <button
+            onClick={() => handleStart(true)}
+            disabled={selected.length < 1}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-colors"
+          >
+            <Video size={16} />
+            Video Call
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default ChatView;

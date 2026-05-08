@@ -1,14 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../utils/supabase';
-import { voiceCallEngine, VoiceCallState } from '../utils/voiceCallEngine';
+import { voiceCallEngine, VoiceCallState, GroupCallState } from '../utils/voiceCallEngine';
 import { useAuth } from './AuthContext';
 
 interface VoiceCallContextType {
   callState: VoiceCallState | null;
+  groupCallState: GroupCallState | null;
   startCall: (peerId: string, peerName: string, peerAvatar?: string, conversationId?: string, clubId?: string, isVideo?: boolean) => Promise<boolean>;
+  startGroupCall: (participants: { userId: string; name: string; avatar?: string }[], isVideo: boolean, conversationId?: string) => Promise<boolean>;
   acceptCall: () => Promise<boolean>;
+  acceptGroupCall: () => Promise<boolean>;
   declineCall: () => void;
+  declineGroupCall: () => void;
   endCall: () => void;
+  addParticipant: (userId: string, name: string, avatar?: string) => Promise<boolean>;
   toggleMute: () => void;
   toggleVideo: () => void;
   isMuted: boolean;
@@ -16,10 +21,15 @@ interface VoiceCallContextType {
 
 const VoiceCallContext = createContext<VoiceCallContextType>({
   callState: null,
+  groupCallState: null,
   startCall: async () => false,
+  startGroupCall: async () => false,
   acceptCall: async () => false,
+  acceptGroupCall: async () => false,
   declineCall: () => {},
+  declineGroupCall: () => {},
   endCall: () => {},
+  addParticipant: async () => false,
   toggleMute: () => {},
   toggleVideo: () => {},
   isMuted: false,
@@ -32,8 +42,10 @@ export function useVoiceCall() {
 export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [callState, setCallState] = useState<VoiceCallState | null>(null);
+  const [groupCallState, setGroupCallState] = useState<GroupCallState | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const groupChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -42,6 +54,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     voiceCallEngine.setHandlers(
       (state) => {
         setCallState(state);
+        setGroupCallState(state?.groupCallState || null);
         if (!state) setIsMuted(false);
       },
       (error) => {
@@ -49,7 +62,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // Listen for incoming calls via realtime
+    // Listen for incoming 1:1 calls
     const channel = supabase.channel(`voice-calls-${user.id}`)
       .on(
         'postgres_changes',
@@ -63,7 +76,9 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
           const call = payload.new as any;
           if (call.status !== 'ringing') return;
 
-          // Look up caller profile
+          // If it's a group call, handle via group signaling instead
+          if (call.is_group_call) return;
+
           const { data: profile } = await supabase
             .from('profiles')
             .select('full_name, avatar_url')
@@ -92,7 +107,8 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
         },
         (payload) => {
           const call = payload.new as any;
-          if ((call.status === 'declined' || call.status === 'missed') && callState?.status === 'ringing' && callState?.direction === 'outgoing') {
+          const currentState = voiceCallEngine.getCallState();
+          if ((call.status === 'declined' || call.status === 'missed') && currentState?.status === 'ringing' && currentState?.direction === 'outgoing') {
             voiceCallEngine.endCall(call.status === 'declined' ? 'declined' : 'missed');
           }
         }
@@ -101,10 +117,71 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
     subscriptionRef.current = channel;
 
+    // Listen for incoming group calls
+    const groupChannel = supabase.channel(`group-calls-incoming-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'group_call_participants',
+          filter: `user_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          const participant = payload.new as any;
+          if (participant.status !== 'invited') return;
+
+          // Fetch the group call session details
+          const { data: session } = await supabase
+            .from('group_call_sessions')
+            .select('*')
+            .eq('id', participant.group_call_id)
+            .maybeSingle();
+
+          if (!session || session.status !== 'active') return;
+
+          // Fetch all participants
+          const { data: allParticipants } = await supabase
+            .from('group_call_participants')
+            .select('user_id, display_name, status')
+            .eq('group_call_id', session.id);
+
+          const { data: initiatorProfile } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('id', session.initiated_by)
+            .maybeSingle();
+
+          const participants = (allParticipants || [])
+            .filter(p => p.user_id !== user.id)
+            .map(p => ({
+              userId: p.user_id,
+              name: p.display_name || 'Unknown',
+              avatar: undefined,
+            }));
+
+          voiceCallEngine.handleIncomingGroupCall(
+            session.id,
+            session.initiated_by,
+            initiatorProfile?.full_name || 'Unknown',
+            participants,
+            session.is_video || false,
+            session.conversation_id || undefined
+          );
+        }
+      )
+      .subscribe();
+
+    groupChannelRef.current = groupChannel;
+
     return () => {
       if (subscriptionRef.current) {
         supabase.removeChannel(subscriptionRef.current);
         subscriptionRef.current = null;
+      }
+      if (groupChannelRef.current) {
+        supabase.removeChannel(groupChannelRef.current);
+        groupChannelRef.current = null;
       }
     };
   }, [user?.id]);
@@ -129,16 +206,121 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     return voiceCallEngine.initiateCall(callRecord.id, peerId, peerName, peerAvatar, isVideo);
   }, [user]);
 
+  const startGroupCall = useCallback(async (participants: { userId: string; name: string; avatar?: string }[], isVideo: boolean, conversationId?: string): Promise<boolean> => {
+    if (!user) return false;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    // Create group call session in DB
+    const { data: session, error: sessionError } = await supabase
+      .from('group_call_sessions')
+      .insert({
+        initiated_by: user.id,
+        conversation_id: conversationId || null,
+        is_video: isVideo,
+        max_participants: 6,
+        status: 'active',
+      })
+      .select()
+      .single();
+
+    if (sessionError || !session) {
+      console.error('[VoiceCall] Failed to create group call session:', sessionError);
+      return false;
+    }
+
+    // Add all participants to the group call (including initiator)
+    const participantRecords = [
+      { group_call_id: session.id, user_id: user.id, display_name: profile?.full_name || 'You', status: 'active', joined_at: new Date().toISOString() },
+      ...participants.map(p => ({
+        group_call_id: session.id,
+        user_id: p.userId,
+        display_name: p.name,
+        status: 'invited',
+      })),
+    ];
+
+    const { error: partError } = await supabase
+      .from('group_call_participants')
+      .insert(participantRecords);
+
+    if (partError) {
+      console.error('[VoiceCall] Failed to add group call participants:', partError);
+      return false;
+    }
+
+    return voiceCallEngine.initiateGroupCall(
+      session.id,
+      participants,
+      isVideo,
+      profile?.full_name || 'Unknown',
+      conversationId
+    );
+  }, [user]);
+
   const acceptCall = useCallback(async (): Promise<boolean> => {
+    const currentState = voiceCallEngine.getCallState();
+    if (currentState?.isGroupCall) {
+      return acceptGroupCall();
+    }
     return voiceCallEngine.acceptCall();
   }, []);
 
+  const acceptGroupCall = useCallback(async (): Promise<boolean> => {
+    const groupState = voiceCallEngine.getGroupCallState();
+    if (groupState) {
+      // Update participant status in DB
+      await supabase
+        .from('group_call_participants')
+        .update({ status: 'active', joined_at: new Date().toISOString() })
+        .eq('group_call_id', groupState.groupCallId)
+        .eq('user_id', user?.id);
+    }
+    return voiceCallEngine.acceptGroupCall();
+  }, [user]);
+
   const declineCall = useCallback(() => {
+    const currentState = voiceCallEngine.getCallState();
+    if (currentState?.isGroupCall) {
+      declineGroupCall();
+      return;
+    }
     voiceCallEngine.declineCall();
   }, []);
 
+  const declineGroupCall = useCallback(async () => {
+    const groupState = voiceCallEngine.getGroupCallState();
+    if (groupState && user) {
+      await supabase
+        .from('group_call_participants')
+        .update({ status: 'declined', left_at: new Date().toISOString() })
+        .eq('group_call_id', groupState.groupCallId)
+        .eq('user_id', user.id);
+    }
+    voiceCallEngine.declineGroupCall();
+  }, [user]);
+
   const endCall = useCallback(() => {
     voiceCallEngine.endCall();
+  }, []);
+
+  const addParticipant = useCallback(async (userId: string, name: string, avatar?: string): Promise<boolean> => {
+    const groupState = voiceCallEngine.getGroupCallState();
+    if (!groupState) return false;
+
+    // Add to DB
+    await supabase.from('group_call_participants').insert({
+      group_call_id: groupState.groupCallId,
+      user_id: userId,
+      display_name: name,
+      status: 'invited',
+    });
+
+    return voiceCallEngine.addParticipantToCall(userId, name, avatar);
   }, []);
 
   const toggleMute = useCallback(() => {
@@ -151,7 +333,21 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <VoiceCallContext.Provider value={{ callState, startCall, acceptCall, declineCall, endCall, toggleMute, toggleVideo, isMuted }}>
+    <VoiceCallContext.Provider value={{
+      callState,
+      groupCallState,
+      startCall,
+      startGroupCall,
+      acceptCall,
+      acceptGroupCall,
+      declineCall,
+      declineGroupCall,
+      endCall,
+      addParticipant,
+      toggleMute,
+      toggleVideo,
+      isMuted,
+    }}>
       {children}
     </VoiceCallContext.Provider>
   );
