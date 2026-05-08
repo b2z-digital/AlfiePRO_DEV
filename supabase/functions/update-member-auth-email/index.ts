@@ -68,27 +68,31 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: roleCheck } = await supabase
-      .from("user_clubs")
-      .select("role")
-      .eq("user_id", callingUser.id)
-      .eq("club_id", memberRecord.club_id)
-      .maybeSingle();
+    const isSelf = callingUser.id === memberRecord.user_id;
 
-    const { data: profileCheck } = await supabase
-      .from("profiles")
-      .select("is_super_admin")
-      .eq("id", callingUser.id)
-      .maybeSingle();
+    if (!isSelf) {
+      const { data: roleCheck } = await supabase
+        .from("user_clubs")
+        .select("role")
+        .eq("user_id", callingUser.id)
+        .eq("club_id", memberRecord.club_id)
+        .maybeSingle();
 
-    const isSuperAdmin = profileCheck?.is_super_admin === true;
-    const isClubAdmin = roleCheck && ["admin", "super_admin", "editor"].includes(roleCheck.role);
+      const { data: profileCheck } = await supabase
+        .from("profiles")
+        .select("is_super_admin")
+        .eq("id", callingUser.id)
+        .maybeSingle();
 
-    if (!isSuperAdmin && !isClubAdmin) {
-      return new Response(
-        JSON.stringify({ error: "Insufficient permissions" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const isSuperAdmin = profileCheck?.is_super_admin === true;
+      const isClubAdmin = roleCheck && ["admin", "super_admin", "editor"].includes(roleCheck.role);
+
+      if (!isSuperAdmin && !isClubAdmin) {
+        return new Response(
+          JSON.stringify({ error: "Insufficient permissions" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const { data: existingUser } = await supabase.auth.admin.listUsers();

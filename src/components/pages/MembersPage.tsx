@@ -89,11 +89,6 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [settingPassword, setSettingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [resendingActivation, setResendingActivation] = useState<string | null>(null);
-  const [showUpdateEmailModal, setShowUpdateEmailModal] = useState(false);
-  const [updateEmailMember, setUpdateEmailMember] = useState<Member | null>(null);
-  const [updateEmailAuthEmail, setUpdateEmailAuthEmail] = useState<string | null>(null);
-  const [updatingEmail, setUpdatingEmail] = useState(false);
-  const [updateEmailError, setUpdateEmailError] = useState('');
   const activationMenuRef = useRef<HTMLDivElement>(null);
 
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
@@ -908,53 +903,6 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     }
   };
 
-  const handleUpdateAuthEmail = async () => {
-    if (!updateEmailMember || !updateEmailMember.email || !updateEmailMember.user_id) return;
-
-    setUpdatingEmail(true);
-    setUpdateEmailError('');
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('Not authenticated');
-
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-member-auth-email`;
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          member_id: updateEmailMember.id,
-          new_email: updateEmailMember.email,
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to update account email');
-
-      addNotification(`Account email updated to ${updateEmailMember.email} for ${updateEmailMember.first_name} ${updateEmailMember.last_name}`, 'success');
-      setShowUpdateEmailModal(false);
-      setUpdateEmailMember(null);
-      setUpdateEmailAuthEmail(null);
-      setUpdateEmailError('');
-    } catch (err: any) {
-      setUpdateEmailError(err.message || 'Failed to update account email');
-    } finally {
-      setUpdatingEmail(false);
-    }
-  };
-
-  const handleOpenUpdateEmailModal = async (member: Member) => {
-    if (!member.user_id || !member.email) return;
-    setUpdateEmailMember(member);
-    setUpdateEmailError('');
-    setUpdateEmailAuthEmail(null);
-    setShowUpdateEmailModal(true);
-
-    const { data: authEmail } = await supabase.rpc('get_user_email_by_id', { p_user_id: member.user_id });
-    setUpdateEmailAuthEmail(authEmail || 'Unknown');
-  };
 
   const getActivationIcon = (member: Member) => {
     const hasUserId = !!member.user_id;
@@ -1573,19 +1521,6 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                                         >
                                           <KeyRound size={14} className="text-amber-400" />
                                           Set password manually
-                                        </button>
-                                      )}
-                                      {member.user_id && member.email && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActivationMenuMemberId(null);
-                                            handleOpenUpdateEmailModal(member);
-                                          }}
-                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-300 hover:bg-slate-600/50 transition-colors"
-                                        >
-                                          <Mail size={14} className="text-teal-400" />
-                                          Update account email
                                         </button>
                                       )}
                                     </div>
@@ -2284,110 +2219,6 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                   <>
                     <KeyRound size={16} />
                     Set Password
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Update Account Email Modal */}
-      {showUpdateEmailModal && updateEmailMember && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full">
-            <div className="p-6 border-b border-slate-700">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center">
-                    <Mail size={20} className="text-teal-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">Update Account Email</h3>
-                    <p className="text-sm text-slate-400">
-                      {updateEmailMember.first_name} {updateEmailMember.last_name}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowUpdateEmailModal(false);
-                    setUpdateEmailMember(null);
-                    setUpdateEmailAuthEmail(null);
-                    setUpdateEmailError('');
-                  }}
-                  className="text-slate-400 hover:text-slate-300 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-slate-300 mb-4">
-                This will update the login email for <span className="font-semibold text-white">{updateEmailMember.first_name} {updateEmailMember.last_name}</span> to match their current member email address.
-              </p>
-              <div className="space-y-3 mb-4">
-                <div className="p-3 bg-slate-700/50 rounded-lg">
-                  <p className="text-xs text-slate-400 mb-1">Current login email</p>
-                  <p className="text-sm text-white font-mono">
-                    {updateEmailAuthEmail === null ? (
-                      <span className="text-slate-500 italic">Loading...</span>
-                    ) : updateEmailAuthEmail}
-                  </p>
-                </div>
-                <div className="flex justify-center">
-                  <ChevronDown size={16} className="text-teal-400" />
-                </div>
-                <div className="p-3 bg-teal-900/20 border border-teal-800/30 rounded-lg">
-                  <p className="text-xs text-teal-400 mb-1">New login email (from member record)</p>
-                  <p className="text-sm text-white font-mono">{updateEmailMember.email}</p>
-                </div>
-              </div>
-              {updateEmailAuthEmail && updateEmailMember.email &&
-                updateEmailAuthEmail.toLowerCase() === updateEmailMember.email.toLowerCase() && (
-                <div className="p-3 bg-green-900/20 border border-green-900/30 rounded-lg mb-4">
-                  <p className="text-xs text-green-400">
-                    The account email already matches the member email. No update needed.
-                  </p>
-                </div>
-              )}
-              {updateEmailError && (
-                <div className="p-3 bg-red-900/20 border border-red-900/30 rounded-lg mb-4">
-                  <p className="text-xs text-red-400">{updateEmailError}</p>
-                </div>
-              )}
-              <div className="p-3 bg-amber-900/20 border border-amber-900/30 rounded-lg">
-                <p className="text-xs text-amber-400">
-                  After updating, the member will need to use their new email address to sign in. Any pending password resets will need to be resent.
-                </p>
-              </div>
-            </div>
-            <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowUpdateEmailModal(false);
-                  setUpdateEmailMember(null);
-                  setUpdateEmailAuthEmail(null);
-                  setUpdateEmailError('');
-                }}
-                className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpdateAuthEmail}
-                disabled={updatingEmail || !updateEmailAuthEmail || (updateEmailAuthEmail?.toLowerCase() === updateEmailMember.email?.toLowerCase())}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-600 text-white rounded-lg hover:from-teal-600 hover:to-emerald-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {updatingEmail ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <Mail size={16} />
-                    Update Email
                   </>
                 )}
               </button>
