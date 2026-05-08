@@ -582,12 +582,65 @@ function GroupCallPickerModal({
   const fetchMembers = async () => {
     if (!user) return;
     setLoading(true);
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url')
-      .neq('id', user.id)
-      .order('full_name');
-    setMembers((data || []).map(p => ({ id: p.id, name: p.full_name || 'Unknown', avatar: p.avatar_url || undefined })));
+    try {
+      // Get user's clubs
+      const { data: userClubs } = await supabase
+        .from('user_clubs')
+        .select('club_id, role')
+        .eq('user_id', user.id);
+
+      const clubIds = (userClubs || []).map(uc => uc.club_id);
+      const isAdmin = (userClubs || []).some(uc => uc.role === 'admin' || uc.role === 'owner');
+
+      if (clubIds.length > 0) {
+        // Fetch all members from user's clubs
+        const { data: clubMembers } = await supabase
+          .from('members')
+          .select('user_id, first_name, last_name, avatar_url')
+          .in('club_id', clubIds)
+          .not('user_id', 'is', null)
+          .neq('user_id', user.id);
+
+        // Deduplicate by user_id
+        const seen = new Set<string>();
+        const memberList: { id: string; name: string; avatar?: string }[] = [];
+        for (const m of (clubMembers || [])) {
+          if (!m.user_id || seen.has(m.user_id)) continue;
+          const name = [m.first_name, m.last_name].filter(Boolean).join(' ').trim();
+          if (!name) continue;
+          seen.add(m.user_id);
+          memberList.push({ id: m.user_id, name, avatar: m.avatar_url || undefined });
+        }
+        memberList.sort((a, b) => a.name.localeCompare(b.name));
+        setMembers(memberList);
+      } else {
+        // Fallback: show social connections
+        const { data: connections } = await supabase
+          .from('social_connections')
+          .select('user_id, connected_user_id')
+          .or(`user_id.eq.${user.id},connected_user_id.eq.${user.id}`)
+          .eq('status', 'accepted');
+
+        const connectedIds = (connections || []).map(c =>
+          c.user_id === user.id ? c.connected_user_id : c.user_id
+        );
+
+        if (connectedIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('id', connectedIds);
+
+          setMembers((profiles || [])
+            .filter(p => p.full_name)
+            .map(p => ({ id: p.id, name: p.full_name!, avatar: p.avatar_url || undefined }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+          );
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching members:', e);
+    }
     setLoading(false);
   };
 

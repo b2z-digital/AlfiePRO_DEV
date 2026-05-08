@@ -25,15 +25,34 @@ export function AddParticipantModal({ groupCallState, onClose }: AddParticipantM
     if (!user) return;
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .neq('id', user.id)
-        .order('full_name');
+      // Get user's clubs
+      const { data: userClubs } = await supabase
+        .from('user_clubs')
+        .select('club_id')
+        .eq('user_id', user.id);
 
-      setMembers(
-        (data || []).map(p => ({ id: p.id, name: p.full_name || 'Unknown', avatar: p.avatar_url || undefined }))
-      );
+      const clubIds = (userClubs || []).map(uc => uc.club_id);
+
+      if (clubIds.length > 0) {
+        const { data: clubMembers } = await supabase
+          .from('members')
+          .select('user_id, first_name, last_name, avatar_url')
+          .in('club_id', clubIds)
+          .not('user_id', 'is', null)
+          .neq('user_id', user.id);
+
+        const seen = new Set<string>();
+        const memberList: { id: string; name: string; avatar?: string }[] = [];
+        for (const m of (clubMembers || [])) {
+          if (!m.user_id || seen.has(m.user_id)) continue;
+          const name = [m.first_name, m.last_name].filter(Boolean).join(' ').trim();
+          if (!name) continue;
+          seen.add(m.user_id);
+          memberList.push({ id: m.user_id, name, avatar: m.avatar_url || undefined });
+        }
+        memberList.sort((a, b) => a.name.localeCompare(b.name));
+        setMembers(memberList);
+      }
     } catch (e) {
       console.error('Error fetching members:', e);
     }
