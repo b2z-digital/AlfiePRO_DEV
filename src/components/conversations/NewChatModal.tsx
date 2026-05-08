@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, MessageSquare, UserPlus, Users, Clock } from 'lucide-react';
+import { X, Search, MessageSquare, UserPlus, Users, Clock, Check, UserX, Bell } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
@@ -17,7 +17,15 @@ interface DiscoverUser {
   avatar?: string;
 }
 
-type ModalTab = 'chat' | 'connect';
+type ModalTab = 'chat' | 'connect' | 'requests';
+
+interface PendingRequest {
+  id: string;
+  user_id: string;
+  name: string;
+  avatar?: string;
+  created_at: string;
+}
 
 interface NewChatModalProps {
   onClose: () => void;
@@ -36,13 +44,18 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
   const [discoverUsers, setDiscoverUsers] = useState<DiscoverUser[]>([]);
   const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set());
   const [pendingSentIds, setPendingSentIds] = useState<Set<string>>(new Set());
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingDiscover, setLoadingDiscover] = useState(false);
   const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (currentUserId) fetchPeople();
+    if (currentUserId) {
+      fetchPeople();
+      fetchPendingRequests();
+    }
   }, [currentUserId]);
 
   useEffect(() => {
@@ -172,6 +185,67 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
     }
   };
 
+  const fetchPendingRequests = async () => {
+    if (!currentUserId) return;
+    try {
+      const { data } = await supabase
+        .from('social_connections')
+        .select(`
+          id, user_id, created_at,
+          requester:profiles!social_connections_user_id_profiles_fkey(id, full_name, avatar_url)
+        `)
+        .eq('connected_user_id', currentUserId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      setPendingRequests(
+        (data || []).map((r: any) => ({
+          id: r.id,
+          user_id: r.user_id,
+          name: r.requester?.full_name || 'Unknown',
+          avatar: r.requester?.avatar_url || undefined,
+          created_at: r.created_at,
+        }))
+      );
+    } catch (err) {
+      console.error('Error fetching pending requests:', err);
+    }
+  };
+
+  const handleAcceptRequest = async (connectionId: string, requesterId: string) => {
+    setRespondingId(connectionId);
+    try {
+      await supabase
+        .from('social_connections')
+        .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+        .eq('id', connectionId);
+
+      setPendingRequests(prev => prev.filter(r => r.id !== connectionId));
+      setConnectedIds(prev => new Set([...prev, requesterId]));
+      fetchPeople();
+    } catch (err) {
+      console.error('Error accepting request:', err);
+    } finally {
+      setRespondingId(null);
+    }
+  };
+
+  const handleRejectRequest = async (connectionId: string) => {
+    setRespondingId(connectionId);
+    try {
+      await supabase
+        .from('social_connections')
+        .delete()
+        .eq('id', connectionId);
+
+      setPendingRequests(prev => prev.filter(r => r.id !== connectionId));
+    } catch (err) {
+      console.error('Error rejecting request:', err);
+    } finally {
+      setRespondingId(null);
+    }
+  };
+
   const filtered = connections.filter(c =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -216,7 +290,7 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
             }`}
           >
             <Users size={16} />
-            Club & Connections
+            People
           </button>
           <button
             onClick={() => { setActiveTab('connect'); setSearchTerm(''); }}
@@ -227,29 +301,47 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
             }`}
           >
             <UserPlus size={16} />
-            Find People
+            Find
+          </button>
+          <button
+            onClick={() => { setActiveTab('requests'); setSearchTerm(''); }}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative ${
+              activeTab === 'requests'
+                ? 'text-blue-500 border-b-2 border-blue-500'
+                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Bell size={16} />
+            Requests
+            {pendingRequests.length > 0 && (
+              <span className="absolute top-2 right-3 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1">
+                {pendingRequests.length}
+              </span>
+            )}
           </button>
         </div>
 
         <div className="p-4">
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-            <input
-              type="text"
-              placeholder={activeTab === 'chat' ? 'Search connections...' : 'Search people to connect...'}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              autoFocus
-              className={`w-full pl-9 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all ${
-                darkMode
-                  ? 'bg-slate-700/60 border border-slate-600/50 text-white placeholder-slate-500'
-                  : 'bg-gray-100 border border-gray-200 text-gray-900 placeholder-gray-400'
-              }`}
-            />
-          </div>
+          {activeTab !== 'requests' && (
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+              <input
+                type="text"
+                placeholder={activeTab === 'chat' ? 'Search connections...' : 'Search people to connect...'}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                autoFocus
+                className={`w-full pl-9 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all ${
+                  darkMode
+                    ? 'bg-slate-700/60 border border-slate-600/50 text-white placeholder-slate-500'
+                    : 'bg-gray-100 border border-gray-200 text-gray-900 placeholder-gray-400'
+                }`}
+              />
+            </div>
+          )}
 
           <div className="max-h-[360px] overflow-y-auto -mx-1 px-1">
-            {activeTab === 'chat' ? (
+            {activeTab === 'chat' && (
               loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="w-7 h-7 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
@@ -260,7 +352,7 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
                     {searchTerm ? 'No matching people' : 'No people found'}
                   </p>
                   <p className={`text-xs mt-1 ${darkMode ? 'text-slate-600' : 'text-gray-400'}`}>
-                    {searchTerm ? 'Try a different search' : 'Use "Find People" to connect with other members'}
+                    {searchTerm ? 'Try a different search' : 'Use "Find" to connect with other members'}
                   </p>
                   {!searchTerm && (
                     <button
@@ -305,7 +397,9 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
                   ))}
                 </div>
               )
-            ) : (
+            )}
+
+            {activeTab === 'connect' && (
               loadingDiscover ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="w-7 h-7 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
@@ -357,6 +451,72 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
                             {isConnecting ? '...' : 'Connect'}
                           </button>
                         )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+
+            {activeTab === 'requests' && (
+              pendingRequests.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Bell size={32} className={darkMode ? 'text-slate-600' : 'text-gray-300'} />
+                  <p className={`text-sm mt-3 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                    No pending connection requests
+                  </p>
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-slate-600' : 'text-gray-400'}`}>
+                    When someone sends you a connection request, it will appear here
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {pendingRequests.map(request => {
+                    const isResponding = respondingId === request.id;
+                    return (
+                      <div
+                        key={request.id}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl ${
+                          darkMode ? 'bg-slate-700/30' : 'bg-gray-50'
+                        }`}
+                      >
+                        {request.avatar ? (
+                          <img src={request.avatar} alt={request.name} className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">
+                            {request.name.charAt(0)}
+                          </div>
+                        )}
+                        <div className="flex-1 text-left min-w-0">
+                          <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {request.name}
+                          </p>
+                          <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                            Wants to connect
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleAcceptRequest(request.id, request.user_id)}
+                            disabled={isResponding}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-green-600 text-white hover:bg-green-500 transition-colors disabled:opacity-50"
+                          >
+                            <Check size={12} />
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => handleRejectRequest(request.id)}
+                            disabled={isResponding}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+                              darkMode
+                                ? 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                            }`}
+                          >
+                            <UserX size={12} />
+                            Decline
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
