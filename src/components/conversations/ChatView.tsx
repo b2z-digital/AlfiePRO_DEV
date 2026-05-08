@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Send, Phone, Video } from 'lucide-react';
+import { ArrowLeft, Send, Phone, Video, PhoneOff } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
@@ -11,6 +11,7 @@ interface ChatMessage {
   sender_id: string;
   content: string;
   created_at: string;
+  message_type?: string;
 }
 
 interface ChatViewProps {
@@ -432,6 +433,33 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
                 {group.msgs.map((msg) => {
                   const isOwn = msg.sender_id === currentUserId;
                   const isOptimistic = msg.id.startsWith('temp-');
+                  const isCallEvent = msg.message_type && msg.message_type !== 'text';
+
+                  if (isCallEvent) {
+                    const isMissed = msg.message_type === 'missed_call';
+                    const isDeclined = msg.message_type === 'declined_call';
+                    const isCompleted = msg.message_type === 'completed_call';
+                    return (
+                      <div key={msg.id} className="flex justify-center mb-3">
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium ${
+                          isMissed || isDeclined
+                            ? darkMode ? 'bg-red-900/20 text-red-400' : 'bg-red-50 text-red-600'
+                            : darkMode ? 'bg-slate-700/50 text-slate-300' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {isMissed || isDeclined ? (
+                            <PhoneOff size={14} />
+                          ) : (
+                            <Phone size={14} />
+                          )}
+                          <span>{msg.content}</span>
+                          <span className={`${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                            {formatMessageTime(msg.created_at)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={msg.id} className={`flex mb-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[75%] ${isOwn ? 'order-2' : ''}`}>
