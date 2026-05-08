@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, CheckCircle, Mail, X, Send } from 'lucide-react';
+import { Clock, CircleCheck as CheckCircle, Mail, X, Send } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -200,13 +200,12 @@ export const ApplicationPendingScreen: React.FC<ApplicationPendingScreenProps> =
         throw new Error('Not authenticated');
       }
 
+      // Get all users with admin role for this club
       const { data: adminUsers, error: adminError } = await supabase
         .from('user_clubs')
         .select('user_id')
         .eq('club_id', application.club_id)
-        .eq('role', 'admin');
-
-      console.log('Admin users query:', { adminUsers, adminError, club_id: application.club_id });
+        .in('role', ['admin', 'super_admin']);
 
       if (adminError) throw adminError;
 
@@ -214,8 +213,19 @@ export const ApplicationPendingScreen: React.FC<ApplicationPendingScreenProps> =
         throw new Error('No admin users found for this club');
       }
 
-      const adminUserIds = adminUsers.map(u => u.user_id);
-      console.log('Admin user IDs:', adminUserIds);
+      // Filter to only admins who are actual club members (excludes state/national admins
+      // who have auto-synced user_clubs entries but aren't real members of the club)
+      const allAdminIds = adminUsers.map(u => u.user_id);
+      const { data: actualMembers } = await supabase
+        .from('members')
+        .select('user_id')
+        .eq('club_id', application.club_id)
+        .not('user_id', 'is', null)
+        .in('user_id', allAdminIds);
+
+      const adminUserIds = actualMembers && actualMembers.length > 0
+        ? actualMembers.map(m => m.user_id)
+        : allAdminIds;
 
       const { data: adminProfiles, error: profilesError } = await supabase
         .from('profiles')
