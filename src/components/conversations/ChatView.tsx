@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Send, Phone } from 'lucide-react';
+import { ArrowLeft, Send, Phone, Video } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
@@ -364,7 +364,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
           <div className={`text-xs ${recipientOnline ? 'text-green-500' : darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{recipientOnline ? 'Online' : 'Offline'}</div>
         </div>
         <button
-          onClick={() => startCall(recipientId, recipientName, recipientAvatar, conversationId || undefined)}
+          onClick={() => startCall(recipientId, recipientName, recipientAvatar, conversationId || undefined, undefined, false)}
           disabled={!!callState}
           className={`p-2 rounded-lg transition-colors ${
             callState
@@ -375,9 +375,25 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
                   ? 'text-slate-500 hover:bg-slate-700 hover:text-slate-300'
                   : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
           }`}
-          title={recipientOnline ? 'Voice call - Online' : 'Voice call - Offline'}
+          title="Voice call"
         >
           <Phone size={20} />
+        </button>
+        <button
+          onClick={() => startCall(recipientId, recipientName, recipientAvatar, conversationId || undefined, undefined, true)}
+          disabled={!!callState}
+          className={`p-2 rounded-lg transition-colors ${
+            callState
+              ? 'opacity-40 cursor-not-allowed'
+              : recipientOnline
+                ? 'text-blue-500 hover:bg-blue-500/10 hover:text-blue-400'
+                : darkMode
+                  ? 'text-slate-500 hover:bg-slate-700 hover:text-slate-300'
+                  : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+          }`}
+          title="Video call"
+        >
+          <Video size={20} />
         </button>
       </div>
 

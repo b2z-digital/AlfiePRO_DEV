@@ -5,11 +5,12 @@ import { useAuth } from './AuthContext';
 
 interface VoiceCallContextType {
   callState: VoiceCallState | null;
-  startCall: (peerId: string, peerName: string, peerAvatar?: string, conversationId?: string, clubId?: string) => Promise<boolean>;
+  startCall: (peerId: string, peerName: string, peerAvatar?: string, conversationId?: string, clubId?: string, isVideo?: boolean) => Promise<boolean>;
   acceptCall: () => Promise<boolean>;
   declineCall: () => void;
   endCall: () => void;
   toggleMute: () => void;
+  toggleVideo: () => void;
   isMuted: boolean;
 }
 
@@ -20,6 +21,7 @@ const VoiceCallContext = createContext<VoiceCallContextType>({
   declineCall: () => {},
   endCall: () => {},
   toggleMute: () => {},
+  toggleVideo: () => {},
   isMuted: false,
 });
 
@@ -71,7 +73,13 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
           const callerName = profile?.full_name || 'Unknown';
           const callerAvatar = profile?.avatar_url || undefined;
 
-          voiceCallEngine.handleIncomingCall(call.id, call.caller_id, callerName, callerAvatar);
+          voiceCallEngine.handleIncomingCall(
+            call.id,
+            call.caller_id,
+            callerName,
+            callerAvatar,
+            call.is_video || false
+          );
         }
       )
       .on(
@@ -84,10 +92,8 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
         },
         (payload) => {
           const call = payload.new as any;
-          // If callee declined or call was missed while we're still ringing
           if ((call.status === 'declined' || call.status === 'missed') && callState?.status === 'ringing' && callState?.direction === 'outgoing') {
-            setCallState(prev => prev ? { ...prev, status: 'ended' } : null);
-            setTimeout(() => setCallState(null), 2000);
+            voiceCallEngine.endCall(call.status === 'declined' ? 'declined' : 'missed');
           }
         }
       )
@@ -103,16 +109,16 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user?.id]);
 
-  const startCall = useCallback(async (peerId: string, peerName: string, peerAvatar?: string, conversationId?: string, clubId?: string): Promise<boolean> => {
+  const startCall = useCallback(async (peerId: string, peerName: string, peerAvatar?: string, conversationId?: string, clubId?: string, isVideo = false): Promise<boolean> => {
     if (!user) return false;
 
-    // Create call record
     const { data: callRecord, error } = await supabase.from('voice_calls').insert({
       caller_id: user.id,
       callee_id: peerId,
       club_id: clubId || null,
       conversation_id: conversationId || null,
       status: 'ringing',
+      is_video: isVideo,
     }).select().single();
 
     if (error || !callRecord) {
@@ -120,7 +126,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
 
-    return voiceCallEngine.initiateCall(callRecord.id, peerId, peerName, peerAvatar);
+    return voiceCallEngine.initiateCall(callRecord.id, peerId, peerName, peerAvatar, isVideo);
   }, [user]);
 
   const acceptCall = useCallback(async (): Promise<boolean> => {
@@ -140,8 +146,12 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     setIsMuted(muted);
   }, []);
 
+  const toggleVideo = useCallback(() => {
+    voiceCallEngine.toggleVideo();
+  }, []);
+
   return (
-    <VoiceCallContext.Provider value={{ callState, startCall, acceptCall, declineCall, endCall, toggleMute, isMuted }}>
+    <VoiceCallContext.Provider value={{ callState, startCall, acceptCall, declineCall, endCall, toggleMute, toggleVideo, isMuted }}>
       {children}
     </VoiceCallContext.Provider>
   );

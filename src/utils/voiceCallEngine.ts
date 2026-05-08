@@ -15,14 +15,112 @@ export interface VoiceCallState {
   status: 'ringing' | 'connecting' | 'active' | 'ended';
   startTime?: number;
   duration: number;
+  isVideo: boolean;
+  localStream?: MediaStream;
+  remoteStream?: MediaStream;
+  isVideoEnabled: boolean;
 }
 
-type CallEventHandler = (state: VoiceCallState) => void;
+type CallEventHandler = (state: VoiceCallState | null) => void;
 type ErrorHandler = (error: string) => void;
+
+class RingToneGenerator {
+  private audioContext: AudioContext | null = null;
+  private oscillator: OscillatorNode | null = null;
+  private gainNode: GainNode | null = null;
+  private intervalId: ReturnType<typeof setInterval> | null = null;
+
+  startRingback() {
+    this.stop();
+    try {
+      this.audioContext = new AudioContext();
+      this.gainNode = this.audioContext.createGain();
+      this.gainNode.connect(this.audioContext.destination);
+      this.gainNode.gain.value = 0;
+
+      this.oscillator = this.audioContext.createOscillator();
+      this.oscillator.type = 'sine';
+      this.oscillator.frequency.value = 440;
+      this.oscillator.connect(this.gainNode);
+      this.oscillator.start();
+
+      // US ringback pattern: 2s on, 4s off
+      let on = true;
+      this.gainNode.gain.value = 0.15;
+      this.intervalId = setInterval(() => {
+        if (!this.gainNode) return;
+        on = !on;
+        this.gainNode.gain.value = on ? 0.15 : 0;
+      }, on ? 2000 : 4000);
+
+      // Fix timing: alternate 2s/4s
+      let phase = true;
+      if (this.intervalId) clearInterval(this.intervalId);
+      const tick = () => {
+        if (!this.gainNode) return;
+        phase = !phase;
+        this.gainNode.gain.value = phase ? 0.15 : 0;
+        this.intervalId = setTimeout(tick, phase ? 2000 : 4000) as unknown as ReturnType<typeof setInterval>;
+      };
+      this.intervalId = setTimeout(tick, 2000) as unknown as ReturnType<typeof setInterval>;
+    } catch (e) {
+      // Audio context not available
+    }
+  }
+
+  startRingtone() {
+    this.stop();
+    try {
+      this.audioContext = new AudioContext();
+      this.gainNode = this.audioContext.createGain();
+      this.gainNode.connect(this.audioContext.destination);
+
+      this.oscillator = this.audioContext.createOscillator();
+      this.oscillator.type = 'sine';
+      this.oscillator.frequency.value = 523.25; // C5
+      this.oscillator.connect(this.gainNode);
+      this.oscillator.start();
+
+      // Ring pattern: 1s on, 2s off, repeating
+      let on = true;
+      this.gainNode.gain.value = 0.25;
+      const tick = () => {
+        if (!this.gainNode) return;
+        on = !on;
+        this.gainNode.gain.value = on ? 0.25 : 0;
+        this.intervalId = setTimeout(tick, on ? 1000 : 2000) as unknown as ReturnType<typeof setInterval>;
+      };
+      this.intervalId = setTimeout(tick, 1000) as unknown as ReturnType<typeof setInterval>;
+    } catch (e) {
+      // Audio context not available
+    }
+  }
+
+  stop() {
+    if (this.intervalId) {
+      clearTimeout(this.intervalId as unknown as ReturnType<typeof setTimeout>);
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+    if (this.oscillator) {
+      try { this.oscillator.stop(); } catch (e) {}
+      this.oscillator = null;
+    }
+    if (this.gainNode) {
+      this.gainNode.disconnect();
+      this.gainNode = null;
+    }
+    if (this.audioContext) {
+      this.audioContext.close().catch(() => {});
+      this.audioContext = null;
+    }
+  }
+}
 
 export class VoiceCallEngine {
   private peerConnection: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
+  private remoteStream: MediaStream | null = null;
   private signalingChannel: ReturnType<typeof supabase.channel> | null = null;
   private callState: VoiceCallState | null = null;
   private durationInterval: ReturnType<typeof setInterval> | null = null;
@@ -32,6 +130,8 @@ export class VoiceCallEngine {
   private userId: string = '';
   private iceCandidateQueue: RTCIceCandidateInit[] = [];
   private remoteDescriptionSet = false;
+  private ringTone = new RingToneGenerator();
+  private signalingReady = false;
 
   setHandlers(onStateChange: CallEventHandler, onError: ErrorHandler) {
     this.onStateChange = onStateChange;
@@ -46,7 +146,7 @@ export class VoiceCallEngine {
     return this.callState;
   }
 
-  async initiateCall(callId: string, peerId: string, peerName: string, peerAvatar?: string): Promise<boolean> {
+  async initiateCall(callId: string, peerId: string, peerName: string, peerAvatar?: string, isVideo = false): Promise<boolean> {
     if (this.callState) {
       this.onError?.('Already in a call');
       return false;
@@ -61,11 +161,16 @@ export class VoiceCallEngine {
         direction: 'outgoing',
         status: 'ringing',
         duration: 0,
+        isVideo,
+        isVideoEnabled: isVideo,
       };
       this.emitState();
 
-      await this.setupLocalAudio();
-      this.setupSignaling(callId);
+      await this.setupLocalMedia(isVideo);
+      await this.setupSignaling(callId);
+
+      // Play ringback tone for the caller
+      this.ringTone.startRingback();
 
       // Auto-end after 30s if not answered
       this.ringTimeout = setTimeout(() => {
@@ -75,16 +180,15 @@ export class VoiceCallEngine {
       }, 30000);
 
       return true;
-    } catch (error) {
-      this.onError?.('Failed to access microphone');
+    } catch (error: any) {
+      this.onError?.(error?.message?.includes('Permission') ? 'Microphone access denied' : 'Failed to access microphone');
       this.cleanup();
       return false;
     }
   }
 
-  async handleIncomingCall(callId: string, callerId: string, callerName: string, callerAvatar?: string) {
+  async handleIncomingCall(callId: string, callerId: string, callerName: string, callerAvatar?: string, isVideo = false) {
     if (this.callState) {
-      // Already in a call, decline this one
       await supabase.from('voice_calls').update({ status: 'declined', end_reason: 'declined', ended_at: new Date().toISOString() }).eq('id', callId);
       return;
     }
@@ -97,10 +201,15 @@ export class VoiceCallEngine {
       direction: 'incoming',
       status: 'ringing',
       duration: 0,
+      isVideo,
+      isVideoEnabled: isVideo,
     };
     this.emitState();
 
-    this.setupSignaling(callId);
+    await this.setupSignaling(callId);
+
+    // Play ringtone for the callee
+    this.ringTone.startRingtone();
 
     // Auto-decline after 30s
     this.ringTimeout = setTimeout(() => {
@@ -114,7 +223,10 @@ export class VoiceCallEngine {
     if (!this.callState || this.callState.direction !== 'incoming') return false;
 
     try {
-      await this.setupLocalAudio();
+      // Stop ringtone
+      this.ringTone.stop();
+
+      await this.setupLocalMedia(this.callState.isVideo);
 
       this.callState.status = 'connecting';
       this.emitState();
@@ -137,8 +249,8 @@ export class VoiceCallEngine {
       });
 
       return true;
-    } catch (error) {
-      this.onError?.('Failed to access microphone');
+    } catch (error: any) {
+      this.onError?.(error?.message?.includes('Permission') ? 'Camera/microphone access denied' : 'Failed to access media devices');
       this.endCall('error');
       return false;
     }
@@ -146,11 +258,15 @@ export class VoiceCallEngine {
 
   async declineCall() {
     if (!this.callState) return;
+    this.ringTone.stop();
     await this.endCall('declined');
   }
 
   async endCall(reason: string = 'completed') {
     if (!this.callState) return;
+
+    // Stop any ringing tones
+    this.ringTone.stop();
 
     const callId = this.callState.callId;
     const duration = this.callState.duration;
@@ -175,22 +291,47 @@ export class VoiceCallEngine {
     this.callState.status = 'ended';
     this.emitState();
 
-    setTimeout(() => this.cleanup(), 500);
+    setTimeout(() => this.cleanup(), 1500);
   }
 
-  private async setupLocalAudio() {
+  toggleVideo(): boolean {
+    if (!this.localStream) return false;
+    const videoTrack = this.localStream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled;
+      if (this.callState) {
+        this.callState.isVideoEnabled = videoTrack.enabled;
+        this.emitState();
+      }
+      return videoTrack.enabled;
+    }
+    return false;
+  }
+
+  private async setupLocalMedia(withVideo: boolean) {
     this.localStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
       },
-      video: false,
+      video: withVideo ? {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        facingMode: 'user',
+      } : false,
     });
+
+    if (this.callState) {
+      this.callState.localStream = this.localStream;
+      this.emitState();
+    }
   }
 
-  private setupSignaling(callId: string) {
+  private async setupSignaling(callId: string): Promise<void> {
     const channelName = `voice-call-${callId}`;
+    this.signalingReady = false;
+
     this.signalingChannel = supabase.channel(channelName, {
       config: { broadcast: { self: false } },
     });
@@ -200,14 +341,31 @@ export class VoiceCallEngine {
       await this.handleSignal(payload);
     });
 
-    this.signalingChannel.subscribe();
+    return new Promise<void>((resolve) => {
+      this.signalingChannel!.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          this.signalingReady = true;
+          resolve();
+        }
+      });
+      // Fallback timeout in case subscription takes too long
+      setTimeout(() => {
+        if (!this.signalingReady) {
+          this.signalingReady = true;
+          resolve();
+        }
+      }, 3000);
+    });
   }
 
   private async handleSignal(payload: any) {
     switch (payload.type) {
       case 'ready':
-        // Callee is ready, create offer
+        // Callee is ready, create offer (stop ringback for caller)
         if (this.callState?.direction === 'outgoing') {
+          this.ringTone.stop();
+          this.callState.status = 'connecting';
+          this.emitState();
           await this.createOffer();
         }
         break;
@@ -225,9 +383,12 @@ export class VoiceCallEngine {
         break;
 
       case 'hangup':
-        this.callState = this.callState ? { ...this.callState, status: 'ended' } : null;
-        this.emitState();
-        setTimeout(() => this.cleanup(), 500);
+        this.ringTone.stop();
+        if (this.callState) {
+          this.callState.status = 'ended';
+          this.emitState();
+        }
+        setTimeout(() => this.cleanup(), 1500);
         break;
     }
   }
@@ -251,7 +412,6 @@ export class VoiceCallEngine {
     await this.peerConnection!.setRemoteDescription(new RTCSessionDescription(sdp));
     this.remoteDescriptionSet = true;
 
-    // Process queued ICE candidates
     for (const candidate of this.iceCandidateQueue) {
       await this.peerConnection!.addIceCandidate(new RTCIceCandidate(candidate));
     }
@@ -291,19 +451,35 @@ export class VoiceCallEngine {
 
     this.peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-    // Add local audio tracks
+    // Add local tracks
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
         this.peerConnection!.addTrack(track, this.localStream!);
       });
     }
 
-    // Handle remote audio
+    // Handle remote tracks (audio + video)
     this.peerConnection.ontrack = (event) => {
-      const audio = new Audio();
-      audio.srcObject = event.streams[0];
-      audio.autoplay = true;
-      audio.play().catch(() => {});
+      if (!this.remoteStream) {
+        this.remoteStream = new MediaStream();
+      }
+      event.streams[0].getTracks().forEach(track => {
+        this.remoteStream!.addTrack(track);
+      });
+
+      // Play remote audio
+      const audioTracks = this.remoteStream.getAudioTracks();
+      if (audioTracks.length > 0) {
+        const audio = new Audio();
+        audio.srcObject = this.remoteStream;
+        audio.autoplay = true;
+        audio.play().catch(() => {});
+      }
+
+      if (this.callState) {
+        this.callState.remoteStream = this.remoteStream;
+        this.emitState();
+      }
     };
 
     // ICE candidates
@@ -349,12 +525,13 @@ export class VoiceCallEngine {
   }
 
   private emitState() {
-    if (this.callState && this.onStateChange) {
-      this.onStateChange({ ...this.callState });
+    if (this.onStateChange) {
+      this.onStateChange(this.callState ? { ...this.callState } : null);
     }
   }
 
   private cleanup() {
+    this.ringTone.stop();
     if (this.durationInterval) {
       clearInterval(this.durationInterval);
       this.durationInterval = null;
@@ -367,6 +544,7 @@ export class VoiceCallEngine {
       this.localStream.getTracks().forEach(t => t.stop());
       this.localStream = null;
     }
+    this.remoteStream = null;
     if (this.peerConnection) {
       this.peerConnection.close();
       this.peerConnection = null;
@@ -378,6 +556,7 @@ export class VoiceCallEngine {
     this.callState = null;
     this.remoteDescriptionSet = false;
     this.iceCandidateQueue = [];
+    this.signalingReady = false;
     this.emitState();
   }
 
@@ -386,7 +565,7 @@ export class VoiceCallEngine {
     const audioTrack = this.localStream.getAudioTracks()[0];
     if (audioTrack) {
       audioTrack.enabled = !audioTrack.enabled;
-      return !audioTrack.enabled; // returns true if muted
+      return !audioTrack.enabled;
     }
     return false;
   }
