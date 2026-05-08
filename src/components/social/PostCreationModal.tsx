@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { X, Image, Video, Link as LinkIcon, MapPin, Smile, Users, Lock, Globe, MessageSquare, ChevronDown, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { socialStorage, SocialGroup } from '../../utils/socialStorage';
@@ -38,7 +39,7 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
-  const [showFeelingModal, setShowFeelingModal] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   useEffect(() => {
     if (isOpen && user) {
@@ -381,7 +382,7 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
           />
 
           {/* Display added features */}
-          {(videoUrl || linkUrl || location || feeling) && (
+          {(videoUrl || linkUrl || location) && (
             <div className="flex flex-wrap gap-2 mt-3">
               {videoUrl && (
                 <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${lightMode ? 'bg-red-50 text-red-700' : 'bg-red-900/30 text-red-300'}`}>
@@ -406,15 +407,6 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
                   <MapPin size={16} />
                   <span className="text-sm font-medium">{location}</span>
                   <button onClick={() => setLocation('')} className="ml-1 hover:opacity-70">
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
-              {feeling && (
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${lightMode ? 'bg-yellow-50 text-yellow-700' : 'bg-yellow-900/30 text-yellow-300'}`}>
-                  <Smile size={16} />
-                  <span className="text-sm font-medium">{feeling}</span>
-                  <button onClick={() => setFeeling('')} className="ml-1 hover:opacity-70">
                     <X size={14} />
                   </button>
                 </div>
@@ -472,13 +464,28 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
               >
                 <MapPin className="w-6 h-6 text-orange-500" />
               </button>
-              <button
-                onClick={() => setShowFeelingModal(true)}
-                className={`p-3 rounded-xl transition-all hover:scale-110 ${lightMode ? 'hover:bg-yellow-50' : 'hover:bg-yellow-900/30'}`}
-                title="Add feeling"
-              >
-                <Smile className="w-6 h-6 text-yellow-500" />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  className={`p-3 rounded-xl transition-all hover:scale-110 ${lightMode ? 'hover:bg-yellow-50' : 'hover:bg-yellow-900/30'}`}
+                  title="Add emoji"
+                >
+                  <Smile className="w-6 h-6 text-yellow-500" />
+                </button>
+                {showEmojiPicker && (
+                  <div className="absolute bottom-full left-0 mb-2 z-50">
+                    <EmojiPicker
+                      onEmojiClick={(emojiData) => {
+                        setContent(prev => prev + emojiData.emoji);
+                        setShowEmojiPicker(false);
+                      }}
+                      theme={darkMode ? Theme.DARK : Theme.LIGHT}
+                      width={320}
+                      height={400}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             <button
@@ -618,39 +625,6 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
         </div>
       )}
 
-      {/* Feeling Modal */}
-      {showFeelingModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={() => setShowFeelingModal(false)}>
-          <div className={`w-full max-w-md rounded-xl shadow-xl p-6 ${darkMode ? 'bg-slate-800' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>How are you feeling?</h3>
-              <button onClick={() => setShowFeelingModal(false)} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} className={lightMode ? 'text-gray-500' : 'text-gray-400'} />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {['Happy', 'Excited', 'Blessed', 'Grateful', 'Loved', 'Motivated', 'Relaxed', 'Proud', 'Sad', 'Tired', 'Worried', 'Frustrated'].map(emotion => (
-                <button
-                  key={emotion}
-                  onClick={() => {
-                    setFeeling(emotion);
-                    setShowFeelingModal(false);
-                  }}
-                  className={`px-4 py-3 rounded-lg text-left transition-colors ${
-                    feeling === emotion
-                      ? 'bg-blue-500 text-white'
-                      : lightMode
-                      ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                      : 'bg-slate-700 hover:bg-slate-600 text-white'
-                  }`}
-                >
-                  {emotion}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
