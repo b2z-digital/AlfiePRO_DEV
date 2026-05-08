@@ -228,6 +228,16 @@ export const Conversations: React.FC<ConversationsProps> = ({
         table: 'conversation_participants',
       }, () => {
         debouncedFetchChats();
+      }).on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'voice_calls',
+        filter: `callee_id=eq.${viewingUserId}`,
+      }, (payload: any) => {
+        const call = payload.new;
+        if (call?.status === 'missed' || call?.status === 'declined' || call?.status === 'ended') {
+          debouncedFetchChats();
+        }
       }).subscribe()
     );
     return () => {

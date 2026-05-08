@@ -458,6 +458,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         }, () => fetchUnreadConversationsCount()).subscribe()
       },
       {
+        name: `voice-calls-unread-${userId}`,
+        setup: (ch: any) => ch.on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'voice_calls',
+          filter: `callee_id=eq.${userId}`
+        }, (payload: any) => {
+          const call = payload.new;
+          if (call?.status === 'missed' || call?.status === 'declined' || call?.status === 'ended') {
+            setTimeout(() => fetchUnreadConversationsCount(), 500);
+          }
+        }).subscribe()
+      },
+      {
         name: `social-notifications-${userId}`,
         setup: (ch: any) => ch.on('postgres_changes', {
           event: '*',
@@ -592,14 +606,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     try {
       const { data, error } = await supabase
         .from('conversation_participants')
-        .select('conversation_id, last_read_at, conversations!inner(last_message_at)')
+        .select('conversation_id, last_read_at, conversations!inner(last_message_at, last_message_sender_id)')
         .eq('user_id', user.id);
 
       if (error) throw error;
 
       const unread = (data || []).filter((p: any) => {
         const lastMsg = p.conversations?.last_message_at;
+        const lastSenderId = p.conversations?.last_message_sender_id;
         if (!lastMsg) return false;
+        if (lastSenderId === user.id) return false;
         if (!p.last_read_at) return true;
         return new Date(lastMsg) > new Date(p.last_read_at);
       }).length;
