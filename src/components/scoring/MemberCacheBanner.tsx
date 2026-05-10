@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Users, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Users, RefreshCw, WifiOff } from 'lucide-react';
 import { memberPreloader } from '../../utils/memberPreloader';
 
 interface MemberCacheBannerProps {
@@ -12,49 +12,46 @@ export const MemberCacheBanner: React.FC<MemberCacheBannerProps> = ({
   onRefresh,
 }) => {
   const [state, setState] = useState(memberPreloader.getState());
+  const [visible, setVisible] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return memberPreloader.onStateChange(setState);
   }, []);
 
-  const getFreshnessConfig = () => {
-    switch (state.freshness) {
-      case 'fresh':
-        return {
-          dotColor: 'bg-emerald-400',
-          textColor: darkMode ? 'text-emerald-300' : 'text-emerald-700',
-          bgColor: darkMode ? 'bg-emerald-900/20' : 'bg-emerald-50',
-          borderColor: darkMode ? 'border-emerald-800/30' : 'border-emerald-100',
-          icon: <Wifi className="w-3.5 h-3.5" />,
-        };
-      case 'recent':
-        return {
-          dotColor: 'bg-blue-400',
-          textColor: darkMode ? 'text-blue-300' : 'text-blue-700',
-          bgColor: darkMode ? 'bg-blue-900/20' : 'bg-blue-50',
-          borderColor: darkMode ? 'border-blue-800/30' : 'border-blue-100',
-          icon: <Users className="w-3.5 h-3.5" />,
-        };
-      case 'stale':
-        return {
-          dotColor: 'bg-amber-400',
-          textColor: darkMode ? 'text-amber-300' : 'text-amber-700',
-          bgColor: darkMode ? 'bg-amber-900/20' : 'bg-amber-50',
-          borderColor: darkMode ? 'border-amber-800/30' : 'border-amber-100',
-          icon: <WifiOff className="w-3.5 h-3.5" />,
-        };
-      case 'none':
-        return {
-          dotColor: 'bg-red-400',
-          textColor: darkMode ? 'text-red-300' : 'text-red-700',
-          bgColor: darkMode ? 'bg-red-900/20' : 'bg-red-50',
-          borderColor: darkMode ? 'border-red-800/30' : 'border-red-100',
-          icon: <WifiOff className="w-3.5 h-3.5" />,
-        };
-    }
-  };
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
-  const config = getFreshnessConfig();
+  useEffect(() => {
+    if (isOffline) {
+      setVisible(true);
+      if (dismissTimer.current) {
+        clearTimeout(dismissTimer.current);
+        dismissTimer.current = null;
+      }
+    } else {
+      // When online, briefly show then auto-dismiss
+      setVisible(true);
+      if (dismissTimer.current) clearTimeout(dismissTimer.current);
+      dismissTimer.current = setTimeout(() => {
+        setVisible(false);
+      }, 4000);
+    }
+    return () => {
+      if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    };
+  }, [isOffline, state.memberCount]);
+
+  if (!visible || state.memberCount === 0) return null;
 
   const handleRefresh = async () => {
     await memberPreloader.forceRefresh();
@@ -62,25 +59,35 @@ export const MemberCacheBanner: React.FC<MemberCacheBannerProps> = ({
   };
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border ${config.bgColor} ${config.borderColor}`}>
-      <div className={`flex items-center gap-1.5 ${config.textColor}`}>
-        {config.icon}
+    <div
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border transition-opacity duration-500 ${
+        isOffline
+          ? darkMode
+            ? 'bg-amber-900/20 border-amber-800/30'
+            : 'bg-amber-50 border-amber-100'
+          : darkMode
+            ? 'bg-emerald-900/20 border-emerald-800/30'
+            : 'bg-emerald-50 border-emerald-100'
+      }`}
+    >
+      <div className={`flex items-center gap-1.5 ${isOffline ? (darkMode ? 'text-amber-300' : 'text-amber-700') : (darkMode ? 'text-emerald-300' : 'text-emerald-700')}`}>
+        {isOffline ? <WifiOff className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
         <span className="font-medium">
-          {state.memberCount > 0
-            ? `${state.memberCount} members cached`
-            : 'No member data cached'}
+          {isOffline
+            ? `Offline - ${state.memberCount} members cached locally`
+            : `${state.memberCount} members cached`}
         </span>
-        <span className="opacity-70">
-          ({state.syncAge})
-        </span>
+        {!isOffline && (
+          <span className="opacity-70">({state.syncAge})</span>
+        )}
       </div>
 
       {state.isLoading ? (
-        <RefreshCw className={`w-3.5 h-3.5 animate-spin ${config.textColor}`} />
-      ) : (
+        <RefreshCw className={`w-3.5 h-3.5 animate-spin ${isOffline ? 'text-amber-500' : 'text-emerald-500'}`} />
+      ) : isOffline ? null : (
         <button
           onClick={handleRefresh}
-          className={`p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 ${config.textColor}`}
+          className={`p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 ${darkMode ? 'text-emerald-300' : 'text-emerald-700'}`}
           title="Refresh member list"
         >
           <RefreshCw className="w-3.5 h-3.5" />
