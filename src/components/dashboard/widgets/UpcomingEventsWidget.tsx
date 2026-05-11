@@ -516,7 +516,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           if (attendees.length === 0 && event.skippers && event.skippers.length > 0) {
             attendees = event.skippers.map((skipper: any) => ({
               name: skipper.name,
-              avatarUrl: memberAvatarMap[skipper.name]
+              avatarUrl: skipper.avatarUrl || memberAvatarMap[skipper.name]
             }));
           }
         } else {
@@ -525,7 +525,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           if (attendees.length === 0 && event.skippers && event.skippers.length > 0) {
             attendees = event.skippers.map((skipper: any) => ({
               name: skipper.name,
-              avatarUrl: memberAvatarMap[skipper.name]
+              avatarUrl: skipper.avatarUrl || memberAvatarMap[skipper.name]
             }));
           }
         }
