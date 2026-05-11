@@ -211,7 +211,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     letterScoreSummary.sort((a, b) => b.count - a.count);
 
     const qualDiscards = calculateSHRSDiscards(qualifyingRaces.length);
-    const finalsDiscards = finalsRaces.length >= 4 ? 1 : 0;
+    const finalsDiscards = calculateSHRSDiscards(finalsRaces.length);
 
     const fleetSizes: Record<string, number> = {};
     if (finalRounds.length > 0) {
@@ -404,7 +404,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     const finalsCount = finalsRaces.length;
 
     const qualDiscards = calculateSHRSDiscards(qualCount);
-    const finalsDiscards = finalsCount >= 4 ? 1 : 0;
+    const finalsDiscards = calculateSHRSDiscards(finalsCount);
     const totalDiscards = qualDiscards + finalsDiscards;
 
     const allStandings = Array.from(skipperIndicesWithResults).map((skipperIndex: any) => {
@@ -698,7 +698,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
 
   const totalDiscards = useMemo(() => {
     const qualDiscards = calculateSHRSDiscards(qualifyingRaces.length);
-    const finalsDiscards = finalsRaces.length >= 4 ? 1 : 0;
+    const finalsDiscards = calculateSHRSDiscards(finalsRaces.length);
     return qualDiscards + finalsDiscards;
   }, [qualifyingRaces.length, finalsRaces.length]);
 
