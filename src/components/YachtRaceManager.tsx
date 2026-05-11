@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle } from 'lucide-react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle, Share2 } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -50,6 +50,7 @@ import { SyncStatusIndicator } from './scoring/SyncStatusIndicator';
 import { ConflictToast } from './scoring/ConflictToast';
 import { MemberCacheBanner } from './scoring/MemberCacheBanner';
 import { SkipperMatchReviewModal } from './scoring/SkipperMatchReviewModal';
+import { ShareScoringSessionModal } from './scoring/ShareScoringSessionModal';
 
 class ScoringErrorBoundary extends Component<
   { children: React.ReactNode; darkMode?: boolean; onRetry?: () => void },
@@ -150,6 +151,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [touchModeCurrentRace, setTouchModeCurrentRace] = useState<number>(1);
   const [isFullscreenScoring, setIsFullscreenScoring] = useState(false);
   const [showOverallResults, setShowOverallResults] = useState(false);
+  const [showShareScoringModal, setShowShareScoringModal] = useState(false);
   const [eventUpdateTrigger, setEventUpdateTrigger] = useState(0);
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
@@ -3511,6 +3513,18 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 <div className="flex items-center gap-2 ml-3 flex-shrink-0">
                   <MemberCacheBanner darkMode={darkMode} />
                   <SyncStatusIndicator darkMode={darkMode} compact />
+                  <button
+                    onClick={() => setShowShareScoringModal(true)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      darkMode
+                        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-800/30 hover:bg-cyan-500/20'
+                        : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                    }`}
+                    title="Share scoring session"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Share</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -4684,6 +4698,18 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             />
           )}
         </>
+      )}
+
+      {/* Share Scoring Session Modal */}
+      {selectedEvent && currentClubId && (
+        <ShareScoringSessionModal
+          isOpen={showShareScoringModal}
+          onClose={() => setShowShareScoringModal(false)}
+          eventId={selectedEvent.id}
+          eventName={selectedEvent.eventName || 'Race Event'}
+          clubId={currentClubId}
+          darkMode={darkMode}
+        />
       )}
     </div>
   );
