@@ -672,12 +672,16 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
                       title={`${att.first_name} ${att.last_name}`}
                     >
                       {att.avatar_url ? (
-                        <img src={att.avatar_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[8px] font-semibold text-slate-300">
-                          {att.first_name?.[0]}{att.last_name?.[0]}
-                        </div>
-                      )}
+                        <img
+                          src={att.avatar_url}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+                        />
+                      ) : null}
+                      <div className={`w-full h-full flex items-center justify-center text-[8px] font-semibold text-slate-300 ${att.avatar_url ? 'hidden' : ''}`}>
+                        {att.first_name?.[0]}{att.last_name?.[0]}
+                      </div>
                     </div>
                   ))}
                   {event.meetingAttendingCount > 3 && (
@@ -778,10 +782,14 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
                         title={attendee.name}
                       >
                         {attendee.avatarUrl ? (
-                          <img src={attendee.avatarUrl} alt={attendee.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-xs text-slate-300">{attendee.name.charAt(0)}</span>
-                        )}
+                          <img
+                            src={attendee.avatarUrl}
+                            alt={attendee.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+                          />
+                        ) : null}
+                        <span className={`text-xs text-slate-300 ${attendee.avatarUrl ? 'hidden' : ''}`}>{attendee.name.charAt(0)}</span>
                       </div>
                     ))}
                   </div>
