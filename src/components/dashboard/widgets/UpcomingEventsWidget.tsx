@@ -311,7 +311,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
                 isSeriesEvent: true,
                 seriesId: series.id,
                 roundName: round.name,
-                skippers: series.skippers
+                skippers: round.skippers?.length > 0 ? round.skippers : series.skippers
               });
             }
           });
