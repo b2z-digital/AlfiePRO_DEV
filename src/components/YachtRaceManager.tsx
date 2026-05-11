@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle, Share2 } from 'lucide-react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -3513,18 +3513,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 <div className="flex items-center gap-2 ml-3 flex-shrink-0">
                   <MemberCacheBanner darkMode={darkMode} />
                   <SyncStatusIndicator darkMode={darkMode} compact />
-                  <button
-                    onClick={() => setShowShareScoringModal(true)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      darkMode
-                        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-800/30 hover:bg-cyan-500/20'
-                        : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                    }`}
-                    title="Share scoring session"
-                  >
-                    <Share2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Share</span>
-                  </button>
                 </div>
               </div>
             </div>
@@ -4267,6 +4255,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           initialDropRules={currentDropRules}
           currentEvent={getCurrentEvent()}
           autoEnableHeatRacing={autoEnableHeatRacing}
+          onShareScoring={() => setShowShareScoringModal(true)}
           onSaveSettings={async (settings) => {
             await handleSaveRaceSettings(settings);
             setShowRaceSettingsModal(false);

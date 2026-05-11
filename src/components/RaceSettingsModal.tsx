@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen as Edit2, Check, TriangleAlert as AlertTriangle, Sailboat, Eye, Grid3x2 as Grid3X3, ClipboardCheck, Table2, Hand } from 'lucide-react';
+import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen as Edit2, Check, TriangleAlert as AlertTriangle, Sailboat, Eye, Grid3x2 as Grid3X3, ClipboardCheck, Table2, Hand, Share2, QrCode } from 'lucide-react';
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
 import { seedInitialHeats, validateHeatConfig, validateHeatAssignments, HMSConfig, calculateOptimalHeats, calculateHMSHeatSizes } from '../utils/hmsHeatSystem';
@@ -41,6 +41,7 @@ interface RaceSettingsModalProps {
   onScoringModeChange?: (mode: 'pro' | 'touch' | 'spreadsheet') => void;
   currentEvent?: any;
   autoEnableHeatRacing?: boolean;
+  onShareScoring?: () => void;
 }
 
 const DROP_RULE_OPTIONS = [
@@ -70,7 +71,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   onClearAllRaceResults,
   onScoringModeChange,
   currentEvent,
-  autoEnableHeatRacing = false
+  autoEnableHeatRacing = false,
+  onShareScoring,
 }) => {
   const [currentNumRaces, setCurrentNumRaces] = useState(initialNumRaces);
   const [currentDropRules, setCurrentDropRules] = useState<number[] | string>(initialDropRules);
@@ -2374,6 +2376,38 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 </p>
               </div>
             </div>
+
+            {/* Collaborative Scoring */}
+            {onShareScoring && (
+              <div className={`p-4 rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${darkMode ? 'bg-cyan-500/10' : 'bg-blue-50'}`}>
+                      <Share2 className={`w-4.5 h-4.5 ${darkMode ? 'text-cyan-400' : 'text-blue-600'}`} />
+                    </div>
+                    <div>
+                      <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Collaborative Scoring
+                      </h4>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Invite others to help score via QR code or PIN
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={onShareScoring}
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      darkMode
+                        ? 'bg-cyan-600 text-white hover:bg-cyan-500'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    <QrCode className="w-4 h-4" />
+                    Share
+                  </button>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
