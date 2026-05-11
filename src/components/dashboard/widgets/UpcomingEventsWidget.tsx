@@ -311,7 +311,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
                 isSeriesEvent: true,
                 seriesId: series.id,
                 roundName: round.name,
-                skippers: series.skippers
+                skippers: round.skippers?.length > 0 ? round.skippers : series.skippers
               });
             }
           });
@@ -509,26 +509,39 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
 
       return events.map(event => {
         let attendees: any[] = [];
-        if (event.isSeriesEvent && event.seriesId && event.roundName) {
-          const key = `${event.seriesId}-${event.roundName}`;
-          attendees = seriesRoundAttendanceMap[key] || [];
 
-          if (attendees.length === 0 && event.skippers && event.skippers.length > 0) {
-            attendees = event.skippers.map((skipper: any) => ({
+        // Registered skippers (from race data) take priority as they are actual competitors
+        const skipperAttendees = (event.skippers && event.skippers.length > 0)
+          ? event.skippers.map((skipper: any) => ({
               name: skipper.name,
-              avatarUrl: memberAvatarMap[skipper.name]
-            }));
+              avatarUrl: skipper.avatarUrl || memberAvatarMap[skipper.name]
+            }))
+          : [];
+
+        if (skipperAttendees.length > 0) {
+          // Use registered skippers as the primary list
+          attendees = skipperAttendees;
+
+          // Merge in any attendance-only people not already in skippers
+          const skipperNames = new Set(attendees.map(a => a.name));
+          let extraAttendees: any[] = [];
+          if (event.isSeriesEvent && event.seriesId && event.roundName) {
+            const key = `${event.seriesId}-${event.roundName}`;
+            extraAttendees = (seriesRoundAttendanceMap[key] || []).filter(a => !skipperNames.has(a.name));
+          } else {
+            extraAttendees = (singleEventAttendanceMap[event.id] || []).filter(a => !skipperNames.has(a.name));
           }
+          attendees = [...attendees, ...extraAttendees];
         } else {
-          attendees = singleEventAttendanceMap[event.id] || [];
-
-          if (attendees.length === 0 && event.skippers && event.skippers.length > 0) {
-            attendees = event.skippers.map((skipper: any) => ({
-              name: skipper.name,
-              avatarUrl: memberAvatarMap[skipper.name]
-            }));
+          // No skippers registered - fall back to attendance data
+          if (event.isSeriesEvent && event.seriesId && event.roundName) {
+            const key = `${event.seriesId}-${event.roundName}`;
+            attendees = seriesRoundAttendanceMap[key] || [];
+          } else {
+            attendees = singleEventAttendanceMap[event.id] || [];
           }
         }
+
         return {
           ...event,
           attendees,
@@ -672,12 +685,16 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
                       title={`${att.first_name} ${att.last_name}`}
                     >
                       {att.avatar_url ? (
-                        <img src={att.avatar_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[8px] font-semibold text-slate-300">
-                          {att.first_name?.[0]}{att.last_name?.[0]}
-                        </div>
-                      )}
+                        <img
+                          src={att.avatar_url}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+                        />
+                      ) : null}
+                      <div className={`w-full h-full flex items-center justify-center text-[8px] font-semibold text-slate-300 ${att.avatar_url ? 'hidden' : ''}`}>
+                        {att.first_name?.[0]}{att.last_name?.[0]}
+                      </div>
                     </div>
                   ))}
                   {event.meetingAttendingCount > 3 && (
@@ -778,10 +795,14 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
                         title={attendee.name}
                       >
                         {attendee.avatarUrl ? (
-                          <img src={attendee.avatarUrl} alt={attendee.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-xs text-slate-300">{attendee.name.charAt(0)}</span>
-                        )}
+                          <img
+                            src={attendee.avatarUrl}
+                            alt={attendee.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+                          />
+                        ) : null}
+                        <span className={`text-xs text-slate-300 ${attendee.avatarUrl ? 'hidden' : ''}`}>{attendee.name.charAt(0)}</span>
                       </div>
                     ))}
                   </div>

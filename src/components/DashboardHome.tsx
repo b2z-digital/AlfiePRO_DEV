@@ -629,7 +629,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               raceFormat: series.raceFormat,
               isSeriesEvent: true,
               seriesId: series.id,
-              roundName: round.name
+              roundName: round.name,
+              skippers: round.skippers?.length > 0 ? round.skippers : series.skippers
             });
           }
         });
@@ -777,24 +778,44 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         }
       });
 
-      // Enrich events with attendance data
+      // Enrich events with attendance data - skippers (registered competitors) take priority
       return events.map(event => {
         let attendees: any[] = [];
 
-        if (event.isSeriesEvent && event.seriesId && event.roundName) {
-          // For series rounds, look up by series_id + round_name
-          const key = `${event.seriesId}-${event.roundName}`;
-          attendees = seriesRoundAttendanceMap[key] || [];
+        const skipperAttendees = (event.skippers && event.skippers.length > 0)
+          ? event.skippers.map((skipper: any) => ({
+              name: skipper.name,
+              sailNo: skipper.sailNo || '',
+              club: skipper.club || '',
+              boatModel: skipper.boatModel || '',
+              startHcap: skipper.startHcap || 0,
+              avatarUrl: skipper.avatarUrl
+            }))
+          : [];
+
+        if (skipperAttendees.length > 0) {
+          attendees = skipperAttendees;
+          const skipperNames = new Set(attendees.map(a => a.name));
+          let extraAttendees: any[] = [];
+          if (event.isSeriesEvent && event.seriesId && event.roundName) {
+            const key = `${event.seriesId}-${event.roundName}`;
+            extraAttendees = (seriesRoundAttendanceMap[key] || []).filter(a => !skipperNames.has(a.name));
+          } else {
+            extraAttendees = (singleEventAttendanceMap[event.id] || []).filter(a => !skipperNames.has(a.name));
+          }
+          attendees = [...attendees, ...extraAttendees];
         } else {
-          // For single events, use event.id directly
-          attendees = singleEventAttendanceMap[event.id] || [];
+          if (event.isSeriesEvent && event.seriesId && event.roundName) {
+            const key = `${event.seriesId}-${event.roundName}`;
+            attendees = seriesRoundAttendanceMap[key] || [];
+          } else {
+            attendees = singleEventAttendanceMap[event.id] || [];
+          }
         }
 
-        // Store attendees separately and preserve existing skippers from storage
-        // Don't overwrite skippers - they contain the actual competing participants
         return {
           ...event,
-          attendees: attendees
+          attendees
         };
       });
     } catch (error) {
