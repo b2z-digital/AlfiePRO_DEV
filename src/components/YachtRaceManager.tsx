@@ -50,6 +50,7 @@ import { SyncStatusIndicator } from './scoring/SyncStatusIndicator';
 import { ConflictToast } from './scoring/ConflictToast';
 import { MemberCacheBanner } from './scoring/MemberCacheBanner';
 import { SkipperMatchReviewModal } from './scoring/SkipperMatchReviewModal';
+import { ShareScoringSessionModal } from './scoring/ShareScoringSessionModal';
 
 class ScoringErrorBoundary extends Component<
   { children: React.ReactNode; darkMode?: boolean; onRetry?: () => void },
@@ -150,6 +151,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [touchModeCurrentRace, setTouchModeCurrentRace] = useState<number>(1);
   const [isFullscreenScoring, setIsFullscreenScoring] = useState(false);
   const [showOverallResults, setShowOverallResults] = useState(false);
+  const [showShareScoringModal, setShowShareScoringModal] = useState(false);
   const [eventUpdateTrigger, setEventUpdateTrigger] = useState(0);
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
@@ -4253,6 +4255,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           initialDropRules={currentDropRules}
           currentEvent={getCurrentEvent()}
           autoEnableHeatRacing={autoEnableHeatRacing}
+          onShareScoring={() => setShowShareScoringModal(true)}
           onSaveSettings={async (settings) => {
             await handleSaveRaceSettings(settings);
             setShowRaceSettingsModal(false);
@@ -4684,6 +4687,18 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             />
           )}
         </>
+      )}
+
+      {/* Share Scoring Session Modal */}
+      {selectedEvent && currentClubId && (
+        <ShareScoringSessionModal
+          isOpen={showShareScoringModal}
+          onClose={() => setShowShareScoringModal(false)}
+          eventId={selectedEvent.id}
+          eventName={selectedEvent.eventName || 'Race Event'}
+          clubId={currentClubId}
+          darkMode={darkMode}
+        />
       )}
     </div>
   );

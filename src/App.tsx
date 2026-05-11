@@ -59,6 +59,7 @@ import { HMSValidatorPage } from './pages/HMSValidatorPage';
 import PublicVideoPlayer from './components/public/PublicVideoPlayer';
 import { DelegatedRollCallPage } from './pages/DelegatedRollCallPage';
 import { MobileAppComingSoon } from './components/MobileAppComingSoon';
+import { JoinScoringSessionPage } from './pages/JoinScoringSessionPage';
 import './styles/index.css';
 
 function useIsMobilePhone() {
@@ -253,6 +254,9 @@ function App() {
         <Route path="/live/:token" element={<LiveTrackingPage />} />
         <Route path="/live/:token/dashboard" element={<LiveDashboardPage />} />
         <Route path="/live/:token/pro-broadcast" element={<ProBroadcastView />} />
+
+        {/* Join Scoring Session Route */}
+        <Route path="/join-scoring/:pin?" element={<JoinScoringSessionPage />} />
 
         {/* Delegated Roll Call Route (Public) */}
         <Route path="/rc/:token" element={<DelegatedRollCallPage />} />
