@@ -459,87 +459,54 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         }
       }
 
-      if (allAttendanceData.length === 0) return events;
-
-      const userIds = [...new Set(allAttendanceData.map((a: any) => a.user_id))];
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, avatar_url')
-        .in('id', userIds);
-
-      const profileMap: Record<string, any> = {};
-      profilesData?.forEach(profile => {
-        profileMap[profile.id] = profile;
-      });
-
+      // Build attendance maps from DB data
       const singleEventAttendanceMap: Record<string, any[]> = {};
       const seriesRoundAttendanceMap: Record<string, any[]> = {};
 
-      allAttendanceData.forEach((att: any) => {
-        const profile = profileMap[att.user_id];
-        const attendee = {
-          name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown',
-          avatarUrl: profile?.avatar_url
-        };
+      if (allAttendanceData.length > 0) {
+        const userIds = [...new Set(allAttendanceData.map((a: any) => a.user_id))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, avatar_url')
+          .in('id', userIds);
 
-        if (att.series_id && att.round_name) {
-          const key = `${att.series_id}-${att.round_name}`;
-          if (!seriesRoundAttendanceMap[key]) {
-            seriesRoundAttendanceMap[key] = [];
+        const profileMap: Record<string, any> = {};
+        profilesData?.forEach(profile => {
+          profileMap[profile.id] = profile;
+        });
+
+        allAttendanceData.forEach((att: any) => {
+          const profile = profileMap[att.user_id];
+          const attendee = {
+            name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown',
+            avatarUrl: profile?.avatar_url
+          };
+
+          if (att.series_id && att.round_name) {
+            const key = `${att.series_id}-${att.round_name}`;
+            if (!seriesRoundAttendanceMap[key]) seriesRoundAttendanceMap[key] = [];
+            seriesRoundAttendanceMap[key].push(attendee);
+          } else if (att.event_id) {
+            if (!singleEventAttendanceMap[att.event_id]) singleEventAttendanceMap[att.event_id] = [];
+            singleEventAttendanceMap[att.event_id].push(attendee);
           }
-          seriesRoundAttendanceMap[key].push(attendee);
-        } else if (att.event_id) {
-          if (!singleEventAttendanceMap[att.event_id]) {
-            singleEventAttendanceMap[att.event_id] = [];
-          }
-          singleEventAttendanceMap[att.event_id].push(attendee);
-        }
-      });
-
-      const { data: members } = await supabase
-        .from('members')
-        .select('first_name, last_name, avatar_url')
-        .eq('club_id', currentClub.clubId);
-
-      const memberAvatarMap: Record<string, string> = {};
-      members?.forEach(m => {
-        const fullName = `${m.first_name} ${m.last_name}`.trim();
-        if (m.avatar_url) memberAvatarMap[fullName] = m.avatar_url;
-      });
+        });
+      }
 
       return events.map(event => {
         let attendees: any[] = [];
 
-        // Registered skippers (from race data) take priority as they are actual competitors
-        const skipperAttendees = (event.skippers && event.skippers.length > 0)
-          ? event.skippers.map((skipper: any) => ({
-              name: skipper.name,
-              avatarUrl: skipper.avatarUrl || memberAvatarMap[skipper.name]
-            }))
-          : [];
-
-        if (skipperAttendees.length > 0) {
-          // Use registered skippers as the primary list
-          attendees = skipperAttendees;
-
-          // Merge in any attendance-only people not already in skippers
-          const skipperNames = new Set(attendees.map(a => a.name));
-          let extraAttendees: any[] = [];
-          if (event.isSeriesEvent && event.seriesId && event.roundName) {
-            const key = `${event.seriesId}-${event.roundName}`;
-            extraAttendees = (seriesRoundAttendanceMap[key] || []).filter(a => !skipperNames.has(a.name));
-          } else {
-            extraAttendees = (singleEventAttendanceMap[event.id] || []).filter(a => !skipperNames.has(a.name));
-          }
-          attendees = [...attendees, ...extraAttendees];
+        // Registered skippers take priority - they are actual competitors
+        if (event.skippers && event.skippers.length > 0) {
+          attendees = event.skippers.map((skipper: any) => ({
+            name: skipper.name,
+            avatarUrl: skipper.avatarUrl || undefined
+          }));
+        } else if (event.isSeriesEvent && event.seriesId && event.roundName) {
+          const key = `${event.seriesId}-${event.roundName}`;
+          attendees = seriesRoundAttendanceMap[key] || [];
         } else {
-          // No skippers registered - fall back to attendance data
-          if (event.isSeriesEvent && event.seriesId && event.roundName) {
-            const key = `${event.seriesId}-${event.roundName}`;
-            attendees = seriesRoundAttendanceMap[key] || [];
-          } else {
-            attendees = singleEventAttendanceMap[event.id] || [];
-          }
+          attendees = singleEventAttendanceMap[event.id] || [];
         }
 
         return {
@@ -802,7 +769,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
                           />
                         ) : null}
-                        <span className={`text-xs text-slate-300 ${attendee.avatarUrl ? 'hidden' : ''}`}>{attendee.name.charAt(0)}</span>
+                        <span className={`text-[9px] font-medium text-slate-300 ${attendee.avatarUrl ? 'hidden' : ''}`}>{attendee.name.split(' ').map((n: string) => n[0]).join('')}</span>
                       </div>
                     ))}
                   </div>

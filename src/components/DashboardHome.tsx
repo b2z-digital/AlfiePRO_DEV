@@ -782,35 +782,20 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       return events.map(event => {
         let attendees: any[] = [];
 
-        const skipperAttendees = (event.skippers && event.skippers.length > 0)
-          ? event.skippers.map((skipper: any) => ({
-              name: skipper.name,
-              sailNo: skipper.sailNo || '',
-              club: skipper.club || '',
-              boatModel: skipper.boatModel || '',
-              startHcap: skipper.startHcap || 0,
-              avatarUrl: skipper.avatarUrl
-            }))
-          : [];
-
-        if (skipperAttendees.length > 0) {
-          attendees = skipperAttendees;
-          const skipperNames = new Set(attendees.map(a => a.name));
-          let extraAttendees: any[] = [];
-          if (event.isSeriesEvent && event.seriesId && event.roundName) {
-            const key = `${event.seriesId}-${event.roundName}`;
-            extraAttendees = (seriesRoundAttendanceMap[key] || []).filter(a => !skipperNames.has(a.name));
-          } else {
-            extraAttendees = (singleEventAttendanceMap[event.id] || []).filter(a => !skipperNames.has(a.name));
-          }
-          attendees = [...attendees, ...extraAttendees];
+        if (event.skippers && event.skippers.length > 0) {
+          attendees = event.skippers.map((skipper: any) => ({
+            name: skipper.name,
+            sailNo: skipper.sailNo || '',
+            club: skipper.club || '',
+            boatModel: skipper.boatModel || '',
+            startHcap: skipper.startHcap || 0,
+            avatarUrl: skipper.avatarUrl
+          }));
+        } else if (event.isSeriesEvent && event.seriesId && event.roundName) {
+          const key = `${event.seriesId}-${event.roundName}`;
+          attendees = seriesRoundAttendanceMap[key] || [];
         } else {
-          if (event.isSeriesEvent && event.seriesId && event.roundName) {
-            const key = `${event.seriesId}-${event.roundName}`;
-            attendees = seriesRoundAttendanceMap[key] || [];
-          } else {
-            attendees = singleEventAttendanceMap[event.id] || [];
-          }
+          attendees = singleEventAttendanceMap[event.id] || [];
         }
 
         return {
