@@ -104,8 +104,8 @@ export const AskAlfieOrb: React.FC<AskAlfieOrbProps> = ({ darkMode }) => {
     <>
       <button
         onClick={handleToggle}
-        className={`fixed bottom-6 right-6 z-[9990] rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${
-          isOpen ? 'w-14 h-14 bg-slate-700 hover:bg-slate-600' : 'w-[68px] h-[68px]'
+        className={`fixed bottom-6 right-6 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${
+          isOpen ? 'w-14 h-14 bg-slate-700 hover:bg-slate-600 z-[9990]' : 'w-[68px] h-[68px] z-40'
         }`}
         title="Ask Alfie"
         style={!isOpen ? { background: 'transparent', boxShadow: '0 0 20px rgba(56, 189, 248, 0.25)' } : undefined}
@@ -122,7 +122,7 @@ export const AskAlfieOrb: React.FC<AskAlfieOrbProps> = ({ darkMode }) => {
       </button>
 
       {!isOpen && !hasInteracted && (
-        <div className="fixed bottom-[6.5rem] right-6 z-[9989] animate-fade-in">
+        <div className="fixed bottom-[6.5rem] right-6 z-40 animate-fade-in">
           <div className={`px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg ${
             darkMode ? 'bg-slate-700 text-cyan-300 border border-slate-600' : 'bg-white text-sky-600 border border-sky-200'
           }`}>

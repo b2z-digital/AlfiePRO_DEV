@@ -45,6 +45,11 @@ import { AskAlfieOrb } from './ask-alfie/AskAlfieOrb';
 import { HeatRacingSetupWizard } from './HeatRacingSetupWizard';
 import { useScoringContext } from '../contexts/ScoringContext';
 import type { ScoringSkipper, ScoringRaceResult, ScoringHeatInfo, ScoringStanding } from '../contexts/ScoringContext';
+import { useCollaborativeScoring } from '../hooks/useCollaborativeScoring';
+import { SyncStatusIndicator } from './scoring/SyncStatusIndicator';
+import { ConflictToast } from './scoring/ConflictToast';
+import { MemberCacheBanner } from './scoring/MemberCacheBanner';
+import { SkipperMatchReviewModal } from './scoring/SkipperMatchReviewModal';
 
 class ScoringErrorBoundary extends Component<
   { children: React.ReactNode; darkMode?: boolean; onRetry?: () => void },
@@ -151,6 +156,28 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const isCalculatingHandicaps = useRef(false);
   const liveSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { updateScoringContext, setScoringActive } = useScoringContext();
+
+  // Collaborative scoring - real-time sync, member preloading, skipper matching
+  const currentClubId = localStorage.getItem('currentClubId');
+  const collaborativeScoring = useCollaborativeScoring({
+    eventId: selectedEvent?.id || null,
+    clubId: currentClubId,
+    skippers,
+    raceResults,
+    onRemoteResultChange: (race, skipperIndex, field, value) => {
+      // Apply remote scoring changes from other devices
+      setRaceResults(prev => {
+        const updated = [...prev];
+        const idx = updated.findIndex(r => r.race === race && r.skipperIndex === skipperIndex);
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], [field]: value };
+        } else {
+          updated.push({ race, skipperIndex, [field]: value });
+        }
+        return updated;
+      });
+    },
+  });
 
   // Sync live scoring state to ScoringContext for AskAlfie
   useEffect(() => {
@@ -1375,6 +1402,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
     setSkippers(uniqueSkippers);
 
+    // Trigger skipper-to-member reconciliation if there are unlinked skippers
+    if (newlyAddedSkippers.length > 0 && navigator.onLine) {
+      setTimeout(() => collaborativeScoring.triggerReconciliation(), 500);
+    }
+
     // Capture original handicaps if this is before any race completion (for handicap events)
     if (lastCompletedRace === 0 && raceType === 'handicap') {
       const newOriginalHandicaps: {[key: number]: number} = {};
@@ -1595,6 +1627,14 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       customPoints,
       currentResults: raceResults
     });
+
+    // Broadcast scoring change to other connected devices
+    if (position !== null) {
+      collaborativeScoring.recordScoringChange(race, skipperIndex, 'position', position);
+    }
+    if (letterScore) {
+      collaborativeScoring.recordScoringChange(race, skipperIndex, 'letterScore', letterScore);
+    }
 
     // Auto-update status to live when results are being entered
     const autoUpdateStatusToLive = async () => {
@@ -3461,10 +3501,18 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         <div className={`flex-1 flex flex-col justify-center ${isFullscreenScoring ? '' : 'min-h-[calc(100vh-24rem)]'}`}>
           {getCurrentEvent() && !isFullscreenScoring && (
             <div className="mb-4">
-              <RaceHeader
-                event={getCurrentEvent()!}
-                darkMode={darkMode}
-              />
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <RaceHeader
+                    event={getCurrentEvent()!}
+                    darkMode={darkMode}
+                  />
+                </div>
+                <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                  <MemberCacheBanner darkMode={darkMode} />
+                  <SyncStatusIndicator darkMode={darkMode} compact />
+                </div>
+              </div>
             </div>
           )}
 
@@ -4610,6 +4658,33 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       </div>
 
       <AskAlfieOrb darkMode={darkMode} />
+
+      {/* Collaborative scoring overlays */}
+      {selectedEvent && !isRaceManagementOpen && (
+        <>
+          <ConflictToast darkMode={darkMode} />
+          {collaborativeScoring.showMatchReview && collaborativeScoring.reconciliationReport && (
+            <SkipperMatchReviewModal
+              isOpen={collaborativeScoring.showMatchReview}
+              onClose={collaborativeScoring.dismissMatchReview}
+              report={collaborativeScoring.reconciliationReport}
+              onApproveMatch={(skipperId, member) => {
+                const updated = collaborativeScoring.applyMatch(skipperId, member);
+                setSkippers(updated);
+              }}
+              onRejectMatch={(skipperId) => {
+                collaborativeScoring.rejectMatch(skipperId);
+              }}
+              onApproveAll={() => {
+                const updated = collaborativeScoring.applyAllSuggestedMatches();
+                setSkippers(updated);
+                collaborativeScoring.dismissMatchReview();
+              }}
+              darkMode={darkMode}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 };
