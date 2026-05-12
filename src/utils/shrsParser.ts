@@ -97,6 +97,7 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
       const tdContent = tdMatch[1];
       const divMatch = tdContent.match(/<div[^>]*class="cell"[^>]*>([\s\S]*?)<\/div>/i);
       let text = divMatch ? divMatch[1] : tdContent;
+      text = text.replace(/<br\s*\/?>/gi, ' ');
       text = text.replace(/<[^>]+>/g, '');
       text = text.replace(/&nbsp;?/gi, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(parseInt(n)));
       cells.push(text.trim());
@@ -113,15 +114,27 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
 
   // Filter out fleet label rows (GOLD FLEET, SILVER FLEET, etc.) and repeated header rows
   // Keep only: the first header row, and data rows
+  // Track which fleet section each data row belongs to so we can prefix the Place column
   let headerFound = false;
+  let placeColIndex = -1;
+  let currentFleetPrefix = '';
+  let fleetStartOffset = 0;
+  let firstInFleet = true;
   const filteredRows: string[][] = [];
+
+  const fleetLabelMap: Record<string, string> = {
+    'gold': 'G', 'silver': 'S', 'bronze': 'B', 'copper': 'C',
+    'emerald': 'E', 'diamond': 'D',
+  };
 
   for (const row of rows) {
     const joined = row.map(c => c.toLowerCase()).join(' ');
 
-    // Skip fleet label rows
-    if (/\bgold\s+fleet\b/i.test(joined) || /\bsilver\s+fleet\b/i.test(joined) ||
-        /\bbronze\s+fleet\b/i.test(joined) || /\bcopper\s+fleet\b/i.test(joined)) {
+    // Detect fleet label rows and track current fleet section
+    const fleetLabelMatch = joined.match(/\b(gold|silver|bronze|copper|emerald|diamond)\s+fleet\b/i);
+    if (fleetLabelMatch) {
+      currentFleetPrefix = fleetLabelMap[fleetLabelMatch[1].toLowerCase()] || '';
+      firstInFleet = true;
       continue;
     }
 
@@ -133,6 +146,7 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
     if ((hasPlace || hasSail) && hasQ) {
       if (!headerFound) {
         headerFound = true;
+        placeColIndex = row.findIndex(c => /^place$/i.test(c.trim()));
         filteredRows.push(row);
       }
       // Skip duplicate header rows (repeated after each fleet)
@@ -142,6 +156,21 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
     // Skip empty rows
     const nonEmpty = row.filter(c => c.trim() !== '');
     if (nonEmpty.length < 3) continue;
+
+    // If we know which fleet section this row belongs to, convert overall position
+    // to fleet-relative position (e.g., Silver pos 21 becomes "S 1")
+    if (currentFleetPrefix && placeColIndex >= 0 && row[placeColIndex]) {
+      const placeVal = String(row[placeColIndex]).trim();
+      if (/^\d+$/.test(placeVal)) {
+        const overallPos = parseInt(placeVal);
+        if (firstInFleet) {
+          fleetStartOffset = overallPos - 1;
+          firstInFleet = false;
+        }
+        const fleetRelativePos = overallPos - fleetStartOffset;
+        row[placeColIndex] = `${currentFleetPrefix} ${fleetRelativePos}`;
+      }
+    }
 
     filteredRows.push(row);
   }
@@ -357,8 +386,8 @@ function parseSHRSFromRows(
 
     const rawPlace = posCol >= 0 ? String(row[posCol] || '').trim() : '';
     const skipperPosition = parseInt(rawPlace) || skippers.length + 1;
-    const totalScore = totalCol >= 0 ? parseFloat(String(row[totalCol] || '')) || undefined : undefined;
-    const netScore = netCol >= 0 ? parseFloat(String(row[netCol] || '')) || undefined : undefined;
+    const totalScore = totalCol >= 0 ? parseFloat(String(row[totalCol] || '').replace(',', '.')) || undefined : undefined;
+    const netScore = netCol >= 0 ? parseFloat(String(row[netCol] || '').replace(',', '.')) || undefined : undefined;
 
     // Parse fleet designation from Place column (e.g., "G 1", "S 3", "B 12")
     let sourceFleet: string | undefined;
@@ -436,11 +465,13 @@ function parseResultCell(
 ): void {
   const trimmed = cellValue.trim();
   if (!trimmed) return;
-  const upper = trimmed.toUpperCase();
+  // Normalize European comma decimals to period (e.g. "RGA 9,8c" -> "RGA 9.8c", "13,6" -> "13.6")
+  const normalized = trimmed.replace(/(\d),(\d)/g, '$1.$2');
+  const upper = normalized.toUpperCase();
 
-  // Pure number: "3", "14", "7.5"
-  if (/^\d+\.?\d*$/.test(trimmed)) {
-    const numVal = parseFloat(trimmed);
+  // Pure number: "3", "14", "7.5", "9,8" (comma decimal normalized)
+  if (/^\d+\.?\d*$/.test(normalized)) {
+    const numVal = parseFloat(normalized);
     results.push({ raceNumber, sailNumber, position: numVal, points: numVal, heat });
     return;
   }
@@ -455,7 +486,15 @@ function parseResultCell(
 
   // Standalone letter score: "DNF", "DNC", "DSQ", etc.
   if (KNOWN_LETTER_SCORES.includes(upper)) {
-    results.push({ raceNumber, sailNumber, position: null, points: 0, letterScore: upper, heat });
+    let letterScore = upper;
+    let customPoints: number | undefined = undefined;
+    if (upper === 'RGA') {
+      letterScore = 'RDG';
+      customPoints = -1;
+    } else if (upper === 'RGP') {
+      letterScore = 'RDG';
+    }
+    results.push({ raceNumber, sailNumber, position: null, points: 0, letterScore, customPoints, heat });
     return;
   }
 
@@ -475,7 +514,7 @@ function parseResultCell(
       customPoints = points;
     } else if (code === 'RGA') {
       letterScore = 'RDG';
-      customPoints = -1;
+      customPoints = points;
     } else if (code === 'SCP') {
       customPoints = points;
     }
@@ -502,7 +541,7 @@ function parseResultCell(
     let customPoints: number | undefined = undefined;
 
     if (code === 'RGP') { letterScore = 'RDG'; customPoints = points; }
-    else if (code === 'RGA') { letterScore = 'RDG'; customPoints = -1; }
+    else if (code === 'RGA') { letterScore = 'RDG'; customPoints = points; }
     else if (code === 'SCP') { customPoints = points; }
 
     results.push({
@@ -521,7 +560,7 @@ function parseResultCell(
       let letterScore = code;
       let customPoints: number | undefined = undefined;
       if (code === 'RGP') { letterScore = 'RDG'; customPoints = points; }
-      else if (code === 'RGA') { letterScore = 'RDG'; customPoints = -1; }
+      else if (code === 'RGA') { letterScore = 'RDG'; customPoints = points; }
       else if (code === 'SCP') { customPoints = points; }
 
       results.push({
@@ -697,64 +736,40 @@ export function reconstructSHRSHeats(
       skipperIndices: [] as number[],
     }));
 
-    // Use source fleet allocation when available (respects the event organizer's fleet assignment)
-    const fleetLetterToIndex: Record<string, number> = { 'G': 0, 'S': 1, 'B': 2, 'C': 3 };
-    const allHaveSourceFleet = skippers.every(s => s.sourceFleet && fleetLetterToIndex[s.sourceFleet] !== undefined);
+    // Always calculate fleet allocations from qualifying results
+    // This ensures Alfie independently verifies the correct fleet assignments
+    // For imported events, use empty heat maps so the tiebreaker falls back to
+    // full countback (all scores with discards). The reconstructed heat assignments
+    // don't reflect actual heat pairings from the source event, so same-heat
+    // countback would produce incorrect tie resolution.
+    const emptyHeatMaps: Map<number, string>[] = [];
 
-    if (allHaveSourceFleet) {
-      skippers.forEach((s, skipperIdx) => {
-        const fleetIdx = fleetLetterToIndex[s.sourceFleet!];
-        if (fleetIdx !== undefined && fleetIdx < numberOfHeats) {
-          fleetAssignments[fleetIdx].skipperIndices.push(skipperIdx);
-        }
-      });
-      // Sort within each fleet by source fleet position
-      fleetAssignments.forEach(fa => {
-        fa.skipperIndices.sort((a, b) => {
-          const posA = skippers[a].sourceFleetPosition ?? 999;
-          const posB = skippers[b].sourceFleetPosition ?? 999;
-          return posA - posB;
-        });
-      });
-    } else {
-      // Build round heat assignments for SHRS 5.7 same-heat countback
-      const roundHeatMaps: Map<number, string>[] = rounds.map(round => {
-        const skipperToHeat = new Map<number, string>();
-        for (const ha of round.heatAssignments) {
-          for (const si of ha.skipperIndices) {
-            skipperToHeat.set(si, ha.heatDesignation);
-          }
-        }
-        return skipperToHeat;
+    // Rank by qualifying net score with countback tiebreaker
+    const rankedSkippers = Array.from(qualScores.entries())
+      .sort(([idxA, a], [idxB, b]) => {
+        if (a !== b) return a - b;
+        const aScores = qualRaceScores.get(idxA) || [];
+        const bScores = qualRaceScores.get(idxB) || [];
+        return compareSHRSWithCountback(
+          emptyHeatMaps,
+          idxA,
+          idxB,
+          aScores,
+          bScores,
+          numDiscards,
+          numDiscards,
+          skippers[idxA]?.name,
+          skippers[idxB]?.name,
+          skippers[idxA]?.sailNumber,
+          skippers[idxB]?.sailNumber
+        );
       });
 
-      // Rank by qualifying net score with SHRS 5.7 same-heat countback tiebreaker
-      const rankedSkippers = Array.from(qualScores.entries())
-        .sort(([idxA, a], [idxB, b]) => {
-          if (a !== b) return a - b;
-          const aScores = qualRaceScores.get(idxA) || [];
-          const bScores = qualRaceScores.get(idxB) || [];
-          return compareSHRSWithCountback(
-            roundHeatMaps,
-            idxA,
-            idxB,
-            aScores,
-            bScores,
-            numDiscards,
-            numDiscards,
-            skippers[idxA]?.name,
-            skippers[idxB]?.name,
-            skippers[idxA]?.sailNumber,
-            skippers[idxB]?.sailNumber
-          );
-        });
-
-      let idx = 0;
-      for (let f = 0; f < numberOfHeats; f++) {
-        for (let s = 0; s < fleetSizes[f] && idx < rankedSkippers.length; s++) {
-          fleetAssignments[f].skipperIndices.push(rankedSkippers[idx][0]);
-          idx++;
-        }
+    let idx = 0;
+    for (let f = 0; f < numberOfHeats; f++) {
+      for (let s = 0; s < fleetSizes[f] && idx < rankedSkippers.length; s++) {
+        fleetAssignments[f].skipperIndices.push(rankedSkippers[idx][0]);
+        idx++;
       }
     }
 
@@ -765,7 +780,24 @@ export function reconstructSHRSHeats(
       const roundResults = results.filter(r => r.raceNumber === raceNum);
       const reconstructedResults: ReconstructedRound['results'] = [];
 
+      // Determine which fleets actually sailed this round
+      // A fleet is considered "not sailed" if ALL its skippers have DNC/DNS or no result
+      const fleetSailed = new Map<string, boolean>();
       for (const assignment of fleetAssignments) {
+        const hasRealResult = assignment.skipperIndices.some(skipperIndex => {
+          const skipper = skippers[skipperIndex];
+          const result = roundResults.find(r => r.sailNumber === skipper.sailNumber);
+          if (!result) return false;
+          const code = result.letterScore?.toUpperCase();
+          return code !== 'DNC' && code !== 'DNS';
+        });
+        fleetSailed.set(assignment.heatDesignation, hasRealResult);
+      }
+
+      for (const assignment of fleetAssignments) {
+        // Skip fleets that didn't sail this round
+        if (!fleetSailed.get(assignment.heatDesignation)) continue;
+
         for (const skipperIndex of assignment.skipperIndices) {
           const skipper = skippers[skipperIndex];
           const result = roundResults.find(r => r.sailNumber === skipper.sailNumber);
@@ -807,15 +839,20 @@ export function reconstructSHRSHeats(
         }
       }
 
-      rounds.push({
-        round: raceNum,
-        phase: 'finals',
-        heatAssignments: fleetAssignments.map(a => ({
-          heatDesignation: a.heatDesignation,
-          skipperIndices: [...a.skipperIndices],
-        })),
-        results: reconstructedResults,
-      });
+      // Only include this round if at least one fleet sailed
+      if (reconstructedResults.length > 0) {
+        rounds.push({
+          round: raceNum,
+          phase: 'finals',
+          heatAssignments: fleetAssignments
+            .filter(a => fleetSailed.get(a.heatDesignation))
+            .map(a => ({
+              heatDesignation: a.heatDesignation,
+              skipperIndices: [...a.skipperIndices],
+            })),
+          results: reconstructedResults,
+        });
+      }
     }
   }
 
