@@ -2487,17 +2487,10 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         onUpdateAssignments={onUpdateHeatAssignments}
         onImportAllRoundAssignments={onImportAllRoundAssignments}
         onAdvanceToNextRound={(nextRoundNumber) => {
-          console.log('🔄 Advancing to Round', nextRoundNumber, '- keeping modal open to show allocations');
-          if (heatManagement.roundJustCompleted) {
-            delete heatManagement.roundJustCompleted;
-          }
-          // Call the actual advance handler with the last heat to trigger round creation
+          console.log('🔄 Advancing to Round', nextRoundNumber);
           if (onAdvanceToNextRound) {
-            const lastHeat = availableHeats[availableHeats.length - 1];
-            console.log('📍 Calling onAdvanceToNextRound with last heat:', lastHeat);
-            onAdvanceToNextRound(lastHeat);
+            onAdvanceToNextRound(nextRoundNumber);
           } else if (onGoToRound) {
-            // Fallback to just navigating if advance handler not available
             onGoToRound(nextRoundNumber);
           }
         }}
