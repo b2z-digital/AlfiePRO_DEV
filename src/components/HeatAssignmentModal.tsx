@@ -2831,7 +2831,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               onClose();
             }}
             disabled={loadingObservers || showQualifyingCompletePrompt}
-            className={`px-4 py-1.5 rounded-lg transition-all font-medium text-sm ${
+            className={`ml-auto px-4 py-1.5 rounded-lg transition-all font-medium text-sm ${
               loadingObservers || showQualifyingCompletePrompt
                 ? 'bg-slate-400 text-slate-200 cursor-not-allowed'
                 : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 shadow-lg'
