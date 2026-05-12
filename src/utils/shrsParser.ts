@@ -773,7 +773,24 @@ export function reconstructSHRSHeats(
       const roundResults = results.filter(r => r.raceNumber === raceNum);
       const reconstructedResults: ReconstructedRound['results'] = [];
 
+      // Determine which fleets actually sailed this round
+      // A fleet is considered "not sailed" if ALL its skippers have DNC/DNS or no result
+      const fleetSailed = new Map<string, boolean>();
       for (const assignment of fleetAssignments) {
+        const hasRealResult = assignment.skipperIndices.some(skipperIndex => {
+          const skipper = skippers[skipperIndex];
+          const result = roundResults.find(r => r.sailNumber === skipper.sailNumber);
+          if (!result) return false;
+          const code = result.letterScore?.toUpperCase();
+          return code !== 'DNC' && code !== 'DNS';
+        });
+        fleetSailed.set(assignment.heatDesignation, hasRealResult);
+      }
+
+      for (const assignment of fleetAssignments) {
+        // Skip fleets that didn't sail this round
+        if (!fleetSailed.get(assignment.heatDesignation)) continue;
+
         for (const skipperIndex of assignment.skipperIndices) {
           const skipper = skippers[skipperIndex];
           const result = roundResults.find(r => r.sailNumber === skipper.sailNumber);
@@ -815,15 +832,20 @@ export function reconstructSHRSHeats(
         }
       }
 
-      rounds.push({
-        round: raceNum,
-        phase: 'finals',
-        heatAssignments: fleetAssignments.map(a => ({
-          heatDesignation: a.heatDesignation,
-          skipperIndices: [...a.skipperIndices],
-        })),
-        results: reconstructedResults,
-      });
+      // Only include this round if at least one fleet sailed
+      if (reconstructedResults.length > 0) {
+        rounds.push({
+          round: raceNum,
+          phase: 'finals',
+          heatAssignments: fleetAssignments
+            .filter(a => fleetSailed.get(a.heatDesignation))
+            .map(a => ({
+              heatDesignation: a.heatDesignation,
+              skipperIndices: [...a.skipperIndices],
+            })),
+          results: reconstructedResults,
+        });
+      }
     }
   }
 

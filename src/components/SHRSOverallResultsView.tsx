@@ -401,11 +401,8 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
 
     const totalRaces = completedRaces.length;
     const qualCount = qualifyingRaces.length;
-    const finalsCount = finalsRaces.length;
 
     const qualDiscards = calculateSHRSDiscards(qualCount);
-    const finalsDiscards = calculateSHRSDiscards(finalsCount);
-    const totalDiscards = qualDiscards + finalsDiscards;
 
     const allStandings = Array.from(skipperIndicesWithResults).map((skipperIndex: any) => {
       const skipper = skippers[skipperIndex];
@@ -433,14 +430,18 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       }
 
       const qualPoints = raceScores.slice(0, qualCount).map(s => s ?? 999);
-      const finalsPoints = raceScores.slice(qualCount).map(s => s ?? 999);
+      // For finals, only include races where the skipper actually participated (has a result)
+      const finalsRaceScores = raceScores.slice(qualCount);
+      const finalsPoints = finalsRaceScores.filter(s => s !== null).map(s => s ?? 999);
+      const skipperFinalsCount = finalsPoints.length;
+      const skipperFinalsDiscards = calculateSHRSDiscards(skipperFinalsCount);
 
       const qualSorted = [...qualPoints].sort((a, b) => b - a);
       const qualDropped: number[] = qualSorted.slice(0, qualDiscards);
       const qualNet = qualPoints.reduce((sum, p) => sum + p, 0) - qualDropped.reduce((sum, p) => sum + p, 0);
 
       const finalsSorted = [...finalsPoints].sort((a, b) => b - a);
-      const finalsDropped: number[] = finalsSorted.slice(0, finalsDiscards);
+      const finalsDropped: number[] = finalsSorted.slice(0, skipperFinalsDiscards);
       const finalsNet = finalsPoints.reduce((sum, p) => sum + p, 0) - finalsDropped.reduce((sum, p) => sum + p, 0);
 
       const allPoints = [...qualPoints, ...finalsPoints];
@@ -458,12 +459,19 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
           qualRemaining.splice(dropIdx, 1);
         }
       }
+      // Map finals dropped indices back to positions in the full raceScores array
       const finalsRemaining = [...finalsDropped];
-      for (let i = finalsPoints.length - 1; i >= 0 && finalsRemaining.length > 0; i--) {
+      const finalsPositionMap: number[] = [];
+      for (let i = 0; i < finalsRaceScores.length; i++) {
+        if (finalsRaceScores[i] !== null) {
+          finalsPositionMap.push(i);
+        }
+      }
+      for (let i = finalsPositionMap.length - 1; i >= 0 && finalsRemaining.length > 0; i--) {
         const score = finalsPoints[i];
         const dropIdx = finalsRemaining.indexOf(score);
         if (dropIdx !== -1) {
-          droppedIndices.add(qualCount + i);
+          droppedIndices.add(qualCount + finalsPositionMap[i]);
           finalsRemaining.splice(dropIdx, 1);
         }
       }
