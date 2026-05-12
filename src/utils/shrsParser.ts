@@ -710,25 +710,20 @@ export function reconstructSHRSHeats(
 
     // Always calculate fleet allocations from qualifying results
     // This ensures Alfie independently verifies the correct fleet assignments
-    // Build round heat assignments for SHRS 5.7 same-heat countback
-    const roundHeatMaps: Map<number, string>[] = rounds.map(round => {
-      const skipperToHeat = new Map<number, string>();
-      for (const ha of round.heatAssignments) {
-        for (const si of ha.skipperIndices) {
-          skipperToHeat.set(si, ha.heatDesignation);
-        }
-      }
-      return skipperToHeat;
-    });
+    // For imported events, use empty heat maps so the tiebreaker falls back to
+    // full countback (all scores with discards). The reconstructed heat assignments
+    // don't reflect actual heat pairings from the source event, so same-heat
+    // countback would produce incorrect tie resolution.
+    const emptyHeatMaps: Map<number, string>[] = [];
 
-    // Rank by qualifying net score with SHRS 5.7 same-heat countback tiebreaker
+    // Rank by qualifying net score with countback tiebreaker
     const rankedSkippers = Array.from(qualScores.entries())
       .sort(([idxA, a], [idxB, b]) => {
         if (a !== b) return a - b;
         const aScores = qualRaceScores.get(idxA) || [];
         const bScores = qualRaceScores.get(idxB) || [];
         return compareSHRSWithCountback(
-          roundHeatMaps,
+          emptyHeatMaps,
           idxA,
           idxB,
           aScores,
