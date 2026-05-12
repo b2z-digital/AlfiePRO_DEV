@@ -118,6 +118,8 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
   let headerFound = false;
   let placeColIndex = -1;
   let currentFleetPrefix = '';
+  let fleetStartOffset = 0;
+  let firstInFleet = true;
   const filteredRows: string[][] = [];
 
   const fleetLabelMap: Record<string, string> = {
@@ -132,6 +134,7 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
     const fleetLabelMatch = joined.match(/\b(gold|silver|bronze|copper|emerald|diamond)\s+fleet\b/i);
     if (fleetLabelMatch) {
       currentFleetPrefix = fleetLabelMap[fleetLabelMatch[1].toLowerCase()] || '';
+      firstInFleet = true;
       continue;
     }
 
@@ -154,11 +157,18 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
     const nonEmpty = row.filter(c => c.trim() !== '');
     if (nonEmpty.length < 3) continue;
 
-    // If we know which fleet section this row belongs to, prefix the Place value
+    // If we know which fleet section this row belongs to, convert overall position
+    // to fleet-relative position (e.g., Silver pos 21 becomes "S 1")
     if (currentFleetPrefix && placeColIndex >= 0 && row[placeColIndex]) {
       const placeVal = String(row[placeColIndex]).trim();
       if (/^\d+$/.test(placeVal)) {
-        row[placeColIndex] = `${currentFleetPrefix} ${placeVal}`;
+        const overallPos = parseInt(placeVal);
+        if (firstInFleet) {
+          fleetStartOffset = overallPos - 1;
+          firstInFleet = false;
+        }
+        const fleetRelativePos = overallPos - fleetStartOffset;
+        row[placeColIndex] = `${currentFleetPrefix} ${fleetRelativePos}`;
       }
     }
 
