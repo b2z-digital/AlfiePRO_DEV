@@ -455,7 +455,15 @@ function parseResultCell(
 
   // Standalone letter score: "DNF", "DNC", "DSQ", etc.
   if (KNOWN_LETTER_SCORES.includes(upper)) {
-    results.push({ raceNumber, sailNumber, position: null, points: 0, letterScore: upper, heat });
+    let letterScore = upper;
+    let customPoints: number | undefined = undefined;
+    if (upper === 'RGA') {
+      letterScore = 'RDG';
+      customPoints = -1;
+    } else if (upper === 'RGP') {
+      letterScore = 'RDG';
+    }
+    results.push({ raceNumber, sailNumber, position: null, points: 0, letterScore, customPoints, heat });
     return;
   }
 
@@ -475,7 +483,7 @@ function parseResultCell(
       customPoints = points;
     } else if (code === 'RGA') {
       letterScore = 'RDG';
-      customPoints = -1;
+      customPoints = points;
     } else if (code === 'SCP') {
       customPoints = points;
     }
@@ -502,7 +510,7 @@ function parseResultCell(
     let customPoints: number | undefined = undefined;
 
     if (code === 'RGP') { letterScore = 'RDG'; customPoints = points; }
-    else if (code === 'RGA') { letterScore = 'RDG'; customPoints = -1; }
+    else if (code === 'RGA') { letterScore = 'RDG'; customPoints = points; }
     else if (code === 'SCP') { customPoints = points; }
 
     results.push({
@@ -521,7 +529,7 @@ function parseResultCell(
       let letterScore = code;
       let customPoints: number | undefined = undefined;
       if (code === 'RGP') { letterScore = 'RDG'; customPoints = points; }
-      else if (code === 'RGA') { letterScore = 'RDG'; customPoints = -1; }
+      else if (code === 'RGA') { letterScore = 'RDG'; customPoints = points; }
       else if (code === 'SCP') { customPoints = points; }
 
       results.push({
