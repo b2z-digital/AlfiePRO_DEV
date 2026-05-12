@@ -708,64 +708,45 @@ export function reconstructSHRSHeats(
       skipperIndices: [] as number[],
     }));
 
-    // Use source fleet allocation when available (respects the event organizer's fleet assignment)
-    const fleetLetterToIndex: Record<string, number> = { 'G': 0, 'S': 1, 'B': 2, 'C': 3 };
-    const allHaveSourceFleet = skippers.every(s => s.sourceFleet && fleetLetterToIndex[s.sourceFleet] !== undefined);
-
-    if (allHaveSourceFleet) {
-      skippers.forEach((s, skipperIdx) => {
-        const fleetIdx = fleetLetterToIndex[s.sourceFleet!];
-        if (fleetIdx !== undefined && fleetIdx < numberOfHeats) {
-          fleetAssignments[fleetIdx].skipperIndices.push(skipperIdx);
+    // Always calculate fleet allocations from qualifying results
+    // This ensures Alfie independently verifies the correct fleet assignments
+    // Build round heat assignments for SHRS 5.7 same-heat countback
+    const roundHeatMaps: Map<number, string>[] = rounds.map(round => {
+      const skipperToHeat = new Map<number, string>();
+      for (const ha of round.heatAssignments) {
+        for (const si of ha.skipperIndices) {
+          skipperToHeat.set(si, ha.heatDesignation);
         }
-      });
-      // Sort within each fleet by source fleet position
-      fleetAssignments.forEach(fa => {
-        fa.skipperIndices.sort((a, b) => {
-          const posA = skippers[a].sourceFleetPosition ?? 999;
-          const posB = skippers[b].sourceFleetPosition ?? 999;
-          return posA - posB;
-        });
-      });
-    } else {
-      // Build round heat assignments for SHRS 5.7 same-heat countback
-      const roundHeatMaps: Map<number, string>[] = rounds.map(round => {
-        const skipperToHeat = new Map<number, string>();
-        for (const ha of round.heatAssignments) {
-          for (const si of ha.skipperIndices) {
-            skipperToHeat.set(si, ha.heatDesignation);
-          }
-        }
-        return skipperToHeat;
+      }
+      return skipperToHeat;
+    });
+
+    // Rank by qualifying net score with SHRS 5.7 same-heat countback tiebreaker
+    const rankedSkippers = Array.from(qualScores.entries())
+      .sort(([idxA, a], [idxB, b]) => {
+        if (a !== b) return a - b;
+        const aScores = qualRaceScores.get(idxA) || [];
+        const bScores = qualRaceScores.get(idxB) || [];
+        return compareSHRSWithCountback(
+          roundHeatMaps,
+          idxA,
+          idxB,
+          aScores,
+          bScores,
+          numDiscards,
+          numDiscards,
+          skippers[idxA]?.name,
+          skippers[idxB]?.name,
+          skippers[idxA]?.sailNumber,
+          skippers[idxB]?.sailNumber
+        );
       });
 
-      // Rank by qualifying net score with SHRS 5.7 same-heat countback tiebreaker
-      const rankedSkippers = Array.from(qualScores.entries())
-        .sort(([idxA, a], [idxB, b]) => {
-          if (a !== b) return a - b;
-          const aScores = qualRaceScores.get(idxA) || [];
-          const bScores = qualRaceScores.get(idxB) || [];
-          return compareSHRSWithCountback(
-            roundHeatMaps,
-            idxA,
-            idxB,
-            aScores,
-            bScores,
-            numDiscards,
-            numDiscards,
-            skippers[idxA]?.name,
-            skippers[idxB]?.name,
-            skippers[idxA]?.sailNumber,
-            skippers[idxB]?.sailNumber
-          );
-        });
-
-      let idx = 0;
-      for (let f = 0; f < numberOfHeats; f++) {
-        for (let s = 0; s < fleetSizes[f] && idx < rankedSkippers.length; s++) {
-          fleetAssignments[f].skipperIndices.push(rankedSkippers[idx][0]);
-          idx++;
-        }
+    let idx = 0;
+    for (let f = 0; f < numberOfHeats; f++) {
+      for (let s = 0; s < fleetSizes[f] && idx < rankedSkippers.length; s++) {
+        fleetAssignments[f].skipperIndices.push(rankedSkippers[idx][0]);
+        idx++;
       }
     }
 
