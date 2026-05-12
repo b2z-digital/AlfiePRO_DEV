@@ -114,15 +114,24 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
 
   // Filter out fleet label rows (GOLD FLEET, SILVER FLEET, etc.) and repeated header rows
   // Keep only: the first header row, and data rows
+  // Track which fleet section each data row belongs to so we can prefix the Place column
   let headerFound = false;
+  let placeColIndex = -1;
+  let currentFleetPrefix = '';
   const filteredRows: string[][] = [];
+
+  const fleetLabelMap: Record<string, string> = {
+    'gold': 'G', 'silver': 'S', 'bronze': 'B', 'copper': 'C',
+    'emerald': 'E', 'diamond': 'D',
+  };
 
   for (const row of rows) {
     const joined = row.map(c => c.toLowerCase()).join(' ');
 
-    // Skip fleet label rows
-    if (/\bgold\s+fleet\b/i.test(joined) || /\bsilver\s+fleet\b/i.test(joined) ||
-        /\bbronze\s+fleet\b/i.test(joined) || /\bcopper\s+fleet\b/i.test(joined)) {
+    // Detect fleet label rows and track current fleet section
+    const fleetLabelMatch = joined.match(/\b(gold|silver|bronze|copper|emerald|diamond)\s+fleet\b/i);
+    if (fleetLabelMatch) {
+      currentFleetPrefix = fleetLabelMap[fleetLabelMatch[1].toLowerCase()] || '';
       continue;
     }
 
@@ -134,6 +143,7 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
     if ((hasPlace || hasSail) && hasQ) {
       if (!headerFound) {
         headerFound = true;
+        placeColIndex = row.findIndex(c => /^place$/i.test(c.trim()));
         filteredRows.push(row);
       }
       // Skip duplicate header rows (repeated after each fleet)
@@ -143,6 +153,14 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
     // Skip empty rows
     const nonEmpty = row.filter(c => c.trim() !== '');
     if (nonEmpty.length < 3) continue;
+
+    // If we know which fleet section this row belongs to, prefix the Place value
+    if (currentFleetPrefix && placeColIndex >= 0 && row[placeColIndex]) {
+      const placeVal = String(row[placeColIndex]).trim();
+      if (/^\d+$/.test(placeVal)) {
+        row[placeColIndex] = `${currentFleetPrefix} ${placeVal}`;
+      }
+    }
 
     filteredRows.push(row);
   }
