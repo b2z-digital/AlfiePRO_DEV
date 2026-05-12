@@ -97,6 +97,7 @@ export function parseSHRSFromHTML(rawHtml: string, sourceUrl?: string): ParsedSH
       const tdContent = tdMatch[1];
       const divMatch = tdContent.match(/<div[^>]*class="cell"[^>]*>([\s\S]*?)<\/div>/i);
       let text = divMatch ? divMatch[1] : tdContent;
+      text = text.replace(/<br\s*\/?>/gi, ' ');
       text = text.replace(/<[^>]+>/g, '');
       text = text.replace(/&nbsp;?/gi, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(parseInt(n)));
       cells.push(text.trim());
@@ -357,8 +358,8 @@ function parseSHRSFromRows(
 
     const rawPlace = posCol >= 0 ? String(row[posCol] || '').trim() : '';
     const skipperPosition = parseInt(rawPlace) || skippers.length + 1;
-    const totalScore = totalCol >= 0 ? parseFloat(String(row[totalCol] || '')) || undefined : undefined;
-    const netScore = netCol >= 0 ? parseFloat(String(row[netCol] || '')) || undefined : undefined;
+    const totalScore = totalCol >= 0 ? parseFloat(String(row[totalCol] || '').replace(',', '.')) || undefined : undefined;
+    const netScore = netCol >= 0 ? parseFloat(String(row[netCol] || '').replace(',', '.')) || undefined : undefined;
 
     // Parse fleet designation from Place column (e.g., "G 1", "S 3", "B 12")
     let sourceFleet: string | undefined;
@@ -436,11 +437,13 @@ function parseResultCell(
 ): void {
   const trimmed = cellValue.trim();
   if (!trimmed) return;
-  const upper = trimmed.toUpperCase();
+  // Normalize European comma decimals to period (e.g. "RGA 9,8c" -> "RGA 9.8c", "13,6" -> "13.6")
+  const normalized = trimmed.replace(/(\d),(\d)/g, '$1.$2');
+  const upper = normalized.toUpperCase();
 
-  // Pure number: "3", "14", "7.5"
-  if (/^\d+\.?\d*$/.test(trimmed)) {
-    const numVal = parseFloat(trimmed);
+  // Pure number: "3", "14", "7.5", "9,8" (comma decimal normalized)
+  if (/^\d+\.?\d*$/.test(normalized)) {
+    const numVal = parseFloat(normalized);
     results.push({ raceNumber, sailNumber, position: numVal, points: numVal, heat });
     return;
   }
