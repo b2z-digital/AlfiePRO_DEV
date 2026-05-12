@@ -1941,9 +1941,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               });
                             }
                           }}
-                          draggable={editResultsMode && isHistoricalRound}
+                          draggable={editResultsMode && (isHistoricalRound || completed)}
                           onDragStart={(e) => {
-                            if (!editResultsMode || !isHistoricalRound) return;
+                            if (!editResultsMode || !(isHistoricalRound || completed)) return;
                             e.dataTransfer.effectAllowed = 'move';
                             const localResult = localResults?.find(r => r.skipperIndex === skipperIndex && r.heatDesignation === heatDesignation);
                             setDraggedSkipper({ skipperIndex, heatDesignation, fromPosition: localResult?.position ?? idx + 1 });
@@ -1988,7 +1988,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             setDragOverTarget(null);
                           }}
                           className={`p-1.5 rounded border-2 transition-all ${
-                            editResultsMode && isHistoricalRound ? 'cursor-grab active:cursor-grabbing' : ''
+                            editResultsMode && (isHistoricalRound || completed) ? 'cursor-grab active:cursor-grabbing' : ''
                           } ${
                             editResultsMode && dragOverTarget?.skipperIndex === skipperIndex && dragOverTarget?.heatDesignation === heatDesignation
                               ? 'ring-2 ring-blue-400 border-blue-400 scale-[1.02]'
@@ -2020,7 +2020,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                           }`}
                         >
                           <div className="flex items-center gap-1.5">
-                            {editResultsMode && isHistoricalRound && (
+                            {editResultsMode && (isHistoricalRound || completed) && (
                               <GripVertical size={14} className={`flex-shrink-0 ${darkMode ? 'text-slate-400' : 'text-slate-400'}`} />
                             )}
                             {result && result.position !== null && (() => {
@@ -2831,7 +2831,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               onClose();
             }}
             disabled={loadingObservers || showQualifyingCompletePrompt}
-            className={`px-4 py-1.5 rounded-lg transition-all font-medium text-sm ${
+            className={`ml-auto px-4 py-1.5 rounded-lg transition-all font-medium text-sm ${
               loadingObservers || showQualifyingCompletePrompt
                 ? 'bg-slate-400 text-slate-200 cursor-not-allowed'
                 : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 shadow-lg'

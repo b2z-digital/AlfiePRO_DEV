@@ -593,9 +593,45 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     }
   }, [cells, currentScoringHeat, verifiedHeats]);
 
+  const LETTER_SCORE_CODES: LetterScore[] = ['DNF', 'NSC', 'RET', 'OCS', 'DNS', 'DNC', 'UFD', 'BFD', 'DSQ', 'DNE', 'WDN', 'RDG', 'DPI', 'ZFP', 'SCP'];
+
   const handleKeyDown = (e: React.KeyboardEvent, heat: HeatDesignation, position: number, totalPositions: number) => {
+    if (e.key === '/' || e.key === 'Escape' && showLetterScoreModal) {
+      if (e.key === '/') {
+        e.preventDefault();
+        handleLetterScore(heat, position);
+        return;
+      }
+    }
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
+      const idx = position - 1;
+      const heatCells = cells[heat] || [];
+      const cell = heatCells[idx];
+      if (cell && cell.sailNumber.trim() && !cell.letterScore) {
+        const upper = cell.sailNumber.trim().toUpperCase();
+        const matchedCode = LETTER_SCORE_CODES.find(c => c === upper);
+        if (matchedCode) {
+          const updated = [...heatCells];
+          updated[idx] = { ...updated[idx], sailNumber: '', letterScore: matchedCode, customPoints: undefined };
+          const heatSkips = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
+          const validated = validateCells(updated, heatSkips);
+          const regularFinishers = validated.filter(c => !c.letterScore && (c.sailNumber.trim() || c.skipperIndex !== null));
+          const letterScoreEntries = validated.filter(c => c.letterScore);
+          const emptyEntries = validated.filter(c => !c.letterScore && !c.sailNumber.trim() && c.skipperIndex === null);
+          const reordered = [...regularFinishers, ...letterScoreEntries, ...emptyEntries];
+          const revalidated = validateCells(reordered, heatSkips);
+          setCells(prev => ({ ...prev, [heat]: revalidated }));
+          const firstEmptyIdx = reordered.findIndex(c => !c.letterScore && !c.sailNumber.trim() && c.skipperIndex === null);
+          if (firstEmptyIdx >= 0) {
+            setTimeout(() => {
+              const ref = inputRefs.current[`${heat}-${firstEmptyIdx}`];
+              if (ref) { ref.focus(); ref.select(); }
+            }, 50);
+          }
+          return;
+        }
+      }
       for (let next = position; next < totalPositions; next++) {
         const ref = inputRefs.current[`${heat}-${next}`];
         if (ref) {
@@ -1260,7 +1296,26 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                     <span className="text-xs opacity-80">
                       {stats.filledCount}/{stats.totalPositions}
                     </span>
-                    {isVerified && <Check size={14} />}
+                    {isVerified && (
+                      <>
+                        <Check size={14} />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocalVerifiedHeats(prev => {
+                              const next = new Set(prev);
+                              next.delete(heat);
+                              return next;
+                            });
+                            if (onSelectHeat) onSelectHeat(heat);
+                          }}
+                          className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/20 hover:bg-white/30 transition-colors"
+                          title={`Re-edit Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)}`}
+                        >
+                          <Pencil size={10} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
