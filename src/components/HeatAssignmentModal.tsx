@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, ChevronDown, FileSpreadsheet, Upload, Plus, Minus, GripVertical, Tag } from 'lucide-react';
+import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, ChevronDown, FileSpreadsheet, Upload, Plus, Minus, GripVertical, Pencil } from 'lucide-react';
 import { Skipper, LetterScore } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound, getHeatDisplayLabel } from '../types/heat';
 import { RaceEvent } from '../types/race';
@@ -2128,7 +2128,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 {(() => {
                                   const lr = localResults?.find(r => r.skipperIndex === skipperIndex && r.heatDesignation === heatDesignation);
                                   const ls = lr?.letterScore || result?.letterScore;
-                                  return ls || <Tag size={10} />;
+                                  return ls || <Pencil size={10} />;
                                 })()}
                               </button>
                             ) : result && result.letterScore ? (
