@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, ChevronDown, FileSpreadsheet, Upload, Plus, Minus, GripVertical, Tag } from 'lucide-react';
+import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, ChevronDown, FileSpreadsheet, Upload, Plus, Minus, GripVertical, Pencil } from 'lucide-react';
 import { Skipper, LetterScore } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound, getHeatDisplayLabel } from '../types/heat';
 import { RaceEvent } from '../types/race';
@@ -73,6 +73,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [dragOverTarget, setDragOverTarget] = useState<{ skipperIndex: number; heatDesignation: string } | null>(null);
   const [localResults, setLocalResults] = useState<any[] | null>(null);
   const [editLetterScoreTarget, setEditLetterScoreTarget] = useState<{ skipperIndex: number; heatDesignation: string } | null>(null);
+  const [showEditHint, setShowEditHint] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -1422,6 +1423,19 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           </div>
         )}
 
+        {/* Edit mode hint - shown once */}
+        {showEditHint && (
+          <div className={`mx-5 mt-2 px-4 py-2 rounded-lg text-sm flex items-center gap-2 animate-fade-in ${
+            darkMode ? 'bg-blue-900/40 text-blue-200 border border-blue-700/50' : 'bg-blue-50 text-blue-700 border border-blue-200'
+          }`}>
+            <GripVertical size={14} className="flex-shrink-0" />
+            <span>Drag skippers to reorder positions, or tap the pencil icon to assign a letter score (DNF, DNC, etc.)</span>
+            <button onClick={() => setShowEditHint(false)} className="ml-auto flex-shrink-0 opacity-60 hover:opacity-100">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         {/* Heat Grid - Always columns */}
         <div className="px-5 py-3 overflow-hidden flex-1 flex flex-col min-h-0">
           <div className="flex gap-3 flex-1 overflow-hidden">
@@ -2026,8 +2040,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               <GripVertical size={14} className={`flex-shrink-0 ${darkMode ? 'text-slate-400' : 'text-slate-400'}`} />
                             )}
                             {result && result.position !== null && (() => {
-                              const displayPos = editResultsMode && localResults
-                                ? (localResults.find(r => r.skipperIndex === skipperIndex && r.heatDesignation === heatDesignation)?.position ?? result.position)
+                              const localResult = editResultsMode && localResults
+                                ? localResults.find(r => r.skipperIndex === skipperIndex && r.heatDesignation === heatDesignation)
+                                : null;
+                              // Hide position badge if a letter score was assigned in edit mode
+                              if (localResult && localResult.letterScore) return null;
+                              const displayPos = localResult
+                                ? (localResult.position ?? result.position)
                                 : result.position;
                               return (
                                 <span className={`
@@ -2128,7 +2147,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 {(() => {
                                   const lr = localResults?.find(r => r.skipperIndex === skipperIndex && r.heatDesignation === heatDesignation);
                                   const ls = lr?.letterScore || result?.letterScore;
-                                  return ls || <Tag size={10} />;
+                                  return ls || <Pencil size={10} />;
                                 })()}
                               </button>
                             ) : result && result.letterScore ? (
@@ -2785,6 +2804,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               onClick={() => {
                 setEditResultsMode(true);
                 setLocalResults(results ? [...results] : []);
+                const hintKey = 'heat_edit_hint_shown';
+                if (!localStorage.getItem(hintKey)) {
+                  setShowEditHint(true);
+                  localStorage.setItem(hintKey, '1');
+                  setTimeout(() => setShowEditHint(false), 5000);
+                }
               }}
               className={`px-4 py-1.5 rounded-lg transition-all font-medium text-sm ${
                 darkMode
@@ -2896,19 +2921,41 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             onClose={() => setEditLetterScoreTarget(null)}
             onSelect={(letterScore, customPoints) => {
               if (!localResults) return;
-              const updatedResults = localResults.map(r => {
-                if (r.skipperIndex === editLetterScoreTarget.skipperIndex && r.heatDesignation === editLetterScoreTarget.heatDesignation) {
+              const heatDesignation = editLetterScoreTarget.heatDesignation;
+              const targetSkipperIndex = editLetterScoreTarget.skipperIndex;
+
+              let updatedResults = localResults.map(r => {
+                if (r.skipperIndex === targetSkipperIndex && r.heatDesignation === heatDesignation) {
                   if (letterScore === null) {
-                    const positionedResults = localResults
-                      .filter(lr => lr.heatDesignation === editLetterScoreTarget.heatDesignation && !lr.letterScore && lr.skipperIndex !== editLetterScoreTarget.skipperIndex)
-                      .sort((a: any, b: any) => (a.position || 999) - (b.position || 999));
-                    const newPos = positionedResults.length + 1;
-                    return { ...r, letterScore: undefined, customPoints: undefined, position: newPos };
+                    return { ...r, letterScore: undefined, customPoints: undefined, position: r.position };
                   }
                   return { ...r, letterScore, customPoints, position: null };
                 }
                 return r;
               });
+
+              // Recalculate positions for all non-letter-score skippers in this heat
+              const heatResults = updatedResults.filter(r => r.heatDesignation === heatDesignation);
+              const positionedResults = heatResults
+                .filter(r => !r.letterScore)
+                .sort((a: any, b: any) => (a.position || 999) - (b.position || 999));
+
+              // Reassign sequential positions
+              const positionMap = new Map<number, number>();
+              positionedResults.forEach((r, idx) => {
+                positionMap.set(r.skipperIndex, idx + 1);
+              });
+
+              updatedResults = updatedResults.map(r => {
+                if (r.heatDesignation === heatDesignation && !r.letterScore) {
+                  const newPos = positionMap.get(r.skipperIndex);
+                  if (newPos !== undefined) {
+                    return { ...r, position: newPos };
+                  }
+                }
+                return r;
+              });
+
               setLocalResults(updatedResults);
               setEditLetterScoreTarget(null);
             }}
