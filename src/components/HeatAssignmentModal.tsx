@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, ChevronDown, FileSpreadsheet, Upload, Plus, Minus, GripVertical } from 'lucide-react';
-import { Skipper } from '../types';
+import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown, ChevronDown, FileSpreadsheet, Upload, Plus, Minus, GripVertical, Tag } from 'lucide-react';
+import { Skipper, LetterScore } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound, getHeatDisplayLabel } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
+import { LetterScoreSelector } from './LetterScoreSelector';
 import { selectObservers, saveObserverAssignments, getObserverAssignments, getObserverAssignmentsForRound, getAllObserversForEvent, toggleObserver, preAllocateObserversForAllRounds, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
 import { exportSingleRoundPdf, exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
@@ -71,6 +72,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [draggedSkipper, setDraggedSkipper] = useState<{ skipperIndex: number; heatDesignation: string; fromPosition: number } | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<{ skipperIndex: number; heatDesignation: string } | null>(null);
   const [localResults, setLocalResults] = useState<any[] | null>(null);
+  const [editLetterScoreTarget, setEditLetterScoreTarget] = useState<{ skipperIndex: number; heatDesignation: string } | null>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -2104,11 +2106,36 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               </div>
                             )}
 
-                            {result && result.letterScore && (
+                            {editResultsMode && (isHistoricalRound || completed) ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditLetterScoreTarget({ skipperIndex, heatDesignation });
+                                }}
+                                className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded transition-colors ${
+                                  (() => {
+                                    const lr = localResults?.find(r => r.skipperIndex === skipperIndex && r.heatDesignation === heatDesignation);
+                                    const ls = lr?.letterScore || result?.letterScore;
+                                    return ls
+                                      ? 'bg-red-500 text-white hover:bg-red-600'
+                                      : darkMode
+                                        ? 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                                        : 'bg-slate-200 text-slate-600 hover:bg-slate-300';
+                                  })()
+                                }`}
+                                title="Click to assign or change letter score"
+                              >
+                                {(() => {
+                                  const lr = localResults?.find(r => r.skipperIndex === skipperIndex && r.heatDesignation === heatDesignation);
+                                  const ls = lr?.letterScore || result?.letterScore;
+                                  return ls || <Tag size={10} />;
+                                })()}
+                              </button>
+                            ) : result && result.letterScore ? (
                               <span className="flex-shrink-0 text-[10px] font-semibold px-1 py-0.5 rounded bg-red-500 text-white">
                                 {result.letterScore}
                               </span>
-                            )}
+                            ) : null}
                           </div>
                         </div>
                       );
@@ -2856,6 +2883,42 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           </button>}
         </div>
       </div>
+
+      {/* Letter Score Editor in Edit Results Mode */}
+      {editLetterScoreTarget && localResults && (() => {
+        const targetSkipper = skippers[editLetterScoreTarget.skipperIndex];
+        const targetResult = localResults.find(
+          r => r.skipperIndex === editLetterScoreTarget.skipperIndex && r.heatDesignation === editLetterScoreTarget.heatDesignation
+        );
+        return (
+          <LetterScoreSelector
+            isOpen={true}
+            onClose={() => setEditLetterScoreTarget(null)}
+            onSelect={(letterScore, customPoints) => {
+              if (!localResults) return;
+              const updatedResults = localResults.map(r => {
+                if (r.skipperIndex === editLetterScoreTarget.skipperIndex && r.heatDesignation === editLetterScoreTarget.heatDesignation) {
+                  if (letterScore === null) {
+                    const positionedResults = localResults
+                      .filter(lr => lr.heatDesignation === editLetterScoreTarget.heatDesignation && !lr.letterScore && lr.skipperIndex !== editLetterScoreTarget.skipperIndex)
+                      .sort((a: any, b: any) => (a.position || 999) - (b.position || 999));
+                    const newPos = positionedResults.length + 1;
+                    return { ...r, letterScore: undefined, customPoints: undefined, position: newPos };
+                  }
+                  return { ...r, letterScore, customPoints, position: null };
+                }
+                return r;
+              });
+              setLocalResults(updatedResults);
+              setEditLetterScoreTarget(null);
+            }}
+            darkMode={darkMode}
+            skipperName={targetSkipper?.name || 'Unknown'}
+            raceNumber={round}
+            isHeatRacing={true}
+          />
+        );
+      })()}
 
       {/* Observer Selector Modal - Toggle-based with limit enforcement */}
       {showObserverSelector && currentEvent && (() => {
