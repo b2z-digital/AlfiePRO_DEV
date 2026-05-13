@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { X, User, Mail, Phone, House, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CircleCheck as CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, CircleAlert as AlertCircle, Star, Users, Anchor, Hash, Trophy, ChevronDown, ChevronUp, Award, UserPlus } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -92,6 +93,8 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const [boatClassOptions, setBoatClassOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [allBoatClasses, setAllBoatClasses] = useState<BoatClass[]>([]);
   const [openClassDropdown, setOpenClassDropdown] = useState<number | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const classButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
   const [originalEmail, setOriginalEmail] = useState<string | null>(null);
   const [showUpdateLoginEmailPrompt, setShowUpdateLoginEmailPrompt] = useState(false);
   const [updatingLoginEmail, setUpdatingLoginEmail] = useState(false);
@@ -105,12 +108,27 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
     }
   }, [isOpen, memberId, clubId]);
 
+  const openClassDropdownAt = useCallback((index: number) => {
+    if (openClassDropdown === index) {
+      setOpenClassDropdown(null);
+      setDropdownPos(null);
+      return;
+    }
+    const btn = classButtonRefs.current[index];
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      setDropdownPos({ top: rect.top, left: rect.left });
+    }
+    setOpenClassDropdown(index);
+  }, [openClassDropdown]);
+
   useEffect(() => {
     if (openClassDropdown === null) return;
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest('[data-class-dropdown]')) {
         setOpenClassDropdown(null);
+        setDropdownPos(null);
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -971,14 +989,14 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                     return (
                       <div
                         key={index}
-                        className={`relative rounded-2xl overflow-hidden transition-all ${
+                        className={`relative rounded-2xl transition-all ${
                           darkMode
                             ? 'bg-slate-800/70 border border-slate-700/60 hover:border-slate-600/80'
                             : 'bg-white border border-slate-200 shadow-sm hover:shadow-md'
                         }`}
                       >
                         {darkMode && (
-                          <div className={`absolute inset-0 bg-gradient-to-br ${accentMap[classColor] || accentMap.slate} pointer-events-none`} />
+                          <div className={`absolute inset-0 rounded-2xl overflow-hidden bg-gradient-to-br ${accentMap[classColor] || accentMap.slate} pointer-events-none`} />
                         )}
 
                         <div className="relative p-4">
@@ -1037,7 +1055,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                           <div className={`grid grid-cols-3 gap-2 pt-3 border-t ${
                             darkMode ? 'border-slate-700/40' : 'border-slate-100'
                           }`}>
-                            <div className="relative" data-class-dropdown>
+                            <div data-class-dropdown>
                               <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
                                 darkMode ? 'text-slate-400' : 'text-slate-500'
                               }`}>
@@ -1045,7 +1063,8 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                               </label>
                               <button
                                 type="button"
-                                onClick={() => setOpenClassDropdown(openClassDropdown === index ? null : index)}
+                                ref={(el) => { classButtonRefs.current[index] = el; }}
+                                onClick={() => openClassDropdownAt(index)}
                                 className={`w-full px-2.5 py-2 rounded-xl text-sm font-medium text-left relative ${
                                   darkMode
                                     ? 'bg-slate-700/60 text-slate-100 border-slate-600/50'
@@ -1074,15 +1093,19 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                                 </span>
                                 <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
                               </button>
-                              {openClassDropdown === index && (
-                                <div className={`absolute z-[9999] bottom-full left-0 mb-1 w-56 max-h-60 overflow-y-auto rounded-xl shadow-xl border ${
-                                  darkMode
-                                    ? 'bg-slate-800 border-slate-600/50'
-                                    : 'bg-white border-slate-200'
-                                }`}>
+                              {openClassDropdown === index && dropdownPos && createPortal(
+                                <div
+                                  data-class-dropdown
+                                  className={`fixed z-[99999] w-56 max-h-60 overflow-y-auto rounded-xl shadow-2xl border ${
+                                    darkMode
+                                      ? 'bg-slate-800 border-slate-600/50'
+                                      : 'bg-white border-slate-200'
+                                  }`}
+                                  style={{ top: dropdownPos.top - 4, left: dropdownPos.left, transform: 'translateY(-100%)' }}
+                                >
                                   <button
                                     type="button"
-                                    onClick={() => { updateBoat(index, 'boat_type', ''); setOpenClassDropdown(null); }}
+                                    onClick={() => { updateBoat(index, 'boat_type', ''); setOpenClassDropdown(null); setDropdownPos(null); }}
                                     className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
                                       darkMode ? 'text-slate-400 hover:bg-slate-700/60' : 'text-slate-500 hover:bg-slate-50'
                                     }`}
@@ -1098,7 +1121,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                                       <button
                                         key={bc.id}
                                         type="button"
-                                        onClick={() => { updateBoat(index, 'boat_type', shortCode); setOpenClassDropdown(null); }}
+                                        onClick={() => { updateBoat(index, 'boat_type', shortCode); setOpenClassDropdown(null); setDropdownPos(null); }}
                                         className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
                                           boat.boat_type === shortCode
                                             ? (darkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-700')
@@ -1119,7 +1142,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                                   {boat.boat_type && !allBoatClasses.some(bc => getBoatClassShortCode(bc.name) === boat.boat_type) && (
                                     <button
                                       type="button"
-                                      onClick={() => setOpenClassDropdown(null)}
+                                      onClick={() => { setOpenClassDropdown(null); setDropdownPos(null); }}
                                       className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
                                         darkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-700'
                                       }`}
@@ -1130,7 +1153,8 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                                       <span className="font-medium">{boat.boat_type}</span>
                                     </button>
                                   )}
-                                </div>
+                                </div>,
+                                document.body
                               )}
                             </div>
                             <div>
