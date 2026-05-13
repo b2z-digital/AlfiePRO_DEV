@@ -1738,7 +1738,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 {heatSkippers.length} skippers
               </div>
             </div>
-            <div className="flex items-center gap-2 lg:gap-3 overflow-x-auto">
+            <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
               {/* Scoring Mode Buttons - show all non-current modes */}
               {(['pro', 'touch', 'spreadsheet'] as const).filter(m => m !== heatScoringMode).map(mode => (
                 <button
