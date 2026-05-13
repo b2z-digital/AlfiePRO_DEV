@@ -90,6 +90,8 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const [showAddToClubModal, setShowAddToClubModal] = useState(false);
   const [availableClubs, setAvailableClubs] = useState<Array<{ id: string; name: string; abbreviation?: string }>>([]);
   const [boatClassOptions, setBoatClassOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [allBoatClasses, setAllBoatClasses] = useState<BoatClass[]>([]);
+  const [openClassDropdown, setOpenClassDropdown] = useState<number | null>(null);
   const [originalEmail, setOriginalEmail] = useState<string | null>(null);
   const [showUpdateLoginEmailPrompt, setShowUpdateLoginEmailPrompt] = useState(false);
   const [updatingLoginEmail, setUpdatingLoginEmail] = useState(false);
@@ -102,6 +104,18 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
       fetchBoatClasses();
     }
   }, [isOpen, memberId, clubId]);
+
+  useEffect(() => {
+    if (openClassDropdown === null) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-class-dropdown]')) {
+        setOpenClassDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [openClassDropdown]);
 
   const fetchMemberData = async () => {
     try {
@@ -183,6 +197,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const fetchBoatClasses = async () => {
     try {
       const allClasses = await getBoatClasses();
+      setAllBoatClasses(allClasses);
       const options = allClasses.map((bc: BoatClass) => ({
         value: getBoatClassShortCode(bc.name),
         label: bc.name
@@ -1022,29 +1037,101 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                           <div className={`grid grid-cols-3 gap-2 pt-3 border-t ${
                             darkMode ? 'border-slate-700/40' : 'border-slate-100'
                           }`}>
-                            <div>
+                            <div className="relative" data-class-dropdown>
                               <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
                                 darkMode ? 'text-slate-400' : 'text-slate-500'
                               }`}>
                                 Class
                               </label>
-                              <select
-                                value={boat.boat_type}
-                                onChange={(e) => updateBoat(index, 'boat_type', e.target.value)}
-                                className={`w-full px-2.5 py-2 rounded-xl text-sm font-medium ${
+                              <button
+                                type="button"
+                                onClick={() => setOpenClassDropdown(openClassDropdown === index ? null : index)}
+                                className={`w-full px-2.5 py-2 rounded-xl text-sm font-medium text-left relative ${
                                   darkMode
                                     ? 'bg-slate-700/60 text-slate-100 border-slate-600/50'
                                     : 'bg-slate-50 text-slate-900 border-slate-200'
-                                } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all`}
+                                } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all ${
+                                  boat.boat_type ? 'pl-9' : ''
+                                }`}
                               >
-                                <option value="">Select</option>
-                                {boatClassOptions.map(opt => (
-                                  <option key={opt.value} value={opt.value}>{opt.value !== opt.label ? `${opt.value}` : opt.label}</option>
-                                ))}
-                                {boat.boat_type && !boatClassOptions.some(o => o.value === boat.boat_type) && (
-                                  <option value={boat.boat_type}>{boat.boat_type}</option>
-                                )}
-                              </select>
+                                {(() => {
+                                  const selectedClass = allBoatClasses.find(bc => getBoatClassShortCode(bc.name) === boat.boat_type);
+                                  if (selectedClass?.class_image) {
+                                    return (
+                                      <div className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md overflow-hidden border border-slate-600/50">
+                                        <img src={selectedClass.class_image} alt="" className="w-full h-full object-cover" />
+                                      </div>
+                                    );
+                                  } else if (boat.boat_type) {
+                                    return (
+                                      <Sailboat size={14} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                                <span className={boat.boat_type ? '' : (darkMode ? 'text-slate-500' : 'text-slate-400')}>
+                                  {boat.boat_type || 'Select'}
+                                </span>
+                                <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+                              </button>
+                              {openClassDropdown === index && (
+                                <div className={`absolute z-50 top-full left-0 mt-1 w-56 max-h-60 overflow-y-auto rounded-xl shadow-xl border ${
+                                  darkMode
+                                    ? 'bg-slate-800 border-slate-600/50'
+                                    : 'bg-white border-slate-200'
+                                }`}>
+                                  <button
+                                    type="button"
+                                    onClick={() => { updateBoat(index, 'boat_type', ''); setOpenClassDropdown(null); }}
+                                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
+                                      darkMode ? 'text-slate-400 hover:bg-slate-700/60' : 'text-slate-500 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                                      <Sailboat size={16} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                                    </div>
+                                    <span>None</span>
+                                  </button>
+                                  {allBoatClasses.map(bc => {
+                                    const shortCode = getBoatClassShortCode(bc.name);
+                                    return (
+                                      <button
+                                        key={bc.id}
+                                        type="button"
+                                        onClick={() => { updateBoat(index, 'boat_type', shortCode); setOpenClassDropdown(null); }}
+                                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
+                                          boat.boat_type === shortCode
+                                            ? (darkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-700')
+                                            : (darkMode ? 'text-slate-200 hover:bg-slate-700/60' : 'text-slate-700 hover:bg-slate-50')
+                                        }`}
+                                      >
+                                        {bc.class_image ? (
+                                          <img src={bc.class_image} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-slate-600/50" />
+                                        ) : (
+                                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                                            <Sailboat size={16} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                                          </div>
+                                        )}
+                                        <span className="font-medium truncate">{bc.name}</span>
+                                      </button>
+                                    );
+                                  })}
+                                  {boat.boat_type && !allBoatClasses.some(bc => getBoatClassShortCode(bc.name) === boat.boat_type) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setOpenClassDropdown(null)}
+                                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
+                                        darkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-700'
+                                      }`}
+                                    >
+                                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                                        <Sailboat size={16} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                                      </div>
+                                      <span className="font-medium">{boat.boat_type}</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             <div>
                               <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
