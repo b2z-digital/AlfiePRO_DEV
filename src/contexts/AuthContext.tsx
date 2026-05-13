@@ -254,6 +254,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log('Fetched user clubs with details:', validClubs);
       setUserClubs(validClubs);
+      try { localStorage.setItem('userClubs', JSON.stringify(validClubs)); } catch (e) { /* quota */ }
       setClubsLoaded(true);
 
       // During impersonation, skip overwriting currentClub/localStorage
@@ -431,142 +432,179 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         if (mounted && session?.user) {
-          const { data: { user: validatedUser }, error: validateError } = await supabase.auth.getUser();
-          if (validateError || !validatedUser) {
-            console.warn('Session exists but server validation failed, clearing session');
-            await supabase.auth.signOut().catch(() => {});
-            localStorage.removeItem('alfie-pro-auth');
-            if (mounted) {
-              currentUserIdRef.current = null;
-              setUser(null);
-              setOnboardingCompleted(false);
-              clearTimeout(loadingTimeout);
-              setLoading(false);
+          // Only validate with server if online - skip when offline to allow cached session use
+          let resolvedUser = session.user;
+          if (navigator.onLine) {
+            try {
+              const validatePromise = supabase.auth.getUser();
+              const validateTimeout = new Promise<{ data: { user: null }, error: Error }>((_, reject) =>
+                setTimeout(() => reject(new Error('getUser timeout')), 5000)
+              );
+              const { data: { user: validatedUser }, error: validateError } = await Promise.race([validatePromise, validateTimeout]) as any;
+              if (validateError || !validatedUser) {
+                console.warn('Session exists but server validation failed, clearing session');
+                await supabase.auth.signOut().catch(() => {});
+                localStorage.removeItem('alfie-pro-auth');
+                if (mounted) {
+                  currentUserIdRef.current = null;
+                  setUser(null);
+                  setOnboardingCompleted(false);
+                  clearTimeout(loadingTimeout);
+                  setLoading(false);
+                }
+                return;
+              }
+              resolvedUser = validatedUser;
+            } catch (validateErr) {
+              // Validation timed out or failed - proceed with session user
+              console.warn('Server validation failed/timed out, using cached session');
             }
-            return;
           }
 
-          const firstName = validatedUser.user_metadata?.first_name;
-          const lastName = validatedUser.user_metadata?.last_name;
+          const firstName = resolvedUser.user_metadata?.first_name;
+          const lastName = resolvedUser.user_metadata?.last_name;
 
           const enhancedUser: AuthUser = {
-            ...validatedUser,
+            ...resolvedUser,
             firstName,
             lastName
           };
 
           const previousUserId = currentUserIdRef.current;
-          currentUserIdRef.current = validatedUser.id;
+          currentUserIdRef.current = resolvedUser.id;
 
-          if (previousUserId && previousUserId !== validatedUser.id) {
+          if (previousUserId && previousUserId !== resolvedUser.id) {
             localStorage.removeItem('currentClubId');
             localStorage.removeItem('currentOrganization');
           }
 
           setUser(enhancedUser);
 
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('onboarding_completed, is_race_officer')
-            .eq('id', validatedUser.id)
-            .maybeSingle();
+          // Load profile/membership data - skip if offline, use cached defaults
+          if (navigator.onLine) {
+            try {
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('onboarding_completed, is_race_officer')
+                .eq('id', resolvedUser.id)
+                .maybeSingle();
 
-          setOnboardingCompleted(profileData?.onboarding_completed || false);
-          setIsRaceOfficer(profileData?.is_race_officer || false);
+              const onboardingVal = profileData?.onboarding_completed || false;
+              setOnboardingCompleted(onboardingVal);
+              localStorage.setItem('alfie-onboarding-completed', String(onboardingVal));
+              setIsRaceOfficer(profileData?.is_race_officer || false);
 
-          const { data: pendingApp } = await supabase
-            .from('membership_applications')
-            .select('id, status')
-            .eq('user_id', validatedUser.id)
-            .eq('is_draft', false)
-            .eq('status', 'pending')
-            .limit(1)
-            .maybeSingle();
+              const { data: pendingApp } = await supabase
+                .from('membership_applications')
+                .select('id, status')
+                .eq('user_id', resolvedUser.id)
+                .eq('is_draft', false)
+                .eq('status', 'pending')
+                .limit(1)
+                .maybeSingle();
 
-          setHasPendingApplication(!!pendingApp);
+              setHasPendingApplication(!!pendingApp);
 
-          const { data: pendingClub } = await supabase
-            .from('clubs')
-            .select('id')
-            .eq('registered_by_user_id', validatedUser.id)
-            .eq('approval_status', 'pending_approval')
-            .limit(1)
-            .maybeSingle();
+              const { data: pendingClub } = await supabase
+                .from('clubs')
+                .select('id')
+                .eq('registered_by_user_id', resolvedUser.id)
+                .eq('approval_status', 'pending_approval')
+                .limit(1)
+                .maybeSingle();
 
-          setHasPendingClubApplication(!!pendingClub);
+              setHasPendingClubApplication(!!pendingClub);
 
-          // Check for cancelled memberships - only show renewal gate if ALL memberships are cancelled
-          // and there are no active ones
-          const { data: cancelledData } = await supabase
-            .from('members')
-            .select('club_id, club, cancelled_at, cancelled_reason, previous_membership_level')
-            .eq('user_id', validatedUser.id)
-            .eq('membership_status', 'cancelled');
+              const { data: cancelledData } = await supabase
+                .from('members')
+                .select('club_id, club, cancelled_at, cancelled_reason, previous_membership_level')
+                .eq('user_id', resolvedUser.id)
+                .eq('membership_status', 'cancelled');
 
-          const { data: activeMemberData } = await supabase
-            .from('members')
-            .select('id')
-            .eq('user_id', validatedUser.id)
-            .in('membership_status', ['active', 'expired'])
-            .limit(1)
-            .maybeSingle();
+              const { data: activeMemberData } = await supabase
+                .from('members')
+                .select('id')
+                .eq('user_id', resolvedUser.id)
+                .in('membership_status', ['active', 'expired'])
+                .limit(1)
+                .maybeSingle();
 
-          const hasCancelled = (cancelledData || []).length > 0 && !activeMemberData;
-          setHasCancelledMembership(hasCancelled);
-          if (hasCancelled && cancelledData) {
-            setCancelledMemberships(cancelledData.map((m: any) => ({
-              club_id: m.club_id,
-              club_name: m.club,
-              cancelled_at: m.cancelled_at,
-              cancelled_reason: m.cancelled_reason,
-              previous_membership_level: m.previous_membership_level
-            })));
-          } else {
-            setCancelledMemberships([]);
-          }
+              const hasCancelled = (cancelledData || []).length > 0 && !activeMemberData;
+              setHasCancelledMembership(hasCancelled);
+              if (hasCancelled && cancelledData) {
+                setCancelledMemberships(cancelledData.map((m: any) => ({
+                  club_id: m.club_id,
+                  club_name: m.club,
+                  cancelled_at: m.cancelled_at,
+                  cancelled_reason: m.cancelled_reason,
+                  previous_membership_level: m.previous_membership_level
+                })));
+              } else {
+                setCancelledMemberships([]);
+              }
 
-          if (!hasCancelled) {
-            const { data: unfinancialData } = await supabase
-              .from('members')
-              .select('id, club_id, club, membership_level, is_financial, renewal_date, date_joined')
-              .eq('user_id', validatedUser.id)
-              .eq('is_financial', false)
-              .in('membership_status', ['active', 'expired'])
-              .limit(1)
-              .maybeSingle();
+              if (!hasCancelled) {
+                const { data: unfinancialData } = await supabase
+                  .from('members')
+                  .select('id, club_id, club, membership_level, is_financial, renewal_date, date_joined')
+                  .eq('user_id', resolvedUser.id)
+                  .eq('is_financial', false)
+                  .in('membership_status', ['active', 'expired'])
+                  .limit(1)
+                  .maybeSingle();
 
-            const { data: userRoleData } = await supabase
-              .from('user_clubs')
-              .select('role')
-              .eq('user_id', validatedUser.id)
-              .in('role', ['admin', 'editor', 'super_admin', 'state_admin', 'national_admin']);
+                const { data: userRoleData } = await supabase
+                  .from('user_clubs')
+                  .select('role')
+                  .eq('user_id', resolvedUser.id)
+                  .in('role', ['admin', 'editor', 'super_admin', 'state_admin', 'national_admin']);
 
-            const isAdminUser = (userRoleData || []).length > 0 || validatedUser.user_metadata?.is_super_admin === true;
+                const isAdminUser = (userRoleData || []).length > 0 || resolvedUser.user_metadata?.is_super_admin === true;
 
-            if (unfinancialData && !isAdminUser) {
-              const hasRecentJoin = unfinancialData.date_joined &&
-                (new Date().getTime() - new Date(unfinancialData.date_joined).getTime()) < 30 * 24 * 60 * 60 * 1000;
+                if (unfinancialData && !isAdminUser) {
+                  const hasRecentJoin = unfinancialData.date_joined &&
+                    (new Date().getTime() - new Date(unfinancialData.date_joined).getTime()) < 30 * 24 * 60 * 60 * 1000;
 
-              setHasUnfinancialMember(true);
-              setUnfinancialMemberData({
-                member_id: unfinancialData.id,
-                club_id: unfinancialData.club_id,
-                club_name: unfinancialData.club || 'Your Club',
-                membership_level: unfinancialData.membership_level,
-                is_new_member: !!hasRecentJoin,
-                renewal_date: unfinancialData.renewal_date,
-                date_joined: unfinancialData.date_joined,
-              });
-            } else {
-              setHasUnfinancialMember(false);
-              setUnfinancialMemberData(null);
+                  setHasUnfinancialMember(true);
+                  setUnfinancialMemberData({
+                    member_id: unfinancialData.id,
+                    club_id: unfinancialData.club_id,
+                    club_name: unfinancialData.club || 'Your Club',
+                    membership_level: unfinancialData.membership_level,
+                    is_new_member: !!hasRecentJoin,
+                    renewal_date: unfinancialData.renewal_date,
+                    date_joined: unfinancialData.date_joined,
+                  });
+                } else {
+                  setHasUnfinancialMember(false);
+                  setUnfinancialMemberData(null);
+                }
+              } else {
+                setHasUnfinancialMember(false);
+                setUnfinancialMemberData(null);
+              }
+
+              await refreshUserClubs(resolvedUser.id);
+            } catch (profileErr) {
+              console.warn('Failed to load profile data (likely offline), using defaults');
+              // Use cached onboarding state from localStorage
+              const cachedOnboarding = localStorage.getItem('alfie-onboarding-completed');
+              setOnboardingCompleted(cachedOnboarding === 'true');
             }
           } else {
-            setHasUnfinancialMember(false);
-            setUnfinancialMemberData(null);
+            // Offline - use cached state
+            const cachedOnboarding = localStorage.getItem('alfie-onboarding-completed');
+            setOnboardingCompleted(cachedOnboarding === 'true');
+            // Try to restore clubs from localStorage
+            try {
+              const storedClubs = localStorage.getItem('userClubs');
+              if (storedClubs) {
+                const parsed = JSON.parse(storedClubs);
+                setUserClubs(parsed);
+                setClubsLoaded(true);
+              }
+            } catch (e) { /* ignore */ }
           }
-
-          await refreshUserClubs(validatedUser.id);
 
           // Restore currentOrganization from localStorage if exists
           try {

@@ -631,7 +631,8 @@ document.addEventListener('visibilitychange', async () => {
     } catch (error) {
       console.error('❌ Critical error during tab visibility handling:', error);
       // Last resort - reload the page if we've been hidden for more than 60 seconds
-      if (timeSinceHidden > 60000) {
+      // but only if we're online (avoid reload loops when offline)
+      if (timeSinceHidden > 60000 && navigator.onLine) {
         console.log('⚠️ Long hidden period detected - reloading page');
         window.location.reload();
       }

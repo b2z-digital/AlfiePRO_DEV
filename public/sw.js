@@ -1,4 +1,4 @@
-const CACHE_VERSION = '2.4';
+const CACHE_VERSION = '2.5';
 const CACHE_NAME = `alfiepro-v${CACHE_VERSION}`;
 const RUNTIME_CACHE = `alfiepro-runtime-v${CACHE_VERSION}`;
 const API_CACHE = `alfiepro-api-v${CACHE_VERSION}`;
@@ -62,17 +62,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // CRITICAL: Skip service worker for YouTube and related domains
-  // This prevents interference with video streaming
+  // Skip service worker for YouTube and related domains
   const isExternalDomainToSkip = EXTERNAL_DOMAINS_TO_SKIP.some(domain => url.hostname.includes(domain));
   if (isExternalDomainToSkip) {
-    return; // Let the browser handle it directly - NO CACHING
+    return;
   }
 
-  // CRITICAL: Never cache OAuth callback routes - they must always be fresh
+  // Never cache OAuth callback routes
   const isOAuthRoute = OAUTH_ROUTES.some(route => url.pathname.startsWith(route));
   if (isOAuthRoute) {
-    // For OAuth routes, always fetch fresh and serve the SPA shell
     event.respondWith(
       fetch('/index.html').then(response => {
         return response;
@@ -83,15 +81,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // CRITICAL: Skip iframe embeds to prevent video glitching
+  // Skip iframe embeds
   if (request.destination === 'iframe') {
-    return; // Let browser handle iframes directly
+    return;
   }
 
-  // Handle navigation requests (page loads) - always serve fresh SPA shell
+  // Handle navigation requests - network first with cache fallback
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch('/index.html').then(response => {
+        // Cache the fresh index.html
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put('/index.html', responseToCache);
+        });
         return response;
       }).catch(() => {
         return caches.match('/index.html');
@@ -100,8 +103,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Supabase API requests - stale-while-revalidate
   const isSupabaseRequest = SUPABASE_DOMAINS.some(domain => url.hostname.includes(domain));
-
   if (isSupabaseRequest) {
     event.respondWith(
       staleWhileRevalidate(request, API_CACHE)
@@ -109,7 +112,33 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Same-origin static assets (JS, CSS, fonts, images) - cache first, network fallback
   if (url.origin === location.origin) {
+    // JS and CSS bundles with hashes - cache first (immutable content)
+    const isHashedAsset = /\/assets\/.*\.[a-f0-9]{8,}\.(js|css)$/i.test(url.pathname);
+    if (isHashedAsset) {
+      event.respondWith(
+        caches.match(request).then(cachedResponse => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          return fetch(request).then(response => {
+            if (response && response.status === 200) {
+              const responseToCache = response.clone();
+              caches.open(RUNTIME_CACHE).then(cache => {
+                cache.put(request, responseToCache);
+              });
+            }
+            return response;
+          }).catch(() => {
+            return new Response('', { status: 503, statusText: 'Offline' });
+          });
+        })
+      );
+      return;
+    }
+
+    // Images - cache first
     if (request.destination === 'image') {
       event.respondWith(
         caches.match(request).then(cachedResponse => {
@@ -124,22 +153,27 @@ self.addEventListener('fetch', (event) => {
               });
             }
             return response;
+          }).catch(() => {
+            return new Response('', { status: 503, statusText: 'Offline' });
           });
         })
       );
       return;
     }
 
+    // Other same-origin assets - network first, cache fallback
     event.respondWith(
-      caches.match(request).then(cachedResponse => {
-        return cachedResponse || fetch(request).then(response => {
-          if (response && response.status === 200) {
-            const responseToCache = response.clone();
-            caches.open(RUNTIME_CACHE).then(cache => {
-              cache.put(request, responseToCache);
-            });
-          }
-          return response;
+      fetch(request).then(response => {
+        if (response && response.status === 200) {
+          const responseToCache = response.clone();
+          caches.open(RUNTIME_CACHE).then(cache => {
+            cache.put(request, responseToCache);
+          });
+        }
+        return response;
+      }).catch(() => {
+        return caches.match(request).then(cachedResponse => {
+          return cachedResponse || new Response('', { status: 503, statusText: 'Offline' });
         });
       })
     );
