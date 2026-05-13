@@ -19,6 +19,7 @@ interface LetterScoreSelectorProps {
   numberOfDays?: number;
   currentDay?: number;
   racesPerDay?: Record<number, number[]>;
+  scoringSystem?: 'shrs' | 'hms';
 }
 
 const letterScores: { code: LetterScore; name: string; description: string; color: string; scoring: string }[] = [
@@ -57,8 +58,10 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
   isMultiDay = false,
   numberOfDays = 1,
   currentDay = 1,
-  racesPerDay = {}
+  racesPerDay = {},
+  scoringSystem
 }) => {
+  const isSHRS = scoringSystem === 'shrs';
   const [selectedLetterScore, setSelectedLetterScore] = useState<LetterScore | null>(null);
   const [showCustomPoints, setShowCustomPoints] = useState(false);
   const [customPoints, setCustomPoints] = useState<string>('');
@@ -71,7 +74,8 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
 
     let results = [...skipperPreviousResults];
 
-    if (excludeR1ForHeat && isHeatRacing) {
+    // HMS excludes R1 from average; SHRS does NOT (SHRS Rule 5.6 averages all rounds in phase)
+    if (excludeR1ForHeat && isHeatRacing && !isSHRS) {
       results = results.filter(r => r.raceNumber !== 1);
     }
 
@@ -98,8 +102,8 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
     return Math.round(average * 10) / 10;
   };
 
-  const averagePoints = calculateAveragePoints(isHeatRacing, false);
-  const penultimateDayAverage = calculateAveragePoints(isHeatRacing, true);
+  const averagePoints = calculateAveragePoints(isHeatRacing && !isSHRS, false);
+  const penultimateDayAverage = calculateAveragePoints(isHeatRacing && !isSHRS, true);
   const canUseRdgAvg = hasCompletedRaces;
 
   const handleLetterScoreSelect = (letterScore: LetterScore) => {
@@ -283,13 +287,15 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                             {rdgMode === 'avg_event' && canUseRdgAvg && <div className="w-2 h-2 bg-white rounded-full" />}
                           </div>
                           <span className={`font-semibold ${!canUseRdgAvg ? (darkMode ? 'text-slate-500' : 'text-slate-400') : darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            RDGave - Average All Races {!canUseRdgAvg ? '' : '(Default)'}
+                            RDGave - Average {isSHRS ? 'All Rounds in Phase' : 'All Races'} {!canUseRdgAvg ? '' : '(Default)'}
                           </span>
                         </div>
                         <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                           {!canUseRdgAvg
-                            ? `Requires at least 1 completed race${isHeatRacing ? ' (excluding R1)' : ''} before average can be calculated.`
-                            : `Average of all ${isHeatRacing ? 'race scores (excluding R1 per HMS rules)' : 'prior race scores'}. Recalculated at event completion.`}
+                            ? `Requires at least 1 completed race before average can be calculated.`
+                            : isSHRS
+                              ? `Average of all other round scores in same series phase (SHRS Rule 5.6). Recalculated at event completion.`
+                              : `Average of all ${isHeatRacing ? 'race scores (excluding R1 per HMS Rule 5.3)' : 'prior race scores'}. Recalculated at event completion.`}
                         </p>
                       </div>
                       {canUseRdgAvg && averagePoints !== null && (
@@ -331,7 +337,9 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                           </span>
                         </div>
                         <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          {`Average of all races excluding the final day${isHeatRacing ? ' (R1 excluded per HMS rules)' : ''}. Used for multi-day events.`}
+                          {isSHRS
+                            ? 'Average of all rounds in same phase excluding the final day. Used for multi-day SHRS events.'
+                            : `Average of all races excluding the final day${isHeatRacing ? ' (R1 excluded per HMS rules)' : ''}. Used for multi-day events.`}
                         </p>
                       </div>
                       {penultimateDayAverage !== null && (
@@ -371,7 +379,9 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                       </span>
                     </div>
                     <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Enter specific points determined by the race committee
+                      {isSHRS
+                        ? 'Fixed redress points as determined by protest committee (SHRS Rule 5.5)'
+                        : 'Enter specific points determined by the race committee'}
                     </p>
                   </button>
                 </div>

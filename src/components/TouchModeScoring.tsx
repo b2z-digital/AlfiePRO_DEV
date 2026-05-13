@@ -1468,6 +1468,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             isMultiDay={currentEvent?.multiDay}
             numberOfDays={currentEvent?.numberOfDays}
             currentDay={currentEvent?.currentDay}
+            scoringSystem={currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs' ? 'shrs' : currentEvent?.heatManagement?.configuration?.scoringSystem === 'hms' ? 'hms' : undefined}
           />
         );
       })()}

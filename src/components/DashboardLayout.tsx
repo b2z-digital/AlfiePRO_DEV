@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay } from 'lucide-react';
+import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay, Radio } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -110,6 +110,7 @@ import { NewsScrapingTab } from './super-admin/NewsScrapingTab';
 import { ExternalResultsScrapingTab } from './super-admin/ExternalResultsScrapingTab';
 import { ClassifiedsScrapingTab } from './super-admin/ClassifiedsScrapingTab';
 import { EventsScrapingTab } from './super-admin/EventsScrapingTab';
+import { UwbTrackingTab } from './super-admin/UwbTrackingTab';
 import { usePlatformTracking } from '../hooks/usePlatformTracking';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { useImpersonation } from '../contexts/ImpersonationContext';
@@ -1086,6 +1087,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           description: 'Interactive sailing race simulator',
           path: '/race-simulator'
         }] : []),
+        ...(isSuperAdmin ? [{
+          id: 'uwb-tracking',
+          label: 'UWB Tracking',
+          icon: Radio,
+          description: 'UWB boat position tracking',
+          path: '/uwb-tracking'
+        }] : []),
         ...(!isMember && !isAssociationViewer ? [{
           id: 'event-websites',
           label: 'Event Websites',
@@ -2056,6 +2064,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/results/:id" element={<ResultsPage />} />
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
               {isSuperAdmin && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} />} />}
+              {isSuperAdmin && <Route path="/uwb-tracking" element={<UwbTrackingTab />} />}
               <Route path="/support" element={<SupportPage darkMode={darkMode} />} />
               <Route path="/settings" element={<SettingsPage darkMode={darkMode} />} />
               <Route path="/settings/race-documents/form-builder" element={

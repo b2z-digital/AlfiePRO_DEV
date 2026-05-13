@@ -1475,6 +1475,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             return '';
           })()}
           isHeatRacing={true}
+          scoringSystem="hms"
         />
       )}
     </div>
