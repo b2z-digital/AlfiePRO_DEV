@@ -1075,7 +1075,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                                 <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
                               </button>
                               {openClassDropdown === index && (
-                                <div className={`absolute z-50 top-full left-0 mt-1 w-56 max-h-60 overflow-y-auto rounded-xl shadow-xl border ${
+                                <div className={`absolute z-[9999] bottom-full left-0 mb-1 w-56 max-h-60 overflow-y-auto rounded-xl shadow-xl border ${
                                   darkMode
                                     ? 'bg-slate-800 border-slate-600/50'
                                     : 'bg-white border-slate-200'
