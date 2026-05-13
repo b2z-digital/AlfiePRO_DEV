@@ -73,6 +73,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [dragOverTarget, setDragOverTarget] = useState<{ skipperIndex: number; heatDesignation: string } | null>(null);
   const [localResults, setLocalResults] = useState<any[] | null>(null);
   const [editLetterScoreTarget, setEditLetterScoreTarget] = useState<{ skipperIndex: number; heatDesignation: string } | null>(null);
+  const [showEditHint, setShowEditHint] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -1422,6 +1423,19 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           </div>
         )}
 
+        {/* Edit mode hint - shown once */}
+        {showEditHint && (
+          <div className={`mx-5 mt-2 px-4 py-2 rounded-lg text-sm flex items-center gap-2 animate-fade-in ${
+            darkMode ? 'bg-blue-900/40 text-blue-200 border border-blue-700/50' : 'bg-blue-50 text-blue-700 border border-blue-200'
+          }`}>
+            <GripVertical size={14} className="flex-shrink-0" />
+            <span>Drag skippers to reorder positions, or tap the pencil icon to assign a letter score (DNF, DNC, etc.)</span>
+            <button onClick={() => setShowEditHint(false)} className="ml-auto flex-shrink-0 opacity-60 hover:opacity-100">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         {/* Heat Grid - Always columns */}
         <div className="px-5 py-3 overflow-hidden flex-1 flex flex-col min-h-0">
           <div className="flex gap-3 flex-1 overflow-hidden">
@@ -2026,8 +2040,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               <GripVertical size={14} className={`flex-shrink-0 ${darkMode ? 'text-slate-400' : 'text-slate-400'}`} />
                             )}
                             {result && result.position !== null && (() => {
-                              const displayPos = editResultsMode && localResults
-                                ? (localResults.find(r => r.skipperIndex === skipperIndex && r.heatDesignation === heatDesignation)?.position ?? result.position)
+                              const localResult = editResultsMode && localResults
+                                ? localResults.find(r => r.skipperIndex === skipperIndex && r.heatDesignation === heatDesignation)
+                                : null;
+                              // Hide position badge if a letter score was assigned in edit mode
+                              if (localResult && localResult.letterScore) return null;
+                              const displayPos = localResult
+                                ? (localResult.position ?? result.position)
                                 : result.position;
                               return (
                                 <span className={`
@@ -2785,6 +2804,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               onClick={() => {
                 setEditResultsMode(true);
                 setLocalResults(results ? [...results] : []);
+                const hintKey = 'heat_edit_hint_shown';
+                if (!localStorage.getItem(hintKey)) {
+                  setShowEditHint(true);
+                  localStorage.setItem(hintKey, '1');
+                  setTimeout(() => setShowEditHint(false), 5000);
+                }
               }}
               className={`px-4 py-1.5 rounded-lg transition-all font-medium text-sm ${
                 darkMode
