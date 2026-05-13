@@ -374,6 +374,140 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  const exportAnzamHtml = () => {
+    if (!standings.length || !completedRaces.length) return;
+
+    // Build round-to-heat map for heat suffix letters
+    const roundHeatLookup = new Map<string, string>();
+    for (const round of (heatManagement?.rounds || [])) {
+      if (!round.completed) continue;
+      for (const ha of round.heatAssignments) {
+        for (const si of ha.skipperIndices) {
+          roundHeatLookup.set(`${si}-${round.round}`, ha.heatDesignation.toLowerCase());
+        }
+      }
+    }
+
+    const eventName = heatManagement?.configuration?.shrsQualifyingRounds ? 'SHRS Event' : 'Event';
+    const now = new Date();
+    const totalCols = 8 + qualifyingRaces.length + finalsRaces.length;
+
+    let html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${eventName} - Results</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  th, td { border: 1px solid #999; padding: 3px 6px; text-align: center; }
+  th { background-color: #FCEFDA; font-weight: bold; }
+  .row-odd { background-color: #C1E7FF; }
+  .row-even { background-color: #F0FBFF; }
+  .discard { background-color: #FFFFB8; }
+  .withdrawn { background-color: #DDDDDD; }
+  .summary-col { background-color: #DDF9EA; }
+  .fleet-header { background-color: #FCEFDA; font-weight: bold; color: #FF0000; text-align: left; }
+  .final-score { font-weight: bold; color: #FF0000; }
+  .skipper-name { text-align: left; }
+  .sail-no { text-align: left; }
+</style>
+</head>
+<body>
+<h2>${eventName} - Overall Results</h2>
+<p>Generated: ${now.toLocaleDateString()} ${now.toLocaleTimeString()} by AlfiePRO</p>
+<table>
+<thead>
+<tr>
+  <th>Place</th>
+  <th>Sail No</th>
+  <th class="skipper-name">Skipper</th>
+  <th>Club</th>
+  <th>Total</th>
+  <th>Disc</th>
+  <th>Final</th>`;
+
+    for (const race of qualifyingRaces) {
+      html += `\n  <th>Q${race}</th>`;
+    }
+    for (let i = 0; i < finalsRaces.length; i++) {
+      html += `\n  <th>F${i + 1}</th>`;
+    }
+    html += `\n</tr>\n</thead>\n<tbody>`;
+
+    let rowIdx = 0;
+    let prevFleet = '';
+
+    for (const standing of standings) {
+      // Fleet header row
+      if (hasFinals && standing.fleet !== prevFleet) {
+        prevFleet = standing.fleet;
+        const fleetName = FLEET_NAMES[standing.fleet] || `FLEET ${standing.fleet}`;
+        html += `\n<tr><td colspan="${totalCols}" class="fleet-header">${fleetName}</td></tr>`;
+        rowIdx = 0;
+      }
+
+      const isWithdrawn = standing.raceLetterScores.some(l => l === 'WDN');
+      const rowClass = isWithdrawn ? 'withdrawn' : (rowIdx % 2 === 0 ? 'row-odd' : 'row-even');
+      const prefix = hasFinals ? (FLEET_PREFIX[standing.fleet] || standing.fleet) : '';
+      const placeLabel = `${prefix}${standing.fleetPosition}`;
+      const sailNo = standing.skipper?.sailNo || standing.skipper?.sailNumber || '';
+      const skipperName = standing.skipper?.name || 'Unknown';
+      const club = standing.skipper?.club || '';
+
+      html += `\n<tr class="${rowClass}">`;
+      html += `<td>${placeLabel}</td>`;
+      html += `<td class="sail-no">${sailNo}</td>`;
+      html += `<td class="skipper-name">${skipperName}</td>`;
+      html += `<td>${club}</td>`;
+      html += `<td class="summary-col">${Number.isFinite(standing.total) ? formatNumber(standing.total) : '-'}</td>`;
+      html += `<td class="summary-col">${standing.discardTotal > 0 ? formatNumber(standing.discardTotal) : '-'}</td>`;
+      html += `<td class="summary-col final-score">${Number.isFinite(standing.net) ? formatNumber(standing.net) : '-'}</td>`;
+
+      // Qualifying races
+      for (let raceIdx = 0; raceIdx < qualifyingRaces.length; raceIdx++) {
+        const race = qualifyingRaces[raceIdx];
+        const score = standing.raceScores[raceIdx];
+        const letter = standing.raceLetterScores[raceIdx];
+        const custom = standing.raceCustomPoints[raceIdx];
+        const isDropped = standing.droppedIndices.has(raceIdx);
+        const heatSuffix = roundHeatLookup.get(`${standing.skipperIndex}-${race}`) || '';
+
+        let cellContent = formatScoreForExport(score, letter, custom, heatSuffix);
+        const cellClass = isDropped ? 'discard' : '';
+        html += `<td${cellClass ? ` class="${cellClass}"` : ''}>${cellContent}</td>`;
+      }
+
+      // Finals races
+      for (let i = 0; i < finalsRaces.length; i++) {
+        const raceIdx = qualifyingRaces.length + i;
+        const race = finalsRaces[i];
+        const score = standing.raceScores[raceIdx];
+        const letter = standing.raceLetterScores[raceIdx];
+        const custom = standing.raceCustomPoints[raceIdx];
+        const isDropped = standing.droppedIndices.has(raceIdx);
+        const heatSuffix = roundHeatLookup.get(`${standing.skipperIndex}-${race}`) || '';
+
+        let cellContent = formatScoreForExport(score, letter, custom, heatSuffix);
+        const cellClass = isDropped ? 'discard' : '';
+        html += `<td${cellClass ? ` class="${cellClass}"` : ''}>${cellContent}</td>`;
+      }
+
+      html += `</tr>`;
+      rowIdx++;
+    }
+
+    html += `\n</tbody>\n</table>\n</body>\n</html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Results_ANZAM_Format_${now.toISOString().slice(0, 10)}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const skipperFleetMap = useMemo(() => {
     const map = new Map<number, HeatDesignation>();
     if (!isShrs) return map;
@@ -787,6 +921,20 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     return Number.isInteger(score) ? String(score) : score.toFixed(1);
   };
 
+  const formatScoreForExport = (score: number | null, letterScore?: string, customPoints?: number, heatSuffix?: string): string => {
+    if (letterScore) {
+      const displayCode = getLetterScoreDisplayCode(letterScore, customPoints);
+      if (score !== null && score !== undefined) {
+        const pointsStr = Number.isInteger(score) ? String(score) : score.toFixed(1);
+        return `${displayCode} ${pointsStr}`;
+      }
+      return displayCode;
+    }
+    if (score === null || score === undefined) return '-';
+    const pointsStr = Number.isInteger(score) ? String(score) : score.toFixed(1);
+    return heatSuffix ? `${pointsStr}${heatSuffix}` : pointsStr;
+  };
+
   const fleets = useMemo(() => {
     const fleetSet = new Set(standings.map(s => s.fleet));
     return Array.from(fleetSet).sort();
@@ -825,8 +973,22 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
             </p>
           </div>
         </div>
-        <div className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-          {standings.length} skippers
+        <div className="flex items-center gap-3">
+          <button
+            onClick={exportAnzamHtml}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              darkMode
+                ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
+                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+            }`}
+            title="Export results as HTML table (ANZAM format)"
+          >
+            <Download size={14} />
+            Export HTML
+          </button>
+          <span className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+            {standings.length} skippers
+          </span>
         </div>
       </div>
       )}

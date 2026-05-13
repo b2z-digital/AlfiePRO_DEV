@@ -2798,9 +2798,58 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   };
 
   const handleUpdateHeatResult = (result: HeatResult) => {
+    // If WDN letter score, mark skipper as withdrawn from this round onwards
+    if (result.letterScore === 'WDN') {
+      const skipperIdx = result.skipperIndex;
+      const withdrawRound = result.round;
+      if (skippers[skipperIdx] && !skippers[skipperIdx].withdrawnFromRace) {
+        const newSkippers = [...skippers];
+        newSkippers[skipperIdx] = { ...newSkippers[skipperIdx], withdrawnFromRace: withdrawRound };
+        setSkippers(newSkippers);
+      }
+    }
+
     setHeatManagement(prevHM => {
       if (!prevHM) return prevHM;
-      return updateHeatResult(prevHM, result);
+      let updated = updateHeatResult(prevHM, result);
+
+      // Auto-DNC for withdrawn skipper in all subsequent existing rounds
+      if (result.letterScore === 'WDN') {
+        const withdrawRound = result.round;
+        const heatSize = updated.configuration?.heatsPerRound || 1;
+        const maxSkippersInHeat = Math.max(
+          ...updated.rounds.flatMap(r => r.heatAssignments.map(a => a.skipperIndices.length)),
+          1
+        );
+
+        for (const round of updated.rounds) {
+          if (round.round <= withdrawRound) continue;
+          // Check if skipper already has a result in this round
+          const hasResult = round.results.some(
+            r => r.skipperIndex === result.skipperIndex
+          );
+          if (!hasResult) {
+            // Find which heat assignment (if any) this skipper is in for this round
+            const assignment = round.heatAssignments.find(a =>
+              a.skipperIndices.includes(result.skipperIndex)
+            );
+            const heatDes = assignment?.heatDesignation || result.heatDesignation;
+
+            const dncResult: HeatResult = {
+              skipperIndex: result.skipperIndex,
+              position: null,
+              letterScore: 'DNC',
+              customPoints: maxSkippersInHeat + 1,
+              heatDesignation: heatDes,
+              race: 1,
+              round: round.round
+            };
+            updated = updateHeatResult(updated, dncResult);
+          }
+        }
+      }
+
+      return updated;
     });
   };
 
@@ -3075,8 +3124,39 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       if (!prevHM) return prevHM;
       console.log(`handleCompleteHeat updater: prevHM round=${prevHM.currentRound}, total results in current round=${prevHM.rounds.find(r => r.round === prevHM.currentRound)?.results.length}`);
 
-      const updatedHeatManagement = completeHeat(prevHM, heat, currentDropRules);
+      let updatedHeatManagement = completeHeat(prevHM, heat, currentDropRules);
       console.log(`handleCompleteHeat: after completeHeat, roundJustCompleted=${updatedHeatManagement.roundJustCompleted}, currentRound completed=${updatedHeatManagement.rounds.find(r => r.round === updatedHeatManagement.currentRound)?.completed}`);
+
+      // Auto-DNC withdrawn skippers in newly created rounds
+      const withdrawnSkippers = skippers
+        .map((s, i) => ({ index: i, withdrawnFromRace: s.withdrawnFromRace }))
+        .filter(s => s.withdrawnFromRace != null);
+
+      if (withdrawnSkippers.length > 0) {
+        const maxHeatSize = Math.max(
+          ...updatedHeatManagement.rounds.flatMap(r => r.heatAssignments.map(a => a.skipperIndices.length)),
+          1
+        );
+        for (const ws of withdrawnSkippers) {
+          for (const round of updatedHeatManagement.rounds) {
+            if (round.round < ws.withdrawnFromRace!) continue;
+            const hasResult = round.results.some(r => r.skipperIndex === ws.index);
+            if (!hasResult) {
+              const assignment = round.heatAssignments.find(a => a.skipperIndices.includes(ws.index));
+              const heatDes = assignment?.heatDesignation || 'A' as HeatDesignation;
+              updatedHeatManagement = updateHeatResult(updatedHeatManagement, {
+                skipperIndex: ws.index,
+                position: null,
+                letterScore: 'DNC',
+                customPoints: maxHeatSize + 1,
+                heatDesignation: heatDes,
+                race: 1,
+                round: round.round
+              });
+            }
+          }
+        }
+      }
 
       const convertedResults = convertHeatResultsToRaceResults(updatedHeatManagement, skippers);
       if (convertedResults.length > 0) {
@@ -3159,11 +3239,33 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         targetRoundNumber = updatedHM.currentRound + (isCurrentRoundComplete ? 1 : 0);
       }
 
-      const targetRoundExists = updatedHM.rounds.some(r => r.round === targetRoundNumber);
+      let targetRoundExists = updatedHM.rounds.some(r => r.round === targetRoundNumber);
 
       if (!targetRoundExists) {
-        console.error('Target round', targetRoundNumber, 'does not exist');
-        return updatedHM;
+        // If the current round is complete, create the next round dynamically
+        const currentRd = updatedHM.rounds.find(r => r.round === updatedHM.currentRound);
+        if (currentRd?.completed && targetRoundNumber === updatedHM.currentRound + 1) {
+          try {
+            const nextRoundAssignments = generateNextRoundAssignments(currentRd, updatedHM);
+            updatedHM = {
+              ...updatedHM,
+              rounds: [...updatedHM.rounds, {
+                round: targetRoundNumber,
+                heatAssignments: nextRoundAssignments,
+                results: [],
+                completed: false
+              }]
+            };
+            targetRoundExists = true;
+          } catch (e) {
+            console.error('Failed to create next round:', e);
+          }
+        }
+
+        if (!targetRoundExists) {
+          console.error('Target round', targetRoundNumber, 'does not exist');
+          return updatedHM;
+        }
       }
 
       const result = {
@@ -3191,6 +3293,26 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       if (!prevHeatManagement) return prevHeatManagement;
 
       if (roundNumber > prevHeatManagement.rounds.length) {
+        // Try to create the next round if prior round is complete
+        const priorRound = prevHeatManagement.rounds.find(r => r.round === roundNumber - 1);
+        if (priorRound?.completed && roundNumber === prevHeatManagement.rounds.length + 1) {
+          try {
+            const nextRoundAssignments = generateNextRoundAssignments(priorRound, prevHeatManagement);
+            const updatedRounds = [...prevHeatManagement.rounds, {
+              round: roundNumber,
+              heatAssignments: nextRoundAssignments,
+              results: [],
+              completed: false
+            }];
+            return {
+              ...prevHeatManagement,
+              rounds: updatedRounds,
+              currentRound: roundNumber
+            };
+          } catch (e) {
+            console.error('handleGoToRound: Failed to create next round', e);
+          }
+        }
         console.warn(`Cannot advance to round ${roundNumber} - only ${prevHeatManagement.rounds.length} rounds exist`);
         return prevHeatManagement;
       }
