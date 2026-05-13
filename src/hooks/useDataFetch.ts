@@ -33,16 +33,6 @@ export function useDataFetch<T>({
   const retryCount = useRef(0);
   const isMounted = useRef(true);
 
-  // Check if Supabase connection is stale
-  const checkConnectionHealth = async (): Promise<boolean> => {
-    try {
-      const { error } = await supabase.from('profiles').select('count').limit(1);
-      return !error;
-    } catch {
-      return false;
-    }
-  };
-
   const fetchData = useCallback(async (isRetry = false) => {
     if (!isMounted.current) return;
 
@@ -50,17 +40,19 @@ export function useDataFetch<T>({
       setLoading(true);
       setError(null);
 
-      // Check connection health before fetching
-      const isHealthy = await checkConnectionHealth();
-      if (!isHealthy) {
-        console.warn('Supabase connection appears stale, attempting reconnection...');
-        // Force a new Supabase client connection by reloading
-        if (retryCount.current >= maxRetries) {
-          console.error('Connection remained stale after retries, forcing page reload...');
-          setError('Connection lost. Reloading page...');
-          setTimeout(() => window.location.reload(), 1500);
-          return;
+      // Skip health check and fetch if offline - let fetchFn handle offline fallback
+      if (!navigator.onLine) {
+        try {
+          const result = await fetchFn();
+          if (isMounted.current) {
+            setData(result as T);
+          }
+        } catch (offlineErr) {
+          if (isMounted.current) {
+            setError('Offline - showing cached data');
+          }
         }
+        return;
       }
 
       // Create timeout promise
@@ -73,7 +65,7 @@ export function useDataFetch<T>({
 
       if (isMounted.current) {
         setData(result as T);
-        retryCount.current = 0; // Reset retry count on success
+        retryCount.current = 0;
       }
     } catch (err) {
       console.error('Data fetch error:', err);
@@ -95,9 +87,8 @@ export function useDataFetch<T>({
           setError(`Connection issue. Retrying (${retryCount.current}/${maxRetries})...`);
           setTimeout(() => fetchData(true), 1000 * retryCount.current);
         } else {
-          console.error('Max retries reached. Forcing page reload...');
-          setError('Connection issue detected. Reloading page...');
-          setTimeout(() => window.location.reload(), 2000);
+          // Don't reload - just show error and allow manual retry
+          setError('Unable to connect. Working in offline mode.');
         }
       } else {
         setError(errorMessage);
@@ -122,6 +113,18 @@ export function useDataFetch<T>({
       isMounted.current = false;
     };
   }, dependencies);
+
+  // Auto-refetch when connection is restored
+  useEffect(() => {
+    const handleOnline = () => {
+      if (isMounted.current) {
+        retryCount.current = 0;
+        fetchData();
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [fetchData]);
 
   // Auto-refetch when watched tables are mutated
   useEffect(() => {

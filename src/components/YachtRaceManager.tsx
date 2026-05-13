@@ -1745,6 +1745,27 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       });
     }
 
+    // Re-entry: if a withdrawn skipper gets an actual finishing position,
+    // clear their withdrawal flag - they're back in the competition
+    if (position !== null && letterScore !== 'WDN' && letterScore !== 'DNC') {
+      const skipper = skippers[skipperIndex];
+      if (skipper?.withdrawnFromRace != null && race >= skipper.withdrawnFromRace) {
+        const newSkippers = [...skippers];
+        newSkippers[skipperIndex] = { ...newSkippers[skipperIndex], withdrawnFromRace: undefined };
+        setSkippers(newSkippers);
+        // Remove any auto-generated WDN results for this skipper in this and future races
+        const filteredResults = newResults.filter(r => {
+          if (r.skipperIndex !== skipperIndex) return true;
+          if (r.race < race) return true;
+          if (r.race === race) return true; // keep the current result we just set
+          // Remove future WDN results (they were auto-generated)
+          return r.letterScore !== 'WDN';
+        });
+        newResults.length = 0;
+        newResults.push(...filteredResults);
+      }
+    }
+
     // Check if this is the first NON-WITHDRAWN result being entered for this race
     // If so, auto-score any withdrawn skippers
     // Only count actual skipper results, not withdrawn skippers (WDN)
@@ -1754,16 +1775,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     const isFirstResultForRace = existingNonWithdrawnResults.length === 1 && resultIndex < 0;
 
     if (isFirstResultForRace) {
-      console.log('🎯 First result entered for race', race, '- checking for withdrawn skippers');
-
       skippers.forEach((skipper, index) => {
         // Check if skipper is withdrawn for this race
         if (skipper.withdrawnFromRace && race >= skipper.withdrawnFromRace) {
           // Check if they don't already have a result for this race
           const hasResult = newResults.some(r => r.race === race && r.skipperIndex === index);
           if (!hasResult) {
-            console.log('🚫 Auto-scoring withdrawn skipper:', skipper.name);
-
             // Get handicap from previous race if available (for handicap racing)
             let handicap = skipper.startHcap || 0;
             if (race > 1 && raceType !== 'scratch') {
@@ -2807,6 +2824,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         newSkippers[skipperIdx] = { ...newSkippers[skipperIdx], withdrawnFromRace: withdrawRound };
         setSkippers(newSkippers);
       }
+    } else if (result.position !== null || (result.letterScore && result.letterScore !== 'DNC')) {
+      // Re-entry: if a withdrawn skipper gets a finishing position or non-DNC score,
+      // clear their withdrawal - they're back in the competition
+      const skipperIdx = result.skipperIndex;
+      if (skippers[skipperIdx]?.withdrawnFromRace != null && result.round >= skippers[skipperIdx].withdrawnFromRace!) {
+        const newSkippers = [...skippers];
+        newSkippers[skipperIdx] = { ...newSkippers[skipperIdx], withdrawnFromRace: undefined };
+        setSkippers(newSkippers);
+      }
     }
 
     setHeatManagement(prevHM => {
@@ -2845,6 +2871,20 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               round: round.round
             };
             updated = updateHeatResult(updated, dncResult);
+          }
+        }
+      } else if (result.position !== null && result.letterScore !== 'DNC') {
+        // Re-entry: clear any auto-DNC results for subsequent rounds
+        // since skipper is back in the competition
+        const skipperIdx = result.skipperIndex;
+        const skipper = skippers[skipperIdx];
+        if (skipper?.withdrawnFromRace != null && result.round >= skipper.withdrawnFromRace) {
+          for (const round of updated.rounds) {
+            if (round.round <= result.round) continue;
+            // Remove auto-DNC results for this skipper in future rounds
+            round.results = round.results.filter(
+              r => !(r.skipperIndex === skipperIdx && r.letterScore === 'DNC')
+            );
           }
         }
       }
