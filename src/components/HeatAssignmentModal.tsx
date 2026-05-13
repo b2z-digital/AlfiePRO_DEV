@@ -2963,6 +2963,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             skipperName={targetSkipper?.name || 'Unknown'}
             raceNumber={round}
             isHeatRacing={true}
+            scoringSystem={heatManagement.configuration.scoringSystem === 'shrs' ? 'shrs' : 'hms'}
           />
         );
       })()}

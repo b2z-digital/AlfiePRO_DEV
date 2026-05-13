@@ -1549,6 +1549,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
             isMultiDay={currentEvent?.multiDay}
             numberOfDays={currentEvent?.numberOfDays}
             currentDay={currentEvent?.currentDay}
+            scoringSystem={currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs' ? 'shrs' : currentEvent?.heatManagement?.configuration?.scoringSystem === 'hms' ? 'hms' : undefined}
           />
         );
       })()}

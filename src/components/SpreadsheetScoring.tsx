@@ -594,6 +594,35 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   }, [cells, currentScoringHeat, verifiedHeats]);
 
   const LETTER_SCORE_CODES: LetterScore[] = ['DNF', 'NSC', 'RET', 'OCS', 'DNS', 'DNC', 'UFD', 'BFD', 'DSQ', 'DNE', 'WDN', 'RDG', 'DPI', 'ZFP', 'SCP'];
+  const SHRS_EXTRA_CODES = ['RGA', 'RGP'];
+  const ALL_LETTER_CODES = isSHRS ? [...LETTER_SCORE_CODES, ...SHRS_EXTRA_CODES] : LETTER_SCORE_CODES;
+
+  const parseInputForLetterCode = (input: string): { sailNumber: string; letterScore: LetterScore | null; customPoints?: number } | null => {
+    const upper = input.trim().toUpperCase();
+    if (!upper) return null;
+
+    // Exact match: just a letter code typed alone (e.g., "DNF", "RGA")
+    const exactMatch = ALL_LETTER_CODES.find(c => c === upper);
+    if (exactMatch) {
+      if (isSHRS && exactMatch === 'RGA') return { sailNumber: '', letterScore: 'RDG' as LetterScore, customPoints: -1 };
+      if (isSHRS && exactMatch === 'RGP') return { sailNumber: '', letterScore: 'RDG' as LetterScore, customPoints: -2 };
+      return { sailNumber: '', letterScore: exactMatch as LetterScore };
+    }
+
+    // Sail number followed by letter code (e.g., "123DNF", "45RGA")
+    for (const code of ALL_LETTER_CODES) {
+      if (upper.endsWith(code) && upper.length > code.length) {
+        const sailPart = input.trim().substring(0, input.trim().length - code.length).trim();
+        if (sailPart && /\d/.test(sailPart)) {
+          if (isSHRS && code === 'RGA') return { sailNumber: sailPart, letterScore: 'RDG' as LetterScore, customPoints: -1 };
+          if (isSHRS && code === 'RGP') return { sailNumber: sailPart, letterScore: 'RDG' as LetterScore, customPoints: -2 };
+          return { sailNumber: sailPart, letterScore: code as LetterScore };
+        }
+      }
+    }
+
+    return null;
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent, heat: HeatDesignation, position: number, totalPositions: number) => {
     if (e.key === '/' || e.key === 'Escape' && showLetterScoreModal) {
@@ -609,11 +638,12 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       const heatCells = cells[heat] || [];
       const cell = heatCells[idx];
       if (cell && cell.sailNumber.trim() && !cell.letterScore) {
-        const upper = cell.sailNumber.trim().toUpperCase();
-        const matchedCode = LETTER_SCORE_CODES.find(c => c === upper);
-        if (matchedCode) {
+        const parsed = parseInputForLetterCode(cell.sailNumber);
+        if (parsed && parsed.letterScore) {
           const updated = [...heatCells];
-          updated[idx] = { ...updated[idx], sailNumber: '', letterScore: matchedCode, customPoints: undefined };
+          updated[idx] = { ...updated[idx], sailNumber: parsed.sailNumber, letterScore: parsed.letterScore, customPoints: parsed.customPoints };
+
+          // If sail number was included, keep it matched to a skipper; otherwise clear
           const heatSkips = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
           const validated = validateCells(updated, heatSkips);
           const regularFinishers = validated.filter(c => !c.letterScore && (c.sailNumber.trim() || c.skipperIndex !== null));
@@ -1219,6 +1249,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
               isMultiDay={currentEvent?.multiDay}
               numberOfDays={currentEvent?.numberOfDays}
               currentDay={currentEvent?.currentDay}
+              scoringSystem={isSHRS ? 'shrs' : isHMS ? 'hms' : undefined}
             />
           );
         })()}
@@ -1858,6 +1889,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
             isMultiDay={currentEvent?.multiDay}
             numberOfDays={currentEvent?.numberOfDays}
             currentDay={currentEvent?.currentDay}
+            scoringSystem={isSHRS ? 'shrs' : isHMS ? 'hms' : undefined}
           />
         );
       })()}

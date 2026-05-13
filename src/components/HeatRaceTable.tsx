@@ -793,6 +793,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
             skipperPreviousResults={skipperPreviousResults}
             isHeatRacing={true}
             hasCompletedRaces={hrtHasCompleted}
+            scoringSystem={configuration.scoringSystem === 'shrs' ? 'shrs' : 'hms'}
           />
         );
       })()}
