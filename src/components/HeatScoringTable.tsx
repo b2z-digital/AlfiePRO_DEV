@@ -1738,7 +1738,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 {heatSkippers.length} skippers
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
               {/* Scoring Mode Buttons - show all non-current modes */}
               {(['pro', 'touch', 'spreadsheet'] as const).filter(m => m !== heatScoringMode).map(mode => (
                 <button
@@ -1768,7 +1768,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
               <button
                 onClick={() => setShowHeatAssignments(true)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`whitespace-nowrap px-3 lg:px-4 py-2 rounded-lg text-xs lg:text-sm font-medium transition-colors ${
                   darkMode
                     ? 'bg-purple-600 text-white hover:bg-purple-700'
                     : 'bg-purple-600 text-white hover:bg-purple-700'
@@ -1779,15 +1779,15 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               <div className="relative" ref={exportMenuRef}>
                 <button
                   onClick={() => setShowExportMenu(!showExportMenu)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`whitespace-nowrap flex items-center gap-1.5 px-3 lg:px-4 py-2 rounded-lg text-xs lg:text-sm font-medium transition-colors ${
                     darkMode
                       ? 'bg-slate-600 text-white hover:bg-slate-500'
                       : 'bg-slate-600 text-white hover:bg-slate-500'
                   }`}
                 >
-                  <Download size={16} />
+                  <Download size={16} className="flex-shrink-0" />
                   Export Assignments
-                  <ChevronDown size={14} />
+                  <ChevronDown size={14} className="flex-shrink-0" />
                 </button>
                 {showExportMenu && (
                   <div className={`absolute right-0 top-full mt-1 w-64 rounded-lg shadow-lg border z-50 py-1 ${
@@ -1863,7 +1863,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                     setShowRaceResults(true);
                   }
                 }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`whitespace-nowrap px-3 lg:px-4 py-2 rounded-lg text-xs lg:text-sm font-medium transition-colors ${
                   darkMode
                     ? 'bg-emerald-600 text-white hover:bg-emerald-700'
                     : 'bg-emerald-600 text-white hover:bg-emerald-700'
@@ -1882,7 +1882,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                     setShowOverallResults(true);
                   }
                 }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`whitespace-nowrap px-3 lg:px-4 py-2 rounded-lg text-xs lg:text-sm font-medium transition-colors ${
                   darkMode
                     ? 'bg-blue-600 text-white hover:bg-blue-700'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
