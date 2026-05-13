@@ -255,135 +255,219 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
               {selectedLetterScore === 'RDG' ? (
                 <div>
                   <label className={`block text-sm font-medium mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Scoring Method
+                    {isSHRS ? 'SHRS Redress Method' : 'Scoring Method'}
                   </label>
 
-                  <button
-                    onClick={() => canUseRdgAvg && setRdgMode('avg_event')}
-                    disabled={!canUseRdgAvg}
-                    className={`
-                      w-full p-4 rounded-lg border-2 text-left transition-all mb-3
-                      ${!canUseRdgAvg
-                        ? darkMode
-                          ? 'border-slate-700 bg-slate-800/30 opacity-50 cursor-not-allowed'
-                          : 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
-                        : rdgMode === 'avg_event'
-                          ? 'border-green-500 bg-green-500/10'
-                          : darkMode
-                            ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
-                            : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
-                    `}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            !canUseRdgAvg
-                              ? darkMode ? 'border-slate-600' : 'border-slate-300'
-                              : rdgMode === 'avg_event'
-                                ? 'border-green-500 bg-green-500'
-                                : darkMode ? 'border-slate-500' : 'border-slate-400'
-                          }`}>
-                            {rdgMode === 'avg_event' && canUseRdgAvg && <div className="w-2 h-2 bg-white rounded-full" />}
+                  {isSHRS ? (
+                    <>
+                      {/* SHRS Option 1: Average all races in the series/phase */}
+                      <button
+                        onClick={() => canUseRdgAvg && setRdgMode('avg_event')}
+                        disabled={!canUseRdgAvg}
+                        className={`
+                          w-full p-4 rounded-lg border-2 text-left transition-all mb-3
+                          ${!canUseRdgAvg
+                            ? darkMode
+                              ? 'border-slate-700 bg-slate-800/30 opacity-50 cursor-not-allowed'
+                              : 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
+                            : rdgMode === 'avg_event'
+                              ? 'border-green-500 bg-green-500/10'
+                              : darkMode
+                                ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                                : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
+                        `}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                !canUseRdgAvg
+                                  ? darkMode ? 'border-slate-600' : 'border-slate-300'
+                                  : rdgMode === 'avg_event'
+                                    ? 'border-green-500 bg-green-500'
+                                    : darkMode ? 'border-slate-500' : 'border-slate-400'
+                              }`}>
+                                {rdgMode === 'avg_event' && canUseRdgAvg && <div className="w-2 h-2 bg-white rounded-full" />}
+                              </div>
+                              <span className={`font-semibold ${!canUseRdgAvg ? (darkMode ? 'text-slate-500' : 'text-slate-400') : darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                RGA - Average All Rounds in Phase {canUseRdgAvg ? '(Default)' : ''}
+                              </span>
+                            </div>
+                            <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                              {!canUseRdgAvg
+                                ? 'Requires at least 1 completed race before average can be calculated.'
+                                : 'Average of all other round scores in the same series phase (SHRS Rule 5.6). Progressive - recalculated as more races complete.'}
+                            </p>
                           </div>
-                          <span className={`font-semibold ${!canUseRdgAvg ? (darkMode ? 'text-slate-500' : 'text-slate-400') : darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            RDGave - Average {isSHRS ? 'All Rounds in Phase' : 'All Races'} {!canUseRdgAvg ? '' : '(Default)'}
-                          </span>
+                          {canUseRdgAvg && averagePoints !== null && (
+                            <div className="text-right ml-3">
+                              <div className={`text-lg font-bold ${rdgMode === 'avg_event' ? 'text-green-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                ~{averagePoints}
+                              </div>
+                              <div className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                current avg
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          {!canUseRdgAvg
-                            ? `Requires at least 1 completed race before average can be calculated.`
-                            : isSHRS
-                              ? `Average of all other round scores in same series phase (SHRS Rule 5.6). Recalculated at event completion.`
-                              : `Average of all ${isHeatRacing ? 'race scores (excluding R1 per HMS Rule 5.3)' : 'prior race scores'}. Recalculated at event completion.`}
-                        </p>
-                      </div>
-                      {canUseRdgAvg && averagePoints !== null && (
-                        <div className="text-right ml-3">
-                          <div className={`text-lg font-bold ${rdgMode === 'avg_event' ? 'text-green-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            ~{averagePoints}
-                          </div>
-                          <div className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                            current avg
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </button>
+                      </button>
 
-                  <button
-                    onClick={() => setRdgMode('avg_penultimate')}
-                    className={`
-                      w-full p-4 rounded-lg border-2 text-left transition-all mb-3
-                      ${rdgMode === 'avg_penultimate'
-                        ? 'border-amber-500 bg-amber-500/10'
-                        : darkMode
-                          ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
-                          : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
-                    `}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
+                      {/* SHRS Option 2: Fixed points (RGP / committee determined) */}
+                      <button
+                        onClick={() => setRdgMode('manual')}
+                        className={`
+                          w-full p-4 rounded-lg border-2 text-left transition-all
+                          ${rdgMode === 'manual'
+                            ? 'border-blue-500 bg-blue-500/10'
+                            : darkMode
+                              ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                              : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
+                        `}
+                      >
                         <div className="flex items-center gap-2 mb-1">
                           <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            rdgMode === 'avg_penultimate'
-                              ? 'border-amber-500 bg-amber-500'
+                            rdgMode === 'manual'
+                              ? 'border-blue-500 bg-blue-500'
                               : darkMode ? 'border-slate-500' : 'border-slate-400'
                           }`}>
-                            {rdgMode === 'avg_penultimate' && <div className="w-2 h-2 bg-white rounded-full" />}
+                            {rdgMode === 'manual' && <div className="w-2 h-2 bg-white rounded-full" />}
                           </div>
                           <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            RDGave - Average to Penultimate Day
+                            RGP - Fixed Points (Protest Committee)
                           </span>
                         </div>
                         <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          {isSHRS
-                            ? 'Average of all rounds in same phase excluding the final day. Used for multi-day SHRS events.'
-                            : `Average of all races excluding the final day${isHeatRacing ? ' (R1 excluded per HMS rules)' : ''}. Used for multi-day events.`}
+                          Fixed redress points as determined by the protest committee (SHRS Rule 5.5). Enter specific score value.
                         </p>
-                      </div>
-                      {penultimateDayAverage !== null && (
-                        <div className="text-right ml-3">
-                          <div className={`text-lg font-bold ${rdgMode === 'avg_penultimate' ? 'text-amber-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            ~{penultimateDayAverage}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* HMS/Standard Option 1: Average all races */}
+                      <button
+                        onClick={() => canUseRdgAvg && setRdgMode('avg_event')}
+                        disabled={!canUseRdgAvg}
+                        className={`
+                          w-full p-4 rounded-lg border-2 text-left transition-all mb-3
+                          ${!canUseRdgAvg
+                            ? darkMode
+                              ? 'border-slate-700 bg-slate-800/30 opacity-50 cursor-not-allowed'
+                              : 'border-slate-200 bg-slate-100 opacity-50 cursor-not-allowed'
+                            : rdgMode === 'avg_event'
+                              ? 'border-green-500 bg-green-500/10'
+                              : darkMode
+                                ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                                : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
+                        `}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                !canUseRdgAvg
+                                  ? darkMode ? 'border-slate-600' : 'border-slate-300'
+                                  : rdgMode === 'avg_event'
+                                    ? 'border-green-500 bg-green-500'
+                                    : darkMode ? 'border-slate-500' : 'border-slate-400'
+                              }`}>
+                                {rdgMode === 'avg_event' && canUseRdgAvg && <div className="w-2 h-2 bg-white rounded-full" />}
+                              </div>
+                              <span className={`font-semibold ${!canUseRdgAvg ? (darkMode ? 'text-slate-500' : 'text-slate-400') : darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                RDGave - Average All Races {canUseRdgAvg ? '(Default)' : ''}
+                              </span>
+                            </div>
+                            <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                              {!canUseRdgAvg
+                                ? 'Requires at least 1 completed race before average can be calculated.'
+                                : `Average of all ${isHeatRacing ? 'race scores (excluding R1 per HMS Rule 5.3)' : 'prior race scores'}. Recalculated at event completion.`}
+                            </p>
                           </div>
-                          <div className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                            penultimate avg
-                          </div>
+                          {canUseRdgAvg && averagePoints !== null && (
+                            <div className="text-right ml-3">
+                              <div className={`text-lg font-bold ${rdgMode === 'avg_event' ? 'text-green-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                ~{averagePoints}
+                              </div>
+                              <div className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                current avg
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </button>
+                      </button>
 
-                  <button
-                    onClick={() => setRdgMode('manual')}
-                    className={`
-                      w-full p-4 rounded-lg border-2 text-left transition-all
-                      ${rdgMode === 'manual'
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : darkMode
-                          ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
-                          : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
-                    `}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        rdgMode === 'manual'
-                          ? 'border-blue-500 bg-blue-500'
-                          : darkMode ? 'border-slate-500' : 'border-slate-400'
-                      }`}>
-                        {rdgMode === 'manual' && <div className="w-2 h-2 bg-white rounded-full" />}
-                      </div>
-                      <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        RDGfix - Fixed Points (Committee Set)
-                      </span>
-                    </div>
-                    <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {isSHRS
-                        ? 'Fixed redress points as determined by protest committee (SHRS Rule 5.5)'
-                        : 'Enter specific points determined by the race committee'}
-                    </p>
-                  </button>
+                      {/* HMS/Standard Option 2: Average to penultimate day */}
+                      <button
+                        onClick={() => setRdgMode('avg_penultimate')}
+                        className={`
+                          w-full p-4 rounded-lg border-2 text-left transition-all mb-3
+                          ${rdgMode === 'avg_penultimate'
+                            ? 'border-amber-500 bg-amber-500/10'
+                            : darkMode
+                              ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                              : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
+                        `}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                rdgMode === 'avg_penultimate'
+                                  ? 'border-amber-500 bg-amber-500'
+                                  : darkMode ? 'border-slate-500' : 'border-slate-400'
+                              }`}>
+                                {rdgMode === 'avg_penultimate' && <div className="w-2 h-2 bg-white rounded-full" />}
+                              </div>
+                              <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                RDGave - Average to Penultimate Day
+                              </span>
+                            </div>
+                            <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                              Average of all races excluding the final day{isHeatRacing ? ' (R1 excluded per HMS Rule 5.3)' : ''}. Used for multi-day events.
+                            </p>
+                          </div>
+                          {penultimateDayAverage !== null && (
+                            <div className="text-right ml-3">
+                              <div className={`text-lg font-bold ${rdgMode === 'avg_penultimate' ? 'text-amber-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                ~{penultimateDayAverage}
+                              </div>
+                              <div className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                penultimate avg
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* HMS/Standard Option 3: Fixed points */}
+                      <button
+                        onClick={() => setRdgMode('manual')}
+                        className={`
+                          w-full p-4 rounded-lg border-2 text-left transition-all
+                          ${rdgMode === 'manual'
+                            ? 'border-blue-500 bg-blue-500/10'
+                            : darkMode
+                              ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                              : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
+                        `}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            rdgMode === 'manual'
+                              ? 'border-blue-500 bg-blue-500'
+                              : darkMode ? 'border-slate-500' : 'border-slate-400'
+                          }`}>
+                            {rdgMode === 'manual' && <div className="w-2 h-2 bg-white rounded-full" />}
+                          </div>
+                          <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            RDGfix - Fixed Points (Committee Set)
+                          </span>
+                        </div>
+                        <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          Enter specific points determined by the race committee
+                        </p>
+                      </button>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div>
