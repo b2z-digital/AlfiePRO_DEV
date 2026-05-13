@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../utils/supabase';
-import { Tag, Plus, Trash2, CreditCard as Edit2, Battery, Clock, Check } from 'lucide-react';
+import { Tag, Plus, Trash2, Battery, Clock, Check, UserPlus, X, Search } from 'lucide-react';
 
 interface UwbTag {
   id: string;
@@ -16,6 +16,15 @@ interface UwbTag {
   is_active: boolean;
 }
 
+interface ClubMember {
+  id: string;
+  first_name: string;
+  last_name: string;
+  sail_number: string | null;
+  avatar_url: string | null;
+  boat_class: string | null;
+}
+
 const TAG_COLORS = [
   '#0ea5e9', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
   '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1',
@@ -24,18 +33,18 @@ const TAG_COLORS = [
 
 export function UwbTagRegistry({ configId }: { configId: string }) {
   const [tags, setTags] = useState<UwbTag[]>([]);
+  const [members, setMembers] = useState<ClubMember[]>([]);
   const [showAddTag, setShowAddTag] = useState(false);
-  const [editingTag, setEditingTag] = useState<UwbTag | null>(null);
+  const [assigningTag, setAssigningTag] = useState<UwbTag | null>(null);
+  const [memberSearch, setMemberSearch] = useState('');
   const [formData, setFormData] = useState({
     tag_hardware_id: '',
-    sail_number: '',
-    skipper_name: '',
-    boat_class: '',
     color: TAG_COLORS[0],
   });
 
   useEffect(() => {
     loadTags();
+    loadMembers();
   }, [configId]);
 
   async function loadTags() {
@@ -47,6 +56,22 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
     setTags(data || []);
   }
 
+  async function loadMembers() {
+    const { data: configData } = await supabase
+      .from('uwb_tracking_configs')
+      .select('club_id')
+      .eq('id', configId)
+      .maybeSingle();
+    if (!configData) return;
+
+    const { data } = await supabase
+      .from('members')
+      .select('id, first_name, last_name, sail_number, avatar_url, boat_class')
+      .eq('club_id', configData.club_id)
+      .order('first_name');
+    setMembers(data || []);
+  }
+
   async function addTag() {
     if (!formData.tag_hardware_id) return;
     const { data, error } = await supabase
@@ -54,41 +79,49 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
       .insert({
         config_id: configId,
         tag_hardware_id: formData.tag_hardware_id,
-        sail_number: formData.sail_number || null,
-        skipper_name: formData.skipper_name || null,
-        boat_class: formData.boat_class || null,
         color: formData.color,
       })
       .select()
       .single();
     if (!error && data) {
       setTags(prev => [...prev, data]);
-      resetForm();
+      setFormData({ tag_hardware_id: '', color: TAG_COLORS[(tags.length + 1) % TAG_COLORS.length] });
       setShowAddTag(false);
     }
   }
 
-  async function updateTag() {
-    if (!editingTag) return;
+  async function assignMemberToTag(tag: UwbTag, member: ClubMember) {
     const { error } = await supabase
       .from('uwb_tags')
       .update({
-        sail_number: formData.sail_number || null,
-        skipper_name: formData.skipper_name || null,
-        boat_class: formData.boat_class || null,
-        color: formData.color,
+        member_id: member.id,
+        skipper_name: `${member.first_name} ${member.last_name}`,
+        sail_number: member.sail_number,
+        boat_class: member.boat_class,
       })
-      .eq('id', editingTag.id);
+      .eq('id', tag.id);
     if (!error) {
-      setTags(prev => prev.map(t => t.id === editingTag.id ? {
+      setTags(prev => prev.map(t => t.id === tag.id ? {
         ...t,
-        sail_number: formData.sail_number || null,
-        skipper_name: formData.skipper_name || null,
-        boat_class: formData.boat_class || null,
-        color: formData.color,
+        member_id: member.id,
+        skipper_name: `${member.first_name} ${member.last_name}`,
+        sail_number: member.sail_number,
+        boat_class: member.boat_class,
       } : t));
-      setEditingTag(null);
-      resetForm();
+      setAssigningTag(null);
+      setMemberSearch('');
+    }
+  }
+
+  async function unassignTag(tag: UwbTag) {
+    const { error } = await supabase
+      .from('uwb_tags')
+      .update({ member_id: null, skipper_name: null, sail_number: null, boat_class: null })
+      .eq('id', tag.id);
+    if (!error) {
+      setTags(prev => prev.map(t => t.id === tag.id ? {
+        ...t, member_id: null, skipper_name: null, sail_number: null, boat_class: null,
+      } : t));
     }
   }
 
@@ -102,21 +135,6 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
     if (!error) setTags(prev => prev.map(t => t.id === tag.id ? { ...t, is_active: !t.is_active } : t));
   }
 
-  function resetForm() {
-    setFormData({ tag_hardware_id: '', sail_number: '', skipper_name: '', boat_class: '', color: TAG_COLORS[tags.length % TAG_COLORS.length] });
-  }
-
-  function startEdit(tag: UwbTag) {
-    setEditingTag(tag);
-    setFormData({
-      tag_hardware_id: tag.tag_hardware_id,
-      sail_number: tag.sail_number || '',
-      skipper_name: tag.skipper_name || '',
-      boat_class: tag.boat_class || '',
-      color: tag.color,
-    });
-  }
-
   function formatLastSeen(date: string | null) {
     if (!date) return 'Never';
     const diff = Date.now() - new Date(date).getTime();
@@ -126,21 +144,30 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
     return new Date(date).toLocaleDateString();
   }
 
+  const assignedMemberIds = tags.map(t => t.member_id).filter(Boolean);
+  const filteredMembers = members.filter(m => {
+    if (assignedMemberIds.includes(m.id)) return false;
+    if (!memberSearch) return true;
+    const name = `${m.first_name} ${m.last_name}`.toLowerCase();
+    return name.includes(memberSearch.toLowerCase()) ||
+      (m.sail_number?.toLowerCase().includes(memberSearch.toLowerCase()));
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-            <Tag className="w-5 h-5 text-sky-600" />
+          <h3 className="font-semibold text-white flex items-center gap-2">
+            <Tag className="w-5 h-5 text-sky-400" />
             Tag Registry
           </h3>
-          <p className="text-xs text-gray-500 mt-1">
-            Map UWB hardware tags to boats and skippers for identification during races
+          <p className="text-xs text-slate-500 mt-1">
+            Assign club members to UWB hardware tags for race identification
           </p>
         </div>
         <button
-          onClick={() => { resetForm(); setShowAddTag(true); }}
+          onClick={() => { setFormData({ tag_hardware_id: '', color: TAG_COLORS[tags.length % TAG_COLORS.length] }); setShowAddTag(true); }}
           className="flex items-center gap-2 px-3 py-2 bg-sky-600 text-white text-sm rounded-lg hover:bg-sky-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -150,158 +177,184 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
 
       {/* Tags Grid */}
       {tags.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {tags.map(tag => (
             <div
               key={tag.id}
-              className={`bg-white rounded-xl border p-4 transition-all ${
-                tag.is_active ? 'border-gray-200' : 'border-gray-100 opacity-60'
+              className={`rounded-2xl border p-4 transition-all bg-slate-800/30 backdrop-blur-sm ${
+                tag.is_active ? 'border-slate-700/50' : 'border-slate-800/50 opacity-50'
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
+              {/* Tag header with hardware ID */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
                   <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                    className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: tag.color }}
-                  >
-                    {tag.sail_number?.slice(0, 3) || '?'}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900 text-sm">
-                      {tag.skipper_name || 'Unassigned'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {tag.sail_number ? `Sail: ${tag.sail_number}` : 'No sail number'}
-                    </p>
-                  </div>
+                  />
+                  <code className="text-xs font-mono text-slate-400">{tag.tag_hardware_id}</code>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => startEdit(tag)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+                    onClick={() => toggleTagActive(tag)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                      tag.is_active ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-700/50 text-slate-500'
+                    }`}
                   >
-                    <Edit2 className="w-3.5 h-3.5" />
+                    {tag.is_active ? 'ON' : 'OFF'}
                   </button>
                   <button
                     onClick={() => deleteTag(tag.id)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    className="p-1 rounded text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
 
-              <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400">Hardware ID</span>
-                  <code className="font-mono text-gray-600">{tag.tag_hardware_id}</code>
-                </div>
-                {tag.boat_class && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-400">Class</span>
-                    <span className="text-gray-600">{tag.boat_class}</span>
+              {/* Assigned member or empty slot */}
+              {tag.skipper_name ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/40 border border-slate-700/30">
+                  <MemberAvatar
+                    name={tag.skipper_name}
+                    avatarUrl={members.find(m => m.id === tag.member_id)?.avatar_url || null}
+                    color={tag.color}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{tag.skipper_name}</p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      {tag.sail_number && <span>Sail: {tag.sail_number}</span>}
+                      {tag.boat_class && <span>{tag.boat_class}</span>}
+                    </div>
                   </div>
-                )}
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400 flex items-center gap-1">
-                    <Battery className="w-3 h-3" /> Battery
-                  </span>
-                  <span className={`font-medium ${
-                    (tag.battery_level ?? 0) > 50 ? 'text-emerald-600' :
-                    (tag.battery_level ?? 0) > 20 ? 'text-amber-600' : 'text-red-600'
-                  }`}>
-                    {tag.battery_level != null ? `${tag.battery_level}%` : '--'}
-                  </span>
+                  <button
+                    onClick={() => unassignTag(tag)}
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    title="Unassign"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> Last Seen
-                  </span>
-                  <span className="text-gray-600">{formatLastSeen(tag.last_seen_at)}</span>
-                </div>
-              </div>
+              ) : (
+                <button
+                  onClick={() => setAssigningTag(tag)}
+                  className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-sky-400 hover:border-sky-500/50 transition-colors"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span className="text-xs font-medium">Assign Skipper</span>
+                </button>
+              )}
 
-              <button
-                onClick={() => toggleTagActive(tag)}
-                className={`mt-3 w-full py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  tag.is_active
-                    ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
-                }`}
-              >
-                {tag.is_active ? 'Active' : 'Inactive'}
-              </button>
+              {/* Stats row */}
+              <div className="flex items-center justify-between mt-3 text-xs text-slate-500">
+                <span className="flex items-center gap-1">
+                  <Battery className="w-3 h-3" />
+                  {tag.battery_level != null ? (
+                    <span className={
+                      tag.battery_level > 50 ? 'text-emerald-400' :
+                      tag.battery_level > 20 ? 'text-amber-400' : 'text-red-400'
+                    }>{tag.battery_level}%</span>
+                  ) : '--'}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {formatLastSeen(tag.last_seen_at)}
+                </span>
+              </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <Tag className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">No tags registered yet</p>
-          <p className="text-gray-400 text-xs mt-1">Add UWB tags and assign them to boats</p>
+        <div className="text-center py-12 rounded-2xl border bg-slate-800/30 border-slate-700/50">
+          <Tag className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+          <p className="text-slate-400 text-sm">No tags registered yet</p>
+          <p className="text-slate-600 text-xs mt-1">Add UWB tags and assign them to club members</p>
         </div>
       )}
 
-      {/* Add/Edit Tag Modal */}
-      {(showAddTag || editingTag) && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              {editingTag ? 'Edit Tag' : 'Add New Tag'}
-            </h3>
+      {/* Assign Member Modal */}
+      {assigningTag && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-slate-700/50 rounded-2xl shadow-xl max-w-lg w-full p-6 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">
+                Assign Skipper to Tag <code className="text-sky-400 ml-2 text-sm">{assigningTag.tag_hardware_id}</code>
+              </h3>
+              <button onClick={() => { setAssigningTag(null); setMemberSearch(''); }} className="p-1 text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                placeholder="Search members..."
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-sm text-white placeholder-slate-500 focus:border-sky-500 outline-none"
+                autoFocus
+              />
+            </div>
+
+            {/* Members list */}
+            <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
+              {filteredMembers.length > 0 ? filteredMembers.map(member => (
+                <button
+                  key={member.id}
+                  onClick={() => assignMemberToTag(assigningTag, member)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-900/30 border border-slate-700/30 hover:border-sky-500/50 hover:bg-sky-500/5 transition-all text-left"
+                >
+                  <MemberAvatar
+                    name={`${member.first_name} ${member.last_name}`}
+                    avatarUrl={member.avatar_url}
+                    color={assigningTag.color}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white">{member.first_name} {member.last_name}</p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      {member.sail_number && <span>Sail: {member.sail_number}</span>}
+                      {member.boat_class && <span>{member.boat_class}</span>}
+                    </div>
+                  </div>
+                  <UserPlus className="w-4 h-4 text-slate-500" />
+                </button>
+              )) : (
+                <p className="text-center text-slate-500 text-sm py-8">
+                  {memberSearch ? 'No matching members found' : 'All members are already assigned'}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Tag Modal */}
+      {showAddTag && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-slate-700/50 rounded-2xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Add New Tag</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Hardware Tag ID</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Hardware Tag ID</label>
                 <input
                   type="text"
                   value={formData.tag_hardware_id}
                   onChange={(e) => setFormData(prev => ({ ...prev, tag_hardware_id: e.target.value }))}
                   placeholder="e.g. TAG-001"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                  disabled={!!editingTag}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Sail Number</label>
-                  <input
-                    type="text"
-                    value={formData.sail_number}
-                    onChange={(e) => setFormData(prev => ({ ...prev, sail_number: e.target.value }))}
-                    placeholder="e.g. AUS 42"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Boat Class</label>
-                  <input
-                    type="text"
-                    value={formData.boat_class}
-                    onChange={(e) => setFormData(prev => ({ ...prev, boat_class: e.target.value }))}
-                    placeholder="e.g. IOM"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Skipper Name</label>
-                <input
-                  type="text"
-                  value={formData.skipper_name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, skipper_name: e.target.value }))}
-                  placeholder="e.g. John Smith"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:border-sky-500 outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Display Color</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Display Color</label>
                 <div className="flex flex-wrap gap-2">
                   {TAG_COLORS.map(color => (
                     <button
                       key={color}
                       onClick={() => setFormData(prev => ({ ...prev, color }))}
                       className={`w-7 h-7 rounded-full border-2 transition-all ${
-                        formData.color === color ? 'border-gray-900 scale-110' : 'border-transparent'
+                        formData.color === color ? 'border-white scale-110' : 'border-transparent'
                       }`}
                       style={{ backgroundColor: color }}
                     >
@@ -312,23 +365,42 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setShowAddTag(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
               <button
-                onClick={() => { setShowAddTag(false); setEditingTag(null); resetForm(); }}
-                className="px-4 py-2 text-sm text-gray-600"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={editingTag ? updateTag : addTag}
-                disabled={!editingTag && !formData.tag_hardware_id}
+                onClick={addTag}
+                disabled={!formData.tag_hardware_id}
                 className="px-4 py-2 bg-sky-600 text-white text-sm rounded-lg hover:bg-sky-700 disabled:opacity-50"
               >
-                {editingTag ? 'Save Changes' : 'Add Tag'}
+                Add Tag
               </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function MemberAvatar({ name, avatarUrl, color }: { name: string; avatarUrl: string | null; color: string }) {
+  const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className="w-10 h-10 rounded-full object-cover border-2"
+        style={{ borderColor: color }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm border-2"
+      style={{ backgroundColor: color, borderColor: color }}
+    >
+      {initials}
     </div>
   );
 }

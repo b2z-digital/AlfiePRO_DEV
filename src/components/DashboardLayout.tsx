@@ -1087,6 +1087,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           description: 'Interactive sailing race simulator',
           path: '/race-simulator'
         }] : []),
+        ...(isSuperAdmin ? [{
+          id: 'uwb-tracking',
+          label: 'UWB Tracking',
+          icon: Radio,
+          description: 'UWB boat position tracking',
+          path: '/uwb-tracking'
+        }] : []),
         ...(!isMember && !isAssociationViewer ? [{
           id: 'event-websites',
           label: 'Event Websites',
@@ -1164,7 +1171,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'results-scraping', label: 'Results Scraping', icon: Trophy, description: 'External race results feeds', path: '/results-scraping' },
           { id: 'classifieds-scraping', label: 'Classifieds Scraping', icon: Tag, description: 'External classifieds feeds', path: '/classifieds-scraping' },
           { id: 'events-scraping', label: 'Events Scraping', icon: CalendarDays, description: 'External events feeds', path: '/events-scraping' },
-          { id: 'uwb-tracking', label: 'UWB Tracking', icon: Radio, description: 'UWB boat position tracking', path: '/uwb-tracking' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1956,11 +1962,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <EventsScrapingTab darkMode={true} />
                 </div></div>
               } />
-              <Route path="/uwb-tracking" element={
-                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
-                  <UwbTrackingTab />
-                </div></div>
-              } />
               <Route path="/github" element={<Navigate to="/backups" replace />} />
               <Route path="/associations" element={<AssociationsManagementPage darkMode={darkMode} />} />
               <Route path="/clubs" element={<ClubsManagementPage darkMode={darkMode} />} />
@@ -2063,6 +2064,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/results/:id" element={<ResultsPage />} />
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
               {isSuperAdmin && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} />} />}
+              {isSuperAdmin && <Route path="/uwb-tracking" element={<UwbTrackingTab />} />}
               <Route path="/support" element={<SupportPage darkMode={darkMode} />} />
               <Route path="/settings" element={<SettingsPage darkMode={darkMode} />} />
               <Route path="/settings/race-documents/form-builder" element={

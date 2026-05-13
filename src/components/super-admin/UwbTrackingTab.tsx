@@ -127,11 +127,11 @@ export function UwbTrackingTab() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-            <Radio className="w-7 h-7 text-sky-600" />
+          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+            <Radio className="w-7 h-7 text-sky-400" />
             UWB Boat Tracking
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-slate-400 mt-1">
             Ultra-wideband precision tracking system for automated race scoring
           </p>
         </div>
@@ -153,17 +153,17 @@ export function UwbTrackingTab() {
               onClick={() => { setSelectedConfig(config); setActiveTab('overview'); }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
                 selectedConfig?.id === config.id
-                  ? 'border-sky-500 bg-sky-50 text-sky-700'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                  ? 'border-sky-500 bg-sky-500/10 text-sky-300'
+                  : 'border-slate-700/50 bg-slate-800/30 text-slate-300 hover:border-slate-600'
               }`}
             >
               {config.is_active ? (
-                <Wifi className="w-4 h-4 text-emerald-500" />
+                <Wifi className="w-4 h-4 text-emerald-400" />
               ) : (
-                <WifiOff className="w-4 h-4 text-gray-400" />
+                <WifiOff className="w-4 h-4 text-slate-500" />
               )}
               <span className="font-medium text-sm">{config.name}</span>
-              <span className="text-xs text-gray-400">({clubName(config.club_id)})</span>
+              <span className="text-xs text-slate-500">({clubName(config.club_id)})</span>
             </button>
           ))}
         </div>
@@ -173,7 +173,7 @@ export function UwbTrackingTab() {
       {selectedConfig && (
         <>
           {/* Tab Navigation */}
-          <div className="border-b border-gray-200">
+          <div className="border-b border-slate-700/50">
             <nav className="flex gap-1">
               {([
                 { key: 'overview', label: 'Overview', icon: Settings },
@@ -187,8 +187,8 @@ export function UwbTrackingTab() {
                   onClick={() => setActiveTab(tab.key)}
                   className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === tab.key
-                      ? 'border-sky-500 text-sky-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-sky-500 text-sky-400'
+                      : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-600'
                   }`}
                 >
                   <tab.icon className="w-4 h-4" />
@@ -232,10 +232,10 @@ export function UwbTrackingTab() {
 
       {/* Empty State */}
       {configs.length === 0 && (
-        <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-          <Radio className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No UWB Configurations</h3>
-          <p className="text-gray-500 mb-6 max-w-md mx-auto">
+        <div className="text-center py-16 rounded-2xl border bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+          <Radio className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">No UWB Configurations</h3>
+          <p className="text-slate-400 mb-6 max-w-md mx-auto text-sm">
             Create a UWB tracking configuration for a club to get started with precision boat tracking and automated scoring.
           </p>
           <button
@@ -279,21 +279,21 @@ function OverviewPanel({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Status Card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">System Status</h3>
+      <div className="rounded-2xl border p-6 bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+        <h3 className="font-semibold text-white mb-4">System Status</h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Club</span>
-            <span className="text-sm font-medium text-gray-900">{clubName}</span>
+            <span className="text-sm text-slate-400">Club</span>
+            <span className="text-sm font-medium text-white">{clubName}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Status</span>
+            <span className="text-sm text-slate-400">Status</span>
             <button
               onClick={onToggleActive}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 config.is_active
-                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                  : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700/70'
               }`}
             >
               {config.is_active ? (
@@ -304,13 +304,13 @@ function OverviewPanel({
             </button>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Auto Scoring</span>
+            <span className="text-sm text-slate-400">Auto Scoring</span>
             <button
               onClick={() => onUpdate({ auto_scoring_enabled: !config.auto_scoring_enabled })}
               className={`px-3 py-1.5 rounded-full text-xs font-medium ${
                 config.auto_scoring_enabled
-                  ? 'bg-sky-100 text-sky-700'
-                  : 'bg-gray-100 text-gray-600'
+                  ? 'bg-sky-500/20 text-sky-300'
+                  : 'bg-slate-700/50 text-slate-400'
               }`}
             >
               {config.auto_scoring_enabled ? 'Enabled' : 'Disabled'}
@@ -320,67 +320,67 @@ function OverviewPanel({
       </div>
 
       {/* API Key Card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Coordinator API Key</h3>
-        <p className="text-xs text-gray-500 mb-3">
+      <div className="rounded-2xl border p-6 bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+        <h3 className="font-semibold text-white mb-4">Coordinator API Key</h3>
+        <p className="text-xs text-slate-500 mb-3">
           Flash this key onto the coordinator device. It authenticates position data uploads.
         </p>
         <div className="flex items-center gap-2">
-          <code className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono text-gray-700 truncate">
+          <code className="flex-1 bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-xs font-mono text-slate-300 truncate">
             {config.coordinator_api_key}
           </code>
           <button
             onClick={onCopyKey}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="p-2 rounded-lg border border-slate-700/50 hover:bg-slate-700/30 transition-colors"
             title="Copy API key"
           >
             {copiedKey ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             ) : (
-              <Copy className="w-4 h-4 text-gray-500" />
+              <Copy className="w-4 h-4 text-slate-400" />
             )}
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-2">
+        <p className="text-xs text-slate-600 mt-2">
           POST positions to: /functions/v1/uwb-position-ingest/positions
         </p>
       </div>
 
       {/* Settings Card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Tracking Parameters</h3>
+      <div className="rounded-2xl border p-6 bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+        <h3 className="font-semibold text-white mb-4">Tracking Parameters</h3>
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-gray-500">Update Frequency (Hz)</label>
+            <label className="text-xs text-slate-400">Update Frequency (Hz)</label>
             <input
               type="number"
               value={config.update_frequency_hz}
               onChange={(e) => onUpdate({ update_frequency_hz: parseInt(e.target.value) || 10 })}
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              className="mt-1 w-full px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
               min={1}
               max={50}
             />
           </div>
           <div>
-            <label className="text-xs text-gray-500">Rounding Threshold (meters)</label>
+            <label className="text-xs text-slate-400">Rounding Threshold (meters)</label>
             <input
               type="number"
               step="0.1"
               value={config.rounding_threshold_m}
               onChange={(e) => onUpdate({ rounding_threshold_m: parseFloat(e.target.value) || 2.0 })}
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              className="mt-1 w-full px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
               min={0.5}
               max={10}
             />
           </div>
           <div>
-            <label className="text-xs text-gray-500">OCS Detection Threshold (meters)</label>
+            <label className="text-xs text-slate-400">OCS Detection Threshold (meters)</label>
             <input
               type="number"
               step="0.1"
               value={config.ocs_threshold_m}
               onChange={(e) => onUpdate({ ocs_threshold_m: parseFloat(e.target.value) || 0.5 })}
-              className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              className="mt-1 w-full px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
               min={0.1}
               max={5}
             />
@@ -389,14 +389,14 @@ function OverviewPanel({
       </div>
 
       {/* Danger Zone */}
-      <div className="bg-white rounded-xl border border-red-200 p-6">
-        <h3 className="font-semibold text-red-700 mb-4">Danger Zone</h3>
-        <p className="text-sm text-gray-600 mb-4">
+      <div className="rounded-2xl border p-6 bg-slate-800/30 border-red-900/30 backdrop-blur-sm">
+        <h3 className="font-semibold text-red-400 mb-4">Danger Zone</h3>
+        <p className="text-sm text-slate-400 mb-4">
           Deleting this configuration will remove all anchors, tags, course layouts, and recorded race data permanently.
         </p>
         <button
           onClick={onDelete}
-          className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-colors text-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/20 transition-colors text-sm"
         >
           <Trash2 className="w-4 h-4" />
           Delete Configuration
@@ -419,16 +419,16 @@ function CreateConfigModal({
   const [name, setName] = useState('');
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">New UWB Configuration</h3>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 border border-slate-700/50 rounded-2xl shadow-xl max-w-md w-full p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">New UWB Configuration</h3>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Club</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Club</label>
             <select
               value={clubId}
               onChange={(e) => setClubId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
             >
               <option value="">Select a club...</option>
               {clubs.map(club => (
@@ -437,18 +437,18 @@ function CreateConfigModal({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Configuration Name</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Configuration Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Lake Macquarie UWB Setup"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none"
             />
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
             Cancel
           </button>
           <button

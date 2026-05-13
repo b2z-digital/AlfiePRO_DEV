@@ -27,11 +27,11 @@ interface CourseLayout {
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  setup: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Setup' },
-  pre_start: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Pre-Start' },
-  racing: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Racing' },
-  finished: { bg: 'bg-sky-100', text: 'text-sky-700', label: 'Finished' },
-  abandoned: { bg: 'bg-red-100', text: 'text-red-700', label: 'Abandoned' },
+  setup: { bg: 'bg-slate-700/50', text: 'text-slate-300', label: 'Setup' },
+  pre_start: { bg: 'bg-amber-500/20', text: 'text-amber-300', label: 'Pre-Start' },
+  racing: { bg: 'bg-emerald-500/20', text: 'text-emerald-300', label: 'Racing' },
+  finished: { bg: 'bg-sky-500/20', text: 'text-sky-300', label: 'Finished' },
+  abandoned: { bg: 'bg-red-500/20', text: 'text-red-300', label: 'Abandoned' },
 };
 
 export function UwbRaceSessionManager({
@@ -91,8 +91,8 @@ export function UwbRaceSessionManager({
     }
   }
 
-  async function updateSessionStatus(id: string, status: string, extras?: Partial<RaceSession>) {
-    const updates: Record<string, unknown> = { status, ...extras };
+  async function updateSessionStatus(id: string, status: string) {
+    const updates: Record<string, unknown> = { status };
     if (status === 'racing') {
       updates.started_at = new Date().toISOString();
       updates.is_live = true;
@@ -127,14 +127,13 @@ export function UwbRaceSessionManager({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-            <Play className="w-5 h-5 text-sky-600" />
+          <h3 className="font-semibold text-white flex items-center gap-2">
+            <Play className="w-5 h-5 text-sky-400" />
             Race Sessions
           </h3>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Create and manage tracked racing sessions with recording and replay
           </p>
         </div>
@@ -147,26 +146,24 @@ export function UwbRaceSessionManager({
         </button>
       </div>
 
-      {/* Sessions List */}
       {sessions.length > 0 ? (
         <div className="space-y-3">
           {sessions.map(session => {
             const statusStyle = STATUS_STYLES[session.status] || STATUS_STYLES.setup;
             return (
-              <div key={session.id} className="bg-white rounded-xl border border-gray-200 p-4">
+              <div key={session.id} className="rounded-2xl border p-4 bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {session.is_live && (
                       <div className="relative">
-                        <Radio className="w-5 h-5 text-red-500" />
+                        <Radio className="w-5 h-5 text-red-400" />
                         <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
                       </div>
                     )}
                     <div>
-                      <p className="font-medium text-gray-900">{session.name}</p>
-                      <p className="text-xs text-gray-400">
-                        {new Date(session.created_at).toLocaleDateString()} |
-                        Duration: {formatDuration(session.started_at, session.finished_at)}
+                      <p className="font-medium text-white">{session.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {new Date(session.created_at).toLocaleDateString()} | Duration: {formatDuration(session.started_at, session.finished_at)}
                       </p>
                     </div>
                   </div>
@@ -175,7 +172,7 @@ export function UwbRaceSessionManager({
                       {statusStyle.label}
                     </span>
                     {session.viewer_count > 0 && (
-                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                      <span className="flex items-center gap-1 text-xs text-slate-400">
                         <Users className="w-3.5 h-3.5" />
                         {session.viewer_count}
                       </span>
@@ -183,12 +180,11 @@ export function UwbRaceSessionManager({
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/50">
                   {session.status === 'setup' && (
                     <button
                       onClick={() => updateSessionStatus(session.id, 'pre_start')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-medium hover:bg-amber-500/20 transition-colors"
                     >
                       <Clock className="w-3.5 h-3.5" />
                       Start Sequence
@@ -197,7 +193,7 @@ export function UwbRaceSessionManager({
                   {session.status === 'pre_start' && (
                     <button
                       onClick={() => updateSessionStatus(session.id, 'racing')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-100 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-medium hover:bg-emerald-500/20 transition-colors"
                     >
                       <Play className="w-3.5 h-3.5" />
                       Start Race
@@ -206,7 +202,7 @@ export function UwbRaceSessionManager({
                   {session.status === 'racing' && (
                     <button
                       onClick={() => updateSessionStatus(session.id, 'finished')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 text-sky-700 rounded-lg text-xs font-medium hover:bg-sky-100 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/10 text-sky-300 border border-sky-500/30 rounded-lg text-xs font-medium hover:bg-sky-500/20 transition-colors"
                     >
                       <Square className="w-3.5 h-3.5" />
                       Finish Race
@@ -215,7 +211,7 @@ export function UwbRaceSessionManager({
                   {(session.is_live || session.status === 'finished') && (
                     <button
                       onClick={() => onViewLive(session.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 text-sky-700 rounded-lg text-xs font-medium hover:bg-sky-100 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/10 text-sky-300 border border-sky-500/30 rounded-lg text-xs font-medium hover:bg-sky-500/20 transition-colors"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       {session.is_live ? 'View Live' : 'Replay'}
@@ -224,7 +220,7 @@ export function UwbRaceSessionManager({
                   <div className="flex-1" />
                   <button
                     onClick={() => deleteSession(session.id)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -234,35 +230,34 @@ export function UwbRaceSessionManager({
           })}
         </div>
       ) : (
-        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <Play className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">No race sessions yet</p>
-          <p className="text-gray-400 text-xs mt-1">Create a session to start tracking races</p>
+        <div className="text-center py-12 rounded-2xl border bg-slate-800/30 border-slate-700/50">
+          <Play className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+          <p className="text-slate-400 text-sm">No race sessions yet</p>
+          <p className="text-slate-600 text-xs mt-1">Create a session to start tracking races</p>
         </div>
       )}
 
-      {/* Create Session Modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">New Race Session</h3>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-slate-700/50 rounded-2xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">New Race Session</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Session Name</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Session Name</label>
                 <input
                   type="text"
                   value={newSession.name}
                   onChange={(e) => setNewSession(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="e.g. Heat 1 - Round 3"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:border-sky-500 outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Course Layout</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Course Layout</label>
                 <select
                   value={newSession.course_layout_id}
                   onChange={(e) => setNewSession(prev => ({ ...prev, course_layout_id: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white focus:border-sky-500 outline-none"
                 >
                   <option value="">None (free tracking)</option>
                   {layouts.map(l => (
@@ -275,13 +270,13 @@ export function UwbRaceSessionManager({
                   type="checkbox"
                   checked={newSession.recording_enabled}
                   onChange={(e) => setNewSession(prev => ({ ...prev, recording_enabled: e.target.checked }))}
-                  className="w-4 h-4 text-sky-600 rounded"
+                  className="w-4 h-4 text-sky-600 rounded bg-slate-900 border-slate-600"
                 />
-                <span className="text-sm text-gray-700">Record positions for replay</span>
+                <span className="text-sm text-slate-300">Record positions for replay</span>
               </label>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
+              <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
               <button
                 onClick={createSession}
                 disabled={!newSession.name}

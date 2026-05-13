@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../../utils/supabase';
-import { MapPin, Plus, Trash2, Save, RotateCcw, Wind, Anchor as AnchorIcon } from 'lucide-react';
+import { MapPin, Plus, Trash2, Save, Wind, Anchor as AnchorIcon } from 'lucide-react';
 
 interface UwbAnchor {
   id: string;
@@ -94,7 +94,6 @@ export function UwbCourseDesigner({ configId }: { configId: string }) {
 
   async function addAnchor() {
     if (!newAnchor.anchor_id || !newAnchor.name) return;
-    const centerOffset = CANVAS_SIZE / 2;
     const { data, error } = await supabase
       .from('uwb_anchors')
       .insert({
@@ -184,12 +183,12 @@ export function UwbCourseDesigner({ configId }: { configId: string }) {
     canvas.height = CANVAS_SIZE * dpr;
     ctx.scale(dpr, dpr);
 
-    // Background
-    ctx.fillStyle = '#f0f9ff';
+    // Dark ocean background
+    ctx.fillStyle = '#0f1729';
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
     // Grid
-    ctx.strokeStyle = '#e0e7ff';
+    ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = 0.5;
     for (let i = 0; i <= 12; i++) {
       const pos = COURSE_PADDING + i * ((CANVAS_SIZE - COURSE_PADDING * 2) / 12);
@@ -223,7 +222,7 @@ export function UwbCourseDesigner({ configId }: { configId: string }) {
     ctx.textAlign = 'center';
     ctx.fillText('WIND', windCx, windCy + 25);
 
-    // Draw start/finish lines
+    // Start line
     const startAnchors = anchors.filter(a => a.role === 'start_pin' || a.role === 'start_boat');
     if (startAnchors.length === 2) {
       const [x1, y1] = worldToCanvas(startAnchors[0].position_x, startAnchors[0].position_y);
@@ -238,6 +237,7 @@ export function UwbCourseDesigner({ configId }: { configId: string }) {
       ctx.setLineDash([]);
     }
 
+    // Finish line
     const finishAnchors = anchors.filter(a => a.role === 'finish_pin' || a.role === 'finish_boat');
     if (finishAnchors.length === 2) {
       const [x1, y1] = worldToCanvas(finishAnchors[0].position_x, finishAnchors[0].position_y);
@@ -252,32 +252,35 @@ export function UwbCourseDesigner({ configId }: { configId: string }) {
       ctx.setLineDash([]);
     }
 
-    // Draw anchors/marks
+    // Anchors/marks
     anchors.forEach(anchor => {
       const [cx, cy] = worldToCanvas(anchor.position_x, anchor.position_y);
       const color = ROLE_COLORS[anchor.role] || '#6b7280';
 
-      // Buoy shape
+      // Glow
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12;
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(cx, cy, 10, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowBlur = 0;
 
-      // White inner
-      ctx.fillStyle = '#ffffff';
+      // Inner
+      ctx.fillStyle = '#0f1729';
       ctx.beginPath();
       ctx.arc(cx, cy, 5, 0, Math.PI * 2);
       ctx.fill();
 
       // Label
-      ctx.fillStyle = '#1f2937';
+      ctx.fillStyle = '#94a3b8';
       ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(anchor.name, cx, cy + 22);
     });
 
     // Scale bar
-    ctx.fillStyle = '#6b7280';
+    ctx.fillStyle = '#475569';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'left';
     const scaleBarWidth = (CANVAS_SIZE - COURSE_PADDING * 2) / 6;
@@ -329,23 +332,23 @@ export function UwbCourseDesigner({ configId }: { configId: string }) {
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
       {/* Canvas */}
-      <div className="xl:col-span-2 bg-white rounded-xl border border-gray-200 p-4">
+      <div className="xl:col-span-2 rounded-2xl border p-4 bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-sky-600" />
+          <h3 className="font-semibold text-white flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-sky-400" />
             Course Layout
           </h3>
           <div className="flex items-center gap-2">
-            <Wind className="w-4 h-4 text-sky-500" />
+            <Wind className="w-4 h-4 text-sky-400" />
             <input
               type="range"
               min={0}
               max={359}
               value={windDirection}
               onChange={(e) => setWindDirection(parseInt(e.target.value))}
-              className="w-24"
+              className="w-24 accent-sky-500"
             />
-            <span className="text-xs text-gray-500 w-8">{windDirection}°</span>
+            <span className="text-xs text-slate-400 w-8">{windDirection}</span>
           </div>
         </div>
         <div className="relative">
@@ -356,52 +359,50 @@ export function UwbCourseDesigner({ configId }: { configId: string }) {
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
             onMouseLeave={handleCanvasMouseUp}
-            className="rounded-lg border border-gray-100"
+            className="rounded-xl border border-slate-700/50"
           />
         </div>
-        <p className="text-xs text-gray-400 mt-2">
+        <p className="text-xs text-slate-500 mt-2">
           Drag marks to reposition. Green dashed = start line, Red dashed = finish line.
         </p>
       </div>
 
       {/* Sidebar */}
       <div className="space-y-4">
-        {/* Anchors List */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="rounded-2xl border p-4 bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-medium text-gray-900 text-sm">Anchors / Buoys</h4>
+            <h4 className="font-medium text-white text-sm">Anchors / Buoys</h4>
             <button
               onClick={() => setShowAddAnchor(true)}
-              className="p-1.5 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors"
+              className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 transition-colors"
             >
               <Plus className="w-4 h-4" />
             </button>
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {anchors.map(anchor => (
-              <div key={anchor.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+              <div key={anchor.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 border border-slate-700/30">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: ROLE_COLORS[anchor.role] }} />
                   <div>
-                    <p className="text-xs font-medium text-gray-900">{anchor.name}</p>
-                    <p className="text-[10px] text-gray-400">{ROLE_LABELS[anchor.role]} | {anchor.anchor_id}</p>
+                    <p className="text-xs font-medium text-white">{anchor.name}</p>
+                    <p className="text-[10px] text-slate-500">{ROLE_LABELS[anchor.role]} | {anchor.anchor_id}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => deleteAnchor(anchor.id)}
-                  className="p-1 rounded text-gray-400 hover:text-red-500 transition-colors"
+                  className="p-1 rounded text-slate-600 hover:text-red-400 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             ))}
             {anchors.length === 0 && (
-              <p className="text-xs text-gray-400 text-center py-4">No anchors added yet</p>
+              <p className="text-xs text-slate-500 text-center py-4">No anchors added yet</p>
             )}
           </div>
         </div>
 
-        {/* Save Layout */}
         <button
           onClick={saveLayout}
           disabled={anchors.length < 3}
@@ -411,21 +412,22 @@ export function UwbCourseDesigner({ configId }: { configId: string }) {
           Save Course Layout
         </button>
 
-        {/* Saved Layouts */}
         {layouts.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h4 className="font-medium text-gray-900 text-sm mb-3">Saved Layouts</h4>
+          <div className="rounded-2xl border p-4 bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
+            <h4 className="font-medium text-white text-sm mb-3">Saved Layouts</h4>
             <div className="space-y-2">
               {layouts.map(layout => (
                 <button
                   key={layout.id}
                   onClick={() => setSelectedLayout(layout)}
                   className={`w-full text-left p-2 rounded-lg text-xs transition-colors ${
-                    selectedLayout?.id === layout.id ? 'bg-sky-50 text-sky-700' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                    selectedLayout?.id === layout.id
+                      ? 'bg-sky-500/10 text-sky-300 border border-sky-500/30'
+                      : 'bg-slate-900/40 text-slate-300 border border-slate-700/30 hover:border-slate-600'
                   }`}
                 >
                   <p className="font-medium">{layout.name}</p>
-                  <p className="text-gray-400">{layout.course_type} | Wind: {layout.wind_direction_deg}°</p>
+                  <p className="text-slate-500">{layout.course_type} | Wind: {layout.wind_direction_deg}</p>
                 </button>
               ))}
             </div>
@@ -435,36 +437,36 @@ export function UwbCourseDesigner({ configId }: { configId: string }) {
 
       {/* Add Anchor Modal */}
       {showAddAnchor && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Anchor</h3>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-slate-700/50 rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Add Anchor</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Hardware ID</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Hardware ID</label>
                 <input
                   type="text"
                   value={newAnchor.anchor_id}
                   onChange={(e) => setNewAnchor(prev => ({ ...prev, anchor_id: e.target.value }))}
                   placeholder="e.g. ANCHOR-001"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:border-sky-500 outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Name</label>
                 <input
                   type="text"
                   value={newAnchor.name}
                   onChange={(e) => setNewAnchor(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="e.g. Windward Mark"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:border-sky-500 outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Role</label>
                 <select
                   value={newAnchor.role}
                   onChange={(e) => setNewAnchor(prev => ({ ...prev, role: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm text-white focus:border-sky-500 outline-none"
                 >
                   {Object.entries(ROLE_LABELS).map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
@@ -473,7 +475,7 @@ export function UwbCourseDesigner({ configId }: { configId: string }) {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-5">
-              <button onClick={() => setShowAddAnchor(false)} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
+              <button onClick={() => setShowAddAnchor(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
               <button
                 onClick={addAnchor}
                 disabled={!newAnchor.anchor_id || !newAnchor.name}
