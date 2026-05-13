@@ -2896,19 +2896,41 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             onClose={() => setEditLetterScoreTarget(null)}
             onSelect={(letterScore, customPoints) => {
               if (!localResults) return;
-              const updatedResults = localResults.map(r => {
-                if (r.skipperIndex === editLetterScoreTarget.skipperIndex && r.heatDesignation === editLetterScoreTarget.heatDesignation) {
+              const heatDesignation = editLetterScoreTarget.heatDesignation;
+              const targetSkipperIndex = editLetterScoreTarget.skipperIndex;
+
+              let updatedResults = localResults.map(r => {
+                if (r.skipperIndex === targetSkipperIndex && r.heatDesignation === heatDesignation) {
                   if (letterScore === null) {
-                    const positionedResults = localResults
-                      .filter(lr => lr.heatDesignation === editLetterScoreTarget.heatDesignation && !lr.letterScore && lr.skipperIndex !== editLetterScoreTarget.skipperIndex)
-                      .sort((a: any, b: any) => (a.position || 999) - (b.position || 999));
-                    const newPos = positionedResults.length + 1;
-                    return { ...r, letterScore: undefined, customPoints: undefined, position: newPos };
+                    return { ...r, letterScore: undefined, customPoints: undefined, position: r.position };
                   }
                   return { ...r, letterScore, customPoints, position: null };
                 }
                 return r;
               });
+
+              // Recalculate positions for all non-letter-score skippers in this heat
+              const heatResults = updatedResults.filter(r => r.heatDesignation === heatDesignation);
+              const positionedResults = heatResults
+                .filter(r => !r.letterScore)
+                .sort((a: any, b: any) => (a.position || 999) - (b.position || 999));
+
+              // Reassign sequential positions
+              const positionMap = new Map<number, number>();
+              positionedResults.forEach((r, idx) => {
+                positionMap.set(r.skipperIndex, idx + 1);
+              });
+
+              updatedResults = updatedResults.map(r => {
+                if (r.heatDesignation === heatDesignation && !r.letterScore) {
+                  const newPos = positionMap.get(r.skipperIndex);
+                  if (newPos !== undefined) {
+                    return { ...r, position: newPos };
+                  }
+                }
+                return r;
+              });
+
               setLocalResults(updatedResults);
               setEditLetterScoreTarget(null);
             }}
