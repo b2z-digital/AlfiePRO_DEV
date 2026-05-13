@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay } from 'lucide-react';
+import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay, Radio } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -110,6 +110,7 @@ import { NewsScrapingTab } from './super-admin/NewsScrapingTab';
 import { ExternalResultsScrapingTab } from './super-admin/ExternalResultsScrapingTab';
 import { ClassifiedsScrapingTab } from './super-admin/ClassifiedsScrapingTab';
 import { EventsScrapingTab } from './super-admin/EventsScrapingTab';
+import { UwbTrackingTab } from './super-admin/UwbTrackingTab';
 import { usePlatformTracking } from '../hooks/usePlatformTracking';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { useImpersonation } from '../contexts/ImpersonationContext';
@@ -1163,6 +1164,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'results-scraping', label: 'Results Scraping', icon: Trophy, description: 'External race results feeds', path: '/results-scraping' },
           { id: 'classifieds-scraping', label: 'Classifieds Scraping', icon: Tag, description: 'External classifieds feeds', path: '/classifieds-scraping' },
           { id: 'events-scraping', label: 'Events Scraping', icon: CalendarDays, description: 'External events feeds', path: '/events-scraping' },
+          { id: 'uwb-tracking', label: 'UWB Tracking', icon: Radio, description: 'UWB boat position tracking', path: '/uwb-tracking' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1952,6 +1954,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/events-scraping" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <EventsScrapingTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/uwb-tracking" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <UwbTrackingTab />
                 </div></div>
               } />
               <Route path="/github" element={<Navigate to="/backups" replace />} />
