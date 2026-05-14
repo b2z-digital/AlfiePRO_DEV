@@ -317,8 +317,8 @@ export const getSHRSHeatLabel = (heat: HeatDesignation, round: number, config: H
       'B': 'Silver Fleet',
       'C': 'Bronze Fleet',
       'D': 'Copper Fleet',
-      'E': 'Fleet E',
-      'F': 'Fleet F'
+      'E': 'Emerald Fleet',
+      'F': 'Pewter Fleet'
     };
     return fleetNames[heat] || `Fleet ${heat}`;
   }

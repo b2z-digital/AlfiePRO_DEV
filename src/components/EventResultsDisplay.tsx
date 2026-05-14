@@ -820,7 +820,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
   const SHRS_FLEET_NAMES: Record<string, string> = {
     'A': 'Gold Fleet', 'B': 'Silver Fleet', 'C': 'Bronze Fleet',
-    'D': 'Copper Fleet', 'E': 'Fleet E', 'F': 'Fleet F',
+    'D': 'Copper Fleet', 'E': 'Emerald Fleet', 'F': 'Pewter Fleet',
   };
   const SHRS_FLEET_COLORS: Record<string, { border: string; text: string; bg: string; exportBorder: string; exportText: string; exportBg: string }> = {
     'A': { border: 'border-yellow-500', text: 'text-yellow-400', bg: 'bg-yellow-500/10', exportBorder: '#b8960c', exportText: '#ffffff', exportBg: '#c9a70c' },

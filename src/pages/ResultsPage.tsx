@@ -1329,7 +1329,7 @@ export const ResultsPage: React.FC = () => {
           })
         : sortedSkippers;
 
-      const fleetNames: Record<string, string> = { 'A': 'Gold Fleet', 'B': 'Silver Fleet', 'C': 'Bronze Fleet', 'D': 'Copper Fleet', 'E': 'Fleet E', 'F': 'Fleet F' };
+      const fleetNames: Record<string, string> = { 'A': 'Gold Fleet', 'B': 'Silver Fleet', 'C': 'Bronze Fleet', 'D': 'Copper Fleet', 'E': 'Emerald Fleet', 'F': 'Pewter Fleet' };
       const getRaceLabel = (raceNum: number) => {
         if (!isShrs) return `R${raceNum}`;
         return raceNum <= shrsQualifyingRounds ? `Q${raceNum}` : `F${raceNum - shrsQualifyingRounds}`;
