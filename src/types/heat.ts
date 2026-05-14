@@ -417,7 +417,35 @@ export const generateNextRoundAssignments = (
       .map(r => r.round)
       .sort((a, b) => a - b);
 
-    const rankedSkippers = Array.from(allSkipperScores.entries())
+    // SHRS Rule 4.2: Identify withdrawn skippers - they go to lowest fleet
+    const withdrawnSkipperIndices = new Set<number>();
+    for (const r of heatManagement.rounds) {
+      if (r.round > currentRound.round) continue;
+      for (const result of r.results) {
+        if (result.letterScore === 'WDN') {
+          withdrawnSkipperIndices.add(result.skipperIndex);
+        }
+      }
+    }
+    // If a skipper has results after WDN (re-entry), remove from withdrawn set
+    for (const r of heatManagement.rounds) {
+      if (r.round > currentRound.round) continue;
+      for (const result of r.results) {
+        if (withdrawnSkipperIndices.has(result.skipperIndex) && result.position != null && !result.letterScore) {
+          // Check if this non-WDN result is AFTER the WDN
+          const wdnRound = heatManagement.rounds.find(rd =>
+            rd.results.some(res => res.skipperIndex === result.skipperIndex && res.letterScore === 'WDN')
+          )?.round || 0;
+          if (r.round > wdnRound) {
+            withdrawnSkipperIndices.delete(result.skipperIndex);
+          }
+        }
+      }
+    }
+
+    // Separate active and withdrawn skippers for fleet allocation
+    const activeRanked = Array.from(allSkipperScores.entries())
+      .filter(([idx]) => !withdrawnSkipperIndices.has(idx))
       .sort(([idxA, scoreA], [idxB, scoreB]) => {
         if (scoreA !== scoreB) return scoreA - scoreB;
 
@@ -454,8 +482,16 @@ export const generateNextRoundAssignments = (
         return idxA - idxB;
       });
 
+    const withdrawnRanked = Array.from(allSkipperScores.entries())
+      .filter(([idx]) => withdrawnSkipperIndices.has(idx));
+
+    if (withdrawnSkipperIndices.size > 0) {
+      console.log(`SHRS Rule 4.2: ${withdrawnSkipperIndices.size} withdrawn skipper(s) placed in lowest fleet`);
+    }
+
+    // Calculate fleet sizes based on ALL skippers (active + withdrawn)
     const fleetSizes: number[] = [];
-    const totalSkippers = rankedSkippers.length;
+    const totalSkippers = activeRanked.length + withdrawnRanked.length;
     const baseSize = Math.floor(totalSkippers / numberOfHeats);
     const remainder = totalSkippers % numberOfHeats;
     for (let i = 0; i < numberOfHeats; i++) {
@@ -467,12 +503,19 @@ export const generateNextRoundAssignments = (
       skipperIndices: []
     }));
 
+    // Place active skippers by ranking into fleets
     let skipperIdx = 0;
+    const lowestFleetIdx = numberOfHeats - 1;
     for (let fleetIdx = 0; fleetIdx < numberOfHeats; fleetIdx++) {
-      for (let i = 0; i < fleetSizes[fleetIdx] && skipperIdx < rankedSkippers.length; i++) {
-        newAssignments[fleetIdx].skipperIndices.push(rankedSkippers[skipperIdx][0]);
+      for (let i = 0; i < fleetSizes[fleetIdx] && skipperIdx < activeRanked.length; i++) {
+        newAssignments[fleetIdx].skipperIndices.push(activeRanked[skipperIdx][0]);
         skipperIdx++;
       }
+    }
+
+    // SHRS Rule 4.2: Place withdrawn skippers in lowest fleet
+    for (const [wdnIdx] of withdrawnRanked) {
+      newAssignments[lowestFleetIdx].skipperIndices.push(wdnIdx);
     }
 
     console.log('SHR Finals fleet assignments:');
