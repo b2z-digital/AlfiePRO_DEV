@@ -67,8 +67,8 @@ const SHRS_FLEET_CONFIG: Record<string, { name: string; color: string; borderCol
   'B': { name: 'Silver Fleet', color: 'bg-slate-400/15', borderColor: 'border-slate-400', textColor: 'text-slate-300' },
   'C': { name: 'Bronze Fleet', color: 'bg-amber-600/15', borderColor: 'border-amber-600', textColor: 'text-amber-500' },
   'D': { name: 'Copper Fleet', color: 'bg-orange-500/15', borderColor: 'border-orange-500', textColor: 'text-orange-400' },
-  'E': { name: 'Fleet E', color: 'bg-teal-500/15', borderColor: 'border-teal-500', textColor: 'text-teal-400' },
-  'F': { name: 'Fleet F', color: 'bg-green-500/15', borderColor: 'border-green-500', textColor: 'text-green-400' },
+  'E': { name: 'Emerald Fleet', color: 'bg-teal-500/15', borderColor: 'border-teal-500', textColor: 'text-teal-400' },
+  'F': { name: 'Pewter Fleet', color: 'bg-green-500/15', borderColor: 'border-green-500', textColor: 'text-green-400' },
 };
 
 type ViewMode = 'handicaps' | 'rankings';

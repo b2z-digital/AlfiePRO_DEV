@@ -22,8 +22,8 @@ const FLEET_NAMES: Record<string, string> = {
   'B': 'Silver Fleet',
   'C': 'Bronze Fleet',
   'D': 'Copper Fleet',
-  'E': 'Fleet E',
-  'F': 'Fleet F',
+  'E': 'Emerald Fleet',
+  'F': 'Pewter Fleet',
 };
 
 const FLEET_COLORS: Record<string, { bg: string; text: string; border: string }> = {

@@ -350,9 +350,9 @@ export function assignToFinalFleets(
   roundHeatAssignments?: Map<string, string>[]
 ): Map<string, Skipper[]> {
   const fleets = new Map<string, Skipper[]>();
-  const fleetNames = ['Gold', 'Silver', 'Bronze', 'Copper'];
+  const fleetNames = ['Gold', 'Silver', 'Bronze', 'Copper', 'Emerald', 'Pewter'];
   for (let i = 0; i < numberOfFleets; i++) {
-    fleets.set(fleetNames[i], []);
+    fleets.set(fleetNames[i] || `Fleet ${i + 1}`, []);
   }
 
   let rankingScores = new Map(qualifyingScores);

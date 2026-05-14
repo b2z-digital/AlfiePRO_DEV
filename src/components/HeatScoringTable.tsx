@@ -849,11 +849,11 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   const SHRS_FLEET_NAMES: Record<string, string> = {
     'A': 'Gold', 'B': 'Silver', 'C': 'Bronze',
-    'D': 'Copper', 'E': 'Fleet E', 'F': 'Fleet F',
+    'D': 'Copper', 'E': 'Emerald', 'F': 'Pewter',
   };
   const SHRS_FLEET_FULL_NAMES: Record<string, string> = {
     'A': 'Gold Fleet', 'B': 'Silver Fleet', 'C': 'Bronze Fleet',
-    'D': 'Copper Fleet', 'E': 'Fleet E', 'F': 'Fleet F',
+    'D': 'Copper Fleet', 'E': 'Emerald Fleet', 'F': 'Pewter Fleet',
   };
   const SHRS_FLEET_BUTTON_COLORS: Record<string, string> = {
     'A': 'bg-yellow-600',

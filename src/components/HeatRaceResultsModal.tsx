@@ -151,9 +151,9 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
       'A': { name: 'Gold Fleet', bgClass: 'bg-yellow-500', textClass: 'text-yellow-950', borderClass: 'border-yellow-500' },
       'B': { name: 'Silver Fleet', bgClass: 'bg-slate-400', textClass: 'text-slate-950', borderClass: 'border-slate-400' },
       'C': { name: 'Bronze Fleet', bgClass: 'bg-amber-600', textClass: 'text-white', borderClass: 'border-amber-600' },
-      'D': { name: '4th Fleet', bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' },
-      'E': { name: '5th Fleet', bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' },
-      'F': { name: '6th Fleet', bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' },
+      'D': { name: 'Copper Fleet', bgClass: 'bg-orange-600', textClass: 'text-white', borderClass: 'border-orange-600' },
+      'E': { name: 'Emerald Fleet', bgClass: 'bg-teal-600', textClass: 'text-white', borderClass: 'border-teal-600' },
+      'F': { name: 'Pewter Fleet', bgClass: 'bg-green-700', textClass: 'text-white', borderClass: 'border-green-700' },
     };
     return fleetMap[heat] || { name: `Fleet ${heat}`, bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' };
   };
