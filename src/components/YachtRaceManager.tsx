@@ -2914,6 +2914,136 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     });
   };
 
+  // Fleet Status: Two-step withdrawal handlers
+  const handleFleetWithdrawSkipper = (skipperIndex: number) => {
+    if (skipperIndex < 0 || skipperIndex >= skippers.length) return;
+    const currentRound = heatManagement?.currentRound || 1;
+    const newSkippers = [...skippers];
+    newSkippers[skipperIndex] = { ...newSkippers[skipperIndex], withdrawnFromRace: currentRound };
+    setSkippers(newSkippers);
+
+    // Apply WDN to the current round's heat result for this skipper
+    if (heatManagement) {
+      const currentRoundData = heatManagement.rounds.find(r => r.round === currentRound);
+      if (currentRoundData) {
+        const assignment = currentRoundData.heatAssignments.find(a =>
+          a.skipperIndices.includes(skipperIndex)
+        );
+        if (assignment) {
+          const existingResult = currentRoundData.results.find(
+            r => r.skipperIndex === skipperIndex && r.round === currentRound
+          );
+          if (!existingResult) {
+            const wdnResult: HeatResult = {
+              skipperIndex,
+              position: null,
+              letterScore: 'WDN',
+              heatDesignation: assignment.heatDesignation,
+              race: 1,
+              round: currentRound
+            };
+            handleUpdateHeatResult(wdnResult);
+            return; // handleUpdateHeatResult already handles auto-DNC for future rounds
+          }
+        }
+      }
+    }
+  };
+
+  const handleFleetConfirmWithdrawals = () => {
+    // Confirm pending withdrawals by auto-generating DNC results for future rounds
+    // and recalculating heat sizes for HMS
+    if (!heatManagement) return;
+    const currentRound = heatManagement.currentRound;
+    const withdrawnIndices = skippers
+      .map((s, idx) => ({ idx, s }))
+      .filter(({ s }) => s.withdrawnFromRace === currentRound)
+      .map(({ idx }) => idx);
+
+    if (withdrawnIndices.length === 0) return;
+
+    setHeatManagement(prevHM => {
+      if (!prevHM) return prevHM;
+      let updated = { ...prevHM, rounds: prevHM.rounds.map(r => ({ ...r, results: [...r.results] })) };
+      const maxSkippersInHeat = Math.max(
+        ...updated.rounds.flatMap(r => r.heatAssignments.map(a => a.skipperIndices.length)),
+        1
+      );
+
+      for (const skipperIdx of withdrawnIndices) {
+        for (const round of updated.rounds) {
+          if (round.round <= currentRound) continue;
+          const hasResult = round.results.some(r => r.skipperIndex === skipperIdx);
+          if (!hasResult) {
+            const assignment = round.heatAssignments.find(a =>
+              a.skipperIndices.includes(skipperIdx)
+            );
+            const heatDes = assignment?.heatDesignation || 'A';
+            round.results.push({
+              skipperIndex: skipperIdx,
+              position: null,
+              letterScore: 'DNC',
+              customPoints: maxSkippersInHeat + 1,
+              heatDesignation: heatDes as HeatDesignation,
+              race: 1,
+              round: round.round
+            });
+          }
+        }
+      }
+      return updated;
+    });
+  };
+
+  const handleFleetReenterSkipper = (skipperIndex: number) => {
+    if (skipperIndex < 0 || skipperIndex >= skippers.length) return;
+    const newSkippers = [...skippers];
+    newSkippers[skipperIndex] = { ...newSkippers[skipperIndex], withdrawnFromRace: undefined };
+    setSkippers(newSkippers);
+
+    // Remove auto-DNC results for future rounds
+    setHeatManagement(prevHM => {
+      if (!prevHM) return prevHM;
+      const currentRound = prevHM.currentRound;
+      const updatedRounds = prevHM.rounds.map(round => {
+        if (round.round <= currentRound) return round;
+        return {
+          ...round,
+          results: round.results.filter(
+            r => !(r.skipperIndex === skipperIndex && (r.letterScore === 'DNC' || r.letterScore === 'WDN'))
+          )
+        };
+      });
+      return { ...prevHM, rounds: updatedRounds };
+    });
+  };
+
+  const handleFleetCancelPendingWithdrawal = (skipperIndex: number) => {
+    if (skipperIndex < 0 || skipperIndex >= skippers.length) return;
+    const currentRound = heatManagement?.currentRound || 1;
+    // Only cancel if withdrawal was declared in the current round
+    if (skippers[skipperIndex]?.withdrawnFromRace === currentRound) {
+      const newSkippers = [...skippers];
+      newSkippers[skipperIndex] = { ...newSkippers[skipperIndex], withdrawnFromRace: undefined };
+      setSkippers(newSkippers);
+
+      // Remove the WDN result from the current round
+      setHeatManagement(prevHM => {
+        if (!prevHM) return prevHM;
+        const updatedRounds = prevHM.rounds.map(round => {
+          if (round.round < currentRound) return round;
+          return {
+            ...round,
+            results: round.results.filter(
+              r => !(r.skipperIndex === skipperIndex && (r.letterScore === 'WDN' || r.letterScore === 'DNC'))
+            )
+          };
+        });
+        return { ...prevHM, rounds: updatedRounds };
+      });
+    }
+  };
+
   const handleSaveRaceSettings = async (settings: {
     numRaces: number;
     dropRules: number[] | string;
@@ -4068,6 +4198,10 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 }}
                 isFullscreen={isFullscreenScoring}
                 scoringMode={scoringMode}
+                onWithdrawSkipper={handleFleetWithdrawSkipper}
+                onConfirmWithdrawals={handleFleetConfirmWithdrawals}
+                onReenterSkipper={handleFleetReenterSkipper}
+                onCancelPendingWithdrawal={handleFleetCancelPendingWithdrawal}
               />
               </ScoringErrorBoundary>
             ) : scoringMode === 'touch' ? (

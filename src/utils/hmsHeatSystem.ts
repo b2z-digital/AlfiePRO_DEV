@@ -773,10 +773,13 @@ export function generateHeatAssignmentsForNextRace(
   currentRace: number,
   currentRound: HeatRound,
   config: HMSConfig,
-  allRoundsResults?: HeatResult[]
+  allRoundsResults?: HeatResult[],
+  withdrawnSkipperIndices?: Set<number>
 ): HeatAssignment[] {
   const heatResults = new Map<HeatDesignation, HeatResult[]>();
   currentRound.results.forEach(result => {
+    // Exclude confirmed withdrawn skippers from heat assignment generation
+    if (withdrawnSkipperIndices?.has(result.skipperIndex)) return;
     if (!heatResults.has(result.heatDesignation)) {
       heatResults.set(result.heatDesignation, []);
     }

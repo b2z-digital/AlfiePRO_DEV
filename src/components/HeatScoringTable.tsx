@@ -11,6 +11,7 @@ import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
 import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 as Grid3X3, Check, Timer, Share2, Download, ChevronDown, FileSpreadsheet, Users } from 'lucide-react';
+import { FleetStatusBadge } from './FleetStatusBadge';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
@@ -63,6 +64,10 @@ interface HeatScoringTableProps {
   onExtendQualifying?: (newQualifyingRounds: number) => void;
   isFullscreen?: boolean;
   scoringMode?: 'pro' | 'touch' | 'spreadsheet';
+  onWithdrawSkipper?: (skipperIndex: number) => void;
+  onConfirmWithdrawals?: () => void;
+  onReenterSkipper?: (skipperIndex: number) => void;
+  onCancelPendingWithdrawal?: (skipperIndex: number) => void;
 }
 
 export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
@@ -104,7 +109,11 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   onFinaliseQualifying,
   onExtendQualifying,
   isFullscreen,
-  scoringMode: initialScoringMode = 'touch'
+  scoringMode: initialScoringMode = 'touch',
+  onWithdrawSkipper,
+  onConfirmWithdrawals,
+  onReenterSkipper,
+  onCancelPendingWithdrawal
 }) => {
   if (!heatManagement?.configuration || !heatManagement?.rounds) {
     return (
@@ -1734,9 +1743,16 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
               <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1" />
 
-              <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                {heatSkippers.length} skippers
-              </div>
+              <FleetStatusBadge
+                skippers={skippers}
+                heatManagement={heatManagement}
+                darkMode={darkMode}
+                currentRound={safeCurrentRound}
+                onWithdrawSkipper={onWithdrawSkipper || (() => {})}
+                onConfirmWithdrawals={onConfirmWithdrawals || (() => {})}
+                onReenterSkipper={onReenterSkipper || (() => {})}
+                onCancelPendingWithdrawal={onCancelPendingWithdrawal || (() => {})}
+              />
             </div>
             <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
               {/* Scoring Mode Buttons - show all non-current modes */}
