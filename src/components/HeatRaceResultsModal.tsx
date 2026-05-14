@@ -17,6 +17,7 @@ interface HeatRaceResultsModalProps {
   darkMode: boolean;
   currentEvent?: RaceEvent | null;
   embedded?: boolean;
+  showExportInEmbedded?: boolean;
 }
 
 export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
@@ -26,7 +27,8 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
   heatManagement,
   darkMode,
   currentEvent,
-  embedded
+  embedded,
+  showExportInEmbedded
 }) => {
   const tableRef = useRef<HTMLDivElement>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -508,6 +510,62 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
             >
               <X size={24} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Compact export bar when embedded */}
+      {embedded && showExportInEmbedded && (
+        <div className={`flex items-center justify-between px-6 py-2 border-b flex-shrink-0 ${
+          darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'
+        }`}>
+          <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+            <Trophy className="text-emerald-500" size={16} />
+            <span>{completedRounds.length} round{completedRounds.length !== 1 ? 's' : ''} completed</span>
+          </div>
+          <div className="relative export-menu-container">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                darkMode
+                  ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
+                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+              }`}
+            >
+              <Download size={14} />
+              Export
+              <ChevronDown size={12} />
+            </button>
+            {showExportMenu && (
+              <div className={`absolute right-0 mt-1 w-36 rounded-lg shadow-lg overflow-hidden z-50 ${
+                darkMode ? 'bg-slate-700 border border-slate-600' : 'bg-white border border-slate-200'
+              }`}>
+                <button
+                  onClick={() => { exportAsJPG(); setShowExportMenu(false); }}
+                  className={`w-full px-3 py-2 text-left text-xs transition-colors ${
+                    darkMode ? 'text-slate-200 hover:bg-slate-600' : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  Export as JPG
+                </button>
+                <button
+                  onClick={() => { exportAsPDF(); setShowExportMenu(false); }}
+                  className={`w-full px-3 py-2 text-left text-xs border-t transition-colors ${
+                    darkMode ? 'text-slate-200 hover:bg-slate-600 border-slate-600' : 'text-slate-700 hover:bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  Export as PDF
+                </button>
+                <button
+                  onClick={() => { exportAsCSV(); setShowExportMenu(false); }}
+                  className={`w-full px-3 py-2 text-left text-xs border-t transition-colors ${
+                    darkMode ? 'text-slate-200 hover:bg-slate-600 border-slate-600' : 'text-slate-700 hover:bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  Export as CSV
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
