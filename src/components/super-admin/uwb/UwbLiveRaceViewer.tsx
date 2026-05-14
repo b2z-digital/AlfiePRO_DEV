@@ -526,7 +526,13 @@ export function UwbLiveRaceViewer({
       ctx.fillText(anchor.name, cx, cy + 18);
     });
 
-    // Draw boat trails and current positions
+    // Draw boat trails and flag-style markers
+    const ALFIE_BLUE = '#0ea5e9';
+    const ALFIE_BLUE_DARK = '#0284c7';
+    const FLAG_POLE_HEIGHT = 28;
+    const FLAG_PADDING_X = 5;
+    const FLAG_PADDING_Y = 3;
+
     positions.forEach((trail, tagId) => {
       const tag = tags.find(t => t.id === tagId);
       const color = tag?.color || '#ffffff';
@@ -549,39 +555,82 @@ export function UwbLiveRaceViewer({
       if (!current) return;
       const [bx, by] = worldToCanvas(current.position_x, current.position_y, bounds);
 
-      // Boat triangle shape with glow
-      const heading = current.heading_deg != null ? (current.heading_deg - 90) * (Math.PI / 180) : 0;
-      ctx.save();
-      ctx.translate(bx, by);
-      ctx.rotate(heading);
-
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 6;
-      ctx.fillStyle = color;
+      // Boat dot (position indicator)
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = ALFIE_BLUE_DARK;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(0, -BOAT_SIZE);
-      ctx.lineTo(-BOAT_SIZE * 0.6, BOAT_SIZE * 0.7);
-      ctx.lineTo(BOAT_SIZE * 0.6, BOAT_SIZE * 0.7);
-      ctx.closePath();
+      ctx.arc(bx, by, 4, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-      ctx.lineWidth = 1;
       ctx.stroke();
+
+      // Green activity ring
+      ctx.strokeStyle = '#4ade80';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(bx - 1, by + 2, 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#4ade80';
+      ctx.beginPath();
+      ctx.arc(bx - 1, by + 2, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Flag pole (vertical line going up from boat dot)
+      ctx.strokeStyle = ALFIE_BLUE_DARK;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx, by - FLAG_POLE_HEIGHT);
+      ctx.stroke();
+
+      // Flag rectangle with sail number
+      const sailLabel = tag?.sail_number || tag?.tag_hardware_id?.slice(-3) || '?';
+      ctx.font = 'bold 11px sans-serif';
+      const textWidth = ctx.measureText(sailLabel).width;
+      const flagWidth = textWidth + FLAG_PADDING_X * 2;
+      const flagHeight = 18;
+      const flagX = bx;
+      const flagY = by - FLAG_POLE_HEIGHT - flagHeight;
+
+      // Flag background with rounded corners
+      const radius = 3;
+      ctx.beginPath();
+      ctx.moveTo(flagX + radius, flagY);
+      ctx.lineTo(flagX + flagWidth - radius, flagY);
+      ctx.arcTo(flagX + flagWidth, flagY, flagX + flagWidth, flagY + radius, radius);
+      ctx.lineTo(flagX + flagWidth, flagY + flagHeight - radius);
+      ctx.arcTo(flagX + flagWidth, flagY + flagHeight, flagX + flagWidth - radius, flagY + flagHeight, radius);
+      ctx.lineTo(flagX + radius, flagY + flagHeight);
+      ctx.arcTo(flagX, flagY + flagHeight, flagX, flagY + flagHeight - radius, radius);
+      ctx.lineTo(flagX, flagY + radius);
+      ctx.arcTo(flagX, flagY, flagX + radius, flagY, radius);
+      ctx.closePath();
+
+      ctx.fillStyle = ALFIE_BLUE;
+      ctx.shadowColor = 'rgba(14, 165, 233, 0.4)';
+      ctx.shadowBlur = 6;
+      ctx.fill();
       ctx.shadowBlur = 0;
 
-      ctx.restore();
+      // Flag border
+      ctx.strokeStyle = ALFIE_BLUE_DARK;
+      ctx.lineWidth = 1;
+      ctx.stroke();
 
-      // Sail number label
+      // Flag text (sail number)
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 9px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(tag?.sail_number || tag?.tag_hardware_id?.slice(-3) || '?', bx, by + BOAT_SIZE + 14);
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(sailLabel, flagX + FLAG_PADDING_X, flagY + flagHeight / 2);
+      ctx.textBaseline = 'alphabetic';
 
-      // Speed indicator
+      // Speed indicator below the boat dot
       if (current.speed_mps != null && current.speed_mps > 0) {
         ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
         ctx.font = '8px sans-serif';
-        ctx.fillText(`${(current.speed_mps * 1.94384).toFixed(1)}kts`, bx, by + BOAT_SIZE + 24);
+        ctx.textAlign = 'center';
+        ctx.fillText(`${(current.speed_mps * 1.94384).toFixed(1)}kts`, bx + flagWidth / 2, by + 14);
       }
     });
 

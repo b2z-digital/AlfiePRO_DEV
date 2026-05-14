@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../utils/supabase';
-import { Tag, Plus, Trash2, Battery, Clock, Check, UserPlus, X, Search } from 'lucide-react';
+import { Tag, Plus, Trash2, Battery, Clock, Check, UserPlus, X, Search, Users, Globe } from 'lucide-react';
 
 interface UwbTag {
   id: string;
@@ -37,6 +37,10 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
   const [showAddTag, setShowAddTag] = useState(false);
   const [assigningTag, setAssigningTag] = useState<UwbTag | null>(null);
   const [memberSearch, setMemberSearch] = useState('');
+  const [searchTab, setSearchTab] = useState<'club' | 'search'>('club');
+  const [globalSearchResults, setGlobalSearchResults] = useState<ClubMember[]>([]);
+  const [globalSearching, setGlobalSearching] = useState(false);
+  const [clubName, setClubName] = useState('');
   const [formData, setFormData] = useState({
     tag_hardware_id: '',
     color: TAG_COLORS[0],
@@ -64,12 +68,35 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
       .maybeSingle();
     if (!configData) return;
 
+    const { data: clubData } = await supabase
+      .from('clubs')
+      .select('name')
+      .eq('id', configData.club_id)
+      .maybeSingle();
+    if (clubData) setClubName(clubData.name);
+
     const { data } = await supabase
       .from('members')
       .select('id, first_name, last_name, sail_number, avatar_url, boat_class')
       .eq('club_id', configData.club_id)
+      .eq('membership_status', 'active')
       .order('first_name');
     setMembers(data || []);
+  }
+
+  async function searchGlobalSkippers(query: string) {
+    if (query.length < 2) {
+      setGlobalSearchResults([]);
+      return;
+    }
+    setGlobalSearching(true);
+    const { data } = await supabase
+      .from('members')
+      .select('id, first_name, last_name, sail_number, avatar_url, boat_class')
+      .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,sail_number.ilike.%${query}%`)
+      .limit(20);
+    setGlobalSearchResults(data || []);
+    setGlobalSearching(false);
   }
 
   async function addTag() {
@@ -110,6 +137,7 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
       } : t));
       setAssigningTag(null);
       setMemberSearch('');
+      setGlobalSearchResults([]);
     }
   }
 
@@ -237,7 +265,7 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
                 </div>
               ) : (
                 <button
-                  onClick={() => setAssigningTag(tag)}
+                  onClick={() => { setAssigningTag(tag); setSearchTab('club'); setMemberSearch(''); }}
                   className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-slate-700/50 text-slate-500 hover:text-sky-400 hover:border-sky-500/50 transition-colors"
                 >
                   <UserPlus className="w-4 h-4" />
@@ -280,8 +308,37 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
               <h3 className="text-lg font-semibold text-white">
                 Assign Skipper to Tag <code className="text-sky-400 ml-2 text-sm">{assigningTag.tag_hardware_id}</code>
               </h3>
-              <button onClick={() => { setAssigningTag(null); setMemberSearch(''); }} className="p-1 text-slate-400 hover:text-white">
+              <button onClick={() => { setAssigningTag(null); setMemberSearch(''); setGlobalSearchResults([]); }} className="p-1 text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 p-1 bg-slate-900/50 rounded-lg mb-4">
+              <button
+                onClick={() => { setSearchTab('club'); setMemberSearch(''); }}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                  searchTab === 'club'
+                    ? 'bg-sky-500/20 text-sky-300'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                Club Members
+                {members.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-slate-700/50 rounded text-[10px]">{members.length}</span>
+                )}
+              </button>
+              <button
+                onClick={() => { setSearchTab('search'); setMemberSearch(''); setGlobalSearchResults([]); }}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                  searchTab === 'search'
+                    ? 'bg-sky-500/20 text-sky-300'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                Search All Skippers
               </button>
             </div>
 
@@ -291,8 +348,13 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
               <input
                 type="text"
                 value={memberSearch}
-                onChange={(e) => setMemberSearch(e.target.value)}
-                placeholder="Search members..."
+                onChange={(e) => {
+                  setMemberSearch(e.target.value);
+                  if (searchTab === 'search') {
+                    searchGlobalSkippers(e.target.value);
+                  }
+                }}
+                placeholder={searchTab === 'club' ? `Search ${clubName || 'club'} members...` : 'Search by name or sail number...'}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-sm text-white placeholder-slate-500 focus:border-sky-500 outline-none"
                 autoFocus
               />
@@ -300,30 +362,85 @@ export function UwbTagRegistry({ configId }: { configId: string }) {
 
             {/* Members list */}
             <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
-              {filteredMembers.length > 0 ? filteredMembers.map(member => (
-                <button
-                  key={member.id}
-                  onClick={() => assignMemberToTag(assigningTag, member)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-900/30 border border-slate-700/30 hover:border-sky-500/50 hover:bg-sky-500/5 transition-all text-left"
-                >
-                  <MemberAvatar
-                    name={`${member.first_name} ${member.last_name}`}
-                    avatarUrl={member.avatar_url}
-                    color={assigningTag.color}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white">{member.first_name} {member.last_name}</p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      {member.sail_number && <span>Sail: {member.sail_number}</span>}
-                      {member.boat_class && <span>{member.boat_class}</span>}
+              {searchTab === 'club' ? (
+                <>
+                  {filteredMembers.length > 0 ? filteredMembers.map(member => (
+                    <button
+                      key={member.id}
+                      onClick={() => assignMemberToTag(assigningTag, member)}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-900/30 border border-slate-700/30 hover:border-sky-500/50 hover:bg-sky-500/5 transition-all text-left"
+                    >
+                      <MemberAvatar
+                        name={`${member.first_name} ${member.last_name}`}
+                        avatarUrl={member.avatar_url}
+                        color={assigningTag.color}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white">{member.first_name} {member.last_name}</p>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          {member.sail_number && <span>Sail: {member.sail_number}</span>}
+                          {member.boat_class && <span>{member.boat_class}</span>}
+                        </div>
+                      </div>
+                      <UserPlus className="w-4 h-4 text-slate-500" />
+                    </button>
+                  )) : (
+                    <div className="text-center py-8">
+                      <Users className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500">
+                        {memberSearch ? 'No matching members found' : members.length === 0 ? 'No active members in this club' : 'All members are already assigned'}
+                      </p>
+                      {members.length === 0 && (
+                        <p className="text-xs text-slate-600 mt-1">
+                          Members must be added to the club first, or try the "Search All Skippers" tab
+                        </p>
+                      )}
                     </div>
-                  </div>
-                  <UserPlus className="w-4 h-4 text-slate-500" />
-                </button>
-              )) : (
-                <p className="text-center text-slate-500 text-sm py-8">
-                  {memberSearch ? 'No matching members found' : 'All members are already assigned'}
-                </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {globalSearching ? (
+                    <div className="text-center py-8">
+                      <div className="w-6 h-6 border-2 border-sky-500/30 border-t-sky-500 rounded-full animate-spin mx-auto mb-2" />
+                      <p className="text-xs text-slate-500">Searching...</p>
+                    </div>
+                  ) : globalSearchResults.length > 0 ? (
+                    globalSearchResults
+                      .filter(m => !assignedMemberIds.includes(m.id))
+                      .map(member => (
+                        <button
+                          key={member.id}
+                          onClick={() => assignMemberToTag(assigningTag, member)}
+                          className="w-full flex items-center gap-3 p-3 rounded-xl bg-slate-900/30 border border-slate-700/30 hover:border-sky-500/50 hover:bg-sky-500/5 transition-all text-left"
+                        >
+                          <MemberAvatar
+                            name={`${member.first_name} ${member.last_name}`}
+                            avatarUrl={member.avatar_url}
+                            color={assigningTag.color}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white">{member.first_name} {member.last_name}</p>
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                              {member.sail_number && <span>Sail: {member.sail_number}</span>}
+                              {member.boat_class && <span>{member.boat_class}</span>}
+                            </div>
+                          </div>
+                          <UserPlus className="w-4 h-4 text-slate-500" />
+                        </button>
+                      ))
+                  ) : memberSearch.length >= 2 ? (
+                    <p className="text-center text-slate-500 text-sm py-8">
+                      No skippers found matching "{memberSearch}"
+                    </p>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Search className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500">Type at least 2 characters to search</p>
+                      <p className="text-xs text-slate-600 mt-1">Search across all registered skippers in Alfie</p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
