@@ -33,28 +33,20 @@ export const FleetStatusBadge: React.FC<FleetStatusBadgeProps> = ({
 }) => {
   const [panelOpen, setPanelOpen] = useState(false);
   const [confirmingReentry, setConfirmingReentry] = useState<number | null>(null);
-  const [panelAlignLeft, setPanelAlignLeft] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const badgeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!panelOpen) return;
     const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node) &&
+          badgeRef.current && !badgeRef.current.contains(e.target as Node)) {
         setPanelOpen(false);
         setConfirmingReentry(null);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [panelOpen]);
-
-  useEffect(() => {
-    if (panelOpen && badgeRef.current) {
-      const rect = badgeRef.current.getBoundingClientRect();
-      const spaceRight = window.innerWidth - rect.right;
-      setPanelAlignLeft(spaceRight < 400);
-    }
   }, [panelOpen]);
 
   const scoringSystem = heatManagement.configuration?.scoringSystem || 'hms';
@@ -154,16 +146,19 @@ export const FleetStatusBadge: React.FC<FleetStatusBadgeProps> = ({
         )}
       </button>
 
-      {/* Panel */}
+      {/* Panel - Fixed overlay to prevent clipping on any screen size */}
       {panelOpen && (
-        <div
-          ref={panelRef}
-          className={`absolute top-full mt-2 w-96 max-h-[70vh] overflow-y-auto rounded-xl shadow-2xl border z-50 ${
-            panelAlignLeft ? 'left-0' : 'right-0'
-          } ${
-            darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-          }`}
-        >
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 sm:pt-24">
+          <div
+            className="fixed inset-0 bg-black/20"
+            onClick={() => { setPanelOpen(false); setConfirmingReentry(null); }}
+          />
+          <div
+            ref={panelRef}
+            className={`relative w-full max-w-md max-h-[70vh] overflow-y-auto rounded-xl shadow-2xl border z-50 ${
+              darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+            }`}
+          >
           {/* Panel Header */}
           <div className={`sticky top-0 px-4 py-3 border-b flex items-center justify-between ${
             darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
@@ -385,6 +380,7 @@ export const FleetStatusBadge: React.FC<FleetStatusBadgeProps> = ({
             ) : (
               <p>SHRS Rule 4.2: Withdrawn skippers are placed in the lowest fleet for finals.</p>
             )}
+          </div>
           </div>
         </div>
       )}
