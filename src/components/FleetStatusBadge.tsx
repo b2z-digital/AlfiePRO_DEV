@@ -33,7 +33,9 @@ export const FleetStatusBadge: React.FC<FleetStatusBadgeProps> = ({
 }) => {
   const [panelOpen, setPanelOpen] = useState(false);
   const [confirmingReentry, setConfirmingReentry] = useState<number | null>(null);
+  const [panelAlignLeft, setPanelAlignLeft] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const badgeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!panelOpen) return;
@@ -45,6 +47,14 @@ export const FleetStatusBadge: React.FC<FleetStatusBadgeProps> = ({
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, [panelOpen]);
+
+  useEffect(() => {
+    if (panelOpen && badgeRef.current) {
+      const rect = badgeRef.current.getBoundingClientRect();
+      const spaceRight = window.innerWidth - rect.right;
+      setPanelAlignLeft(spaceRight < 400);
+    }
   }, [panelOpen]);
 
   const scoringSystem = heatManagement.configuration?.scoringSystem || 'hms';
@@ -127,6 +137,7 @@ export const FleetStatusBadge: React.FC<FleetStatusBadgeProps> = ({
     <div className="relative">
       {/* Badge */}
       <button
+        ref={badgeRef}
         onClick={() => setPanelOpen(!panelOpen)}
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${getBadgeStyles()} hover:opacity-80`}
         title="Fleet Status - Click to manage withdrawals"
@@ -147,7 +158,9 @@ export const FleetStatusBadge: React.FC<FleetStatusBadgeProps> = ({
       {panelOpen && (
         <div
           ref={panelRef}
-          className={`absolute top-full right-0 mt-2 w-96 max-h-[70vh] overflow-y-auto rounded-xl shadow-2xl border z-50 ${
+          className={`absolute top-full mt-2 w-96 max-h-[70vh] overflow-y-auto rounded-xl shadow-2xl border z-50 ${
+            panelAlignLeft ? 'left-0' : 'right-0'
+          } ${
             darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
           }`}
         >

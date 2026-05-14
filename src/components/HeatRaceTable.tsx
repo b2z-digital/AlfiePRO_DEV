@@ -777,7 +777,10 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
           }
         });
 
-        const hrtHasCompleted = skipperPreviousResults.some(r => r.position !== null && r.position > 0 && r.raceNumber !== 1);
+        const isSHRS = configuration.scoringSystem === 'shrs';
+        const hrtHasCompleted = isSHRS
+          ? skipperPreviousResults.some(r => r.position !== null && r.position > 0)
+          : skipperPreviousResults.some(r => r.position !== null && r.position > 0 && r.raceNumber !== 1);
 
         return (
           <LetterScoreSelector
