@@ -1185,30 +1185,30 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>
             )}
-            <div className={`flex rounded-lg overflow-hidden border ${
-              darkMode ? 'border-slate-600' : 'border-slate-300'
-            }`}>
-              <button
-                onClick={() => setShrsResultsTab('race')}
-                className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                  shrsResultsTab === 'race'
-                    ? darkMode ? 'bg-emerald-600 text-white' : 'bg-emerald-600 text-white'
-                    : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Race Results
-              </button>
-              <button
-                onClick={() => setShrsResultsTab('overall')}
-                className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                  shrsResultsTab === 'overall'
-                    ? darkMode ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'
-                    : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Overall Results
-              </button>
-            </div>
+          </div>
+          <div className={`flex rounded-lg overflow-hidden border ${
+            darkMode ? 'border-slate-600' : 'border-slate-300'
+          }`}>
+            <button
+              onClick={() => setShrsResultsTab('race')}
+              className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                shrsResultsTab === 'race'
+                  ? darkMode ? 'bg-emerald-600 text-white' : 'bg-emerald-600 text-white'
+                  : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Race Results
+            </button>
+            <button
+              onClick={() => setShrsResultsTab('overall')}
+              className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                shrsResultsTab === 'overall'
+                  ? darkMode ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'
+                  : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Overall Results
+            </button>
           </div>
         </div>
         {/* Tab content */}
@@ -1224,7 +1224,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 }
               }}
               isSimulated={currentEvent?.is_simulated}
-              hideHeader={true}
+              compactHeader={true}
             />
           ) : (
             <HeatRaceResultsModal
@@ -1239,6 +1239,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               darkMode={darkMode}
               currentEvent={currentEvent}
               embedded={true}
+              showExportInEmbedded={true}
             />
           )}
         </div>

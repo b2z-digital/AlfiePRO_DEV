@@ -14,6 +14,7 @@ interface SHRSOverallResultsViewProps {
   onBack: () => void;
   isSimulated?: boolean;
   hideHeader?: boolean;
+  compactHeader?: boolean;
 }
 
 const FLEET_NAMES: Record<string, string> = {
@@ -72,6 +73,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
   onBack,
   isSimulated,
   hideHeader,
+  compactHeader,
 }) => {
   const isShrs = heatManagement?.configuration?.scoringSystem === 'shrs';
   const shrsQualifyingRounds = heatManagement?.configuration?.shrsQualifyingRounds || 0;
@@ -946,9 +948,10 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     <div className="flex flex-col h-full">
       {/* Header */}
       {!hideHeader && (
-      <div className={`flex items-center justify-between px-6 py-4 border-b flex-shrink-0 ${
+      <div className={`flex items-center justify-between px-6 ${compactHeader ? 'py-2' : 'py-4'} border-b flex-shrink-0 ${
         darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'
       }`}>
+        {!compactHeader && (
         <div className="flex items-center gap-3">
           {!isSimulated && (
             <button
@@ -973,6 +976,13 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
             </p>
           </div>
         </div>
+        )}
+        {compactHeader && (
+          <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+            <Trophy className="text-yellow-500" size={16} />
+            <span>{completedRaces.length} races completed \u2022 {standings.length} skippers</span>
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <button
             onClick={exportAnzamHtml}
@@ -986,9 +996,11 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
             <Download size={14} />
             Export HTML
           </button>
-          <span className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-            {standings.length} skippers
-          </span>
+          {!compactHeader && (
+            <span className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+              {standings.length} skippers
+            </span>
+          )}
         </div>
       </div>
       )}
