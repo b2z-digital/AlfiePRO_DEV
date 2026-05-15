@@ -1099,7 +1099,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                     ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
                                     : 'bg-slate-100 text-slate-700 border border-slate-300'
                                 }`}
-                                title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
+                                title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 || cell.customPoints === -3 ? 'AVG' : cell.customPoints})` : ''}`}
                               >
                                 {getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}
                               </button>
@@ -1615,7 +1615,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                             ? 'bg-slate-600/40 text-slate-300 border border-slate-500/40'
                                             : 'bg-slate-100 text-slate-700 border border-slate-300'
                                         }`}
-                                        title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 ? 'AVG' : cell.customPoints})` : ''}`}
+                                        title={`${getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}${cell.customPoints !== undefined ? ` (${cell.customPoints === -1 || cell.customPoints === -3 ? 'AVG' : cell.customPoints})` : ''}`}
                                       >
                                         {getLetterScoreDisplayCode(cell.letterScore, cell.customPoints)}
                                       </button>

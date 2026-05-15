@@ -611,7 +611,7 @@ export function reconstructSHRSHeats(
         const result = roundResults.find(r => r.sailNumber === skipper.sailNumber);
 
         if (result) {
-          const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
+          const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2 || result.customPoints === -3);
           let importedScore: number | null | undefined;
           if (isRDGave) {
             importedScore = undefined;
@@ -689,7 +689,7 @@ export function reconstructSHRSHeats(
         if (!aveQualScores.has(result.skipperIndex)) {
           aveQualScores.set(result.skipperIndex, []);
         }
-        const resIsRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
+        const resIsRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2 || result.customPoints === -3);
         if (resIsRDGave) continue;
         const s = (result.importedScore !== undefined && result.importedScore !== null)
           ? result.importedScore
@@ -706,7 +706,7 @@ export function reconstructSHRSHeats(
           qualRaceScores.set(result.skipperIndex, []);
         }
         let score: number;
-        const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
+        const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2 || result.customPoints === -3);
         if (isRDGave) {
           const scores = aveQualScores.get(result.skipperIndex) || [];
           score = scores.length > 0
@@ -803,7 +803,7 @@ export function reconstructSHRSHeats(
           const result = roundResults.find(r => r.sailNumber === skipper.sailNumber);
 
           if (result) {
-            const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2);
+            const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2 || result.customPoints === -3);
             let finImportedScore: number | null | undefined;
             if (isRDGave) {
               finImportedScore = undefined;

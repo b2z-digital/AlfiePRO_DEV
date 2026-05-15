@@ -738,7 +738,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           if (!c?.sailNumber?.trim() || c.skipperIndex !== skipperIndex) continue;
           const isProm = h !== 'A' && r > 1 && p <= promotionCount;
           if (isProm) continue;
-          if (c.letterScore === 'RDG' && (c.customPoints === -1 || c.customPoints === -2)) continue;
+          if (c.letterScore === 'RDG' && (c.customPoints === -1 || c.customPoints === -2 || c.customPoints === -3)) continue;
 
           if (c.hmsPoints != null && c.hmsPoints > 0) {
             scores.push(c.hmsPoints);
@@ -780,7 +780,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
     if (cell?.letterScore) {
       if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
-      if (cell.customPoints === -1 || cell.customPoints === -2) {
+      if (cell.customPoints === -1 || cell.customPoints === -2 || cell.customPoints === -3) {
         if (cell.skipperIndex != null) {
           const avg = calculateRdgAverage(cell.skipperIndex, race);
           if (avg !== null) return avg;
@@ -887,7 +887,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
 
     if (cell?.letterScore) {
       if (cell.customPoints !== undefined && cell.customPoints > 0) return cell.customPoints;
-      if (cell.customPoints === -1 || cell.customPoints === -2) {
+      if (cell.customPoints === -1 || cell.customPoints === -2 || cell.customPoints === -3) {
         if (cell.skipperIndex != null) {
           const avg = calculateRdgAverage(cell.skipperIndex, race);
           if (avg !== null) return avg;
