@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import { Calendar, MapPin, Users, Trophy, Loader2, AlertCircle, ExternalLink, ArrowLeft, Menu as MenuIcon, X, Home } from 'lucide-react';
+import { Calendar, MapPin, Users, Trophy, Loader as Loader2, CircleAlert as AlertCircle, ExternalLink, ArrowLeft, Menu as MenuIcon, X, Hop as Home } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { eventWebsiteStorage } from '../../utils/eventWebsiteStorage';
 import { EventWidgetRenderer } from '../events/EventWidgetRenderer';
@@ -329,7 +329,7 @@ export const PublicEventWebsitePage: React.FC<PublicEventWebsitePageProps> = ({ 
     );
   }
 
-  if (!website || !eventData) {
+  if (!website) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
