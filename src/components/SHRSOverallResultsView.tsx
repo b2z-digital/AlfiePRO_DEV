@@ -15,6 +15,7 @@ interface SHRSOverallResultsViewProps {
   isSimulated?: boolean;
   hideHeader?: boolean;
   compactHeader?: boolean;
+  eventName?: string;
 }
 
 const FLEET_NAMES: Record<string, string> = {
@@ -74,6 +75,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
   isSimulated,
   hideHeader,
   compactHeader,
+  eventName,
 }) => {
   const isShrs = heatManagement?.configuration?.scoringSystem === 'shrs';
   const shrsQualifyingRounds = heatManagement?.configuration?.shrsQualifyingRounds || 0;
@@ -145,7 +147,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     for (const round of rounds) {
       for (const res of round.results) {
         if (!res.letterScore) continue;
-        const displayCode = getLetterScoreDisplayCode(res.letterScore, res.customPoints);
+        const displayCode = getLetterScoreDisplayCode(res.letterScore, res.customPoints, 'shrs');
         const baseCode = displayCode.replace(/\s*[\d.]+$/, '').trim();
         letterCounts[baseCode] = (letterCounts[baseCode] || 0) + 1;
 
@@ -168,11 +170,11 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
               type = 'Sailed';
             } else if (pRes.letterScore && pRes.customPoints !== undefined && pRes.customPoints > 0) {
               score = pRes.customPoints;
-              type = getLetterScoreDisplayCode(pRes.letterScore, pRes.customPoints);
+              type = getLetterScoreDisplayCode(pRes.letterScore, pRes.customPoints, 'shrs');
             } else if (pRes.letterScore) {
               const heatSizes = pr.heatAssignments.map(a => a.skipperIndices.length);
               score = Math.max(...heatSizes) + 1;
-              type = getLetterScoreDisplayCode(pRes.letterScore, pRes.customPoints);
+              type = getLetterScoreDisplayCode(pRes.letterScore, pRes.customPoints, 'shrs');
             } else continue;
             inputScores.push({ round: pr.round, score, type });
           }
@@ -505,7 +507,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Results_ANZAM_Format_${now.toISOString().slice(0, 10)}.html`;
+    a.download = `Results_${(eventName || 'Event').replace(/[^a-zA-Z0-9_-]/g, '_')}_${now.toISOString().slice(0, 10)}.html`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -729,11 +731,11 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       return sailResult;
     };
 
-    // SHRS 5.7(ii)(3): Multi-way tie resolution - "higher place resolved first"
-    // When 3+ boats are tied, resolve iteratively: find the best boat from the group,
-    // remove it, then resolve the remaining tied boats.
+    // SHRS 5.6/5.7: Multi-way tie resolution
+    // For 2 boats: use same-heat countback per SHRS 5.6(a)
+    // For 3+ boats: use standard RRS A8.1/A8.2 with ALL scores (discards included)
+    // to resolve each position iteratively from highest to lowest.
     const resolveMultiWayTies = (standings: SkipperStanding[]): SkipperStanding[] => {
-      // Group by fleet+net to find tied groups
       const groupKey = (s: SkipperStanding) => `${s.fleet}|${s.net}`;
       const groups = new Map<string, SkipperStanding[]>();
       const order: string[] = [];
@@ -750,60 +752,27 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
       const result: SkipperStanding[] = [];
       for (const key of order) {
         const group = groups.get(key)!;
-        if (group.length <= 2) {
-          // 1 or 2 boats: standard pairwise sort is fine
+        if (group.length <= 1) {
+          result.push(...group);
+        } else if (group.length === 2) {
+          // 2 boats: use same-heat countback per SHRS 5.6(a)
           group.sort((a, b) => {
             try { return shrsCountback(a, b); } catch { return 0; }
           });
           result.push(...group);
         } else {
-          // 3+ boats: resolve iteratively per SHRS 5.7(ii)(3)
+          // 3+ boats: use standard RRS A8.1/A8.2 with all scores (0 discards)
+          // Resolve iteratively: find best from remaining group, place them, repeat
           const remaining = [...group];
           while (remaining.length > 1) {
-            // Find the "best" boat from the remaining group
             let bestIdx = 0;
             for (let i = 1; i < remaining.length; i++) {
-              const cmp = shrsCountback(remaining[i], remaining[bestIdx]);
+              const aAll = remaining[i].raceScores.map(s => s ?? 999);
+              const bAll = remaining[bestIdx].raceScores.map(s => s ?? 999);
+              const cmp = compareWithCountback(aAll, bAll, 0, 0);
               if (cmp < 0) bestIdx = i;
             }
-            // Verify best is consistent (beats all others or at least isn't beaten by all)
-            let confirmed = true;
-            for (let i = 0; i < remaining.length; i++) {
-              if (i === bestIdx) continue;
-              const cmp = shrsCountback(remaining[bestIdx], remaining[i]);
-              if (cmp > 0) { confirmed = false; break; }
-            }
-            if (!confirmed) {
-              // Non-transitive tie (circular): per SHRS 5.7(ii)(3), resolve by
-              // best individual same-heat score across all pairwise matchups.
-              // The boat with the best (lowest) individual same-heat result gets the higher place.
-              const bestSameHeatScore = (s: SkipperStanding): number => {
-                let best = 999;
-                for (let i = 0; i < completedRaces.length; i++) {
-                  const roundNum = completedRaces[i];
-                  const skipperToHeat = roundHeatMap.get(roundNum);
-                  if (!skipperToHeat) continue;
-                  const sHeat = skipperToHeat.get(s.skipperIndex);
-                  if (!sHeat) continue;
-                  // Check if any other boat in the remaining group was in the same heat
-                  const inSameHeat = remaining.some(other =>
-                    other !== s && skipperToHeat.get(other.skipperIndex) === sHeat
-                  );
-                  if (inSameHeat) {
-                    const score = s.raceScores[i] ?? 999;
-                    if (score < best) best = score;
-                  }
-                }
-                return best;
-              };
-
-              // Sort remaining by best individual same-heat score
-              remaining.sort((a, b) => bestSameHeatScore(a) - bestSameHeatScore(b));
-              result.push(...remaining);
-              remaining.length = 0;
-            } else {
-              result.push(remaining.splice(bestIdx, 1)[0]);
-            }
+            result.push(remaining.splice(bestIdx, 1)[0]);
           }
           if (remaining.length === 1) result.push(remaining[0]);
         }
@@ -912,7 +881,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
 
   const formatScore = (score: number | null, letterScore?: string, customPoints?: number): string => {
     if (letterScore) {
-      const displayCode = getLetterScoreDisplayCode(letterScore, customPoints);
+      const displayCode = getLetterScoreDisplayCode(letterScore, customPoints, 'shrs');
       if (score !== null && score !== undefined) {
         const pointsStr = Number.isInteger(score) ? String(score) : score.toFixed(1);
         return `${displayCode} ${pointsStr}`;
@@ -925,7 +894,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
 
   const formatScoreForExport = (score: number | null, letterScore?: string, customPoints?: number, heatSuffix?: string): string => {
     if (letterScore) {
-      const displayCode = getLetterScoreDisplayCode(letterScore, customPoints);
+      const displayCode = getLetterScoreDisplayCode(letterScore, customPoints, 'shrs');
       if (score !== null && score !== undefined) {
         const pointsStr = Number.isInteger(score) ? String(score) : score.toFixed(1);
         return `${displayCode} ${pointsStr}`;

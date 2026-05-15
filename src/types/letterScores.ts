@@ -195,11 +195,11 @@ export function isScoreDiscardable(letterScore: LetterScore | string | null | un
   return definition?.isDiscardable !== false;
 }
 
-export function getLetterScoreDisplayCode(letterScore: string | null | undefined, customPoints?: number): string {
+export function getLetterScoreDisplayCode(letterScore: string | null | undefined, customPoints?: number, scoringSystem?: 'shrs' | 'hms'): string {
   if (!letterScore) return '';
   if (letterScore === 'RDG') {
-    if (customPoints !== undefined && customPoints > 0) return 'RDGfix';
-    if (customPoints === -1) return 'RDGave';
+    if (customPoints !== undefined && customPoints > 0) return scoringSystem === 'shrs' ? 'RGP' : 'RDGfix';
+    if (customPoints === -1) return scoringSystem === 'shrs' ? 'RGA' : 'RDGave';
     if (customPoints === -2) return 'RDGave';
     if (customPoints === -3) return 'RGS';
     return 'RDG';
