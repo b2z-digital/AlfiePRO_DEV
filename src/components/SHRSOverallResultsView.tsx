@@ -149,7 +149,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
         const baseCode = displayCode.replace(/\s*[\d.]+$/, '').trim();
         letterCounts[baseCode] = (letterCounts[baseCode] || 0) + 1;
 
-        const isRDGave = res.letterScore === 'RDG' && (res.customPoints === -1 || res.customPoints === -2);
+        const isRDGave = res.letterScore === 'RDG' && (res.customPoints === -1 || res.customPoints === -2 || res.customPoints === -3);
         if (isRDGave) {
           const isQualPhase = round.round <= shrsQualifyingRounds;
           const phaseRounds = isQualPhase ? qualRounds : finalRounds;
@@ -158,7 +158,7 @@ export const SHRSOverallResultsView: React.FC<SHRSOverallResultsViewProps> = ({
           for (const pr of phaseRounds) {
             const pRes = pr.results.find(r => r.skipperIndex === res.skipperIndex);
             if (!pRes) continue;
-            const pIsRDGave = pRes.letterScore === 'RDG' && (pRes.customPoints === -1 || pRes.customPoints === -2);
+            const pIsRDGave = pRes.letterScore === 'RDG' && (pRes.customPoints === -1 || pRes.customPoints === -2 || pRes.customPoints === -3);
             if (pIsRDGave) continue;
 
             let score: number;

@@ -201,6 +201,7 @@ export function getLetterScoreDisplayCode(letterScore: string | null | undefined
     if (customPoints !== undefined && customPoints > 0) return 'RDGfix';
     if (customPoints === -1) return 'RDGave';
     if (customPoints === -2) return 'RDGave';
+    if (customPoints === -3) return 'RGS';
     return 'RDG';
   }
   return letterScore;

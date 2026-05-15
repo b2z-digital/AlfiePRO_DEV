@@ -40,7 +40,7 @@ const letterScores: { code: LetterScore; name: string; description: string; colo
   { code: 'SCP', name: 'Scoring Penalty', description: 'Scoring penalty under rule 44.3', color: 'bg-cyan-700', scoring: 'Custom' }
 ];
 
-type RdgMode = 'avg_event' | 'avg_penultimate' | 'manual';
+type RdgMode = 'avg_event' | 'avg_penultimate' | 'avg_series' | 'manual';
 
 const CUSTOM_POINTS_CODES: LetterScore[] = ['RDG', 'DPI', 'ZFP', 'SCP'];
 
@@ -110,7 +110,7 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
     if (letterScore === 'RDG') {
       setSelectedLetterScore(letterScore);
       setShowCustomPoints(true);
-      setRdgMode(hasCompletedRaces ? 'avg_event' : 'manual');
+      setRdgMode(hasCompletedRaces ? 'avg_event' : isSHRS ? 'avg_series' : 'manual');
     } else if (CUSTOM_POINTS_CODES.includes(letterScore)) {
       setSelectedLetterScore(letterScore);
       setShowCustomPoints(true);
@@ -125,6 +125,8 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
       onSelect(selectedLetterScore!, -1);
     } else if (selectedLetterScore === 'RDG' && rdgMode === 'avg_penultimate') {
       onSelect(selectedLetterScore!, -2);
+    } else if (selectedLetterScore === 'RDG' && rdgMode === 'avg_series') {
+      onSelect(selectedLetterScore!, -3);
     } else {
       const points = parseFloat(customPoints);
       if (isNaN(points) || points < 0.1) {
@@ -290,13 +292,13 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                                 {rdgMode === 'avg_event' && canUseRdgAvg && <div className="w-2 h-2 bg-white rounded-full" />}
                               </div>
                               <span className={`font-semibold ${!canUseRdgAvg ? (darkMode ? 'text-slate-500' : 'text-slate-400') : darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                RGA - Average All Rounds in Phase {canUseRdgAvg ? '(Default)' : ''}
+                                RGA - Average of Prior Races {canUseRdgAvg ? '(Default)' : ''}
                               </span>
                             </div>
                             <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                               {!canUseRdgAvg
-                                ? 'Requires at least 1 completed race before average can be calculated.'
-                                : 'Average of all other round scores in the same series phase (SHRS Rule 5.6). Progressive - recalculated as more races complete.'}
+                                ? 'Cannot be used in Race 1 - requires at least 1 prior completed race.'
+                                : 'Average of prior round scores in the same series phase. Cannot be used in Race 1.'}
                             </p>
                           </div>
                           {canUseRdgAvg && averagePoints !== null && (
@@ -312,7 +314,50 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                         </div>
                       </button>
 
-                      {/* SHRS Option 2: Fixed points (RGP / committee determined) */}
+                      {/* SHRS Option 2: Average all races in series (RGS) - always available */}
+                      <button
+                        onClick={() => setRdgMode('avg_series')}
+                        className={`
+                          w-full p-4 rounded-lg border-2 text-left transition-all mb-3
+                          ${rdgMode === 'avg_series'
+                            ? 'border-amber-500 bg-amber-500/10'
+                            : darkMode
+                              ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                              : 'border-slate-300 bg-slate-50 hover:border-slate-400'}
+                        `}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                rdgMode === 'avg_series'
+                                  ? 'border-amber-500 bg-amber-500'
+                                  : darkMode ? 'border-slate-500' : 'border-slate-400'
+                              }`}>
+                                {rdgMode === 'avg_series' && <div className="w-2 h-2 bg-white rounded-full" />}
+                              </div>
+                              <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                RGS - Average All Races in Series
+                              </span>
+                            </div>
+                            <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                              Average of all races in the series (Q or F) excluding races scored RGS. Can be used in any race including Race 1.
+                            </p>
+                          </div>
+                          {canUseRdgAvg && averagePoints !== null && (
+                            <div className="text-right ml-3">
+                              <div className={`text-lg font-bold ${rdgMode === 'avg_series' ? 'text-amber-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                ~{averagePoints}
+                              </div>
+                              <div className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                current avg
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* SHRS Option 3: Fixed points (RGP / committee determined) */}
                       <button
                         onClick={() => setRdgMode('manual')}
                         className={`
