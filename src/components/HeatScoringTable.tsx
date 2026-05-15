@@ -1225,6 +1225,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               }}
               isSimulated={currentEvent?.is_simulated}
               compactHeader={true}
+              eventName={currentEvent?.name}
             />
           ) : (
             <HeatRaceResultsModal

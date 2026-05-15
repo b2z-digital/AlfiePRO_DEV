@@ -1082,7 +1082,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                           : 'bg-blue-600 text-white'
                         }
                       `}>
-                        {entry.letterScore ? getLetterScoreDisplayCode(entry.letterScore, entry.customPoints) : entry.position}
+                        {entry.letterScore ? getLetterScoreDisplayCode(entry.letterScore, entry.customPoints, currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs' ? 'shrs' : 'hms') : entry.position}
                       </div>
 
                       {/* Flag (if event shows flag) */}

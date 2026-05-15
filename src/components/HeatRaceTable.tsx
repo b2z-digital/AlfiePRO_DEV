@@ -351,7 +351,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
                         const isEditingThisHeat = isCurrentRound && isInCurrentHeat;
                         
                         // Display value
-                        const displayValue = (result?.letterScore ? getLetterScoreDisplayCode(result.letterScore, result.customPoints) : null) || result?.position || '';
+                        const displayValue = (result?.letterScore ? getLetterScoreDisplayCode(result.letterScore, result.customPoints, configuration.scoringSystem === 'shrs' ? 'shrs' : 'hms') : null) || result?.position || '';
                         
                         return (
                           <td 
@@ -573,7 +573,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
                         p-3 text-center
                         ${darkMode ? 'text-slate-300' : 'text-slate-700'}
                       `}>
-                        {(heatResult?.letterScore ? getLetterScoreDisplayCode(heatResult.letterScore, heatResult.customPoints) : null) || heatResult?.position || '-'}
+                        {(heatResult?.letterScore ? getLetterScoreDisplayCode(heatResult.letterScore, heatResult.customPoints, configuration.scoringSystem === 'shrs' ? 'shrs' : 'hms') : null) || heatResult?.position || '-'}
                       </td>
                     </tr>
                   );
