@@ -23,6 +23,7 @@ class StartBoxAudioEngine {
   private gainNode: GainNode | null = null;
   private audioBuffers: Map<string, AudioBuffer> = new Map();
   private loadingUrls: Set<string> = new Set();
+  private unlocked = false;
 
   private currentSequence: StartSequence | null = null;
   private currentState: StartBoxState = 'idle';
@@ -54,6 +55,9 @@ class StartBoxAudioEngine {
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
       }
+      if (!this.unlocked) {
+        this.unlockAudioContext();
+      }
       return;
     }
 
@@ -61,6 +65,25 @@ class StartBoxAudioEngine {
     this.gainNode = this.audioContext.createGain();
     this.gainNode.gain.value = this.volume;
     this.gainNode.connect(this.audioContext.destination);
+
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+
+    this.unlockAudioContext();
+  }
+
+  private unlockAudioContext(): void {
+    if (this.unlocked || !this.audioContext || !this.gainNode) return;
+    try {
+      const buffer = this.audioContext.createBuffer(1, 1, 22050);
+      const source = this.audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(this.gainNode);
+      source.start(0);
+      source.stop(this.audioContext.currentTime + 0.001);
+      this.unlocked = true;
+    } catch {}
   }
 
   async preloadSequence(sequence: StartSequence): Promise<void> {
@@ -98,11 +121,11 @@ class StartBoxAudioEngine {
     this.loadingUrls.add(url);
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { mode: 'cors', credentials: 'omit' });
       if (!response.ok) return;
       const arrayBuffer = await response.arrayBuffer();
       if (!this.audioContext) return;
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer.slice(0));
       this.audioBuffers.set(url, audioBuffer);
     } catch (err) {
       console.warn('Failed to load audio:', url, err);
@@ -114,6 +137,10 @@ class StartBoxAudioEngine {
   async playSound(url: string, volumeOverride?: number): Promise<void> {
     await this.initialize();
     if (!this.audioContext || !this.gainNode) return;
+
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
 
     let buffer = this.audioBuffers.get(url);
     if (!buffer) {
@@ -140,6 +167,10 @@ class StartBoxAudioEngine {
   async playSynthBeep(frequency = 880, durationMs = 150): Promise<void> {
     await this.initialize();
     if (!this.audioContext || !this.gainNode) return;
+
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
 
     const osc = this.audioContext.createOscillator();
     const oscGain = this.audioContext.createGain();
@@ -173,14 +204,25 @@ class StartBoxAudioEngine {
     this.setState('armed');
     this.emitTick();
 
-    this.preloadSequence(sequence).catch(() => {});
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.preloadSequence(sequence).catch(() => {});
+    }
   }
 
   start(): void {
     if (this.currentState === 'armed' || this.currentState === 'paused') {
+      // Ensure audio context is active - critical for mobile browsers
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        this.audioContext.resume().catch(() => {});
+      }
+
       const wasArmed = this.currentState === 'armed';
       if (wasArmed) {
         this.pausedElapsedMs = 0;
+        // If sequence wasn't preloaded (mobile: arm() called before initialize()), do it now
+        if (this.currentSequence && this.audioBuffers.size === 0) {
+          this.preloadSequence(this.currentSequence).catch(() => {});
+        }
       }
       this.startTimestamp = performance.now() - this.pausedElapsedMs;
       this.setState('running');
@@ -192,55 +234,7 @@ class StartBoxAudioEngine {
 
       if (this.currentSequence?.audio_file_url && this.audioContext && this.gainNode) {
         this.stopCountdownAudio();
-        const buffer = this.audioBuffers.get(this.currentSequence.audio_file_url);
-        if (buffer) {
-          const source = this.audioContext.createBufferSource();
-          source.buffer = buffer;
-          source.connect(this.gainNode);
-
-          const audioStartMs = this.currentSequence.audio_start_ms || 0;
-          const audioEndMs = this.currentSequence.audio_end_ms;
-
-          if (this.currentSequence.use_audio_only) {
-            const elapsedSec = this.pausedElapsedMs / 1000;
-            const startOffset = audioStartMs / 1000 + elapsedSec;
-            const duration = audioEndMs != null ? (audioEndMs / 1000) - startOffset : undefined;
-            source.start(0, startOffset, duration);
-          } else {
-            const offsetMs = this.currentSequence.audio_offset_ms || 0;
-            const elapsedSec = this.pausedElapsedMs / 1000;
-            const audioStartSec = elapsedSec + (offsetMs / 1000);
-
-            if (audioStartSec >= 0) {
-              source.start(0, audioStartSec);
-            } else {
-              source.start(this.audioContext.currentTime + Math.abs(audioStartSec), 0);
-            }
-          }
-
-          if (audioEndMs != null && this.currentSequence.use_audio_only && !this.audioStopScheduled) {
-            const effectivePlayMs = (audioEndMs - audioStartMs) - this.pausedElapsedMs;
-            if (effectivePlayMs > 0) {
-              this.audioStopTimeout = setTimeout(() => {
-                this.stopCountdownAudio();
-                this.audioStopScheduled = true;
-              }, effectivePlayMs);
-            }
-          }
-
-          source.onended = () => {
-            if (this.countdownAudioSource === source) {
-              this.countdownAudioSource = null;
-              if (this.currentState === 'completed') {
-                for (const cb of this.audioEndedCallbacks) {
-                  try { cb(); } catch {}
-                }
-              }
-            }
-          };
-          this.countdownAudioSource = source;
-          this.countdownAudioStartCtxTime = this.audioContext.currentTime;
-        }
+        this.startCountdownAudio();
       }
     }
   }
@@ -370,8 +364,17 @@ class StartBoxAudioEngine {
     if (!this.audioContext || !this.gainNode || !this.currentSequence?.background_music_url) return;
     this.stopBackgroundMusic();
 
-    const buffer = this.audioBuffers.get(this.currentSequence.background_music_url);
-    if (!buffer) return;
+    const url = this.currentSequence.background_music_url;
+    let buffer = this.audioBuffers.get(url);
+    if (!buffer) {
+      // Buffer not yet loaded - load it and start when ready
+      this.loadAudioBuffer(url).then(() => {
+        if (this.currentState === 'running' && this.currentSequence?.background_music_url === url) {
+          this.startBackgroundMusic(false);
+        }
+      });
+      return;
+    }
 
     const bgGain = this.audioContext.createGain();
     const normalVol = this.currentSequence.background_music_volume ?? 0.6;
@@ -465,6 +468,69 @@ class StartBoxAudioEngine {
       try { this.countdownAudioSource.stop(); } catch {}
       this.countdownAudioSource = null;
     }
+  }
+
+  private startCountdownAudio(): void {
+    if (!this.currentSequence?.audio_file_url || !this.audioContext || !this.gainNode) return;
+
+    const url = this.currentSequence.audio_file_url;
+    const buffer = this.audioBuffers.get(url);
+
+    if (!buffer) {
+      // Buffer not loaded yet - load and start when ready
+      this.loadAudioBuffer(url).then(() => {
+        if (this.currentState === 'running' && this.currentSequence?.audio_file_url === url) {
+          this.startCountdownAudio();
+        }
+      });
+      return;
+    }
+
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.gainNode);
+
+    const audioStartMs = this.currentSequence.audio_start_ms || 0;
+    const audioEndMs = this.currentSequence.audio_end_ms;
+    const elapsedSec = (performance.now() - this.startTimestamp) / 1000;
+
+    if (this.currentSequence.use_audio_only) {
+      const startOffset = audioStartMs / 1000 + elapsedSec;
+      const duration = audioEndMs != null ? (audioEndMs / 1000) - startOffset : undefined;
+      source.start(0, startOffset, duration);
+    } else {
+      const offsetMs = this.currentSequence.audio_offset_ms || 0;
+      const audioStartSec = elapsedSec + (offsetMs / 1000);
+
+      if (audioStartSec >= 0) {
+        source.start(0, audioStartSec);
+      } else {
+        source.start(this.audioContext.currentTime + Math.abs(audioStartSec), 0);
+      }
+    }
+
+    if (audioEndMs != null && this.currentSequence.use_audio_only && !this.audioStopScheduled) {
+      const effectivePlayMs = (audioEndMs - audioStartMs) - (elapsedSec * 1000);
+      if (effectivePlayMs > 0) {
+        this.audioStopTimeout = setTimeout(() => {
+          this.stopCountdownAudio();
+          this.audioStopScheduled = true;
+        }, effectivePlayMs);
+      }
+    }
+
+    source.onended = () => {
+      if (this.countdownAudioSource === source) {
+        this.countdownAudioSource = null;
+        if (this.currentState === 'completed') {
+          for (const cb of this.audioEndedCallbacks) {
+            try { cb(); } catch {}
+          }
+        }
+      }
+    };
+    this.countdownAudioSource = source;
+    this.countdownAudioStartCtxTime = this.audioContext.currentTime;
   }
 
   private tick(): void {
@@ -602,10 +668,30 @@ class StartBoxAudioEngine {
 }
 
 let instance: StartBoxAudioEngine | null = null;
+let globalUnlockRegistered = false;
+
+function registerGlobalUnlock(): void {
+  if (globalUnlockRegistered) return;
+  globalUnlockRegistered = true;
+
+  const unlock = () => {
+    if (instance) {
+      instance.initialize().catch(() => {});
+    }
+    document.removeEventListener('touchstart', unlock, true);
+    document.removeEventListener('touchend', unlock, true);
+    document.removeEventListener('click', unlock, true);
+  };
+
+  document.addEventListener('touchstart', unlock, true);
+  document.addEventListener('touchend', unlock, true);
+  document.addEventListener('click', unlock, true);
+}
 
 export function getStartBoxEngine(): StartBoxAudioEngine {
   if (!instance) {
     instance = new StartBoxAudioEngine();
+    registerGlobalUnlock();
   }
   return instance;
 }

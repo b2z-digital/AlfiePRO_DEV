@@ -220,7 +220,6 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
       setTotalDuration(seq.total_duration_seconds);
       setRemainingMs(seq.total_duration_seconds * 1000);
       const engine = engineRef.current;
-      await engine.initialize();
       engine.arm(seq);
     }
   };
