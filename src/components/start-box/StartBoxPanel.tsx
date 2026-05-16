@@ -132,7 +132,6 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
       setRemainingMs(countdownDuration * 1000);
 
       const engine = engineRef.current;
-      await engine.initialize();
       engine.arm(seq);
     }
   };
