@@ -787,7 +787,15 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
             isOpen={!!showLetterScoreSelector}
             onClose={handleCloseLetterScoreSelector}
             onSelect={(letterScore, customPoints) => {
-              handleUpdateResult(skipperIndex, heat as HeatDesignation, null, letterScore || undefined, customPoints);
+              const POSITION_PRESERVING = new Set(['RDG', 'DPI', 'ZFP', 'SCP']);
+              let pos: number | null = null;
+              if (letterScore && POSITION_PRESERVING.has(letterScore)) {
+                const existingResult = displayRoundData?.results.find(
+                  r => r.skipperIndex === skipperIndex && r.heatDesignation === heat
+                );
+                pos = existingResult?.position ?? null;
+              }
+              handleUpdateResult(skipperIndex, heat as HeatDesignation, pos, letterScore || undefined, customPoints);
               handleCloseLetterScoreSelector();
             }}
             darkMode={darkMode}

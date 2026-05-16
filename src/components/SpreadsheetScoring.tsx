@@ -66,6 +66,8 @@ const getOrdinal = (n: number): string => {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
 
+const POSITION_PRESERVING_SCORES = new Set<string>(['RDG', 'DPI', 'ZFP', 'SCP']);
+
 export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   skippers,
   currentRace: initialRace,
@@ -711,9 +713,10 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
         if (cell.skipperIndex !== null && (cell.sailNumber.trim() || cell.letterScore)) {
           const globalIdx = getGlobalSkipperIndex(heat, cell.skipperIndex);
           if (globalIdx >= 0) {
+            const preservesPosition = cell.letterScore && POSITION_PRESERVING_SCORES.has(cell.letterScore);
             globalResults.push({
               skipperIndex: globalIdx,
-              position: cell.letterScore ? null : posCounter++,
+              position: cell.letterScore && !preservesPosition ? null : posCounter++,
               letterScore: cell.letterScore || undefined,
               customPoints: cell.customPoints
             });
@@ -727,10 +730,11 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       let posCounter = 1;
       heatCells.forEach((cell) => {
         if (cell.skipperIndex !== null && (cell.sailNumber.trim() || cell.letterScore)) {
+          const preservesPosition = cell.letterScore && POSITION_PRESERVING_SCORES.has(cell.letterScore);
           newResults.push({
             race: currentRound,
             skipperIndex: cell.skipperIndex,
-            position: cell.letterScore ? null : posCounter++,
+            position: cell.letterScore && !preservesPosition ? null : posCounter++,
             letterScore: cell.letterScore || undefined,
             customPoints: cell.customPoints
           });
@@ -742,10 +746,11 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       let posCounter = 1;
       heatCells.forEach((cell) => {
         if (cell.skipperIndex !== null && (cell.sailNumber.trim() || cell.letterScore)) {
+          const preservesPosition = cell.letterScore && POSITION_PRESERVING_SCORES.has(cell.letterScore);
           newResults.push({
             race: initialRace,
             skipperIndex: cell.skipperIndex,
-            position: cell.letterScore ? null : posCounter++,
+            position: cell.letterScore && !preservesPosition ? null : posCounter++,
             letterScore: cell.letterScore || undefined,
             customPoints: cell.customPoints
           });
