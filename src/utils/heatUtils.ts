@@ -373,16 +373,26 @@ export const convertHeatResultsToRaceResults = (
 
       heats.forEach(heat => {
         if (resultsByHeat[heat]) {
+          const POSITION_PRESERVING = new Set(['RDG', 'DPI', 'ZFP', 'SCP']);
           const sortedResults = [...resultsByHeat[heat]]
             .filter(r => r.position !== null && skipperFinalHeat.get(r.skipperIndex) === heat)
             .sort((a, b) => (a.position || 999) - (b.position || 999));
 
           sortedResults.forEach(result => {
-            overallPositions.set(result.skipperIndex, currentPosition++);
+            if (result.letterScore && POSITION_PRESERVING.has(result.letterScore)) {
+              if (result.customPoints !== undefined && result.customPoints > 0) {
+                overallPositions.set(result.skipperIndex, result.customPoints);
+              } else {
+                overallPositions.set(result.skipperIndex, currentPosition);
+              }
+            } else if (!result.letterScore) {
+              overallPositions.set(result.skipperIndex, currentPosition);
+            }
+            currentPosition++;
           });
 
           const letterScoreResults = resultsByHeat[heat]
-            .filter(r => r.letterScore && skipperFinalHeat.get(r.skipperIndex) === heat);
+            .filter(r => r.letterScore && r.position === null && skipperFinalHeat.get(r.skipperIndex) === heat);
           letterScoreResults.forEach(result => {
             const points = isEntrantsPlusOne(result.letterScore as LetterScore)
               ? skippers.length + 1

@@ -21,6 +21,8 @@ import { Video } from 'lucide-react';
 import { LivestreamControlPanel } from './livestream/LivestreamControlPanel';
 
 
+const POSITION_PRESERVING_SCORES = new Set<string>(['RDG', 'DPI', 'ZFP', 'SCP']);
+
 interface TouchModeScoringProps {
   skippers: Skipper[];
   currentRace: number;
@@ -486,21 +488,32 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       const existingEntry = finishOrder.find(e => e.skipperIndex === skipperIndex);
 
       if (existingEntry) {
-        // Update existing entry with letter score and move to end
-        const withoutCurrent = finishOrder.filter(e => e.skipperIndex !== skipperIndex);
-        const updatedEntry: FinishingEntry = {
-          ...existingEntry,
-          letterScore,
-          customPoints,
-          position: 999
-        };
+        const preservesPosition = letterScore && POSITION_PRESERVING_SCORES.has(letterScore);
 
-        // Add letter score entry to end
-        const sortedOrder = [...withoutCurrent, updatedEntry];
-
-        setFinishOrder(sortedOrder);
-        setIsConfirmed(false); // Reset confirmation when order changes
-        saveResults(sortedOrder);
+        if (preservesPosition) {
+          // Keep entry in its current position - just add the letter score
+          const updatedOrder = finishOrder.map(e =>
+            e.skipperIndex === skipperIndex
+              ? { ...e, letterScore, customPoints }
+              : e
+          );
+          setFinishOrder(updatedOrder);
+          setIsConfirmed(false);
+          saveResults(updatedOrder);
+        } else {
+          // Move to end for non-position-preserving scores
+          const withoutCurrent = finishOrder.filter(e => e.skipperIndex !== skipperIndex);
+          const updatedEntry: FinishingEntry = {
+            ...existingEntry,
+            letterScore,
+            customPoints,
+            position: 999
+          };
+          const sortedOrder = [...withoutCurrent, updatedEntry];
+          setFinishOrder(sortedOrder);
+          setIsConfirmed(false);
+          saveResults(sortedOrder);
+        }
       } else {
         // Add new entry with letter score at the end
         const skipper = skippers[skipperIndex];
@@ -532,10 +545,11 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
     // Add new results
     entries.forEach(entry => {
+      const preservesPosition = entry.letterScore && POSITION_PRESERVING_SCORES.has(entry.letterScore);
       const newResult = {
         race: currentRace,
         skipperIndex: entry.skipperIndex,
-        position: entry.letterScore ? null : entry.position,
+        position: entry.letterScore && !preservesPosition ? null : entry.position,
         letterScore: entry.letterScore || undefined,
         customPoints: entry.customPoints
       };
