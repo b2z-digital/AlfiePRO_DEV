@@ -367,18 +367,17 @@ class StartBoxAudioEngine {
     const url = this.currentSequence.background_music_url;
     let buffer = this.audioBuffers.get(url);
     if (!buffer) {
-      // Buffer not yet loaded - load it and start when ready
       this.loadAudioBuffer(url).then(() => {
-        if (this.currentState === 'running' && this.currentSequence?.background_music_url === url) {
+        if (this.audioBuffers.has(url) && this.currentState === 'running' && this.currentSequence?.background_music_url === url) {
           this.startBackgroundMusic(false);
         }
-      });
+      }).catch(() => {});
       return;
     }
 
     const bgGain = this.audioContext.createGain();
-    const normalVol = this.currentSequence.background_music_volume ?? 0.6;
-    const fadeInMs = this.currentSequence.background_music_fade_in_ms ?? 2000;
+    const normalVol = this.currentSequence?.background_music_volume ?? 0.6;
+    const fadeInMs = this.currentSequence?.background_music_fade_in_ms ?? 2000;
 
     if (fromBeginning && fadeInMs > 0) {
       bgGain.gain.value = 0;
@@ -477,12 +476,11 @@ class StartBoxAudioEngine {
     const buffer = this.audioBuffers.get(url);
 
     if (!buffer) {
-      // Buffer not loaded yet - load and start when ready
       this.loadAudioBuffer(url).then(() => {
-        if (this.currentState === 'running' && this.currentSequence?.audio_file_url === url) {
+        if (this.audioBuffers.has(url) && this.currentState === 'running' && this.currentSequence?.audio_file_url === url) {
           this.startCountdownAudio();
         }
-      });
+      }).catch(() => {});
       return;
     }
 
