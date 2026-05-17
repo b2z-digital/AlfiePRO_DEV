@@ -366,7 +366,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
                                 onChange={(value, letterScore) =>
                                   handleUpdateResult(skipperIndex, currentHeat, value, letterScore || undefined)
                                 }
-                                onOpenLetterScoreSelector={() => handleOpenLetterScoreSelector(`${raceNum}-${skipperIndex}`)}
+                                onOpenLetterScoreSelector={() => handleOpenLetterScoreSelector(`${currentHeat}-${skipperIndex}`)}
                                 maxPosition={getHeatSkippers(currentHeat).length}
                                 disabled={false}
                                 darkMode={darkMode}

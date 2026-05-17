@@ -42,6 +42,7 @@ interface SpreadsheetScoringProps {
   selectedHeat?: HeatDesignation | null;
   onSelectHeat?: (heat: HeatDesignation) => void;
   parentVerifiedHeats?: Set<string>;
+  onUnverifyHeat?: (heat: HeatDesignation) => void;
   onShowOverallResults?: () => void;
   onUpdatePreviousRoundResults?: (round: number, heat: HeatDesignation, results: { skipperIndex: number; position: number | null; letterScore?: LetterScore; customPoints?: number }[]) => void;
 }
@@ -94,6 +95,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   selectedHeat,
   onSelectHeat,
   parentVerifiedHeats,
+  onUnverifyHeat,
   onShowOverallResults,
   onUpdatePreviousRoundResults,
 }) => {
@@ -1343,6 +1345,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                               next.delete(heat);
                               return next;
                             });
+                            if (onUnverifyHeat) onUnverifyHeat(heat);
                             if (onSelectHeat) onSelectHeat(heat);
                           }}
                           className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/20 hover:bg-white/30 transition-colors"
