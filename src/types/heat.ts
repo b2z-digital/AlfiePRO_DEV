@@ -238,23 +238,26 @@ export const calculateOverallPositions = (
   // Process heats in order (A, B, C, etc.)
   const heats: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'];
   
+  const POSITION_PRESERVING = new Set(['RDG', 'DPI', 'ZFP', 'SCP']);
+
   heats.forEach(heat => {
     if (resultsByHeat[heat]) {
-      // Sort results within this heat by position
+      // Sort positioned results (includes position-preserving letter scores like RDG)
       const sortedResults = [...resultsByHeat[heat]]
-        .filter(r => r.position !== null)
+        .filter(r => r.position !== null || (r.letterScore && POSITION_PRESERVING.has(r.letterScore)))
         .sort((a, b) => (a.position || 999) - (b.position || 999));
-      
-      // Assign overall positions
+
       sortedResults.forEach(result => {
         overallPositions.push({
           skipperIndex: result.skipperIndex,
           position: currentPosition++
         });
       });
-      
-      // Add letter scores at the end
-      const letterScoreResults = resultsByHeat[heat].filter(r => r.letterScore);
+
+      // Add non-position letter scores (DNS, DNF, DSQ, etc.) at the end
+      const letterScoreResults = resultsByHeat[heat].filter(r =>
+        r.letterScore && r.position === null && !POSITION_PRESERVING.has(r.letterScore)
+      );
       letterScoreResults.forEach(result => {
         overallPositions.push({
           skipperIndex: result.skipperIndex,

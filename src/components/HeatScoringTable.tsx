@@ -2382,6 +2382,14 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             darkMode={darkMode}
             currentEvent={currentEvent}
             parentVerifiedHeats={spreadsheetVerifiedHeats}
+            onUnverifyHeat={(heat: HeatDesignation) => {
+              const roundKey = `${heatManagement.currentRound}-${heat}`;
+              setSpreadsheetVerifiedHeats(prev => {
+                const next = new Set(prev);
+                next.delete(roundKey);
+                return next;
+              });
+            }}
             onShowOverallResults={heatManagement.configuration?.scoringSystem === 'shrs' ? () => setShowOverallResultsView(true) : undefined}
             onUpdatePreviousRoundResults={(round, heat, results) => {
               const heatResults = results.map(entry => ({
