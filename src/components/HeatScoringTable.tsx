@@ -687,6 +687,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
       heatDesignation: selectedHeat,
       position: position,
       letterScore: letterScore,
+      customPoints: customPoints,
       round: heatManagement.currentRound,
       race: race
     };
@@ -2213,6 +2214,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                   heatDesignation: selectedHeat,
                   position: entry.position,
                   letterScore: entry.letterScore,
+                  customPoints: entry.customPoints,
                   round: heatManagement.currentRound,
                   race: currentRace
                 };
@@ -2284,6 +2286,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 heatDesignation: heat,
                 position: entry.position,
                 letterScore: entry.letterScore,
+                customPoints: entry.customPoints,
                 round: heatManagement.currentRound,
                 race: currentRace
               }));
@@ -2314,6 +2317,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 heatDesignation: selectedHeat,
                 position: entry.position,
                 letterScore: entry.letterScore,
+                customPoints: entry.customPoints,
                 round: heatManagement.currentRound,
                 race: currentRace
               }));
