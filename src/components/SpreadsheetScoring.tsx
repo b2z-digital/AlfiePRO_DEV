@@ -560,8 +560,11 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     const updated = [...heatCells];
     updated[idx] = { ...updated[idx], letterScore: score, customPoints };
 
-    const regularFinishers = updated.filter(c => !c.letterScore && (c.sailNumber.trim() || c.skipperIndex !== null));
-    const letterScoreEntries = updated.filter(c => c.letterScore);
+    // Position-preserving scores (RDG/RGP, DPI, ZFP, SCP) stay in their finishing position
+    // Non-position-preserving scores (DNF, DNS, OCS, etc.) move to the bottom
+    const positionPreserving = (c: CellEntry) => c.letterScore && POSITION_PRESERVING_SCORES.has(c.letterScore);
+    const regularFinishers = updated.filter(c => (!c.letterScore && (c.sailNumber.trim() || c.skipperIndex !== null)) || positionPreserving(c));
+    const letterScoreEntries = updated.filter(c => c.letterScore && !POSITION_PRESERVING_SCORES.has(c.letterScore));
     const emptyEntries = updated.filter(c => !c.letterScore && !c.sailNumber.trim() && c.skipperIndex === null);
     const reordered = [...regularFinishers, ...letterScoreEntries, ...emptyEntries];
 
@@ -650,8 +653,8 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
           // If sail number was included, keep it matched to a skipper; otherwise clear
           const heatSkips = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
           const validated = validateCells(updated, heatSkips);
-          const regularFinishers = validated.filter(c => !c.letterScore && (c.sailNumber.trim() || c.skipperIndex !== null));
-          const letterScoreEntries = validated.filter(c => c.letterScore);
+          const regularFinishers = validated.filter(c => (!c.letterScore && (c.sailNumber.trim() || c.skipperIndex !== null)) || (c.letterScore && POSITION_PRESERVING_SCORES.has(c.letterScore)));
+          const letterScoreEntries = validated.filter(c => c.letterScore && !POSITION_PRESERVING_SCORES.has(c.letterScore));
           const emptyEntries = validated.filter(c => !c.letterScore && !c.sailNumber.trim() && c.skipperIndex === null);
           const reordered = [...regularFinishers, ...letterScoreEntries, ...emptyEntries];
           const revalidated = validateCells(reordered, heatSkips);
