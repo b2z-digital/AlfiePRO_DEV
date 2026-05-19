@@ -1687,7 +1687,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               </button>
             </div>
             {(!collapsed || isHoveringNav) && (
-              <div className="px-3 py-1 text-[10px] text-slate-500 text-center select-all" title={`Built: ${__APP_BUILD_TIME__}`}>
+              <div className="px-3 py-1 text-[10px] text-slate-500 text-center select-all" title={`Built: ${new Date(__APP_BUILD_TIME__).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'medium', timeStyle: 'short' })} AEST`}>
                 Build {__APP_BUILD_DATE__}
               </div>
             )}
