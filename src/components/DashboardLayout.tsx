@@ -1686,6 +1686,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 {(!collapsed || isHoveringNav) && <span className="text-sm">Sign Out</span>}
               </button>
             </div>
+            {(!collapsed || isHoveringNav) && (
+              <div className="px-3 py-1 text-[10px] text-slate-500 text-center select-all" title={`Built: ${__APP_BUILD_TIME__}`}>
+                Build {__APP_BUILD_DATE__}
+              </div>
+            )}
           </div>
         </div>
       </div>
