@@ -514,7 +514,7 @@ function parseResultCell(
       customPoints = points;
     } else if (code === 'RGA') {
       letterScore = 'RDG';
-      customPoints = points;
+      customPoints = -3;
     } else if (code === 'SCP') {
       customPoints = points;
     }
@@ -541,7 +541,7 @@ function parseResultCell(
     let customPoints: number | undefined = undefined;
 
     if (code === 'RGP') { letterScore = 'RDG'; customPoints = points; }
-    else if (code === 'RGA') { letterScore = 'RDG'; customPoints = points; }
+    else if (code === 'RGA') { letterScore = 'RDG'; customPoints = -3; }
     else if (code === 'SCP') { customPoints = points; }
 
     results.push({
@@ -560,7 +560,7 @@ function parseResultCell(
       let letterScore = code;
       let customPoints: number | undefined = undefined;
       if (code === 'RGP') { letterScore = 'RDG'; customPoints = points; }
-      else if (code === 'RGA') { letterScore = 'RDG'; customPoints = points; }
+      else if (code === 'RGA') { letterScore = 'RDG'; customPoints = -3; }
       else if (code === 'SCP') { customPoints = points; }
 
       results.push({
