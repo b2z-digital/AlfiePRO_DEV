@@ -970,7 +970,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                       const rawPoints = cell.letterScore
                         ? (cell.customPoints !== undefined ? cell.customPoints : sfTotalPositions + 1)
                         : (hasValue && cell.isValid ? position : null);
-                      const points = rawPoints === -1 ? 'AVG' : rawPoints;
+                      const points = (rawPoints === -1 || rawPoints === -2 || rawPoints === -3) ? 'AVG' : rawPoints;
 
                       return (
                         <tr
@@ -1472,7 +1472,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                         const rawPoints = cell.letterScore
                           ? (cell.customPoints !== undefined ? cell.customPoints : totalPositions + 1)
                           : (hasValue && cell.isValid ? position : null);
-                        const points = rawPoints === -1 ? 'AVG' : rawPoints;
+                        const points = (rawPoints === -1 || rawPoints === -2 || rawPoints === -3) ? 'AVG' : rawPoints;
 
                         return (
                           <tr
