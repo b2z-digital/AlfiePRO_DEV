@@ -330,9 +330,14 @@ export const convertHeatResultsToRaceResults = (
         const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2 || result.customPoints === -3);
         if (isRDGave) {
           const scores = aveScoresBySkipper.get(result.skipperIndex) || [];
-          const avg = scores.length > 0
-            ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10
-            : calculateNonFinisherScore(largestHeatSize);
+          let avg: number;
+          if (scores.length > 0) {
+            avg = Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10;
+          } else if (result.position !== null && result.position !== undefined) {
+            avg = result.position;
+          } else {
+            avg = calculateNonFinisherScore(largestHeatSize);
+          }
           overallPositions.set(result.skipperIndex, avg);
         } else if (result.importedScore !== undefined && result.importedScore !== null) {
           overallPositions.set(result.skipperIndex, result.importedScore);

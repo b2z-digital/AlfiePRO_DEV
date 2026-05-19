@@ -709,9 +709,13 @@ export function reconstructSHRSHeats(
         const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2 || result.customPoints === -3);
         if (isRDGave) {
           const scores = aveQualScores.get(result.skipperIndex) || [];
-          score = scores.length > 0
-            ? Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10
-            : calculateNonFinisherScore(largestHeat);
+          if (scores.length > 0) {
+            score = Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 10) / 10;
+          } else if (result.position !== null && result.position !== undefined) {
+            score = result.position;
+          } else {
+            score = calculateNonFinisherScore(largestHeat);
+          }
         } else if (result.importedScore !== undefined && result.importedScore !== null) {
           score = result.importedScore;
         } else {
