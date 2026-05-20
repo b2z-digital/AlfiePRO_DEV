@@ -1850,19 +1850,43 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
         const lsSkipperName = lsCell ? getSkipperName(lsHeat, lsCell) || `Position ${lsPos}` : `Position ${lsPos}`;
         const lsHeatSkips = isMultiHeatMode ? getHeatSkippers(lsHeat) : skippers;
         const lsHeatResults = getHeatRaceResults(lsHeat);
-        const prevResults = lsCell?.skipperIndex !== null && lsCell?.skipperIndex !== undefined
-          ? lsHeatResults
-              .filter(r => r.race !== currentRound && r.skipperIndex === lsCell.skipperIndex)
-              .map(r => ({
-                position: r.position,
-                letterScore: r.letterScore,
-                customPoints: r.customPoints,
-                points: r.letterScore
-                  ? (r.customPoints !== undefined && r.customPoints > 0 ? r.customPoints : lsHeatSkips.length + 1)
-                  : (r.position || lsHeatSkips.length + 1),
-                raceNumber: r.race
-              }))
-          : [];
+
+        // For SHRS, build prevResults from heatManagement.rounds using global indices
+        // because heat-local indices change between rounds (reshuffled heats)
+        let prevResults: { position: number | null; letterScore?: any; customPoints?: number; points: number; raceNumber: number }[] = [];
+        if (isSHRS && heatManagement && lsCell?.skipperIndex !== null && lsCell?.skipperIndex !== undefined) {
+          const globalIdx = getGlobalSkipperIndex(lsHeat, lsCell.skipperIndex);
+          if (globalIdx >= 0) {
+            const completedRounds = heatManagement.rounds.filter(r => r.round < currentRound && r.completed && r.results.length > 0);
+            for (const round of completedRounds) {
+              const skipperResults = round.results.filter(r => r.skipperIndex === globalIdx && r.position !== null);
+              for (const r of skipperResults) {
+                const heatSize = round.heatAssignments.find(a => a.heatDesignation === r.heatDesignation)?.skipperIndices.length || lsHeatSkips.length;
+                prevResults.push({
+                  position: r.position,
+                  letterScore: r.letterScore,
+                  customPoints: r.customPoints,
+                  points: r.letterScore
+                    ? (r.customPoints !== undefined && r.customPoints > 0 ? r.customPoints : heatSize + 1)
+                    : (r.position || heatSize + 1),
+                  raceNumber: r.race || r.round
+                });
+              }
+            }
+          }
+        } else if (lsCell?.skipperIndex !== null && lsCell?.skipperIndex !== undefined) {
+          prevResults = lsHeatResults
+            .filter(r => r.race !== currentRound && r.skipperIndex === lsCell.skipperIndex)
+            .map(r => ({
+              position: r.position,
+              letterScore: r.letterScore,
+              customPoints: r.customPoints,
+              points: r.letterScore
+                ? (r.customPoints !== undefined && r.customPoints > 0 ? r.customPoints : lsHeatSkips.length + 1)
+                : (r.position || lsHeatSkips.length + 1),
+              raceNumber: r.race
+            }));
+        }
         const ssHeatHasCompleted = prevResults.some(r => r.position !== null && r.position > 0);
         return (
           <LetterScoreSelector

@@ -297,8 +297,8 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                             </div>
                             <p className={`text-sm ml-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                               {!canUseRdgAvg
-                                ? 'Cannot be used in Race 1 - requires at least 1 prior completed race.'
-                                : 'Average of prior round scores in the same series phase. Cannot be used in Race 1.'}
+                                ? `Cannot be used in Round ${raceNumber} - requires at least 1 prior completed race.`
+                                : 'Average of prior round scores in the same series phase.'}
                             </p>
                           </div>
                           {canUseRdgAvg && averagePoints !== null && (
