@@ -1334,9 +1334,6 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             </div>
             <button
               onClick={() => {
-                if (!isInitialAllocation && onStartRound && completed && nextRound) {
-                  onStartRound(nextRound.round);
-                }
                 setPreviewRoundIndex(null);
                 onClose();
               }}
@@ -2903,7 +2900,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 ? 'Close'
                 : isInitialAllocation
                 ? 'Accept & Start Scoring'
-                : 'Start Scoring'
+                : 'Score Next Heat'
             }
           </button>}
         </div>
