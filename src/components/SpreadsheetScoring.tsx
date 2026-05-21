@@ -415,8 +415,12 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       const positionedResults = existingResults
         .filter(r => r.position !== null && r.position !== undefined)
         .sort((a, b) => (a.position || 0) - (b.position || 0));
-      const letterScoreResults = existingResults
-        .filter(r => (r.position === null || r.position === undefined) && r.letterScore);
+      // Position-preserving letter scores with null position (legacy data from before fix)
+      // should be placed after positioned entries, not at the very bottom with DNF/DNS
+      const posPreservingNullPos = existingResults
+        .filter(r => (r.position === null || r.position === undefined) && r.letterScore && POSITION_PRESERVING_SCORES.has(r.letterScore));
+      const nonPreservingLetterScores = existingResults
+        .filter(r => (r.position === null || r.position === undefined) && r.letterScore && !POSITION_PRESERVING_SCORES.has(r.letterScore));
 
       const newCells: CellEntry[] = [];
       for (const result of positionedResults) {
@@ -432,7 +436,20 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
           isDuplicate: false
         });
       }
-      for (const result of letterScoreResults) {
+      for (const result of posPreservingNullPos) {
+        const skipperIdx = result.skipperIndex;
+        const skipper = heatSkips[skipperIdx];
+        const sailNo = String(skipper?.sailNumber || skipper?.sailNo || '');
+        newCells.push({
+          sailNumber: sailNo,
+          skipperIndex: skipperIdx,
+          letterScore: result.letterScore || null,
+          customPoints: result.customPoints,
+          isValid: true,
+          isDuplicate: false
+        });
+      }
+      for (const result of nonPreservingLetterScores) {
         const skipperIdx = result.skipperIndex;
         const skipper = heatSkips[skipperIdx];
         const sailNo = String(skipper?.sailNumber || skipper?.sailNo || '');

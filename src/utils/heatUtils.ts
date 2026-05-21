@@ -396,8 +396,21 @@ export const convertHeatResultsToRaceResults = (
             currentPosition++;
           });
 
+          // Handle position-preserving letter scores with null position (legacy data)
+          const posPreservingNullPos = resultsByHeat[heat]
+            .filter(r => r.letterScore && r.position === null && POSITION_PRESERVING.has(r.letterScore) && skipperFinalHeat.get(r.skipperIndex) === heat);
+          posPreservingNullPos.forEach(result => {
+            if (result.customPoints !== undefined && result.customPoints > 0) {
+              overallPositions.set(result.skipperIndex, result.customPoints);
+            } else {
+              overallPositions.set(result.skipperIndex, currentPosition);
+            }
+            currentPosition++;
+          });
+
+          // Non-position-preserving letter scores with null position get penalty
           const letterScoreResults = resultsByHeat[heat]
-            .filter(r => r.letterScore && r.position === null && skipperFinalHeat.get(r.skipperIndex) === heat);
+            .filter(r => r.letterScore && r.position === null && !POSITION_PRESERVING.has(r.letterScore) && skipperFinalHeat.get(r.skipperIndex) === heat);
           letterScoreResults.forEach(result => {
             const points = isEntrantsPlusOne(result.letterScore as LetterScore)
               ? skippers.length + 1
