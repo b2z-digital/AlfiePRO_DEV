@@ -82,7 +82,7 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
       // Try matching member by user_id first
       const { data: memberData } = await supabase
         .from('members')
-        .select('first_name, last_name, sail_number')
+        .select('id, first_name, last_name')
         .eq('user_id', effectiveUserId)
         .eq('club_id', resolvedClubId)
         .maybeSingle();
@@ -90,7 +90,16 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
       if (memberData) {
         const name = `${memberData.first_name || ''} ${memberData.last_name || ''}`.trim();
         setUserName(name);
-        setUserSailNumber(memberData.sail_number || null);
+
+        // Get sail number from member_boats
+        const { data: boatData } = await supabase
+          .from('member_boats')
+          .select('sail_number')
+          .eq('member_id', memberData.id)
+          .limit(1)
+          .maybeSingle();
+
+        setUserSailNumber(boatData?.sail_number || null);
         return;
       }
 
@@ -111,7 +120,7 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
         if (userEmail) {
           const { data: memberByEmail } = await supabase
             .from('members')
-            .select('first_name, last_name, sail_number')
+            .select('id, first_name, last_name')
             .eq('email', userEmail)
             .eq('club_id', resolvedClubId)
             .maybeSingle();
@@ -119,7 +128,15 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
           if (memberByEmail) {
             const name = `${memberByEmail.first_name || ''} ${memberByEmail.last_name || ''}`.trim();
             setUserName(name);
-            setUserSailNumber(memberByEmail.sail_number || null);
+
+            const { data: boatData } = await supabase
+              .from('member_boats')
+              .select('sail_number')
+              .eq('member_id', memberByEmail.id)
+              .limit(1)
+              .maybeSingle();
+
+            setUserSailNumber(boatData?.sail_number || null);
             return;
           }
         }
@@ -145,55 +162,102 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
         return;
       }
 
-      const { data: events, error } = await supabase
-        .from('quick_races')
-        .select('id, event_name, date, race_results, skippers, scoring_system, boat_class, last_completed_race')
-        .eq('club_id', resolvedClubId)
-        .not('race_results', 'is', null)
-        .order('date', { ascending: false });
-
-      if (error || !events) {
-        setLoading(false);
-        return;
-      }
-
       const sailorResults: SailorResult[] = [];
 
-      for (const event of events) {
-        if (!event.race_results || !event.skippers) continue;
-
-        const skippers = event.skippers as Array<{ name: string; sailNumber?: string; boatClass?: string }>;
-        const skipperIndex = skippers.findIndex((s) => {
-          if (userSailNumber && s.sailNumber === userSailNumber) return true;
+      const findSkipperIndex = (skippers: Array<{ name: string; sailNo?: string; boatClass?: string; hull?: string }>): number => {
+        return skippers.findIndex((s) => {
+          if (userSailNumber && s.sailNo === userSailNumber) return true;
           if (userName && s.name.toLowerCase() === userName.toLowerCase()) return true;
           return false;
         });
+      };
 
-        if (skipperIndex === -1) continue;
+      // Fetch quick_races (standalone events)
+      const { data: events } = await supabase
+        .from('quick_races')
+        .select('id, event_name, race_date, race_results, skippers, race_class, last_completed_race')
+        .eq('club_id', resolvedClubId)
+        .not('race_results', 'is', null)
+        .not('skippers', 'is', null)
+        .neq('is_simulated', true)
+        .order('race_date', { ascending: false });
 
-        const raceResults = event.race_results as Array<Array<{ skipperIndex: number; position: number | null; letterScore?: string }>>;
+      if (events) {
+        for (const event of events) {
+          if (!event.race_results || !event.skippers) continue;
 
-        for (let raceIdx = 0; raceIdx < raceResults.length; raceIdx++) {
-          const raceData = raceResults[raceIdx];
-          if (!raceData) continue;
+          const skippers = event.skippers as Array<{ name: string; sailNo?: string; boatClass?: string; hull?: string }>;
+          const skipperIdx = findSkipperIndex(skippers);
+          if (skipperIdx === -1) continue;
 
-          const myResult = raceData.find((r) => r.skipperIndex === skipperIndex);
-          if (!myResult) continue;
+          // race_results is a flat array of {race, position, skipperIndex, letterScore?}
+          const raceResults = event.race_results as Array<{ race: number; position: number | null; skipperIndex: number; letterScore?: string }>;
 
-          sailorResults.push({
-            event_id: event.id,
-            event_name: event.event_name || 'Untitled Event',
-            event_date: event.date || '',
-            race_number: raceIdx + 1,
-            position: myResult.position,
-            letter_score: myResult.letterScore || null,
-            total_entries: skippers.length,
-            scoring_system: event.scoring_system || 'low-point',
-            boat_class: event.boat_class || skippers[skipperIndex]?.boatClass || null,
-          });
+          for (const result of raceResults) {
+            if (result.skipperIndex !== skipperIdx) continue;
+
+            sailorResults.push({
+              event_id: event.id,
+              event_name: event.event_name || 'Untitled Event',
+              event_date: event.race_date || '',
+              race_number: result.race || 1,
+              position: typeof result.position === 'string' ? parseInt(result.position as string) : result.position,
+              letter_score: result.letterScore || null,
+              total_entries: skippers.length,
+              scoring_system: event.race_class || 'low-point',
+              boat_class: skippers[skipperIdx]?.hull || skippers[skipperIdx]?.boatClass || event.race_class || null,
+            });
+          }
         }
       }
 
+      // Fetch race_series_rounds (series events)
+      const { data: seriesRounds } = await supabase
+        .from('race_series_rounds')
+        .select(`
+          id, round_name, round_index, date, race_results, skippers,
+          race_series:series_id(id, series_name, race_class, club_id)
+        `)
+        .not('race_results', 'is', null)
+        .not('skippers', 'is', null)
+        .order('date', { ascending: false });
+
+      if (seriesRounds) {
+        for (const round of seriesRounds) {
+          if (!round.race_results || !round.skippers) continue;
+
+          // Check club_id from the parent series
+          const series = Array.isArray(round.race_series) ? round.race_series[0] : round.race_series as any;
+          if (series?.club_id && series.club_id !== resolvedClubId) continue;
+
+          const skippers = round.skippers as Array<{ name: string; sailNo?: string; boatClass?: string; hull?: string }>;
+          const skipperIdx = findSkipperIndex(skippers);
+          if (skipperIdx === -1) continue;
+
+          const raceResults = round.race_results as Array<{ race: number; position: number | null; skipperIndex: number; letterScore?: string }>;
+          const seriesName = series?.series_name || '';
+          const roundLabel = round.round_name || `Round ${(round.round_index ?? 0) + 1}`;
+
+          for (const result of raceResults) {
+            if (result.skipperIndex !== skipperIdx) continue;
+
+            sailorResults.push({
+              event_id: round.id,
+              event_name: seriesName ? `${seriesName} - ${roundLabel}` : roundLabel,
+              event_date: round.date || '',
+              race_number: result.race || 1,
+              position: typeof result.position === 'string' ? parseInt(result.position as string) : result.position,
+              letter_score: result.letterScore || null,
+              total_entries: skippers.length,
+              scoring_system: series?.race_class || 'low-point',
+              boat_class: skippers[skipperIdx]?.hull || skippers[skipperIdx]?.boatClass || series?.race_class || null,
+            });
+          }
+        }
+      }
+
+      // Sort by date descending
+      sailorResults.sort((a, b) => (b.event_date || '').localeCompare(a.event_date || ''));
       setResults(sailorResults);
     } catch (err) {
       console.error('Failed to load sailor results:', err);
