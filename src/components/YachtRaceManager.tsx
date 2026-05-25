@@ -4724,6 +4724,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setCurrentNumRaces(checkpoint.num_races);
             lastCheckpointedRound.current = 0;
             lastCheckpointedRace.current = 0;
+
+            // Navigate user to the correct race after restore
+            const nextRace = checkpoint.last_completed_race + 1;
+            setEditingRace(nextRace <= checkpoint.num_races ? nextRace : checkpoint.last_completed_race);
+            setTouchModeCurrentRace(nextRace <= checkpoint.num_races ? nextRace : checkpoint.last_completed_race);
+
             addNotification('success', `Restored to: ${checkpoint.label}`);
           }}
         />
