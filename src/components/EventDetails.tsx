@@ -3534,6 +3534,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 darkMode={darkMode}
                 isAdmin={isAdmin || isEditor}
                 eventName={event.eventName || event.clubName}
+                eventSkippers={event.skippers || []}
               />
             )}
             {activeTab === 'protests' && (isAdmin || isEditor) && (
