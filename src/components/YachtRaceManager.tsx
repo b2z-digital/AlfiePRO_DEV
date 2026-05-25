@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle, RotateCcw, Gavel, Anchor } from 'lucide-react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle, RotateCcw } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -54,8 +54,6 @@ import { ConflictToast } from './scoring/ConflictToast';
 import { MemberCacheBanner } from './scoring/MemberCacheBanner';
 import { SkipperMatchReviewModal } from './scoring/SkipperMatchReviewModal';
 import { ShareScoringSessionModal } from './scoring/ShareScoringSessionModal';
-import { ProtestBoard } from './ProtestBoard';
-import { RaceSignOnSheet } from './RaceSignOnSheet';
 
 class ScoringErrorBoundary extends Component<
   { children: React.ReactNode; darkMode?: boolean; onRetry?: () => void },
@@ -158,8 +156,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [isFullscreenScoring, setIsFullscreenScoring] = useState(false);
   const [showOverallResults, setShowOverallResults] = useState(false);
   const [showShareScoringModal, setShowShareScoringModal] = useState(false);
-  const [showProtestBoard, setShowProtestBoard] = useState(false);
-  const [showSignOnSheet, setShowSignOnSheet] = useState(false);
   const [eventUpdateTrigger, setEventUpdateTrigger] = useState(0);
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
@@ -4023,34 +4019,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowSignOnSheet(true)}
-                  className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors
-                    ${darkMode
-                      ? 'text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600'
-                      : 'text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200'}
-                  `}
-                  title="Race Day Sign-On Sheet"
-                >
-                  <Anchor size={16} />
-                  <span className="text-xs font-medium">Sign-On</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowProtestBoard(true)}
-                  className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors
-                    ${darkMode
-                      ? 'text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600'
-                      : 'text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200'}
-                  `}
-                  title="Protest Board & Score Reviews"
-                >
-                  <Gavel size={16} />
-                  <span className="text-xs font-medium">Protests</span>
-                </button>
-                <button
-                  type="button"
                   onClick={() => setShowCheckpointModal(true)}
                   className={`
                     flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors
@@ -5159,51 +5127,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         />
       )}
 
-      {/* Protest Board Panel */}
-      {showProtestBoard && selectedEvent && currentClubId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4 rounded-xl shadow-2xl ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
-            <div className={`sticky top-0 z-10 flex items-center justify-between p-4 border-b ${darkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'}`}>
-              <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Protest Board</h2>
-              <button onClick={() => setShowProtestBoard(false)} className={`p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}>
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4">
-              <ProtestBoard
-                eventId={selectedEvent.id}
-                clubId={currentClubId}
-                darkMode={darkMode}
-                isAdmin={true}
-                eventName={selectedEvent.eventName}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Race Day Sign-On Sheet Panel */}
-      {showSignOnSheet && selectedEvent && currentClubId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className={`w-full max-w-3xl max-h-[90vh] overflow-y-auto m-4 rounded-xl shadow-2xl ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
-            <div className={`sticky top-0 z-10 flex items-center justify-between p-4 border-b ${darkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'}`}>
-              <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Sign-On Sheet</h2>
-              <button onClick={() => setShowSignOnSheet(false)} className={`p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}>
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4">
-              <RaceSignOnSheet
-                eventId={selectedEvent.id}
-                clubId={currentClubId}
-                darkMode={darkMode}
-                isAdmin={true}
-                eventName={selectedEvent.eventName}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

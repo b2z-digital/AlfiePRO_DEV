@@ -969,6 +969,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           featureKey: 'membership'
         }] : []),
         {
+          id: 'my-results',
+          label: 'My Results',
+          icon: Trophy,
+          description: 'View your personal race results and statistics',
+          path: '/my-results'
+        },
+        {
           id: 'my-garage',
           label: 'Boat Shed',
           icon: Wrench,
@@ -1064,13 +1071,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           description: 'View race results',
           path: '/results',
           featureKey: 'results_display'
-        },
-        {
-          id: 'my-results',
-          label: 'My Results',
-          icon: TrendingUp,
-          description: 'View your personal race results',
-          path: '/my-results'
         },
         {
           id: 'yacht-classes',
