@@ -41,7 +41,7 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
   const [raceDay, setRaceDay] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddWalkUp, setShowAddWalkUp] = useState(false);
-  const [viewMode, setViewMode] = useState<'all' | 'on_water' | 'signed_off'>('all');
+  const [viewMode, setViewMode] = useState<'all' | 'signed_on' | 'not_signed_on'>('all');
 
   const [walkUpForm, setWalkUpForm] = useState({
     skipper_name: '',
@@ -173,11 +173,10 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
   const totalSignedOn = entries.length;
   const unsignedCount = eventSkippers.filter(s => !getSkipperStatus(s)).length;
 
-  // Build display list based on view mode
+  // Build display list based on view mode (for events without registered skippers)
   const getDisplayList = () => {
     if (eventSkippers.length === 0) {
-      // No registered skippers - show entries as before
-      const list = viewMode === 'on_water' ? onWater : viewMode === 'signed_off' ? signedOff : entries;
+      const list = viewMode === 'signed_on' ? entries : viewMode === 'not_signed_on' ? [] : entries;
       return list.filter(e =>
         e.skipper_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.sail_number.toLowerCase().includes(searchTerm.toLowerCase())
@@ -196,10 +195,10 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
     }));
 
     // Filter by view mode
-    if (viewMode === 'on_water') {
-      roster = roster.filter(r => r.entry && !r.entry.signed_off_at);
-    } else if (viewMode === 'signed_off') {
-      roster = roster.filter(r => r.entry?.signed_off_at);
+    if (viewMode === 'signed_on') {
+      roster = roster.filter(r => !!r.entry);
+    } else if (viewMode === 'not_signed_on') {
+      roster = roster.filter(r => !r.entry);
     }
 
     // Filter by search
@@ -301,17 +300,17 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
             className={`w-full pl-9 pr-3 py-2 text-sm rounded-lg border ${inputClass}`}
           />
         </div>
-        <div className="flex rounded-lg overflow-hidden border border-slate-600">
-          {['all', 'on_water', 'signed_off'].map(mode => (
+        <div className={`flex rounded-lg overflow-hidden border ${darkMode ? 'border-slate-600' : 'border-slate-300'}`}>
+          {(['all', 'signed_on', 'not_signed_on'] as const).map(mode => (
             <button
               key={mode}
-              onClick={() => setViewMode(mode as any)}
+              onClick={() => setViewMode(mode)}
               className={`px-3 py-2 text-xs font-medium ${viewMode === mode
                 ? 'bg-blue-600 text-white'
                 : darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
               }`}
             >
-              {mode === 'all' ? `All (${entries.length})` : mode === 'on_water' ? `On Water (${onWater.length})` : `Off (${signedOff.length})`}
+              {mode === 'all' ? `All (${eventSkippers.length || entries.length})` : mode === 'signed_on' ? `Signed On (${entries.length})` : `Awaiting (${unsignedCount})`}
             </button>
           ))}
         </div>
@@ -595,10 +594,10 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
               </>
             )}
 
-            {getSkipperRoster().length === 0 && !loading && (
+            {getSkipperRoster().length === 0 && getWalkUpEntries().length === 0 && !loading && (
               <div className={`text-center py-6 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                 <p className="text-sm">
-                  {searchTerm ? 'No matching skippers' : viewMode === 'on_water' ? 'No one currently on water' : 'No sign-off records'}
+                  {searchTerm ? 'No matching skippers' : viewMode === 'signed_on' ? 'No one has signed on yet' : viewMode === 'not_signed_on' ? 'Everyone is signed on' : 'No registered skippers'}
                 </p>
               </div>
             )}
