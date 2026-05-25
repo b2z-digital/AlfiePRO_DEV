@@ -4658,6 +4658,10 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             console.log('🗑️ Clearing all race results...');
             setRaceResults([]);
             setLastCompletedRace(0);
+            setEditingRace(1);
+            setTouchModeCurrentRace(1);
+            lastCheckpointedRace.current = 0;
+            lastCheckpointedRound.current = 0;
 
             // Clear withdrawal flags but keep current handicap values as-is
             const newSkippers = skippers.map((skipper) => ({
@@ -4722,13 +4726,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setLastCompletedRace(checkpoint.last_completed_race);
             setCurrentDropRules(checkpoint.drop_rules);
             setCurrentNumRaces(checkpoint.num_races);
-            lastCheckpointedRound.current = 0;
-            lastCheckpointedRace.current = 0;
 
-            // Navigate user to the correct race after restore
-            const nextRace = checkpoint.last_completed_race + 1;
-            setEditingRace(nextRace <= checkpoint.num_races ? nextRace : checkpoint.last_completed_race);
-            setTouchModeCurrentRace(nextRace <= checkpoint.num_races ? nextRace : checkpoint.last_completed_race);
+            // Prevent duplicate checkpoint from being created for the restored race
+            lastCheckpointedRound.current = checkpoint.round_number;
+            lastCheckpointedRace.current = checkpoint.last_completed_race;
+
+            // Navigate user to the restored race (the last completed one in the checkpoint)
+            const restoredRace = checkpoint.last_completed_race > 0 ? checkpoint.last_completed_race : 1;
+            setEditingRace(restoredRace);
+            setTouchModeCurrentRace(restoredRace);
 
             addNotification('success', `Restored to: ${checkpoint.label}`);
           }}
