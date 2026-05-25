@@ -111,6 +111,7 @@ import { ExternalResultsScrapingTab } from './super-admin/ExternalResultsScrapin
 import { ClassifiedsScrapingTab } from './super-admin/ClassifiedsScrapingTab';
 import { EventsScrapingTab } from './super-admin/EventsScrapingTab';
 import { UwbTrackingTab } from './super-admin/UwbTrackingTab';
+import { SailorResultsPortal } from './SailorResultsPortal';
 import { usePlatformTracking } from '../hooks/usePlatformTracking';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { useImpersonation } from '../contexts/ImpersonationContext';
@@ -1063,6 +1064,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           description: 'View race results',
           path: '/results',
           featureKey: 'results_display'
+        },
+        {
+          id: 'my-results',
+          label: 'My Results',
+          icon: TrendingUp,
+          description: 'View your personal race results',
+          path: '/my-results'
         },
         {
           id: 'yacht-classes',
@@ -2067,6 +2075,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               } />
               <Route path="/results" element={<ResultsPage />} />
               <Route path="/results/:id" element={<ResultsPage />} />
+              <Route path="/my-results" element={
+                <SailorResultsPortal
+                  clubId={currentClub?.clubId || ''}
+                  darkMode={darkMode}
+                />
+              } />
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
               {isSuperAdmin && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} />} />}
               {isSuperAdmin && <Route path="/uwb-tracking" element={<UwbTrackingTab />} />}
