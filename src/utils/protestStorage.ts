@@ -23,6 +23,10 @@ export interface EventProtest {
   decided_at: string | null;
   decided_by: string | null;
   protest_time_limit: string | null;
+  diagram_image: string | null;
+  alfie_ruling: string | null;
+  alfie_ruling_confidence: string | null;
+  alfie_rules_cited: string | null;
   created_at: string;
   updated_at: string;
 }

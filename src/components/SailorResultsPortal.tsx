@@ -61,8 +61,10 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
   useEffect(() => {
     if (userName || userSailNumber) {
       loadSailorResults();
+    } else if (resolvedClubId && effectiveUserId) {
+      setLoading(false);
     }
-  }, [resolvedClubId, userName, userSailNumber]);
+  }, [resolvedClubId, userName, userSailNumber, effectiveUserId]);
 
   const loadUserInfo = async () => {
     if (memberName && sailNumber) {
@@ -71,20 +73,35 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
       return;
     }
 
-    if (!effectiveUserId || !resolvedClubId) return;
+    if (!effectiveUserId || !resolvedClubId) {
+      setLoading(false);
+      return;
+    }
 
-    const { data: memberData } = await supabase
-      .from('members')
-      .select('first_name, last_name, sail_number')
-      .eq('user_id', effectiveUserId)
-      .eq('club_id', resolvedClubId)
-      .maybeSingle();
+    try {
+      const { data: memberData } = await supabase
+        .from('members')
+        .select('first_name, last_name, sail_number')
+        .eq('user_id', effectiveUserId)
+        .eq('club_id', resolvedClubId)
+        .maybeSingle();
 
-    if (memberData) {
-      setUserName(`${memberData.first_name || ''} ${memberData.last_name || ''}`.trim());
-      setUserSailNumber(memberData.sail_number || null);
-    } else if (profile) {
-      setUserName(`${profile.first_name || ''} ${profile.last_name || ''}`.trim());
+      if (memberData) {
+        const name = `${memberData.first_name || ''} ${memberData.last_name || ''}`.trim();
+        setUserName(name);
+        setUserSailNumber(memberData.sail_number || null);
+      } else if (profile) {
+        const name = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
+        if (name) {
+          setUserName(name);
+        } else {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    } catch {
+      setLoading(false);
     }
   };
 
@@ -194,7 +211,7 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
       <div className="h-full overflow-y-auto">
         <div className="p-4 sm:p-6 lg:p-16">
           <div className="flex items-center justify-center py-20">
-            <div className="animate-spin w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full" />
+            <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full" />
           </div>
         </div>
       </div>
