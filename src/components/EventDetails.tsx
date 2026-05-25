@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, Circle as HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader as Loader2, CircleCheck as CheckCircle, Radio, Upload, TriangleAlert } from 'lucide-react';
+import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, Circle as HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader as Loader2, CircleCheck as CheckCircle, Radio, Upload, TriangleAlert, ClipboardList, Gavel } from 'lucide-react';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { setCurrentEvent } from '../utils/raceStorage';
@@ -24,6 +24,8 @@ import { EventLivestreamModal } from './livestream/EventLivestreamModal';
 import { ImportRoundResultsModal } from './ImportRoundResultsModal';
 import { getStoredRaceSeries, storeRaceSeries } from '../utils/raceStorage';
 import { RaceSeries } from '../types/race';
+import { RaceSignOnSheet } from './RaceSignOnSheet';
+import { ProtestBoard } from './ProtestBoard';
 
 // Helper function to extract database UUID from app event ID
 function extractDbId(eventId: string): string {
@@ -73,7 +75,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   useEffect(() => {
     eventRef.current = event;
   }, [event]);
-  const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'media' | 'registrations' | 'registration' | 'results' | 'weather'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'media' | 'registrations' | 'registration' | 'results' | 'weather' | 'signon' | 'protests'>('details');
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3472,6 +3474,50 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 from-cyan-500 to-blue-500"></div>
               )}
             </button>
+            <button
+              onClick={() => setActiveTab('signon')}
+              className={`
+                flex-1 py-4 text-center text-sm font-semibold transition-all duration-200 relative
+                ${activeTab === 'signon'
+                  ? darkMode
+                    ? 'text-green-400 bg-slate-800'
+                    : 'text-green-600 bg-white'
+                  : darkMode
+                    ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'}
+              `}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <ClipboardList size={16} />
+                <span>Sign On</span>
+              </div>
+              {activeTab === 'signon' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-green-500 to-emerald-500"></div>
+              )}
+            </button>
+            {(isAdmin || isEditor) && (
+              <button
+                onClick={() => setActiveTab('protests')}
+                className={`
+                  flex-1 py-4 text-center text-sm font-semibold transition-all duration-200 relative
+                  ${activeTab === 'protests'
+                    ? darkMode
+                      ? 'text-red-400 bg-slate-800'
+                      : 'text-red-600 bg-white'
+                    : darkMode
+                      ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'}
+                `}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Gavel size={16} />
+                  <span>Protests</span>
+                </div>
+                {activeTab === 'protests' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 from-red-500 to-orange-500"></div>
+                )}
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-6">
@@ -3481,6 +3527,29 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             {activeTab === 'media' && renderMediaTab()}
             {activeTab === 'results' && renderResultsTab()}
             {activeTab === 'weather' && renderWeatherTab()}
+            {activeTab === 'signon' && (
+              <RaceSignOnSheet
+                eventId={event.id}
+                clubId={currentClub?.clubId || event.clubId || ''}
+                darkMode={darkMode}
+                isAdmin={isAdmin || isEditor}
+                eventName={event.eventName || event.clubName}
+                eventSkippers={event.skippers || []}
+                eventDate={event.date}
+                eventEndDate={event.endDate}
+                numberOfDays={event.numberOfDays}
+                multiDay={event.multiDay}
+              />
+            )}
+            {activeTab === 'protests' && (isAdmin || isEditor) && (
+              <ProtestBoard
+                eventId={event.id}
+                clubId={currentClub?.clubId || event.clubId || ''}
+                darkMode={darkMode}
+                isAdmin={isAdmin || isEditor}
+                eventName={event.eventName || event.clubName}
+              />
+            )}
           </div>
         </div>
       </div>

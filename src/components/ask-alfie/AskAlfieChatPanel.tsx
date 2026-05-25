@@ -86,11 +86,21 @@ interface ChatMessage {
 
 type ViewMode = 'welcome' | 'chat' | 'drawing';
 
+export interface ProtestFilingData {
+  ruling: string;
+  rulesCited: string;
+  confidence: string;
+  diagramImage: string | null;
+  incidentDescription: string;
+}
+
 interface AskAlfieChatPanelProps {
   darkMode: boolean;
   onClose: () => void;
   embedded?: boolean;
   courseMode?: boolean;
+  initialMessage?: string;
+  onFileProtest?: (data: ProtestFilingData) => void;
 }
 
 const QUICK_ACTIONS = [
@@ -158,6 +168,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   onClose,
   embedded = false,
   courseMode = false,
+  initialMessage,
+  onFileProtest,
 }) => {
   const { user, currentClub } = useAuth();
   const { scoringContext, getScoringSnapshot } = useScoringContext();
@@ -195,9 +207,19 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   const hasSpeechRecognition = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
   const hasSpeechSynthesis = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
+  const initialMessageSentRef = useRef(false);
+
   useEffect(() => {
     loadUserProfile();
   }, []);
+
+  useEffect(() => {
+    if (initialMessage && !initialMessageSentRef.current && messages.length === 0) {
+      initialMessageSentRef.current = true;
+      setViewMode('chat');
+      setTimeout(() => sendMessage(initialMessage), 300);
+    }
+  }, [initialMessage]);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -615,6 +637,46 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
         <p className="text-xs text-slate-500 mt-3">Listening... tap to stop early</p>
       </div>
     );
+  };
+
+  const handleFileAsProtest = () => {
+    if (!onFileProtest || messages.length === 0) return;
+    const assistantMessages = messages.filter(m => m.role === 'assistant');
+    const userMessages = messages.filter(m => m.role === 'user');
+    if (assistantMessages.length === 0) return;
+
+    const lastRuling = assistantMessages[assistantMessages.length - 1].content;
+    const firstUserMessage = userMessages[0]?.content || '';
+
+    // Extract rule references - matches patterns like "Rule 10", "Rule 18.2(a)", "RRS 11", "rules 10, 11 and 18.2"
+    const rulesMatch = lastRuling.match(/(?:RRS|rule|rules?)\s*[\d]+(?:\.[\d]+)?(?:\([a-z]\))?/gi);
+    const uniqueRules = rulesMatch
+      ? [...new Set(rulesMatch.map(r => r.replace(/^rules?\s*/i, 'Rule ').replace(/^RRS\s*/i, 'Rule ')))].join(', ')
+      : '';
+
+    let confidence = 'medium';
+    const lower = lastRuling.toLowerCase();
+    if (lower.includes('clearly') || lower.includes('definite') || lower.includes('without doubt') || lower.includes('must')) {
+      confidence = 'high';
+    } else if (lower.includes('unclear') || lower.includes('difficult to determine') || lower.includes('depends on') || lower.includes('might')) {
+      confidence = 'low';
+    }
+
+    const userDrawing = userMessages.find(m => m.drawingImage)?.drawingImage || null;
+
+    // Build a comprehensive incident description from all user messages
+    const incidentDescription = userMessages
+      .map(m => m.content)
+      .filter(c => c && c.length > 5)
+      .join(' | ');
+
+    onFileProtest({
+      ruling: lastRuling,
+      rulesCited: uniqueRules,
+      confidence,
+      diagramImage: userDrawing || attachedDrawing,
+      incidentDescription,
+    });
   };
 
   const handleEditDrawingSave = (imageData: string, _elements: any[]) => {
@@ -1059,6 +1121,15 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                         <Share2 size={11} />
                         Share
                       </button>
+                      {onFileProtest && messages.length >= 2 && (
+                        <button
+                          onClick={handleFileAsProtest}
+                          className="flex items-center gap-1 text-[10px] text-amber-500 hover:text-amber-400 transition-colors font-medium"
+                        >
+                          <AlertTriangle size={11} />
+                          File as Protest
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

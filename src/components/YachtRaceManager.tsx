@@ -5126,6 +5126,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           darkMode={darkMode}
         />
       )}
+
     </div>
   );
 };
