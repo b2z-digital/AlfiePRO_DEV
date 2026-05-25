@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle } from 'lucide-react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle, RotateCcw } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -41,6 +41,9 @@ import { LiveStatusControl } from './LiveStatusControl';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
 import { updateRaceStatus } from '../utils/liveTrackingStorage';
+import { createCheckpoint } from '../utils/scoringCheckpoints';
+import { ScoringCheckpointModal } from './ScoringCheckpointModal';
+import type { ScoringCheckpoint } from '../utils/scoringCheckpoints';
 import { AskAlfieOrb } from './ask-alfie/AskAlfieOrb';
 import { HeatRacingSetupWizard } from './HeatRacingSetupWizard';
 import { useScoringContext } from '../contexts/ScoringContext';
@@ -135,6 +138,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
   const [showRaceSettingsModal, setShowRaceSettingsModal] = useState(false);
+  const [showCheckpointModal, setShowCheckpointModal] = useState(false);
   const [autoEnableHeatRacing, setAutoEnableHeatRacing] = useState(false);
   const [showHeatRacingRecommendation, setShowHeatRacingRecommendation] = useState(false);
   const [showWizardManualAssignModal, setShowWizardManualAssignModal] = useState(false);
@@ -1081,6 +1085,78 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       }
     }
   }, [isInitialLoad, raceResults, skippers, lastCompletedRace, hasDeterminedInitialHcaps, isManualHandicaps, currentDay, heatManagement]);
+
+  // Auto-checkpoint when a heat round completes
+  const lastCheckpointedRound = useRef<number>(0);
+  useEffect(() => {
+    if (!heatManagement?.roundJustCompleted) return;
+    if (!heatManagement.configuration.enabled) return;
+    const completedRound = heatManagement.roundJustCompleted;
+    if (completedRound <= lastCheckpointedRound.current) return;
+
+    const event = getCurrentEvent();
+    if (!event?.id || !event?.clubId) return;
+
+    lastCheckpointedRound.current = completedRound;
+
+    const dropRulesArray = Array.isArray(currentDropRules)
+      ? currentDropRules
+      : [4, 8, 16, 24, 32, 40];
+
+    createCheckpoint({
+      eventId: event.isSeriesEvent ? event.seriesId : event.id,
+      clubId: event.clubId,
+      roundNumber: completedRound,
+      checkpointType: 'auto_round_complete',
+      label: `End of Race ${completedRound}`,
+      heatManagement: heatManagement,
+      raceResults,
+      skippers,
+      lastCompletedRace: completedRound,
+      dropRules: dropRulesArray,
+      numRaces: currentNumRaces,
+    }).then(result => {
+      if (result.success) {
+        console.log(`Scoring checkpoint saved: End of Race ${completedRound}`);
+      }
+    });
+  }, [heatManagement?.roundJustCompleted]);
+
+  // Auto-checkpoint when a race completes (non-heat scoring)
+  const lastCheckpointedRace = useRef<number>(0);
+  useEffect(() => {
+    if (isInitialLoad) return;
+    if (heatManagement?.configuration?.enabled) return;
+    if (lastCompletedRace <= 0) return;
+    if (lastCompletedRace <= lastCheckpointedRace.current) return;
+
+    const event = getCurrentEvent();
+    if (!event?.id || !event?.clubId) return;
+
+    lastCheckpointedRace.current = lastCompletedRace;
+
+    const dropRulesArray = Array.isArray(currentDropRules)
+      ? currentDropRules
+      : [4, 8, 16, 24, 32, 40];
+
+    createCheckpoint({
+      eventId: event.isSeriesEvent ? event.seriesId : event.id,
+      clubId: event.clubId,
+      roundNumber: lastCompletedRace,
+      checkpointType: 'auto_round_complete',
+      label: `End of Race ${lastCompletedRace}`,
+      heatManagement: heatManagement || { configuration: { enabled: false, numberOfHeats: 2, promotionCount: 4, seedingMethod: 'random', autoAssign: false }, rounds: [], currentRound: 1, currentHeat: null },
+      raceResults,
+      skippers,
+      lastCompletedRace,
+      dropRules: dropRulesArray,
+      numRaces: currentNumRaces,
+    }).then(result => {
+      if (result.success) {
+        console.log(`Scoring checkpoint saved: End of Race ${lastCompletedRace}`);
+      }
+    });
+  }, [lastCompletedRace]);
 
   useEffect(() => {
     // Initial setup only - toggleDarkMode handles updates
@@ -3943,6 +4019,20 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 </button>
                 <button
                   type="button"
+                  onClick={() => setShowCheckpointModal(true)}
+                  className={`
+                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors
+                    ${darkMode
+                      ? 'text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600'
+                      : 'text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200'}
+                  `}
+                  title="Scoring Checkpoints & Rollback"
+                >
+                  <RotateCcw size={16} />
+                  <span className="text-xs font-medium">Checkpoints</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setIsFullscreenScoring(prev => !prev)}
                   className={`
                     flex items-center justify-center p-2 rounded-lg transition-colors
@@ -4568,6 +4658,10 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             console.log('🗑️ Clearing all race results...');
             setRaceResults([]);
             setLastCompletedRace(0);
+            setEditingRace(1);
+            setTouchModeCurrentRace(1);
+            lastCheckpointedRace.current = 0;
+            lastCheckpointedRound.current = 0;
 
             // Clear withdrawal flags but keep current handicap values as-is
             const newSkippers = skippers.map((skipper) => ({
@@ -4608,6 +4702,42 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             }
           }}
           onScoringModeChange={(mode) => setScoringMode(mode)}
+        />
+
+        <ScoringCheckpointModal
+          isOpen={showCheckpointModal}
+          onClose={() => setShowCheckpointModal(false)}
+          darkMode={darkMode}
+          eventId={(() => { const e = getCurrentEvent(); return e?.isSeriesEvent ? e.seriesId : e?.id || ''; })()}
+          clubId={getCurrentEvent()?.clubId || ''}
+          currentHeatManagement={heatManagement || { configuration: { enabled: false, numberOfHeats: 2, promotionCount: 4, seedingMethod: 'random', autoAssign: false }, rounds: [], currentRound: 1, currentHeat: null }}
+          currentRaceResults={raceResults}
+          currentSkippers={skippers}
+          currentLastCompletedRace={lastCompletedRace}
+          currentDropRules={Array.isArray(currentDropRules) ? currentDropRules : [4, 8, 16, 24, 32, 40]}
+          currentNumRaces={currentNumRaces}
+          onRestore={(checkpoint: ScoringCheckpoint) => {
+            const restoredHM = checkpoint.heat_management;
+            if (restoredHM.configuration.enabled) {
+              setHeatManagement(restoredHM);
+            }
+            setRaceResults(checkpoint.race_results);
+            setSkippers(checkpoint.skippers);
+            setLastCompletedRace(checkpoint.last_completed_race);
+            setCurrentDropRules(checkpoint.drop_rules);
+            setCurrentNumRaces(checkpoint.num_races);
+
+            // Prevent duplicate checkpoint from being created for the restored race
+            lastCheckpointedRound.current = checkpoint.round_number;
+            lastCheckpointedRace.current = checkpoint.last_completed_race;
+
+            // Navigate user to the restored race (the last completed one in the checkpoint)
+            const restoredRace = checkpoint.last_completed_race > 0 ? checkpoint.last_completed_race : 1;
+            setEditingRace(restoredRace);
+            setTouchModeCurrentRace(restoredRace);
+
+            addNotification('success', `Restored to: ${checkpoint.label}`);
+          }}
         />
 
         <ManualHeatAssignmentModal

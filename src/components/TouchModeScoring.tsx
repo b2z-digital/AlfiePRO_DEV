@@ -254,8 +254,12 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     setCurrentRace(initialRace);
     setIsConfirmed(false);
     setRaceTimerRunning(false);
+    setIsEditingPreviousRace(false);
 
-    if (initialRace > activeTargetRace.current) {
+    if (initialRace < activeTargetRace.current) {
+      // Race went backward (restore or clear) - reset the target
+      activeTargetRace.current = initialRace;
+    } else if (initialRace > activeTargetRace.current) {
       activeTargetRace.current = initialRace;
     }
 
