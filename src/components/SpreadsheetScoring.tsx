@@ -108,6 +108,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const heatSectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const heatTableScrollRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const verifyButtonRef = useRef<HTMLDivElement | null>(null);
   const autoCompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoCompleteCellRef = useRef<{ heat: HeatDesignation; position: number; value: string } | null>(null);
@@ -298,6 +299,12 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     if (prevActualRoundRef.current !== actualCurrentRound) {
       setEditingRound(null);
       prevActualRoundRef.current = actualCurrentRound;
+      // Auto-scroll heat tables to the right so the editing column is visible
+      setTimeout(() => {
+        Object.values(heatTableScrollRefs.current).forEach(el => {
+          if (el) el.scrollLeft = el.scrollWidth;
+        });
+      }, 100);
     }
   }, [actualCurrentRound]);
 
@@ -522,6 +529,21 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     const heatCells = cells[heat] || [];
     const updated = [...heatCells];
     updated[idx] = { ...updated[idx], sailNumber: value, letterScore: null, customPoints: undefined };
+
+    // If this sail number already exists elsewhere and is a valid skipper match,
+    // remove it from the old position and shift entries (insert behavior, not swap/duplicate)
+    if (value.trim()) {
+      const heatSkipsForCheck = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
+      const sailMap = buildSailNumberMap(heatSkipsForCheck);
+      const lower = value.trim().toLowerCase();
+      if (sailMap.has(lower)) {
+        const existingIdx = updated.findIndex((c, i) => i !== idx && c.sailNumber.trim().toLowerCase() === lower && !c.letterScore);
+        if (existingIdx >= 0) {
+          updated.splice(existingIdx, 1);
+          updated.push({ sailNumber: '', skipperIndex: null, letterScore: null, isValid: true, isDuplicate: false });
+        }
+      }
+    }
 
     const heatSkips = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
     const validated = validateCells(updated, heatSkips);
@@ -1025,7 +1047,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                 ? (displayResult.customPoints !== undefined ? displayResult.customPoints : raceStarters + 1)
                                 : displayResult.position
                               : null;
-                            const prevPts = prevPtsRaw === -1 ? -1 : prevPtsRaw;
+                            const isAvgScore = prevPtsRaw === -1 || prevPtsRaw === -2 || prevPtsRaw === -3;
 
                             return (
                               <React.Fragment key={`sf-prev-r${r}-${position}`}>
@@ -1052,9 +1074,9 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                   ) : ''}
                                 </td>
                                 <td className={`px-1 py-1 text-center font-mono font-semibold ${
-                                  prevPts === -1 ? 'text-green-500' : darkMode ? 'text-slate-400' : 'text-slate-600'
+                                  isAvgScore ? 'text-green-500' : darkMode ? 'text-slate-400' : 'text-slate-600'
                                 }`}>
-                                  {prevPts !== null ? (prevPts === -1 ? 'AVG' : prevPts) : ''}
+                                  {prevPtsRaw !== null ? (isAvgScore ? 'AVG' : prevPtsRaw) : ''}
                                 </td>
                               </React.Fragment>
                             );
@@ -1378,7 +1400,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto" ref={el => { heatTableScrollRefs.current[heat] = el; }}>
                   <table className="text-[13px] border-collapse">
                     <colgroup>
                       <col style={{ width: '40px' }} />
@@ -1404,12 +1426,15 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                   if (!isCurrent && onSelectHeat) onSelectHeat(heat);
                                   if (isEditingPreviousRound) setEditingRound(null);
                                 }}
-                                className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${colIdx > 0 ? 'border-l ' : ''}${
-                                  darkMode ? 'text-blue-300 border-blue-500/30 bg-blue-900/20' : 'text-blue-700 border-blue-300 bg-blue-50/80'
+                                className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 ${colIdx > 0 ? 'border-l-2 ' : ''}${
+                                  darkMode ? 'text-blue-200 border-blue-400/60 bg-blue-800/40' : 'text-blue-800 border-blue-400 bg-blue-100'
                                 }${!isCurrent ? ' opacity-30' : ''}${!isCurrent || isEditingPreviousRound ? ' cursor-pointer' : ''}`}
                                 title={!isCurrent ? `Switch to Heat ${getHeatDisplayLabel(heat, heatManagement?.configuration)}` : isEditingPreviousRound ? `Return to Race ${actualCurrentRound}` : undefined}
                               >
-                                Race {col.round}
+                                <span className="inline-flex items-center gap-1">
+                                  <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${darkMode ? 'bg-blue-400' : 'bg-blue-600'}`} />
+                                  Race {col.round}
+                                </span>
                               </th>
                             );
                           }
@@ -1421,14 +1446,14 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                 if (!isCurrent && onSelectHeat) onSelectHeat(heat);
                                 setEditingRound(col.round);
                               }}
-                              className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l cursor-pointer transition-colors ${
-                                darkMode ? 'text-slate-300 border-slate-500/50 hover:bg-slate-600/50 hover:text-blue-300' : 'text-slate-500 border-slate-400/50 hover:bg-slate-100 hover:text-blue-600'
+                              className={`text-center font-bold text-[11px] uppercase tracking-widest py-1.5 border-l cursor-pointer transition-colors group ${
+                                darkMode ? 'text-slate-500 border-slate-600/50 hover:bg-slate-600/50 hover:text-slate-300' : 'text-slate-400 border-slate-300/50 hover:bg-slate-100 hover:text-slate-600'
                               }`}
                               title={`Click to edit Race ${col.round}`}
                             >
                               <span className="inline-flex items-center gap-1">
                                 Race {col.round}
-                                <Pencil size={9} className="opacity-40" />
+                                <Pencil size={9} className="opacity-0 group-hover:opacity-40 transition-opacity" />
                               </span>
                             </th>
                           );
@@ -1532,7 +1557,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                     ? (displayResult.customPoints !== undefined ? displayResult.customPoints : prevHeatSize + 1)
                                     : displayResult.position
                                   : null;
-                                const prevPts = prevPtsRaw === -1 ? -1 : prevPtsRaw;
+                                const isAvgScore = prevPtsRaw === -1 || prevPtsRaw === -2 || prevPtsRaw === -3;
 
                                 return (
                                   <React.Fragment key={`prev-r${r.round}-${position}`}>
@@ -1561,11 +1586,11 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                                       ) : ''}
                                     </td>
                                     <td className={`px-1 py-1 text-center font-mono font-semibold ${
-                                      prevPts === -1
+                                      isAvgScore
                                         ? 'text-green-500'
                                         : darkMode ? 'text-slate-400' : 'text-slate-600'
                                     }`}>
-                                      {prevPts !== null ? (prevPts === -1 ? 'AVG' : prevPts) : ''}
+                                      {prevPtsRaw !== null ? (isAvgScore ? 'AVG' : prevPtsRaw) : ''}
                                     </td>
                                   </React.Fragment>
                                 );
