@@ -58,6 +58,7 @@ import StripeOAuthCallback from './components/StripeOAuthCallback';
 import { HMSValidatorPage } from './pages/HMSValidatorPage';
 import PublicVideoPlayer from './components/public/PublicVideoPlayer';
 import { DelegatedRollCallPage } from './pages/DelegatedRollCallPage';
+import SignOnKioskPage from './pages/SignOnKioskPage';
 import { MobileAppComingSoon } from './components/MobileAppComingSoon';
 import { JoinScoringSessionPage } from './pages/JoinScoringSessionPage';
 import './styles/index.css';
@@ -260,6 +261,9 @@ function App() {
 
         {/* Delegated Roll Call Route (Public) */}
         <Route path="/rc/:token" element={<DelegatedRollCallPage />} />
+
+        {/* Self-service Sign On Kiosk (Public) */}
+        <Route path="/sign-on/:eventId" element={<SignOnKioskPage />} />
 
         {/* Mobile Livestream Route (Public) */}
         <Route path="/mobile-stream/:sessionId" element={<MobileStreamPage />} />

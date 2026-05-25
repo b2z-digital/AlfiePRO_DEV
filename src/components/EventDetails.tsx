@@ -3535,6 +3535,10 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 isAdmin={isAdmin || isEditor}
                 eventName={event.eventName || event.clubName}
                 eventSkippers={event.skippers || []}
+                eventDate={event.date}
+                eventEndDate={event.endDate}
+                numberOfDays={event.numberOfDays}
+                multiDay={event.multiDay}
               />
             )}
             {activeTab === 'protests' && (isAdmin || isEditor) && (

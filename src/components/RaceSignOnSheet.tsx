@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Trash2, UserCheck, UserX, Download, Search, Phone, Anchor, SquareCheck as CheckSquare, Square } from 'lucide-react';
+import { Users, Plus, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Trash2, Download, Search, Phone, Anchor, SquareCheck as CheckSquare, Square, QrCode, Share2, Calendar } from 'lucide-react';
 import {
   getSignOnSheet, signOn, signOff, signOffAll, deleteSignOn,
   RaceDaySignOn
@@ -23,6 +23,10 @@ interface RaceSignOnSheetProps {
   isAdmin: boolean;
   eventName?: string;
   eventSkippers?: EventSkipper[];
+  eventDate?: string;
+  eventEndDate?: string;
+  numberOfDays?: number;
+  multiDay?: boolean;
   members?: Array<{ id: string; first_name: string; last_name: string; sail_number?: string }>;
 }
 
@@ -33,6 +37,10 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
   isAdmin,
   eventName,
   eventSkippers = [],
+  eventDate,
+  eventEndDate,
+  numberOfDays,
+  multiDay,
   members = []
 }) => {
   const { user } = useAuth();
@@ -42,6 +50,7 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddWalkUp, setShowAddWalkUp] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'signed_on' | 'not_signed_on'>('all');
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const [walkUpForm, setWalkUpForm] = useState({
     skipper_name: '',
@@ -49,6 +58,25 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
     emergency_contact_name: '',
     emergency_contact_phone: '',
   });
+
+  // Generate event day dates for multi-day events
+  const getEventDays = (): { date: string; label: string; dayNum: number }[] => {
+    if (!multiDay || !eventDate) return [];
+    const days: { date: string; label: string; dayNum: number }[] = [];
+    const numDays = numberOfDays || (eventEndDate ? Math.ceil((new Date(eventEndDate).getTime() - new Date(eventDate).getTime()) / (1000 * 60 * 60 * 24)) + 1 : 1);
+    for (let i = 0; i < numDays; i++) {
+      const d = new Date(eventDate);
+      d.setDate(d.getDate() + i);
+      days.push({
+        date: d.toISOString().split('T')[0],
+        label: `Day ${i + 1}`,
+        dayNum: i + 1,
+      });
+    }
+    return days;
+  };
+
+  const eventDays = getEventDays();
 
   useEffect(() => {
     loadEntries();
@@ -159,7 +187,10 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // Determine sign-on status for each event skipper
+  const getKioskUrl = () => {
+    return `${window.location.origin}/sign-on/${eventId}`;
+  };
+
   const getSkipperStatus = (skipper: EventSkipper) => {
     return entries.find(e =>
       e.skipper_name.toLowerCase() === skipper.name.toLowerCase() ||
@@ -168,40 +199,21 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
   };
 
   const onWater = entries.filter(e => !e.signed_off_at);
-  const signedOff = entries.filter(e => !!e.signed_off_at);
   const totalRegistered = eventSkippers.length;
   const totalSignedOn = entries.length;
   const unsignedCount = eventSkippers.filter(s => !getSkipperStatus(s)).length;
 
-  // Build display list based on view mode (for events without registered skippers)
-  const getDisplayList = () => {
-    if (eventSkippers.length === 0) {
-      const list = viewMode === 'signed_on' ? entries : viewMode === 'not_signed_on' ? [] : entries;
-      return list.filter(e =>
-        e.skipper_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.sail_number.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    return [];
-  };
-
-  // Build the skipper roster with status
   const getSkipperRoster = () => {
     if (eventSkippers.length === 0) return [];
-
     let roster = eventSkippers.map(skipper => ({
       skipper,
       entry: getSkipperStatus(skipper),
     }));
-
-    // Filter by view mode
     if (viewMode === 'signed_on') {
       roster = roster.filter(r => !!r.entry);
     } else if (viewMode === 'not_signed_on') {
       roster = roster.filter(r => !r.entry);
     }
-
-    // Filter by search
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       roster = roster.filter(r =>
@@ -209,11 +221,9 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
         (r.skipper.sailNo && r.skipper.sailNo.toLowerCase().includes(term))
       );
     }
-
     return roster;
   };
 
-  // Walk-up entries not in the event skippers list
   const getWalkUpEntries = () => {
     if (eventSkippers.length === 0) return [];
     return entries.filter(e =>
@@ -225,6 +235,17 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
       !searchTerm || e.skipper_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.sail_number.toLowerCase().includes(searchTerm.toLowerCase())
     );
+  };
+
+  const getDisplayList = () => {
+    if (eventSkippers.length === 0) {
+      const list = viewMode === 'signed_on' ? entries : viewMode === 'not_signed_on' ? [] : entries;
+      return list.filter(e =>
+        e.skipper_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.sail_number.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    return [];
   };
 
   const inputClass = darkMode
@@ -251,12 +272,23 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={raceDay}
-              onChange={(e) => setRaceDay(e.target.value)}
-              className={`px-3 py-1.5 text-sm rounded-lg border ${inputClass}`}
-            />
+            {!multiDay && (
+              <input
+                type="date"
+                value={raceDay}
+                onChange={(e) => setRaceDay(e.target.value)}
+                className={`px-3 py-1.5 text-sm rounded-lg border ${inputClass}`}
+              />
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => setShowShareModal(true)}
+                className={`p-2 rounded-lg border ${darkMode ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-100'}`}
+                title="Share sign-on link / QR code"
+              >
+                <QrCode className={`w-4 h-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+              </button>
+            )}
             <button
               onClick={exportCSV}
               className={`p-2 rounded-lg border ${darkMode ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-100'}`}
@@ -267,6 +299,45 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Multi-Day Selector */}
+      {multiDay && eventDays.length > 1 && (
+        <div className={`px-4 pt-4 pb-2`}>
+          <div className="flex items-center gap-2 mb-1">
+            <Calendar className={`w-3.5 h-3.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+            <span className={`text-xs font-medium uppercase tracking-wide ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+              Select Day
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {eventDays.map(day => {
+              const isSelected = raceDay === day.date;
+              const isToday = day.date === new Date().toISOString().split('T')[0];
+              return (
+                <button
+                  key={day.date}
+                  onClick={() => setRaceDay(day.date)}
+                  className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
+                    isSelected
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : isToday
+                        ? darkMode ? 'bg-blue-900/20 border-blue-700/50 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-700'
+                        : darkMode ? 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <div>{day.label}</div>
+                  <div className={`text-[10px] mt-0.5 ${isSelected ? 'text-blue-200' : darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {new Date(day.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  </div>
+                  {isToday && !isSelected && (
+                    <div className="text-[9px] font-bold text-blue-500 mt-0.5">TODAY</div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Safety Alert */}
       {onWater.length > 0 && (
@@ -394,7 +465,7 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
         </div>
       )}
 
-      {/* Skipper Roster (when event has registered skippers) */}
+      {/* Skipper Roster */}
       <div className="px-4 pb-4">
         {loading ? (
           <div className="text-center py-8">
@@ -417,14 +488,10 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
                         : darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
                   }`}
                 >
-                  {/* Status indicator */}
                   <button
                     onClick={() => {
-                      if (!entry) {
-                        handleQuickSignOn(skipper);
-                      } else if (!entry.signed_off_at) {
-                        handleSignOff(entry.id);
-                      }
+                      if (!entry) handleQuickSignOn(skipper);
+                      else if (!entry.signed_off_at) handleSignOff(entry.id);
                     }}
                     className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
                       isOnWater
@@ -438,16 +505,9 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
                     title={isOnWater ? 'Click to sign off' : isSignedOff ? 'Already signed off' : 'Click to sign on'}
                     disabled={!!isSignedOff}
                   >
-                    {isOnWater ? (
-                      <Anchor className="w-4 h-4" />
-                    ) : isSignedOff ? (
-                      <CheckCircle className="w-4 h-4" />
-                    ) : (
-                      <Square className="w-4 h-4" />
-                    )}
+                    {isOnWater ? <Anchor className="w-4 h-4" /> : isSignedOff ? <CheckCircle className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                   </button>
 
-                  {/* Skipper info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`font-medium text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
@@ -480,7 +540,6 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
                     )}
                   </div>
 
-                  {/* Actions */}
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {!entry && (
                       <span className={`text-xs px-2 py-1 rounded ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -529,25 +588,17 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
                     }`}
                   >
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      entry.signed_off_at
-                        ? 'bg-green-600/20 text-green-500'
-                        : 'bg-amber-600/20 text-amber-500'
+                      entry.signed_off_at ? 'bg-green-600/20 text-green-500' : 'bg-amber-600/20 text-amber-500'
                     }`}>
                       {entry.signed_off_at ? <CheckCircle className="w-4 h-4" /> : <Users className="w-4 h-4" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className={`font-medium text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                          {entry.skipper_name}
-                        </span>
+                        <span className={`font-medium text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{entry.skipper_name}</span>
                         {entry.sail_number && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                            {entry.sail_number}
-                          </span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{entry.sail_number}</span>
                         )}
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${darkMode ? 'bg-amber-900/30 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
-                          Walk-up
-                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${darkMode ? 'bg-amber-900/30 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>Walk-up</span>
                       </div>
                       <div className={`flex items-center gap-3 text-xs mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                         <span className="flex items-center gap-1">
@@ -603,7 +654,6 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
             )}
           </div>
         ) : (
-          /* Fallback for events without registered skippers */
           <>
             {getDisplayList().length === 0 ? (
               <div className="text-center py-8">
@@ -660,6 +710,116 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
             )}
           </>
         )}
+      </div>
+
+      {/* Share / QR Modal */}
+      {showShareModal && (
+        <ShareSignOnModal
+          darkMode={darkMode}
+          eventName={eventName}
+          kioskUrl={getKioskUrl()}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
+    </div>
+  );
+};
+
+// Share modal with QR code
+const ShareSignOnModal: React.FC<{
+  darkMode: boolean;
+  eventName?: string;
+  kioskUrl: string;
+  onClose: () => void;
+}> = ({ darkMode, eventName, kioskUrl, onClose }) => {
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    generateQR();
+  }, [kioskUrl]);
+
+  const generateQR = async () => {
+    try {
+      const qrCode = await import('qrcode');
+      const url = await qrCode.toDataURL(kioskUrl, {
+        width: 280,
+        margin: 2,
+        color: { dark: '#000000', light: '#FFFFFF' },
+      });
+      setQrDataUrl(url);
+    } catch {
+      // QR generation failed silently
+    }
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(kioskUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const openKiosk = () => {
+    window.open(kioskUrl, '_blank');
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div
+        className={`w-full max-w-sm rounded-2xl p-6 ${darkMode ? 'bg-slate-800' : 'bg-white'}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className={`text-lg font-semibold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          Share Sign-On
+        </h3>
+        <p className={`text-sm mb-5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+          Skippers scan this QR code to sign themselves in on their phone, or open on an iPad as a kiosk.
+        </p>
+
+        {qrDataUrl && (
+          <div className="flex justify-center mb-5">
+            <div className="p-3 bg-white rounded-xl">
+              <img src={qrDataUrl} alt="Sign-on QR code" className="w-56 h-56" />
+            </div>
+          </div>
+        )}
+
+        {eventName && (
+          <p className={`text-center text-sm font-medium mb-4 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            {eventName}
+          </p>
+        )}
+
+        <div className={`flex items-center gap-2 p-2 rounded-lg border mb-4 ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
+          <input
+            type="text"
+            readOnly
+            value={kioskUrl}
+            className={`flex-1 text-xs bg-transparent border-none outline-none ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}
+          />
+          <button
+            onClick={copyLink}
+            className={`px-2.5 py-1 text-xs font-medium rounded ${copied ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={openKiosk}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+          >
+            <Share2 className="w-4 h-4" />
+            Open Kiosk Mode
+          </button>
+          <button
+            onClick={onClose}
+            className={`px-4 py-2.5 text-sm font-medium rounded-lg border ${darkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
