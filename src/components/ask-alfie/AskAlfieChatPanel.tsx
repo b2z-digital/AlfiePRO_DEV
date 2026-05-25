@@ -648,25 +648,34 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
     const lastRuling = assistantMessages[assistantMessages.length - 1].content;
     const firstUserMessage = userMessages[0]?.content || '';
 
-    const rulesMatch = lastRuling.match(/(?:rule|rules?)\s*[\d.,\s]+(?:\([a-z]\))?/gi);
-    const rulesCited = rulesMatch ? rulesMatch.join(', ') : '';
+    // Extract rule references - matches patterns like "Rule 10", "Rule 18.2(a)", "RRS 11", "rules 10, 11 and 18.2"
+    const rulesMatch = lastRuling.match(/(?:RRS|rule|rules?)\s*[\d]+(?:\.[\d]+)?(?:\([a-z]\))?/gi);
+    const uniqueRules = rulesMatch
+      ? [...new Set(rulesMatch.map(r => r.replace(/^rules?\s*/i, 'Rule ').replace(/^RRS\s*/i, 'Rule ')))].join(', ')
+      : '';
 
     let confidence = 'medium';
     const lower = lastRuling.toLowerCase();
-    if (lower.includes('clearly') || lower.includes('definite') || lower.includes('without doubt')) {
+    if (lower.includes('clearly') || lower.includes('definite') || lower.includes('without doubt') || lower.includes('must')) {
       confidence = 'high';
-    } else if (lower.includes('unclear') || lower.includes('difficult to determine') || lower.includes('depends on')) {
+    } else if (lower.includes('unclear') || lower.includes('difficult to determine') || lower.includes('depends on') || lower.includes('might')) {
       confidence = 'low';
     }
 
     const userDrawing = userMessages.find(m => m.drawingImage)?.drawingImage || null;
 
+    // Build a comprehensive incident description from all user messages
+    const incidentDescription = userMessages
+      .map(m => m.content)
+      .filter(c => c && c.length > 5)
+      .join(' | ');
+
     onFileProtest({
       ruling: lastRuling,
-      rulesCited,
+      rulesCited: uniqueRules,
       confidence,
       diagramImage: userDrawing || attachedDrawing,
-      incidentDescription: firstUserMessage,
+      incidentDescription,
     });
   };
 

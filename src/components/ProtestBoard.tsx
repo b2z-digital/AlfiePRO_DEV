@@ -117,13 +117,14 @@ export const ProtestBoard: React.FC<ProtestBoardProps> = ({
       decided_by: null,
       protest_time_limit: null,
       diagram_image: diagramImage,
-      alfie_ruling: null,
-      alfie_ruling_confidence: null,
-      alfie_rules_cited: null,
+      alfie_ruling: pendingAlfieData?.ruling || null,
+      alfie_ruling_confidence: pendingAlfieData?.confidence || null,
+      alfie_rules_cited: pendingAlfieData?.rulesCited || null,
     });
     if (result.success) {
       setShowFileForm(false);
       setDiagramImage(null);
+      setPendingAlfieData(null);
       setProtestForm({
         protest_type: 'boat_vs_boat',
         filed_by_name: userName || '',
@@ -191,37 +192,23 @@ export const ProtestBoard: React.FC<ProtestBoardProps> = ({
     setShowAlfiePanel(protest.id);
   };
 
-  const handleAlfieFileProtest = async (data: ProtestFilingData) => {
-    const result = await createProtest({
-      event_id: eventId,
-      club_id: clubId,
-      filed_by_user_id: user?.id || null,
-      protest_type: 'boat_vs_boat',
-      filed_by_name: userName || 'Unknown',
-      filed_by_sail_number: null,
-      protestee_sail_number: null,
-      protestee_name: null,
-      race_number: 1,
-      incident_description: data.incidentDescription,
-      rules_alleged_broken: data.rulesCited || null,
-      witnesses: null,
-      hearing_time: null,
-      hearing_location: null,
-      decision: null,
-      decision_summary: null,
-      penalty_applied: null,
-      decided_at: null,
-      decided_by: null,
-      protest_time_limit: null,
-      diagram_image: data.diagramImage || null,
-      alfie_ruling: data.ruling,
-      alfie_ruling_confidence: data.confidence,
-      alfie_rules_cited: data.rulesCited || null,
-    });
-    if (result.success) {
-      setShowAlfiePanel(null);
-      await loadData();
+  // Store Alfie ruling data to attach when submitting the form
+  const [pendingAlfieData, setPendingAlfieData] = useState<ProtestFilingData | null>(null);
+
+  const handleAlfieFileProtest = (data: ProtestFilingData) => {
+    // Pre-populate the protest form with Alfie's analysis
+    setProtestForm(prev => ({
+      ...prev,
+      filed_by_name: prev.filed_by_name || userName || '',
+      incident_description: data.incidentDescription || prev.incident_description,
+      rules_alleged_broken: data.rulesCited || prev.rules_alleged_broken,
+    }));
+    if (data.diagramImage) {
+      setDiagramImage(data.diagramImage);
     }
+    setPendingAlfieData(data);
+    setShowAlfiePanel(null);
+    setShowFileForm(true);
   };
 
   const handleAlfieSaveRuling = async (data: ProtestFilingData) => {
@@ -421,6 +408,25 @@ export const ProtestBoard: React.FC<ProtestBoardProps> = ({
             {showFileForm && (
               <div className={`mb-4 p-4 rounded-lg border ${darkMode ? 'bg-slate-750 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
                 <h3 className={`text-sm font-semibold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>File a Protest</h3>
+                {pendingAlfieData && (
+                  <div className={`mb-3 p-3 rounded-lg border flex items-start gap-2 ${darkMode ? 'bg-sky-900/20 border-sky-700/50' : 'bg-sky-50 border-sky-200'}`}>
+                    <Bot className={`w-4 h-4 mt-0.5 flex-shrink-0 ${darkMode ? 'text-sky-400' : 'text-sky-600'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-medium ${darkMode ? 'text-sky-300' : 'text-sky-700'}`}>
+                        Pre-populated by Alfie (confidence: {pendingAlfieData.confidence})
+                      </p>
+                      <p className={`text-xs mt-0.5 ${darkMode ? 'text-sky-400/70' : 'text-sky-600/70'}`}>
+                        Review and edit the fields below before submitting.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setPendingAlfieData(null)}
+                      className={`text-xs px-2 py-0.5 rounded ${darkMode ? 'text-sky-400 hover:bg-sky-800/30' : 'text-sky-600 hover:bg-sky-100'}`}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Type</label>
@@ -546,7 +552,7 @@ export const ProtestBoard: React.FC<ProtestBoardProps> = ({
                 </div>
                 <div className="flex justify-end gap-2 mt-3">
                   <button
-                    onClick={() => { setShowFileForm(false); setDiagramImage(null); }}
+                    onClick={() => { setShowFileForm(false); setDiagramImage(null); setPendingAlfieData(null); }}
                     className={`px-3 py-1.5 rounded-lg text-sm ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'}`}
                   >
                     Cancel
