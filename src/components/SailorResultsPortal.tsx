@@ -45,6 +45,7 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
   const { user, profile, currentClub } = useAuth();
   const { isImpersonating, session: impersonationSession } = useImpersonation();
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
+  const resolvedClubId = clubId || currentClub?.clubId || '';
   const [results, setResults] = useState<SailorResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterYear, setFilterYear] = useState<string>('all');
@@ -55,13 +56,13 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
 
   useEffect(() => {
     loadUserInfo();
-  }, [effectiveUserId, clubId, currentClub]);
+  }, [effectiveUserId, resolvedClubId]);
 
   useEffect(() => {
     if (userName || userSailNumber) {
       loadSailorResults();
     }
-  }, [clubId, userName, userSailNumber]);
+  }, [resolvedClubId, userName, userSailNumber]);
 
   const loadUserInfo = async () => {
     if (memberName && sailNumber) {
@@ -70,16 +71,13 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
       return;
     }
 
-    if (!effectiveUserId) return;
-
-    const targetClubId = clubId || currentClub?.clubId;
-    if (!targetClubId) return;
+    if (!effectiveUserId || !resolvedClubId) return;
 
     const { data: memberData } = await supabase
       .from('members')
       .select('first_name, last_name, sail_number')
       .eq('user_id', effectiveUserId)
-      .eq('club_id', targetClubId)
+      .eq('club_id', resolvedClubId)
       .maybeSingle();
 
     if (memberData) {
@@ -93,8 +91,7 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
   const loadSailorResults = async () => {
     setLoading(true);
     try {
-      const targetClubId = clubId || currentClub?.clubId;
-      if (!targetClubId) {
+      if (!resolvedClubId) {
         setLoading(false);
         return;
       }
@@ -102,7 +99,7 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
       const { data: events, error } = await supabase
         .from('quick_races')
         .select('id, event_name, date, race_results, skippers, scoring_system, boat_class, last_completed_race')
-        .eq('club_id', targetClubId)
+        .eq('club_id', resolvedClubId)
         .not('race_results', 'is', null)
         .order('date', { ascending: false });
 
