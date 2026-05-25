@@ -42,7 +42,7 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
   memberName,
   sailNumber
 }) => {
-  const { user, profile, currentClub } = useAuth();
+  const { user, currentClub } = useAuth();
   const { isImpersonating, session: impersonationSession } = useImpersonation();
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const resolvedClubId = clubId || currentClub?.clubId || '';
@@ -79,6 +79,7 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
     }
 
     try {
+      // Try matching member by user_id first
       const { data: memberData } = await supabase
         .from('members')
         .select('first_name, last_name, sail_number')
@@ -90,16 +91,47 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
         const name = `${memberData.first_name || ''} ${memberData.last_name || ''}`.trim();
         setUserName(name);
         setUserSailNumber(memberData.sail_number || null);
-      } else if (profile) {
-        const name = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
-        if (name) {
-          setUserName(name);
-        } else {
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
+        return;
       }
+
+      // Fallback: look up user's profile to get name/email, then search members by email
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, full_name')
+        .eq('id', effectiveUserId)
+        .maybeSingle();
+
+      if (profileData) {
+        const profileName = profileData.full_name || `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim();
+
+        // Try finding member by email match
+        const { data: userData } = await supabase.auth.getUser();
+        const userEmail = userData?.user?.email;
+
+        if (userEmail) {
+          const { data: memberByEmail } = await supabase
+            .from('members')
+            .select('first_name, last_name, sail_number')
+            .eq('email', userEmail)
+            .eq('club_id', resolvedClubId)
+            .maybeSingle();
+
+          if (memberByEmail) {
+            const name = `${memberByEmail.first_name || ''} ${memberByEmail.last_name || ''}`.trim();
+            setUserName(name);
+            setUserSailNumber(memberByEmail.sail_number || null);
+            return;
+          }
+        }
+
+        // Last resort: use the profile name to match against skippers
+        if (profileName) {
+          setUserName(profileName);
+          return;
+        }
+      }
+
+      setLoading(false);
     } catch {
       setLoading(false);
     }
