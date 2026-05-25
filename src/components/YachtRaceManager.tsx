@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle } from 'lucide-react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle, RotateCcw } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -41,6 +41,9 @@ import { LiveStatusControl } from './LiveStatusControl';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
 import { updateRaceStatus } from '../utils/liveTrackingStorage';
+import { createCheckpoint } from '../utils/scoringCheckpoints';
+import { ScoringCheckpointModal } from './ScoringCheckpointModal';
+import type { ScoringCheckpoint } from '../utils/scoringCheckpoints';
 import { AskAlfieOrb } from './ask-alfie/AskAlfieOrb';
 import { HeatRacingSetupWizard } from './HeatRacingSetupWizard';
 import { useScoringContext } from '../contexts/ScoringContext';
@@ -135,6 +138,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
   const [showRaceSettingsModal, setShowRaceSettingsModal] = useState(false);
+  const [showCheckpointModal, setShowCheckpointModal] = useState(false);
   const [autoEnableHeatRacing, setAutoEnableHeatRacing] = useState(false);
   const [showHeatRacingRecommendation, setShowHeatRacingRecommendation] = useState(false);
   const [showWizardManualAssignModal, setShowWizardManualAssignModal] = useState(false);
@@ -1081,6 +1085,42 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       }
     }
   }, [isInitialLoad, raceResults, skippers, lastCompletedRace, hasDeterminedInitialHcaps, isManualHandicaps, currentDay, heatManagement]);
+
+  // Auto-checkpoint when a round completes
+  const lastCheckpointedRound = useRef<number>(0);
+  useEffect(() => {
+    if (!heatManagement?.roundJustCompleted) return;
+    if (!heatManagement.configuration.enabled) return;
+    const completedRound = heatManagement.roundJustCompleted;
+    if (completedRound <= lastCheckpointedRound.current) return;
+
+    const event = getCurrentEvent();
+    if (!event?.id || !event?.clubId) return;
+
+    lastCheckpointedRound.current = completedRound;
+
+    const dropRulesArray = Array.isArray(currentDropRules)
+      ? currentDropRules
+      : [4, 8, 16, 24, 32, 40];
+
+    createCheckpoint({
+      eventId: event.id,
+      clubId: event.clubId,
+      roundNumber: completedRound,
+      checkpointType: 'auto_round_complete',
+      label: `End of Race ${completedRound}`,
+      heatManagement,
+      raceResults,
+      skippers,
+      lastCompletedRace,
+      dropRules: dropRulesArray,
+      numRaces: currentNumRaces,
+    }).then(result => {
+      if (result.success) {
+        console.log(`Scoring checkpoint saved: End of Race ${completedRound}`);
+      }
+    });
+  }, [heatManagement?.roundJustCompleted]);
 
   useEffect(() => {
     // Initial setup only - toggleDarkMode handles updates
@@ -3941,6 +3981,22 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   <Settings size={16} />
                   <span className="text-xs font-medium">Settings</span>
                 </button>
+                {heatManagement?.configuration?.enabled && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCheckpointModal(true)}
+                    className={`
+                      flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors
+                      ${darkMode
+                        ? 'text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600'
+                        : 'text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200'}
+                    `}
+                    title="Scoring Checkpoints & Rollback"
+                  >
+                    <RotateCcw size={16} />
+                    <span className="text-xs font-medium">Checkpoints</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsFullscreenScoring(prev => !prev)}
@@ -4609,6 +4665,32 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           }}
           onScoringModeChange={(mode) => setScoringMode(mode)}
         />
+
+        {heatManagement?.configuration?.enabled && (
+          <ScoringCheckpointModal
+            isOpen={showCheckpointModal}
+            onClose={() => setShowCheckpointModal(false)}
+            darkMode={darkMode}
+            eventId={(() => { const e = getCurrentEvent(); return e?.isSeriesEvent ? e.seriesId : e?.id || ''; })()}
+            clubId={getCurrentEvent()?.clubId || ''}
+            currentHeatManagement={heatManagement}
+            currentRaceResults={raceResults}
+            currentSkippers={skippers}
+            currentLastCompletedRace={lastCompletedRace}
+            currentDropRules={Array.isArray(currentDropRules) ? currentDropRules : [4, 8, 16, 24, 32, 40]}
+            currentNumRaces={currentNumRaces}
+            onRestore={(checkpoint: ScoringCheckpoint) => {
+              setHeatManagement(checkpoint.heat_management);
+              setRaceResults(checkpoint.race_results);
+              setSkippers(checkpoint.skippers);
+              setLastCompletedRace(checkpoint.last_completed_race);
+              setCurrentDropRules(checkpoint.drop_rules);
+              setCurrentNumRaces(checkpoint.num_races);
+              lastCheckpointedRound.current = 0;
+              addNotification('success', `Restored to: ${checkpoint.label}`);
+            }}
+          />
+        )}
 
         <ManualHeatAssignmentModal
           isOpen={showWizardManualAssignModal}
