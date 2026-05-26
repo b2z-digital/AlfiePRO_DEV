@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, MoveHorizontal as MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Timer, Flag, Pause, Pencil, Lock } from 'lucide-react';
 import { Skipper, RaceResult } from '../types';
 import { RaceEvent } from '../types/race';
@@ -99,6 +99,21 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   const [storedHandicaps, setStoredHandicaps] = useState<StoredHandicapData[]>([]);
 
   const { user } = useAuth();
+
+  // Sort skippers by sail number for the grid display
+  const sortedSkipperIndices = useMemo(() => {
+    return skippers
+      .map((s, idx) => ({ idx, sail: String(s.sailNumber || s.sailNo || '').trim() }))
+      .sort((a, b) => {
+        const aNum = parseInt(a.sail, 10);
+        const bNum = parseInt(b.sail, 10);
+        if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+        if (!isNaN(aNum)) return -1;
+        if (!isNaN(bNum)) return 1;
+        return a.sail.localeCompare(b.sail);
+      })
+      .map(item => item.idx);
+  }, [skippers]);
 
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const longPressSkipper = useRef<number | null>(null);
@@ -1314,7 +1329,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
           <div className={`flex-1 overflow-y-auto p-6 min-h-0 ${darkMode ? 'bg-slate-800/20' : 'bg-gradient-to-br from-slate-50 to-slate-100'}`}>
             <div className={`grid ${gridCols} gap-6 sm:gap-8`}>
-              {skippers.map((skipper, index) => {
+              {sortedSkipperIndices.map((index) => {
+                const skipper = skippers[index];
                 const isFinished = usedSkipperIndices.has(index);
 
                 return (

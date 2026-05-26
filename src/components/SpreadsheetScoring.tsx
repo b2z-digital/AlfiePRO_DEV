@@ -112,6 +112,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
   const verifyButtonRef = useRef<HTMLDivElement | null>(null);
   const autoCompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoCompleteCellRef = useRef<{ heat: HeatDesignation; position: number; value: string } | null>(null);
+  const preEditSkipperRef = useRef<Record<string, { skipperIndex: number; sailNumber: string }>>({});
   const verifiedCellsRef = useRef<Record<HeatDesignation, CellEntry[]>>({} as any);
   const prevRoundRef = useRef<number | null>(null);
   const [showStartBoxModal, setShowStartBoxModal] = useState(false);
@@ -360,6 +361,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
       setCells({ A: newCells } as any);
       setLocalVerifiedHeats(new Set());
+      preEditSkipperRef.current = {};
       return;
     }
 
@@ -482,6 +484,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
 
     setCells(newAllCells as any);
     setLocalVerifiedHeats(alreadyVerified);
+    preEditSkipperRef.current = {};
   }, [isMultiHeatMode, availableHeats, currentRound, skippers, initialRace, raceResults, heatResultsKey, heatAssignmentKey, completedRounds, editingRoundData, getHeatSkippers, getRacingSkippersForHeat, getHeatRaceResults]);
 
   useEffect(() => {
@@ -528,19 +531,33 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
     const idx = position - 1;
     const heatCells = cells[heat] || [];
     const updated = [...heatCells];
+
+    // Capture pre-edit skipper info when cell first changes from having a valid skipper
+    const cellKey = `${heat}-${idx}`;
+    const currentCell = heatCells[idx];
+    if (currentCell && currentCell.skipperIndex !== null && currentCell.sailNumber.trim()) {
+      if (!preEditSkipperRef.current[cellKey] || preEditSkipperRef.current[cellKey].sailNumber !== currentCell.sailNumber) {
+        preEditSkipperRef.current[cellKey] = { skipperIndex: currentCell.skipperIndex, sailNumber: currentCell.sailNumber };
+      }
+    }
+
     updated[idx] = { ...updated[idx], sailNumber: value, letterScore: null, customPoints: undefined };
 
     // If this sail number already exists elsewhere and is a valid skipper match,
-    // remove it from the old position and shift entries (insert behavior, not swap/duplicate)
+    // remove it from the old position and shift entries (insert behavior, not swap/duplicate).
+    // Only do this when there's no possible longer match (to avoid "14" removing entry while user types "147").
     if (value.trim()) {
       const heatSkipsForCheck = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
       const sailMap = buildSailNumberMap(heatSkipsForCheck);
       const lower = value.trim().toLowerCase();
       if (sailMap.has(lower)) {
-        const existingIdx = updated.findIndex((c, i) => i !== idx && c.sailNumber.trim().toLowerCase() === lower && !c.letterScore);
-        if (existingIdx >= 0) {
-          updated.splice(existingIdx, 1);
-          updated.push({ sailNumber: '', skipperIndex: null, letterScore: null, isValid: true, isDuplicate: false });
+        const hasLongerMatch = [...sailMap.keys()].some(k => k !== lower && k.startsWith(lower));
+        if (!hasLongerMatch) {
+          const existingIdx = updated.findIndex((c, i) => i !== idx && c.sailNumber.trim().toLowerCase() === lower && !c.letterScore);
+          if (existingIdx >= 0) {
+            updated.splice(existingIdx, 1);
+            updated.push({ sailNumber: '', skipperIndex: null, letterScore: null, isValid: true, isDuplicate: false });
+          }
         }
       }
     }
@@ -569,6 +586,20 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
         autoCompleteTimerRef.current = setTimeout(() => {
           const pending = autoCompleteCellRef.current;
           if (pending && pending.heat === heat && pending.position === position && pending.value === lower) {
+            // Perform the insert/shift now that the user has stopped typing
+            setCells(prev => {
+              const currentCells = [...(prev[heat] || [])];
+              const currentLower = currentCells[idx]?.sailNumber.trim().toLowerCase();
+              if (currentLower === lower) {
+                const dupeIdx = currentCells.findIndex((c, i) => i !== idx && c.sailNumber.trim().toLowerCase() === lower && !c.letterScore);
+                if (dupeIdx >= 0) {
+                  currentCells.splice(dupeIdx, 1);
+                  currentCells.push({ sailNumber: '', skipperIndex: null, letterScore: null, isValid: true, isDuplicate: false });
+                  return { ...prev, [heat]: validateCells(currentCells, heatSkips) };
+                }
+              }
+              return prev;
+            });
             for (let next = position; next < currentSkipperCount; next++) {
               const nextRef = inputRefs.current[`${heat}-${next}`];
               if (nextRef) {
@@ -687,9 +718,22 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
         const parsed = parseInputForLetterCode(cell.sailNumber);
         if (parsed && parsed.letterScore) {
           const updated = [...heatCells];
-          updated[idx] = { ...updated[idx], sailNumber: parsed.sailNumber, letterScore: parsed.letterScore, customPoints: parsed.customPoints };
+          let sailForCell = parsed.sailNumber;
 
-          // If sail number was included, keep it matched to a skipper; otherwise clear
+          // If bare letter code typed (no sail number), restore pre-edit skipper info
+          if (!sailForCell) {
+            const cellKey = `${heat}-${idx}`;
+            const preEdit = preEditSkipperRef.current[cellKey];
+            if (preEdit) {
+              sailForCell = preEdit.sailNumber;
+            }
+          }
+
+          updated[idx] = { ...updated[idx], sailNumber: sailForCell, letterScore: parsed.letterScore, customPoints: parsed.customPoints };
+
+          // Clear pre-edit ref for this cell since it's now resolved
+          delete preEditSkipperRef.current[`${heat}-${idx}`];
+
           const heatSkips = isMultiHeatMode ? getHeatSkippers(heat) : skippers;
           const validated = validateCells(updated, heatSkips);
           const regularFinishers = validated.filter(c => (!c.letterScore && (c.sailNumber.trim() || c.skipperIndex !== null)) || (c.letterScore && POSITION_PRESERVING_SCORES.has(c.letterScore)));
