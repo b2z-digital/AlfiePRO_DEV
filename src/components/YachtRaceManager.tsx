@@ -3870,7 +3870,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       <div className={`w-full ${isFullscreenScoring ? 'px-0 py-0' : 'px-20 py-12'}`}>
         <div className={`flex-1 flex flex-col justify-center ${isFullscreenScoring ? '' : 'min-h-[calc(100vh-24rem)]'}`}>
           {getCurrentEvent() && !isFullscreenScoring && (
-            <div className="mb-4">
+            <div className={`mb-4 ${(scoringMode === 'touch' || scoringMode === 'spreadsheet' || heatManagement?.configuration.enabled) ? 'pt-10' : ''}`}>
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <RaceHeader
