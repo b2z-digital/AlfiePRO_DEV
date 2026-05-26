@@ -231,14 +231,17 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
         (a: any) => a.heatDesignation === heat
       );
       const indices = assignment?.skipperIndices || [];
-      return indices[localIndex] ?? -1;
+      // Account for filter(Boolean) in getHeatSkippers - build valid indices only
+      const validIndices = indices.filter((idx: number) => skippers[idx] != null);
+      return validIndices[localIndex] ?? -1;
     }
     if (isMultiHeatMode && heatSkipperIndicesMap) {
       const indices = heatSkipperIndicesMap[heat] || [];
-      return indices[localIndex] ?? -1;
+      const validIndices = indices.filter(idx => skippers[idx] != null);
+      return validIndices[localIndex] ?? -1;
     }
     return localIndex;
-  }, [isMultiHeatMode, heatSkipperIndicesMap, editingRoundData]);
+  }, [isMultiHeatMode, heatSkipperIndicesMap, skippers, editingRoundData]);
 
   const getRacingSkippersForHeat = useCallback((heat: HeatDesignation): Skipper[] => {
     return getHeatSkippers(heat);
@@ -382,11 +385,13 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
           (a: any) => a.heatDesignation === heat
         );
         const assignedIndices = assignment?.skipperIndices || [];
-        totalPos = Math.max(totalPos, assignedIndices.length);
+        // Use filtered indices (matching getGlobalSkipperIndex) for local index mapping
+        const validIndices = assignedIndices.filter((idx: number) => skippers[idx] != null);
+        totalPos = Math.max(totalPos, validIndices.length);
         existingResults = roundResults.map((res: any) => ({
           ...res,
           race: currentRound,
-          skipperIndex: assignedIndices.indexOf(res.skipperIndex)
+          skipperIndex: validIndices.indexOf(res.skipperIndex)
         })).filter((res: any) => res.skipperIndex >= 0);
       } else {
         const heatResults = getHeatRaceResults(heat);
@@ -508,7 +513,9 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
       }
 
       const sailLower = cell.sailNumber.trim().toLowerCase();
-      const skipperIdx = sailMap.get(sailLower) ?? null;
+      const lookupIdx = sailMap.get(sailLower) ?? null;
+      // Preserve existing skipperIndex when sail lookup fails but cell already has a valid one
+      const skipperIdx = lookupIdx !== null ? lookupIdx : cell.skipperIndex;
 
       if (cell.letterScore) {
         if (sailLower && usedSails.has(sailLower)) {
@@ -518,7 +525,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
         return { ...cell, skipperIndex: skipperIdx, isValid: true, isDuplicate: false };
       }
 
-      const isValid = skipperIdx !== null;
+      const isValid = lookupIdx !== null;
       if (usedSails.has(sailLower)) {
         return { ...cell, skipperIndex: skipperIdx, isValid, isDuplicate: true };
       }
