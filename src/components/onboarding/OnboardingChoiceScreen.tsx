@@ -1,15 +1,17 @@
 import React from 'react';
-import { Users, Building2, ArrowRight, Check } from 'lucide-react';
+import { Users, Building2, Timer, ArrowRight, Check } from 'lucide-react';
 import { Logo } from '../Logo';
 
 interface OnboardingChoiceScreenProps {
   onSelectJoinClub: () => void;
   onSelectStartClub: () => void;
+  onSelectRaceManagement?: () => void;
 }
 
 export const OnboardingChoiceScreen: React.FC<OnboardingChoiceScreenProps> = ({
   onSelectJoinClub,
   onSelectStartClub,
+  onSelectRaceManagement,
 }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] flex items-center justify-center p-4">
@@ -29,7 +31,7 @@ export const OnboardingChoiceScreen: React.FC<OnboardingChoiceScreenProps> = ({
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid md:grid-cols-3 gap-6">
           <div
             onClick={onSelectJoinClub}
             className="bg-slate-800/50 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border-2 border-slate-700 hover:border-blue-500 p-8 group"
@@ -129,6 +131,55 @@ export const OnboardingChoiceScreen: React.FC<OnboardingChoiceScreenProps> = ({
               </p>
             </div>
           </div>
+
+          {onSelectRaceManagement && (
+            <div
+              onClick={onSelectRaceManagement}
+              className="bg-slate-800/50 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border-2 border-slate-700 hover:border-sky-500 p-8 group"
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 group-hover:bg-sky-500 transition-colors">
+                  <Timer className="w-10 h-10 text-sky-400 group-hover:text-white transition-colors" />
+                </div>
+
+                <h2 className="text-2xl font-bold text-white mb-4">
+                  Race Scoring Only
+                </h2>
+
+                <p className="text-slate-300 mb-6 leading-relaxed">
+                  Independent race officer? Score races and share results without needing a club account.
+                </p>
+
+                <div className="grid grid-cols-2 gap-x-2 gap-y-3 mb-8 text-left w-full">
+                  <div className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-200 text-sm">Score races</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-200 text-sm">Import skippers</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-200 text-sm">Share results</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                    <span className="text-slate-200 text-sm">QR codes</span>
+                  </div>
+                </div>
+
+                <button className="w-full bg-sky-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-sky-700 transition-colors flex items-center justify-center gap-2 group-hover:bg-sky-700">
+                  Get Started Free
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+
+                <p className="text-sm text-slate-400 mt-4">
+                  Takes about 1 minute • Always free
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="text-center mt-8 text-slate-300">
