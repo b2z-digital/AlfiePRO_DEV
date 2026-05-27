@@ -3,6 +3,7 @@ import { supabase } from '../../utils/supabase';
 import { OnboardingChoiceScreen } from './OnboardingChoiceScreen';
 import { OnboardingWizard } from './OnboardingWizard';
 import { ClubSetupWizard } from './ClubSetupWizard';
+import { RaceManagementOnboarding } from './RaceManagementOnboarding';
 import { CircleCheck as CheckCircle2, Building2, ArrowRight, CircleAlert as AlertCircle, UserCheck, X, Mail, Loader as Loader2 } from 'lucide-react';
 
 interface OnboardingRouterProps {
@@ -30,7 +31,7 @@ interface NameMatchCandidate {
   date_joined: string;
 }
 
-type OnboardingMode = 'choice' | 'join-club' | 'start-club' | 'already-linked' | 'name-match';
+type OnboardingMode = 'choice' | 'join-club' | 'start-club' | 'already-linked' | 'name-match' | 'race-management';
 
 export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) => {
   const [mode, setMode] = useState<OnboardingMode>('choice');
@@ -395,11 +396,21 @@ export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) 
     );
   }
 
+  if (mode === 'race-management') {
+    return (
+      <RaceManagementOnboarding
+        onComplete={handleComplete}
+        onBack={handleBackToChoice}
+      />
+    );
+  }
+
   if (mode === 'choice') {
     return (
       <OnboardingChoiceScreen
         onSelectJoinClub={handleSelectJoinClub}
         onSelectStartClub={handleSelectStartClub}
+        onSelectRaceManagement={() => setMode('race-management')}
       />
     );
   }

@@ -249,10 +249,41 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             }
 
             setMemberAvatars(avatarMap);
+          } else if (isRaceOfficer && !currentEvent.clubId) {
+            // Standalone race officer - fetch from race_officer_contacts
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            if (!currentUser) throw new Error('Not authenticated');
+
+            const { data: contacts, error: contactsError } = await supabase
+              .from('race_officer_contacts')
+              .select('*')
+              .eq('user_id', currentUser.id)
+              .order('last_name', { ascending: true });
+
+            if (contactsError) throw contactsError;
+
+            const contactsAsMembers = (contacts || []).map((c: any) => ({
+              id: c.id,
+              first_name: c.first_name || '',
+              last_name: c.last_name || '',
+              club: c.club || '',
+              email: c.email || '',
+              boats: c.sail_number ? [{
+                id: c.id,
+                member_id: c.id,
+                boat_type: c.boat_class || currentEvent.raceClass || '',
+                sail_number: c.sail_number,
+                hull: c.hull || '',
+                isValid: true,
+              }] : [],
+            }));
+
+            setMembers(contactsAsMembers);
+            setMemberAvatars({});
           } else {
             // Regular event - fetch members from current club only
             const storedMembers = await getStoredMembers();
-            
+
             if (!Array.isArray(storedMembers)) {
               throw new Error('Invalid members data received');
             }
@@ -1469,12 +1500,14 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                 </div>
                 <div>
                   <h3 className="text-lg font-medium text-slate-200">
-                    Add from Club Members
+                    {isRaceOfficer && !currentEvent?.clubId ? 'Add from My Contacts' : 'Add from Club Members'}
                   </h3>
                   <p className="text-sm text-slate-400">
-                    {currentEvent?.isInterclub 
-                      ? "Select from registered members of both clubs" 
-                      : "Select from registered club members"}
+                    {isRaceOfficer && !currentEvent?.clubId
+                      ? "Select from your imported skipper contacts"
+                      : currentEvent?.isInterclub
+                        ? "Select from registered members of both clubs"
+                        : "Select from registered club members"}
                   </p>
                 </div>
               </button>

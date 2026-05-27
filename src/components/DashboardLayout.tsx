@@ -6,6 +6,8 @@ import { RaceManagementPage } from './pages/RaceManagementPage';
 import { ClubSettings } from './pages/ClubSettings';
 import { VenuesPage } from './pages/VenuesPage';
 import { RaceOfficerContactsPage } from './pages/RaceOfficerContactsPage';
+import { StandaloneRaceDashboard } from './dashboard/StandaloneRaceDashboard';
+import { ExternalOrganizationsPage } from '../pages/ExternalOrganizationsPage';
 import { MembersPage } from './pages/MembersPage';
 import { RaceCalendar } from './RaceCalendar';
 import { DashboardHome } from './DashboardHome';
@@ -1116,6 +1118,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: Users,
           description: 'Manage skipper contacts for events',
           path: '/ro-contacts'
+        },
+        {
+          id: 'external-organizations',
+          label: 'Organizations',
+          icon: Building,
+          description: 'Share results with organizations',
+          path: '/external-organizations'
         }] : [])
       ]
     },
@@ -1184,7 +1193,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     : allNavigationSections.map(section => ({
         ...section,
         items: section.items.filter((item: any) => {
-          const raceOfficerItems = ['race-management', 'race-calendar', 'results', 'ro-contacts'];
+          const raceOfficerItems = ['race-management', 'race-calendar', 'results', 'ro-contacts', 'external-organizations'];
           if (isRaceOfficer && !currentClub && raceOfficerItems.includes(item.id)) return true;
           if (item.permission && !can(item.permission as any)) return false;
           if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
@@ -1882,6 +1891,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <NationalAssociationDashboard key={currentOrganization.id} darkMode={darkMode} />
                 ) : currentOrganization?.type === 'state' ? (
                   <StateAssociationDashboard key={currentOrganization.id} darkMode={darkMode} />
+                ) : isRaceOfficer && !currentClub ? (
+                  <StandaloneRaceDashboard darkMode={darkMode} />
                 ) : (
                   <DashboardHome
                     key={dashboardRefreshKey}
@@ -2062,6 +2073,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/weather" element={<WeatherPage />} />
               <Route path="/venues" element={<VenuesPage darkMode={darkMode} />} />
               <Route path="/ro-contacts" element={<RaceOfficerContactsPage darkMode={darkMode} />} />
+              <Route path="/external-organizations" element={<ExternalOrganizationsPage darkMode={darkMode} />} />
               <Route path="/my-garage" element={<MyGaragePage darkMode={darkMode} />} />
               <Route path="/members" element={<MembersPage darkMode={darkMode} />} />
               <Route path="/calendar" element={

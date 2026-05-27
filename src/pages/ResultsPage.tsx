@@ -26,6 +26,7 @@ import { CreateReportSplitButton } from '../components/CreateReportSplitButton';
 import { RaceReportModal } from '../components/RaceReportModal';
 import { EventDetails } from '../components/EventDetails';
 import { PublishToMetaModal } from '../components/PublishToMetaModal';
+import { ShareResultsExternalModal } from '../components/scoring/ShareResultsExternalModal';
 import { HeatRaceResultsModal } from '../components/HeatRaceResultsModal';
 import { SeriesEditModal } from '../components/SeriesEditModal';
 
@@ -70,7 +71,7 @@ export const ResultsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentClub, currentOrganization } = useAuth();
+  const { currentClub, currentOrganization, isRaceOfficer } = useAuth();
   const { can } = usePermissions();
   const resultsRef = useRef<HTMLDivElement>(null);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
@@ -116,6 +117,7 @@ export const ResultsPage: React.FC = () => {
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showHeatResultsModal, setShowHeatResultsModal] = useState(false);
   const [showSeriesEditModal, setShowSeriesEditModal] = useState(false);
+  const [showShareExternalModal, setShowShareExternalModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -1547,6 +1549,22 @@ export const ResultsPage: React.FC = () => {
               </button>
             )}
 
+            {/* Share Externally - standalone race officers */}
+            {isRaceOfficer && !currentClub && (
+              <button
+                onClick={() => hasResultsData && setShowShareExternalModal(true)}
+                disabled={!hasResultsData}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  !hasResultsData
+                    ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                    : 'bg-sky-600 text-white hover:bg-sky-700'
+                }`}
+              >
+                <Globe size={18} />
+                Share Externally
+              </button>
+            )}
+
             {/* Exit Button */}
             <button
               onClick={() => navigate('/results')}
@@ -2537,6 +2555,15 @@ export const ResultsPage: React.FC = () => {
             setShowSeriesEditModal(false);
           }}
           darkMode={true}
+        />
+      )}
+
+      {showShareExternalModal && (selectedEvent || selectedSeries) && (
+        <ShareResultsExternalModal
+          isOpen={showShareExternalModal}
+          onClose={() => setShowShareExternalModal(false)}
+          eventId={selectedEvent?.id || selectedSeries?.id || ''}
+          eventName={selectedEvent?.eventName || selectedSeries?.seriesName || ''}
         />
       )}
     </div>

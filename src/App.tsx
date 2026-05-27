@@ -58,6 +58,7 @@ import StripeOAuthCallback from './components/StripeOAuthCallback';
 import { HMSValidatorPage } from './pages/HMSValidatorPage';
 import PublicVideoPlayer from './components/public/PublicVideoPlayer';
 import { DelegatedRollCallPage } from './pages/DelegatedRollCallPage';
+import { PublicSharedResultsPage } from './components/public/PublicSharedResultsPage';
 import SignOnKioskPage from './pages/SignOnKioskPage';
 import { MobileAppComingSoon } from './components/MobileAppComingSoon';
 import { JoinScoringSessionPage } from './pages/JoinScoringSessionPage';
@@ -258,6 +259,9 @@ function App() {
 
         {/* Join Scoring Session Route */}
         <Route path="/join-scoring/:pin?" element={<JoinScoringSessionPage />} />
+
+        {/* Public Shared Results Route */}
+        <Route path="/results/shared/:shareToken" element={<PublicSharedResultsPage />} />
 
         {/* Delegated Roll Call Route (Public) */}
         <Route path="/rc/:token" element={<DelegatedRollCallPage />} />
