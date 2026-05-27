@@ -233,7 +233,8 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
   }
 
   return (
-    <div className="space-y-6">
+    <div className="h-full overflow-y-auto">
+      <div className="p-6 sm:p-8 lg:p-16 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600">
@@ -241,7 +242,7 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
           </div>
           <div>
             <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              My Contacts
+              Skippers
             </h1>
             <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
               {contacts.length} skipper{contacts.length !== 1 ? 's' : ''} saved
@@ -755,6 +756,7 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

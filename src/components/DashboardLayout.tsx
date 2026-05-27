@@ -1114,7 +1114,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         }] : []),
         ...(isRaceOfficer ? [{
           id: 'ro-contacts',
-          label: 'My Contacts',
+          label: 'Skippers',
           icon: Users,
           description: 'Manage skipper contacts for events',
           path: '/ro-contacts'

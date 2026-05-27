@@ -1500,7 +1500,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                 </div>
                 <div>
                   <h3 className="text-lg font-medium text-slate-200">
-                    {isRaceOfficer && !currentEvent?.clubId ? 'Add from My Contacts' : 'Add from Club Members'}
+                    {isRaceOfficer && !currentEvent?.clubId ? 'Add from Skippers' : 'Add from Club Members'}
                   </h3>
                   <p className="text-sm text-slate-400">
                     {isRaceOfficer && !currentEvent?.clubId
@@ -3256,7 +3256,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   onChange={e => setSaveToContacts(e.target.checked)}
                   className="w-4 h-4 rounded border-slate-600 text-blue-500 focus:ring-blue-500 bg-slate-700"
                 />
-                <span className="text-sm text-slate-300">Save to My Contacts</span>
+                <span className="text-sm text-slate-300">Save to Skippers</span>
               </label>
             )}
             {importStep === 'mapping' && (
