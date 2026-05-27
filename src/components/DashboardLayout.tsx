@@ -1190,17 +1190,30 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'events-scraping', label: 'Events Scraping', icon: CalendarDays, description: 'External events feeds', path: '/events-scraping' },
         ]}
       ]
-    : allNavigationSections.map(section => ({
-        ...section,
-        items: section.items.filter((item: any) => {
-          const raceOfficerItems = ['race-management', 'race-calendar', 'results', 'ro-contacts', 'external-organizations'];
-          if (isRaceOfficer && !currentClub && raceOfficerItems.includes(item.id)) return true;
-          if (item.permission && !can(item.permission as any)) return false;
-          if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
-          if (item.featureKey && !canViewFeature(item.featureKey)) return false;
-          return true;
-        })
-      })).filter(section => section.items.length > 0);
+    : isRaceOfficer && !currentClub
+      ? allNavigationSections
+          .filter(section => section.id === 'dashboard' || section.id === 'racing')
+          .map(section => ({
+            ...section,
+            items: section.id === 'racing'
+              ? section.items.filter((item: any) => {
+                  const standaloneRaceItems = ['race-management', 'race-calendar', 'results', 'yacht-classes', 'venues', 'ro-contacts', 'external-organizations'];
+                  return standaloneRaceItems.includes(item.id);
+                })
+              : section.items
+          }))
+          .filter(section => section.items.length > 0)
+      : allNavigationSections.map(section => ({
+          ...section,
+          items: section.items.filter((item: any) => {
+            const raceOfficerItems = ['race-management', 'race-calendar', 'results', 'ro-contacts', 'external-organizations'];
+            if (isRaceOfficer && !currentClub && raceOfficerItems.includes(item.id)) return true;
+            if (item.permission && !can(item.permission as any)) return false;
+            if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
+            if (item.featureKey && !canViewFeature(item.featureKey)) return false;
+            return true;
+          })
+        })).filter(section => section.items.length > 0);
 
   return (
     <div className={`min-h-screen ${lightMode ? 'bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200' : 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]'}`}>

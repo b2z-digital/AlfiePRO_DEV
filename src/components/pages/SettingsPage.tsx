@@ -42,7 +42,7 @@ type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'assoc
   'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system' | 'handicap-rules';
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
-  const { user, currentClub, currentOrganization } = useAuth();
+  const { user, currentClub, currentOrganization, isRaceOfficer } = useAuth();
   const { isImpersonating, session: impersonationSession } = useImpersonation();
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const { can } = usePermissions();
@@ -794,7 +794,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {/* Race Management Settings Section */}
-          {(can('settings.documents') || can('settings.startbox')) && (
+          {(can('settings.documents') || can('settings.startbox') || (isRaceOfficer && !currentClub)) && (
             <div>
               <button
                 onClick={() => toggleSection('raceManagement')}
@@ -824,7 +824,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
               >
 
                 {/* Race Documents Card */}
-                {can('settings.documents') && (
+                {(can('settings.documents') || (isRaceOfficer && !currentClub)) && (
                   <button
                     onClick={() => setActiveTab('race-documents')}
                     className={`
@@ -851,7 +851,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                 )}
 
                 {/* Start System Card */}
-                {can('settings.startbox') && (
+                {(can('settings.startbox') || (isRaceOfficer && !currentClub)) && (
                   <button
                     onClick={() => setActiveTab('start-system')}
                     className={`
