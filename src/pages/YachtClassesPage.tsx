@@ -34,7 +34,8 @@ export const YachtClassesPage: React.FC<YachtClassesPageProps> = ({ darkMode }) 
         // For clubs, show only classes assigned to this club
         data = await getClubBoatClasses(currentClub.clubId);
       } else {
-        data = [];
+        // Standalone race officers: show all active boat classes
+        data = await getBoatClasses();
       }
 
       setBoatClasses(data);
@@ -99,7 +100,7 @@ export const YachtClassesPage: React.FC<YachtClassesPageProps> = ({ darkMode }) 
               <Sailboat size={48} className="text-slate-500" />
             </div>
             <p className="text-xl text-slate-400 mb-2">No yacht classes yet</p>
-            <p className="text-slate-500">Contact your club administrator to add yacht classes.</p>
+            <p className="text-slate-500">{currentClub ? 'Contact your club administrator to add yacht classes.' : 'No yacht classes have been added to the system yet.'}</p>
           </div>
         ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
