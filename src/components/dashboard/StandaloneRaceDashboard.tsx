@@ -167,7 +167,7 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
       <div className="relative w-full h-[300px] bg-slate-800 overflow-hidden">
         <div className="absolute inset-0 flex items-center justify-center">
           <img
-            src={coverImageUrl || '/RC-Yachts-image-custom_crop.jpg'}
+            src={coverImageUrl || '/Screenshot_2026-05-28_at_12.46.01_pm.png'}
             alt="Dashboard cover"
             className="absolute min-w-full min-h-full object-cover"
             style={coverImageUrl ? {
@@ -382,7 +382,7 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
                   </div>
                 </button>
                 <button
-                  onClick={() => navigate('/data-feeds')}
+                  onClick={() => navigate('/external-organizations')}
                   className={`w-full flex items-center gap-3 ${darkMode ? 'bg-slate-700/60 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'} rounded-lg px-4 py-3 transition-colors text-left`}
                 >
                   <Share2 className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`} />
