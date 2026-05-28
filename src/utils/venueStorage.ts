@@ -60,8 +60,24 @@ export const getStoredVenues = async (): Promise<Venue[]> => {
       return await getAssociationVenues(currentOrg.id, currentOrg.type);
     }
 
-    // Regular club context
-    if (!clubId) return [];
+    // Standalone race officer (no club, no organization)
+    if (!clubId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data, error } = await supabase
+        .from('venues')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching standalone venues:', error);
+        return getVenuesFromLocalStorage();
+      }
+
+      return (data || []) as Venue[];
+    }
 
     // Test connection first
     const isConnected = await testSupabaseConnection();
@@ -214,11 +230,10 @@ const getAssociationVenues = async (
 export const addVenue = async (formData: VenueFormData, explicitClubId?: string): Promise<Venue | null> => {
   try {
     const clubId = explicitClubId || getCurrentClubId();
-    if (!clubId) throw new Error('No club selected');
-    
+
     // Test connection first
     const isConnected = await testSupabaseConnection();
-    
+
     if (!isConnected) {
       console.warn('Supabase connection failed, saving to local storage');
       const venues = getVenuesFromLocalStorage();
@@ -230,7 +245,7 @@ export const addVenue = async (formData: VenueFormData, explicitClubId?: string)
         latitude: formData.latitude,
         longitude: formData.longitude,
         image: formData.image,
-        club_id: clubId,
+        club_id: clubId || '',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -240,6 +255,54 @@ export const addVenue = async (formData: VenueFormData, explicitClubId?: string)
     }
 
     try {
+      // Standalone race officer (no club) - insert with user_id
+      if (!clubId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
+
+        // Check existing standalone venues for default logic
+        const { data: existingVenues } = await supabase
+          .from('venues')
+          .select('id')
+          .eq('user_id', user.id);
+
+        const shouldBeDefault = formData.isDefault || !existingVenues || existingVenues.length === 0;
+
+        if (shouldBeDefault) {
+          await supabase
+            .from('venues')
+            .update({ is_default: false })
+            .eq('user_id', user.id);
+        }
+
+        const { data, error } = await supabase
+          .from('venues')
+          .insert({
+            user_id: user.id,
+            club_id: null,
+            name: formData.name,
+            description: formData.description,
+            address: formData.address,
+            latitude: formData.latitude,
+            longitude: formData.longitude,
+            image: formData.image,
+            is_default: shouldBeDefault
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error adding standalone venue:', error);
+          throw error;
+        }
+
+        const venues = getVenuesFromLocalStorage();
+        venues.push(data as Venue);
+        saveVenuesToLocalStorage(venues);
+        return data as Venue;
+      }
+
+      // Club-based venue creation
       // Check if this is the first venue for the club
       const { data: existingVenues, error: checkError } = await supabase
         .from('club_venues')

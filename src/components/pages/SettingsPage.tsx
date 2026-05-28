@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark, Flag, SlidersHorizontal } from 'lucide-react';
+import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark, Flag, SlidersHorizontal, Share2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { updateUserProfile } from '../../utils/auth';
@@ -24,6 +24,7 @@ import { AdvertisingManagement } from '../advertising/AdvertisingManagement';
 import { StartBoxBuilder } from '../start-box/StartBoxBuilder';
 import { ClubFeaturesAccess } from './ClubFeaturesAccess';
 import HandicapRuleBuilderPage from '../../pages/HandicapRuleBuilderPage';
+import { ExternalOrganizationsPage } from '../../pages/ExternalOrganizationsPage';
 import { ClubYachtClassesSelector } from '../ClubYachtClassesSelector';
 import { formatDate } from '../../utils/date';
 import { supabase } from '../../utils/supabase';
@@ -871,6 +872,33 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                         <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Start system</h3>
                         <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
                           Configure digital StartBox sounds and sequences
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {/* Data Feeds Card - Standalone Race Officers */}
+                {(isRaceOfficer && !currentClub) && (
+                  <button
+                    onClick={() => setActiveTab('data-feeds')}
+                    className={`
+                      group p-6 rounded-xl text-left transition-all border
+                      ${activeTab === 'data-feeds'
+                        ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                        : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                    `}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-sky-50' : 'bg-sky-500/20'}`}>
+                        <Share2 size={20} className="text-sky-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Data Feeds</h3>
+                        <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                          Manage external organizations for sharing results
                         </p>
                       </div>
                     </div>
@@ -1891,6 +1919,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
           {activeTab === 'start-system' && can('settings.startbox') && (
             <StartBoxBuilder darkMode={darkMode} onBack={() => setActiveTab(null)} />
+          )}
+
+          {activeTab === 'data-feeds' && (
+            <ExternalOrganizationsPage darkMode={darkMode} />
           )}
 
           {activeTab === 'handicap-rules' && (
