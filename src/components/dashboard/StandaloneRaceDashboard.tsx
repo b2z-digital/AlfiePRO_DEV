@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Plus, Upload, Users, ChevronRight, Share2, FileText, Timer, Sailboat } from 'lucide-react';
+import { Trophy, Plus, Upload, Users, ChevronRight, Share2, FileText, Timer, Sailboat, Camera } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
+import CoverImageUploadModal from '../CoverImageUploadModal';
 
 export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   const navigate = useNavigate();
@@ -15,9 +16,15 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
   const [userAvatar, setUserAvatar] = useState('');
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [coverImagePosition, setCoverImagePosition] = useState({ x: 0, y: 0, scale: 1 });
+  const [showCoverImageModal, setShowCoverImageModal] = useState(false);
 
   useEffect(() => {
-    if (user) loadData();
+    if (user) {
+      loadData();
+      fetchCoverImage();
+    }
   }, [user]);
 
   const loadData = async () => {
@@ -58,6 +65,93 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
     }
   };
 
+  const fetchCoverImage = async () => {
+    if (!user) return;
+    try {
+      const cacheKey = `cover_image_profile_${user.id}`;
+      const cachedUrl = localStorage.getItem(cacheKey);
+      const cachedPosition = localStorage.getItem(`${cacheKey}_position`);
+
+      if (cachedUrl) setCoverImageUrl(cachedUrl);
+      if (cachedPosition) {
+        try { setCoverImagePosition(JSON.parse(cachedPosition)); } catch {}
+      }
+
+      if (!navigator.onLine) return;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('cover_image_url, cover_image_position_x, cover_image_position_y, cover_image_scale')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data?.cover_image_url) {
+        setCoverImageUrl(data.cover_image_url);
+        localStorage.setItem(cacheKey, data.cover_image_url);
+        const position = {
+          x: data.cover_image_position_x || 0,
+          y: data.cover_image_position_y || 0,
+          scale: data.cover_image_scale || 1
+        };
+        setCoverImagePosition(position);
+        localStorage.setItem(`${cacheKey}_position`, JSON.stringify(position));
+      } else {
+        setCoverImageUrl(null);
+        localStorage.removeItem(cacheKey);
+        localStorage.removeItem(`${cacheKey}_position`);
+      }
+    } catch (err) {
+      console.error('Error fetching cover image:', err);
+    }
+  };
+
+  const handleSaveCoverImage = async (file: File, position: { x: number; y: number; scale: number }) => {
+    if (!user) throw new Error('Not authenticated');
+
+    try {
+      const { compressImage } = await import('../../utils/imageCompression');
+      const compressed = await compressImage(file, 'cover');
+      const fileExt = compressed.name.split('.').pop() || 'jpg';
+      const fileName = `${user.id}/cover-${Date.now()}.${fileExt}`;
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('You must be logged in to upload images');
+
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(fileName, compressed, { cacheControl: '3600', upsert: false });
+
+      if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          cover_image_url: publicUrl,
+          cover_image_position_x: position.x,
+          cover_image_position_y: position.y,
+          cover_image_scale: position.scale
+        })
+        .eq('id', user.id);
+
+      if (updateError) throw new Error(`Failed to update profile: ${updateError.message}`);
+
+      setCoverImageUrl(publicUrl);
+      setCoverImagePosition(position);
+      const cacheKey = `cover_image_profile_${user.id}`;
+      localStorage.setItem(cacheKey, publicUrl);
+      localStorage.setItem(`${cacheKey}_position`, JSON.stringify(position));
+    } catch (err) {
+      console.error('Error saving cover image:', err);
+      throw err instanceof Error ? err : new Error('Failed to save cover image');
+    }
+  };
+
   const greeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -69,34 +163,47 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
 
   return (
     <div className="h-full overflow-y-auto">
-      {/* Hero Cover Image Section */}
-      <div className="relative w-full h-[280px] bg-slate-800 overflow-hidden">
-        <div className="absolute inset-0">
+      {/* Cover Image Section - Same as Club Dashboard */}
+      <div className="relative w-full h-[300px] bg-slate-800 overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center">
           <img
-            src="/RC-Yachts-image-custom_crop.jpg"
-            alt="Race Management"
-            className="absolute inset-0 w-full h-full object-cover"
+            src={coverImageUrl || '/RC-Yachts-image-custom_crop.jpg'}
+            alt="Dashboard cover"
+            className="absolute min-w-full min-h-full object-cover"
+            style={coverImageUrl ? {
+              transform: `translate(${coverImagePosition.x}px, ${coverImagePosition.y}px) scale(${coverImagePosition.scale})`,
+              transformOrigin: 'center',
+            } : undefined}
           />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-slate-900/20" />
+        <div className="absolute inset-0 bg-black opacity-10 pointer-events-none" />
 
-        {/* Welcome Overlay */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 lg:p-12">
-          <div className="flex items-center gap-4">
+        {/* Edit Cover Image Button */}
+        <button
+          onClick={() => setShowCoverImageModal(true)}
+          className="absolute top-4 right-4 p-3 bg-slate-900 bg-opacity-30 hover:bg-opacity-50 text-white rounded-lg backdrop-blur-sm transition-all flex items-center gap-2"
+          title={coverImageUrl ? 'Change Cover' : 'Add Cover'}
+        >
+          <Camera className="w-5 h-5" />
+        </button>
+
+        {/* Welcome Header Overlay */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/90 via-slate-900/70 to-transparent p-4 sm:p-8 lg:p-16">
+          <div className="flex items-center gap-3 sm:gap-4">
             {userAvatar ? (
               <img
                 src={userAvatar}
                 alt={firstName || 'User'}
-                className="w-14 h-14 rounded-full object-cover border-2 border-white/30 shadow-lg"
+                className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border border-white/30"
               />
             ) : (
-              <div className="w-14 h-14 rounded-full bg-sky-500/30 border-2 border-white/20 flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-sky-500/20 border border-white/20 flex items-center justify-center">
                 <Timer className="w-6 h-6 text-white" />
               </div>
             )}
             <div>
               <h1
-                className="text-2xl sm:text-3xl font-bold"
+                className="text-xl sm:text-2xl lg:text-3xl font-bold"
                 style={{
                   color: '#ffffff',
                   textShadow: '0 2px 8px rgba(0, 0, 0, 0.8), 0 4px 16px rgba(0, 0, 0, 0.6)'
@@ -108,7 +215,7 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
                 className="text-sm sm:text-base mt-1"
                 style={{
                   color: '#ffffff',
-                  opacity: 0.9,
+                  opacity: 0.95,
                   textShadow: '0 2px 4px rgba(0, 0, 0, 0.7)'
                 }}
               >
@@ -120,39 +227,39 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
       </div>
 
       {/* Dashboard Content */}
-      <div className="p-4 sm:p-6 lg:p-10 max-w-7xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-16">
         {/* Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 -mt-8 relative z-10">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg backdrop-blur-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div className={`${darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'} border rounded-xl p-5 shadow-sm`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Events</p>
-                <p className="text-2xl font-bold text-white mt-1">{eventCount}</p>
+                <p className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Events</p>
+                <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{eventCount}</p>
               </div>
-              <div className="w-10 h-10 bg-sky-500/10 rounded-lg flex items-center justify-center">
-                <Trophy className="w-5 h-5 text-sky-400" />
+              <div className={`w-10 h-10 ${darkMode ? 'bg-sky-500/10' : 'bg-sky-50'} rounded-lg flex items-center justify-center`}>
+                <Trophy className="w-5 h-5 text-sky-500" />
               </div>
             </div>
           </div>
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg backdrop-blur-sm">
+          <div className={`${darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'} border rounded-xl p-5 shadow-sm`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Skippers</p>
-                <p className="text-2xl font-bold text-white mt-1">{contactCount}</p>
+                <p className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Skippers</p>
+                <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{contactCount}</p>
               </div>
-              <div className="w-10 h-10 bg-emerald-500/10 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-emerald-400" />
+              <div className={`w-10 h-10 ${darkMode ? 'bg-emerald-500/10' : 'bg-emerald-50'} rounded-lg flex items-center justify-center`}>
+                <Users className="w-5 h-5 text-emerald-500" />
               </div>
             </div>
           </div>
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-lg backdrop-blur-sm">
+          <div className={`${darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'} border rounded-xl p-5 shadow-sm`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Shared Results</p>
-                <p className="text-2xl font-bold text-white mt-1">{sharedCount}</p>
+                <p className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Shared Results</p>
+                <p className={`text-2xl font-bold mt-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{sharedCount}</p>
               </div>
-              <div className="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center">
-                <Share2 className="w-5 h-5 text-amber-400" />
+              <div className={`w-10 h-10 ${darkMode ? 'bg-amber-500/10' : 'bg-amber-50'} rounded-lg flex items-center justify-center`}>
+                <Share2 className="w-5 h-5 text-amber-500" />
               </div>
             </div>
           </div>
@@ -162,15 +269,15 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Column - Recent Events */}
           <div className="lg:col-span-2">
-            <div className="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
-                <h2 className="text-base font-semibold text-white flex items-center gap-2">
-                  <Trophy className="w-4 h-4 text-sky-400" />
+            <div className={`${darkMode ? 'bg-slate-800/60 border-slate-700' : 'bg-white border-slate-200'} border rounded-xl overflow-hidden shadow-sm`}>
+              <div className={`flex items-center justify-between px-5 py-4 border-b ${darkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+                <h2 className={`text-base font-semibold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  <Trophy className="w-4 h-4 text-sky-500" />
                   Recent Events
                 </h2>
                 <button
                   onClick={() => navigate('/race-management')}
-                  className="text-xs text-sky-400 hover:text-sky-300 flex items-center gap-1 font-medium"
+                  className="text-xs text-sky-500 hover:text-sky-400 flex items-center gap-1 font-medium"
                 >
                   View All <ChevronRight className="w-3.5 h-3.5" />
                 </button>
@@ -178,16 +285,16 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
 
               <div className="p-4">
                 {loading ? (
-                  <div className="flex justify-center py-10">
+                  <div className="flex justify-center py-12">
                     <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
                   </div>
                 ) : recentEvents.length === 0 ? (
-                  <div className="text-center py-10">
-                    <div className="inline-flex p-4 rounded-full bg-slate-700/50 mb-4">
-                      <Trophy className="w-8 h-8 text-slate-500" />
+                  <div className="text-center py-12">
+                    <div className={`inline-flex p-4 rounded-full ${darkMode ? 'bg-slate-700/50' : 'bg-slate-100'} mb-4`}>
+                      <Trophy className={`w-8 h-8 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
                     </div>
-                    <h3 className="text-base font-medium text-white mb-1">No events yet</h3>
-                    <p className="text-slate-400 mb-5 text-sm">
+                    <h3 className={`text-base font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>No events yet</h3>
+                    <p className={`mb-5 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                       Create your first event to start scoring races.
                     </p>
                     <button
@@ -206,16 +313,16 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
                         <div
                           key={event.id}
                           onClick={() => navigate('/race-management')}
-                          className="bg-slate-700/30 hover:bg-slate-700/50 border border-slate-700/50 rounded-lg p-3.5 flex items-center gap-3.5 cursor-pointer transition-colors"
+                          className={`${darkMode ? 'bg-slate-700/30 hover:bg-slate-700/50 border-slate-700/50' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'} border rounded-lg p-3.5 flex items-center gap-3.5 cursor-pointer transition-colors`}
                         >
-                          <div className="w-9 h-9 bg-sky-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <Trophy className="w-4 h-4 text-sky-400" />
+                          <div className={`w-9 h-9 ${darkMode ? 'bg-sky-500/10' : 'bg-sky-50'} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                            <Trophy className="w-4 h-4 text-sky-500" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-white font-medium text-sm truncate">{event.event_name}</p>
-                            <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                            <p className={`font-medium text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.event_name}</p>
+                            <div className={`flex items-center gap-2 text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                               {event.boat_class && (
-                                <span className="bg-slate-600/50 px-1.5 py-0.5 rounded text-slate-300">{event.boat_class}</span>
+                                <span className={`${darkMode ? 'bg-slate-600/50 text-slate-300' : 'bg-slate-200 text-slate-600'} px-1.5 py-0.5 rounded`}>{event.boat_class}</span>
                               )}
                               <span>{skipperCount} skippers</span>
                               {event.last_completed_race && (
@@ -223,10 +330,10 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
                               )}
                             </div>
                           </div>
-                          <div className="text-xs text-slate-500 hidden sm:block">
+                          <div className={`text-xs hidden sm:block ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                             {formatDate(event.created_at)}
                           </div>
-                          <ChevronRight className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                          <ChevronRight className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
                         </div>
                       );
                     })}
@@ -239,9 +346,9 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
           {/* Sidebar Column - Quick Actions & Info */}
           <div className="space-y-6">
             {/* Quick Actions Widget */}
-            <div className="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-700">
-                <h2 className="text-base font-semibold text-white">Quick Actions</h2>
+            <div className={`${darkMode ? 'bg-slate-800/60 border-slate-700' : 'bg-white border-slate-200'} border rounded-xl overflow-hidden shadow-sm`}>
+              <div className={`px-5 py-4 border-b ${darkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+                <h2 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Quick Actions</h2>
               </div>
               <div className="p-4 space-y-2">
                 <button
@@ -256,52 +363,52 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
                 </button>
                 <button
                   onClick={() => navigate('/ro-contacts')}
-                  className="w-full flex items-center gap-3 bg-slate-700/60 hover:bg-slate-700 text-white rounded-lg px-4 py-3 transition-colors text-left"
+                  className={`w-full flex items-center gap-3 ${darkMode ? 'bg-slate-700/60 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'} rounded-lg px-4 py-3 transition-colors text-left`}
                 >
-                  <Upload className="w-4 h-4 flex-shrink-0 text-slate-300" />
+                  <Upload className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`} />
                   <div>
                     <p className="text-sm font-medium">Manage Skippers</p>
-                    <p className="text-xs text-slate-400">Add or import contacts</p>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Add or import contacts</p>
                   </div>
                 </button>
                 <button
                   onClick={() => navigate('/results')}
-                  className="w-full flex items-center gap-3 bg-slate-700/60 hover:bg-slate-700 text-white rounded-lg px-4 py-3 transition-colors text-left"
+                  className={`w-full flex items-center gap-3 ${darkMode ? 'bg-slate-700/60 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'} rounded-lg px-4 py-3 transition-colors text-left`}
                 >
-                  <FileText className="w-4 h-4 flex-shrink-0 text-slate-300" />
+                  <FileText className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`} />
                   <div>
                     <p className="text-sm font-medium">View Results</p>
-                    <p className="text-xs text-slate-400">Past events and series</p>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Past events and series</p>
                   </div>
                 </button>
                 <button
                   onClick={() => navigate('/data-feeds')}
-                  className="w-full flex items-center gap-3 bg-slate-700/60 hover:bg-slate-700 text-white rounded-lg px-4 py-3 transition-colors text-left"
+                  className={`w-full flex items-center gap-3 ${darkMode ? 'bg-slate-700/60 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'} rounded-lg px-4 py-3 transition-colors text-left`}
                 >
-                  <Share2 className="w-4 h-4 flex-shrink-0 text-slate-300" />
+                  <Share2 className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`} />
                   <div>
                     <p className="text-sm font-medium">Data Feeds</p>
-                    <p className="text-xs text-slate-400">Export results externally</p>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Export results externally</p>
                   </div>
                 </button>
               </div>
             </div>
 
             {/* Upgrade Info Widget */}
-            <div className="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden">
+            <div className={`${darkMode ? 'bg-slate-800/60 border-slate-700' : 'bg-white border-slate-200'} border rounded-xl overflow-hidden shadow-sm`}>
               <div className="p-5">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 bg-emerald-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Sailboat className="w-4 h-4 text-emerald-400" />
+                  <div className={`w-9 h-9 ${darkMode ? 'bg-emerald-500/10' : 'bg-emerald-50'} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                    <Sailboat className="w-4 h-4 text-emerald-500" />
                   </div>
-                  <h3 className="text-sm font-semibold text-white">Want more features?</h3>
+                  <h3 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Want more features?</h3>
                 </div>
-                <p className="text-xs text-slate-400 leading-relaxed mb-3">
+                <p className={`text-xs leading-relaxed mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   Connect to a club or upgrade to the full AlfiePRO platform for member management, website builder, communications, and more.
                 </p>
                 <button
                   onClick={() => navigate('/settings')}
-                  className="text-xs text-sky-400 hover:text-sky-300 font-medium"
+                  className="text-xs text-sky-500 hover:text-sky-400 font-medium"
                 >
                   Learn more &rarr;
                 </button>
@@ -310,6 +417,15 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
           </div>
         </div>
       </div>
+
+      {/* Cover Image Upload Modal */}
+      <CoverImageUploadModal
+        isOpen={showCoverImageModal}
+        onClose={() => setShowCoverImageModal(false)}
+        onSave={handleSaveCoverImage}
+        currentImageUrl={coverImageUrl}
+        currentPosition={coverImagePosition}
+      />
     </div>
   );
 };
