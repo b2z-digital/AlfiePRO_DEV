@@ -4,6 +4,7 @@ export interface SkipperBoat {
   class: string;
   sail_number: string;
   design: string;
+  handicap: number | null;
 }
 
 export interface RaceOfficerContact {
@@ -48,12 +49,18 @@ export async function getRaceOfficerContacts(): Promise<RaceOfficerContact[]> {
 function normalizeContact(raw: any): RaceOfficerContact {
   let boats: SkipperBoat[] = [];
   if (Array.isArray(raw.boats) && raw.boats.length > 0) {
-    boats = raw.boats;
+    boats = raw.boats.map((b: any) => ({
+      class: b.class || '',
+      sail_number: b.sail_number || '',
+      design: b.design || '',
+      handicap: b.handicap ?? null,
+    }));
   } else if (raw.boat_class || raw.sail_number || raw.boat_name) {
     boats = [{
       class: raw.boat_class || '',
       sail_number: raw.sail_number || '',
       design: raw.boat_name || '',
+      handicap: null,
     }];
   }
 
@@ -215,10 +222,10 @@ export async function searchRaceOfficerContacts(searchTerm: string): Promise<Rac
   return (data || []).map(normalizeContact);
 }
 
-export async function getBoatClasses(): Promise<{ id: string; name: string }[]> {
+export async function getBoatClasses(): Promise<{ id: string; name: string; class_image: string | null }[]> {
   const { data, error } = await supabase
     .from('boat_classes')
-    .select('id, name')
+    .select('id, name, class_image')
     .eq('is_active', true)
     .order('name', { ascending: true });
 

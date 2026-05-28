@@ -262,21 +262,47 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
             if (contactsError) throw contactsError;
 
-            const contactsAsMembers = (contacts || []).map((c: any) => ({
-              id: c.id,
-              first_name: c.first_name || '',
-              last_name: c.last_name || '',
-              club: c.club || '',
-              email: c.email || '',
-              boats: c.sail_number ? [{
+            const contactsAsMembers = (contacts || []).map((c: any) => {
+              const nameParts = (c.name || '').trim().split(/\s+/);
+              const firstName = nameParts[0] || '';
+              const lastName = nameParts.slice(1).join(' ') || '';
+
+              let boats: any[] = [];
+              const parsedBoats = Array.isArray(c.boats) ? c.boats : [];
+              if (parsedBoats.length > 0) {
+                boats = parsedBoats.map((b: any, idx: number) => ({
+                  id: `${c.id}_boat_${idx}`,
+                  member_id: c.id,
+                  boat_type: b.class || currentEvent.raceClass || '',
+                  sail_number: b.sail_number || '',
+                  hull: b.design || '',
+                  handicap: b.handicap ?? 0,
+                  isValid: true,
+                }));
+              } else if (c.sail_number) {
+                boats = [{
+                  id: c.id,
+                  member_id: c.id,
+                  boat_type: c.boat_class || currentEvent.raceClass || '',
+                  sail_number: c.sail_number,
+                  hull: c.boat_name || '',
+                  handicap: 0,
+                  isValid: true,
+                }];
+              }
+
+              return {
                 id: c.id,
-                member_id: c.id,
-                boat_type: c.boat_class || currentEvent.raceClass || '',
-                sail_number: c.sail_number,
-                hull: c.hull || '',
-                isValid: true,
-              }] : [],
-            }));
+                first_name: firstName,
+                last_name: lastName,
+                club: c.club_name || '',
+                email: c.email || '',
+                country: c.country || '',
+                state: c.state || '',
+                division: c.division || '',
+                boats,
+              };
+            });
 
             setMembers(contactsAsMembers);
             setMemberAvatars({});
