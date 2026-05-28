@@ -142,13 +142,13 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
               </div>
             </button>
             <button
-              onClick={() => navigate('/external-organizations')}
+              onClick={() => navigate('/data-feeds')}
               className="flex items-center gap-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl p-4 transition-colors text-left"
             >
               <Share2 className="w-5 h-5 flex-shrink-0" />
               <div>
-                <p className="font-medium">Organizations</p>
-                <p className="text-xs text-slate-300">Share results externally</p>
+                <p className="font-medium">Data Feeds</p>
+                <p className="text-xs text-slate-300">Export results externally</p>
               </div>
             </button>
           </div>

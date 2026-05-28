@@ -1195,9 +1195,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           .filter(section => section.id === 'dashboard' || section.id === 'racing')
           .map(section => ({
             ...section,
+            label: section.id === 'racing' ? '' : section.label,
+            collapsible: section.id === 'racing' ? false : section.collapsible,
             items: section.id === 'racing'
               ? section.items.filter((item: any) => {
-                  const standaloneRaceItems = ['race-management', 'race-calendar', 'results', 'yacht-classes', 'venues', 'ro-contacts', 'external-organizations'];
+                  const standaloneRaceItems = ['race-management', 'race-calendar', 'results', 'yacht-classes', 'venues', 'ro-contacts', 'data-feeds'];
                   return standaloneRaceItems.includes(item.id);
                 })
               : section.items
