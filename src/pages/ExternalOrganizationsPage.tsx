@@ -786,6 +786,3 @@ export const ExternalOrganizationsPage: React.FC<ExternalOrganizationsPageProps>
     </div>
   );
 };
-
-
-export { ExternalOrganizationsPage }
