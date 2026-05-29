@@ -258,7 +258,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               .from('race_officer_contacts')
               .select('*')
               .eq('user_id', currentUser.id)
-              .order('last_name', { ascending: true });
+              .order('name', { ascending: true });
 
             if (contactsError) throw contactsError;
 
