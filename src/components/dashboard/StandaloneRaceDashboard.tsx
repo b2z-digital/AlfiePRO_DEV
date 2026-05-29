@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Plus, Upload, Users, ChevronRight, Share2, FileText, Timer, Sailboat, Camera, Tv, Video, Image, Globe } from 'lucide-react';
+import { Trophy, Plus, Upload, Users, ChevronRight, Share2, FileText, Sailboat, Camera, Tv, Video, Image, Globe } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
 import CoverImageUploadModal from '../CoverImageUploadModal';
+import { Logo } from '../Logo';
 
 export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkMode }) => {
   const navigate = useNavigate();
@@ -197,9 +198,7 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
                 className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border border-white/30"
               />
             ) : (
-              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-sky-500/20 border border-white/20 flex items-center justify-center">
-                <Timer className="w-6 h-6 text-white" />
-              </div>
+              <Logo size="large" />
             )}
             <div>
               <h1
@@ -219,7 +218,7 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
                   textShadow: '0 2px 4px rgba(0, 0, 0, 0.7)'
                 }}
               >
-                Race Management Dashboard
+                Welcome to Alfie<span className="font-extrabold">PRO</span> Race Management
               </p>
             </div>
           </div>

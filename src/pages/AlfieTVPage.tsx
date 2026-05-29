@@ -682,8 +682,8 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   useEffect(() => {
     if (organizationId) {
       loadCachedData();
-      loadContent();
     }
+    loadContent();
   }, [organizationId]);
 
   useEffect(() => {
@@ -942,16 +942,11 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   }, [heroSlides.length]);
 
   const loadContent = async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     try {
       // Load channels with visibility
       // For clubs: load club-specific and global channels
-      // For associations: only load global channels
+      // For associations or standalone: only load global channels
       let channelsQuery = supabase
         .from('alfie_tv_channels')
         .select('id, channel_name, channel_thumbnail, is_visible, category, is_global')
@@ -960,7 +955,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       if (organizationType === 'club' && currentClub?.clubId) {
         channelsQuery = channelsQuery.or(`club_id.eq.${currentClub.clubId},is_global.eq.true`);
       } else {
-        // For associations, only show global channels
+        // For associations or standalone race officers, only show global channels
         channelsQuery = channelsQuery.eq('is_global', true);
       }
 
@@ -1056,7 +1051,10 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       }
 
       // Load hero videos (featured videos for hero carousel)
-      const featured = await alfieTVStorage.getFeaturedVideos(organizationId);
+      let featured: AlfieTVVideo[] = [];
+      if (organizationId) {
+        featured = await alfieTVStorage.getFeaturedVideos(organizationId);
+      }
       if (featured.length === 0) {
         // If no featured, get latest videos from visible channels
         const { data: latestHero } = await supabase
@@ -1099,7 +1097,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       setFeaturedVideos(featuredVids || []);
 
       // Load trending videos from visible channels
-      const trending = await alfieTVStorage.getTrendingVideos(organizationId, 10);
+      const trending = organizationId ? await alfieTVStorage.getTrendingVideos(organizationId, 10) : [];
       setTrendingVideos(trending.filter(v => visibleChannelIds.includes(v.channel_id)));
 
       // Load personalized videos for authenticated users
