@@ -11,7 +11,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { SaveAsTemplateModal } from '../components/events/SaveAsTemplateModal';
 
 export const EventWebsitesPage: React.FC = () => {
-  const { currentClub, currentOrganization, user } = useAuth();
+  const { currentClub, currentOrganization, user, isRaceOfficer } = useAuth();
   const { isImpersonating, session: impersonationSession } = useImpersonation();
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const navigate = useNavigate();
@@ -88,30 +88,71 @@ export const EventWebsitesPage: React.FC = () => {
     try {
       setLoading(true);
 
-      // Query event_websites table directly
-      const { data: websites, error } = await supabase
-        .from('event_websites')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const isStandalone = isRaceOfficer && !currentClub && !currentOrganization;
 
-      if (error) throw error;
-
-      // Enrich with event data
-      if (websites && websites.length > 0) {
-        const eventIds = websites.map((w: any) => w.event_id);
-        const { data: events } = await supabase
+      if (isStandalone && effectiveUserId) {
+        // For standalone race officers, only show websites for events they created
+        const { data: userEvents } = await supabase
           .from('public_events')
-          .select('id, event_name, date, event_level, venue, created_at')
-          .in('id', eventIds);
+          .select('id')
+          .eq('created_by_user_id', effectiveUserId);
 
-        const enrichedWebsites = websites.map((website: any) => ({
-          ...website,
-          public_events: events?.find((e: any) => e.id === website.event_id) || null
-        }));
+        if (!userEvents || userEvents.length === 0) {
+          setEventWebsites([]);
+          return;
+        }
 
-        setEventWebsites(enrichedWebsites);
+        const userEventIds = userEvents.map((e: any) => e.id);
+        const { data: websites, error } = await supabase
+          .from('event_websites')
+          .select('*')
+          .in('event_id', userEventIds)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (websites && websites.length > 0) {
+          const eventIds = websites.map((w: any) => w.event_id);
+          const { data: events } = await supabase
+            .from('public_events')
+            .select('id, event_name, date, event_level, venue, created_at')
+            .in('id', eventIds);
+
+          const enrichedWebsites = websites.map((website: any) => ({
+            ...website,
+            public_events: events?.find((e: any) => e.id === website.event_id) || null
+          }));
+
+          setEventWebsites(enrichedWebsites);
+        } else {
+          setEventWebsites([]);
+        }
       } else {
-        setEventWebsites([]);
+        // Query event_websites table directly for club/association users
+        const { data: websites, error } = await supabase
+          .from('event_websites')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Enrich with event data
+        if (websites && websites.length > 0) {
+          const eventIds = websites.map((w: any) => w.event_id);
+          const { data: events } = await supabase
+            .from('public_events')
+            .select('id, event_name, date, event_level, venue, created_at')
+            .in('id', eventIds);
+
+          const enrichedWebsites = websites.map((website: any) => ({
+            ...website,
+            public_events: events?.find((e: any) => e.id === website.event_id) || null
+          }));
+
+          setEventWebsites(enrichedWebsites);
+        } else {
+          setEventWebsites([]);
+        }
       }
     } catch (error) {
       console.error('Error loading event websites:', error);
@@ -188,11 +229,18 @@ export const EventWebsitesPage: React.FC = () => {
     try {
       setLoadingEvents(true);
       const existingEventIds = new Set(eventWebsites.map(w => w.event_id).filter(Boolean));
+      const isStandalone = isRaceOfficer && !currentClub && !currentOrganization;
 
-      const { data: events, error } = await supabase
+      let query = supabase
         .from('public_events')
         .select('id, event_name, date, end_date, event_level, venue, club_id, state_association_id, national_association_id')
         .order('date', { ascending: false });
+
+      if (isStandalone && effectiveUserId) {
+        query = query.eq('created_by_user_id', effectiveUserId);
+      }
+
+      const { data: events, error } = await query;
 
       if (error) throw error;
 
