@@ -6,12 +6,12 @@ import { LivestreamControlPanel } from '../components/livestream/LivestreamContr
 import { LivestreamArchiveViewer } from '../components/livestream/LivestreamArchiveViewer';
 
 export default function LivestreamPage() {
-  const { currentClub } = useAuth();
+  const { currentClub, user, isRaceOfficer } = useAuth();
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('sessionId') || undefined;
   const [activeTab, setActiveTab] = useState<'stream' | 'archives'>('stream');
 
-  const clubId = currentClub?.club?.id;
+  const clubId = currentClub?.club?.id || (isRaceOfficer && user ? user.id : undefined);
 
   if (!clubId) {
     return (
