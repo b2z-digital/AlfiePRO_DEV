@@ -1192,17 +1192,22 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       ]
     : isRaceOfficer && !currentClub
       ? allNavigationSections
-          .filter(section => section.id === 'dashboard' || section.id === 'racing')
+          .filter(section => section.id === 'dashboard' || section.id === 'racing' || section.id === 'content-media')
           .map(section => ({
             ...section,
             label: section.id === 'racing' ? '' : section.label,
             collapsible: section.id === 'racing' ? false : section.collapsible,
             items: section.id === 'racing'
               ? section.items.filter((item: any) => {
-                  const standaloneRaceItems = ['race-management', 'race-calendar', 'results', 'yacht-classes', 'venues', 'ro-contacts', 'external-organizations'];
+                  const standaloneRaceItems = ['race-management', 'race-calendar', 'results', 'yacht-classes', 'venues', 'ro-contacts', 'external-organizations', 'event-websites'];
                   return standaloneRaceItems.includes(item.id);
                 }).map((item: any) => item.id === 'external-organizations' ? { ...item, label: 'Data Feeds' } : item)
-              : section.items
+              : section.id === 'content-media'
+                ? section.items.filter((item: any) => {
+                    const standaloneMediaItems = ['media', 'alfie-tv', 'livestream'];
+                    return standaloneMediaItems.includes(item.id);
+                  })
+                : section.items
           }))
           .filter(section => section.items.length > 0)
       : allNavigationSections.map(section => ({

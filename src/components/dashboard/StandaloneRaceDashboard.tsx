@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Plus, Upload, Users, ChevronRight, Share2, FileText, Timer, Sailboat, Camera } from 'lucide-react';
+import { Trophy, Plus, Upload, Users, ChevronRight, Share2, FileText, Timer, Sailboat, Camera, Tv, Video, Image, Globe } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
@@ -389,6 +389,46 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
                   <div>
                     <p className="text-sm font-medium">Data Feeds</p>
                     <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Export results externally</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => navigate('/alfie-tv')}
+                  className={`w-full flex items-center gap-3 ${darkMode ? 'bg-slate-700/60 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'} rounded-lg px-4 py-3 transition-colors text-left`}
+                >
+                  <Tv className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`} />
+                  <div>
+                    <p className="text-sm font-medium">AlfieTV</p>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Watch RC yachting videos</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => navigate('/livestream')}
+                  className={`w-full flex items-center gap-3 ${darkMode ? 'bg-slate-700/60 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'} rounded-lg px-4 py-3 transition-colors text-left`}
+                >
+                  <Video className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`} />
+                  <div>
+                    <p className="text-sm font-medium">Event Livestream</p>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Broadcast races live</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => navigate('/media')}
+                  className={`w-full flex items-center gap-3 ${darkMode ? 'bg-slate-700/60 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'} rounded-lg px-4 py-3 transition-colors text-left`}
+                >
+                  <Image className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`} />
+                  <div>
+                    <p className="text-sm font-medium">Event Media</p>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Photos and media gallery</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => navigate('/event-websites')}
+                  className={`w-full flex items-center gap-3 ${darkMode ? 'bg-slate-700/60 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'} rounded-lg px-4 py-3 transition-colors text-left`}
+                >
+                  <Globe className={`w-4 h-4 flex-shrink-0 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`} />
+                  <div>
+                    <p className="text-sm font-medium">Event Websites</p>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Manage event websites</p>
                   </div>
                 </button>
               </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Users, Plus, Search, Trash2, Pencil, X, Upload, Download, Flag, ChevronDown, ChevronUp, Save, Loader as Loader2, Sailboat } from 'lucide-react';
+import { Users, Plus, Search, Trash2, Pencil, X, Upload, Download, Flag, ChevronDown, ChevronUp, Save, Loader as Loader2, Sailboat, Eye } from 'lucide-react';
 import {
   getRaceOfficerContacts,
   addRaceOfficerContact,
@@ -49,6 +49,7 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
   const [formData, setFormData] = useState<SkipperFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [viewingContact, setViewingContact] = useState<RaceOfficerContact | null>(null);
   const [sortField, setSortField] = useState<'name' | 'club_name' | 'division'>('name');
   const [sortAsc, setSortAsc] = useState(true);
   const [showImport, setShowImport] = useState(false);
@@ -878,6 +879,15 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <button
+                            onClick={() => setViewingContact(contact)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              darkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-sky-400' : 'hover:bg-slate-100 text-slate-400 hover:text-sky-600'
+                            }`}
+                            title="View"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
                             onClick={() => handleEdit(contact)}
                             className={`p-1.5 rounded-lg transition-colors ${
                               darkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-700'
@@ -967,6 +977,118 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
           </div>
         )}
       </div>
+
+      {/* View Skipper Modal */}
+      {viewingContact && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setViewingContact(null)} />
+          <div className={`relative w-full max-w-lg rounded-2xl border shadow-2xl ${
+            darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+          }`}>
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${darkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                Skipper Details
+              </h3>
+              <button onClick={() => setViewingContact(null)} className={`p-1.5 rounded-lg ${darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+              {/* Name & Country */}
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
+                  darkMode ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-100 text-sky-700'
+                }`}>
+                  {viewingContact.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h4 className={`font-semibold text-base ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    {viewingContact.name}
+                  </h4>
+                  {viewingContact.country && (
+                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{viewingContact.country}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Details Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-xs font-medium uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Club</label>
+                  <p className={`text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{viewingContact.club_name || '-'}</p>
+                </div>
+                <div>
+                  <label className={`block text-xs font-medium uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Division</label>
+                  <p className={`text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{viewingContact.division || '-'}</p>
+                </div>
+              </div>
+
+              {/* Boats */}
+              {viewingContact.boats.length > 0 && (
+                <div>
+                  <label className={`block text-xs font-medium uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Boats ({viewingContact.boats.length})
+                  </label>
+                  <div className="space-y-2">
+                    {viewingContact.boats.map((boat, i) => (
+                      <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${
+                        darkMode ? 'bg-slate-900/40 border-slate-700' : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <div className={`w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                          {boat.class && getClassImage(boat.class) ? (
+                            <img src={getClassImage(boat.class)!} alt={boat.class} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Sailboat size={16} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            {boat.class || 'Unknown Class'}
+                          </p>
+                          <div className={`flex items-center gap-3 text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {boat.sail_number && <span>Sail: {boat.sail_number}</span>}
+                            {boat.design && <span>Design: {boat.design}</span>}
+                            {boat.handicap != null && (
+                              <span className={darkMode ? 'text-amber-400' : 'text-amber-600'}>Hcap: {boat.handicap}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {viewingContact.notes && (
+                <div>
+                  <label className={`block text-xs font-medium uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Notes</label>
+                  <p className={`text-sm whitespace-pre-wrap ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{viewingContact.notes}</p>
+                </div>
+              )}
+            </div>
+            <div className={`px-6 py-4 border-t flex justify-end gap-2 ${darkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+              <button
+                onClick={() => { handleEdit(viewingContact); setViewingContact(null); }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <Pencil size={14} />
+                Edit
+              </button>
+              <button
+                onClick={() => setViewingContact(null)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                  darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'
+                }`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
