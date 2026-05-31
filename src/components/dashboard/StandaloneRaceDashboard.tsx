@@ -33,9 +33,10 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
       const [eventsRes, contactsRes, sharedRes, profileRes] = await Promise.all([
         supabase
           .from('quick_races')
-          .select('id, event_name, boat_class, race_format, scoring_type, created_at, last_completed_race, skippers')
+          .select('id, event_name, race_class, race_format, created_at, last_completed_race, skippers')
           .eq('user_id', user!.id)
           .is('club_id', null)
+          .eq('is_simulated', false)
           .order('created_at', { ascending: false })
           .limit(5),
         supabase
@@ -54,7 +55,14 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
       ]);
 
       setRecentEvents(eventsRes.data || []);
-      setEventCount(eventsRes.data?.length || 0);
+      // Get total event count (not limited to 5)
+      const { count: totalEventCount } = await supabase
+        .from('quick_races')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user!.id)
+        .is('club_id', null)
+        .eq('is_simulated', false);
+      setEventCount(totalEventCount || 0);
       setContactCount(contactsRes.count || 0);
       setSharedCount(sharedRes.count || 0);
       setUserName(profileRes.data?.full_name || '');
@@ -320,8 +328,8 @@ export const StandaloneRaceDashboard: React.FC<{ darkMode: boolean }> = ({ darkM
                           <div className="flex-1 min-w-0">
                             <p className={`font-medium text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.event_name}</p>
                             <div className={`flex items-center gap-2 text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                              {event.boat_class && (
-                                <span className={`${darkMode ? 'bg-slate-600/50 text-slate-300' : 'bg-slate-200 text-slate-600'} px-1.5 py-0.5 rounded`}>{event.boat_class}</span>
+                              {event.race_class && (
+                                <span className={`${darkMode ? 'bg-slate-600/50 text-slate-300' : 'bg-slate-200 text-slate-600'} px-1.5 py-0.5 rounded`}>{event.race_class}</span>
                               )}
                               <span>{skipperCount} skippers</span>
                               {event.last_completed_race && (
