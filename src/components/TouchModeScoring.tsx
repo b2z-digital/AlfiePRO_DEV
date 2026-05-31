@@ -969,6 +969,22 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     setSkippersProp(updated);
   };
 
+  const handleOverrideHandicap = (skipperIndex: number, value: number) => {
+    const latestRace = Math.max(
+      ...raceResults
+        .filter(r => r.skipperIndex === skipperIndex && r.adjustedHcap !== undefined)
+        .map(r => r.race),
+      0
+    );
+    if (latestRace === 0) return;
+    const updatedResults = raceResults.map(r =>
+      r.race === latestRace && r.skipperIndex === skipperIndex
+        ? { ...r, adjustedHcap: value }
+        : r
+    );
+    updateRaceResults(updatedResults);
+  };
+
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-20 h-screen' : 'h-[75vh]'} flex flex-col overflow-hidden ${isFullscreen ? '' : 'rounded-lg'} no-select ${darkMode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-900'}`}>
       {/* Header - Race Navigation with StartBox + Race Timer */}
@@ -1522,6 +1538,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         allRaceResults={allRaceResults}
         canEditHandicaps={canEditHandicaps}
         onUpdateHandicap={handleTouchUpdateHandicap}
+        onOverrideHandicap={isHandicapEvent ? handleOverrideHandicap : undefined}
         onScratchStart={handleTouchScratchStart}
         storedHandicaps={storedHandicaps}
         onUsePreviousHandicaps={handleUsePreviousHandicaps}
