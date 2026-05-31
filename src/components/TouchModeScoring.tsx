@@ -979,7 +979,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     if (latestRace === 0) return;
     const updatedResults = raceResults.map(r =>
       r.race === latestRace && r.skipperIndex === skipperIndex
-        ? { ...r, adjustedHcap: value }
+        ? { ...r, adjustedHcap: value, handicapOverride: true }
         : r
     );
     updateRaceResults(updatedResults);
