@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../utils/supabase';
-import { Eye, Play, Pause, Users, Radio, Wind, Clock, Maximize2, Minimize2, Zap } from 'lucide-react';
+import { Eye, Play, Pause, Users, Wind, Clock, Maximize2, Minimize2, Zap, MapPin, Calendar, Building2, Anchor, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface BoatPosition {
   tag_id: string;
@@ -48,24 +48,27 @@ interface SessionInfo {
   course_layout_id: string | null;
 }
 
-const CANVAS_SIZE = 700;
-const PADDING = 50;
-const BOAT_SIZE = 8;
-const TRAIL_LENGTH = 30;
+const TRAIL_LENGTH = 40;
+
+const BOAT_COLORS = [
+  '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4',
+  '#3b82f6', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6',
+  '#10b981', '#f43f5e',
+];
 
 const DEMO_SKIPPERS = [
-  { name: 'Stephen Walsh', sail: 'AUS 1', color: '#ef4444' },
-  { name: 'Craig Bowler', sail: 'AUS 7', color: '#f97316' },
-  { name: 'David Craven', sail: 'AUS 12', color: '#eab308' },
-  { name: 'Peter McNamara', sail: 'AUS 23', color: '#22c55e' },
-  { name: 'Mark Thompson', sail: 'AUS 45', color: '#06b6d4' },
-  { name: 'Greg Richards', sail: 'AUS 56', color: '#3b82f6' },
-  { name: 'Andrew Hurst', sail: 'AUS 77', color: '#8b5cf6' },
-  { name: 'Phil Skewes', sail: 'AUS 88', color: '#ec4899' },
-  { name: 'John Robinson', sail: 'AUS 91', color: '#14b8a6' },
-  { name: 'Ross Campbell', sail: 'AUS 33', color: '#f59e0b' },
-  { name: 'Brian Lewis', sail: 'AUS 5', color: '#6366f1' },
-  { name: 'Keith Murray', sail: 'AUS 19', color: '#10b981' },
+  { name: 'Keith Murray', sail: 'AUS 19', color: BOAT_COLORS[0] },
+  { name: 'Craig Bowler', sail: 'AUS 7', color: BOAT_COLORS[1] },
+  { name: 'Andrew Hurst', sail: 'AUS 77', color: BOAT_COLORS[4] },
+  { name: 'Brian Lewis', sail: 'AUS 5', color: BOAT_COLORS[5] },
+  { name: 'Peter McNamara', sail: 'AUS 23', color: BOAT_COLORS[3] },
+  { name: 'Stephen Walsh', sail: 'AUS 1', color: BOAT_COLORS[2] },
+  { name: 'Greg Richards', sail: 'AUS 56', color: BOAT_COLORS[6] },
+  { name: 'Phil Skewes', sail: 'AUS 88', color: BOAT_COLORS[7] },
+  { name: 'John Robinson', sail: 'AUS 91', color: BOAT_COLORS[8] },
+  { name: 'Ross Campbell', sail: 'AUS 33', color: BOAT_COLORS[9] },
+  { name: 'David Craven', sail: 'AUS 12', color: BOAT_COLORS[10] },
+  { name: 'Mark Thompson', sail: 'AUS 45', color: BOAT_COLORS[11] },
 ];
 
 export function UwbLiveRaceViewer({
@@ -84,11 +87,14 @@ export function UwbLiveRaceViewer({
   const [isPlaying, setIsPlaying] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [demoRunning, setDemoRunning] = useState(false);
+  const [showInfoPanel, setShowInfoPanel] = useState(true);
+  const [selectedBoat, setSelectedBoat] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const demoRef = useRef<number>(0);
   const demoTickRef = useRef<number>(0);
+  const canvasSizeRef = useRef({ width: 800, height: 600 });
 
   useEffect(() => {
     if (!sessionId) return;
@@ -149,7 +155,7 @@ export function UwbLiveRaceViewer({
     }
     animationRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animationRef.current);
-  }, [isPlaying, positions, anchors, tags, session]);
+  }, [isPlaying, positions, anchors, tags, session, selectedBoat]);
 
   useEffect(() => {
     if (!session?.started_at || session.status !== 'racing') return;
@@ -164,6 +170,19 @@ export function UwbLiveRaceViewer({
     return () => {
       if (demoRef.current) clearInterval(demoRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    function handleResize() {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const container = canvas.parentElement;
+      if (!container) return;
+      canvasSizeRef.current = { width: container.clientWidth, height: container.clientHeight };
+    }
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   async function loadSessionData() {
@@ -210,11 +229,10 @@ export function UwbLiveRaceViewer({
     setDemoRunning(true);
     demoTickRef.current = 0;
 
-    // Generate course marks if no anchors exist
     const courseAnchors: AnchorInfo[] = anchors.length > 0 ? anchors : [
       { id: 'start_pin', name: 'Start Pin', role: 'start_pin', position_x: -20, position_y: -30 },
       { id: 'start_boat', name: 'Start Boat', role: 'start_boat', position_x: 20, position_y: -30 },
-      { id: 'windward', name: 'Windward', role: 'course_mark', position_x: 0, position_y: 40 },
+      { id: 'windward', name: 'Windward Mark', role: 'course_mark', position_x: 0, position_y: 40 },
       { id: 'leeward_port', name: 'Leeward Port', role: 'course_mark', position_x: -15, position_y: -20 },
       { id: 'leeward_stbd', name: 'Leeward Stbd', role: 'course_mark', position_x: 15, position_y: -20 },
       { id: 'finish_pin', name: 'Finish Pin', role: 'finish_pin', position_x: -18, position_y: -35 },
@@ -223,7 +241,6 @@ export function UwbLiveRaceViewer({
 
     if (anchors.length === 0) setAnchors(courseAnchors);
 
-    // Create demo tags
     const demoTags: TagInfo[] = DEMO_SKIPPERS.map((s, i) => ({
       id: `demo-tag-${i}`,
       tag_hardware_id: `UWB-${String(i + 1).padStart(3, '0')}`,
@@ -234,7 +251,6 @@ export function UwbLiveRaceViewer({
     }));
     setTags(demoTags);
 
-    // Set session info
     setSession({
       id: 'demo-session',
       name: 'LMRYC IOM Club Championship - Heat 3',
@@ -246,13 +262,11 @@ export function UwbLiveRaceViewer({
       course_layout_id: null,
     });
 
-    // Build course waypoints from anchors for boat navigation
     const marks = courseAnchors.filter(a => a.role === 'course_mark');
     const startLine = courseAnchors.filter(a => a.role.includes('start'));
     const startMidX = startLine.length === 2 ? (startLine[0].position_x + startLine[1].position_x) / 2 : 0;
     const startMidY = startLine.length === 2 ? (startLine[0].position_y + startLine[1].position_y) / 2 : -30;
 
-    // Define course route: start -> windward -> leeward -> windward -> finish
     const windward = marks.find(m => m.name.toLowerCase().includes('windward')) || marks[0];
     const leewardPort = marks.find(m => m.name.toLowerCase().includes('leeward') && m.name.toLowerCase().includes('port'));
     const leewardStbd = marks.find(m => m.name.toLowerCase().includes('leeward') && m.name.toLowerCase().includes('stbd'));
@@ -267,16 +281,14 @@ export function UwbLiveRaceViewer({
       { x: startMidX, y: startMidY - 5 },
     ];
 
-    // Each boat has different speed/progress
     const boatStates = demoTags.map((_, i) => ({
       progress: 0,
       segmentIndex: 0,
-      speed: 0.4 + Math.random() * 0.25 + (i === 0 ? 0.08 : 0), // Stephen Walsh slightly faster
+      speed: 0.4 + Math.random() * 0.25 + (i === 0 ? 0.08 : 0),
       lateralOffset: (Math.random() - 0.5) * 8,
       wobble: Math.random() * Math.PI * 2,
     }));
 
-    // Demo event generation
     const demoEvents: RaceEvent[] = [];
     let eventCounter = 0;
 
@@ -291,11 +303,9 @@ export function UwbLiveRaceViewer({
           const tagId = `demo-tag-${i}`;
           const trail = next.get(tagId) || [];
 
-          // Advance along course
           state.progress += state.speed * (0.8 + Math.random() * 0.4);
           state.wobble += 0.1;
 
-          // Calculate position along course route
           const totalSegments = courseRoute.length - 1;
           const progressPerSegment = 100 / totalSegments;
           state.segmentIndex = Math.min(Math.floor(state.progress / progressPerSegment), totalSegments - 1);
@@ -313,7 +323,6 @@ export function UwbLiveRaceViewer({
           const baseX = from.x + (to.x - from.x) * fracClamped;
           const baseY = from.y + (to.y - from.y) * fracClamped;
 
-          // Add lateral offset and wobble for realism
           const dx = to.x - from.x;
           const dy = to.y - from.y;
           const segLen = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -324,10 +333,7 @@ export function UwbLiveRaceViewer({
           const x = baseX + perpX * (state.lateralOffset + wobbleOffset);
           const y = baseY + perpY * (state.lateralOffset + wobbleOffset);
 
-          // Calculate heading
           const heading = Math.atan2(to.y - from.y, to.x - from.x) * (180 / Math.PI) + 90 + Math.sin(state.wobble) * 5;
-
-          // Speed in m/s (IOM boats are ~0.5-1.5 m/s)
           const speedMps = (state.speed * 2.5) + Math.random() * 0.3;
 
           const pos: BoatPosition = {
@@ -343,14 +349,11 @@ export function UwbLiveRaceViewer({
           if (trail.length > TRAIL_LENGTH) trail.shift();
           next.set(tagId, trail);
 
-          // Generate mark rounding events
           if (tick % 20 === 0 && Math.random() < 0.3) {
-            const eventTypes = ['mark_rounding', 'mark_rounding', 'mark_rounding'];
-            const evType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
             demoEvents.push({
               id: `demo-event-${eventCounter++}`,
               tag_id: tagId,
-              event_type: evType,
+              event_type: 'mark_rounding',
               timestamp: new Date().toISOString(),
               lap_number: Math.floor(state.segmentIndex / 2) + 1,
               metadata: {},
@@ -361,12 +364,10 @@ export function UwbLiveRaceViewer({
         return next;
       });
 
-      // Update race events
       if (demoEvents.length > 0) {
         setRaceEvents(prev => [...prev, ...demoEvents.splice(0)].slice(-50));
       }
 
-      // Update elapsed time
       setElapsedTime(tick);
     }, 200);
 
@@ -388,7 +389,7 @@ export function UwbLiveRaceViewer({
       trail.forEach(p => { allX.push(p.position_x); allY.push(p.position_y); });
     });
     if (allX.length === 0) return { minX: -60, maxX: 60, minY: -60, maxY: 60 };
-    const pad = 10;
+    const pad = 15;
     return {
       minX: Math.min(...allX) - pad,
       maxX: Math.max(...allX) + pad,
@@ -397,12 +398,15 @@ export function UwbLiveRaceViewer({
     };
   }
 
-  function worldToCanvas(x: number, y: number, bounds: ReturnType<typeof getCourseBounds>): [number, number] {
+  function worldToCanvas(x: number, y: number, bounds: ReturnType<typeof getCourseBounds>, w: number, h: number): [number, number] {
+    const padding = 60;
     const rangeX = bounds.maxX - bounds.minX || 1;
     const rangeY = bounds.maxY - bounds.minY || 1;
-    const scale = Math.min((CANVAS_SIZE - PADDING * 2) / rangeX, (CANVAS_SIZE - PADDING * 2) / rangeY);
-    const cx = PADDING + (x - bounds.minX) * scale;
-    const cy = CANVAS_SIZE - PADDING - (y - bounds.minY) * scale;
+    const scale = Math.min((w - padding * 2) / rangeX, (h - padding * 2) / rangeY);
+    const offsetX = (w - rangeX * scale) / 2;
+    const offsetY = (h - rangeY * scale) / 2;
+    const cx = offsetX + (x - bounds.minX) * scale;
+    const cy = h - offsetY - (y - bounds.minY) * scale;
     return [cx, cy];
   }
 
@@ -412,276 +416,280 @@ export function UwbLiveRaceViewer({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const container = canvas.parentElement;
+    if (!container) return;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = CANVAS_SIZE * dpr;
-    canvas.height = CANVAS_SIZE * dpr;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
     ctx.scale(dpr, dpr);
 
     const bounds = getCourseBounds();
 
-    // Dark ocean background
-    ctx.fillStyle = '#0f1729';
-    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    // Water background - rich ocean blue gradient
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+    bgGrad.addColorStop(0, '#1a3a4a');
+    bgGrad.addColorStop(0.5, '#1e4050');
+    bgGrad.addColorStop(1, '#162d3a');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
 
-    // Subtle wave pattern
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.03)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < CANVAS_SIZE; i += 20) {
+    // Subtle water texture
+    ctx.globalAlpha = 0.04;
+    ctx.strokeStyle = '#5eead4';
+    ctx.lineWidth = 0.5;
+    const time = Date.now() * 0.0003;
+    for (let row = 0; row < h; row += 28) {
       ctx.beginPath();
-      for (let x = 0; x < CANVAS_SIZE; x += 5) {
-        const y = i + Math.sin((x + Date.now() * 0.001) * 0.05) * 3;
-        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      for (let col = 0; col < w; col += 4) {
+        const yOff = Math.sin((col * 0.008) + time + row * 0.1) * 3;
+        if (col === 0) ctx.moveTo(col, row + yOff);
+        else ctx.lineTo(col, row + yOff);
       }
       ctx.stroke();
     }
+    ctx.globalAlpha = 1.0;
 
-    // Grid overlay
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.05)';
-    ctx.lineWidth = 0.5;
-    for (let i = PADDING; i < CANVAS_SIZE - PADDING; i += 40) {
-      ctx.beginPath();
-      ctx.moveTo(i, PADDING);
-      ctx.lineTo(i, CANVAS_SIZE - PADDING);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(PADDING, i);
-      ctx.lineTo(CANVAS_SIZE - PADDING, i);
-      ctx.stroke();
+    // Draw course boundary lines (connecting marks)
+    const courseMarks = anchors.filter(a => a.role === 'course_mark');
+    if (courseMarks.length >= 2) {
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 8]);
+      courseMarks.forEach((mark, i) => {
+        if (i === 0) return;
+        const [x1, y1] = worldToCanvas(courseMarks[i - 1].position_x, courseMarks[i - 1].position_y, bounds, w, h);
+        const [x2, y2] = worldToCanvas(mark.position_x, mark.position_y, bounds, w, h);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
     }
 
     // Draw start/finish lines
     const startPins = anchors.filter(a => a.role === 'start_pin' || a.role === 'start_boat');
     if (startPins.length === 2) {
-      const [x1, y1] = worldToCanvas(startPins[0].position_x, startPins[0].position_y, bounds);
-      const [x2, y2] = worldToCanvas(startPins[1].position_x, startPins[1].position_y, bounds);
-      ctx.strokeStyle = '#4ade80';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8, 4]);
+      const [x1, y1] = worldToCanvas(startPins[0].position_x, startPins[0].position_y, bounds, w, h);
+      const [x2, y2] = worldToCanvas(startPins[1].position_x, startPins[1].position_y, bounds, w, h);
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([6, 4]);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      ctx.fillStyle = '#4ade80';
-      ctx.font = 'bold 10px sans-serif';
+      // Start label
+      ctx.fillStyle = '#22c55e';
+      ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('START', (x1 + x2) / 2, (y1 + y2) / 2 - 10);
+      ctx.fillText('START', (x1 + x2) / 2, Math.min(y1, y2) - 12);
     }
 
     const finishPins = anchors.filter(a => a.role === 'finish_pin' || a.role === 'finish_boat');
     if (finishPins.length === 2) {
-      const [x1, y1] = worldToCanvas(finishPins[0].position_x, finishPins[0].position_y, bounds);
-      const [x2, y2] = worldToCanvas(finishPins[1].position_x, finishPins[1].position_y, bounds);
-      ctx.strokeStyle = '#f87171';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8, 4]);
+      const [x1, y1] = worldToCanvas(finishPins[0].position_x, finishPins[0].position_y, bounds, w, h);
+      const [x2, y2] = worldToCanvas(finishPins[1].position_x, finishPins[1].position_y, bounds, w, h);
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([6, 4]);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      ctx.fillStyle = '#f87171';
-      ctx.font = 'bold 10px sans-serif';
+      ctx.fillStyle = '#ef4444';
+      ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('FINISH', (x1 + x2) / 2, (y1 + y2) / 2 - 10);
+      ctx.fillText('FINISH', (x1 + x2) / 2, Math.max(y1, y2) + 18);
     }
 
-    // Draw marks/buoys
+    // Draw marks/anchors
     anchors.forEach(anchor => {
-      const [cx, cy] = worldToCanvas(anchor.position_x, anchor.position_y, bounds);
+      const [cx, cy] = worldToCanvas(anchor.position_x, anchor.position_y, bounds, w, h);
 
-      // Glow
-      ctx.shadowColor = anchor.role.includes('start') ? '#4ade80' :
-                        anchor.role.includes('finish') ? '#f87171' : '#fbbf24';
-      ctx.shadowBlur = 12;
+      const markColor = anchor.role.includes('start') ? '#22c55e' :
+                        anchor.role.includes('finish') ? '#ef4444' : '#f59e0b';
 
-      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 16);
-      const glowColor = anchor.role.includes('start') ? '74, 222, 128' :
-                        anchor.role.includes('finish') ? '248, 113, 113' : '251, 191, 36';
-      gradient.addColorStop(0, `rgba(${glowColor}, 0.4)`);
-      gradient.addColorStop(1, `rgba(${glowColor}, 0)`);
-      ctx.fillStyle = gradient;
+      // Outer glow ring
+      ctx.strokeStyle = markColor + '40';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(cx, cy, 16, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Buoy body
-      ctx.fillStyle = anchor.role.includes('start') ? '#4ade80' :
-                      anchor.role.includes('finish') ? '#f87171' : '#fbbf24';
-      ctx.beginPath();
-      ctx.arc(cx, cy, 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-      ctx.lineWidth = 1.5;
+      ctx.arc(cx, cy, 12, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.shadowBlur = 0;
+      // Mark circle
+      ctx.fillStyle = markColor;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+      ctx.fill();
 
-      // Name
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.font = '9px sans-serif';
+      // White ring
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Name label
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(anchor.name, cx, cy + 18);
+      ctx.fillText(anchor.name, cx, cy + 22);
     });
 
-    // Draw boat trails and flag-style markers
-    const ALFIE_BLUE = '#0ea5e9';
-    const ALFIE_BLUE_DARK = '#0284c7';
-    const FLAG_POLE_HEIGHT = 28;
-    const FLAG_PADDING_X = 5;
-    const FLAG_PADDING_Y = 3;
-
+    // Draw boat trails with gradient opacity
     positions.forEach((trail, tagId) => {
       const tag = tags.find(t => t.id === tagId);
       const color = tag?.color || '#ffffff';
+      const isSelected = selectedBoat === tagId;
+      const isHighlighted = !selectedBoat || isSelected;
 
-      // Trail
       if (trail.length > 1) {
-        ctx.strokeStyle = color + '40';
+        const opacity = isHighlighted ? 0.8 : 0.15;
+        const lineWidth = isSelected ? 3.5 : (isHighlighted ? 2.5 : 1);
+
+        for (let i = 1; i < trail.length; i++) {
+          const segmentAlpha = (i / trail.length) * opacity;
+          ctx.strokeStyle = color + Math.round(segmentAlpha * 255).toString(16).padStart(2, '0');
+          ctx.lineWidth = lineWidth * (0.3 + (i / trail.length) * 0.7);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          const [px1, py1] = worldToCanvas(trail[i - 1].position_x, trail[i - 1].position_y, bounds, w, h);
+          const [px2, py2] = worldToCanvas(trail[i].position_x, trail[i].position_y, bounds, w, h);
+          ctx.beginPath();
+          ctx.moveTo(px1, py1);
+          ctx.lineTo(px2, py2);
+          ctx.stroke();
+        }
+      }
+
+      // Current position
+      const current = trail[trail.length - 1];
+      if (!current) return;
+      const [bx, by] = worldToCanvas(current.position_x, current.position_y, bounds, w, h);
+      const baseOpacity = isHighlighted ? 1 : 0.3;
+
+      // Boat marker - filled circle with border
+      ctx.globalAlpha = baseOpacity;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(bx, by, isSelected ? 6 : 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Heading indicator
+      if (current.heading_deg != null) {
+        const headRad = (current.heading_deg - 90) * (Math.PI / 180);
+        const arrowLen = isSelected ? 14 : 10;
+        ctx.strokeStyle = color;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        trail.forEach((p, i) => {
-          const [px, py] = worldToCanvas(p.position_x, p.position_y, bounds);
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        });
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx + Math.cos(headRad) * arrowLen, by + Math.sin(headRad) * arrowLen);
         ctx.stroke();
       }
 
-      // Current position (last in trail)
-      const current = trail[trail.length - 1];
-      if (!current) return;
-      const [bx, by] = worldToCanvas(current.position_x, current.position_y, bounds);
+      // Sail number label
+      if (isHighlighted) {
+        const sailLabel = tag?.sail_number || tag?.tag_hardware_id?.slice(-3) || '?';
+        ctx.font = `bold ${isSelected ? '12' : '11'}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        const textW = ctx.measureText(sailLabel).width;
+        const labelX = bx - textW / 2 - 4;
+        const labelY = by - (isSelected ? 20 : 16);
+        const labelW = textW + 8;
+        const labelH = isSelected ? 18 : 16;
 
-      // Boat dot (position indicator)
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = ALFIE_BLUE_DARK;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(bx, by, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+        // Label background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.beginPath();
+        const r = 3;
+        ctx.moveTo(labelX + r, labelY);
+        ctx.lineTo(labelX + labelW - r, labelY);
+        ctx.arcTo(labelX + labelW, labelY, labelX + labelW, labelY + r, r);
+        ctx.lineTo(labelX + labelW, labelY + labelH - r);
+        ctx.arcTo(labelX + labelW, labelY + labelH, labelX + labelW - r, labelY + labelH, r);
+        ctx.lineTo(labelX + r, labelY + labelH);
+        ctx.arcTo(labelX, labelY + labelH, labelX, labelY + labelH - r, r);
+        ctx.lineTo(labelX, labelY + r);
+        ctx.arcTo(labelX, labelY, labelX + r, labelY, r);
+        ctx.closePath();
+        ctx.fill();
 
-      // Green activity ring
-      ctx.strokeStyle = '#4ade80';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(bx - 1, by + 2, 3, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = '#4ade80';
-      ctx.beginPath();
-      ctx.arc(bx - 1, by + 2, 1.5, 0, Math.PI * 2);
-      ctx.fill();
+        // Label border accent
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
 
-      // Flag pole (vertical line going up from boat dot)
-      ctx.strokeStyle = ALFIE_BLUE_DARK;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(bx, by);
-      ctx.lineTo(bx, by - FLAG_POLE_HEIGHT);
-      ctx.stroke();
-
-      // Flag rectangle with sail number
-      const sailLabel = tag?.sail_number || tag?.tag_hardware_id?.slice(-3) || '?';
-      ctx.font = 'bold 11px sans-serif';
-      const textWidth = ctx.measureText(sailLabel).width;
-      const flagWidth = textWidth + FLAG_PADDING_X * 2;
-      const flagHeight = 18;
-      const flagX = bx;
-      const flagY = by - FLAG_POLE_HEIGHT - flagHeight;
-
-      // Flag background with rounded corners
-      const radius = 3;
-      ctx.beginPath();
-      ctx.moveTo(flagX + radius, flagY);
-      ctx.lineTo(flagX + flagWidth - radius, flagY);
-      ctx.arcTo(flagX + flagWidth, flagY, flagX + flagWidth, flagY + radius, radius);
-      ctx.lineTo(flagX + flagWidth, flagY + flagHeight - radius);
-      ctx.arcTo(flagX + flagWidth, flagY + flagHeight, flagX + flagWidth - radius, flagY + flagHeight, radius);
-      ctx.lineTo(flagX + radius, flagY + flagHeight);
-      ctx.arcTo(flagX, flagY + flagHeight, flagX, flagY + flagHeight - radius, radius);
-      ctx.lineTo(flagX, flagY + radius);
-      ctx.arcTo(flagX, flagY, flagX + radius, flagY, radius);
-      ctx.closePath();
-
-      ctx.fillStyle = ALFIE_BLUE;
-      ctx.shadowColor = 'rgba(14, 165, 233, 0.4)';
-      ctx.shadowBlur = 6;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-
-      // Flag border
-      ctx.strokeStyle = ALFIE_BLUE_DARK;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // Flag text (sail number)
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(sailLabel, flagX + FLAG_PADDING_X, flagY + flagHeight / 2);
-      ctx.textBaseline = 'alphabetic';
-
-      // Speed indicator below the boat dot
-      if (current.speed_mps != null && current.speed_mps > 0) {
-        ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
-        ctx.font = '8px sans-serif';
+        // Label text
+        ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
-        ctx.fillText(`${(current.speed_mps * 1.94384).toFixed(1)}kts`, bx + flagWidth / 2, by + 14);
+        ctx.textBaseline = 'middle';
+        ctx.fillText(sailLabel, bx, labelY + labelH / 2);
+        ctx.textBaseline = 'alphabetic';
+
+        // Speed below
+        if (current.speed_mps != null && current.speed_mps > 0) {
+          const speedText = `${(current.speed_mps * 1.94384).toFixed(1)}kts`;
+          ctx.fillStyle = 'rgba(148, 163, 184, 0.8)';
+          ctx.font = '9px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(speedText, bx, by + 16);
+        }
       }
+
+      ctx.globalAlpha = 1.0;
     });
 
-    // Wind indicator (top-right)
+    // Wind indicator (top-right corner)
     if (session?.wind_direction_deg != null) {
       const windRad = (session.wind_direction_deg - 90) * (Math.PI / 180);
-      const windCx = CANVAS_SIZE - 45;
-      const windCy = 45;
+      const windCx = w - 50;
+      const windCy = 50;
 
-      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      // Background circle
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.beginPath();
-      ctx.arc(windCx, windCy, 25, 0, Math.PI * 2);
+      ctx.arc(windCx, windCy, 28, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
       ctx.lineWidth = 1;
       ctx.stroke();
 
+      // Wind arrow
       ctx.save();
       ctx.translate(windCx, windCy);
       ctx.rotate(windRad);
       ctx.fillStyle = '#38bdf8';
       ctx.beginPath();
-      ctx.moveTo(0, -16);
-      ctx.lineTo(-5, 8);
-      ctx.lineTo(5, 8);
+      ctx.moveTo(0, -18);
+      ctx.lineTo(-6, 10);
+      ctx.lineTo(0, 6);
+      ctx.lineTo(6, 10);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
 
-      ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
-      ctx.font = '8px sans-serif';
+      // Wind text
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.font = '9px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('WIND', windCx, windCy + 35);
+      ctx.fillText('WIND', windCx, windCy + 38);
       if (session.wind_speed_knots) {
-        ctx.fillText(`${session.wind_speed_knots}kts`, windCx, windCy + 44);
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillText(`${session.wind_speed_knots}kts`, windCx, windCy + 50);
       }
-    }
-
-    // Live indicator
-    if (session?.is_live) {
-      ctx.fillStyle = '#ef4444';
-      ctx.shadowColor = '#ef4444';
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.arc(20, 20, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 10px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('LIVE', 30, 24);
     }
   }
 
@@ -702,6 +710,13 @@ export function UwbLiveRaceViewer({
     }
   }
 
+  const sortedBoats = Array.from(positions.entries())
+    .sort((a, b) => {
+      const aLast = a[1][a[1].length - 1];
+      const bLast = b[1][b[1].length - 1];
+      return (bLast?.position_y || 0) - (aLast?.position_y || 0);
+    });
+
   if (!sessionId && !demoRunning) {
     return (
       <div className="space-y-6">
@@ -714,10 +729,10 @@ export function UwbLiveRaceViewer({
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors font-medium text-sm"
           >
             <Zap className="w-4 h-4" />
-            Generate Demo Race (12 IOM Boats)
+            Launch Demo Race
           </button>
           <p className="text-xs text-slate-600 mt-3">
-            Simulates a live race with 12 IOM class boats from LMRYC members
+            Simulates a live race with 12 IOM class boats
           </p>
         </div>
       </div>
@@ -725,164 +740,219 @@ export function UwbLiveRaceViewer({
   }
 
   return (
-    <div ref={containerRef} className={`space-y-4 ${isFullscreen ? 'bg-slate-900 p-4' : ''}`}>
-      {/* Controls Bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h3 className="font-semibold flex items-center gap-2 text-white">
-            {(session?.is_live || demoRunning) && <Radio className="w-4 h-4 text-red-500 animate-pulse" />}
-            {session?.name || 'Race Viewer'}
-          </h3>
-          {(session?.status === 'racing' || demoRunning) && (
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full text-xs font-medium border border-emerald-500/20">
-              <Clock className="w-3.5 h-3.5" />
-              {formatElapsed(elapsedTime)}
-            </span>
-          )}
-          {demoRunning && (
-            <span className="px-2.5 py-1 bg-amber-500/10 text-amber-300 rounded-full text-xs font-medium border border-amber-500/20">
-              Demo Mode
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {demoRunning && (
-            <button
-              onClick={stopDemo}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors text-xs font-medium"
-            >
-              Stop Demo
-            </button>
-          )}
-          <button
-            onClick={() => setIsPlaying(!isPlaying)}
-            className="p-2 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:bg-slate-700/50 transition-colors text-slate-300"
-          >
-            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={toggleFullscreen}
-            className="p-2 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:bg-slate-700/50 transition-colors text-slate-300"
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-        </div>
-      </div>
+    <div ref={containerRef} className={`${isFullscreen ? 'bg-[#0d1b2a] fixed inset-0 z-50 p-0' : ''}`}>
+      {/* Main Layout */}
+      <div className={`flex ${isFullscreen ? 'h-full' : 'h-[calc(100vh-280px)] min-h-[500px]'}`}>
+        {/* Left Info Panel */}
+        {showInfoPanel && (
+          <div className="w-72 flex-shrink-0 bg-[#0f1f2e] border-r border-slate-700/40 flex flex-col overflow-hidden rounded-l-xl">
+            {/* Race Info Header */}
+            <div className="p-4 border-b border-slate-700/40">
+              <div className="flex items-center gap-2 mb-3">
+                {(session?.is_live || demoRunning) && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-[10px] font-bold uppercase tracking-wider">
+                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                    Live
+                  </span>
+                )}
+                {demoRunning && (
+                  <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 rounded text-[10px] font-medium">
+                    Demo
+                  </span>
+                )}
+              </div>
+              <h3 className="font-semibold text-white text-sm leading-tight mb-3">
+                {session?.name || 'Race Viewer'}
+              </h3>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
-        {/* Main Canvas */}
-        <div className="xl:col-span-3">
-          <div className="bg-[#0f1729] rounded-2xl overflow-hidden border border-slate-700/50 shadow-lg">
-            <canvas
-              ref={canvasRef}
-              style={{ width: '100%', height: 'auto', aspectRatio: '1' }}
-              className="block"
-            />
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                  <span>{new Date().toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-400">
+                  <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Lake Macquarie, NSW</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                  <span>LMRYC</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Anchor className="w-3.5 h-3.5 text-slate-500" />
+                  <span>{positions.size} Competitors</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Competitor List */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-3">
+                <h4 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2 px-1">
+                  Competitor Positions
+                </h4>
+                <div className="space-y-1">
+                  {sortedBoats.map(([tagId, trail], rank) => {
+                    const tag = tags.find(t => t.id === tagId);
+                    const latest = trail[trail.length - 1];
+                    const speed = latest?.speed_mps ? (latest.speed_mps * 1.94384).toFixed(1) : '--';
+                    const isActive = selectedBoat === tagId;
+                    return (
+                      <button
+                        key={tagId}
+                        onClick={() => setSelectedBoat(isActive ? null : tagId)}
+                        className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all text-left ${
+                          isActive
+                            ? 'bg-sky-500/10 border border-sky-500/30'
+                            : 'hover:bg-slate-800/60 border border-transparent'
+                        }`}
+                      >
+                        <span className="text-[10px] font-bold text-slate-500 w-4 text-center">{rank + 1}</span>
+                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag?.color || '#ccc' }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate text-white">
+                            {tag?.sail_number || tag?.tag_hardware_id || 'Unknown'}
+                          </p>
+                          <p className="text-[10px] text-slate-500 truncate">
+                            {tag?.skipper_name || 'Unassigned'}
+                          </p>
+                        </div>
+                        <span className="text-[11px] font-mono font-medium text-emerald-400">
+                          {speed}kts
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {positions.size === 0 && (
+                    <p className="text-xs text-center py-6 text-slate-600">
+                      Waiting for position data...
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Wind info at bottom of panel */}
+            {session?.wind_speed_knots != null && (
+              <div className="p-3 border-t border-slate-700/40">
+                <div className="flex items-center gap-2 px-2">
+                  <Wind className="w-4 h-4 text-sky-400" />
+                  <span className="text-sm font-medium text-white">
+                    {session.wind_speed_knots}kts @ {session.wind_direction_deg}&deg;
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
-        {/* Sidebar - Leaderboard & Events */}
-        <div className="space-y-4">
-          {/* Boats on course */}
-          <div className="rounded-2xl border p-4 bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
-            <h4 className="font-medium text-sm mb-3 flex items-center gap-2 text-white">
-              <Users className="w-4 h-4 text-sky-400" />
-              Boats on Course ({positions.size})
-            </h4>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {Array.from(positions.entries())
-                .sort((a, b) => {
-                  const aLast = a[1][a[1].length - 1];
-                  const bLast = b[1][b[1].length - 1];
-                  return (bLast?.position_y || 0) - (aLast?.position_y || 0);
-                })
-                .map(([tagId, trail], rank) => {
-                  const tag = tags.find(t => t.id === tagId);
-                  const latest = trail[trail.length - 1];
-                  const speed = latest?.speed_mps ? (latest.speed_mps * 1.94384).toFixed(1) : '--';
-                  return (
-                    <div key={tagId} className="flex items-center gap-2 p-2 rounded-lg bg-slate-900/50 border border-slate-700/30">
-                      <span className="text-xs font-bold text-slate-500 w-4">{rank + 1}</span>
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag?.color || '#ccc' }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate text-white">
-                          {tag?.sail_number || tag?.tag_hardware_id || 'Unknown'}
-                        </p>
-                        <p className="text-[10px] text-slate-500 truncate">
-                          {tag?.skipper_name || 'Unassigned'}
-                        </p>
-                      </div>
-                      <span className="text-xs font-mono text-sky-400">
-                        {speed}kts
-                      </span>
-                    </div>
-                  );
-                })}
-              {positions.size === 0 && (
-                <p className="text-xs text-center py-4 text-slate-600">
-                  Waiting for position data...
-                </p>
+        {/* Main Canvas Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Top Bar */}
+          <div className="flex items-center justify-between px-4 py-2.5 bg-[#0d1b2a] border-b border-slate-700/40">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowInfoPanel(!showInfoPanel)}
+                className="p-1.5 rounded-md hover:bg-slate-800/60 transition-colors text-slate-400"
+                title={showInfoPanel ? 'Hide panel' : 'Show panel'}
+              >
+                {showInfoPanel ? <ChevronDown className="w-4 h-4 rotate-90" /> : <ChevronUp className="w-4 h-4 rotate-90" />}
+              </button>
+              {(session?.status === 'racing' || demoRunning) && (
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="text-sm font-mono text-white">{formatElapsed(elapsedTime)}</span>
+                </div>
               )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              {demoRunning && (
+                <button
+                  onClick={stopDemo}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors text-xs font-medium"
+                >
+                  Stop Demo
+                </button>
+              )}
+              <button
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="p-2 rounded-md bg-slate-800/50 border border-slate-700/50 hover:bg-slate-700/50 transition-colors text-slate-300"
+              >
+                {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                onClick={toggleFullscreen}
+                className="p-2 rounded-md bg-slate-800/50 border border-slate-700/50 hover:bg-slate-700/50 transition-colors text-slate-300"
+              >
+                {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              </button>
             </div>
           </div>
 
-          {/* Race Events Feed */}
-          <div className="rounded-2xl border p-4 bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
-            <h4 className="font-medium text-sm mb-3 text-white">
-              Race Events
-            </h4>
-            <div className="space-y-1.5 max-h-48 overflow-y-auto">
-              {raceEvents.slice(-10).reverse().map(event => {
+          {/* Canvas */}
+          <div className="flex-1 relative bg-[#0d1b2a]">
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0 w-full h-full"
+            />
+
+            {/* LIVE Badge Overlay */}
+            {(session?.is_live || demoRunning) && (
+              <div className="absolute top-4 left-4 flex items-center gap-1.5 px-2.5 py-1 bg-red-600/90 rounded text-white text-xs font-bold">
+                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                LIVE
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Timeline Bar */}
+          <div className="px-4 py-2.5 bg-[#0d1b2a] border-t border-slate-700/40">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-mono text-slate-500">{formatElapsed(elapsedTime)}</span>
+              <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-sky-500 rounded-full transition-all"
+                  style={{ width: `${Math.min((elapsedTime / 300) * 100, 100)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-slate-500">
+                <Users className="w-3 h-3 inline mr-1" />
+                {positions.size}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Events Panel (visible in fullscreen or wide screens) */}
+        {isFullscreen && raceEvents.length > 0 && (
+          <div className="w-64 flex-shrink-0 bg-[#0f1f2e] border-l border-slate-700/40 flex flex-col overflow-hidden">
+            <div className="p-3 border-b border-slate-700/40">
+              <h4 className="text-xs font-semibold text-white">Race Events</h4>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-1">
+              {raceEvents.slice(-15).reverse().map(event => {
                 const tag = tags.find(t => t.id === event.tag_id);
                 const typeLabels: Record<string, string> = {
                   start_crossing: 'Started',
                   finish_crossing: 'Finished',
                   mark_rounding: 'Mark Rounded',
-                  ocs: 'OCS!',
+                  ocs: 'OCS',
                   recall: 'Recall',
                 };
-                const typeColors: Record<string, string> = {
-                  start_crossing: 'text-emerald-400',
-                  finish_crossing: 'text-sky-400',
-                  mark_rounding: 'text-amber-400',
-                  ocs: 'text-red-400',
-                  recall: 'text-red-400',
-                };
                 return (
-                  <div key={event.id} className="flex items-center gap-2 text-xs p-1.5 rounded-lg bg-slate-900/30">
+                  <div key={event.id} className="flex items-center gap-2 text-xs p-1.5 rounded bg-slate-900/40">
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag?.color || '#ccc' }} />
-                    <span className="font-medium text-slate-300">
-                      {tag?.sail_number || '?'}
-                    </span>
-                    <span className={typeColors[event.event_type] || 'text-slate-500'}>
-                      {typeLabels[event.event_type] || event.event_type}
-                    </span>
-                    <span className="ml-auto text-slate-600">
-                      {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    <span className="font-medium text-slate-300">{tag?.sail_number || '?'}</span>
+                    <span className="text-slate-500">{typeLabels[event.event_type] || event.event_type}</span>
+                    <span className="ml-auto text-slate-600 text-[10px]">
+                      {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                 );
               })}
-              {raceEvents.length === 0 && (
-                <p className="text-xs text-center py-4 text-slate-600">
-                  No events yet
-                </p>
-              )}
             </div>
           </div>
-
-          {/* Wind Info */}
-          {session?.wind_speed_knots != null && (
-            <div className="rounded-2xl border p-4 bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
-              <div className="flex items-center gap-2">
-                <Wind className="w-4 h-4 text-sky-400" />
-                <span className="text-sm text-white">
-                  {session.wind_speed_knots}kts @ {session.wind_direction_deg}°
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
