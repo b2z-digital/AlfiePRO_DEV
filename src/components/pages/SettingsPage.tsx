@@ -23,6 +23,7 @@ import { BackupRestoreSection } from './BackupRestoreSection';
 import { AdvertisingManagement } from '../advertising/AdvertisingManagement';
 import { StartBoxBuilder } from '../start-box/StartBoxBuilder';
 import { ClubFeaturesAccess } from './ClubFeaturesAccess';
+import { RaceOfficerTeamAccess } from './RaceOfficerTeamAccess';
 import HandicapRuleBuilderPage from '../../pages/HandicapRuleBuilderPage';
 import { ExternalOrganizationsPage } from '../../pages/ExternalOrganizationsPage';
 import { ClubYachtClassesSelector } from '../ClubYachtClassesSelector';
@@ -37,7 +38,7 @@ interface SettingsPageProps {
   darkMode: boolean;
 }
 
-type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'club-features' | 'team' | 'subscriptions' | 'integrations' |
+type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'club-features' | 'team' | 'team-access' | 'subscriptions' | 'integrations' |
   'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' | 'finance-payment-settings' | 'finance-opening-balance' |
   'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' |
   'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system' | 'handicap-rules';
@@ -574,6 +575,35 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </div>
                 </div>
               </button>
+
+              {/* Team Access Card - standalone race officers */}
+              {isRaceOfficer && !currentClub && !currentOrganization && (
+                <button
+                  onClick={() => setActiveTab('team-access')}
+                  className={`
+                    group p-6 rounded-xl text-left transition-all border
+                    ${activeTab === 'team-access'
+                      ? lightMode
+                        ? 'bg-white border-blue-500 shadow-lg shadow-blue-500/10'
+                        : 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-cyan-50' : 'bg-cyan-500/20'}`}>
+                      <Users size={20} className="text-cyan-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Team Access</h3>
+                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                        Invite others to manage your race management account
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              )}
 
               {/* Association Users Card - only show for association admins */}
               {currentOrganization && can('users.manage') && (
@@ -1851,6 +1881,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
           {activeTab === 'club-features' && currentOrganization && (
             <ClubFeaturesAccess darkMode={darkMode} />
+          )}
+
+          {activeTab === 'team-access' && isRaceOfficer && !currentClub && (
+            <RaceOfficerTeamAccess darkMode={darkMode} />
           )}
 
           {activeTab === 'team' && (

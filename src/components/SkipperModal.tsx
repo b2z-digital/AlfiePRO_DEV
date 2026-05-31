@@ -258,25 +258,51 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               .from('race_officer_contacts')
               .select('*')
               .eq('user_id', currentUser.id)
-              .order('last_name', { ascending: true });
+              .order('name', { ascending: true });
 
             if (contactsError) throw contactsError;
 
-            const contactsAsMembers = (contacts || []).map((c: any) => ({
-              id: c.id,
-              first_name: c.first_name || '',
-              last_name: c.last_name || '',
-              club: c.club || '',
-              email: c.email || '',
-              boats: c.sail_number ? [{
+            const contactsAsMembers = (contacts || []).map((c: any) => {
+              const nameParts = (c.name || '').trim().split(/\s+/);
+              const firstName = nameParts[0] || '';
+              const lastName = nameParts.slice(1).join(' ') || '';
+
+              let boats: any[] = [];
+              const parsedBoats = Array.isArray(c.boats) ? c.boats : [];
+              if (parsedBoats.length > 0) {
+                boats = parsedBoats.map((b: any, idx: number) => ({
+                  id: `${c.id}_boat_${idx}`,
+                  member_id: c.id,
+                  boat_type: b.class || currentEvent.raceClass || '',
+                  sail_number: b.sail_number || '',
+                  hull: b.design || '',
+                  handicap: b.handicap ?? 0,
+                  isValid: true,
+                }));
+              } else if (c.sail_number) {
+                boats = [{
+                  id: c.id,
+                  member_id: c.id,
+                  boat_type: c.boat_class || currentEvent.raceClass || '',
+                  sail_number: c.sail_number,
+                  hull: c.boat_name || '',
+                  handicap: 0,
+                  isValid: true,
+                }];
+              }
+
+              return {
                 id: c.id,
-                member_id: c.id,
-                boat_type: c.boat_class || currentEvent.raceClass || '',
-                sail_number: c.sail_number,
-                hull: c.hull || '',
-                isValid: true,
-              }] : [],
-            }));
+                first_name: firstName,
+                last_name: lastName,
+                club: c.club_name || '',
+                email: c.email || '',
+                country: c.country || '',
+                state: c.state || '',
+                division: c.division || '',
+                boats,
+              };
+            });
 
             setMembers(contactsAsMembers);
             setMemberAvatars({});
@@ -3518,7 +3544,7 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
             <Users className="text-white" size={24} />
             <div>
               <h2 className="text-xl font-semibold text-white">
-                Select Members to Add
+                {isRaceOfficer && !currentEvent?.clubId ? 'Select Skippers to Add' : 'Select Members to Add'}
               </h2>
               <p className="text-sm text-blue-100">
                 {currentEvent?.raceClass} Class
@@ -3544,7 +3570,7 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
               />
               <input
                 type="text"
-                placeholder="Search members..."
+                placeholder={isRaceOfficer && !currentEvent?.clubId ? "Search skippers..." : "Search members..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-slate-700 text-slate-200 placeholder-slate-400 rounded-lg"
@@ -3570,6 +3596,7 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
                   <Users size={12} />
                   {showAllMembers ? 'All Boats' : `${currentEvent?.raceClass || 'Class'} Only`}
                 </button>
+                {!(isRaceOfficer && !currentEvent?.clubId) && (
                 <button
                   onClick={() => {
                     setShowOtherClubs(prev => !prev);
@@ -3584,6 +3611,7 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
                   <Sailboat size={12} />
                   Other Clubs
                 </button>
+                )}
               </div>
             </div>
 

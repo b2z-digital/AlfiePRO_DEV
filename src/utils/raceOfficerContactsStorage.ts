@@ -1,5 +1,12 @@
 import { supabase } from './supabase';
 
+export interface SkipperBoat {
+  class: string;
+  sail_number: string;
+  design: string;
+  handicap: number | null;
+}
+
 export interface RaceOfficerContact {
   id: string;
   user_id: string;
@@ -13,6 +20,8 @@ export interface RaceOfficerContact {
   notes: string;
   country: string;
   state: string;
+  division: string;
+  boats: SkipperBoat[];
   created_at: string;
   updated_at: string;
 }
@@ -34,27 +43,57 @@ export async function getRaceOfficerContacts(): Promise<RaceOfficerContact[]> {
     return [];
   }
 
-  return data || [];
+  return (data || []).map(normalizeContact);
+}
+
+function normalizeContact(raw: any): RaceOfficerContact {
+  let boats: SkipperBoat[] = [];
+  if (Array.isArray(raw.boats) && raw.boats.length > 0) {
+    boats = raw.boats.map((b: any) => ({
+      class: b.class || '',
+      sail_number: b.sail_number || '',
+      design: b.design || '',
+      handicap: b.handicap ?? null,
+    }));
+  } else if (raw.boat_class || raw.sail_number || raw.boat_name) {
+    boats = [{
+      class: raw.boat_class || '',
+      sail_number: raw.sail_number || '',
+      design: raw.boat_name || '',
+      handicap: null,
+    }];
+  }
+
+  return {
+    ...raw,
+    division: raw.division || '',
+    boats,
+  };
 }
 
 export async function addRaceOfficerContact(contact: Partial<RaceOfficerContactInput>): Promise<RaceOfficerContact | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const boats = contact.boats || [];
+  const primaryBoat = boats[0] || { class: '', sail_number: '', design: '' };
+
   const { data, error } = await supabase
     .from('race_officer_contacts')
     .insert({
       user_id: user.id,
       name: contact.name || '',
-      sail_number: contact.sail_number || '',
-      boat_class: contact.boat_class || '',
-      boat_name: contact.boat_name || '',
+      sail_number: primaryBoat.sail_number,
+      boat_class: primaryBoat.class,
+      boat_name: primaryBoat.design,
       club_name: contact.club_name || '',
       email: contact.email || '',
       phone: contact.phone || '',
       notes: contact.notes || '',
       country: contact.country || '',
       state: contact.state || '',
+      division: contact.division || '',
+      boats: JSON.stringify(boats),
     })
     .select()
     .maybeSingle();
@@ -64,19 +103,29 @@ export async function addRaceOfficerContact(contact: Partial<RaceOfficerContactI
     return null;
   }
 
-  return data;
+  return data ? normalizeContact(data) : null;
 }
 
 export async function updateRaceOfficerContact(id: string, updates: Partial<RaceOfficerContactInput>): Promise<RaceOfficerContact | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const updatePayload: any = {
+    ...updates,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (updates.boats) {
+    const primaryBoat = updates.boats[0] || { class: '', sail_number: '', design: '' };
+    updatePayload.sail_number = primaryBoat.sail_number;
+    updatePayload.boat_class = primaryBoat.class;
+    updatePayload.boat_name = primaryBoat.design;
+    updatePayload.boats = JSON.stringify(updates.boats);
+  }
+
   const { data, error } = await supabase
     .from('race_officer_contacts')
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', id)
     .eq('user_id', user.id)
     .select()
@@ -87,7 +136,7 @@ export async function updateRaceOfficerContact(id: string, updates: Partial<Race
     return null;
   }
 
-  return data;
+  return data ? normalizeContact(data) : null;
 }
 
 export async function deleteRaceOfficerContact(id: string): Promise<boolean> {
@@ -112,19 +161,32 @@ export async function bulkAddRaceOfficerContacts(contacts: Partial<RaceOfficerCo
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const rows = contacts.map(c => ({
-    user_id: user.id,
-    name: c.name || '',
-    sail_number: c.sail_number || '',
-    boat_class: c.boat_class || '',
-    boat_name: c.boat_name || '',
-    club_name: c.club_name || '',
-    email: c.email || '',
-    phone: c.phone || '',
-    notes: c.notes || '',
-    country: c.country || '',
-    state: c.state || '',
-  }));
+  const rows = contacts.map(c => {
+    const boats = c.boats || [];
+    const primaryBoat = boats.length > 0
+      ? boats[0]
+      : { class: c.boat_class || '', sail_number: c.sail_number || '', design: c.boat_name || '' };
+
+    const allBoats = boats.length > 0 ? boats : (primaryBoat.class || primaryBoat.sail_number || primaryBoat.design)
+      ? [primaryBoat]
+      : [];
+
+    return {
+      user_id: user.id,
+      name: c.name || '',
+      sail_number: primaryBoat.sail_number || '',
+      boat_class: primaryBoat.class || '',
+      boat_name: primaryBoat.design || '',
+      club_name: c.club_name || '',
+      email: c.email || '',
+      phone: c.phone || '',
+      notes: c.notes || '',
+      country: c.country || '',
+      state: c.state || '',
+      division: c.division || '',
+      boats: JSON.stringify(allBoats),
+    };
+  });
 
   const { data, error } = await supabase
     .from('race_officer_contacts')
@@ -136,7 +198,7 @@ export async function bulkAddRaceOfficerContacts(contacts: Partial<RaceOfficerCo
     return [];
   }
 
-  return data || [];
+  return (data || []).map(normalizeContact);
 }
 
 export async function searchRaceOfficerContacts(searchTerm: string): Promise<RaceOfficerContact[]> {
@@ -154,6 +216,21 @@ export async function searchRaceOfficerContacts(searchTerm: string): Promise<Rac
 
   if (error) {
     console.error('Error searching race officer contacts:', error);
+    return [];
+  }
+
+  return (data || []).map(normalizeContact);
+}
+
+export async function getBoatClasses(): Promise<{ id: string; name: string; class_image: string | null }[]> {
+  const { data, error } = await supabase
+    .from('boat_classes')
+    .select('id, name, class_image')
+    .eq('is_active', true)
+    .order('name', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching boat classes:', error);
     return [];
   }
 

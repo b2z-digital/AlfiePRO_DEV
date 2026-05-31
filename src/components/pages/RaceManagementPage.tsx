@@ -41,7 +41,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentClub, currentOrganization, user } = useAuth();
+  const { currentClub, currentOrganization, user, isRaceOfficer } = useAuth();
   const { addNotification } = useNotifications();
 
   // DIAGNOSTIC: Log when component mounts
@@ -2906,7 +2906,11 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             setShowSimulationModal(false);
             await new Promise(resolve => setTimeout(resolve, 300));
             await fetchRaces();
-            handleStartScoring(event);
+            if (isRaceOfficer && !currentClub) {
+              // Standalone race officers: save event and stay on management page
+            } else {
+              handleStartScoring(event);
+            }
           }}
         />
       )}

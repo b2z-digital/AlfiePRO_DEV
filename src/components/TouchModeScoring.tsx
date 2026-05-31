@@ -562,6 +562,14 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     const filteredResults = updatedResults.filter(r => r.race !== currentRace);
     console.log('🗑️ Removed old results, remaining:', filteredResults.length);
 
+    // Clear handicapOverride flags on later races so recalculation cascades properly
+    for (let i = 0; i < filteredResults.length; i++) {
+      if (filteredResults[i].race > currentRace && filteredResults[i].handicapOverride) {
+        const { handicapOverride, ...rest } = filteredResults[i];
+        filteredResults[i] = rest;
+      }
+    }
+
     // Add new results
     entries.forEach(entry => {
       const preservesPosition = entry.letterScore && POSITION_PRESERVING_SCORES.has(entry.letterScore);
@@ -967,6 +975,22 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       return s;
     });
     setSkippersProp(updated);
+  };
+
+  const handleOverrideHandicap = (skipperIndex: number, value: number) => {
+    const latestRace = Math.max(
+      ...raceResults
+        .filter(r => r.skipperIndex === skipperIndex && r.adjustedHcap !== undefined)
+        .map(r => r.race),
+      0
+    );
+    if (latestRace === 0) return;
+    const updatedResults = raceResults.map(r =>
+      r.race === latestRace && r.skipperIndex === skipperIndex
+        ? { ...r, adjustedHcap: value, handicapOverride: true }
+        : r
+    );
+    updateRaceResults(updatedResults);
   };
 
   return (
@@ -1522,6 +1546,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         allRaceResults={allRaceResults}
         canEditHandicaps={canEditHandicaps}
         onUpdateHandicap={handleTouchUpdateHandicap}
+        onOverrideHandicap={isHandicapEvent ? handleOverrideHandicap : undefined}
         onScratchStart={handleTouchScratchStart}
         storedHandicaps={storedHandicaps}
         onUsePreviousHandicaps={handleUsePreviousHandicaps}

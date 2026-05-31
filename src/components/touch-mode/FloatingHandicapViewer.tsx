@@ -26,6 +26,7 @@ interface FloatingHandicapViewerProps {
   allRaceResults?: RaceResult[];
   canEditHandicaps?: boolean;
   onUpdateHandicap?: (skipperIndex: number, value: number) => void;
+  onOverrideHandicap?: (skipperIndex: number, value: number) => void;
   onScratchStart?: () => void;
   storedHandicaps?: StoredHandicapData[];
   onUsePreviousHandicaps?: () => void;
@@ -87,6 +88,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
   allRaceResults,
   canEditHandicaps = false,
   onUpdateHandicap,
+  onOverrideHandicap,
   onScratchStart,
   storedHandicaps,
   onUsePreviousHandicaps
@@ -97,6 +99,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
   const [viewMode, setViewMode] = useState<ViewMode>(isScratchEvent ? 'rankings' : 'handicaps');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [isOverrideMode, setIsOverrideMode] = useState(false);
 
   const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
   const setIsOpen = (open: boolean) => {
@@ -104,6 +107,11 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
       onOpenChange(open);
     } else {
       setInternalIsOpen(open);
+    }
+    if (!open) {
+      setIsOverrideMode(false);
+      setEditingIndex(null);
+      setEditValue('');
     }
   };
 
@@ -313,9 +321,13 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
   };
 
   const handleConfirmEdit = () => {
-    if (editingIndex === null || !onUpdateHandicap) return;
+    if (editingIndex === null) return;
     const numValue = Math.max(0, Math.min(300, parseInt(editValue) || 0));
-    onUpdateHandicap(editingIndex, numValue);
+    if (isOverrideMode && onOverrideHandicap) {
+      onOverrideHandicap(editingIndex, numValue);
+    } else if (onUpdateHandicap) {
+      onUpdateHandicap(editingIndex, numValue);
+    }
     setEditingIndex(null);
     setEditValue('');
   };
@@ -461,7 +473,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                         {isScratchEvent || isShrs
                           ? 'Current Rankings'
                           : viewMode === 'handicaps'
-                            ? canEditHandicaps ? 'Set Starting Handicaps' : 'Current Handicaps'
+                            ? canEditHandicaps ? 'Set Starting Handicaps' : isOverrideMode ? 'Override Handicaps' : 'Current Handicaps'
                             : 'Current Rankings'}
                       </h3>
                       <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -473,10 +485,26 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                             ? hasStoredHandicaps && allHandicapsZero
                               ? 'Load previous handicaps or start from scratch'
                               : 'Tap a handicap to edit or use scratch start'
-                            : `As of Race ${currentRace}`}
+                            : isOverrideMode
+                              ? 'Tap a handicap to override for next race'
+                              : `As of Race ${currentRace}`}
                       </p>
                     </div>
                   </div>
+                  {!canEditHandicaps && !isScratchEvent && !isShrs && viewMode === 'handicaps' && onOverrideHandicap && (
+                    <button
+                      onClick={() => { setIsOverrideMode(!isOverrideMode); setEditingIndex(null); setEditValue(''); }}
+                      className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-colors ${
+                        isOverrideMode
+                          ? 'bg-amber-500 text-white'
+                          : darkMode
+                            ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                      }`}
+                    >
+                      {isOverrideMode ? 'Done' : 'Edit'}
+                    </button>
+                  )}
                 </div>
 
                 {!isScratchEvent && !isShrs && (
@@ -631,7 +659,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                                 </div>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                {canEditHandicaps && isEditing ? (
+                                {(canEditHandicaps || isOverrideMode) && isEditing ? (
                                   <div className="flex items-center gap-1">
                                     <input
                                       type="number"
@@ -658,7 +686,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                                       <Check size={16} />
                                     </button>
                                   </div>
-                                ) : canEditHandicaps ? (
+                                ) : (canEditHandicaps || isOverrideMode) ? (
                                   <div className="flex flex-col items-end gap-0.5">
                                     <button
                                       onClick={() => handleStartEdit(handicap.skipperIndex, handicap.currentHandicap)}

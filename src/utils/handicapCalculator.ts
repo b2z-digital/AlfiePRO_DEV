@@ -38,6 +38,7 @@ export const calculateHandicaps = (
     // simply use startHcap as the adjustedHcap (no further adjustments)
     if (race === 1 && isInitialRaceFromScratch) {
       raceData.forEach(result => {
+        if (result.handicapOverride) return;
         const idx = result.skipperIndex;
         const hcap = skippers[idx]?.startHcap ?? 0;
         result.handicap = 0;
@@ -84,6 +85,7 @@ export const calculateHandicaps = (
     // Assign handicaps based on finishing position (1st=0, 2nd=10, 3rd=20, etc.)
     if (race === 1 && allOnScratch && !isManualHandicaps) {
       raceData.forEach(result => {
+        if (result.handicapOverride) return;
         const idx = result.skipperIndex;
         const pos = result.position;
         result.handicap = 0;
@@ -121,10 +123,24 @@ export const calculateHandicaps = (
       // Set initial handicap for the race
       result.handicap = currentHcaps[idx];
 
+      // If this result has a manual override, preserve it
+      if (result.handicapOverride) {
+        const resultIndex = updatedResults.findIndex(
+          r => r.race === race && r.skipperIndex === idx
+        );
+        if (resultIndex !== -1) {
+          updatedResults[resultIndex] = {
+            ...result,
+            handicap: currentHcaps[idx]
+          };
+        }
+        return;
+      }
+
       if (result.letterScore && result.letterScore !== 'RDGfix') {
-        const withdrawnCodes = ['WDN'];
-        const isWithdrawn = withdrawnCodes.includes(result.letterScore);
-        const letterAdj = !isWithdrawn && scratchBoatBonus > 0 ? scratchBoatBonus : 0;
+        const didNotRaceCodes = ['WDN', 'DNS', 'DNC'];
+        const didNotRace = didNotRaceCodes.includes(result.letterScore);
+        const letterAdj = !didNotRace && scratchBoatBonus > 0 ? scratchBoatBonus : 0;
         result.adjustedHcap = Math.max(0, Math.min(capLimit, currentHcaps[idx] + letterAdj));
         const resultIndex = updatedResults.findIndex(
           r => r.race === race && r.skipperIndex === idx

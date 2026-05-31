@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Users, Plus, Search, Trash2, Pencil, X, Upload, Download, Sailboat, Phone, Mail, Building, Flag, MapPin, FileText, ChevronDown, ChevronUp, Save, Loader as Loader2, CircleAlert as AlertCircle } from 'lucide-react';
+import { Users, Plus, Search, Trash2, Pencil, X, Upload, Download, Flag, ChevronDown, ChevronUp, Save, Loader as Loader2, Sailboat, Eye } from 'lucide-react';
 import {
   getRaceOfficerContacts,
   addRaceOfficerContact,
   updateRaceOfficerContact,
   deleteRaceOfficerContact,
   bulkAddRaceOfficerContacts,
+  getBoatClasses,
   RaceOfficerContact,
-  RaceOfficerContactInput
+  RaceOfficerContactInput,
+  SkipperBoat
 } from '../../utils/raceOfficerContactsStorage';
 import { useNotifications } from '../../contexts/NotificationContext';
 
@@ -15,17 +17,26 @@ interface RaceOfficerContactsPageProps {
   darkMode: boolean;
 }
 
-const EMPTY_FORM: Partial<RaceOfficerContactInput> = {
+const DIVISIONS = ['Junior', 'Open', 'Masters', 'Grand Masters'];
+
+const EMPTY_BOAT: SkipperBoat = { class: '', sail_number: '', design: '', handicap: null };
+
+interface SkipperFormData {
+  name: string;
+  club_name: string;
+  country: string;
+  division: string;
+  boats: SkipperBoat[];
+  notes: string;
+}
+
+const EMPTY_FORM: SkipperFormData = {
   name: '',
-  sail_number: '',
-  boat_class: '',
-  boat_name: '',
   club_name: '',
-  email: '',
-  phone: '',
-  notes: '',
   country: '',
-  state: '',
+  division: '',
+  boats: [{ ...EMPTY_BOAT }],
+  notes: '',
 };
 
 export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = ({ darkMode }) => {
@@ -35,18 +46,33 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Partial<RaceOfficerContactInput>>(EMPTY_FORM);
+  const [formData, setFormData] = useState<SkipperFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [sortField, setSortField] = useState<'name' | 'sail_number' | 'boat_class' | 'club_name'>('name');
+  const [viewingContact, setViewingContact] = useState<RaceOfficerContact | null>(null);
+  const [sortField, setSortField] = useState<'name' | 'club_name' | 'division'>('name');
   const [sortAsc, setSortAsc] = useState(true);
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
   const [importing, setImporting] = useState(false);
+  const [boatClassOptions, setBoatClassOptions] = useState<{ id: string; name: string; class_image: string | null }[]>([]);
+  const [openClassDropdown, setOpenClassDropdown] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadContacts();
+    loadBoatClasses();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenClassDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const loadContacts = async () => {
@@ -56,29 +82,36 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
     setLoading(false);
   };
 
+  const loadBoatClasses = async () => {
+    const classes = await getBoatClasses();
+    setBoatClassOptions(classes);
+  };
+
   const filteredContacts = useMemo(() => {
     let result = contacts;
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       result = result.filter(c =>
         c.name.toLowerCase().includes(term) ||
-        c.sail_number.toLowerCase().includes(term) ||
-        c.boat_class.toLowerCase().includes(term) ||
         c.club_name.toLowerCase().includes(term) ||
-        c.email.toLowerCase().includes(term)
+        c.division?.toLowerCase().includes(term) ||
+        c.boats.some(b =>
+          b.class.toLowerCase().includes(term) ||
+          b.sail_number.toLowerCase().includes(term) ||
+          b.design.toLowerCase().includes(term)
+        )
       );
     }
     result.sort((a, b) => {
-      const aVal = (a[sortField] || '').toLowerCase();
-      const bVal = (b[sortField] || '').toLowerCase();
+      const aVal = ((a as any)[sortField] || '').toLowerCase();
+      const bVal = ((b as any)[sortField] || '').toLowerCase();
       return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
     return result;
   }, [contacts, searchTerm, sortField, sortAsc]);
 
-  const boatClasses = useMemo(() => {
-    const classes = new Set(contacts.map(c => c.boat_class).filter(Boolean));
-    return Array.from(classes).sort();
+  const totalBoats = useMemo(() => {
+    return contacts.reduce((sum, c) => sum + c.boats.length, 0);
   }, [contacts]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,22 +120,31 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
 
     setSaving(true);
     try {
+      const payload: Partial<RaceOfficerContactInput> = {
+        name: formData.name,
+        club_name: formData.club_name,
+        country: formData.country,
+        division: formData.division,
+        boats: formData.boats.filter(b => b.class || b.sail_number || b.design),
+        notes: formData.notes,
+      };
+
       if (editingId) {
-        const updated = await updateRaceOfficerContact(editingId, formData);
+        const updated = await updateRaceOfficerContact(editingId, payload);
         if (updated) {
           setContacts(prev => prev.map(c => c.id === editingId ? updated : c));
-          addNotification('success', 'Contact updated');
+          addNotification('success', 'Skipper updated');
         }
       } else {
-        const created = await addRaceOfficerContact(formData);
+        const created = await addRaceOfficerContact(payload);
         if (created) {
           setContacts(prev => [...prev, created]);
-          addNotification('success', 'Contact added');
+          addNotification('success', 'Skipper added');
         }
       }
       resetForm();
     } catch {
-      addNotification('error', 'Failed to save contact');
+      addNotification('error', 'Failed to save skipper');
     } finally {
       setSaving(false);
     }
@@ -112,15 +154,11 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
     setEditingId(contact.id);
     setFormData({
       name: contact.name,
-      sail_number: contact.sail_number,
-      boat_class: contact.boat_class,
-      boat_name: contact.boat_name,
       club_name: contact.club_name,
-      email: contact.email,
-      phone: contact.phone,
-      notes: contact.notes,
-      country: contact.country,
-      state: contact.state,
+      country: contact.country || '',
+      division: contact.division || '',
+      boats: contact.boats.length > 0 ? [...contact.boats] : [{ ...EMPTY_BOAT }],
+      notes: contact.notes || '',
     });
     setShowForm(true);
   };
@@ -129,7 +167,7 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
     const success = await deleteRaceOfficerContact(id);
     if (success) {
       setContacts(prev => prev.filter(c => c.id !== id));
-      addNotification('success', 'Contact deleted');
+      addNotification('success', 'Skipper deleted');
     }
     setDeleteConfirm(null);
   };
@@ -138,6 +176,7 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
     setFormData(EMPTY_FORM);
     setEditingId(null);
     setShowForm(false);
+    setOpenClassDropdown(null);
   };
 
   const handleSort = (field: typeof sortField) => {
@@ -149,43 +188,78 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
     }
   };
 
+  const addBoat = () => {
+    setFormData(prev => ({ ...prev, boats: [...prev.boats, { ...EMPTY_BOAT }] }));
+  };
+
+  const removeBoat = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      boats: prev.boats.length > 1 ? prev.boats.filter((_, i) => i !== index) : [{ ...EMPTY_BOAT }],
+    }));
+  };
+
+  const updateBoat = (index: number, field: keyof SkipperBoat, value: string | number | null) => {
+    setFormData(prev => ({
+      ...prev,
+      boats: prev.boats.map((b, i) => i === index ? { ...b, [field]: value } : b),
+    }));
+  };
+
+  const selectBoatClass = (index: number, className: string) => {
+    updateBoat(index, 'class', className);
+    setOpenClassDropdown(null);
+  };
+
+  const getClassImage = (className: string): string | null => {
+    const match = boatClassOptions.find(bc => bc.name === className);
+    return match?.class_image || null;
+  };
+
   const handleCsvImport = async () => {
     if (!importText.trim()) return;
     setImporting(true);
     try {
       const lines = importText.trim().split('\n');
       const header = lines[0].toLowerCase();
-      const hasHeader = header.includes('name') || header.includes('sail');
+      const hasHeader = header.includes('name') || header.includes('sail') || header.includes('class');
       const dataLines = hasHeader ? lines.slice(1) : lines;
 
       const parsed: Partial<RaceOfficerContactInput>[] = dataLines
         .filter(line => line.trim())
         .map(line => {
           const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+          const boats: SkipperBoat[] = [];
+          if (cols[3] || cols[4] || cols[5]) {
+            const hcap = cols[6] ? parseFloat(cols[6]) : null;
+            boats.push({
+              class: cols[3] || '',
+              sail_number: cols[4] || '',
+              design: cols[5] || '',
+              handicap: hcap && !isNaN(hcap) ? hcap : null,
+            });
+          }
           return {
             name: cols[0] || '',
-            sail_number: cols[1] || '',
-            boat_class: cols[2] || '',
-            boat_name: cols[3] || '',
-            club_name: cols[4] || '',
-            email: cols[5] || '',
-            phone: cols[6] || '',
+            club_name: cols[1] || '',
+            country: cols[2] || '',
+            boats,
           };
         })
         .filter(c => c.name);
 
       if (parsed.length === 0) {
-        addNotification('error', 'No valid contacts found in CSV');
+        addNotification('error', 'No valid skippers found in CSV');
         return;
       }
 
       const created = await bulkAddRaceOfficerContacts(parsed);
       setContacts(prev => [...prev, ...created]);
-      addNotification('success', `Imported ${created.length} contact${created.length !== 1 ? 's' : ''}`);
+      addNotification('success', `Imported ${created.length} skipper${created.length !== 1 ? 's' : ''}`);
       setShowImport(false);
       setImportText('');
     } catch {
-      addNotification('error', 'Failed to import contacts');
+      addNotification('error', 'Failed to import skippers');
     } finally {
       setImporting(false);
     }
@@ -203,18 +277,34 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
   };
 
   const exportContacts = () => {
-    const header = 'Name,Sail Number,Boat Class,Boat Name,Club,Email,Phone';
-    const rows = contacts.map(c =>
-      [c.name, c.sail_number, c.boat_class, c.boat_name, c.club_name, c.email, c.phone]
-        .map(v => `"${(v || '').replace(/"/g, '""')}"`)
-        .join(',')
-    );
+    const header = 'Name,Club,Country,Division,Class,Sail Number,Design,Handicap';
+    const rows: string[] = [];
+    contacts.forEach(c => {
+      if (c.boats.length === 0) {
+        rows.push([c.name, c.club_name, c.country, c.division, '', '', '', '']
+          .map(v => `"${(v || '').replace(/"/g, '""')}"`)
+          .join(','));
+      } else {
+        c.boats.forEach((boat, i) => {
+          rows.push([
+            i === 0 ? c.name : '',
+            i === 0 ? c.club_name : '',
+            i === 0 ? c.country : '',
+            i === 0 ? c.division : '',
+            boat.class,
+            boat.sail_number,
+            boat.design,
+            boat.handicap != null ? String(boat.handicap) : '',
+          ].map(v => `"${(v || '').replace(/"/g, '""')}"`).join(','));
+        });
+      }
+    });
     const csv = [header, ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `race_officer_contacts_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `skippers_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -235,517 +325,47 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-6 sm:p-8 lg:p-16 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600">
-            <Users className="text-white" size={24} />
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600">
+              <Users className="text-white" size={24} />
+            </div>
+            <div>
+              <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                Skippers
+              </h1>
+              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                {contacts.length} skipper{contacts.length !== 1 ? 's' : ''}
+                {totalBoats > 0 && ` | ${totalBoats} boat${totalBoats !== 1 ? 's' : ''} registered`}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Skippers
-            </h1>
-            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              {contacts.length} skipper{contacts.length !== 1 ? 's' : ''} saved
-              {boatClasses.length > 0 && ` across ${boatClasses.length} class${boatClasses.length !== 1 ? 'es' : ''}`}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowImport(true)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              darkMode
-                ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <Upload size={16} />
-            Import
-          </button>
-          {contacts.length > 0 && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={exportContacts}
+              onClick={() => setShowImport(true)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 darkMode
                   ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
-              <Download size={16} />
-              Export
-            </button>
-          )}
-          <button
-            onClick={() => { resetForm(); setShowForm(true); }}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={16} />
-            Add Skipper
-          </button>
-        </div>
-      </div>
-
-      {showImport && (
-        <div className={`rounded-xl border p-5 ${
-          darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'
-        }`}>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Import Contacts from CSV
-            </h3>
-            <button onClick={() => { setShowImport(false); setImportText(''); }}>
-              <X size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
-            </button>
-          </div>
-          <p className={`text-sm mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            Format: Name, Sail Number, Boat Class, Boat Name, Club, Email, Phone (one per line)
-          </p>
-          <div className="flex gap-2 mb-3">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.txt"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm ${
-                darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <Upload size={14} />
-              Choose File
-            </button>
-          </div>
-          <textarea
-            value={importText}
-            onChange={e => setImportText(e.target.value)}
-            placeholder={`John Smith, AUS 123, IOM, Speedy, Lake Sailing Club, john@email.com, 0412345678\nJane Doe, AUS 456, DF65, Wind Rider, Bay Club, jane@email.com, 0498765432`}
-            rows={6}
-            className={`w-full rounded-lg p-3 text-sm font-mono border ${
-              darkMode
-                ? 'bg-slate-900/50 border-slate-600 text-white placeholder-slate-500'
-                : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-            }`}
-          />
-          <div className="flex justify-end gap-2 mt-3">
-            <button
-              onClick={() => { setShowImport(false); setImportText(''); }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'
-              }`}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCsvImport}
-              disabled={importing || !importText.trim()}
-              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {importing ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+              <Upload size={16} />
               Import
             </button>
-          </div>
-        </div>
-      )}
-
-      {showForm && (
-        <div className={`rounded-xl border p-5 ${
-          darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'
-        }`}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              {editingId ? 'Edit Contact' : 'New Contact'}
-            </h3>
-            <button onClick={resetForm}>
-              <X size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
-            </button>
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name || ''}
-                  onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className={`w-full rounded-lg px-3 py-2 text-sm border ${
-                    darkMode
-                      ? 'bg-slate-900/50 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  }`}
-                  placeholder="John Smith"
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Sail Number
-                </label>
-                <input
-                  type="text"
-                  value={formData.sail_number || ''}
-                  onChange={e => setFormData(prev => ({ ...prev, sail_number: e.target.value }))}
-                  className={`w-full rounded-lg px-3 py-2 text-sm border ${
-                    darkMode
-                      ? 'bg-slate-900/50 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  }`}
-                  placeholder="AUS 123"
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Boat Class
-                </label>
-                <input
-                  type="text"
-                  value={formData.boat_class || ''}
-                  onChange={e => setFormData(prev => ({ ...prev, boat_class: e.target.value }))}
-                  list="boat-class-options"
-                  className={`w-full rounded-lg px-3 py-2 text-sm border ${
-                    darkMode
-                      ? 'bg-slate-900/50 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  }`}
-                  placeholder="IOM"
-                />
-                {boatClasses.length > 0 && (
-                  <datalist id="boat-class-options">
-                    {boatClasses.map(bc => <option key={bc} value={bc} />)}
-                  </datalist>
-                )}
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Boat Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.boat_name || ''}
-                  onChange={e => setFormData(prev => ({ ...prev, boat_name: e.target.value }))}
-                  className={`w-full rounded-lg px-3 py-2 text-sm border ${
-                    darkMode
-                      ? 'bg-slate-900/50 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  }`}
-                  placeholder="Lightning"
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Club
-                </label>
-                <input
-                  type="text"
-                  value={formData.club_name || ''}
-                  onChange={e => setFormData(prev => ({ ...prev, club_name: e.target.value }))}
-                  className={`w-full rounded-lg px-3 py-2 text-sm border ${
-                    darkMode
-                      ? 'bg-slate-900/50 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  }`}
-                  placeholder="Lake Sailing Club"
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={formData.email || ''}
-                  onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  className={`w-full rounded-lg px-3 py-2 text-sm border ${
-                    darkMode
-                      ? 'bg-slate-900/50 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  }`}
-                  placeholder="john@email.com"
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Phone
-                </label>
-                <input
-                  type="text"
-                  value={formData.phone || ''}
-                  onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  className={`w-full rounded-lg px-3 py-2 text-sm border ${
-                    darkMode
-                      ? 'bg-slate-900/50 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  }`}
-                  placeholder="04XX XXX XXX"
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Country
-                </label>
-                <input
-                  type="text"
-                  value={formData.country || ''}
-                  onChange={e => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                  className={`w-full rounded-lg px-3 py-2 text-sm border ${
-                    darkMode
-                      ? 'bg-slate-900/50 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  }`}
-                  placeholder="Australia"
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  State
-                </label>
-                <input
-                  type="text"
-                  value={formData.state || ''}
-                  onChange={e => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                  className={`w-full rounded-lg px-3 py-2 text-sm border ${
-                    darkMode
-                      ? 'bg-slate-900/50 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  }`}
-                  placeholder="NSW"
-                />
-              </div>
-            </div>
-            <div>
-              <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Notes
-              </label>
-              <textarea
-                value={formData.notes || ''}
-                onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                rows={2}
-                className={`w-full rounded-lg px-3 py-2 text-sm border ${
+            {contacts.length > 0 && (
+              <button
+                onClick={exportContacts}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   darkMode
-                    ? 'bg-slate-900/50 border-slate-600 text-white'
-                    : 'bg-white border-slate-300 text-slate-900'
-                }`}
-                placeholder="Any additional notes..."
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={resetForm}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                  darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'
+                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                Cancel
+                <Download size={16} />
+                Export
               </button>
-              <button
-                type="submit"
-                disabled={saving || !formData.name?.trim()}
-                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                {editingId ? 'Update' : 'Save'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {contacts.length > 0 && (
-        <div className="relative">
-          <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${
-            darkMode ? 'text-slate-500' : 'text-slate-400'
-          }`} />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            placeholder="Search contacts by name, sail number, class, club or email..."
-            className={`w-full pl-9 pr-4 py-2.5 rounded-xl text-sm border ${
-              darkMode
-                ? 'bg-slate-800/80 border-slate-700 text-white placeholder-slate-500'
-                : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
-            }`}
-          />
-        </div>
-      )}
-
-      {filteredContacts.length > 0 ? (
-        <div className={`rounded-xl border overflow-hidden ${
-          darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
-        }`}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className={darkMode ? 'bg-slate-800' : 'bg-slate-50'}>
-                  <th className="text-left px-4 py-3">
-                    <button onClick={() => handleSort('name')} className={`flex items-center gap-1 font-semibold ${
-                      darkMode ? 'text-slate-300' : 'text-slate-700'
-                    }`}>
-                      Name <SortIcon field="name" />
-                    </button>
-                  </th>
-                  <th className="text-left px-4 py-3">
-                    <button onClick={() => handleSort('sail_number')} className={`flex items-center gap-1 font-semibold ${
-                      darkMode ? 'text-slate-300' : 'text-slate-700'
-                    }`}>
-                      Sail # <SortIcon field="sail_number" />
-                    </button>
-                  </th>
-                  <th className="text-left px-4 py-3">
-                    <button onClick={() => handleSort('boat_class')} className={`flex items-center gap-1 font-semibold ${
-                      darkMode ? 'text-slate-300' : 'text-slate-700'
-                    }`}>
-                      Class <SortIcon field="boat_class" />
-                    </button>
-                  </th>
-                  <th className="text-left px-4 py-3 hidden lg:table-cell">
-                    <button onClick={() => handleSort('club_name')} className={`flex items-center gap-1 font-semibold ${
-                      darkMode ? 'text-slate-300' : 'text-slate-700'
-                    }`}>
-                      Club <SortIcon field="club_name" />
-                    </button>
-                  </th>
-                  <th className="text-left px-4 py-3 hidden xl:table-cell">
-                    <span className={`font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Contact</span>
-                  </th>
-                  <th className="text-right px-4 py-3">
-                    <span className={`font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className={`divide-y ${darkMode ? 'divide-slate-700/50' : 'divide-slate-100'}`}>
-                {filteredContacts.map(contact => (
-                  <tr key={contact.id} className={`transition-colors ${
-                    darkMode ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'
-                  }`}>
-                    <td className="px-4 py-3">
-                      <div className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {contact.name}
-                      </div>
-                      {contact.boat_name && (
-                        <div className={`text-xs mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                          {contact.boat_name}
-                        </div>
-                      )}
-                    </td>
-                    <td className={`px-4 py-3 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {contact.sail_number || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {contact.boat_class ? (
-                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                          darkMode ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-50 text-sky-700'
-                        }`}>
-                          {contact.boat_class}
-                        </span>
-                      ) : '-'}
-                    </td>
-                    <td className={`px-4 py-3 hidden lg:table-cell ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {contact.club_name || '-'}
-                    </td>
-                    <td className="px-4 py-3 hidden xl:table-cell">
-                      <div className="flex items-center gap-3">
-                        {contact.email && (
-                          <a href={`mailto:${contact.email}`} className="text-blue-500 hover:text-blue-400" title={contact.email}>
-                            <Mail size={14} />
-                          </a>
-                        )}
-                        {contact.phone && (
-                          <a href={`tel:${contact.phone}`} className="text-green-500 hover:text-green-400" title={contact.phone}>
-                            <Phone size={14} />
-                          </a>
-                        )}
-                        {!contact.email && !contact.phone && (
-                          <span className={`text-xs ${darkMode ? 'text-slate-600' : 'text-slate-300'}`}>-</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleEdit(contact)}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            darkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-700'
-                          }`}
-                          title="Edit"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        {deleteConfirm === contact.id ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleDelete(contact.id)}
-                              className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
-                              title="Confirm delete"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirm(null)}
-                              className={`p-1.5 rounded-lg transition-colors ${
-                                darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-400'
-                              }`}
-                              title="Cancel"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setDeleteConfirm(contact.id)}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              darkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-red-400' : 'hover:bg-slate-100 text-slate-400 hover:text-red-500'
-                            }`}
-                            title="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : contacts.length > 0 && searchTerm ? (
-        <div className={`text-center py-12 rounded-xl border ${
-          darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
-        }`}>
-          <Search size={40} className={`mx-auto mb-3 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
-          <p className={`font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            No contacts match "{searchTerm}"
-          </p>
-        </div>
-      ) : (
-        <div className={`text-center py-16 rounded-xl border ${
-          darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
-        }`}>
-          <Flag size={48} className={`mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
-          <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            No Contacts Yet
-          </h3>
-          <p className={`text-sm mb-6 max-w-md mx-auto ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            Build your address book of skippers and participants. Add them manually, import from CSV, or save them when importing race entries.
-          </p>
-          <div className="flex items-center justify-center gap-3">
-            <button
-              onClick={() => setShowImport(true)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium ${
-                darkMode
-                  ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <Upload size={16} />
-              Import CSV
-            </button>
+            )}
             <button
               onClick={() => { resetForm(); setShowForm(true); }}
               className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
@@ -755,8 +375,720 @@ export const RaceOfficerContactsPage: React.FC<RaceOfficerContactsPageProps> = (
             </button>
           </div>
         </div>
-      )}
+
+        {/* Import Panel */}
+        {showImport && (
+          <div className={`rounded-xl border p-5 ${
+            darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'
+          }`}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                Import Skippers from CSV
+              </h3>
+              <button onClick={() => { setShowImport(false); setImportText(''); }}>
+                <X size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+              </button>
+            </div>
+            <p className={`text-sm mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Format: Name, Club, Country, Class, Sail Number, Design, Handicap (one per line)
+            </p>
+            <div className="flex gap-2 mb-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.txt"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm ${
+                  darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <Upload size={14} />
+                Choose File
+              </button>
+            </div>
+            <textarea
+              value={importText}
+              onChange={e => setImportText(e.target.value)}
+              placeholder={`John Smith, Lake Sailing Club, Australia, IOM, AUS 123, Kantun 2, 45\nJane Doe, Bay Club, Australia, 10R, AUS 456, Ikon, 0`}
+              rows={6}
+              className={`w-full rounded-lg p-3 text-sm font-mono border ${
+                darkMode
+                  ? 'bg-slate-900/50 border-slate-600 text-white placeholder-slate-500'
+                  : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+              }`}
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                onClick={() => { setShowImport(false); setImportText(''); }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                  darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCsvImport}
+                disabled={importing || !importText.trim()}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {importing ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                Import
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Add/Edit Form */}
+        {showForm && (
+          <div className={`rounded-xl border p-5 ${
+            darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white border-slate-200'
+          }`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                {editingId ? 'Edit Skipper' : 'New Skipper'}
+              </h3>
+              <button onClick={resetForm}>
+                <X size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Skipper Details */}
+              <div>
+                <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Skipper Details
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.name}
+                      onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      className={`w-full rounded-lg px-3 py-2 text-sm border ${
+                        darkMode
+                          ? 'bg-slate-900/50 border-slate-600 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                      placeholder="John Smith"
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Club
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.club_name}
+                      onChange={e => setFormData(prev => ({ ...prev, club_name: e.target.value }))}
+                      className={`w-full rounded-lg px-3 py-2 text-sm border ${
+                        darkMode
+                          ? 'bg-slate-900/50 border-slate-600 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                      placeholder="Lake Sailing Club"
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Country
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.country}
+                      onChange={e => setFormData(prev => ({ ...prev, country: e.target.value }))}
+                      className={`w-full rounded-lg px-3 py-2 text-sm border ${
+                        darkMode
+                          ? 'bg-slate-900/50 border-slate-600 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                      placeholder="Australia"
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Division
+                    </label>
+                    <select
+                      value={formData.division}
+                      onChange={e => setFormData(prev => ({ ...prev, division: e.target.value }))}
+                      className={`w-full rounded-lg px-3 py-2 text-sm border ${
+                        darkMode
+                          ? 'bg-slate-900/50 border-slate-600 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      }`}
+                    >
+                      <option value="">-- None --</option>
+                      {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Boats Section */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Boats
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={addBoat}
+                    className="flex items-center gap-1 text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors"
+                  >
+                    <Plus size={14} />
+                    Add Boat
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {formData.boats.map((boat, index) => (
+                    <div
+                      key={index}
+                      className={`p-3 rounded-lg border ${
+                        darkMode ? 'bg-slate-900/30 border-slate-700' : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Boat class avatar */}
+                        <div className={`w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 mt-5 ${
+                          darkMode ? 'bg-slate-700' : 'bg-slate-200'
+                        }`}>
+                          {boat.class && getClassImage(boat.class) ? (
+                            <img
+                              src={getClassImage(boat.class)!}
+                              alt={boat.class}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Sailboat size={18} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          {/* Class dropdown with avatars */}
+                          <div className="relative" ref={openClassDropdown === index ? dropdownRef : undefined}>
+                            <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Class
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setOpenClassDropdown(openClassDropdown === index ? null : index)}
+                              className={`w-full text-left rounded-lg px-3 py-2 text-sm border flex items-center justify-between ${
+                                darkMode
+                                  ? 'bg-slate-800 border-slate-600 text-white'
+                                  : 'bg-white border-slate-300 text-slate-900'
+                              }`}
+                            >
+                              <span className={boat.class ? '' : (darkMode ? 'text-slate-500' : 'text-slate-400')}>
+                                {boat.class || 'Select class...'}
+                              </span>
+                              <ChevronDown size={14} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                            </button>
+                            {openClassDropdown === index && (
+                              <div className={`absolute z-50 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border shadow-lg ${
+                                darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
+                              }`}>
+                                <button
+                                  type="button"
+                                  onClick={() => selectBoatClass(index, '')}
+                                  className={`w-full text-left px-3 py-2 text-sm ${
+                                    darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-50 text-slate-400'
+                                  }`}
+                                >
+                                  -- None --
+                                </button>
+                                {boatClassOptions.map(bc => (
+                                  <button
+                                    type="button"
+                                    key={bc.id}
+                                    onClick={() => selectBoatClass(index, bc.name)}
+                                    className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2.5 ${
+                                      boat.class === bc.name
+                                        ? (darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700')
+                                        : (darkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-slate-50 text-slate-900')
+                                    }`}
+                                  >
+                                    <div className={`w-7 h-7 rounded-md overflow-hidden flex-shrink-0 ${
+                                      darkMode ? 'bg-slate-700' : 'bg-slate-100'
+                                    }`}>
+                                      {bc.class_image ? (
+                                        <img src={bc.class_image} alt={bc.name} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                          <Sailboat size={14} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <span className="font-medium">{bc.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Sail Number */}
+                          <div>
+                            <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Sail Number
+                            </label>
+                            <input
+                              type="text"
+                              value={boat.sail_number}
+                              onChange={e => updateBoat(index, 'sail_number', e.target.value)}
+                              className={`w-full rounded-lg px-3 py-2 text-sm border ${
+                                darkMode
+                                  ? 'bg-slate-800 border-slate-600 text-white'
+                                  : 'bg-white border-slate-300 text-slate-900'
+                              }`}
+                              placeholder="AUS 123"
+                            />
+                          </div>
+
+                          {/* Design */}
+                          <div>
+                            <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Design
+                            </label>
+                            <input
+                              type="text"
+                              value={boat.design}
+                              onChange={e => updateBoat(index, 'design', e.target.value)}
+                              className={`w-full rounded-lg px-3 py-2 text-sm border ${
+                                darkMode
+                                  ? 'bg-slate-800 border-slate-600 text-white'
+                                  : 'bg-white border-slate-300 text-slate-900'
+                              }`}
+                              placeholder="Kantun 2"
+                            />
+                          </div>
+
+                          {/* Handicap */}
+                          <div>
+                            <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Handicap
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={boat.handicap != null ? boat.handicap : ''}
+                              onChange={e => {
+                                const val = e.target.value;
+                                updateBoat(index, 'handicap', val === '' ? null : parseFloat(val));
+                              }}
+                              className={`w-full rounded-lg px-3 py-2 text-sm border ${
+                                darkMode
+                                  ? 'bg-slate-800 border-slate-600 text-white'
+                                  : 'bg-white border-slate-300 text-slate-900'
+                              }`}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Remove boat button */}
+                        <button
+                          type="button"
+                          onClick={() => removeBoat(index)}
+                          className={`mt-6 p-1.5 rounded-lg transition-colors flex-shrink-0 ${
+                            darkMode ? 'hover:bg-slate-700 text-slate-500 hover:text-red-400' : 'hover:bg-slate-200 text-slate-400 hover:text-red-500'
+                          }`}
+                          title="Remove boat"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Notes
+                </label>
+                <textarea
+                  value={formData.notes}
+                  onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={2}
+                  className={`w-full rounded-lg px-3 py-2 text-sm border ${
+                    darkMode
+                      ? 'bg-slate-900/50 border-slate-600 text-white'
+                      : 'bg-white border-slate-300 text-slate-900'
+                  }`}
+                  placeholder="Any additional notes..."
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                    darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving || !formData.name.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                  {editingId ? 'Update' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Search */}
+        {contacts.length > 0 && (
+          <div className="relative">
+            <Search size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${
+              darkMode ? 'text-slate-500' : 'text-slate-400'
+            }`} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search by name, club, class, sail number or division..."
+              className={`w-full pl-9 pr-4 py-2.5 rounded-xl text-sm border ${
+                darkMode
+                  ? 'bg-slate-800/80 border-slate-700 text-white placeholder-slate-500'
+                  : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+              }`}
+            />
+          </div>
+        )}
+
+        {/* Table */}
+        {filteredContacts.length > 0 ? (
+          <div className={`rounded-xl border overflow-hidden ${
+            darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
+          }`}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className={darkMode ? 'bg-slate-800' : 'bg-slate-50'}>
+                    <th className="text-left px-4 py-3">
+                      <button onClick={() => handleSort('name')} className={`flex items-center gap-1 font-semibold ${
+                        darkMode ? 'text-slate-300' : 'text-slate-700'
+                      }`}>
+                        Name <SortIcon field="name" />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <button onClick={() => handleSort('club_name')} className={`flex items-center gap-1 font-semibold ${
+                        darkMode ? 'text-slate-300' : 'text-slate-700'
+                      }`}>
+                        Club <SortIcon field="club_name" />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3 hidden md:table-cell">
+                      <button onClick={() => handleSort('division')} className={`flex items-center gap-1 font-semibold ${
+                        darkMode ? 'text-slate-300' : 'text-slate-700'
+                      }`}>
+                        Division <SortIcon field="division" />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3 hidden lg:table-cell">
+                      <span className={`font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Boats</span>
+                    </th>
+                    <th className="text-right px-4 py-3">
+                      <span className={`font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className={`divide-y ${darkMode ? 'divide-slate-700/50' : 'divide-slate-100'}`}>
+                  {filteredContacts.map(contact => (
+                    <tr key={contact.id} className={`transition-colors ${
+                      darkMode ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'
+                    }`}>
+                      <td className="px-4 py-3">
+                        <div className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          {contact.name}
+                        </div>
+                        {contact.country && (
+                          <div className={`text-xs mt-0.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {contact.country}
+                          </div>
+                        )}
+                      </td>
+                      <td className={`px-4 py-3 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {contact.club_name || '-'}
+                      </td>
+                      <td className={`px-4 py-3 hidden md:table-cell`}>
+                        {contact.division ? (
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                            darkMode ? 'bg-teal-500/20 text-teal-300' : 'bg-teal-50 text-teal-700'
+                          }`}>
+                            {contact.division}
+                          </span>
+                        ) : (
+                          <span className={darkMode ? 'text-slate-600' : 'text-slate-300'}>-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        {contact.boats.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {contact.boats.map((boat, i) => (
+                              <span
+                                key={i}
+                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium ${
+                                  darkMode ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-50 text-sky-700'
+                                }`}
+                                title={[boat.class, boat.sail_number, boat.design, boat.handicap != null ? `Hcap: ${boat.handicap}` : ''].filter(Boolean).join(' | ')}
+                              >
+                                {getClassImage(boat.class) && (
+                                  <img
+                                    src={getClassImage(boat.class)!}
+                                    alt=""
+                                    className="w-4 h-4 rounded-sm object-cover"
+                                  />
+                                )}
+                                <span>{boat.class || 'Unknown'}</span>
+                                {boat.sail_number && (
+                                  <span className={`${darkMode ? 'text-sky-400/70' : 'text-sky-500/70'}`}>
+                                    {boat.sail_number}
+                                  </span>
+                                )}
+                                {boat.handicap != null && (
+                                  <span className={`${darkMode ? 'text-amber-400/80' : 'text-amber-600/80'}`}>
+                                    H:{boat.handicap}
+                                  </span>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className={darkMode ? 'text-slate-600' : 'text-slate-300'}>-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setViewingContact(contact)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              darkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-sky-400' : 'hover:bg-slate-100 text-slate-400 hover:text-sky-600'
+                            }`}
+                            title="View"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleEdit(contact)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              darkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-700'
+                            }`}
+                            title="Edit"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          {deleteConfirm === contact.id ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleDelete(contact.id)}
+                                className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                title="Confirm delete"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-400'
+                                }`}
+                                title="Cancel"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteConfirm(contact.id)}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                darkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-red-400' : 'hover:bg-slate-100 text-slate-400 hover:text-red-500'
+                              }`}
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : contacts.length > 0 && searchTerm ? (
+          <div className={`text-center py-12 rounded-xl border ${
+            darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
+          }`}>
+            <Search size={40} className={`mx-auto mb-3 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
+            <p className={`font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              No skippers match "{searchTerm}"
+            </p>
+          </div>
+        ) : (
+          <div className={`text-center py-16 rounded-xl border ${
+            darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
+          }`}>
+            <Flag size={48} className={`mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
+            <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              No Skippers Yet
+            </h3>
+            <p className={`text-sm mb-6 max-w-md mx-auto ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Build your address book of skippers and their boats. Add them manually, import from CSV, or save them when importing race entries.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => setShowImport(true)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium ${
+                  darkMode
+                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <Upload size={16} />
+                Import CSV
+              </button>
+              <button
+                onClick={() => { resetForm(); setShowForm(true); }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <Plus size={16} />
+                Add Skipper
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* View Skipper Modal */}
+      {viewingContact && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setViewingContact(null)} />
+          <div className={`relative w-full max-w-lg rounded-2xl border shadow-2xl ${
+            darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+          }`}>
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${darkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                Skipper Details
+              </h3>
+              <button onClick={() => setViewingContact(null)} className={`p-1.5 rounded-lg ${darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+              {/* Name & Country */}
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
+                  darkMode ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-100 text-sky-700'
+                }`}>
+                  {viewingContact.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h4 className={`font-semibold text-base ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    {viewingContact.name}
+                  </h4>
+                  {viewingContact.country && (
+                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{viewingContact.country}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Details Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-xs font-medium uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Club</label>
+                  <p className={`text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{viewingContact.club_name || '-'}</p>
+                </div>
+                <div>
+                  <label className={`block text-xs font-medium uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Division</label>
+                  <p className={`text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{viewingContact.division || '-'}</p>
+                </div>
+              </div>
+
+              {/* Boats */}
+              {viewingContact.boats.length > 0 && (
+                <div>
+                  <label className={`block text-xs font-medium uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Boats ({viewingContact.boats.length})
+                  </label>
+                  <div className="space-y-2">
+                    {viewingContact.boats.map((boat, i) => (
+                      <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${
+                        darkMode ? 'bg-slate-900/40 border-slate-700' : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <div className={`w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                          {boat.class && getClassImage(boat.class) ? (
+                            <img src={getClassImage(boat.class)!} alt={boat.class} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Sailboat size={16} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            {boat.class || 'Unknown Class'}
+                          </p>
+                          <div className={`flex items-center gap-3 text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {boat.sail_number && <span>Sail: {boat.sail_number}</span>}
+                            {boat.design && <span>Design: {boat.design}</span>}
+                            {boat.handicap != null && (
+                              <span className={darkMode ? 'text-amber-400' : 'text-amber-600'}>Hcap: {boat.handicap}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {viewingContact.notes && (
+                <div>
+                  <label className={`block text-xs font-medium uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Notes</label>
+                  <p className={`text-sm whitespace-pre-wrap ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{viewingContact.notes}</p>
+                </div>
+              )}
+            </div>
+            <div className={`px-6 py-4 border-t flex justify-end gap-2 ${darkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+              <button
+                onClick={() => { handleEdit(viewingContact); setViewingContact(null); }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <Pencil size={14} />
+                Edit
+              </button>
+              <button
+                onClick={() => setViewingContact(null)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                  darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-700'
+                }`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

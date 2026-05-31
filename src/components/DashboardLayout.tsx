@@ -1191,20 +1191,31 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         ]}
       ]
     : isRaceOfficer && !currentClub
-      ? allNavigationSections
-          .filter(section => section.id === 'dashboard' || section.id === 'racing')
-          .map(section => ({
-            ...section,
-            label: section.id === 'racing' ? '' : section.label,
-            collapsible: section.id === 'racing' ? false : section.collapsible,
-            items: section.id === 'racing'
-              ? section.items.filter((item: any) => {
-                  const standaloneRaceItems = ['race-management', 'race-calendar', 'results', 'yacht-classes', 'venues', 'ro-contacts', 'external-organizations'];
-                  return standaloneRaceItems.includes(item.id);
-                }).map((item: any) => item.id === 'external-organizations' ? { ...item, label: 'Data Feeds' } : item)
-              : section.items
-          }))
-          .filter(section => section.items.length > 0)
+      ? (() => {
+          const racingSection = allNavigationSections.find(s => s.id === 'racing');
+          const raceItems = racingSection
+            ? racingSection.items.filter((item: any) => {
+                const standaloneRaceItems = ['race-management', 'race-calendar', 'results', 'yacht-classes', 'venues', 'ro-contacts'];
+                return standaloneRaceItems.includes(item.id);
+              })
+            : [];
+          const standaloneExtraItems = [
+            { id: 'event-websites', label: 'Event Websites', icon: Globe, description: 'Manage event websites', path: '/event-websites' },
+            { id: 'livestream', label: 'Livestream', icon: Video, description: 'Broadcast races to YouTube', path: '/livestream' },
+            { id: 'alfie-tv', label: 'AlfieTV', icon: Tv, description: 'Watch RC yachting videos', path: '/alfie-tv' },
+            { id: 'external-organizations', label: 'Data Feeds', icon: Database, description: 'External data feeds', path: '/external-organizations' },
+          ];
+          return [
+            ...allNavigationSections.filter(s => s.id === 'dashboard').map(s => ({ ...s })),
+            {
+              id: 'racing',
+              label: '',
+              collapsible: false,
+              icon: ShipWheel,
+              items: [...raceItems, ...standaloneExtraItems]
+            }
+          ].filter(section => section.items.length > 0);
+        })()
       : allNavigationSections.map(section => ({
           ...section,
           items: section.items.filter((item: any) => {

@@ -36,12 +36,29 @@ export type Permission =
   | 'platform.manage';
 
 export function usePermissions() {
-  const { currentClub, currentOrganization, isSuperAdmin } = useAuth();
+  const { currentClub, currentOrganization, isSuperAdmin, isRaceOfficer } = useAuth();
   const userRole = currentOrganization?.role || currentClub?.role || 'member';
   const isAssociationContext = !!currentOrganization && (currentOrganization.type === 'state' || currentOrganization.type === 'national');
+  const isStandaloneRaceOfficer = isRaceOfficer && !currentClub && !currentOrganization;
 
   const hasPermission = (permission: Permission): boolean => {
     if (isSuperAdmin) return true;
+
+    if (isStandaloneRaceOfficer) {
+      const raceOfficerPermissions: Permission[] = [
+        'races.manage',
+        'races.score',
+        'races.view',
+        'reports.create',
+        'venues.create',
+        'venues.view',
+        'settings.documents',
+        'settings.startbox',
+        'settings.integrations',
+        'dashboard.edit',
+      ];
+      return raceOfficerPermissions.includes(permission);
+    }
 
     if (userRole === 'national_admin') {
       if (permission === 'settings.startbox') return false;

@@ -230,11 +230,26 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
 export const getSimulatedRaceEvents = async (): Promise<RaceEvent[]> => {
   try {
     const scope = await getRaceScope();
-    if (!scope || !scope.clubId) return [];
+    if (!scope) return [];
 
-    const { data, error } = await supabase.rpc('get_simulated_race_events', {
-      p_club_id: scope.clubId
-    });
+    let data: any[] | null = null;
+    let error: any = null;
+
+    if (scope.mode === 'club' && scope.clubId) {
+      const result = await supabase.rpc('get_simulated_race_events', {
+        p_club_id: scope.clubId
+      });
+      data = result.data;
+      error = result.error;
+    } else if (scope.mode === 'race_officer' && scope.userId) {
+      const result = await supabase.rpc('get_simulated_race_events_for_user', {
+        p_user_id: scope.userId
+      });
+      data = result.data;
+      error = result.error;
+    } else {
+      return [];
+    }
 
     if (error || !data) return [];
 
@@ -283,13 +298,26 @@ export const getSimulatedRaceEvents = async (): Promise<RaceEvent[]> => {
 // Delete a simulated race event (uses SECURITY DEFINER RPC to bypass RLS)
 export const deleteSimulatedRaceEvent = async (id: string): Promise<boolean> => {
   try {
-    const clubId = localStorage.getItem('currentClubId');
-    if (!clubId) return false;
+    const scope = await getRaceScope();
+    if (!scope) return false;
 
-    const { data, error } = await supabase.rpc('delete_simulated_race_event', {
-      p_event_id: id,
-      p_club_id: clubId
-    });
+    let error: any = null;
+
+    if (scope.mode === 'club' && scope.clubId) {
+      const result = await supabase.rpc('delete_simulated_race_event', {
+        p_event_id: id,
+        p_club_id: scope.clubId
+      });
+      error = result.error;
+    } else if (scope.mode === 'race_officer' && scope.userId) {
+      const result = await supabase.rpc('delete_simulated_race_event_for_user', {
+        p_event_id: id,
+        p_user_id: scope.userId
+      });
+      error = result.error;
+    } else {
+      return false;
+    }
 
     if (error) {
       console.error('Error deleting simulated event:', error);
@@ -361,6 +389,7 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
             num_races: event.numRaces || 12,
             drop_rules: Array.isArray(event.dropRules) ? event.dropRules : [4, 8, 16, 24, 32, 40],
             club_id: scope.mode === 'club' ? event.clubId : null,
+            user_id: scope.mode === 'race_officer' ? scope.userId : null,
             heat_management: event.heatManagement || null,
             multi_day: event.multiDay || false,
             number_of_days: event.numberOfDays || 1,
