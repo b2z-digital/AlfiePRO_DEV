@@ -1170,23 +1170,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   }, [darkMode]);
 
   useEffect(() => {
-    // Prevent infinite loop by checking if we're already calculating
     if (isCalculatingHandicaps.current) {
-      console.log('Handicap calculation already in progress, skipping');
       return;
     }
 
     if (raceResults.length > 0 && raceType === 'handicap' && !heatManagement?.configuration.enabled) {
       isCalculatingHandicaps.current = true;
-
-      console.log('Calculating handicaps:', {
-        skippers,
-        raceResults,
-        currentNumRaces,
-        capLimit,
-        lastPlaceBonus,
-        isManualHandicaps
-      });
 
       try {
         const { updatedSkippers, updatedResults } = calculateHandicaps(
@@ -1198,31 +1187,19 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           isManualHandicaps
         );
 
-        console.log('Handicap calculation results:', {
-          updatedSkippers,
-          updatedResults
-        });
-
-        // Only update if there are actual changes to prevent infinite loop
         const skippersChanged = JSON.stringify(skippers) !== JSON.stringify(updatedSkippers);
         const resultsChanged = JSON.stringify(raceResults) !== JSON.stringify(updatedResults);
 
         if (skippersChanged || resultsChanged) {
-          console.log('Applying handicap updates:', { skippersChanged, resultsChanged });
           setSkippers(updatedSkippers);
           setRaceResults(updatedResults);
           setLastUpdateTime(new Date());
-        } else {
-          console.log('No handicap changes detected, skipping update');
         }
       } catch (error) {
         console.error('Error calculating handicaps:', error);
         setError(error instanceof Error ? error.message : 'Failed to calculate handicaps');
       } finally {
-        // Reset the flag after a brief delay to allow state updates to complete
-        setTimeout(() => {
-          isCalculatingHandicaps.current = false;
-        }, 100);
+        isCalculatingHandicaps.current = false;
       }
     }
   }, [raceResults, skippers, capLimit, lastPlaceBonus, raceType, heatManagement]);
@@ -1795,8 +1772,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     })();
 
     if (resultIndex >= 0) {
+      const { handicapOverride: _ho, ...existingWithoutOverride } = newResults[resultIndex];
       newResults[resultIndex] = {
-        ...newResults[resultIndex],
+        ...existingWithoutOverride,
         position,
         letterScore,
         customPoints,
@@ -1819,6 +1797,14 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         ...(hmsPosition !== undefined && { hmsPosition }),
         ...(hmsHeat !== undefined && skipperSailNo && { hmsSailNumber: skipperSailNo }),
       });
+    }
+
+    // Clear handicapOverride flags on later races so recalculation cascades properly
+    for (let i = 0; i < newResults.length; i++) {
+      if (newResults[i].race > race && newResults[i].handicapOverride) {
+        const { handicapOverride: _ho2, ...rest } = newResults[i];
+        newResults[i] = rest;
+      }
     }
 
     // Re-entry: if a withdrawn skipper gets an actual finishing position,
@@ -4302,6 +4288,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 raceResults={raceResults}
                 dropRules={currentDropRules}
                 updateRaceResults={(results: RaceResult[]) => {
+                  isCalculatingHandicaps.current = false;
                   setRaceResults(results);
                 }}
                 onConfirmResults={() => {
@@ -4453,6 +4440,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 raceResults={raceResults}
                 dropRules={currentDropRules}
                 updateRaceResults={(results: any[]) => {
+                  isCalculatingHandicaps.current = false;
                   setRaceResults(results);
                 }}
                 onConfirmResults={() => {

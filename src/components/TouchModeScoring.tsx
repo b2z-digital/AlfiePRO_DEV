@@ -562,6 +562,14 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     const filteredResults = updatedResults.filter(r => r.race !== currentRace);
     console.log('🗑️ Removed old results, remaining:', filteredResults.length);
 
+    // Clear handicapOverride flags on later races so recalculation cascades properly
+    for (let i = 0; i < filteredResults.length; i++) {
+      if (filteredResults[i].race > currentRace && filteredResults[i].handicapOverride) {
+        const { handicapOverride, ...rest } = filteredResults[i];
+        filteredResults[i] = rest;
+      }
+    }
+
     // Add new results
     entries.forEach(entry => {
       const preservesPosition = entry.letterScore && POSITION_PRESERVING_SCORES.has(entry.letterScore);
