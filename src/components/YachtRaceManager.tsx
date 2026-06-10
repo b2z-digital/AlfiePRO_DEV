@@ -5033,7 +5033,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                               const raceDetail = result.raceDetails?.find((d: any) => d.race === raceNum);
                               const raceResult = raceResults.find(r => r.race === raceNum && r.skipperIndex === result.skipperIndex);
                               const displayValue = raceResult?.letterScore
-                                ? raceResult.letterScore
+                                ? (raceDetail ? raceDetail.points : '')
                                 : raceResult?.position || '';
                               const isDropped = raceDetail?.isDropped;
 

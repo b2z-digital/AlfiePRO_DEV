@@ -17,7 +17,14 @@ export const calculateScratchResults = (
     for (let race = 1; race <= numRaces; race++) {
       const result = skipperResults.find(r => r.race === race);
       if (result) {
-        const points = result.points || result.position || 0;
+        let points: number;
+        if (result.customPoints !== undefined && result.customPoints !== null) {
+          points = result.customPoints;
+        } else if (result.letterScore) {
+          points = skippers.length + 1;
+        } else {
+          points = result.position ?? result.points ?? 0;
+        }
         raceScores.push(points);
         raceDetails.push({
           race,
