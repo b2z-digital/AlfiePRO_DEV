@@ -89,6 +89,14 @@ const defaultTemplates: Record<string, { subject: string; body: string }> = {
 <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">You can renew your membership by logging into your account or contacting us directly.</p>
 <p style="margin:0;color:#374151;font-size:15px;line-height:1.7;">We hope to see you back as an active member soon!</p>`
   },
+  password_reset: {
+    subject: 'Your {{clubName}} password has been reset',
+    body: `<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">Hi {{firstName}},</p>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Your password for <strong>{{clubName}}</strong> has been reset by a club administrator.</p>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">You can now log in to your account using your email address and the new password provided by your club admin.</p>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">If you did not expect this change, please contact your club administrator.</p>
+<p style="margin:0;color:#374151;font-size:15px;line-height:1.7;">For security, we recommend changing your password after logging in.</p>`
+  },
   application_received: {
     subject: 'Application Received - {{clubName}}',
     body: `<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">Thank you for your application, {{firstName}} {{lastName}}!</p>
@@ -128,6 +136,7 @@ const HEADER_SUBTITLES: Record<string, string> = {
   'application_rejected': 'Application Update',
   'payment_confirmation': 'Payment Confirmation',
   'membership_expired': 'Membership Expired',
+  'password_reset': 'Password Reset',
 }
 
 function replacePlaceholders(template: string, data: EmailRequest['member_data'], clubInfo?: ClubInfo): string {
@@ -507,10 +516,14 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const isServiceRole = token === serviceRoleKey
 
-    if (authError || !user) {
-      throw new Error('Unauthorized')
+    if (!isServiceRole) {
+      const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+      if (authError || !user) {
+        throw new Error('Unauthorized')
+      }
     }
 
     const requestData = await req.json() as EmailRequest
