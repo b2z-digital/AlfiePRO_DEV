@@ -124,6 +124,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   const [selectedMembershipType, setSelectedMembershipType] = useState<string>('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [switchingToOnline, setSwitchingToOnline] = useState(false);
   const [migrationNotice, setMigrationNotice] = useState<{ from: string; to: string } | null>(null);
   const [bankDetails, setBankDetails] = useState<{ bank_name: string; bsb: string; account_number: string } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -415,6 +416,52 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
     }
   };
 
+  const handleSwitchToOnlinePayment = async () => {
+    if (!memberData || !currentClub) return;
+
+    try {
+      setSwitchingToOnline(true);
+      const memberLevel = memberData.membership_level_custom || memberData.membership_level;
+      const matchedType = membershipTypes.find(t => t.name === memberLevel);
+
+      if (!matchedType) {
+        addNotification('error', 'Could not determine membership type. Please contact your club administrator.');
+        setSwitchingToOnline(false);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
+        body: {
+          club_id: currentClub.clubId,
+          member_id: memberData.id,
+          amount: matchedType.amount,
+          currency: matchedType.currency,
+          description: `${matchedType.name} Membership Renewal - ${currentClub.club?.name}`,
+          success_url: `${window.location.origin}/dashboard/membership?payment=success`,
+          cancel_url: `${window.location.origin}/dashboard/membership?payment=cancelled`,
+          metadata: {
+            type: 'membership_renewal',
+            member_id: memberData.id,
+            club_id: currentClub.clubId,
+            membership_type_id: matchedType.id,
+            membership_level: matchedType.name
+          }
+        }
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
+    } catch (err: any) {
+      console.error('Error switching to online payment:', err);
+      addNotification('error', err.message || 'Failed to initiate online payment');
+      setSwitchingToOnline(false);
+    }
+  };
+
   const handleEditSuccess = () => {
     setShowEditModal(false);
     fetchAllData(false);
@@ -693,6 +740,38 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                             </button>
                           </div>
                         )}
+                      </div>
+                    </div>
+                  )}
+                  {clubHasStripe && (
+                    <div className="px-4 pb-4">
+                      <div className="bg-blue-500/10 rounded-xl p-4 border border-blue-500/20">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <CreditCard size={18} className="text-blue-400 flex-shrink-0" />
+                            <div>
+                              <p className="text-sm font-medium text-blue-300">Prefer to pay online?</p>
+                              <p className="text-xs text-slate-400 mt-0.5">Pay instantly with credit or debit card via Stripe</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={handleSwitchToOnlinePayment}
+                            disabled={switchingToOnline}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-all hover:shadow-lg hover:shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                          >
+                            {switchingToOnline ? (
+                              <>
+                                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard size={14} />
+                                Pay Online
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
