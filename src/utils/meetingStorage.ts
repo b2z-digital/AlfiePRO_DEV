@@ -681,3 +681,72 @@ export const getClubMembersForMeeting = async (
     throw error;
   }
 };
+
+export const duplicateMeeting = async (meetingId: string): Promise<Meeting> => {
+  try {
+    const { data: source, error: fetchError } = await supabase
+      .from('meetings')
+      .select('*')
+      .eq('id', meetingId)
+      .single();
+
+    if (fetchError || !source) throw fetchError || new Error('Meeting not found');
+
+    const { data: agendaItems, error: agendaFetchError } = await supabase
+      .from('meeting_agendas')
+      .select('item_number, item_name, owner_id, type, duration')
+      .eq('meeting_id', meetingId)
+      .order('item_number', { ascending: true });
+
+    if (agendaFetchError) throw agendaFetchError;
+
+    const today = new Date().toISOString().split('T')[0];
+    const { id, created_at, updated_at, status, minutes_status, minutes_locked, members_present, guests_present, recurrence_parent_id, recurrence_index, recurrence_end_date, google_calendar_event_id, google_calendar_event_link, ...meetingFields } = source;
+
+    const { data: newMeeting, error: insertError } = await supabase
+      .from('meetings')
+      .insert({
+        ...meetingFields,
+        name: `${source.name} (Copy)`,
+        date: today,
+        status: 'upcoming',
+        minutes_status: 'not_started',
+        minutes_locked: false,
+        members_present: [],
+        guests_present: [],
+        recurrence_type: 'none',
+        recurrence_parent_id: null,
+        recurrence_index: 0,
+        recurrence_end_date: null,
+        google_calendar_event_id: null,
+        google_calendar_event_link: null,
+      })
+      .select()
+      .single();
+
+    if (insertError || !newMeeting) throw insertError || new Error('Failed to create meeting');
+
+    if (agendaItems && agendaItems.length > 0) {
+      const newAgendaItems = agendaItems.map(item => ({
+        meeting_id: newMeeting.id,
+        item_number: item.item_number,
+        item_name: item.item_name,
+        owner_id: item.owner_id || null,
+        type: item.type,
+        duration: item.duration || null,
+        minutes_content: '',
+      }));
+
+      const { error: agendaInsertError } = await supabase
+        .from('meeting_agendas')
+        .insert(newAgendaItems);
+
+      if (agendaInsertError) throw agendaInsertError;
+    }
+
+    return newMeeting;
+  } catch (error) {
+    console.error('Error duplicating meeting:', error);
+    throw error;
+  }
+};
