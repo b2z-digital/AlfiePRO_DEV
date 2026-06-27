@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Plus, Search, ListFilter as Filter, MapPin, Clock, Users, SquarePen as Edit2, Trash2, ChevronRight, TriangleAlert as AlertTriangle, Check, Shield, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting } from '../../types/meeting';
-import { getMeetings, deleteMeeting, updateMeetingStatus } from '../../utils/meetingStorage';
+import { getMeetings, deleteMeeting, updateMeetingStatus, duplicateMeeting } from '../../utils/meetingStorage';
 import { formatDate } from '../../utils/date';
 import { MeetingForm } from '../meetings/MeetingForm';
 import { MeetingDetails } from '../meetings/MeetingDetails';
@@ -196,6 +196,20 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
     }
   };
 
+  const handleDuplicateMeeting = async (meetingId: string) => {
+    try {
+      const newMeeting = await duplicateMeeting(meetingId);
+      await fetchMeetings();
+      setSelectedMeeting(null);
+      setEditingMeeting(newMeeting);
+      setShowForm(true);
+      addNotification('success', 'Meeting duplicated! Edit the details below to finalise.');
+    } catch (err) {
+      console.error('Error duplicating meeting:', err);
+      addNotification('error', err instanceof Error ? err.message : 'Failed to duplicate meeting');
+    }
+  };
+
   // Filter meetings based on search term and active view
   const filteredMeetings = meetings.filter(meeting => {
     const matchesSearch = 
@@ -259,6 +273,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           associationType={currentOrganization?.type as 'state' | 'national' | undefined}
           onClose={handleCloseDetails}
           onEdit={() => handleEditMeeting(selectedMeeting)}
+          onDuplicate={() => handleDuplicateMeeting(selectedMeeting.id)}
           onMarkAsCompleted={() => handleMarkAsCompleted(selectedMeeting.id)}
           onMarkAsCancelled={() => handleMarkAsCancelled(selectedMeeting.id)}
         />

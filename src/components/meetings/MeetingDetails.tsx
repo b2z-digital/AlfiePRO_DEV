@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, SquarePen as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Users, Repeat, Navigation, ExternalLink } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, SquarePen as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Users, Repeat, Navigation, ExternalLink, Copy } from 'lucide-react';
 import { Meeting, MeetingAgendaItem } from '../../types/meeting';
 import { getMeetingAgenda, lockMeetingMinutes } from '../../utils/meetingStorage';
 import { formatDate } from '../../utils/date';
@@ -16,6 +16,7 @@ interface MeetingDetailsProps {
   associationType?: 'state' | 'national';
   onClose: () => void;
   onEdit: () => void;
+  onDuplicate?: () => void;
   onMarkAsCompleted: () => void;
   onMarkAsCancelled: () => void;
 }
@@ -27,6 +28,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
   associationType,
   onClose,
   onEdit,
+  onDuplicate,
   onMarkAsCompleted,
   onMarkAsCancelled
 }) => {
@@ -161,6 +163,16 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         </button>
 
         <div className="flex flex-wrap gap-2 justify-end">
+          {onDuplicate && (
+            <button
+              onClick={onDuplicate}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:scale-105"
+            >
+              <Copy size={16} />
+              Duplicate
+            </button>
+          )}
+
           {meeting.status === 'upcoming' && (
             <>
               {meeting.minutes_status !== 'in_progress' && (
