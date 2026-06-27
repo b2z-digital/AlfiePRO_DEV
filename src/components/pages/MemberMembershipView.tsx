@@ -206,6 +206,21 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
           if (replacementType) {
             setMigrationNotice({ from: currentInactiveType.name, to: replacementType.name });
             setSelectedMembershipType(replacementType.id);
+          } else {
+            const { data: fullInactiveType } = await supabase
+              .from('membership_types')
+              .select('*')
+              .eq('id', currentInactiveType.id)
+              .maybeSingle();
+            if (fullInactiveType) {
+              activeTypes.unshift(fullInactiveType);
+              setSelectedMembershipType(fullInactiveType.id);
+            }
+          }
+        } else {
+          const currentActiveType = activeTypes.find(t => t.name === memberLevel);
+          if (currentActiveType) {
+            setSelectedMembershipType(currentActiveType.id);
           }
         }
 

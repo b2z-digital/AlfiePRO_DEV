@@ -50,7 +50,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: memberRecord } = await supabase
         .from("members")
-        .select("id, user_id, club_id")
+        .select("id, user_id, club_id, first_name, last_name")
         .eq("id", member_id)
         .maybeSingle();
 
@@ -106,6 +106,43 @@ Deno.serve(async (req: Request) => {
           activated_at: new Date().toISOString(),
         })
         .eq("id", member_id);
+
+      // Send email notification to member about password reset
+      if (email) {
+        try {
+          const { data: clubData } = await supabase
+            .from("clubs")
+            .select("name")
+            .eq("id", memberRecord.club_id)
+            .maybeSingle();
+
+          const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+          const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+          await fetch(
+            `${supabaseUrl}/functions/v1/send-membership-notifications`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${svcKey}`,
+              },
+              body: JSON.stringify({
+                email_type: "password_reset",
+                recipient_email: email,
+                member_data: {
+                  first_name: memberRecord.first_name || "",
+                  last_name: memberRecord.last_name || "",
+                  club_name: clubData?.name || "",
+                  club_id: memberRecord.club_id,
+                },
+              }),
+            }
+          );
+        } catch (emailErr) {
+          console.error("Failed to send password reset notification email:", emailErr);
+        }
+      }
 
       return new Response(
         JSON.stringify({ success: true, message: "Password has been set successfully" }),
