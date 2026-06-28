@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ClipboardList, Plus, Calendar, Users, ChartBar as BarChart3, Download, Trash2, Pencil, Play, Archive, ChevronRight, Shuffle, GripVertical, CircleCheck as CheckCircle2, Circle as XCircle, Clock, TriangleAlert as AlertTriangle, UserCheck, ListFilter as Filter } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { getRosters, deleteRoster, getRosterWithDetails, activateRoster, createTasksForAssignments } from '../../utils/proRosterStorage';
+import { getRosters, deleteRoster, getRosterWithDetails, activateRoster, createTasksForAssignments, updateAssignmentStatus } from '../../utils/proRosterStorage';
 import { useAuth } from '../../contexts/AuthContext';
 import { getStoredMembers } from '../../utils/storage';
 import type { ProRoster, RosterWithDetails } from '../../types/proRoster';
@@ -93,13 +93,19 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
       const details = await getRosterWithDetails(rosterId);
       if (details.assignments.length > 0 && user?.id) {
         await createTasksForAssignments(details, details.rounds, details.assignments, clubId, user.id);
+        for (const assignment of details.assignments) {
+          if (assignment.status === 'assigned') {
+            await updateAssignmentStatus(assignment.id, 'confirmed');
+          }
+        }
       }
       await fetchRosters();
       if (selectedRoster?.id === rosterId) {
-        setSelectedRoster(details);
+        const refreshed = await getRosterWithDetails(rosterId);
+        setSelectedRoster(refreshed);
       }
       setPendingActivationRosterId(null);
-      addNotification('success', 'Roster activated! Tasks have been created for assigned PROs.');
+      addNotification('success', 'Roster activated! All assignments confirmed and tasks created.');
     } catch (err) {
       console.error('Error activating roster:', err);
       addNotification('error', 'Failed to activate roster');

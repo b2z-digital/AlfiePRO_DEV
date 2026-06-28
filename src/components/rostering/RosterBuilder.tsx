@@ -3,7 +3,8 @@ import { ArrowLeft, ArrowRight, Check, Calendar, Users, Settings, Shuffle, Plus,
 import { useNotifications } from '../../contexts/NotificationContext';
 import {
   createRoster, updateRoster, addRosterRounds, addRosterMembers,
-  applyAllocation, getRosterWithDetails, createTasksForAssignments
+  applyAllocation, getRosterWithDetails, createTasksForAssignments,
+  deleteRosterRound
 } from '../../utils/proRosterStorage';
 import { getStoredRaceSeries } from '../../utils/raceStorage';
 import { AllocationPreview } from './AllocationPreview';
@@ -65,6 +66,35 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
   const [previewAllocations, setPreviewAllocations] = useState<Map<string, string>>(new Map());
+  const [loadingExisting, setLoadingExisting] = useState(false);
+
+  useEffect(() => {
+    if (!existingRoster) return;
+    setLoadingExisting(true);
+    getRosterWithDetails(existingRoster.id).then(details => {
+      if (details.rounds.length > 0) {
+        setSelectedDates(details.rounds.map(r => r.date).sort());
+      }
+      if (details.members.length > 0) {
+        setSelectedMembers(details.members.filter(m => m.is_active).map(m => m.member_id));
+      }
+      if (details.assignments.length > 0) {
+        const allocMap = new Map<string, string>();
+        const roundMap = new Map(details.rounds.map(r => [r.id, r.date]));
+        details.assignments.forEach(a => {
+          const date = roundMap.get(a.round_id);
+          if (date) allocMap.set(date, a.member_id);
+        });
+        setPreviewAllocations(allocMap);
+      }
+      if (existingRoster.series_id) {
+        const series = availableSeries.find(s => s.id === existingRoster.series_id);
+        if (series) setLinkedSeries(series);
+      }
+    }).catch(err => {
+      console.error('Error loading roster details:', err);
+    }).finally(() => setLoadingExisting(false));
+  }, [existingRoster?.id, availableSeries]);
 
   const boatClasses = useMemo(() => {
     const classes = new Set<string>();
@@ -217,15 +247,28 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
         roster = await createRoster(clubId, formData, 'current_user');
       }
 
-      if (!existingRoster && selectedDates.length > 0) {
-        await addRosterRounds(roster.id, selectedDates);
+      if (selectedDates.length > 0) {
+        if (existingRoster) {
+          const existing = await getRosterWithDetails(existingRoster.id);
+          const existingDates = new Set(existing.rounds.map(r => r.date));
+          const newDates = selectedDates.filter(d => !existingDates.has(d));
+          const removedRounds = existing.rounds.filter(r => !selectedDates.includes(r.date));
+          for (const round of removedRounds) {
+            await deleteRosterRound(round.id);
+          }
+          if (newDates.length > 0) {
+            await addRosterRounds(roster.id, newDates);
+          }
+        } else {
+          await addRosterRounds(roster.id, selectedDates);
+        }
       }
 
-      if (!existingRoster && selectedMembers.length > 0) {
+      if (selectedMembers.length > 0) {
         await addRosterMembers(roster.id, selectedMembers);
       }
 
-      if (!existingRoster && previewAllocations.size > 0) {
+      if (previewAllocations.size > 0) {
         const details = await getRosterWithDetails(roster.id);
         const roundByDate = new Map<string, string>();
         details.rounds.forEach(r => roundByDate.set(r.date, r.id));
@@ -238,8 +281,10 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
 
         if (allocations.length > 0) {
           await applyAllocation(roster.id, allocations);
-          const updatedDetails = await getRosterWithDetails(roster.id);
-          await createTasksForAssignments(roster, updatedDetails.rounds, updatedDetails.assignments, clubId, 'current_user');
+          if (!existingRoster) {
+            const updatedDetails = await getRosterWithDetails(roster.id);
+            await createTasksForAssignments(roster, updatedDetails.rounds, updatedDetails.assignments, clubId, 'current_user');
+          }
         }
       }
 

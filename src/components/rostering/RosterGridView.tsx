@@ -103,13 +103,17 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
     }
   };
 
-  const handleStatusChange = async (assignmentId: string, status: 'confirmed' | 'declined' | 'completed') => {
+  const handleConfirmAll = async () => {
+    const pendingAssignments = roster.assignments.filter(a => a.status === 'assigned');
+    if (pendingAssignments.length === 0) return;
     try {
-      await updateAssignmentStatus(assignmentId, status);
-      addNotification('success', `Assignment ${status}`);
+      for (const assignment of pendingAssignments) {
+        await updateAssignmentStatus(assignment.id, 'confirmed');
+      }
+      addNotification('success', `${pendingAssignments.length} assignments confirmed`);
       onRefresh();
     } catch (err) {
-      addNotification('error', 'Failed to update status');
+      addNotification('error', 'Failed to confirm assignments');
     }
   };
 
@@ -136,16 +140,27 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
             {roster.assignments.filter(a => a.status === 'confirmed').length}/{roster.assignments.length} confirmed
           </div>
         </div>
-        {roster.status === 'draft' && (
-          <button
-            onClick={handleRegenerate}
-            disabled={reallocating}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600 transition-all disabled:opacity-50"
-          >
-            {reallocating ? <RefreshCw size={14} className="animate-spin" /> : <Shuffle size={14} />}
-            Regenerate
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {roster.status !== 'draft' && roster.assignments.some(a => a.status === 'assigned') && (
+            <button
+              onClick={handleConfirmAll}
+              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg text-sm hover:bg-emerald-600/30 transition-all"
+            >
+              <CheckCircle2 size={14} />
+              Confirm All
+            </button>
+          )}
+          {roster.status === 'draft' && (
+            <button
+              onClick={handleRegenerate}
+              disabled={reallocating}
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600 transition-all disabled:opacity-50"
+            >
+              {reallocating ? <RefreshCw size={14} className="animate-spin" /> : <Shuffle size={14} />}
+              Regenerate
+            </button>
+          )}
+        </div>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -225,22 +240,6 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
                           </div>
                           {getStatusIcon(assignment.status)}
                         </div>
-                        {roster.status !== 'draft' && assignment.status === 'assigned' && (
-                          <div className="flex gap-1 mt-2">
-                            <button
-                              onClick={() => handleStatusChange(assignment.id, 'confirmed')}
-                              className="flex-1 py-0.5 text-[9px] bg-emerald-500/20 text-emerald-400 rounded hover:bg-emerald-500/30 transition-all"
-                            >
-                              Confirm
-                            </button>
-                            <button
-                              onClick={() => handleStatusChange(assignment.id, 'declined')}
-                              className="flex-1 py-0.5 text-[9px] bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 transition-all"
-                            >
-                              Decline
-                            </button>
-                          </div>
-                        )}
                       </div>
                     ) : (
                       <div className="rounded-lg border border-dashed border-slate-600 p-3 text-center">
