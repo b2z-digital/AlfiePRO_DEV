@@ -32,6 +32,7 @@ import { ConfirmationModal } from './ConfirmationModal';
 import { SeriesLeaderboard } from './SeriesLeaderboard';
 import { EventDetails } from './EventDetails';
 import { useAuth } from '../contexts/AuthContext';
+import { getProAssignmentsForSeries, type ProAssignmentForDisplay } from '../utils/proRosterStorage';
 
 interface SortableRoundCardProps {
   id: string;
@@ -236,6 +237,7 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
   const [selectedSeries, setSelectedSeries] = useState<RaceSeriesType | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
   const [importTarget, setImportTarget] = useState<{ series: RaceSeriesType; roundIndex: number } | null>(null);
+  const [proBySeriesDate, setProBySeriesDate] = useState<Map<string, Map<string, ProAssignmentForDisplay>>>(new Map());
   const [formData, setFormData] = useState({
     clubId: '',
     seriesName: '',
@@ -290,6 +292,21 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
         setClubs(storedClubs);
         setVenues(storedVenues);
         setAllBoatClasses(fetchedBoatClasses);
+
+        // Fetch PRO assignments for all series
+        const proMap = new Map<string, Map<string, ProAssignmentForDisplay>>();
+        const proFetches = storedSeries.map(async (s) => {
+          try {
+            const assignments = await getProAssignmentsForSeries(s.id);
+            if (assignments.length > 0) {
+              const dateMap = new Map<string, ProAssignmentForDisplay>();
+              assignments.forEach(a => dateMap.set(a.date, a));
+              proMap.set(s.id, dateMap);
+            }
+          } catch { /* ignore errors for PRO display */ }
+        });
+        await Promise.all(proFetches);
+        setProBySeriesDate(proMap);
         
         // If editing a series, find and set it
         if (editingSeries) {
@@ -989,8 +1006,8 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
                                   >
                                     <div className="flex items-center gap-3">
                                       {round.cancelled ? (
-                                        <div 
-                                          className="flex items-center gap-1 text-amber-500" 
+                                        <div
+                                          className="flex items-center gap-1 text-amber-500"
                                           title={round.cancellationReason || 'Round cancelled'}
                                         >
                                           <AlertTriangle size={14} />
@@ -1001,6 +1018,24 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
                                           {round.name}
                                         </span>
                                       )}
+                                      {(() => {
+                                        const proInfo = proBySeriesDate.get(s.id)?.get(round.date);
+                                        if (!proInfo) return null;
+                                        return (
+                                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                                            darkMode ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-700'
+                                          }`}>
+                                            {proInfo.member_avatar ? (
+                                              <img src={proInfo.member_avatar} alt="" className="w-4 h-4 rounded-full object-cover" />
+                                            ) : (
+                                              <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${
+                                                darkMode ? 'bg-amber-600 text-white' : 'bg-amber-200 text-amber-800'
+                                              }`}>{proInfo.member_name.split(' ').map(n => n[0]).join('')}</span>
+                                            )}
+                                            PRO: {proInfo.member_name}
+                                          </span>
+                                        );
+                                      })()}
                                     </div>
                                     <div className="flex items-center gap-4 text-xs">
                                       <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>

@@ -366,3 +366,65 @@ export const createTasksForAssignments = async (
     }
   }
 };
+
+export interface ProAssignmentForDisplay {
+  date: string;
+  member_id: string;
+  member_name: string;
+  member_avatar: string | null;
+  status: string;
+}
+
+export const getProAssignmentsForSeries = async (
+  seriesId: string
+): Promise<ProAssignmentForDisplay[]> => {
+  const { data: rosters } = await supabase
+    .from('pro_rosters')
+    .select('id')
+    .eq('series_id', seriesId)
+    .in('status', ['active', 'draft']);
+
+  if (!rosters || rosters.length === 0) return [];
+
+  const rosterIds = rosters.map(r => r.id);
+
+  const { data: rounds } = await supabase
+    .from('pro_roster_rounds')
+    .select('id, date, roster_id')
+    .in('roster_id', rosterIds);
+
+  if (!rounds || rounds.length === 0) return [];
+
+  const roundIds = rounds.map(r => r.id);
+
+  const { data: assignments } = await supabase
+    .from('pro_roster_assignments')
+    .select('round_id, member_id, status')
+    .in('round_id', roundIds)
+    .in('status', ['assigned', 'confirmed']);
+
+  if (!assignments || assignments.length === 0) return [];
+
+  const memberIds = [...new Set(assignments.map(a => a.member_id))];
+  const { data: members } = await supabase
+    .from('members')
+    .select('id, first_name, last_name, avatar_url')
+    .in('id', memberIds);
+
+  const memberMap = new Map(
+    (members || []).map(m => [m.id, m])
+  );
+
+  const roundDateMap = new Map(rounds.map(r => [r.id, r.date]));
+
+  return assignments.map(a => {
+    const member = memberMap.get(a.member_id);
+    return {
+      date: roundDateMap.get(a.round_id) || '',
+      member_id: a.member_id,
+      member_name: member ? `${member.first_name} ${member.last_name}` : 'Unknown',
+      member_avatar: member?.avatar_url || null,
+      status: a.status,
+    };
+  });
+};
