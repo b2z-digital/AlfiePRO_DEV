@@ -83,6 +83,20 @@ export const updateRoster = async (rosterId: string, updates: Partial<RosterForm
 };
 
 export const deleteRoster = async (rosterId: string): Promise<void> => {
+  // First, delete any tasks that were created for this roster's assignments
+  const { data: assignments } = await supabase
+    .from('pro_roster_assignments')
+    .select('task_id')
+    .eq('roster_id', rosterId)
+    .not('task_id', 'is', null);
+
+  if (assignments && assignments.length > 0) {
+    const taskIds = assignments.map(a => a.task_id).filter(Boolean);
+    if (taskIds.length > 0) {
+      await supabase.from('club_tasks').delete().in('id', taskIds);
+    }
+  }
+
   const { error } = await supabase.from('pro_rosters').delete().eq('id', rosterId);
   if (error) throw error;
 };
