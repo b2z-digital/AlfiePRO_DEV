@@ -114,7 +114,7 @@ export const AllocationPreview: React.FC<AllocationPreviewProps> = ({
                 onUnassign={() => handleUnassign(date)}
                 onOpenPicker={() => setPickingForDate(date === pickingForDate ? null : date)}
                 onPickMember={(mId) => handlePickMember(date, mId)}
-                availableMembers={unassignedMembers}
+                availableMembers={members.filter(m => m.id !== assignedId)}
               />
             );
           })}
