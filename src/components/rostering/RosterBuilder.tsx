@@ -541,7 +541,7 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
               />
             </div>
 
-            <div className="max-h-72 overflow-y-auto space-y-1">
+            <div className="max-h-[calc(100vh-420px)] min-h-[200px] overflow-y-auto space-y-1">
               {filteredMembers.map(member => {
                 const isSelected = selectedMembers.includes(member.id);
                 return (
