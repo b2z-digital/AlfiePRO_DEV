@@ -1,12 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Check, Calendar, Users, Settings, Shuffle, Plus, X, Search, UserPlus, CircleAlert as AlertCircle, Link2 } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { ArrowLeft, ArrowRight, Check, Calendar, Users, Settings, Shuffle, Plus, X, Search, UserPlus, CircleAlert as AlertCircle, Link2, RefreshCw } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import {
   createRoster, updateRoster, addRosterRounds, addRosterMembers,
-  generateFairAllocation, applyAllocation, getRosterWithDetails,
-  createTasksForAssignments
+  applyAllocation, getRosterWithDetails, createTasksForAssignments
 } from '../../utils/proRosterStorage';
 import { getStoredRaceSeries } from '../../utils/raceStorage';
+import { AllocationPreview } from './AllocationPreview';
 import type { RaceSeries } from '../../types/race';
 import type { ProRoster, RosterFormData } from '../../types/proRoster';
 
@@ -64,6 +64,7 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
   const [newDate, setNewDate] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [memberSearch, setMemberSearch] = useState('');
+  const [previewAllocations, setPreviewAllocations] = useState<Map<string, string>>(new Map());
 
   const boatClasses = useMemo(() => {
     const classes = new Set<string>();
@@ -137,6 +138,43 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
     setSelectedMembers(eligibleMembers.map(m => m.id));
   };
 
+  const generatePreviewAllocations = useCallback(() => {
+    if (selectedDates.length === 0 || selectedMembers.length === 0) {
+      setPreviewAllocations(new Map());
+      return;
+    }
+    if (formData.allocation_method === 'manual') {
+      setPreviewAllocations(new Map());
+      return;
+    }
+    const sortedDates = [...selectedDates].sort();
+    const memberPool = [...selectedMembers];
+    const allocMap = new Map<string, string>();
+    const dutyCount = new Map<string, number>();
+    const lastAssignedIdx = new Map<string, number>();
+    memberPool.forEach(id => { dutyCount.set(id, 0); lastAssignedIdx.set(id, -999); });
+
+    for (let i = 0; i < sortedDates.length; i++) {
+      const eligible = memberPool.filter(id => {
+        const lastIdx = lastAssignedIdx.get(id) ?? -999;
+        if (formData.max_consecutive > 0 && i - lastIdx <= formData.max_consecutive && lastIdx >= 0) return false;
+        return true;
+      });
+
+      const candidates = eligible.length > 0 ? eligible : memberPool;
+      candidates.sort((a, b) => (dutyCount.get(a) || 0) - (dutyCount.get(b) || 0));
+      const minDuty = dutyCount.get(candidates[0]) || 0;
+      const topCandidates = candidates.filter(id => (dutyCount.get(id) || 0) === minDuty);
+      const chosen = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+
+      allocMap.set(sortedDates[i], chosen);
+      dutyCount.set(chosen, (dutyCount.get(chosen) || 0) + 1);
+      lastAssignedIdx.set(chosen, i);
+    }
+
+    setPreviewAllocations(allocMap);
+  }, [selectedDates, selectedMembers, formData.allocation_method, formData.max_consecutive]);
+
   const handleSelectSeries = (seriesId: string) => {
     if (!seriesId) {
       setLinkedSeries(null);
@@ -187,18 +225,22 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
         await addRosterMembers(roster.id, selectedMembers);
       }
 
-      if (!existingRoster && formData.allocation_method !== 'manual' && selectedDates.length > 0 && selectedMembers.length > 0) {
+      if (!existingRoster && previewAllocations.size > 0) {
         const details = await getRosterWithDetails(roster.id);
-        const allocations = generateFairAllocation(
-          details.rounds,
-          details.members,
-          details.exclusions,
-          formData.max_consecutive
-        );
-        await applyAllocation(roster.id, allocations);
+        const roundByDate = new Map<string, string>();
+        details.rounds.forEach(r => roundByDate.set(r.date, r.id));
 
-        const updatedDetails = await getRosterWithDetails(roster.id);
-        await createTasksForAssignments(roster, updatedDetails.rounds, updatedDetails.assignments, clubId, 'current_user');
+        const allocations: Array<{ round_id: string; member_id: string }> = [];
+        for (const [date, memberId] of previewAllocations.entries()) {
+          const roundId = roundByDate.get(date);
+          if (roundId) allocations.push({ round_id: roundId, member_id: memberId });
+        }
+
+        if (allocations.length > 0) {
+          await applyAllocation(roster.id, allocations);
+          const updatedDetails = await getRosterWithDetails(roster.id);
+          await createTasksForAssignments(roster, updatedDetails.rounds, updatedDetails.assignments, clubId, 'current_user');
+        }
       }
 
       addNotification('success', existingRoster ? 'Roster updated!' : 'Roster created with PRO assignments!');
@@ -541,64 +583,67 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
 
         {step === 3 && (
           <div className="space-y-5">
-            <h3 className="text-lg font-semibold text-white mb-4">Review & Create</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Review & Allocate</h3>
+              {formData.allocation_method !== 'manual' && (
+                <button
+                  onClick={generatePreviewAllocations}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-cyan-600/20 text-cyan-400 rounded-lg hover:bg-cyan-600/30 transition-all"
+                >
+                  <RefreshCw size={12} />
+                  Re-shuffle
+                </button>
+              )}
+            </div>
 
             {linkedSeries && (
-              <div className="flex items-center gap-2 px-4 py-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg mb-2">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
                 <Link2 size={14} className="text-cyan-400" />
-                <span className="text-sm text-cyan-300">Linked to series: <span className="font-medium">{linkedSeries.seriesName}</span></span>
+                <span className="text-sm text-cyan-300">Linked to: <span className="font-medium">{linkedSeries.seriesName}</span></span>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-900/30 rounded-lg p-4">
-                <div className="text-xs text-slate-500 mb-1">Roster Name</div>
-                <div className="text-sm text-white font-medium">{formData.name}</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-slate-900/30 rounded-lg p-3">
+                <div className="text-[10px] text-slate-500 uppercase tracking-wide">Roster</div>
+                <div className="text-sm text-white font-medium mt-0.5 truncate">{formData.name}</div>
               </div>
-              <div className="bg-slate-900/30 rounded-lg p-4">
-                <div className="text-xs text-slate-500 mb-1">Boat Class</div>
-                <div className="text-sm text-white font-medium">{formData.boat_class}</div>
+              <div className="bg-slate-900/30 rounded-lg p-3">
+                <div className="text-[10px] text-slate-500 uppercase tracking-wide">Class</div>
+                <div className="text-sm text-white font-medium mt-0.5">{formData.boat_class}</div>
               </div>
-              <div className="bg-slate-900/30 rounded-lg p-4">
-                <div className="text-xs text-slate-500 mb-1">Period</div>
-                <div className="text-sm text-white font-medium">
-                  {new Date(formData.start_date).toLocaleDateString()} - {new Date(formData.end_date).toLocaleDateString()}
-                </div>
+              <div className="bg-slate-900/30 rounded-lg p-3">
+                <div className="text-[10px] text-slate-500 uppercase tracking-wide">Days</div>
+                <div className="text-sm text-white font-medium mt-0.5">{selectedDates.length}</div>
               </div>
-              <div className="bg-slate-900/30 rounded-lg p-4">
-                <div className="text-xs text-slate-500 mb-1">Allocation</div>
-                <div className="text-sm text-white font-medium capitalize">{formData.allocation_method.replace('_', ' ')}</div>
-              </div>
-              <div className="bg-slate-900/30 rounded-lg p-4">
-                <div className="text-xs text-slate-500 mb-1">Sailing Days</div>
-                <div className="text-sm text-white font-medium">{selectedDates.length} days</div>
-              </div>
-              <div className="bg-slate-900/30 rounded-lg p-4">
-                <div className="text-xs text-slate-500 mb-1">Eligible Members</div>
-                <div className="text-sm text-white font-medium">{selectedMembers.length} members</div>
-              </div>
-              <div className="bg-slate-900/30 rounded-lg p-4">
-                <div className="text-xs text-slate-500 mb-1">Approx. Duties Each</div>
-                <div className="text-sm text-white font-medium">
-                  ~{selectedMembers.length > 0 ? Math.ceil(selectedDates.length / selectedMembers.length) : 0} times
-                </div>
-              </div>
-              <div className="bg-slate-900/30 rounded-lg p-4">
-                <div className="text-xs text-slate-500 mb-1">Reminder</div>
-                <div className="text-sm text-white font-medium">{formData.reminder_days_before} days before</div>
+              <div className="bg-slate-900/30 rounded-lg p-3">
+                <div className="text-[10px] text-slate-500 uppercase tracking-wide">Members</div>
+                <div className="text-sm text-white font-medium mt-0.5">{selectedMembers.length}</div>
               </div>
             </div>
 
+            <AllocationPreview
+              dates={selectedDates}
+              members={members.filter(m => selectedMembers.includes(m.id))}
+              allocations={previewAllocations}
+              onAllocationsChange={setPreviewAllocations}
+            />
+
             {formData.allocation_method !== 'manual' && (
-              <div className="flex items-start gap-3 p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
-                <Shuffle size={18} className="text-cyan-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm text-cyan-300 font-medium">Auto-Allocation Active</p>
-                  <p className="text-xs text-cyan-400/70 mt-0.5">
-                    PROs will be fairly distributed across all sailing days. Each member will do approximately equal duties
-                    with no back-to-back assignments. Tasks with reminders will be created automatically.
-                  </p>
-                </div>
+              <div className="flex items-start gap-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                <Shuffle size={16} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-emerald-300/80">
+                  Allocations are generated fairly. Drag members between dates to adjust, or click Re-shuffle for a new distribution. Tasks and reminders will be created automatically.
+                </p>
+              </div>
+            )}
+
+            {formData.allocation_method === 'manual' && (
+              <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <AlertCircle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-300/80">
+                  Manual mode: assign members by clicking each date or dragging from the pool. You can also assign later from the roster view.
+                </p>
               </div>
             )}
           </div>
@@ -616,7 +661,13 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
 
         {step < steps.length - 1 ? (
           <button
-            onClick={() => setStep(step + 1)}
+            onClick={() => {
+              const nextStep = step + 1;
+              if (nextStep === 3 && previewAllocations.size === 0 && formData.allocation_method !== 'manual') {
+                generatePreviewAllocations();
+              }
+              setStep(nextStep);
+            }}
             disabled={!canProceed()}
             className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg font-medium hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
