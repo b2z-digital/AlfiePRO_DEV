@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ClipboardList, Plus, Calendar, Users, ChartBar as BarChart3, Download, Trash2, CreditCard as Edit2, Play, Archive, ChevronRight, Shuffle, GripVertical, CircleCheck as CheckCircle2, Circle as XCircle, Clock, TriangleAlert as AlertTriangle, UserCheck, ListFilter as Filter } from 'lucide-react';
+import { ClipboardList, Plus, Calendar, Users, ChartBar as BarChart3, Download, Trash2, Pencil, Play, Archive, ChevronRight, Shuffle, GripVertical, CircleCheck as CheckCircle2, Circle as XCircle, Clock, TriangleAlert as AlertTriangle, UserCheck, ListFilter as Filter } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { getRosters, deleteRoster, getRosterWithDetails, activateRoster } from '../../utils/proRosterStorage';
+import { getRosters, deleteRoster, getRosterWithDetails, activateRoster, createTasksForAssignments } from '../../utils/proRosterStorage';
+import { useAuth } from '../../contexts/AuthContext';
 import { getStoredMembers } from '../../utils/storage';
 import type { ProRoster, RosterWithDetails } from '../../types/proRoster';
 import { RosterBuilder } from './RosterBuilder';
@@ -16,6 +17,7 @@ interface ProRosteringPageProps {
 
 export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, clubName, darkMode = true }) => {
   const { addNotification } = useNotifications();
+  const { user } = useAuth();
   const [rosters, setRosters] = useState<ProRoster[]>([]);
   const [selectedRoster, setSelectedRoster] = useState<RosterWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,7 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
   const [view, setView] = useState<'dashboard' | 'grid' | 'list'>('dashboard');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [members, setMembers] = useState<Array<{ id: string; first_name: string; last_name: string; avatar_url?: string | null; boats?: Array<{ boat_type: string }> }>>([]);
+  const [pendingActivationRosterId, setPendingActivationRosterId] = useState<string | null>(null);
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -87,12 +90,16 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
   const handleActivateRoster = async (rosterId: string) => {
     try {
       await activateRoster(rosterId);
+      const details = await getRosterWithDetails(rosterId);
+      if (details.assignments.length > 0 && user?.id) {
+        await createTasksForAssignments(details, details.rounds, details.assignments, clubId, user.id);
+      }
       await fetchRosters();
       if (selectedRoster?.id === rosterId) {
-        const details = await getRosterWithDetails(rosterId);
         setSelectedRoster(details);
       }
-      addNotification('success', 'Roster activated! Tasks and reminders will be created.');
+      setPendingActivationRosterId(null);
+      addNotification('success', 'Roster activated! Tasks have been created for assigned PROs.');
     } catch (err) {
       console.error('Error activating roster:', err);
       addNotification('error', 'Failed to activate roster');
@@ -103,6 +110,11 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
     setShowBuilder(false);
     setEditingRoster(null);
     await fetchRosters();
+    const latestRosters = await getRosters(clubId);
+    const newestDraft = latestRosters.find(r => r.status === 'draft');
+    if (newestDraft) {
+      setPendingActivationRosterId(newestDraft.id);
+    }
   };
 
   const handleRefresh = async () => {
@@ -326,13 +338,6 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
               </div>
 
               <div className="flex items-center gap-2 pt-3 border-t border-slate-700/50">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setEditingRoster(roster); }}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
-                  title="Edit"
-                >
-                  <Edit2 size={14} />
-                </button>
                 {roster.status === 'draft' && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleActivateRoster(roster.id); }}
@@ -344,6 +349,13 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
                 )}
                 <div className="flex-1" />
                 <button
+                  onClick={(e) => { e.stopPropagation(); setEditingRoster(roster); }}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
+                  title="Edit"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
                   onClick={(e) => { e.stopPropagation(); handleDeleteRoster(roster.id); }}
                   className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
                   title="Delete"
@@ -353,6 +365,36 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {pendingActivationRosterId && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-emerald-500/20 rounded-xl">
+                <Play size={20} className="text-emerald-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Activate Roster?</h3>
+            </div>
+            <p className="text-slate-300 mb-6">
+              Your roster has been created. Would you like to activate it now? This will create tasks and send reminders to assigned PROs.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setPendingActivationRosterId(null)}
+                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+              >
+                Later
+              </button>
+              <button
+                onClick={() => handleActivateRoster(pendingActivationRosterId)}
+                className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-medium hover:from-emerald-500 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/20"
+              >
+                Activate Now
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div></div>
