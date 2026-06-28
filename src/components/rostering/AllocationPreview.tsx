@@ -35,12 +35,6 @@ export const AllocationPreview: React.FC<AllocationPreviewProps> = ({
     return map;
   }, [members]);
 
-  const assignedMemberIds = useMemo(() => new Set(allocations.values()), [allocations]);
-
-  const unassignedMembers = useMemo(() =>
-    members.filter(m => !assignedMemberIds.has(m.id)),
-  [members, assignedMemberIds]);
-
   const handleDragStart = (event: DragStartEvent) => {
     setDraggedMemberId(event.active.id as string);
   };
@@ -57,16 +51,16 @@ export const AllocationPreview: React.FC<AllocationPreviewProps> = ({
     const newAllocations = new Map(allocations);
     const existingOnTarget = newAllocations.get(targetDate);
 
-    let sourceDate: string | null = null;
+    const sourceDates: string[] = [];
     for (const [d, mId] of newAllocations.entries()) {
-      if (mId === memberId) { sourceDate = d; break; }
+      if (mId === memberId) sourceDates.push(d);
     }
 
-    if (sourceDate && existingOnTarget) {
-      newAllocations.set(sourceDate, existingOnTarget);
+    if (sourceDates.length === 1 && existingOnTarget) {
+      newAllocations.set(sourceDates[0], existingOnTarget);
       newAllocations.set(targetDate, memberId);
-    } else if (sourceDate) {
-      newAllocations.delete(sourceDate);
+    } else if (sourceDates.length === 1) {
+      newAllocations.delete(sourceDates[0]);
       newAllocations.set(targetDate, memberId);
     } else {
       newAllocations.set(targetDate, memberId);
@@ -83,9 +77,6 @@ export const AllocationPreview: React.FC<AllocationPreviewProps> = ({
 
   const handlePickMember = (date: string, memberId: string) => {
     const newAllocations = new Map(allocations);
-    for (const [d, mId] of newAllocations.entries()) {
-      if (mId === memberId) { newAllocations.delete(d); break; }
-    }
     newAllocations.set(date, memberId);
     onAllocationsChange(newAllocations);
     setPickingForDate(null);
@@ -120,11 +111,11 @@ export const AllocationPreview: React.FC<AllocationPreviewProps> = ({
           })}
         </div>
 
-        {unassignedMembers.length > 0 && (
+        {members.length > 0 && (
           <div className="border-t border-slate-700 pt-3">
-            <p className="text-xs text-slate-500 mb-2">Unassigned - drag to a date above</p>
+            <p className="text-xs text-slate-500 mb-2">Members - drag to a date above</p>
             <div className="flex flex-wrap gap-2">
-              {unassignedMembers.map(m => (
+              {members.map(m => (
                 <DraggableMemberChip key={m.id} member={m} />
               ))}
             </div>
