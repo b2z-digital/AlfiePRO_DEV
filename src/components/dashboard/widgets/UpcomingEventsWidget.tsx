@@ -431,7 +431,8 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
     if (!currentClub?.clubId || events.length === 0) return events;
 
     try {
-      const eventIds = events.filter(e => !e.isSeriesEvent).map(e => e.id);
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const eventIds = events.filter(e => !e.isSeriesEvent).map(e => e.id).filter(id => uuidRegex.test(id));
 
       let allAttendanceData: any[] = [];
 
