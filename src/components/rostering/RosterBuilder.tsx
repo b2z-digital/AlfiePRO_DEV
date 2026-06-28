@@ -31,8 +31,18 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
 
   useEffect(() => {
     getStoredRaceSeries().then(series => {
-      const incomplete = series.filter(s => !s.completed && s.rounds && s.rounds.length > 0);
-      setAvailableSeries(incomplete);
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const active = series.filter(s => {
+        if (s.completed || !s.rounds || s.rounds.length === 0) return false;
+        const hasCurrentOrFutureRound = s.rounds.some(r => {
+          if (!r.date) return false;
+          const roundDate = new Date(r.date);
+          return roundDate.getFullYear() >= currentYear;
+        });
+        return hasCurrentOrFutureRound;
+      });
+      setAvailableSeries(active);
     }).catch(() => {});
   }, []);
 
