@@ -170,7 +170,7 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
+    <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-16 space-y-6">
       <div className="flex items-center gap-4">
         <button onClick={onCancel} className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all">
           <ArrowLeft size={18} />
@@ -554,6 +554,6 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
           </button>
         )}
       </div>
-    </div>
+    </div></div>
   );
 };

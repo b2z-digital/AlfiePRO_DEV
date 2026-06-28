@@ -143,7 +143,7 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
 
   if (selectedRoster && (view === 'grid' || view === 'list')) {
     return (
-      <div className="p-4 sm:p-6 space-y-4">
+      <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-16 space-y-4">
         <div className="flex items-center gap-3 mb-4">
           <button
             onClick={() => { setSelectedRoster(null); setView('dashboard'); }}
@@ -196,12 +196,12 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
             darkMode={darkMode}
           />
         )}
-      </div>
+      </div></div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
+    <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-16 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-3">
@@ -355,6 +355,6 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
           ))}
         </div>
       )}
-    </div>
+    </div></div>
   );
 };
