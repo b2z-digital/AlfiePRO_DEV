@@ -1,11 +1,13 @@
-import React, { useState, useMemo } from 'react';
-import { ArrowLeft, ArrowRight, Check, Calendar, Users, Settings, Shuffle, Plus, X, Search, UserPlus, CircleAlert as AlertCircle } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { ArrowLeft, ArrowRight, Check, Calendar, Users, Settings, Shuffle, Plus, X, Search, UserPlus, CircleAlert as AlertCircle, Link2 } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import {
   createRoster, updateRoster, addRosterRounds, addRosterMembers,
   generateFairAllocation, applyAllocation, getRosterWithDetails,
   createTasksForAssignments
 } from '../../utils/proRosterStorage';
+import { getStoredRaceSeries } from '../../utils/raceStorage';
+import type { RaceSeries } from '../../types/race';
 import type { ProRoster, RosterFormData } from '../../types/proRoster';
 
 interface RosterBuilderProps {
@@ -24,6 +26,15 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
   const { addNotification } = useNotifications();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [availableSeries, setAvailableSeries] = useState<RaceSeries[]>([]);
+  const [linkedSeries, setLinkedSeries] = useState<RaceSeries | null>(null);
+
+  useEffect(() => {
+    getStoredRaceSeries().then(series => {
+      const incomplete = series.filter(s => !s.completed && s.rounds && s.rounds.length > 0);
+      setAvailableSeries(incomplete);
+    }).catch(() => {});
+  }, []);
 
   const [formData, setFormData] = useState<RosterFormData>({
     name: existingRoster?.name || '',
@@ -114,6 +125,37 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
 
   const selectAllEligible = () => {
     setSelectedMembers(eligibleMembers.map(m => m.id));
+  };
+
+  const handleSelectSeries = (seriesId: string) => {
+    if (!seriesId) {
+      setLinkedSeries(null);
+      setFormData(prev => ({ ...prev, series_id: null, name: '', boat_class: '', start_date: new Date().toISOString().split('T')[0], end_date: '' }));
+      setSelectedDates([]);
+      return;
+    }
+    const series = availableSeries.find(s => s.id === seriesId);
+    if (!series) return;
+    setLinkedSeries(series);
+
+    const roundDates = series.rounds
+      .filter(r => r.date && !r.cancelled)
+      .map(r => r.date)
+      .sort();
+
+    const startDate = roundDates[0] || new Date().toISOString().split('T')[0];
+    const endDate = roundDates[roundDates.length - 1] || '';
+
+    setFormData(prev => ({
+      ...prev,
+      series_id: series.id,
+      name: `${series.seriesName} PRO Roster`,
+      boat_class: series.raceClass || prev.boat_class,
+      start_date: startDate,
+      end_date: endDate,
+    }));
+
+    setSelectedDates(roundDates);
   };
 
   const handleSave = async () => {
@@ -210,6 +252,32 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
         {step === 0 && (
           <div className="space-y-5">
             <h3 className="text-lg font-semibold text-white mb-4">Roster Details</h3>
+
+            {availableSeries.length > 0 && !existingRoster && (
+              <div className="p-4 bg-slate-900/50 border border-cyan-500/20 rounded-xl space-y-3">
+                <div className="flex items-center gap-2 text-cyan-400 text-sm font-medium">
+                  <Link2 size={14} />
+                  Link to Existing Series
+                </div>
+                <select
+                  value={linkedSeries?.id || ''}
+                  onChange={e => handleSelectSeries(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-800/80 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="">Create standalone roster (manual setup)</option>
+                  {availableSeries.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.seriesName} ({s.raceClass || 'All classes'}) - {s.rounds.filter(r => !r.cancelled).length} rounds
+                    </option>
+                  ))}
+                </select>
+                {linkedSeries && (
+                  <p className="text-xs text-slate-400">
+                    Details and sailing days will be auto-populated from the series. You can still adjust settings below.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">Roster Name</label>
@@ -333,7 +401,11 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
         {step === 1 && (
           <div className="space-y-5">
             <h3 className="text-lg font-semibold text-white mb-2">Sailing Days</h3>
-            <p className="text-sm text-slate-400 mb-4">Add the dates that need a PRO assigned. Use quick-fill to add weekly recurring dates.</p>
+            <p className="text-sm text-slate-400 mb-4">
+              {linkedSeries
+                ? `Dates have been pre-filled from "${linkedSeries.seriesName}". You can add or remove dates as needed.`
+                : 'Add the dates that need a PRO assigned. Use quick-fill to add weekly recurring dates.'}
+            </p>
 
             <div className="flex flex-wrap gap-2 mb-4">
               <span className="text-xs text-slate-500 self-center mr-1">Quick fill:</span>
@@ -460,6 +532,13 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
         {step === 3 && (
           <div className="space-y-5">
             <h3 className="text-lg font-semibold text-white mb-4">Review & Create</h3>
+
+            {linkedSeries && (
+              <div className="flex items-center gap-2 px-4 py-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg mb-2">
+                <Link2 size={14} className="text-cyan-400" />
+                <span className="text-sm text-cyan-300">Linked to series: <span className="font-medium">{linkedSeries.seriesName}</span></span>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-900/30 rounded-lg p-4">
