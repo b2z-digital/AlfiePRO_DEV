@@ -1060,6 +1060,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           featureKey: 'race_management'
         },
         {
+          id: 'pro-rostering',
+          label: 'PRO Rostering',
+          icon: ClipboardList,
+          description: 'Manage race officer duty rosters',
+          path: '/rostering'
+        },
+        {
           id: 'race-calendar',
           label: 'Race Calendar',
           icon: Calendar,
@@ -1090,13 +1097,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           description: 'Manage racing venues',
           path: '/venues',
           featureKey: 'venues'
-        },
-        {
-          id: 'pro-rostering',
-          label: 'PRO Rostering',
-          icon: ClipboardList,
-          description: 'Manage race officer duty rosters',
-          path: '/rostering'
         },
         ...(isSuperAdmin ? [{
           id: 'race-simulator',
