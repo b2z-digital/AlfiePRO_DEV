@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Calendar, CalendarDays, CalendarRange, List, Grid2x2 as Grid, X, ChevronDown, ChevronRight, ChevronLeft, ListFilter as Filter, Map, FileImage, Download, Medal, Maximize2, Minimize2, TrendingUp as TrendyUp, FileText, Globe, MapPin, Link2, Map as MapIcon, Clock } from 'lucide-react';
+import { Trophy, Calendar, CalendarDays, CalendarRange, List, Grid2x2 as Grid, X, ChevronDown, ChevronRight, ChevronLeft, ListFilter as Filter, FileImage, Download, Medal, Maximize2, Minimize2, TrendingUp as TrendyUp, FileText, Globe, MapPin, Link2, Map as MapIcon, Clock } from 'lucide-react';
 import { RaceType } from '../types';
 import { RaceEvent, RaceSeries } from '../types/race';
 import { formatDate } from '../utils/date';
