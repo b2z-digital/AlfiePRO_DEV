@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay, Radio } from 'lucide-react';
+import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay, Radio, ClipboardList } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -36,6 +36,7 @@ import { MeetingsPage } from './pages/MeetingsPage';
 import { RankingsManagement } from './pages/RankingsManagement';
 import { NameMappingManager } from './pages/NameMappingManager';
 import { TasksPage } from './tasks/TasksPage';
+import { ProRosteringPage } from './rostering/ProRosteringPage';
 import { EventDetails } from './EventDetails';
 import { usePermissions } from '../hooks/usePermissions';
 import { useFeatureAccess } from '../hooks/useFeatureAccess';
@@ -1057,6 +1058,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/race-management',
           permission: 'races.manage',
           featureKey: 'race_management'
+        },
+        {
+          id: 'pro-rostering',
+          label: 'PRO Rostering',
+          icon: ClipboardList,
+          description: 'Manage race officer duty rosters',
+          path: '/rostering'
         },
         {
           id: 'race-calendar',
@@ -2094,6 +2102,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   selectedEvent={selectedEvent}
                   onEventSelect={onEventSelect}
                   onStartScoring={handleStartScoring}
+                />
+              } />
+              <Route path="/rostering" element={
+                <ProRosteringPage
+                  clubId={currentClub?.clubId || ''}
+                  clubName={currentClub?.name || ''}
+                  darkMode={darkMode}
                 />
               } />
               <Route path="/weather" element={<WeatherPage />} />

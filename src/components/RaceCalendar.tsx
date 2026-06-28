@@ -22,6 +22,7 @@ import { LocationExplorer } from './LocationExplorer';
 import { getCalendarMeetings, CalendarMeeting } from '../utils/calendarMeetingStorage';
 import { CalendarMeetingDetailsModal } from './meetings/CalendarMeetingDetailsModal';
 import { Users, Shield, Building2, Globe as Globe2, Flag } from 'lucide-react';
+import { getProAssignmentsForSeries, type ProAssignmentForDisplay } from '../utils/proRosterStorage';
 
 type CalendarView = 'list' | 'grid' | 'month' | 'year';
 type EventScope = 'all' | 'club' | 'my_state' | 'national' | 'all_states';
@@ -79,6 +80,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   });
   const [clubStateAssociationId, setClubStateAssociationId] = useState<string | null>(null);
   const [stateAssociationNames, setStateAssociationNames] = useState<Record<string, string>>({});
+  const [proAssignmentsByKey, setProAssignmentsByKey] = useState<Map<string, ProAssignmentForDisplay>>(new Map());
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const subscribeMenuRef = useRef<HTMLDivElement>(null);
@@ -387,6 +389,17 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
         
         console.log('Series map for calendar:', seriesNameMap);
         setSeriesMap(seriesNameMap);
+
+        // Fetch PRO assignments for series
+        const proMap = new Map<string, ProAssignmentForDisplay>();
+        const proFetches = storedSeries.map(async (series) => {
+          try {
+            const assignments = await getProAssignmentsForSeries(series.id);
+            assignments.forEach(a => proMap.set(`${series.id}-${a.date}`, a));
+          } catch { /* ignore */ }
+        });
+        await Promise.all(proFetches);
+        setProAssignmentsByKey(proMap);
         
         // Convert series events into race events
         const seriesRaceEvents: RaceEvent[] = storedSeries.flatMap(series => {
@@ -1315,6 +1328,24 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                             <span className={getBoatClassBadge(event.raceClass, darkMode).className}>
                               {event.raceClass}
                             </span>
+                            {event.isSeriesEvent && (() => {
+                              const proInfo = proAssignmentsByKey.get(`${event.seriesId}-${event.date}`);
+                              if (!proInfo) return null;
+                              return (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                                  darkMode ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}>
+                                  {proInfo.member_avatar ? (
+                                    <img src={proInfo.member_avatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                                  ) : (
+                                    <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-bold ${
+                                      darkMode ? 'bg-amber-600 text-white' : 'bg-amber-200 text-amber-800'
+                                    }`}>{proInfo.member_name.split(' ').map(n => n[0]).join('')}</span>
+                                  )}
+                                  PRO: {proInfo.member_name}
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -1805,6 +1836,24 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                             Done
                           </div>
                         )}
+                        {event.isSeriesEvent && (() => {
+                          const proInfo = proAssignmentsByKey.get(`${event.seriesId}-${event.date}`);
+                          if (!proInfo) return null;
+                          return (
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${
+                              darkMode ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-700'
+                            }`}>
+                              {proInfo.member_avatar ? (
+                                <img src={proInfo.member_avatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                              ) : (
+                                <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-bold ${
+                                  darkMode ? 'bg-amber-600 text-white' : 'bg-amber-200 text-amber-800'
+                                }`}>{proInfo.member_name.split(' ').map(n => n[0]).join('')}</span>
+                              )}
+                              PRO: {proInfo.member_name}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {skipperCount > 0 && (
