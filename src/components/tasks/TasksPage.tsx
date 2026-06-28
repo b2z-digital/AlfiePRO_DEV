@@ -40,6 +40,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const { can, isMember } = usePermissions();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [userMemberIds, setUserMemberIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -86,6 +87,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
       const userStateIds = stateAssocData.data?.map(s => s.state_association_id) || [];
       const userNationalIds = nationalAssocData.data?.map(n => n.national_association_id) || [];
       const userMemberIds = memberData.data?.map(m => m.id) || [];
+      setUserMemberIds(userMemberIds);
 
       let query = supabase
         .from('club_tasks')
@@ -276,42 +278,47 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
     // Apply category filter
     switch (activeCategory) {
       case 'current':
-        filtered = tasks.filter(task => 
-          task.status === 'pending' || task.status === 'in_progress'
+        filtered = tasks.filter(task =>
+          (task.status === 'pending' || task.status === 'in_progress') &&
+          (userMemberIds.length === 0 || userMemberIds.includes(task.assignee_id || ''))
         );
         break;
       case 'overdue':
-        filtered = tasks.filter(task => 
-          task.due_date && 
-          new Date(task.due_date) < today && 
-          task.status !== 'completed'
+        filtered = tasks.filter(task =>
+          task.due_date &&
+          new Date(task.due_date) < today &&
+          task.status !== 'completed' &&
+          userMemberIds.includes(task.assignee_id || '')
         );
         break;
       case 'dueToday':
-        filtered = tasks.filter(task => 
-          task.due_date && 
-          new Date(task.due_date).toDateString() === today.toDateString()
+        filtered = tasks.filter(task =>
+          task.due_date &&
+          new Date(task.due_date).toDateString() === today.toDateString() &&
+          userMemberIds.includes(task.assignee_id || '')
         );
         break;
       case 'dueThisWeek':
-        filtered = tasks.filter(task => 
-          task.due_date && 
-          new Date(task.due_date) >= today && 
-          new Date(task.due_date) <= weekFromNow
+        filtered = tasks.filter(task =>
+          task.due_date &&
+          new Date(task.due_date) >= today &&
+          new Date(task.due_date) <= weekFromNow &&
+          userMemberIds.includes(task.assignee_id || '')
         );
         break;
       case 'dueThisMonth':
-        filtered = tasks.filter(task => 
-          task.due_date && 
-          new Date(task.due_date) >= today && 
-          new Date(task.due_date) <= monthFromNow
+        filtered = tasks.filter(task =>
+          task.due_date &&
+          new Date(task.due_date) >= today &&
+          new Date(task.due_date) <= monthFromNow &&
+          userMemberIds.includes(task.assignee_id || '')
         );
         break;
       case 'completed':
-        filtered = tasks.filter(task => task.status === 'completed');
+        filtered = tasks.filter(task => task.status === 'completed' && userMemberIds.includes(task.assignee_id || ''));
         break;
       case 'myTasks':
-        filtered = tasks.filter(task => task.assignee_id === user?.id);
+        filtered = tasks.filter(task => userMemberIds.includes(task.assignee_id || ''));
         break;
       case 'all':
       default:
@@ -355,32 +362,34 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
     const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
     const monthFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
 
+    const myTasks = tasks.filter(task => userMemberIds.includes(task.assignee_id || ''));
+
     return {
-      current: tasks.filter(task => 
+      current: myTasks.filter(task =>
         task.status === 'pending' || task.status === 'in_progress'
       ).length,
-      overdue: tasks.filter(task => 
-        task.due_date && 
-        new Date(task.due_date) < today && 
+      overdue: myTasks.filter(task =>
+        task.due_date &&
+        new Date(task.due_date) < today &&
         task.status !== 'completed'
       ).length,
-      dueToday: tasks.filter(task => 
-        task.due_date && 
+      dueToday: myTasks.filter(task =>
+        task.due_date &&
         new Date(task.due_date).toDateString() === today.toDateString()
       ).length,
-      dueThisWeek: tasks.filter(task => 
-        task.due_date && 
-        new Date(task.due_date) >= today && 
+      dueThisWeek: myTasks.filter(task =>
+        task.due_date &&
+        new Date(task.due_date) >= today &&
         new Date(task.due_date) <= weekFromNow
       ).length,
-      dueThisMonth: tasks.filter(task => 
-        task.due_date && 
-        new Date(task.due_date) >= today && 
+      dueThisMonth: myTasks.filter(task =>
+        task.due_date &&
+        new Date(task.due_date) >= today &&
         new Date(task.due_date) <= monthFromNow
       ).length,
-      completed: tasks.filter(task => task.status === 'completed').length,
+      completed: myTasks.filter(task => task.status === 'completed').length,
       all: tasks.length,
-      myTasks: tasks.filter(task => task.assignee_id === user?.id).length
+      myTasks: myTasks.length
     };
   };
 
