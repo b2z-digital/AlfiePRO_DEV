@@ -27,6 +27,7 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [members, setMembers] = useState<Array<{ id: string; first_name: string; last_name: string; avatar_url?: string | null; boats?: Array<{ boat_type: string }> }>>([]);
   const [pendingActivationRosterId, setPendingActivationRosterId] = useState<string | null>(null);
+  const [pendingDeleteRosterId, setPendingDeleteRosterId] = useState<string | null>(null);
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -72,7 +73,6 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
   };
 
   const handleDeleteRoster = async (rosterId: string) => {
-    if (!confirm('Are you sure you want to delete this roster? This cannot be undone.')) return;
     try {
       await deleteRoster(rosterId);
       setRosters(prev => prev.filter(r => r.id !== rosterId));
@@ -80,7 +80,8 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
         setSelectedRoster(null);
         setView('dashboard');
       }
-      addNotification('success', 'Roster deleted');
+      setPendingDeleteRosterId(null);
+      addNotification('success', 'Roster and associated tasks deleted');
     } catch (err) {
       console.error('Error deleting roster:', err);
       addNotification('error', 'Failed to delete roster');
@@ -362,7 +363,7 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
                   <Pencil size={14} />
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleDeleteRoster(roster.id); }}
+                  onClick={(e) => { e.stopPropagation(); setPendingDeleteRosterId(roster.id); }}
                   className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
                   title="Delete"
                 >
@@ -398,6 +399,36 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
                 className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-medium hover:from-emerald-500 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/20"
               >
                 Activate Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteRosterId && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-500/20 rounded-xl">
+                <Trash2 size={20} className="text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Delete Roster?</h3>
+            </div>
+            <p className="text-slate-300 mb-6">
+              Are you sure you want to delete this roster? This will also remove all tasks created for members on this roster. This cannot be undone.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setPendingDeleteRosterId(null)}
+                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteRoster(pendingDeleteRosterId)}
+                className="px-5 py-2 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl font-medium hover:from-red-500 hover:to-red-400 transition-all shadow-lg shadow-red-500/20"
+              >
+                Delete Roster
               </button>
             </div>
           </div>
