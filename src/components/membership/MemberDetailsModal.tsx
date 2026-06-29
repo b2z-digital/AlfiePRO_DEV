@@ -81,14 +81,51 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({
 
   const fetchMemberBoats = async () => {
     try {
-      const { data, error } = await supabase
-        .from('member_boats')
-        .select('*')
-        .eq('member_id', memberId)
-        .order('created_at');
+      // First get the user_id for this member to find boats across all clubs
+      const { data: member } = await supabase
+        .from('members')
+        .select('user_id')
+        .eq('id', memberId)
+        .single();
 
-      if (error) throw error;
-      setMemberBoats(data || []);
+      if (member?.user_id) {
+        // Get all member IDs for this user across clubs
+        const { data: allMembers } = await supabase
+          .from('members')
+          .select('id')
+          .eq('user_id', member.user_id);
+
+        const memberIds = allMembers?.map(m => m.id) || [memberId];
+
+        const { data, error } = await supabase
+          .from('member_boats')
+          .select('*')
+          .in('member_id', memberIds)
+          .order('created_at');
+
+        if (error) throw error;
+
+        // Deduplicate by sail_number + boat_type
+        const seen = new Set<string>();
+        const unique = (data || []).filter(boat => {
+          const key = `${boat.boat_type}|${boat.sail_number}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        setMemberBoats(unique);
+      } else {
+        // Fallback: just query for this member_id directly
+        const { data, error } = await supabase
+          .from('member_boats')
+          .select('*')
+          .eq('member_id', memberId)
+          .order('created_at');
+
+        if (error) throw error;
+        setMemberBoats(data || []);
+      }
     } catch (err) {
       console.error('Error fetching member boats:', err);
     }
