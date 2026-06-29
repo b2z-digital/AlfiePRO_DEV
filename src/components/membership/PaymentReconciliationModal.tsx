@@ -255,8 +255,25 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
       setProcessing(true);
       const memberIds = Array.from(selectedMembers);
 
-      const today = new Date();
-      const renewalDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+      // Get club renewal settings to calculate correct renewal date
+      const { data: clubSettings } = await supabase
+        .from('clubs')
+        .select('renewal_mode, fixed_renewal_date, name')
+        .eq('id', clubId)
+        .single();
+
+      let renewalDate: Date;
+      const now = new Date();
+
+      if (clubSettings?.renewal_mode === 'fixed' && clubSettings?.fixed_renewal_date) {
+        const [month, day] = clubSettings.fixed_renewal_date.split('-').map(Number);
+        renewalDate = new Date(now.getFullYear(), month - 1, day);
+        if (renewalDate <= now) {
+          renewalDate = new Date(now.getFullYear() + 1, month - 1, day);
+        }
+      } else {
+        renewalDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+      }
 
       const { error } = await supabase
         .from('members')
@@ -282,12 +299,6 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
         }
       }
 
-      const { data: clubData } = await supabase
-        .from('clubs')
-        .select('name')
-        .eq('id', clubId)
-        .maybeSingle();
-
       for (const memberId of memberIds) {
         const member = allMembers.find(m => m.id === memberId);
         if (member?.email) {
@@ -296,7 +307,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
               email: member.email,
               first_name: member.first_name,
               last_name: member.last_name,
-              club_name: clubData?.name || 'your club',
+              club_name: clubSettings?.name || 'your club',
               membership_type: member.membership_level || 'Membership',
               renewal_date: renewalDate.toISOString().split('T')[0],
               amount: member.application_data?.membership_amount || 0,
