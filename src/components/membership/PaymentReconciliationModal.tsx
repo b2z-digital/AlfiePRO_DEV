@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, DollarSign, CircleCheck as CheckCircle, Clock, History } from 'lucide-react';
+import { X, Search, DollarSign, CircleCheck as CheckCircle, Clock, History, RefreshCw, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Avatar } from '../ui/Avatar';
@@ -23,6 +23,7 @@ interface PendingPayment {
   membership_level: string;
   date_joined: string;
   is_financial: boolean;
+  payment_status: string;
   user_id: string;
   avatar_url?: string;
   application_data?: {
@@ -43,7 +44,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
   const [allMembers, setAllMembers] = useState<PendingPayment[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'pending' | 'financial'>('pending');
+  const [filterType, setFilterType] = useState<'all' | 'pending' | 'financial' | 'unfinancial'>('pending');
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
@@ -247,6 +248,84 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
     }
   };
 
+  const handleRenewAndMarkPaid = async () => {
+    if (selectedMembers.size === 0) return;
+
+    try {
+      setProcessing(true);
+      const memberIds = Array.from(selectedMembers);
+
+      const today = new Date();
+      const renewalDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+
+      const { error } = await supabase
+        .from('members')
+        .update({
+          is_financial: true,
+          payment_status: 'paid',
+          payment_confirmed_at: new Date().toISOString(),
+          renewal_date: renewalDate.toISOString().split('T')[0],
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', memberIds);
+
+      if (error) throw error;
+
+      await markRemittancesAsExternallyPaid(memberIds);
+
+      let financeErrors = 0;
+      for (const memberId of memberIds) {
+        const result = await updateMembershipTransactionStatus(memberId, 'paid');
+        if (!result.success) {
+          console.error('Finance transaction failed for member:', memberId, result.error);
+          financeErrors++;
+        }
+      }
+
+      const { data: clubData } = await supabase
+        .from('clubs')
+        .select('name')
+        .eq('id', clubId)
+        .maybeSingle();
+
+      for (const memberId of memberIds) {
+        const member = allMembers.find(m => m.id === memberId);
+        if (member?.email) {
+          try {
+            await sendPaymentConfirmation({
+              email: member.email,
+              first_name: member.first_name,
+              last_name: member.last_name,
+              club_name: clubData?.name || 'your club',
+              membership_type: member.membership_level || 'Membership',
+              renewal_date: renewalDate.toISOString().split('T')[0],
+              amount: member.application_data?.membership_amount || 0,
+              currency: 'AUD',
+              club_id: clubId,
+              user_id: member.user_id,
+            });
+          } catch (emailErr) {
+            console.error('Failed to send confirmation email to:', member.email, emailErr);
+          }
+        }
+      }
+
+      if (financeErrors > 0) {
+        addNotification('warning', `${memberIds.length} member(s) renewed but ${financeErrors} finance record(s) could not be created`);
+      } else {
+        addNotification('success', `${memberIds.length} member(s) renewed and marked as paid`);
+      }
+      await fetchAllMembers();
+      setSelectedMembers(new Set());
+      onUpdate?.();
+    } catch (error: any) {
+      console.error('Error renewing members:', error);
+      addNotification('error', 'Failed to renew members');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleMarkAsUnpaid = async (memberId: string) => {
     try {
       setProcessing(true);
@@ -287,16 +366,24 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
   };
 
   const selectAll = () => {
-    const pendingIds = filteredMembers.filter(m => m.payment_status === 'pending').map(m => m.id);
-    setSelectedMembers(new Set(pendingIds));
+    const selectableIds = filteredMembers
+      .filter(m => m.payment_status === 'pending' || (filterType === 'unfinancial' && (m.payment_status === 'overdue' || (!m.is_financial && m.payment_status !== 'pending'))))
+      .map(m => m.id);
+    setSelectedMembers(new Set(selectableIds));
   };
 
   const deselectAll = () => {
     setSelectedMembers(new Set());
   };
 
+  const switchFilter = (type: typeof filterType) => {
+    setFilterType(type);
+    setSelectedMembers(new Set());
+  };
+
   const pendingCount = allMembers.filter(m => m.payment_status === 'pending').length;
   const financialCount = allMembers.filter(m => m.payment_status === 'paid').length;
+  const unfinancialCount = allMembers.filter(m => !m.is_financial && m.payment_status !== 'pending').length;
 
   const filteredMembers = allMembers.filter(member => {
     const matchesSearch =
@@ -305,6 +392,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
 
     if (filterType === 'pending') return matchesSearch && member.payment_status === 'pending';
     if (filterType === 'financial') return matchesSearch && member.payment_status === 'paid';
+    if (filterType === 'unfinancial') return matchesSearch && !member.is_financial && member.payment_status !== 'pending';
     return matchesSearch;
   });
 
@@ -353,7 +441,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
 
             <div className="flex gap-2">
               <button
-                onClick={() => setFilterType('all')}
+                onClick={() => switchFilter('all')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   filterType === 'all'
                     ? 'bg-cyan-500 text-white'
@@ -363,7 +451,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
                 All ({allMembers.length})
               </button>
               <button
-                onClick={() => setFilterType('pending')}
+                onClick={() => switchFilter('pending')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   filterType === 'pending'
                     ? 'bg-orange-500 text-white'
@@ -374,7 +462,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
                 Pending ({pendingCount})
               </button>
               <button
-                onClick={() => setFilterType('financial')}
+                onClick={() => switchFilter('financial')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   filterType === 'financial'
                     ? 'bg-green-500 text-white'
@@ -383,6 +471,17 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
               >
                 <CheckCircle size={16} className="inline mr-1" />
                 Financial ({financialCount})
+              </button>
+              <button
+                onClick={() => switchFilter('unfinancial')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  filterType === 'unfinancial'
+                    ? 'bg-red-500 text-white'
+                    : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <AlertTriangle size={16} className="inline mr-1" />
+                Unfinancial ({unfinancialCount})
               </button>
             </div>
           </div>
@@ -403,26 +502,39 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
                 >
                   Deselect
                 </button>
-                <button
-                  onClick={handlePreviouslyPaid}
-                  disabled={processing}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5 ${
-                    darkMode
-                      ? 'bg-slate-600 text-slate-100 hover:bg-slate-500 border border-slate-500'
-                      : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-300'
-                  }`}
-                >
-                  <History size={14} />
-                  Previously Paid
-                </button>
-                <button
-                  onClick={handleConfirmPayment}
-                  disabled={processing}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5 bg-green-500 text-white hover:bg-green-600"
-                >
-                  <DollarSign size={14} />
-                  Confirm Payment
-                </button>
+                {filterType === 'unfinancial' ? (
+                  <button
+                    onClick={handleRenewAndMarkPaid}
+                    disabled={processing}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5 bg-green-500 text-white hover:bg-green-600"
+                  >
+                    <RefreshCw size={14} />
+                    Renew & Mark Paid
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={handlePreviouslyPaid}
+                      disabled={processing}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5 ${
+                        darkMode
+                          ? 'bg-slate-600 text-slate-100 hover:bg-slate-500 border border-slate-500'
+                          : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-300'
+                      }`}
+                    >
+                      <History size={14} />
+                      Previously Paid
+                    </button>
+                    <button
+                      onClick={handleConfirmPayment}
+                      disabled={processing}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5 bg-green-500 text-white hover:bg-green-600"
+                    >
+                      <DollarSign size={14} />
+                      Confirm Payment
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -434,6 +546,14 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
               <span>for new payments or</span>
               <span className="font-medium text-slate-300">Previously Paid</span>
               <span>for imported members</span>
+            </div>
+          )}
+
+          {selectedMembers.size === 0 && unfinancialCount > 0 && filterType === 'unfinancial' && (
+            <div className={`mt-3 flex items-center gap-2 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+              <span>Select members who have paid directly to the club, then click</span>
+              <span className="font-medium text-green-400">Renew & Mark Paid</span>
+              <span>to renew their membership</span>
             </div>
           )}
         </div>
@@ -458,26 +578,28 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
                 <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   {filteredMembers.length} member{filteredMembers.length !== 1 ? 's' : ''}
                 </span>
-                {filteredMembers.some(m => m.payment_status === 'pending') && (
+                {(filteredMembers.some(m => m.payment_status === 'pending') || filterType === 'unfinancial') && (
                   <button
-                    onClick={selectedMembers.size === filteredMembers.filter(m => m.payment_status === 'pending').length ? deselectAll : selectAll}
+                    onClick={selectedMembers.size > 0 ? deselectAll : selectAll}
                     className={`text-sm font-medium ${darkMode ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-600 hover:text-cyan-700'}`}
                   >
-                    {selectedMembers.size === filteredMembers.filter(m => m.payment_status === 'pending').length ? 'Deselect All' : 'Select All'}
+                    {selectedMembers.size > 0 ? 'Deselect All' : 'Select All'}
                   </button>
                 )}
               </div>
 
               {filteredMembers.map((member) => {
                 const isPending = member.payment_status === 'pending';
+                const isUnfinancial = !member.is_financial && member.payment_status !== 'pending';
+                const isSelectable = isPending || (filterType === 'unfinancial' && isUnfinancial);
                 const isSelected = selectedMembers.has(member.id);
 
                 return (
                   <div
                     key={member.id}
-                    onClick={isPending ? () => toggleMemberSelection(member.id) : undefined}
+                    onClick={isSelectable ? () => toggleMemberSelection(member.id) : undefined}
                     className={`p-4 rounded-lg border transition-all ${
-                      isPending ? 'cursor-pointer' : ''
+                      isSelectable ? 'cursor-pointer' : ''
                     } ${
                       isSelected
                         ? darkMode ? 'border-cyan-500 bg-cyan-500/10' : 'border-cyan-500 bg-cyan-50'
@@ -485,7 +607,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
                     }`}
                   >
                     <div className="flex items-center gap-4">
-                      {isPending && (
+                      {isSelectable && (
                         <input
                           type="checkbox"
                           checked={isSelected}

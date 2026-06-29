@@ -50,6 +50,8 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [replacementMap, setReplacementMap] = useState<Record<string, string>>({});
   const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null);
+  const [renewingMember, setRenewingMember] = useState<string | null>(null);
+  const [bulkRenewing, setBulkRenewing] = useState(false);
 
   useEffect(() => {
     if (currentClub?.clubId) {
@@ -263,6 +265,128 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
     } catch (error) {
       console.error('Error sending bulk reminders:', error);
       addNotification('error', 'Failed to send some reminders');
+    }
+  };
+
+  const handleRenewMember = async (member: ExpiringMember) => {
+    if (!currentClub?.clubId) return;
+
+    try {
+      setRenewingMember(member.member_id);
+
+      const today = new Date();
+      const renewalDate = new Date(today.setFullYear(today.getFullYear() + 1));
+
+      // Get the membership type fee
+      const { data: typeData } = await supabase
+        .from('membership_types')
+        .select('fee')
+        .eq('club_id', currentClub.clubId)
+        .eq('name', member.membership_level)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      const amount = typeData?.fee || 0;
+
+      // Update member to financial/paid with new renewal date
+      const { error: memberError } = await supabase
+        .from('members')
+        .update({
+          is_financial: true,
+          payment_status: 'paid',
+          payment_confirmed_at: new Date().toISOString(),
+          renewal_date: renewalDate.toISOString().split('T')[0],
+          amount_paid: amount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', member.member_id);
+
+      if (memberError) throw memberError;
+
+      // Mark any pending remittances as externally paid
+      const { data: remittances } = await supabase
+        .from('membership_remittances')
+        .select('id')
+        .eq('member_id', member.member_id)
+        .in('status', ['pending', 'overdue']);
+
+      if (remittances && remittances.length > 0) {
+        await supabase
+          .from('membership_remittances')
+          .update({
+            status: 'paid',
+            paid_externally: true,
+            payment_confirmed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', remittances.map(r => r.id));
+      }
+
+      // Create finance transaction
+      try {
+        await updateMembershipTransactionStatus(member.member_id, 'paid');
+      } catch (finErr) {
+        console.error('Finance update failed:', finErr);
+      }
+
+      // Send confirmation email
+      if (member.email) {
+        try {
+          const { data: memberData } = await supabase
+            .from('members')
+            .select('user_id')
+            .eq('id', member.member_id)
+            .single();
+
+          await sendPaymentConfirmation({
+            email: member.email,
+            first_name: member.first_name,
+            last_name: member.last_name,
+            club_name: currentClub?.club?.name || 'your club',
+            membership_type: member.membership_level,
+            renewal_date: renewalDate.toISOString().split('T')[0],
+            amount,
+            currency: 'AUD',
+            club_id: currentClub.clubId,
+            user_id: memberData?.user_id,
+          });
+        } catch (emailErr) {
+          console.error('Failed to send confirmation email:', emailErr);
+        }
+      }
+
+      addNotification('success', `Membership renewed for ${member.first_name} ${member.last_name}`);
+      await fetchExpiringMemberships();
+    } catch (error) {
+      console.error('Error renewing member:', error);
+      addNotification('error', `Failed to renew membership for ${member.first_name} ${member.last_name}`);
+    } finally {
+      setRenewingMember(null);
+    }
+  };
+
+  const handleBulkRenew = async () => {
+    if (selectedMembers.size === 0) {
+      addNotification('error', 'Please select members to renew');
+      return;
+    }
+
+    try {
+      setBulkRenewing(true);
+      const members = activeTab === 'expiring' ? expiringMembers : overdueMembers;
+      const selectedMembersList = members.filter(m => selectedMembers.has(m.member_id));
+
+      for (const member of selectedMembersList) {
+        await handleRenewMember(member);
+      }
+
+      setSelectedMembers(new Set());
+      addNotification('success', `Renewed ${selectedMembersList.length} memberships`);
+    } catch (error) {
+      console.error('Error in bulk renewal:', error);
+      addNotification('error', 'Failed to complete some renewals');
+    } finally {
+      setBulkRenewing(false);
     }
   };
 
@@ -495,13 +619,32 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
         )}
 
         {selectedMembers.size > 0 && (
-          <button
-            onClick={handleBulkSendReminders}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-          >
-            <Mail size={16} />
-            Send Reminders ({selectedMembers.size})
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBulkSendReminders}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+            >
+              <Mail size={16} />
+              Send Reminders ({selectedMembers.size})
+            </button>
+            <button
+              onClick={handleBulkRenew}
+              disabled={bulkRenewing}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {bulkRenewing ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  Renewing...
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={16} />
+                  Renew & Mark Paid ({selectedMembers.size})
+                </>
+              )}
+            </button>
+          </div>
         )}
       </div>
 
@@ -693,12 +836,28 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handleSendReminder(member.member_id)}
-                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-                      >
-                        Send Reminder
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleSendReminder(member.member_id)}
+                          className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                        >
+                          Send Reminder
+                        </button>
+                        <button
+                          onClick={() => handleRenewMember(member)}
+                          disabled={renewingMember === member.member_id}
+                          className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        >
+                          {renewingMember === member.member_id ? (
+                            <>
+                              <RefreshCw size={12} className="animate-spin" />
+                              Renewing...
+                            </>
+                          ) : (
+                            'Renew'
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
