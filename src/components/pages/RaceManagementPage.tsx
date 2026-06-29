@@ -15,6 +15,7 @@ import { EventDetails } from '../EventDetails';
 import { VenueDetails } from '../VenueDetails';
 import { SingleEventManagement } from '../SingleEventManagement';
 import { RaceSeries as RaceSeriesComponent } from '../RaceSeries';
+import { SeriesRolloverModal } from '../SeriesRolloverModal';
 import LiveTrackingQRCodeModal from '../live-tracking/LiveTrackingQRCodeModal';
 import { EventWebsiteSettingsModal } from '../events/EventWebsiteSettingsModal';
 import { EventWebsiteDashboard } from '../events/EventWebsiteDashboard';
@@ -91,6 +92,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
   const [showEventWebsiteModal, setShowEventWebsiteModal] = useState(false);
   const [showEventWebsiteDashboard, setShowEventWebsiteDashboard] = useState(false);
   const [selectedEventForWebsite, setSelectedEventForWebsite] = useState<RaceEvent | null>(null);
+  const [showRolloverModal, setShowRolloverModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
@@ -2764,18 +2766,32 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             {/* Series Section */}
             {timeFilter !== 'pending' && timeFilter !== 'simulated' && sortedSeries.length > 0 && (
               <div>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 rounded-lg bg-purple-600/20">
-                    <Calendar className="text-purple-400" size={24} />
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-purple-600/20">
+                      <Calendar className="text-purple-400" size={24} />
+                    </div>
+                    <div>
+                      <h2 className={`text-2xl font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                        Race Series
+                      </h2>
+                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {sortedSeries.length} {sortedSeries.length === 1 ? 'series' : 'series'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className={`text-2xl font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                      Race Series
-                    </h2>
-                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {sortedSeries.length} {sortedSeries.length === 1 ? 'series' : 'series'}
-                    </p>
-                  </div>
+                  <button
+                    onClick={() => setShowRolloverModal(true)}
+                    className={`
+                      flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors
+                      ${darkMode
+                        ? 'bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600'
+                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-sm'}
+                    `}
+                  >
+                    <RotateCcw size={15} />
+                    Roll Over to Next Year
+                  </button>
                 </div>
                 <div className={`grid gap-6 items-start ${
                   viewMode === 'grid'
@@ -2975,6 +2991,19 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           venueName={selectedVenueName}
           darkMode={darkMode}
           onClose={() => setSelectedVenueName(null)}
+        />
+      )}
+
+      {showRolloverModal && (
+        <SeriesRolloverModal
+          isOpen={showRolloverModal}
+          onClose={() => setShowRolloverModal(false)}
+          darkMode={darkMode}
+          series={series}
+          onComplete={async () => {
+            const updatedSeries = await getStoredRaceSeries();
+            setSeries(updatedSeries);
+          }}
         />
       )}
 
