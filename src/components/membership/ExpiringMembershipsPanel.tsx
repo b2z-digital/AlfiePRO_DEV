@@ -171,8 +171,26 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
     try {
       setConfirmingPayment(member.id);
 
-      const today = new Date();
-      const renewalDate = new Date(today.setFullYear(today.getFullYear() + 1));
+      // Get club renewal settings
+      const { data: clubData } = await supabase
+        .from('clubs')
+        .select('renewal_mode, fixed_renewal_date')
+        .eq('id', currentClub?.clubId)
+        .single();
+
+      let renewalDate: Date;
+      const now = new Date();
+
+      if (clubData?.renewal_mode === 'fixed' && clubData?.fixed_renewal_date) {
+        const [month, day] = clubData.fixed_renewal_date.split('-').map(Number);
+        renewalDate = new Date(now.getFullYear(), month - 1, day);
+        if (renewalDate <= now) {
+          renewalDate = new Date(now.getFullYear() + 1, month - 1, day);
+        }
+      } else {
+        renewalDate = new Date(now);
+        renewalDate.setFullYear(renewalDate.getFullYear() + 1);
+      }
 
       const { error: memberError } = await supabase
         .from('members')
@@ -274,19 +292,52 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
     try {
       setRenewingMember(member.member_id);
 
-      const today = new Date();
-      const renewalDate = new Date(today.setFullYear(today.getFullYear() + 1));
+      // Get club renewal settings to determine correct renewal date
+      const { data: clubData } = await supabase
+        .from('clubs')
+        .select('renewal_mode, fixed_renewal_date')
+        .eq('id', currentClub.clubId)
+        .single();
 
-      // Get the membership type fee
+      let renewalDate: Date;
+      const now = new Date();
+
+      if (clubData?.renewal_mode === 'fixed' && clubData?.fixed_renewal_date) {
+        // Fixed mode: use the club's fixed renewal date (e.g., '07-01' for July 1)
+        const [month, day] = clubData.fixed_renewal_date.split('-').map(Number);
+        renewalDate = new Date(now.getFullYear(), month - 1, day);
+        // If that date has already passed this year, use next year
+        if (renewalDate <= now) {
+          renewalDate = new Date(now.getFullYear() + 1, month - 1, day);
+        }
+      } else {
+        // Anniversary mode: 1 year from today
+        renewalDate = new Date(now);
+        renewalDate.setFullYear(renewalDate.getFullYear() + 1);
+      }
+
+      // Get the membership type fee and renewal period
       const { data: typeData } = await supabase
         .from('membership_types')
-        .select('fee')
+        .select('fee, renewal_period')
         .eq('club_id', currentClub.clubId)
         .eq('name', member.membership_level)
         .eq('is_active', true)
         .maybeSingle();
 
       const amount = typeData?.fee || 0;
+
+      // For anniversary mode, respect the membership type's renewal period
+      if (clubData?.renewal_mode !== 'fixed' && typeData?.renewal_period) {
+        const periodDate = new Date(now);
+        if (typeData.renewal_period === 'quarterly') {
+          periodDate.setMonth(periodDate.getMonth() + 3);
+          renewalDate = periodDate;
+        } else if (typeData.renewal_period === 'monthly') {
+          periodDate.setMonth(periodDate.getMonth() + 1);
+          renewalDate = periodDate;
+        }
+      }
 
       // Update member to financial/paid with new renewal date
       const { error: memberError } = await supabase
