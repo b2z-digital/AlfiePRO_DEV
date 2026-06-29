@@ -101,8 +101,12 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
     members.forEach(m => {
       m.boats?.forEach(b => classes.add(b.boat_type));
     });
+    availableSeries.forEach(s => {
+      if (s.raceClass) classes.add(s.raceClass);
+    });
+    if (formData.boat_class) classes.add(formData.boat_class);
     return Array.from(classes).sort();
-  }, [members]);
+  }, [members, availableSeries, formData.boat_class]);
 
   const eligibleMembers = useMemo(() => {
     if (!formData.boat_class) return members;
