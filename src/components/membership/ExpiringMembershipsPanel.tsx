@@ -339,8 +339,23 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
         renewalDate.setFullYear(renewalDate.getFullYear() + 1);
       }
 
-      const selectedType = membershipTypes.find(t => t.name === renewAsType);
-      const amount = selectedType?.fee || 0;
+      let selectedType = membershipTypes.find(t => t.name === renewAsType);
+      let amount = selectedType?.fee || 0;
+      let selectedTypeId = selectedType?.id;
+
+      if (!selectedType && renewAsType) {
+        const { data: typeData } = await supabase
+          .from('membership_types')
+          .select('id, amount, renewal_period')
+          .eq('club_id', currentClub.clubId)
+          .eq('name', renewAsType)
+          .single();
+        if (typeData) {
+          amount = typeData.amount || 0;
+          selectedTypeId = typeData.id;
+          selectedType = { id: typeData.id, name: renewAsType, fee: typeData.amount || 0, renewal_period: typeData.renewal_period };
+        }
+      }
 
       if (clubData?.renewal_mode !== 'fixed' && selectedType?.renewal_period) {
         const periodDate = new Date(now);
@@ -373,13 +388,12 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
       }
 
       // Insert a pending payment record so it shows in the pending renewals tab
-      const membershipType = membershipTypes.find(t => t.name === renewAsType);
-      if (membershipType) {
+      if (selectedTypeId) {
         await supabase
           .from('membership_payments')
           .insert({
             member_id: member.member_id,
-            membership_type_id: membershipType.id,
+            membership_type_id: selectedTypeId,
             amount,
             currency: 'AUD',
             status: 'pending',
