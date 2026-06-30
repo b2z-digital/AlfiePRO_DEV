@@ -93,6 +93,36 @@ export const sendPaymentConfirmation = async (data: any): Promise<void> => {
   }
 };
 
+export const sendRenewalPendingNotification = async (data: any): Promise<void> => {
+  try {
+    const { error } = await supabase.functions.invoke('send-membership-notifications', {
+      body: {
+        email_type: 'renewal_pending',
+        recipient_email: data.email,
+        member_data: {
+          first_name: data.first_name,
+          last_name: data.last_name,
+          club_name: data.club_name,
+          membership_type: data.membership_type,
+          renewal_date: data.renewal_date,
+          amount: data.amount,
+          currency: data.currency || 'AUD',
+          bank_name: data.bank_name,
+          bsb: data.bsb,
+          account_number: data.account_number,
+          club_id: data.club_id,
+          user_id: data.user_id,
+        }
+      }
+    });
+
+    if (error) throw error;
+  } catch (err) {
+    console.error('Error sending renewal pending notification:', err);
+    throw err;
+  }
+};
+
 export const sendApplicationApproved = async (data: any): Promise<void> => {
   try {
     const { error } = await supabase.functions.invoke('send-membership-notifications', {

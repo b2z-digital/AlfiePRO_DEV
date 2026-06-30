@@ -5,7 +5,7 @@ import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { formatDate } from '../../utils/date';
 import { Avatar } from '../ui/Avatar';
-import { sendPaymentConfirmation } from '../../utils/membershipUtils';
+import { sendPaymentConfirmation, sendRenewalPendingNotification } from '../../utils/membershipUtils';
 import { updateMembershipTransactionStatus } from '../../utils/membershipFinanceUtils';
 
 interface MembershipType {
@@ -321,7 +321,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
 
       const { data: clubData } = await supabase
         .from('clubs')
-        .select('renewal_mode, fixed_renewal_date')
+        .select('renewal_mode, fixed_renewal_date, bank_name, bsb, account_number')
         .eq('id', currentClub.clubId)
         .single();
 
@@ -356,9 +356,8 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
       const { data: updatedRows, error: memberError } = await supabase
         .from('members')
         .update({
-          is_financial: true,
-          payment_status: 'paid',
-          payment_confirmed_at: new Date().toISOString(),
+          is_financial: false,
+          payment_status: 'pending',
           renewal_date: renewalDate.toISOString().split('T')[0],
           membership_level: renewAsType,
           amount_paid: amount,
@@ -373,28 +372,19 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
         throw new Error('Update failed - no rows affected. You may not have permission to update this member.');
       }
 
-      const { data: remittances } = await supabase
-        .from('membership_remittances')
-        .select('id')
-        .eq('member_id', member.member_id)
-        .in('status', ['pending', 'overdue']);
-
-      if (remittances && remittances.length > 0) {
+      // Insert a pending payment record so it shows in the pending renewals tab
+      const membershipType = membershipTypes.find(t => t.name === renewAsType);
+      if (membershipType) {
         await supabase
-          .from('membership_remittances')
-          .update({
-            status: 'paid',
-            paid_externally: true,
-            payment_confirmed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .in('id', remittances.map(r => r.id));
-      }
-
-      try {
-        await updateMembershipTransactionStatus(member.member_id, 'paid');
-      } catch (finErr) {
-        console.error('Finance update failed:', finErr);
+          .from('membership_payments')
+          .insert({
+            member_id: member.member_id,
+            membership_type_id: membershipType.id,
+            amount,
+            currency: 'AUD',
+            status: 'pending',
+            payment_method: 'bank_transfer',
+          });
       }
 
       if (member.email) {
@@ -405,7 +395,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
             .eq('id', member.member_id)
             .single();
 
-          await sendPaymentConfirmation({
+          await sendRenewalPendingNotification({
             email: member.email,
             first_name: member.first_name,
             last_name: member.last_name,
@@ -414,19 +404,23 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
             renewal_date: renewalDate.toISOString().split('T')[0],
             amount,
             currency: 'AUD',
+            bank_name: clubData?.bank_name || '',
+            bsb: clubData?.bsb || '',
+            account_number: clubData?.account_number || '',
             club_id: currentClub.clubId,
             user_id: memberData?.user_id,
           });
         } catch (emailErr) {
-          console.error('Failed to send confirmation email:', emailErr);
+          console.error('Failed to send renewal pending email:', emailErr);
         }
       }
 
-      addNotification('success', `Membership renewed for ${member.first_name} ${member.last_name} as "${renewAsType}"`);
+      addNotification('success', `Membership renewed for ${member.first_name} ${member.last_name} as "${renewAsType}" - awaiting payment`);
 
       setExpiringMembers(prev => prev.filter(m => m.member_id !== member.member_id));
       setOverdueMembers(prev => prev.filter(m => m.member_id !== member.member_id));
 
+      await fetchPendingRenewals();
       await fetchExpiringMemberships();
     } catch (error: any) {
       console.error('Error renewing member:', error);

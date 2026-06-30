@@ -97,6 +97,33 @@ const defaultTemplates: Record<string, { subject: string; body: string }> = {
 <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">If you did not expect this change, please contact your club administrator.</p>
 <p style="margin:0;color:#374151;font-size:15px;line-height:1.7;">For security, we recommend changing your password after logging in.</p>`
   },
+  renewal_pending: {
+    subject: 'Your {{clubName}} membership renewal - Payment Required',
+    body: `<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">Hi {{firstName}},</p>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Your <strong>{{membershipType}}</strong> membership with <strong>{{clubName}}</strong> has been renewed and is now awaiting payment.</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+  <tr><td style="background-color:#f8fafc;padding:14px 20px;border-bottom:1px solid #e2e8f0;"><p style="margin:0;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Membership Details</p></td></tr>
+  <tr><td style="padding:0;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;width:40%;"><span style="color:#64748b;font-size:13px;">Membership Type</span></td>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{membershipType}}</span></td>
+      </tr>
+      <tr>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#64748b;font-size:13px;">Amount Due</span></td>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{amount}} {{currency}}</span></td>
+      </tr>
+      <tr>
+        <td style="padding:12px 20px;"><span style="color:#64748b;font-size:13px;">Valid Until</span></td>
+        <td style="padding:12px 20px;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{renewalDate}}</span></td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+{{bankDetails}}
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Please use your <strong>full name</strong> as the payment reference so we can identify your payment.</p>
+<p style="margin:0;color:#374151;font-size:15px;line-height:1.7;">Once your payment is received, your membership will be confirmed and you'll receive a payment confirmation email.</p>`
+  },
   application_received: {
     subject: 'Application Received - {{clubName}}',
     body: `<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">Thank you for your application, {{firstName}} {{lastName}}!</p>
@@ -135,6 +162,7 @@ const HEADER_SUBTITLES: Record<string, string> = {
   'application_approved': 'Application Approved',
   'application_rejected': 'Application Update',
   'payment_confirmation': 'Payment Confirmation',
+  'renewal_pending': 'Membership Renewal - Payment Required',
   'membership_expired': 'Membership Expired',
   'password_reset': 'Password Reset',
 }
