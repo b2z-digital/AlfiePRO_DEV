@@ -119,6 +119,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
 
         const activeTypes = typesData
           .filter(t => t.is_active)
+          .filter(t => !t.name.toLowerCase().includes('lifetime'))
           .map(t => ({ id: t.id, name: t.name, fee: t.amount || 0, renewal_period: t.renewal_period }));
         setMembershipTypes(activeTypes);
       }
@@ -977,6 +978,11 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
                 onChange={(e) => setSelectedMembershipType(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
+                {!membershipTypes.some(t => t.name === renewTarget.membership_level) && (
+                  <option value={renewTarget.membership_level}>
+                    {renewTarget.membership_level} (Current)
+                  </option>
+                )}
                 {membershipTypes.map((type) => (
                   <option key={type.id} value={type.name}>
                     {type.name} {type.fee > 0 ? `($${type.fee.toFixed(2)})` : '(Free)'}
