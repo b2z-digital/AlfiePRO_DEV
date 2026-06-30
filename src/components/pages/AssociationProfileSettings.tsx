@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, X, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Save, X, Image as ImageIcon, CircleAlert as AlertCircle, Mail } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { supabase } from '../../utils/supabase';
 import imageCompression from 'browser-image-compression';
+import { AssociationEmailLogs } from '../membership/AssociationEmailLogs';
 
 interface AssociationProfileSettingsProps {
   darkMode: boolean;
@@ -12,7 +13,7 @@ interface AssociationProfileSettingsProps {
 export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProps> = ({ darkMode }) => {
   const { currentOrganization } = useAuth();
   const { addNotification } = useNotifications();
-  const [activeTab, setActiveTab] = useState<'profile'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'email_logs'>('profile');
   const [associationName, setAssociationName] = useState('');
   const [shortName, setShortName] = useState('');
   const [description, setDescription] = useState('');
@@ -214,6 +215,24 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
             >
               Profile
               {activeTab === 'profile' && (
+                <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${darkMode ? 'bg-blue-400' : 'bg-blue-600'}`} />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('email_logs')}
+              className={`px-6 py-3 font-medium transition-colors relative flex items-center gap-2 ${
+                activeTab === 'email_logs'
+                  ? darkMode
+                    ? 'text-blue-400'
+                    : 'text-blue-600'
+                  : darkMode
+                  ? 'text-gray-400 hover:text-gray-300'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Mail size={16} />
+              Email Logs
+              {activeTab === 'email_logs' && (
                 <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${darkMode ? 'bg-blue-400' : 'bg-blue-600'}`} />
               )}
             </button>
@@ -420,6 +439,10 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
                 </button>
               </div>
             </form>
+          )}
+
+          {activeTab === 'email_logs' && (
+            <AssociationEmailLogs darkMode={darkMode} />
           )}
 
         </div>
