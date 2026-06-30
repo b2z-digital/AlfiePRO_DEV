@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, X, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Save, X, Image as ImageIcon, CircleAlert as AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { supabase } from '../../utils/supabase';
@@ -12,7 +12,6 @@ interface AssociationProfileSettingsProps {
 export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProps> = ({ darkMode }) => {
   const { currentOrganization } = useAuth();
   const { addNotification } = useNotifications();
-  const [activeTab, setActiveTab] = useState<'profile'>('profile');
   const [associationName, setAssociationName] = useState('');
   const [shortName, setShortName] = useState('');
   const [description, setDescription] = useState('');
@@ -196,33 +195,8 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
 
   return (
     <div className="space-y-6">
-      {/* Tabs */}
       <div className={`rounded-xl ${darkMode ? 'bg-gray-800/50' : 'bg-gray-900/5'} border ${darkMode ? 'border-gray-700/50' : 'border-gray-200/50'} overflow-hidden`}>
-        <div className={`border-b ${darkMode ? 'border-gray-700/50' : 'border-gray-200/50'}`}>
-          <div className="flex">
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`px-6 py-3 font-medium transition-colors relative ${
-                activeTab === 'profile'
-                  ? darkMode
-                    ? 'text-blue-400'
-                    : 'text-blue-600'
-                  : darkMode
-                  ? 'text-gray-400 hover:text-gray-300'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Profile
-              {activeTab === 'profile' && (
-                <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${darkMode ? 'bg-blue-400' : 'bg-blue-600'}`} />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Tab Content */}
         <div className="p-6">
-          {activeTab === 'profile' && (
             <form onSubmit={handleSaveProfile} className="space-y-6">
               {error && (
                 <div className={`p-4 rounded-lg ${darkMode ? 'bg-red-900/20' : 'bg-red-50'} border ${darkMode ? 'border-red-800/50' : 'border-red-200/50'} flex items-start gap-3`}>
@@ -420,8 +394,6 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
                 </button>
               </div>
             </form>
-          )}
-
         </div>
       </div>
     </div>
