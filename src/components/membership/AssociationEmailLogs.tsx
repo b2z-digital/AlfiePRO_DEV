@@ -50,8 +50,7 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
 
   useEffect(() => {
     if (currentOrganization?.id) {
-      fetchClubs();
-      fetchLogs(true);
+      fetchClubs().then((clubList) => fetchLogs(true, clubList));
     }
   }, [currentOrganization?.id]);
 
@@ -68,22 +67,24 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
       .eq('state_association_id', currentOrganization!.id)
       .order('name');
     if (data) setClubs(data);
+    return data || [];
   };
 
-  const fetchLogs = async (reset = false) => {
+  const fetchLogs = async (reset = false, clubList?: { id: string; name: string }[]) => {
     if (!currentOrganization?.id) return;
     setLoading(true);
 
     const currentPage = reset ? 0 : page;
     if (reset) setPage(0);
 
-    const clubIds = clubs.length > 0
-      ? clubs.map(c => c.id)
+    const availableClubs = clubList || clubs;
+    const clubIds = availableClubs.length > 0
+      ? availableClubs.map(c => c.id)
       : (await supabase
           .from('clubs')
-          .select('id')
+          .select('id, name')
           .eq('state_association_id', currentOrganization.id)
-        ).data?.map((c: { id: string }) => c.id) || [];
+        ).data?.map((c: { id: string; name: string }) => c.id) || [];
 
     if (clubIds.length === 0) {
       setLogs([]);
@@ -93,7 +94,7 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
 
     let query = supabase
       .from('email_logs')
-      .select('*')
+      .select('*, clubs(name)')
       .in('club_id', filterClub !== 'all' ? [filterClub] : clubIds)
       .order('created_at', { ascending: false })
       .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
@@ -116,9 +117,10 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
       return;
     }
 
-    const enriched = (data || []).map(log => ({
+    const enriched = (data || []).map((log: any) => ({
       ...log,
-      club_name: clubs.find(c => c.id === log.club_id)?.name || 'Unknown Club',
+      club_name: log.clubs?.name || 'Unknown Club',
+      clubs: undefined,
     }));
 
     if (reset) {
