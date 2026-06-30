@@ -201,8 +201,13 @@ function replacePlaceholders(template: string, data: EmailRequest['member_data']
     result = result.replace(/\{\{renewalDate\}\}/g, formattedDate)
   }
 
-  if (data.amount && data.currency) {
-    result = result.replace(/\{\{amount\}\}/g, `$${data.amount.toFixed(2)}`)
+  if (data.amount != null && data.amount !== '') {
+    const numAmount = typeof data.amount === 'number' ? data.amount : parseFloat(String(data.amount))
+    if (!isNaN(numAmount)) {
+      result = result.replace(/\{\{amount\}\}/g, `$${numAmount.toFixed(2)}`)
+    }
+  }
+  if (data.currency) {
     result = result.replace(/\{\{currency\}\}/g, data.currency)
   }
 
