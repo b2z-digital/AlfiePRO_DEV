@@ -101,7 +101,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
 
       const { data: typesData } = await supabase
         .from('membership_types')
-        .select('id, name, is_active, replaces_membership_type_id, fee, renewal_period')
+        .select('id, name, is_active, replaces_membership_type_id, amount, renewal_period')
         .eq('club_id', currentClub.clubId);
 
       if (typesData) {
@@ -119,7 +119,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
 
         const activeTypes = typesData
           .filter(t => t.is_active)
-          .map(t => ({ id: t.id, name: t.name, fee: t.fee || 0, renewal_period: t.renewal_period }));
+          .map(t => ({ id: t.id, name: t.name, fee: t.amount || 0, renewal_period: t.renewal_period }));
         setMembershipTypes(activeTypes);
       }
     } catch (error) {
