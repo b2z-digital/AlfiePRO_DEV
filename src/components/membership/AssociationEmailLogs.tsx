@@ -44,13 +44,17 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
   const [filterClub, setFilterClub] = useState<string>('all');
   const [clubs, setClubs] = useState<{ id: string; name: string }[]>([]);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  const [stats, setStats] = useState({ total: 0, delivered: 0, failed: 0, clubsWithLogs: 0 });
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const PAGE_SIZE = 50;
 
   useEffect(() => {
     if (currentOrganization?.id) {
-      fetchClubs().then((clubList) => fetchLogs(true, clubList));
+      fetchClubs().then((clubList) => {
+        fetchLogs(true, clubList);
+        fetchStats(clubList);
+      });
     }
   }, [currentOrganization?.id]);
 
@@ -68,6 +72,42 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
       .order('name');
     if (data) setClubs(data);
     return data || [];
+  };
+
+  const fetchStats = async (clubList: { id: string; name: string }[]) => {
+    if (!currentOrganization?.id || clubList.length === 0) return;
+    const clubIds = clubList.map(c => c.id);
+
+    const { count: total } = await supabase
+      .from('email_logs')
+      .select('*', { count: 'exact', head: true })
+      .in('club_id', clubIds);
+
+    const { count: delivered } = await supabase
+      .from('email_logs')
+      .select('*', { count: 'exact', head: true })
+      .in('club_id', clubIds)
+      .eq('status', 'sent');
+
+    const { count: failed } = await supabase
+      .from('email_logs')
+      .select('*', { count: 'exact', head: true })
+      .in('club_id', clubIds)
+      .eq('status', 'failed');
+
+    const { data: clubsWithLogsData } = await supabase
+      .from('email_logs')
+      .select('club_id')
+      .in('club_id', clubIds);
+
+    const uniqueClubs = new Set(clubsWithLogsData?.map(r => r.club_id) || []);
+
+    setStats({
+      total: total || 0,
+      delivered: delivered || 0,
+      failed: failed || 0,
+      clubsWithLogs: uniqueClubs.size,
+    });
   };
 
   const fetchLogs = async (reset = false, clubList?: { id: string; name: string }[]) => {
@@ -157,28 +197,25 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
     return styles[status as keyof typeof styles] || styles.pending;
   };
 
-  const totalSent = logs.filter(l => l.status === 'sent').length;
-  const totalFailed = logs.filter(l => l.status === 'failed').length;
-
   return (
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} border ${darkMode ? 'border-gray-600/50' : 'border-gray-200'}`}>
           <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Emails</div>
-          <div className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{logs.length}</div>
+          <div className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{stats.total}</div>
         </div>
         <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} border ${darkMode ? 'border-gray-600/50' : 'border-gray-200'}`}>
           <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Delivered</div>
-          <div className="text-xl font-bold text-green-500">{totalSent}</div>
+          <div className="text-xl font-bold text-green-500">{stats.delivered}</div>
         </div>
         <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} border ${darkMode ? 'border-gray-600/50' : 'border-gray-200'}`}>
           <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Failed</div>
-          <div className="text-xl font-bold text-red-500">{totalFailed}</div>
+          <div className="text-xl font-bold text-red-500">{stats.failed}</div>
         </div>
         <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} border ${darkMode ? 'border-gray-600/50' : 'border-gray-200'}`}>
           <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Clubs</div>
-          <div className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{clubs.length}</div>
+          <div className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{stats.clubsWithLogs}</div>
         </div>
       </div>
 
