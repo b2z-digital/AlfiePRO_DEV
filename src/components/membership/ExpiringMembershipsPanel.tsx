@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TriangleAlert as AlertTriangle, Calendar, Mail, Phone, Clock, RefreshCw, Download, Search, ListFilter as Filter, ArrowRightLeft, DollarSign, CircleCheck as CheckCircle, Banknote } from 'lucide-react';
+import { TriangleAlert as AlertTriangle, Calendar, Mail, Phone, Clock, RefreshCw, Download, Search, ListFilter as Filter, ArrowRightLeft, DollarSign, CircleCheck as CheckCircle, Banknote, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -7,6 +7,13 @@ import { formatDate } from '../../utils/date';
 import { Avatar } from '../ui/Avatar';
 import { sendPaymentConfirmation } from '../../utils/membershipUtils';
 import { updateMembershipTransactionStatus } from '../../utils/membershipFinanceUtils';
+
+interface MembershipType {
+  id: string;
+  name: string;
+  fee: number;
+  renewal_period: string | null;
+}
 
 interface ExpiringMember {
   member_id: string;
@@ -52,6 +59,12 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
   const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null);
   const [renewingMember, setRenewingMember] = useState<string | null>(null);
   const [bulkRenewing, setBulkRenewing] = useState(false);
+  const [showRenewModal, setShowRenewModal] = useState(false);
+  const [renewTarget, setRenewTarget] = useState<ExpiringMember | null>(null);
+  const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
+  const [selectedMembershipType, setSelectedMembershipType] = useState<string>('');
+  const [bulkRenewType, setBulkRenewType] = useState<string>('');
+  const [showBulkRenewModal, setShowBulkRenewModal] = useState(false);
 
   useEffect(() => {
     if (currentClub?.clubId) {
@@ -88,7 +101,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
 
       const { data: typesData } = await supabase
         .from('membership_types')
-        .select('id, name, is_active, replaces_membership_type_id')
+        .select('id, name, is_active, replaces_membership_type_id, fee, renewal_period')
         .eq('club_id', currentClub.clubId);
 
       if (typesData) {
@@ -103,6 +116,11 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
           }
         }
         setReplacementMap(map);
+
+        const activeTypes = typesData
+          .filter(t => t.is_active)
+          .map(t => ({ id: t.id, name: t.name, fee: t.fee || 0, renewal_period: t.renewal_period }));
+        setMembershipTypes(activeTypes);
       }
     } catch (error) {
       console.error('Error fetching expiring memberships:', error);
@@ -286,13 +304,20 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
     }
   };
 
-  const handleRenewMember = async (member: ExpiringMember) => {
+  const openRenewModal = (member: ExpiringMember) => {
+    setRenewTarget(member);
+    setSelectedMembershipType(member.membership_level);
+    setShowRenewModal(true);
+  };
+
+  const handleRenewMember = async (member: ExpiringMember, membershipTypeName?: string) => {
     if (!currentClub?.clubId) return;
+
+    const renewAsType = membershipTypeName || member.membership_level;
 
     try {
       setRenewingMember(member.member_id);
 
-      // Get club renewal settings to determine correct renewal date
       const { data: clubData } = await supabase
         .from('clubs')
         .select('renewal_mode, fixed_renewal_date')
@@ -303,58 +328,50 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
       const now = new Date();
 
       if (clubData?.renewal_mode === 'fixed' && clubData?.fixed_renewal_date) {
-        // Fixed mode: use the club's fixed renewal date (e.g., '07-01' for July 1)
         const [month, day] = clubData.fixed_renewal_date.split('-').map(Number);
         renewalDate = new Date(now.getFullYear(), month - 1, day);
-        // If that date has already passed this year, use next year
         if (renewalDate <= now) {
           renewalDate = new Date(now.getFullYear() + 1, month - 1, day);
         }
       } else {
-        // Anniversary mode: 1 year from today
         renewalDate = new Date(now);
         renewalDate.setFullYear(renewalDate.getFullYear() + 1);
       }
 
-      // Get the membership type fee and renewal period
-      const { data: typeData } = await supabase
-        .from('membership_types')
-        .select('fee, renewal_period')
-        .eq('club_id', currentClub.clubId)
-        .eq('name', member.membership_level)
-        .eq('is_active', true)
-        .maybeSingle();
+      const selectedType = membershipTypes.find(t => t.name === renewAsType);
+      const amount = selectedType?.fee || 0;
 
-      const amount = typeData?.fee || 0;
-
-      // For anniversary mode, respect the membership type's renewal period
-      if (clubData?.renewal_mode !== 'fixed' && typeData?.renewal_period) {
+      if (clubData?.renewal_mode !== 'fixed' && selectedType?.renewal_period) {
         const periodDate = new Date(now);
-        if (typeData.renewal_period === 'quarterly') {
+        if (selectedType.renewal_period === 'quarterly') {
           periodDate.setMonth(periodDate.getMonth() + 3);
           renewalDate = periodDate;
-        } else if (typeData.renewal_period === 'monthly') {
+        } else if (selectedType.renewal_period === 'monthly') {
           periodDate.setMonth(periodDate.getMonth() + 1);
           renewalDate = periodDate;
         }
       }
 
-      // Update member to financial/paid with new renewal date
-      const { error: memberError } = await supabase
+      const { data: updatedRows, error: memberError } = await supabase
         .from('members')
         .update({
           is_financial: true,
           payment_status: 'paid',
           payment_confirmed_at: new Date().toISOString(),
           renewal_date: renewalDate.toISOString().split('T')[0],
+          membership_level: renewAsType,
           amount_paid: amount,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', member.member_id);
+        .eq('id', member.member_id)
+        .select('id');
 
       if (memberError) throw memberError;
 
-      // Mark any pending remittances as externally paid
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('Update failed - no rows affected. You may not have permission to update this member.');
+      }
+
       const { data: remittances } = await supabase
         .from('membership_remittances')
         .select('id')
@@ -373,14 +390,12 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
           .in('id', remittances.map(r => r.id));
       }
 
-      // Create finance transaction
       try {
         await updateMembershipTransactionStatus(member.member_id, 'paid');
       } catch (finErr) {
         console.error('Finance update failed:', finErr);
       }
 
-      // Send confirmation email
       if (member.email) {
         try {
           const { data: memberData } = await supabase
@@ -394,7 +409,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
             first_name: member.first_name,
             last_name: member.last_name,
             club_name: currentClub?.club?.name || 'your club',
-            membership_type: member.membership_level,
+            membership_type: renewAsType,
             renewal_date: renewalDate.toISOString().split('T')[0],
             amount,
             currency: 'AUD',
@@ -406,13 +421,19 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
         }
       }
 
-      addNotification('success', `Membership renewed for ${member.first_name} ${member.last_name}`);
+      addNotification('success', `Membership renewed for ${member.first_name} ${member.last_name} as "${renewAsType}"`);
+
+      setExpiringMembers(prev => prev.filter(m => m.member_id !== member.member_id));
+      setOverdueMembers(prev => prev.filter(m => m.member_id !== member.member_id));
+
       await fetchExpiringMemberships();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error renewing member:', error);
-      addNotification('error', `Failed to renew membership for ${member.first_name} ${member.last_name}`);
+      addNotification('error', error?.message || `Failed to renew membership for ${member.first_name} ${member.last_name}`);
     } finally {
       setRenewingMember(null);
+      setShowRenewModal(false);
+      setRenewTarget(null);
     }
   };
 
@@ -421,14 +442,18 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
       addNotification('error', 'Please select members to renew');
       return;
     }
+    setShowBulkRenewModal(true);
+  };
 
+  const executeBulkRenew = async () => {
     try {
       setBulkRenewing(true);
+      setShowBulkRenewModal(false);
       const members = activeTab === 'expiring' ? expiringMembers : overdueMembers;
       const selectedMembersList = members.filter(m => selectedMembers.has(m.member_id));
 
       for (const member of selectedMembersList) {
-        await handleRenewMember(member);
+        await handleRenewMember(member, bulkRenewType || undefined);
       }
 
       setSelectedMembers(new Set());
@@ -438,6 +463,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
       addNotification('error', 'Failed to complete some renewals');
     } finally {
       setBulkRenewing(false);
+      setBulkRenewType('');
     }
   };
 
@@ -895,7 +921,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
                           Send Reminder
                         </button>
                         <button
-                          onClick={() => handleRenewMember(member)}
+                          onClick={() => openRenewModal(member)}
                           disabled={renewingMember === member.member_id}
                           className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                         >
@@ -917,6 +943,137 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
           </div>
         )}
       </div>
+      )}
+
+      {/* Renew Member Modal */}
+      {showRenewModal && renewTarget && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Renew Membership</h3>
+              <button
+                onClick={() => { setShowRenewModal(false); setRenewTarget(null); }}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-slate-300">
+                Renewing membership for <span className="font-medium text-white">{renewTarget.first_name} {renewTarget.last_name}</span>
+              </p>
+              <p className="text-slate-400 text-sm mt-1">
+                Current type: {renewTarget.membership_level}
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Renew as membership type
+              </label>
+              <select
+                value={selectedMembershipType}
+                onChange={(e) => setSelectedMembershipType(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                {membershipTypes.map((type) => (
+                  <option key={type.id} value={type.name}>
+                    {type.name} {type.fee > 0 ? `($${type.fee.toFixed(2)})` : '(Free)'}
+                  </option>
+                ))}
+              </select>
+              {selectedMembershipType !== renewTarget.membership_level && (
+                <p className="text-sm text-amber-400 mt-2">
+                  Membership type will be changed from "{renewTarget.membership_level}" to "{selectedMembershipType}"
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => { setShowRenewModal(false); setRenewTarget(null); }}
+                className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRenewMember(renewTarget, selectedMembershipType)}
+                disabled={renewingMember === renewTarget.member_id}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {renewingMember === renewTarget.member_id ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Renewing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={14} />
+                    Confirm Renewal
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Renew Modal */}
+      {showBulkRenewModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Bulk Renew Memberships</h3>
+              <button
+                onClick={() => { setShowBulkRenewModal(false); setBulkRenewType(''); }}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-slate-300">
+                Renewing <span className="font-medium text-white">{selectedMembers.size}</span> selected member{selectedMembers.size !== 1 ? 's' : ''}
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Renew all as membership type (optional)
+              </label>
+              <select
+                value={bulkRenewType}
+                onChange={(e) => setBulkRenewType(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">Keep each member's current type</option>
+                {membershipTypes.map((type) => (
+                  <option key={type.id} value={type.name}>
+                    {type.name} {type.fee > 0 ? `($${type.fee.toFixed(2)})` : '(Free)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => { setShowBulkRenewModal(false); setBulkRenewType(''); }}
+                className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeBulkRenew}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <CheckCircle size={14} />
+                Renew {selectedMembers.size} Member{selectedMembers.size !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
