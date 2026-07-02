@@ -45,6 +45,7 @@ interface ClubInfo {
 
 const TYPE_ALIASES: Record<string, string> = {
   'renewal': 'renewal_reminder',
+  'renewal_unregistered': 'renewal_reminder_unregistered',
 }
 
 const defaultTemplates: Record<string, { subject: string; body: string }> = {
@@ -80,6 +81,36 @@ const defaultTemplates: Record<string, { subject: string; body: string }> = {
 <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">We have successfully received your payment of {{amount}} {{currency}} for your <strong>{{clubName}}</strong> membership.</p>
 <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Your membership is now active until {{renewalDate}}.</p>
 <p style="margin:0;color:#374151;font-size:15px;line-height:1.7;">Thank you for your continued support of {{clubName}}.</p>`
+  },
+  renewal_reminder_unregistered: {
+    subject: 'Time to renew your {{clubName}} membership',
+    body: `<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">Hi {{firstName}},</p>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Your <strong>{{membershipType}}</strong> membership with <strong>{{clubName}}</strong> is due for renewal.</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+  <tr><td style="background-color:#f8fafc;padding:14px 20px;border-bottom:1px solid #e2e8f0;"><p style="margin:0;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Membership Details</p></td></tr>
+  <tr><td style="padding:0;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;width:40%;"><span style="color:#64748b;font-size:13px;">Membership Type</span></td>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{membershipType}}</span></td>
+      </tr>
+      <tr>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#64748b;font-size:13px;">Renewal Date</span></td>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{renewalDate}}</span></td>
+      </tr>
+      <tr>
+        <td style="padding:12px 20px;"><span style="color:#64748b;font-size:13px;">Amount Due</span></td>
+        <td style="padding:12px 20px;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{amount}}</span></td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">To renew your membership, please make a bank transfer using the details below:</p>
+{{bankDetails}}
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Please use your <strong>full name</strong> as the payment reference so the club treasurer can identify your payment.</p>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Once your payment is received, your membership will be renewed by the club treasurer.</p>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">If you have any questions or need help, please email <strong>{{secretaryName}}</strong> - {{secretaryEmail}}</p>
+<p style="margin:0;color:#374151;font-size:15px;line-height:1.7;">Thank you for being a valued member of {{clubName}}!</p>`
   },
   membership_expired: {
     subject: 'Your {{clubName}} membership has expired',
@@ -163,6 +194,7 @@ const HEADER_SUBTITLES: Record<string, string> = {
   'application_rejected': 'Application Update',
   'payment_confirmation': 'Payment Confirmation',
   'renewal_pending': 'Membership Renewal - Payment Required',
+  'renewal_reminder_unregistered': 'Membership Renewal',
   'membership_expired': 'Membership Expired',
   'password_reset': 'Password Reset',
 }

@@ -9,6 +9,7 @@ import { ClubProfileSettings } from './ClubProfileSettings';
 import { AssociationProfileSettings } from './AssociationProfileSettings';
 import { AssociationUsersManagement } from './AssociationUsersManagement';
 import { AssociationEmailLogs } from '../membership/AssociationEmailLogs';
+import { ClubEmailLogs } from '../membership/ClubEmailLogs';
 import { StateAssociationFeeSettings } from '../membership/StateAssociationFeeSettings';
 import { NationalAssociationFeeSettings } from '../membership/NationalAssociationFeeSettings';
 import { CommitteeManagement } from './CommitteeManagement';
@@ -42,7 +43,7 @@ interface SettingsPageProps {
 type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'club-features' | 'team' | 'team-access' | 'subscriptions' | 'integrations' |
   'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' | 'finance-payment-settings' | 'finance-opening-balance' |
   'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' |
-  'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system' | 'handicap-rules' | 'email-logs';
+  'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system' | 'handicap-rules' | 'email-logs' | 'club-email-logs';
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const { user, currentClub, currentOrganization, isRaceOfficer } = useAuth();
@@ -1465,6 +1466,33 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                 </button>
               )}
 
+              {/* Email Logs Card - Club Admins */}
+              {currentClub && !currentOrganization && (
+                <button
+                  onClick={() => setActiveTab('club-email-logs')}
+                  className={`
+                    group p-6 rounded-xl text-left transition-all border
+                    ${activeTab === 'club-email-logs'
+                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-rose-50' : 'bg-rose-500/20'}`}>
+                      <Mail size={20} className="text-rose-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Email Logs</h3>
+                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                        View email delivery history for your club
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              )}
+
               {/* Advertising Card - SuperAdmin Only */}
               {user?.user_metadata?.is_super_admin && (
                 <button
@@ -1997,6 +2025,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
           {activeTab === 'email-logs' && currentOrganization && (
             <AssociationEmailLogs darkMode={darkMode} />
+          )}
+
+          {activeTab === 'club-email-logs' && currentClub && !currentOrganization && (
+            <ClubEmailLogs darkMode={darkMode} />
           )}
           </div>
         )}

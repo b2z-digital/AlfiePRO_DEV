@@ -60,10 +60,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Fetch club details
+    // Fetch club details including bank details
     const { data: club, error: clubError } = await supabaseAdmin
       .from('clubs')
-      .select('name, renewal_notification_days')
+      .select('name, renewal_notification_days, bank_name, bsb, account_number')
       .eq('id', club_id)
       .single();
 
@@ -75,6 +75,21 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
+    }
+
+    // Fetch membership fee amount if available
+    let feeAmount: number | null = null;
+    if (member.membership_level) {
+      const { data: membershipType } = await supabaseAdmin
+        .from('membership_types')
+        .select('amount')
+        .eq('club_id', club_id)
+        .eq('name', member.membership_level)
+        .maybeSingle();
+
+      if (membershipType?.amount) {
+        feeAmount = membershipType.amount;
+      }
     }
 
     // Calculate days until expiry
@@ -140,9 +155,13 @@ Deno.serve(async (req: Request) => {
     }
 
     // Send renewal reminder email using the email template
+    // Use different template for unregistered (unlinked) members
     let emailSent = false;
     if (member.email) {
       try {
+        const isRegistered = !!member.user_id;
+        const emailType = isRegistered ? 'renewal_reminder' : 'renewal_reminder_unregistered';
+
         const emailResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-membership-notifications`, {
           method: 'POST',
           headers: {
@@ -150,7 +169,7 @@ Deno.serve(async (req: Request) => {
             'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
           },
           body: JSON.stringify({
-            email_type: 'renewal_reminder',
+            email_type: emailType,
             recipient_email: member.email,
             member_data: {
               first_name: member.first_name,
@@ -160,7 +179,11 @@ Deno.serve(async (req: Request) => {
               membership_type: member.membership_level,
               club_id: club_id,
               user_id: member.user_id,
-              member_id: member.id
+              member_id: member.id,
+              amount: feeAmount,
+              bank_name: club.bank_name || undefined,
+              bsb: club.bsb || undefined,
+              account_number: club.account_number || undefined,
             }
           })
         });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Search, RefreshCw, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Circle as XCircle, Clock, ListFilter as Filter, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mail, Search, RefreshCw, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Circle as XCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
@@ -14,10 +14,9 @@ interface EmailLog {
   error_message: string | null;
   sent_at: string | null;
   created_at: string;
-  club_name?: string;
 }
 
-interface AssociationEmailLogsProps {
+interface ClubEmailLogsProps {
   darkMode: boolean;
 }
 
@@ -35,108 +34,70 @@ const EMAIL_TYPE_LABELS: Record<string, string> = {
   password_reset: 'Password Reset',
 };
 
-export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ darkMode }) => {
-  const { currentOrganization } = useAuth();
+export const ClubEmailLogs: React.FC<ClubEmailLogsProps> = ({ darkMode }) => {
+  const { currentClub } = useAuth();
   const [logs, setLogs] = useState<EmailLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterClub, setFilterClub] = useState<string>('all');
-  const [clubs, setClubs] = useState<{ id: string; name: string }[]>([]);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
-  const [stats, setStats] = useState({ total: 0, delivered: 0, failed: 0, clubsWithLogs: 0 });
+  const [stats, setStats] = useState({ total: 0, delivered: 0, failed: 0 });
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const PAGE_SIZE = 50;
 
   useEffect(() => {
-    if (currentOrganization?.id) {
-      fetchClubs().then((clubList) => {
-        fetchLogs(true, clubList);
-        fetchStats(clubList);
-      });
-    }
-  }, [currentOrganization?.id]);
-
-  useEffect(() => {
-    if (currentOrganization?.id) {
+    if (currentClub?.clubId) {
+      fetchStats();
       fetchLogs(true);
     }
-  }, [filterType, filterStatus, filterClub, searchQuery]);
+  }, [currentClub?.clubId]);
 
-  const fetchClubs = async () => {
-    const { data } = await supabase
-      .from('clubs')
-      .select('id, name')
-      .eq('state_association_id', currentOrganization!.id)
-      .order('name');
-    if (data) setClubs(data);
-    return data || [];
-  };
+  useEffect(() => {
+    if (currentClub?.clubId) {
+      fetchLogs(true);
+    }
+  }, [filterType, filterStatus, searchQuery]);
 
-  const fetchStats = async (clubList: { id: string; name: string }[]) => {
-    if (!currentOrganization?.id || clubList.length === 0) return;
-    const clubIds = clubList.map(c => c.id);
+  const fetchStats = async () => {
+    if (!currentClub?.clubId) return;
 
     const { count: total } = await supabase
       .from('email_logs')
       .select('*', { count: 'exact', head: true })
-      .in('club_id', clubIds);
+      .eq('club_id', currentClub.clubId);
 
     const { count: delivered } = await supabase
       .from('email_logs')
       .select('*', { count: 'exact', head: true })
-      .in('club_id', clubIds)
+      .eq('club_id', currentClub.clubId)
       .eq('status', 'sent');
 
     const { count: failed } = await supabase
       .from('email_logs')
       .select('*', { count: 'exact', head: true })
-      .in('club_id', clubIds)
+      .eq('club_id', currentClub.clubId)
       .eq('status', 'failed');
-
-    const { data: clubsWithLogsData } = await supabase
-      .from('email_logs')
-      .select('club_id')
-      .in('club_id', clubIds);
-
-    const uniqueClubs = new Set(clubsWithLogsData?.map(r => r.club_id) || []);
 
     setStats({
       total: total || 0,
       delivered: delivered || 0,
       failed: failed || 0,
-      clubsWithLogs: uniqueClubs.size,
     });
   };
 
-  const fetchLogs = async (reset = false, clubList?: { id: string; name: string }[]) => {
-    if (!currentOrganization?.id) return;
+  const fetchLogs = async (reset = false) => {
+    if (!currentClub?.clubId) return;
     setLoading(true);
 
     const currentPage = reset ? 0 : page;
     if (reset) setPage(0);
 
-    const availableClubs = clubList || clubs;
-    const clubIds = availableClubs.length > 0
-      ? availableClubs.map(c => c.id)
-      : (await supabase
-          .from('clubs')
-          .select('id, name')
-          .eq('state_association_id', currentOrganization.id)
-        ).data?.map((c: { id: string; name: string }) => c.id) || [];
-
-    if (clubIds.length === 0) {
-      setLogs([]);
-      setLoading(false);
-      return;
-    }
-
     let query = supabase
       .from('email_logs')
-      .select('*, clubs(name)')
-      .in('club_id', filterClub !== 'all' ? [filterClub] : clubIds)
+      .select('*')
+      .eq('club_id', currentClub.clubId)
       .order('created_at', { ascending: false })
       .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
 
@@ -158,16 +119,10 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
       return;
     }
 
-    const enriched = (data || []).map((log: any) => ({
-      ...log,
-      club_name: log.clubs?.name || 'Unknown Club',
-      clubs: undefined,
-    }));
-
     if (reset) {
-      setLogs(enriched);
+      setLogs(data || []);
     } else {
-      setLogs(prev => [...prev, ...enriched]);
+      setLogs(prev => [...prev, ...(data || [])]);
     }
     setHasMore((data || []).length === PAGE_SIZE);
     setLoading(false);
@@ -201,7 +156,7 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} border ${darkMode ? 'border-gray-600/50' : 'border-gray-200'}`}>
           <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Emails</div>
           <div className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{stats.total}</div>
@@ -213,10 +168,6 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
         <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} border ${darkMode ? 'border-gray-600/50' : 'border-gray-200'}`}>
           <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Failed</div>
           <div className="text-xl font-bold text-red-500">{stats.failed}</div>
-        </div>
-        <div className={`rounded-lg p-3 ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} border ${darkMode ? 'border-gray-600/50' : 'border-gray-200'}`}>
-          <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Clubs</div>
-          <div className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{stats.clubsWithLogs}</div>
         </div>
       </div>
 
@@ -234,19 +185,6 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
             } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
           />
         </div>
-
-        <select
-          value={filterClub}
-          onChange={e => setFilterClub(e.target.value)}
-          className={`px-3 py-2 rounded-lg text-sm border ${
-            darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'
-          }`}
-        >
-          <option value="all">All Clubs</option>
-          {clubs.map(club => (
-            <option key={club.id} value={club.id}>{club.name}</option>
-          ))}
-        </select>
 
         <select
           value={filterType}
@@ -274,7 +212,7 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
         </select>
 
         <button
-          onClick={() => fetchLogs(true)}
+          onClick={() => { fetchLogs(true); fetchStats(); }}
           className={`px-3 py-2 rounded-lg text-sm border flex items-center gap-1.5 ${
             darkMode ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
           }`}
@@ -303,7 +241,6 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
                 <tr className={darkMode ? 'bg-gray-800/50' : 'bg-gray-50'}>
                   <th className={`px-4 py-3 text-left font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Status</th>
                   <th className={`px-4 py-3 text-left font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Date</th>
-                  <th className={`px-4 py-3 text-left font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Club</th>
                   <th className={`px-4 py-3 text-left font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Recipient</th>
                   <th className={`px-4 py-3 text-left font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Type</th>
                   <th className={`px-4 py-3 text-left font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Subject</th>
@@ -329,9 +266,6 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
                         {log.sent_at ? formatDate(log.sent_at) : formatDate(log.created_at)}
                       </td>
                       <td className={`px-4 py-2.5 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        <span className="truncate max-w-[150px] block">{log.club_name}</span>
-                      </td>
-                      <td className={`px-4 py-2.5 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                         <span className="truncate max-w-[200px] block">{log.recipient_email}</span>
                       </td>
                       <td className={`px-4 py-2.5 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -348,7 +282,7 @@ export const AssociationEmailLogs: React.FC<AssociationEmailLogsProps> = ({ dark
                     </tr>
                     {expandedLog === log.id && (
                       <tr>
-                        <td colSpan={7} className={`px-4 py-3 ${darkMode ? 'bg-gray-800/30' : 'bg-gray-50/80'}`}>
+                        <td colSpan={6} className={`px-4 py-3 ${darkMode ? 'bg-gray-800/30' : 'bg-gray-50/80'}`}>
                           <div className="space-y-2">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                               <div>
