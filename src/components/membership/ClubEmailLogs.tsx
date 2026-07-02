@@ -23,6 +23,7 @@ interface ClubEmailLogsProps {
 const EMAIL_TYPE_LABELS: Record<string, string> = {
   welcome: 'Welcome',
   renewal_reminder: 'Renewal Reminder',
+  renewal_reminder_unregistered: 'Renewal Reminder (Unregistered)',
   renewal_pending: 'Renewal Pending',
   payment_confirmation: 'Payment Confirmation',
   application_approved: 'Application Approved',
