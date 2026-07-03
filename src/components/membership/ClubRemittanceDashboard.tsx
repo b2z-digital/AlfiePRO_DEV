@@ -155,6 +155,24 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
     }
   }, [currentClub, selectedYear, selectedStatus]);
 
+  useEffect(() => {
+    if (!currentClub?.clubId) return;
+
+    const channel = supabase
+      .channel('club-remittances-realtime')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'membership_remittances', filter: `club_id=eq.${currentClub.clubId}` },
+        () => { loadData(); }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'remittance_payments' },
+        () => { loadData(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentClub?.clubId, selectedYear, selectedStatus]);
+
   const loadData = async () => {
     if (!currentClub?.clubId) return;
 

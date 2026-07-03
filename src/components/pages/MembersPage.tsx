@@ -132,8 +132,31 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
           filter: `club_id=eq.${currentClub.clubId}`,
         },
         () => {
-          // Refresh members list when any change occurs
           fetchMembers();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'club_memberships',
+          filter: `club_id=eq.${currentClub.clubId}`,
+        },
+        () => {
+          fetchMembers();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'membership_remittances',
+          filter: `club_id=eq.${currentClub.clubId}`,
+        },
+        () => {
+          fetchRemittanceStatuses();
         }
       )
       .subscribe();

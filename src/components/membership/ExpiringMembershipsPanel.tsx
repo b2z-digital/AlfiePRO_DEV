@@ -73,6 +73,24 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
     }
   }, [currentClub, filterDays]);
 
+  useEffect(() => {
+    if (!currentClub?.clubId) return;
+
+    const channel = supabase
+      .channel('renewals-realtime')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'members', filter: `club_id=eq.${currentClub.clubId}` },
+        () => { fetchExpiringMemberships(); fetchPendingRenewals(); }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'membership_payments' },
+        () => { fetchPendingRenewals(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentClub?.clubId]);
+
   const fetchExpiringMemberships = async () => {
     if (!currentClub?.clubId) return;
 

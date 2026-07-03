@@ -411,6 +411,17 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         return;
       }
 
+      // Prevent deactivating a type that has members unless a replacement is linked
+      if (editingType.is_active && !typeFormData.is_active) {
+        const memberCount = memberCountsByType[editingType.id] || 0;
+        if (memberCount > 0 && !typeFormData.replaces_membership_type_id) {
+          setError(
+            `Cannot deactivate this membership type because ${memberCount} member${memberCount === 1 ? ' is' : 's are'} currently assigned to it. Please select a replacement membership type first so members can be migrated.`
+          );
+          return;
+        }
+      }
+
       // Prevent changing the last primary type to associate
       if (editingType.requires_association_fees !== false && !typeFormData.requires_association_fees) {
         const primaryTypes = membershipTypes.filter(t => t.requires_association_fees !== false);
