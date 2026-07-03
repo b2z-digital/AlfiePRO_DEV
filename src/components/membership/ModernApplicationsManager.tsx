@@ -59,6 +59,20 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
   }, [currentClub]);
 
   useEffect(() => {
+    if (!currentClub?.clubId) return;
+
+    const channel = supabase
+      .channel('applications-realtime')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'membership_applications', filter: `club_id=eq.${currentClub.clubId}` },
+        () => { fetchApplications(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentClub?.clubId]);
+
+  useEffect(() => {
     filterApplications();
   }, [applications, searchQuery, statusFilter]);
 

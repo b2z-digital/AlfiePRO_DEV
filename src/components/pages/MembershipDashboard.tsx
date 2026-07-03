@@ -83,6 +83,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
   const [pendingApplicationsCount, setPendingApplicationsCount] = useState(0);
   const [paymentPendingCount, setPaymentPendingCount] = useState(0);
   const [pendingRemittancesCount, setPendingRemittancesCount] = useState(0);
+  const [remittanceRefreshKey, setRemittanceRefreshKey] = useState(0);
 
   useEffect(() => {
     if (currentClub?.clubId) {
@@ -1253,6 +1254,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
           {activeTab === 'renewals' && <ExpiringMembershipsPanel darkMode={darkMode} />}
           {activeTab === 'remittances' && (
             <ClubRemittanceDashboard
+              key={remittanceRefreshKey}
               darkMode={darkMode}
               onRecordPayment={() => setShowPaymentModal(true)}
             />
@@ -1273,10 +1275,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
             toEntityId={stateAssociationId}
             onPaymentRecorded={() => {
               setShowPaymentModal(false);
-              // Trigger refresh of remittances
-              if (activeTab === 'remittances') {
-                window.location.reload();
-              }
+              setRemittanceRefreshKey(k => k + 1);
             }}
           />
         )}
