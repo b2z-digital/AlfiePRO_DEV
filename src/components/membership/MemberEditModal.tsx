@@ -27,6 +27,7 @@ interface MemberEditModalProps {
   clubId: string;
   darkMode?: boolean;
   onSuccess?: () => void;
+  onRenew?: (memberId: string) => void;
   initialTab?: 'details' | 'boats' | 'membership';
 }
 
@@ -68,6 +69,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   clubId,
   darkMode = true,
   onSuccess,
+  onRenew,
   initialTab
 }) => {
   const { addNotification } = useNotifications();
@@ -1261,7 +1263,27 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
 
                 <div className="flex items-center gap-2 mt-4">
                   <div className="flex items-center gap-2">
-                    {memberData.is_financial ? (
+                    {memberData.is_financial && memberData.renewal_date && new Date(memberData.renewal_date) < new Date() ? (
+                      <>
+                        <span className="flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-sm font-medium border border-amber-500/30">
+                          <Clock size={16} />
+                          Renewal Due
+                        </span>
+                        {onRenew && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClose();
+                              onRenew(memberId);
+                            }}
+                            className="flex items-center gap-2 px-4 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium"
+                          >
+                            <DollarSign size={14} />
+                            Renew Membership
+                          </button>
+                        )}
+                      </>
+                    ) : memberData.is_financial ? (
                       <span className="flex items-center gap-2 px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">
                         <CheckCircle size={16} />
                         Financial

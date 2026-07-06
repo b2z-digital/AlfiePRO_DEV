@@ -1750,6 +1750,10 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
           clubId={currentClub?.clubId || ''}
           darkMode={darkMode}
           onSuccess={handleMembershipFormSuccess}
+          onRenew={(id) => {
+            setShowMemberEditModal(false);
+            handleRenewMember(id);
+          }}
         />
       )}
 
