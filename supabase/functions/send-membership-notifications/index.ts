@@ -77,11 +77,14 @@ const defaultTemplates: Record<string, { subject: string; body: string }> = {
   </td></tr>
 </table>
 <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">To keep racing and enjoying all club benefits without interruption, you can renew your membership in just a few minutes:</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;"><tr><td align="center">
+  <p style="margin:0 0 12px;font-size:15px;color:#374151;font-weight:600;">On your phone:</p>
+  <a href="{{appDeepLink}}" style="display:inline-block;padding:14px 32px;background-color:#0284c7;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">Open in AlfiePRO App</a>
+  <p style="margin:12px 0 0;font-size:12px;color:#94a3b8;">(Opens directly in the AlfiePRO app)</p>
+</td></tr></table>
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td align="center">
-  <p style="margin:0 0 8px;font-size:15px;color:#374151;">Renew via <strong>AlfiePRO App</strong></p>
-  <p style="margin:0 0 16px;font-size:14px;color:#64748b;font-style:italic;">Open AlfiePRO &rarr; Tap your profile &rarr; Membership</p>
-  <p style="margin:0 0 8px;font-size:14px;color:#64748b;font-weight:600;">OR</p>
-  <a href="{{renewalLink}}" style="display:inline-block;padding:12px 32px;background-color:#0284c7;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">Renew My Membership</a>
+  <p style="margin:16px 0 12px;font-size:15px;color:#374151;font-weight:600;">On your computer:</p>
+  <a href="{{renewalLink}}" style="display:inline-block;padding:14px 32px;background-color:#0f766e;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">Renew via Web Browser</a>
 </td></tr></table>
 {{bankDetails}}
 <p style="margin:24px 0 16px;color:#374151;font-size:15px;line-height:1.7;font-weight:600;">Why renew now?</p>
@@ -287,8 +290,10 @@ function replacePlaceholders(template: string, data: EmailRequest['member_data']
 
   const appBaseUrl = data.app_url || 'https://alfiepro.com.au'
   const renewalUrl = `${appBaseUrl}/my-membership`
+  const appDeepLink = `alfiepro://my-membership`
   result = result.replace(/\{\{renewal_link\}\}/g, renewalUrl)
   result = result.replace(/\{\{renewalLink\}\}/g, renewalUrl)
+  result = result.replace(/\{\{appDeepLink\}\}/g, appDeepLink)
   result = result.replace(/\{\{event_name\}\}/g, data.event_name || '')
   result = result.replace(/\{\{eventName\}\}/g, data.event_name || '')
   result = result.replace(/\{\{event_date\}\}/g, data.event_date || '')
