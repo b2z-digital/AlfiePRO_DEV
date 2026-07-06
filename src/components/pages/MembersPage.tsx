@@ -35,7 +35,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired' | 'cancelled'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'renewal_due' | 'expired' | 'cancelled'>('all');
   const [filterBoatClass, setFilterBoatClass] = useState<string>('all');
   const [boatClasses, setBoatClasses] = useState<string[]>([]);
   const [showMembershipForm, setShowMembershipForm] = useState(false);
@@ -518,9 +518,10 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
     // Step 2: Apply tab-level status filter client-side
     if (filterStatus === 'active') {
-      filtered = filtered.filter(m => m.is_financial === true);
+      filtered = filtered.filter(m => m.is_financial === true && !(m.renewal_date && new Date(m.renewal_date) < new Date()));
+    } else if (filterStatus === 'renewal_due') {
+      filtered = filtered.filter(m => m.is_financial === true && m.renewal_date && new Date(m.renewal_date) < new Date());
     } else if (filterStatus === 'expired') {
-      // Expired = active membership status but not financial (renewal overdue)
       filtered = filtered.filter(m => m.is_financial === false || m.is_financial === null);
     }
     // 'all' and 'cancelled' use the data already scoped by the DB query
@@ -963,10 +964,15 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <p className="text-slate-400 text-sm">
-            {members.filter(m => m.is_financial === true).length} {members.filter(m => m.is_financial === true).length === 1 ? 'Member' : 'Members'} Financial
+            {members.filter(m => m.is_financial === true && !(m.renewal_date && new Date(m.renewal_date) < new Date())).length} Financial
+            {members.filter(m => m.is_financial === true && m.renewal_date && new Date(m.renewal_date) < new Date()).length > 0 && (
+              <span className="ml-2 text-amber-400">
+                · {members.filter(m => m.is_financial === true && m.renewal_date && new Date(m.renewal_date) < new Date()).length} Renewal Due
+              </span>
+            )}
             {members.filter(m => m.is_financial === false || m.is_financial === null).length > 0 && (
-              <span className="ml-2 text-yellow-400">
-                · {members.filter(m => m.is_financial === false || m.is_financial === null).length} Overdue
+              <span className="ml-2 text-red-400">
+                · {members.filter(m => m.is_financial === false || m.is_financial === null).length} Unfinancial
               </span>
             )}
           </p>
@@ -1148,21 +1154,24 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
       {/* Status Filter Tabs */}
       <div className="flex items-center gap-1 border-b border-slate-700/50 pb-0">
-        {(['all', 'active', 'expired', 'cancelled'] as const).map((status) => {
+        {(['all', 'active', 'renewal_due', 'expired', 'cancelled'] as const).map((status) => {
           const allNonCancelled = members;
-          const activeCnt = allNonCancelled.filter(m => m.is_financial === true).length;
+          const activeCnt = allNonCancelled.filter(m => m.is_financial === true && !(m.renewal_date && new Date(m.renewal_date) < new Date())).length;
+          const renewalDueCnt = allNonCancelled.filter(m => m.is_financial === true && m.renewal_date && new Date(m.renewal_date) < new Date()).length;
           const expiredCnt = allNonCancelled.filter(m => m.is_financial === false || m.is_financial === null).length;
 
           const labels: Record<string, string> = {
             all: `All Members`,
-            active: `Active (${activeCnt})`,
-            expired: `Overdue (${expiredCnt})`,
+            active: `Financial (${activeCnt})`,
+            renewal_due: `Renewal Due (${renewalDueCnt})`,
+            expired: `Unfinancial (${expiredCnt})`,
             cancelled: 'Cancelled',
           };
           const activeStyles: Record<string, string> = {
             all: 'border-blue-500 text-blue-400',
             active: 'border-green-500 text-green-400',
-            expired: 'border-yellow-500 text-yellow-400',
+            renewal_due: 'border-amber-500 text-amber-400',
+            expired: 'border-red-500 text-red-400',
             cancelled: 'border-red-500 text-red-400',
           };
           const isActive = filterStatus === status;
@@ -1403,15 +1412,15 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                               <UserX size={11} />
                               Cancelled
                             </span>
+                          ) : (member.is_financial && member.renewal_date && new Date(member.renewal_date) < new Date()) ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-900/30 text-amber-400 border border-amber-500/30">
+                              <Clock size={11} />
+                              Renewal Due
+                            </span>
                           ) : (
-                          <span className={`
-                            inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                            ${member.is_financial
-                              ? 'bg-green-900/30 text-green-400'
-                              : 'bg-red-900/30 text-red-400'}
-                          `}>
-                            {member.is_financial ? 'Financial' : 'Unfinancial'}
-                          </span>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${member.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+                              {member.is_financial ? 'Financial' : 'Unfinancial'}
+                            </span>
                           )}
                           {(member as any).payment_status === 'pending' && (
                             <button
@@ -1741,6 +1750,10 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
           clubId={currentClub?.clubId || ''}
           darkMode={darkMode}
           onSuccess={handleMembershipFormSuccess}
+          onRenew={(id) => {
+            setShowMemberEditModal(false);
+            handleRenewMember(id);
+          }}
         />
       )}
 

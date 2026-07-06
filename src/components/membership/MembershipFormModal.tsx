@@ -117,12 +117,12 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
         .order('amount', { ascending: true });
       
       if (typesError) throw typesError;
-      
-      setMembershipTypes(typesData || []);
-      if (typesData && typesData.length > 0) {
-        setSelectedTypeId(typesData[0].id);
+
+      let filteredTypes = typesData || [];
+      if (isRenewal) {
+        filteredTypes = filteredTypes.filter(t => !t.name.toLowerCase().includes('lifetime'));
       }
-      
+
       // If this is a renewal or edit, fetch existing member data
       if (existingMemberId) {
         const { data: memberData, error: memberError } = await supabase
@@ -137,6 +137,27 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
         if (memberError) throw memberError;
 
         if (memberData) {
+          // Ensure member's current type is in the list (even if marked inactive)
+          if (isRenewal && memberData.membership_level) {
+            const currentTypeInList = filteredTypes.find(t => t.name === memberData.membership_level);
+            if (!currentTypeInList) {
+              const { data: currentType } = await supabase
+                .from('membership_types')
+                .select('*')
+                .eq('club_id', clubId)
+                .eq('name', memberData.membership_level)
+                .single();
+              if (currentType && !currentType.name.toLowerCase().includes('lifetime')) {
+                filteredTypes = [currentType, ...filteredTypes];
+              }
+            }
+          }
+
+          setMembershipTypes(filteredTypes);
+          if (filteredTypes.length > 0) {
+            setSelectedTypeId(filteredTypes[0].id);
+          }
+
           setFormData({
             first_name: memberData.first_name || '',
             last_name: memberData.last_name || '',
@@ -160,7 +181,7 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
 
           // Set the membership type to the member's current type if available
           if (memberData.membership_level) {
-            const matchingType = typesData?.find(type => type.name === memberData.membership_level);
+            const matchingType = filteredTypes.find(type => type.name === memberData.membership_level);
             if (matchingType) {
               setSelectedTypeId(matchingType.id);
             }
@@ -179,14 +200,20 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
             }
           }
         }
-      } else if (user) {
-        // Pre-fill with user data if available
-        setFormData(prev => ({
-          ...prev,
-          first_name: user.user_metadata?.first_name || '',
-          last_name: user.user_metadata?.last_name || '',
-          email: user.email || ''
-        }));
+      } else {
+        setMembershipTypes(filteredTypes);
+        if (filteredTypes.length > 0) {
+          setSelectedTypeId(filteredTypes[0].id);
+        }
+        if (user) {
+          // Pre-fill with user data if available
+          setFormData(prev => ({
+            ...prev,
+            first_name: user.user_metadata?.first_name || '',
+            last_name: user.user_metadata?.last_name || '',
+            email: user.email || ''
+          }));
+        }
       }
     } catch (err) {
       console.error('Error fetching data:', err);
