@@ -290,7 +290,8 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
       const { error } = await supabase.functions.invoke('send-renewal-reminder', {
         body: {
           member_id: memberId,
-          club_id: currentClub?.clubId
+          club_id: currentClub?.clubId,
+          force: true
         }
       });
 

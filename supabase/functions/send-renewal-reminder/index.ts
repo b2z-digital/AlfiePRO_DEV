@@ -9,6 +9,7 @@ const corsHeaders = {
 interface RenewalReminderRequest {
   member_id: string;
   club_id: string;
+  force?: boolean;
 }
 
 Deno.serve(async (req: Request) => {
@@ -31,7 +32,7 @@ Deno.serve(async (req: Request) => {
       }
     );
 
-    const { member_id, club_id }: RenewalReminderRequest = await req.json();
+    const { member_id, club_id, force }: RenewalReminderRequest = await req.json();
 
     if (!member_id || !club_id) {
       return new Response(
@@ -105,26 +106,28 @@ Deno.serve(async (req: Request) => {
     else if (daysUntilExpiry === 1) notificationType = '1_day';
     else if (daysUntilExpiry <= 0) notificationType = 'expired';
 
-    // Check if notification already sent
-    const { data: existingNotification } = await supabaseAdmin
-      .from('membership_renewal_notifications')
-      .select('id')
-      .eq('member_id', member_id)
-      .eq('notification_type', notificationType)
-      .eq('renewal_date', member.renewal_date)
-      .maybeSingle();
+    // Check if notification already sent (skip for manual/forced sends)
+    if (!force) {
+      const { data: existingNotification } = await supabaseAdmin
+        .from('membership_renewal_notifications')
+        .select('id')
+        .eq('member_id', member_id)
+        .eq('notification_type', notificationType)
+        .eq('renewal_date', member.renewal_date)
+        .maybeSingle();
 
-    if (existingNotification) {
-      return new Response(
-        JSON.stringify({
-          message: 'Notification already sent for this period',
-          already_sent: true
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      if (existingNotification) {
+        return new Response(
+          JSON.stringify({
+            message: 'Notification already sent for this period',
+            already_sent: true
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
     }
 
     // Create in-app notification if member has user_id
@@ -199,6 +202,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Record that we sent this notification
+    const recordType = force ? 'manual_reminder' : notificationType;
     const { error: recordError } = await supabaseAdmin
       .from('membership_renewal_notifications')
       .insert({
@@ -206,7 +210,7 @@ Deno.serve(async (req: Request) => {
         club_id: club_id,
         renewal_date: member.renewal_date,
         notification_date: today.toISOString().split('T')[0],
-        notification_type: notificationType,
+        notification_type: recordType,
         days_before_expiry: daysUntilExpiry,
         sent_at: new Date().toISOString(),
         email_sent: emailSent,
