@@ -201,6 +201,18 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // For unregistered members, set payment_status to 'pending' so they appear in treasurer's pending renewals
+    if (!member.user_id && emailSent) {
+      const { error: statusError } = await supabaseAdmin
+        .from('members')
+        .update({ payment_status: 'pending' })
+        .eq('id', member_id);
+
+      if (statusError) {
+        console.error('Error updating payment_status:', statusError);
+      }
+    }
+
     // Record that we sent this notification
     const recordType = force ? 'manual_reminder' : notificationType;
     const { error: recordError } = await supabaseAdmin
