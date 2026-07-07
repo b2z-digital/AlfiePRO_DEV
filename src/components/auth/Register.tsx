@@ -5,6 +5,7 @@ import { Logo } from '../Logo';
 import { GoogleIcon } from './GoogleIcon';
 import { ArrowLeft, User, Building, Smartphone, Monitor, ExternalLink } from 'lucide-react';
 import { PasswordInput, validatePassword } from './PasswordInput';
+import { sanitizePassword, getPasswordPolicyError } from '../../utils/password';
 
 const AppleIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg viewBox="0 0 384 512" fill="currentColor" className={className}>
@@ -77,13 +78,15 @@ export const Register: React.FC = () => {
     setLoading(true);
     setError('');
 
-    if (password !== confirmPassword) {
+    const cleanPassword = sanitizePassword(password);
+
+    if (cleanPassword !== sanitizePassword(confirmPassword)) {
       setError('Passwords do not match');
       setLoading(false);
       return;
     }
 
-    const { valid } = validatePassword(password);
+    const { valid } = validatePassword(cleanPassword);
     if (!valid) {
       setError('Please fix the password issues highlighted below');
       setLoading(false);
@@ -93,7 +96,7 @@ export const Register: React.FC = () => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
-        password,
+        password: cleanPassword,
       });
 
       if (error) throw error;
@@ -106,7 +109,7 @@ export const Register: React.FC = () => {
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to register');
+      setError(getPasswordPolicyError(err.message) || err.message || 'Failed to register');
     } finally {
       setLoading(false);
     }

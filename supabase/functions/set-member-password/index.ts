@@ -21,7 +21,24 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { activation_token, reset_token, email, password, admin_set, member_id } = await req.json();
+    const { activation_token, reset_token, email, password: rawPassword, admin_set, member_id } = await req.json();
+
+    const password = typeof rawPassword === "string" ? rawPassword.trim() : rawPassword;
+
+    const friendlyPasswordError = (message?: string): string => {
+      const m = (message || "").toLowerCase();
+      if (
+        m.includes("weak") || m.includes("pwned") || m.includes("leaked") ||
+        m.includes("breach") || m.includes("compromised") ||
+        m.includes("easy to guess") || m.includes("commonly used")
+      ) {
+        return "This password is too common or has appeared in a known data breach. Please choose a different, less common password.";
+      }
+      if (m.includes("at least") || m.includes("minimum") || m.includes("too short")) {
+        return "That password is too short. Please use at least 6 characters.";
+      }
+      return message || "Failed to set password. Please try again.";
+    };
 
     if (password && password.length < 6) {
       return new Response(
@@ -92,10 +109,10 @@ Deno.serve(async (req: Request) => {
         console.error("Admin password set failed:", updateError.message, updateError);
         const msg = updateError.message?.includes("not found")
           ? "The linked user account was not found. The member may need to be re-linked."
-          : updateError.message || "Failed to set password. Please try again.";
+          : friendlyPasswordError(updateError.message);
         return new Response(
           JSON.stringify({ error: msg }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -199,8 +216,8 @@ Deno.serve(async (req: Request) => {
     if (updateError) {
       console.error("Password update failed:", updateError);
       return new Response(
-        JSON.stringify({ error: "Failed to update password. Please try again." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: friendlyPasswordError(updateError.message) }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

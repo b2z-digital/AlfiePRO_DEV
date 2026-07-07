@@ -880,7 +880,8 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   };
 
   const handleSetPasswordForMember = async () => {
-    if (!setPasswordMember || !newPassword || newPassword.length < 6) {
+    const cleanPassword = newPassword.trim();
+    if (!setPasswordMember || !cleanPassword || cleanPassword.length < 6) {
       setPasswordError('Password must be at least 6 characters');
       return;
     }
@@ -901,7 +902,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         body: JSON.stringify({
           member_id: setPasswordMember.id,
           email: setPasswordMember.email,
-          password: newPassword,
+          password: cleanPassword,
           admin_set: true,
         }),
       });

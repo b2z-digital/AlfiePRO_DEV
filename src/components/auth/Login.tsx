@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
+import { sanitizePassword } from '../../utils/password';
 import { Logo } from '../Logo';
 import { GoogleIcon } from './GoogleIcon';
 import { Smartphone, Monitor, ExternalLink } from 'lucide-react';
@@ -75,7 +76,7 @@ export const Login: React.FC = () => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password: sanitizePassword(password),
       });
 
       if (error) throw error;

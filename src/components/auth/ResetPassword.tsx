@@ -4,6 +4,7 @@ import { supabase } from '../../utils/supabase';
 import { Logo } from '../Logo';
 import { CircleCheck as CheckCircle, Lock, TriangleAlert as AlertTriangle, UserPlus } from 'lucide-react';
 import { PasswordInput, validatePassword } from './PasswordInput';
+import { sanitizePassword, getPasswordPolicyError } from '../../utils/password';
 
 type FlowType = 'activation' | 'reset' | 'legacy';
 
@@ -107,13 +108,15 @@ export const ResetPassword: React.FC = () => {
     setLoading(true);
     setError('');
 
-    if (password !== confirmPassword) {
+    const cleanPassword = sanitizePassword(password);
+
+    if (cleanPassword !== sanitizePassword(confirmPassword)) {
       setError('Passwords do not match');
       setLoading(false);
       return;
     }
 
-    const { valid } = validatePassword(password);
+    const { valid } = validatePassword(cleanPassword);
     if (!valid) {
       setError('Please fix the password issues highlighted below');
       setLoading(false);
@@ -127,7 +130,7 @@ export const ResetPassword: React.FC = () => {
 
         const body: Record<string, string> = {
           email: tokenEmail!,
-          password,
+          password: cleanPassword,
         };
 
         if (flowType === 'activation') {
@@ -154,7 +157,7 @@ export const ResetPassword: React.FC = () => {
         setSuccess(true);
         setLoading(false);
       } else {
-        const { error } = await supabase.auth.updateUser({ password });
+        const { error } = await supabase.auth.updateUser({ password: cleanPassword });
         if (error) throw error;
 
         setSuccess(true);
@@ -166,7 +169,10 @@ export const ResetPassword: React.FC = () => {
       }
     } catch (err: any) {
       setLoading(false);
-      if (err.message?.includes('expired') || err.message?.includes('invalid') || err.message?.includes('session') || err.message?.includes('token')) {
+      const policyMsg = getPasswordPolicyError(err.message);
+      if (policyMsg) {
+        setError(policyMsg);
+      } else if (err.message?.includes('expired') || err.message?.includes('invalid') || err.message?.includes('session') || err.message?.includes('token')) {
         if (flowType === 'activation') {
           setError('Your activation link has expired or is invalid. Please contact your club administrator to resend the activation email.');
         } else {

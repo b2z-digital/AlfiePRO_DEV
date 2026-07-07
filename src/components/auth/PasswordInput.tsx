@@ -14,11 +14,11 @@ interface PasswordInputProps {
 }
 
 export function validatePassword(password: string): { valid: boolean; checks: { label: string; met: boolean }[] } {
+  const trimmed = password.trim();
   const checks = [
-    { label: 'At least 6 characters', met: password.length >= 6 },
-    { label: 'No leading or trailing spaces', met: password.length === 0 || password === password.trim() },
+    { label: 'At least 6 characters', met: trimmed.length >= 6 },
   ];
-  return { valid: checks.every(c => c.met) && password.length >= 6, checks };
+  return { valid: trimmed.length >= 6, checks };
 }
 
 export const PasswordInput: React.FC<PasswordInputProps> = ({
@@ -36,8 +36,8 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({
 
   const { checks } = validatePassword(value);
   const hasStartedTyping = value.length > 0;
-  const passwordsMatch = confirmValue !== undefined && value === confirmValue;
-  const passwordsMismatch = confirmValue !== undefined && hasStartedTyping && confirmValue.length > 0 && value !== confirmValue;
+  const passwordsMatch = confirmValue !== undefined && value.trim() === confirmValue.trim();
+  const passwordsMismatch = confirmValue !== undefined && hasStartedTyping && confirmValue.length > 0 && value.trim() !== confirmValue.trim();
 
   return (
     <div>
@@ -53,7 +53,10 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({
           required
           minLength={6}
           autoFocus={autoFocus}
-          autoComplete={isConfirmField ? 'new-password' : 'new-password'}
+          autoComplete="new-password"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           className="w-full px-4 py-3 pr-12 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
           placeholder={placeholder}
         />
