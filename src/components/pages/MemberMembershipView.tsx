@@ -7,7 +7,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { formatDate } from '../../utils/date';
-import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
 import { MyClubMembershipsWidget } from '../membership/MyClubMembershipsWidget';
 import { MemberEditModal } from '../membership/MemberEditModal';
 import { Avatar } from '../ui/Avatar';
@@ -361,48 +360,18 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
           throw new Error('No checkout URL received');
         }
       } else {
-        const { error: renewalError } = await supabase
-          .from('membership_renewals')
-          .insert({
-            member_id: memberData.id,
-            membership_type_id: selectedType.id,
-            renewal_date: new Date().toISOString().split('T')[0],
-            expiry_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-            amount_paid: selectedType.amount,
-            payment_method: 'bank_transfer',
-            payment_reference: null
-          });
+        const { data: renewalResult, error: renewalError } = await supabase.rpc(
+          'submit_membership_self_renewal',
+          {
+            p_member_id: memberData.id,
+            p_membership_type_id: selectedType.id,
+          }
+        );
 
         if (renewalError) throw renewalError;
-
-        await supabase
-          .from('membership_payments')
-          .insert({
-            member_id: memberData.id,
-            membership_type_id: selectedType.id,
-            amount: selectedType.amount,
-            currency: selectedType.currency,
-            status: 'pending',
-            payment_method: 'bank_transfer'
-          });
-
-        await supabase
-          .from('members')
-          .update({
-            payment_status: 'pending',
-            membership_level: selectedType.name,
-          })
-          .eq('id', memberData.id);
-
-        await createMembershipTransaction({
-          clubId: currentClub.clubId,
-          memberId: memberData.id,
-          membershipTypeId: selectedType.id,
-          memberName: `${memberData.first_name} ${memberData.last_name}`,
-          membershipTypeName: selectedType.name,
-          amount: selectedType.amount,
-          paymentMethod: 'bank_transfer',
-        }, 'pending');
+        if (!renewalResult?.success) {
+          throw new Error(renewalResult?.error || 'Failed to submit renewal request');
+        }
 
         addNotification('success', 'Renewal request submitted! Please complete the bank transfer and notify your club administrator.');
         setShowRenewalModal(false);
