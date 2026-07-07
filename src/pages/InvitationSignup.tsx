@@ -5,6 +5,7 @@ import { validateInvitationToken, acceptInvitation } from '../utils/memberInvita
 import { Logo } from '../components/Logo';
 import { CircleCheck as CheckCircle, CircleAlert as AlertCircle, Loader } from 'lucide-react';
 import { PasswordInput, validatePassword } from '../components/auth/PasswordInput';
+import { sanitizePassword, getPasswordPolicyError } from '../utils/password';
 
 export const InvitationSignup: React.FC = () => {
   const { token } = useParams<{ token: string }>();
@@ -78,13 +79,15 @@ export const InvitationSignup: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    const { valid } = validatePassword(password);
+    const cleanPassword = sanitizePassword(password);
+
+    const { valid } = validatePassword(cleanPassword);
     if (!valid) {
       setError('Please fix the password issues highlighted below');
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (cleanPassword !== sanitizePassword(confirmPassword)) {
       setError('Passwords do not match');
       return;
     }
@@ -98,7 +101,7 @@ export const InvitationSignup: React.FC = () => {
 
       const signupResult = await supabase.auth.signUp({
         email: memberEmail,
-        password: password,
+        password: cleanPassword,
         options: {
           emailRedirectTo: `${window.location.origin}/dashboard`,
         }
@@ -117,7 +120,7 @@ export const InvitationSignup: React.FC = () => {
 
           const signInResult = await supabase.auth.signInWithPassword({
             email: memberEmail,
-            password: password,
+            password: cleanPassword,
           });
 
           if (signInResult.error) {
@@ -153,7 +156,7 @@ export const InvitationSignup: React.FC = () => {
 
     } catch (err: any) {
       console.error('Signup error:', err);
-      setError(err.message || 'Failed to create account. Please try again.');
+      setError(getPasswordPolicyError(err.message) || err.message || 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
     }
