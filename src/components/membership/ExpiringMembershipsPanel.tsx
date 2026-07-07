@@ -255,6 +255,12 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
         console.error('Finance update failed:', finErr);
       }
 
+      try {
+        await supabase.rpc('ensure_renewal_financials', { p_member_id: member.id });
+      } catch (remitErr) {
+        console.error('Remittance/finance backfill failed:', remitErr);
+      }
+
       if (member.email) {
         try {
           await sendPaymentConfirmation({
@@ -290,7 +296,8 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
       const { error } = await supabase.functions.invoke('send-renewal-reminder', {
         body: {
           member_id: memberId,
-          club_id: currentClub?.clubId
+          club_id: currentClub?.clubId,
+          force: true
         }
       });
 

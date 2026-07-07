@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CircleCheck as CheckCircle2, Clock, ChevronRight, X, Grid2x2 as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, Circle as XCircle, Send, SquarePen as Edit2, Globe, Map, ArrowUpDown, ListFilter as Filter } from 'lucide-react';
+import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CircleCheck as CheckCircle2, Clock, ChevronRight, X, Grid2x2 as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, Circle as XCircle, Send, SquarePen as Edit2, Globe, Map as MapIcon, ArrowUpDown, ListFilter as Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Papa from 'papaparse';
@@ -66,6 +66,303 @@ interface RoundResult {
   skippers: any[];
   clubName: string;
 }
+
+interface StandingsRow {
+  isFleetSeparator: boolean;
+  fleetLabel?: string;
+  position?: number;
+  sailNumber: string;
+  skipper: string;
+  club: string;
+  design: string;
+  fleet?: string;
+  raceCells: string[];
+  gross: number;
+  net: number;
+}
+
+interface EventStandings {
+  raceLabels: string[];
+  rows: StandingsRow[];
+  hasFleets: boolean;
+}
+
+const FLEET_NAMES: Record<string, string> = {
+  A: 'Gold Fleet', B: 'Silver Fleet', C: 'Bronze Fleet',
+  D: 'Copper Fleet', E: 'Emerald Fleet', F: 'Pewter Fleet',
+};
+
+const computeEventStandings = (event: RaceEvent): EventStandings => {
+  const isShrs = event.heatManagement?.configuration?.scoringSystem === 'shrs';
+  const shrsQualifyingRounds = event.heatManagement?.configuration?.shrsQualifyingRounds || 0;
+  const skippers = event.skippers || [];
+  const raceResults = event.raceResults || [];
+
+  const resultsByRace: Record<number, any[]> = {};
+  if (raceResults.length && skippers.length) {
+    const hasRaceProperty = raceResults.some(r => r.race !== undefined);
+    if (hasRaceProperty) {
+      raceResults.forEach(result => {
+        const raceNum = result.race;
+        if (!resultsByRace[raceNum]) resultsByRace[raceNum] = [];
+        resultsByRace[raceNum].push(result);
+      });
+    } else {
+      let currentRace = 1;
+      let skippersSeen = 0;
+      raceResults.forEach(result => {
+        if (!resultsByRace[currentRace]) resultsByRace[currentRace] = [];
+        resultsByRace[currentRace].push({ ...result, race: currentRace });
+        skippersSeen++;
+        if (skippersSeen === skippers.length) { currentRace++; skippersSeen = 0; }
+      });
+    }
+  }
+
+  const allRaceNumbers = Object.keys(resultsByRace).map(Number).sort((a, b) => a - b);
+  const activeSkippers = skippers.filter(s => !s.withdrawnFromRace || typeof s.withdrawnFromRace !== 'number');
+  const activeSkipperCount = activeSkippers.length;
+  const raceNumbers = allRaceNumbers.filter(raceNum => {
+    const rr = resultsByRace[raceNum] || [];
+    const activeCount = rr.filter(result => {
+      const sk = skippers[result.skipperIndex];
+      if (!sk) return false;
+      return !sk.withdrawnFromRace || typeof sk.withdrawnFromRace !== 'number' || raceNum < sk.withdrawnFromRace;
+    }).length;
+    return activeCount >= activeSkipperCount;
+  });
+
+  const totals: Record<number, { gross: number; net: number }> = {};
+  const drops: Record<string, boolean> = {};
+
+  skippers.forEach((skipper, idx) => {
+    const scores = raceNumbers.map(raceNum => {
+      const rr = resultsByRace[raceNum] || [];
+      const result = rr.find((r: any) => r.skipperIndex === idx);
+      if (!result) {
+        return { race: raceNum, score: skippers.length + 1, isDNE: false, isLetterScore: false };
+      }
+      if (result.letterScore) {
+        if ((result.letterScore === 'RDG' || result.letterScore === 'DPI' || result.letterScore === 'RDGfix') && result.customPoints !== undefined) {
+          return { race: raceNum, score: result.customPoints, isDNE: false, isLetterScore: true };
+        }
+        const raceFinishers = rr.filter((res: any) => res.position !== null && !res.letterScore).length;
+        return { race: raceNum, score: getLetterScoreValue(result.letterScore as LetterScore, raceFinishers, skippers.length), isDNE: result.letterScore === 'DNE', isLetterScore: true };
+      }
+      if (result.position !== null) return { race: raceNum, score: result.position, isDNE: false, isLetterScore: false };
+      return { race: raceNum, score: skippers.length + 1, isDNE: false, isLetterScore: false };
+    });
+
+    const gross = scores.reduce((sum, r) => sum + r.score, 0);
+    let numDrops = 0;
+    const dropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
+    for (const threshold of dropRules) {
+      if (scores.length >= threshold) numDrops++;
+      else break;
+    }
+    if (numDrops === 0) { totals[idx] = { gross, net: gross }; return; }
+    const droppableScores = scores.filter(s => !s.isDNE);
+    const sortedDroppable = [...droppableScores].sort((a, b) => b.score - a.score);
+    sortedDroppable.slice(0, numDrops).forEach(r => { drops[`${idx}-${r.race}`] = true; });
+    let net = gross;
+    scores.forEach(r => { if (drops[`${idx}-${r.race}`]) net -= r.score; });
+    totals[idx] = { gross, net };
+  });
+
+  const sortedSkippers = skippers.map((skipper, index) => ({
+    ...skipper, index, netTotal: totals[index]?.net || 0
+  })).sort((a, b) => {
+    if (a.netTotal !== b.netTotal) return a.netTotal - b.netTotal;
+    return a.index - b.index;
+  });
+
+  const shrsFleetMap = new Map<number, HeatDesignation>();
+  if (isShrs && event.heatManagement) {
+    const finalsRounds = (event.heatManagement.rounds || []).filter(r => r.round > shrsQualifyingRounds && r.completed);
+    if (finalsRounds.length > 0) {
+      (finalsRounds[0].heatAssignments || []).forEach(assignment => {
+        (assignment.skipperIndices || []).forEach(idx => {
+          shrsFleetMap.set(idx, assignment.heatDesignation);
+        });
+      });
+    }
+  }
+  const shrsHasFinals = isShrs && shrsFleetMap.size > 0;
+
+  const displaySkippers = shrsHasFinals
+    ? [...sortedSkippers].sort((a, b) => {
+        const fleetA = shrsFleetMap.get(a.index) || 'Z';
+        const fleetB = shrsFleetMap.get(b.index) || 'Z';
+        if (fleetA !== fleetB) return fleetA.localeCompare(fleetB);
+        if (a.netTotal !== b.netTotal) return a.netTotal - b.netTotal;
+        return a.index - b.index;
+      })
+    : sortedSkippers;
+
+  const getRaceLabel = (raceNum: number) => {
+    if (!isShrs) return `R${raceNum}`;
+    return raceNum <= shrsQualifyingRounds ? `Q${raceNum}` : `F${raceNum - shrsQualifyingRounds}`;
+  };
+
+  const rows: StandingsRow[] = [];
+  let currentFleet: string | null = null;
+  let posCounter = 0;
+
+  displaySkippers.forEach(skipper => {
+    const skipperFleet = shrsHasFinals ? (shrsFleetMap.get(skipper.index) || 'Z') : null;
+
+    if (shrsHasFinals && skipperFleet !== currentFleet) {
+      currentFleet = skipperFleet;
+      posCounter = 0;
+      rows.push({
+        isFleetSeparator: true,
+        fleetLabel: FLEET_NAMES[skipperFleet!] || `Fleet ${skipperFleet}`,
+        sailNumber: '', skipper: '', club: '', design: '',
+        raceCells: raceNumbers.map(() => ''), gross: 0, net: 0,
+      });
+    }
+
+    posCounter++;
+    const raceCells = raceNumbers.map(raceNum => {
+      const rr = resultsByRace[raceNum] || [];
+      const result = rr.find((r: any) => r.skipperIndex === skipper.index);
+      const isDropped = drops[`${skipper.index}-${raceNum}`];
+      let val = '-';
+      if (result) {
+        if (result.letterScore) {
+          val = `${getLetterScorePointsForRace(result.letterScore, raceNum, raceResults, skippers, skipper.index)}`;
+        } else if (result.position !== null) {
+          val = `${result.position}`;
+        }
+      } else {
+        const skipperWithdrew = skipper.withdrawnFromRace && typeof skipper.withdrawnFromRace === 'number' && raceNum >= skipper.withdrawnFromRace;
+        if (skipperWithdrew) val = `${skippers.length + 1}`;
+      }
+      return isDropped ? `[${val}]` : val;
+    });
+
+    rows.push({
+      isFleetSeparator: false,
+      position: posCounter,
+      sailNumber: skipper.sailNo || '',
+      skipper: skipper.name || '',
+      club: skipper.club || '',
+      design: skipper.hull || skipper.boatModel || '',
+      fleet: shrsHasFinals ? (skipperFleet === 'A' ? 'Gold' : skipperFleet === 'B' ? 'Silver' : skipperFleet === 'C' ? 'Bronze' : skipperFleet || '') : undefined,
+      raceCells,
+      gross: totals[skipper.index]?.gross || 0,
+      net: totals[skipper.index]?.net || 0,
+    });
+  });
+
+  return { raceLabels: raceNumbers.map(getRaceLabel), rows, hasFleets: shrsHasFinals };
+};
+
+const escapeHtml = (value: string | number): string =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+const triggerDownload = (content: string, mimeType: string, filename: string): void => {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const buildResultsHtml = (
+  standings: EventStandings,
+  meta: { eventName: string; venue?: string; date?: string; raceClass?: string; clubName?: string }
+): string => {
+  const { raceLabels, rows, hasFleets } = standings;
+  const columnCount = 5 + (hasFleets ? 1 : 0) + raceLabels.length + 2;
+
+  const headerCells = [
+    '<th class="pos">Rank</th>',
+    '<th>Sail No</th>',
+    '<th class="left">Skipper</th>',
+    '<th class="left">Club</th>',
+    '<th class="left">Design</th>',
+    ...(hasFleets ? ['<th>Fleet</th>'] : []),
+    ...raceLabels.map(label => `<th>${escapeHtml(label)}</th>`),
+    '<th>Gross</th>',
+    '<th>Nett</th>',
+  ].join('');
+
+  const bodyRows = rows.map(row => {
+    if (row.isFleetSeparator) {
+      return `<tr class="fleet-row"><td colspan="${columnCount}">${escapeHtml(row.fleetLabel || '')}</td></tr>`;
+    }
+    const cells = [
+      `<td class="pos">${row.position ?? ''}</td>`,
+      `<td>${escapeHtml(row.sailNumber)}</td>`,
+      `<td class="left">${escapeHtml(row.skipper)}</td>`,
+      `<td class="left">${escapeHtml(row.club)}</td>`,
+      `<td class="left">${escapeHtml(row.design)}</td>`,
+      ...(hasFleets ? [`<td>${escapeHtml(row.fleet || '')}</td>`] : []),
+      ...row.raceCells.map(cell => {
+        const dropped = cell.startsWith('[') && cell.endsWith(']');
+        return `<td class="${dropped ? 'drop' : ''}">${escapeHtml(cell)}</td>`;
+      }),
+      `<td class="total">${row.gross}</td>`,
+      `<td class="total nett">${row.net}</td>`,
+    ].join('');
+    return `<tr>${cells}</tr>`;
+  }).join('\n');
+
+  const subtitleParts = [meta.raceClass, meta.venue, meta.date].filter(Boolean).map(p => escapeHtml(p as string));
+  const generated = new Date().toLocaleString();
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(meta.eventName)} - Results</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; margin: 0; padding: 24px; background: #ffffff; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: #555; font-size: 14px; margin: 0 0 2px; }
+  .club { color: #777; font-size: 13px; margin: 0 0 16px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #d0d0d0; padding: 6px 8px; text-align: center; white-space: nowrap; }
+  th { background: #1f3a5f; color: #fff; font-weight: 600; }
+  td.left, th.left { text-align: left; }
+  td.pos, th.pos { font-weight: 700; }
+  tbody tr:nth-child(even) { background: #f5f7fa; }
+  td.drop { color: #999; }
+  td.total { font-weight: 600; }
+  td.nett { background: #eef3f9; }
+  .fleet-row td { background: #dfe7f1; font-weight: 700; text-align: left; }
+  footer { margin-top: 16px; color: #999; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>${escapeHtml(meta.eventName)}</h1>
+  ${subtitleParts.length ? `<p class="subtitle">${subtitleParts.join(' &middot; ')}</p>` : ''}
+  ${meta.clubName ? `<p class="club">${escapeHtml(meta.clubName)}</p>` : ''}
+  <table>
+    <thead><tr>${headerCells}</tr></thead>
+    <tbody>
+${bodyRows}
+    </tbody>
+  </table>
+  <footer>Generated ${escapeHtml(generated)} &middot; [ ] denotes discarded score</footer>
+</div>
+</body>
+</html>`;
+};
 
 export const ResultsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -1165,242 +1462,97 @@ export const ResultsPage: React.FC = () => {
     }
   };
 
+  const getExportEvent = (): RaceEvent | null =>
+    selectedEvent || (selectedRound ? {
+      ...selectedRound,
+      eventName: selectedRound.roundName,
+    } as RaceEvent : null);
+
+  const buildSeriesCsvRows = (series: RaceSeries): Record<string, any>[] => {
+    let effectiveSkippers = series.skippers && series.skippers.length > 0 ? [...series.skippers] : [];
+    if (effectiveSkippers.length === 0) {
+      const skipperMap = new Map<string, any>();
+      series.rounds?.forEach(round => {
+        if (round.completed && round.skippers) {
+          round.skippers.forEach((skipper: any) => {
+            const sailNum = skipper.sailNumber || skipper.sailNo;
+            if (sailNum && !skipperMap.has(sailNum)) skipperMap.set(sailNum, skipper);
+          });
+        }
+      });
+      effectiveSkippers = Array.from(skipperMap.values());
+    }
+    return effectiveSkippers.map((skipper, index) => ({
+      Position: index + 1,
+      Name: skipper.name || '',
+      'Sail Number': skipper.sailNo || skipper.sailNumber || '',
+      Club: skipper.club || skipper.clubName || '',
+      Design: skipper.hull || skipper.boatModel || skipper.design || '',
+      'Total Points': '',
+    }));
+  };
+
+  const buildEventCsvRows = (standings: EventStandings): Record<string, string | number>[] => {
+    const { raceLabels, rows, hasFleets } = standings;
+    return rows.map(row => {
+      const record: Record<string, string | number> = {
+        Position: row.isFleetSeparator ? '' : (row.position ?? ''),
+        'Sail Number': row.sailNumber,
+        Skipper: row.isFleetSeparator ? (row.fleetLabel || '') : row.skipper,
+        Club: row.club,
+        Design: row.design,
+      };
+      if (hasFleets) record['Fleet'] = row.isFleetSeparator ? '' : (row.fleet || '');
+      raceLabels.forEach((label, i) => { record[label] = row.isFleetSeparator ? '' : (row.raceCells[i] ?? ''); });
+      record['Gross'] = row.isFleetSeparator ? '' : row.gross;
+      record['Net'] = row.isFleetSeparator ? '' : row.net;
+      return record;
+    });
+  };
+
   const handleExportCSV = () => {
     try {
-      const event = selectedEvent || (selectedRound ? {
-        ...selectedRound,
-        eventName: selectedRound.roundName
-      } as RaceEvent : null);
-
+      const event = getExportEvent();
       if (!selectedSeries && !event) {
         console.log('No series or event selected for CSV export');
         return;
       }
 
-      let csvData: any[] = [];
-
-    if (selectedSeries) {
-      // For series, export the leaderboard standings
-      // Get skippers from series or from rounds
-      const effectiveSkippers = selectedSeries.skippers && selectedSeries.skippers.length > 0
-        ? selectedSeries.skippers
-        : [];
-
-      // If no series-level skippers, collect from completed rounds
-      if (effectiveSkippers.length === 0) {
-        const skipperMap = new Map();
-        selectedSeries.rounds?.forEach(round => {
-          if (round.completed && round.skippers) {
-            round.skippers.forEach((skipper: any) => {
-              const sailNum = skipper.sailNumber || skipper.sailNo;
-              if (sailNum && !skipperMap.has(sailNum)) {
-                skipperMap.set(sailNum, skipper);
-              }
-            });
-          }
-        });
-        effectiveSkippers.push(...Array.from(skipperMap.values()));
+      if (selectedSeries) {
+        const csv = Papa.unparse(buildSeriesCsvRows(selectedSeries));
+        triggerDownload(csv, 'text/csv;charset=utf-8;', `${selectedSeries.seriesName}_leaderboard_${Date.now()}.csv`);
+      } else if (event) {
+        const standings = computeEventStandings(event);
+        const csv = Papa.unparse(buildEventCsvRows(standings));
+        const eventName = event.eventName || (event as any).name || 'results';
+        triggerDownload(csv, 'text/csv;charset=utf-8;', `${eventName.replace(/\s+/g, '_')}_results_${Date.now()}.csv`);
       }
-
-      csvData = effectiveSkippers.map((skipper, index) => ({
-        Position: index + 1,
-        Name: skipper.name,
-        'Sail Number': skipper.sailNo || skipper.sailNumber,
-        Club: skipper.club || skipper.clubName,
-        Design: skipper.hull || skipper.boatModel || skipper.design,
-        'Total Points': '' // This would need actual calculation from rounds
-      }));
-
-      const filename = `${selectedSeries.seriesName}_leaderboard_${Date.now()}.csv`;
-      const csv = Papa.unparse(csvData);
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = filename;
-      link.click();
-    } else if (event) {
-      const isShrs = event.heatManagement?.configuration?.scoringSystem === 'shrs';
-      const shrsQualifyingRounds = event.heatManagement?.configuration?.shrsQualifyingRounds || 0;
-      const skippers = event.skippers || [];
-      const raceResults = event.raceResults || [];
-
-      const groupResultsByRace = () => {
-        const resultsByRace: Record<number, any[]> = {};
-        if (!raceResults.length || !skippers.length) return resultsByRace;
-        const hasRaceProperty = raceResults.some(r => r.race !== undefined);
-        if (hasRaceProperty) {
-          raceResults.forEach(result => {
-            const raceNum = result.race;
-            if (!resultsByRace[raceNum]) resultsByRace[raceNum] = [];
-            resultsByRace[raceNum].push(result);
-          });
-        } else {
-          let currentRace = 1;
-          let skippersSeen = 0;
-          raceResults.forEach(result => {
-            if (!resultsByRace[currentRace]) resultsByRace[currentRace] = [];
-            resultsByRace[currentRace].push({ ...result, race: currentRace });
-            skippersSeen++;
-            if (skippersSeen === skippers.length) { currentRace++; skippersSeen = 0; }
-          });
-        }
-        return resultsByRace;
-      };
-
-      const resultsByRace = groupResultsByRace();
-      const allRaceNumbers = Object.keys(resultsByRace).map(Number).sort((a, b) => a - b);
-      const activeSkippers = skippers.filter(s => !s.withdrawnFromRace || typeof s.withdrawnFromRace !== 'number');
-      const activeSkipperCount = activeSkippers.length;
-      const raceNumbers = allRaceNumbers.filter(raceNum => {
-        const rr = resultsByRace[raceNum] || [];
-        const activeCount = rr.filter(result => {
-          const sk = skippers[result.skipperIndex];
-          if (!sk) return false;
-          return !sk.withdrawnFromRace || typeof sk.withdrawnFromRace !== 'number' || raceNum < sk.withdrawnFromRace;
-        }).length;
-        return activeCount >= activeSkipperCount;
-      });
-
-      const totals: Record<number, { gross: number; net: number }> = {};
-      const drops: Record<string, boolean> = {};
-
-      skippers.forEach((skipper, idx) => {
-        const scores = raceNumbers.map(raceNum => {
-          const rr = resultsByRace[raceNum] || [];
-          const result = rr.find((r: any) => r.skipperIndex === idx);
-          if (!result) {
-            const skipperWithdrewAtRace = skipper.withdrawnFromRace && typeof skipper.withdrawnFromRace === 'number' && raceNum >= skipper.withdrawnFromRace;
-            if (skipperWithdrewAtRace) return { race: raceNum, score: skippers.length + 1, isDNE: false, isLetterScore: false };
-            return { race: raceNum, score: skippers.length + 1, isDNE: false, isLetterScore: false };
-          }
-          if (result.letterScore) {
-            if ((result.letterScore === 'RDG' || result.letterScore === 'DPI' || result.letterScore === 'RDGfix') && result.customPoints !== undefined) {
-              return { race: raceNum, score: result.customPoints, isDNE: false, isLetterScore: true };
-            }
-            const raceFinishers = rr.filter((res: any) => res.position !== null && !res.letterScore).length;
-            return { race: raceNum, score: getLetterScoreValue(result.letterScore as LetterScore, raceFinishers, skippers.length), isDNE: result.letterScore === 'DNE', isLetterScore: true };
-          }
-          if (result.position !== null) return { race: raceNum, score: result.position, isDNE: false, isLetterScore: false };
-          return { race: raceNum, score: skippers.length + 1, isDNE: false, isLetterScore: false };
-        });
-
-        const gross = scores.reduce((sum, r) => sum + r.score, 0);
-        let numDrops = 0;
-        const dropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
-        for (const threshold of dropRules) {
-          if (scores.length >= threshold) numDrops++;
-          else break;
-        }
-        if (numDrops === 0) { totals[idx] = { gross, net: gross }; return; }
-        const dneScores = scores.filter(s => s.isDNE);
-        const droppableScores = scores.filter(s => !s.isDNE);
-        const sortedDroppable = [...droppableScores].sort((a, b) => b.score - a.score);
-        sortedDroppable.slice(0, numDrops).forEach(r => { drops[`${idx}-${r.race}`] = true; });
-        let net = gross;
-        scores.forEach(r => { if (drops[`${idx}-${r.race}`]) net -= r.score; });
-        totals[idx] = { gross, net };
-      });
-
-      const sortedSkippers = skippers.map((skipper, index) => ({
-        ...skipper, index, netTotal: totals[index]?.net || 0
-      })).sort((a, b) => {
-        if (a.netTotal !== b.netTotal) return a.netTotal - b.netTotal;
-        return a.index - b.index;
-      });
-
-      const shrsFleetMap = new Map<number, HeatDesignation>();
-      if (isShrs && event.heatManagement) {
-        const finalsRounds = event.heatManagement.rounds.filter(r => r.round > shrsQualifyingRounds && r.completed);
-        if (finalsRounds.length > 0) {
-          finalsRounds[0].heatAssignments.forEach(assignment => {
-            assignment.skipperIndices.forEach(idx => {
-              shrsFleetMap.set(idx, assignment.heatDesignation);
-            });
-          });
-        }
-      }
-      const shrsHasFinals = isShrs && shrsFleetMap.size > 0;
-
-      const displaySkippers = shrsHasFinals
-        ? [...sortedSkippers].sort((a, b) => {
-            const fleetA = shrsFleetMap.get(a.index) || 'Z';
-            const fleetB = shrsFleetMap.get(b.index) || 'Z';
-            if (fleetA !== fleetB) return fleetA.localeCompare(fleetB);
-            if (a.netTotal !== b.netTotal) return a.netTotal - b.netTotal;
-            return a.index - b.index;
-          })
-        : sortedSkippers;
-
-      const fleetNames: Record<string, string> = { 'A': 'Gold Fleet', 'B': 'Silver Fleet', 'C': 'Bronze Fleet', 'D': 'Copper Fleet', 'E': 'Emerald Fleet', 'F': 'Pewter Fleet' };
-      const getRaceLabel = (raceNum: number) => {
-        if (!isShrs) return `R${raceNum}`;
-        return raceNum <= shrsQualifyingRounds ? `Q${raceNum}` : `F${raceNum - shrsQualifyingRounds}`;
-      };
-
-      const csvRows: any[] = [];
-      let currentFleet: string | null = null;
-      let posCounter = 0;
-
-      displaySkippers.forEach(skipper => {
-        const skipperFleet = shrsHasFinals ? (shrsFleetMap.get(skipper.index) || 'Z') : null;
-
-        if (shrsHasFinals && skipperFleet !== currentFleet) {
-          currentFleet = skipperFleet;
-          posCounter = 0;
-          const separator: Record<string, string> = { Position: '', 'Sail Number': '', Skipper: fleetNames[skipperFleet!] || `Fleet ${skipperFleet}`, Club: '', Design: '' };
-          if (shrsHasFinals) separator['Fleet'] = '';
-          raceNumbers.forEach(rn => { separator[getRaceLabel(rn)] = ''; });
-          separator['Gross'] = '';
-          separator['Net'] = '';
-          csvRows.push(separator);
-        }
-
-        posCounter++;
-        const row: Record<string, string | number> = {};
-        row['Position'] = posCounter;
-        row['Sail Number'] = skipper.sailNo || '';
-        row['Skipper'] = skipper.name;
-        row['Club'] = skipper.club || '';
-        row['Design'] = skipper.hull || skipper.boatModel || '';
-        if (shrsHasFinals) {
-          row['Fleet'] = skipperFleet === 'A' ? 'Gold' : skipperFleet === 'B' ? 'Silver' : skipperFleet === 'C' ? 'Bronze' : skipperFleet || '';
-        }
-
-        raceNumbers.forEach(raceNum => {
-          const rr = resultsByRace[raceNum] || [];
-          const result = rr.find((r: any) => r.skipperIndex === skipper.index);
-          const isDropped = drops[`${skipper.index}-${raceNum}`];
-          let val = '-';
-          if (result) {
-            if (result.letterScore) {
-              const pts = getLetterScorePointsForRace(result.letterScore, raceNum, raceResults, skippers, skipper.index);
-              val = `${pts}`;
-            } else if (result.position !== null) {
-              val = `${result.position}`;
-            }
-          } else {
-            const skipperWithdrew = skipper.withdrawnFromRace && typeof skipper.withdrawnFromRace === 'number' && raceNum >= skipper.withdrawnFromRace;
-            if (skipperWithdrew) val = `${skippers.length + 1}`;
-          }
-          row[getRaceLabel(raceNum)] = isDropped ? `[${val}]` : val;
-        });
-
-        row['Gross'] = totals[skipper.index]?.gross || 0;
-        row['Net'] = totals[skipper.index]?.net || 0;
-        csvRows.push(row);
-      });
-
-      const csv = Papa.unparse(csvRows);
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      const eventName = event.eventName || (event as any).name || 'results';
-      link.download = `${eventName.replace(/\s+/g, '_')}_results_${Date.now()}.csv`;
-      link.click();
-    }
     } catch (error) {
       console.error('Error exporting CSV:', error);
       alert(`Failed to export CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleExportHTML = () => {
+    try {
+      const event = getExportEvent();
+      if (!event) {
+        alert('HTML export is available for individual event and round results.');
+        return;
+      }
+      const standings = computeEventStandings(event);
+      const eventName = event.eventName || (event as any).name || 'Results';
+      const html = buildResultsHtml(standings, {
+        eventName,
+        venue: (event as any).venue,
+        date: event.date ? formatDate(event.date) : undefined,
+        raceClass: (event as any).raceClass,
+        clubName: (event as any).clubName,
+      });
+      triggerDownload(html, 'text/html;charset=utf-8;', `${eventName.replace(/\s+/g, '_')}_results_${Date.now()}.html`);
+    } catch (error) {
+      console.error('Error exporting HTML:', error);
+      alert(`Failed to export HTML: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -1516,6 +1668,22 @@ export const ResultsPage: React.FC = () => {
                     <div>
                       <div className="text-white font-medium text-sm">Export as CSV</div>
                       <div className="text-slate-400 text-xs">Download results as spreadsheet</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleExportHTML();
+                      setShowExportDropdown(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                  >
+                    <div className="p-2 rounded-lg bg-amber-600/20">
+                      <Globe className="text-amber-400" size={20} />
+                    </div>
+                    <div>
+                      <div className="text-white font-medium text-sm">Export as HTML</div>
+                      <div className="text-slate-400 text-xs">Download results as web page</div>
                     </div>
                   </button>
                 </div>
@@ -1675,6 +1843,22 @@ export const ResultsPage: React.FC = () => {
                       <div className="text-slate-400 text-xs">Download results as spreadsheet</div>
                     </div>
                   </button>
+
+                  <button
+                    onClick={() => {
+                      handleExportHTML();
+                      setShowExportDropdown(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                  >
+                    <div className="p-2 rounded-lg bg-amber-600/20">
+                      <Globe className="text-amber-400" size={20} />
+                    </div>
+                    <div>
+                      <div className="text-white font-medium text-sm">Export as HTML</div>
+                      <div className="text-slate-400 text-xs">Download results as web page</div>
+                    </div>
+                  </button>
                 </div>
               )}
             </div>
@@ -1823,6 +2007,22 @@ export const ResultsPage: React.FC = () => {
                     <div>
                       <div className="text-white font-medium text-sm">Export as CSV</div>
                       <div className="text-slate-400 text-xs">Download results as spreadsheet</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleExportHTML();
+                      setShowExportDropdown(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                  >
+                    <div className="p-2 rounded-lg bg-amber-600/20">
+                      <Globe className="text-amber-400" size={20} />
+                    </div>
+                    <div>
+                      <div className="text-white font-medium text-sm">Export as HTML</div>
+                      <div className="text-slate-400 text-xs">Download results as web page</div>
                     </div>
                   </button>
                 </div>
@@ -2179,7 +2379,7 @@ export const ResultsPage: React.FC = () => {
               }`}
             >
               <div className="flex items-center gap-2">
-                <Map size={18} />
+                <MapIcon size={18} />
                 <span>State Events</span>
                 <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredStateEvents.length}</span>
               </div>
@@ -2347,7 +2547,7 @@ export const ResultsPage: React.FC = () => {
                               </div>
                             )}
                             <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${accentColor}-500/90 text-white backdrop-blur-sm`}>
-                              {mainTab === 'state' ? <Map size={12} /> : <Globe size={12} />}
+                              {mainTab === 'state' ? <MapIcon size={12} /> : <Globe size={12} />}
                               {mainTab === 'national' ? 'National' : mainTab === 'state' ? 'State' : 'World'}
                             </div>
                           </div>
@@ -2408,7 +2608,7 @@ export const ResultsPage: React.FC = () => {
                           <img src={listClassImg} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            {mainTab === 'state' ? <Map className={`text-${accentColor}-400`} size={20} /> : <Globe className={`text-${accentColor}-400`} size={20} />}
+                            {mainTab === 'state' ? <MapIcon className={`text-${accentColor}-400`} size={20} /> : <Globe className={`text-${accentColor}-400`} size={20} />}
                           </div>
                         )}
                       </div>

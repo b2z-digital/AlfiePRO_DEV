@@ -101,6 +101,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const [showUpdateLoginEmailPrompt, setShowUpdateLoginEmailPrompt] = useState(false);
   const [updatingLoginEmail, setUpdatingLoginEmail] = useState(false);
   const [pendingSavedEmail, setPendingSavedEmail] = useState<string | null>(null);
+  const [sendingReminder, setSendingReminder] = useState(false);
 
   useEffect(() => {
     if (isOpen && memberId) {
@@ -376,6 +377,30 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
       addNotification('error', error.message || 'Failed to unlink account');
     } finally {
       setLinkingAccount(false);
+    }
+  };
+
+  const handleSendReminder = async () => {
+    try {
+      setSendingReminder(true);
+      const { data, error } = await supabase.functions.invoke('send-renewal-reminder', {
+        body: {
+          member_id: memberId,
+          club_id: clubId,
+          force: true
+        }
+      });
+      if (error) throw error;
+      if (data?.email_sent === false && data?.notification_sent === false) {
+        addNotification('Reminder created but email could not be sent (no email on file)', 'warning');
+      } else {
+        addNotification('Renewal reminder sent successfully', 'success');
+      }
+    } catch (err) {
+      console.error('Error sending reminder:', err);
+      addNotification('Failed to send renewal reminder', 'error');
+    } finally {
+      setSendingReminder(false);
     }
   };
 
@@ -1282,6 +1307,15 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                             Renew Membership
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={handleSendReminder}
+                          disabled={sendingReminder}
+                          className="flex items-center gap-2 px-4 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
+                        >
+                          <Mail size={14} />
+                          {sendingReminder ? 'Sending...' : 'Send Reminder'}
+                        </button>
                       </>
                     ) : memberData.is_financial ? (
                       <span className="flex items-center gap-2 px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">

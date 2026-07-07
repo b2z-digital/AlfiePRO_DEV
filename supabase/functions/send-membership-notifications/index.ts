@@ -55,7 +55,47 @@ const defaultTemplates: Record<string, { subject: string; body: string }> = {
   },
   renewal_reminder: {
     subject: 'Time to renew your {{clubName}} membership',
-    body: `<p>Hi {{firstName}},</p><p>Your {{membershipType}} membership with {{clubName}} is due for renewal.</p><h2 class="ql-align-center"><strong>Membership Details</strong></h2><p class="ql-align-center"><strong>Membership Type</strong>: {{membershipType}}</p><p class="ql-align-center"><strong>Renewal Date</strong>: {{renewalDate}}</p><p class="ql-align-center"><br></p><p class="ql-align-center">To keep racing and enjoying all club benefits without interruption,</p><p class="ql-align-center">you can renew your membership in just a few minutes:</p><p class="ql-align-center"><br></p><p class="ql-align-center">\u{1F449} <strong>Renew via AlfiePRO App</strong></p><p class="ql-align-center"><em>Open AlfiePRO \u2192 Tap your profile \u2192 Membership</em></p><p class="ql-align-center"><strong>OR</strong></p><p class="ql-align-center">\u{1F449} <strong>Renew Online</strong></p><p class="ql-align-center"><a href="{{renewalLink}}" rel="noopener noreferrer" target="_blank">Renew My Membership</a></p><h3><br></h3><h3><strong>\u26A0\uFE0F Why renew now?</strong></h3><p>Renewing before your expiry ensures:</p><ul><li>You stay eligible to race</li><li>Your results and rankings continue uninterrupted</li><li>You remain covered under association insurance</li><li>If you have any questions or need help, just email<strong> {{secretaryName}}</strong> - {{secretaryEmail}}</li></ul><p>Thank you for being a valued member of {{clubName}}!</p>`
+    body: `<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">Hi {{firstName}},</p>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Your <strong>{{membershipType}}</strong> membership with <strong>{{clubName}}</strong> is due for renewal.</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+  <tr><td style="background-color:#f8fafc;padding:14px 20px;border-bottom:1px solid #e2e8f0;"><p style="margin:0;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Membership Details</p></td></tr>
+  <tr><td style="padding:0;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;width:40%;"><span style="color:#64748b;font-size:13px;">Membership Type</span></td>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{membershipType}}</span></td>
+      </tr>
+      <tr>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#64748b;font-size:13px;">Renewal Date</span></td>
+        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{renewalDate}}</span></td>
+      </tr>
+      <tr>
+        <td style="padding:12px 20px;"><span style="color:#64748b;font-size:13px;">Amount Due</span></td>
+        <td style="padding:12px 20px;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{amount}}</span></td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">To keep racing and enjoying all club benefits without interruption, you can renew your membership in just a few minutes:</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;"><tr><td align="center">
+  <p style="margin:0 0 12px;font-size:15px;color:#374151;font-weight:600;">On your phone:</p>
+  <a href="{{appDeepLink}}" style="display:inline-block;padding:14px 32px;background-color:#0284c7;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">Open in AlfiePRO App</a>
+  <p style="margin:12px 0 0;font-size:12px;color:#94a3b8;">(Opens directly in the AlfiePRO app)</p>
+</td></tr></table>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td align="center">
+  <p style="margin:16px 0 12px;font-size:15px;color:#374151;font-weight:600;">On your computer:</p>
+  <a href="{{renewalLink}}" style="display:inline-block;padding:14px 32px;background-color:#0f766e;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">Renew via Web Browser</a>
+</td></tr></table>
+{{bankDetails}}
+<p style="margin:24px 0 16px;color:#374151;font-size:15px;line-height:1.7;font-weight:600;">Why renew now?</p>
+<p style="margin:0 0 8px;color:#374151;font-size:15px;line-height:1.7;">Renewing before your expiry ensures:</p>
+<ul style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:15px;line-height:1.7;">
+  <li>You stay eligible to race</li>
+  <li>Your results and rankings continue uninterrupted</li>
+  <li>You remain covered under association insurance</li>
+</ul>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">If you have any questions or need help, just email <strong>{{secretaryName}}</strong> - <a href="mailto:{{secretaryEmail}}" style="color:#0284c7;">{{secretaryEmail}}</a></p>
+<p style="margin:0;color:#374151;font-size:15px;line-height:1.7;">Thank you for being a valued member of {{clubName}}!</p>`
   },
   event: {
     subject: 'New Event: {{eventName}}',
@@ -108,8 +148,13 @@ const defaultTemplates: Record<string, { subject: string; body: string }> = {
 <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">To renew your membership, please make a bank transfer using the details below:</p>
 {{bankDetails}}
 <p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Please use your <strong>full name</strong> as the payment reference so the club treasurer can identify your payment.</p>
-<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Once your payment is received, your membership will be renewed by the club treasurer.</p>
-<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">If you have any questions or need help, please email <strong>{{secretaryName}}</strong> - {{secretaryEmail}}</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td align="center">
+  <p style="margin:0 0 12px;color:#374151;font-size:15px;line-height:1.7;font-weight:600;">Once you have made your payment:</p>
+  <a href="mailto:{{secretaryEmail}}?subject=Membership%20Renewal%20Payment%20-%20{{firstName}}%20{{lastName}}&body=Hi%2C%0A%0AI%20have%20made%20my%20membership%20renewal%20payment%20via%20bank%20transfer.%0A%0AName%3A%20{{firstName}}%20{{lastName}}%0AMembership%20Type%3A%20{{membershipType}}%0A%0APlease%20confirm%20once%20received.%0A%0AThank%20you" style="display:inline-block;padding:14px 32px;background-color:#16a34a;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">Notify Treasurer I've Paid</a>
+  <p style="margin:12px 0 0;color:#64748b;font-size:13px;">(This will open an email to your club treasurer)</p>
+</td></tr></table>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Once your payment is received and confirmed, your membership will be renewed by the club treasurer.</p>
+<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">If you have any questions or need help, please email <strong>{{secretaryName}}</strong> - <a href="mailto:{{secretaryEmail}}" style="color:#0284c7;">{{secretaryEmail}}</a></p>
 <p style="margin:0;color:#374151;font-size:15px;line-height:1.7;">Thank you for being a valued member of {{clubName}}!</p>`
   },
   membership_expired: {
@@ -245,8 +290,10 @@ function replacePlaceholders(template: string, data: EmailRequest['member_data']
 
   const appBaseUrl = data.app_url || 'https://alfiepro.com.au'
   const renewalUrl = `${appBaseUrl}/my-membership`
+  const appDeepLink = `alfiepro://my-membership`
   result = result.replace(/\{\{renewal_link\}\}/g, renewalUrl)
   result = result.replace(/\{\{renewalLink\}\}/g, renewalUrl)
+  result = result.replace(/\{\{appDeepLink\}\}/g, appDeepLink)
   result = result.replace(/\{\{event_name\}\}/g, data.event_name || '')
   result = result.replace(/\{\{eventName\}\}/g, data.event_name || '')
   result = result.replace(/\{\{event_date\}\}/g, data.event_date || '')
@@ -400,6 +447,7 @@ async function getClubInfo(supabase: any, clubId: string): Promise<ClubInfo> {
     .select('name, email, position_title, member_id')
     .eq('club_id', clubId)
     .or('position_title.ilike.%secretary%,title.ilike.%secretary%')
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
