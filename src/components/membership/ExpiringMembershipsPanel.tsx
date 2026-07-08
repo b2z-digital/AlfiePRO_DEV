@@ -59,6 +59,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
   const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null);
   const [renewingMember, setRenewingMember] = useState<string | null>(null);
   const [bulkRenewing, setBulkRenewing] = useState(false);
+  const [bulkMarkingPaid, setBulkMarkingPaid] = useState(false);
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [renewTarget, setRenewTarget] = useState<ExpiringMember | null>(null);
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
@@ -501,6 +502,40 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
     }
   };
 
+  const handleBulkMarkPaid = async () => {
+    if (selectedMembers.size === 0) {
+      addNotification('error', 'Please select members to mark as paid');
+      return;
+    }
+
+    const selectedPending = pendingRenewals.filter(r => selectedMembers.has(r.id));
+    if (selectedPending.length === 0) return;
+
+    try {
+      setBulkMarkingPaid(true);
+      let succeeded = 0;
+
+      for (const renewal of selectedPending) {
+        try {
+          await handleConfirmRenewalPayment(renewal);
+          succeeded += 1;
+        } catch (err) {
+          console.error(`Failed to mark paid for ${renewal.first_name} ${renewal.last_name}:`, err);
+        }
+      }
+
+      setSelectedMembers(new Set());
+      if (succeeded > 0) {
+        addNotification('success', `Marked ${succeeded} renewal${succeeded !== 1 ? 's' : ''} as paid`);
+      }
+      if (succeeded < selectedPending.length) {
+        addNotification('error', `${selectedPending.length - succeeded} renewal(s) could not be confirmed`);
+      }
+    } finally {
+      setBulkMarkingPaid(false);
+    }
+  };
+
   const handleExportCSV = () => {
     const members = activeTab === 'expiring' ? expiringMembers : overdueMembers;
     const csvContent = [
@@ -539,6 +574,14 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
   };
 
   const toggleSelectAll = () => {
+    if (activeTab === 'pending') {
+      if (selectedMembers.size === pendingRenewals.length && pendingRenewals.length > 0) {
+        setSelectedMembers(new Set());
+      } else {
+        setSelectedMembers(new Set(pendingRenewals.map(r => r.id)));
+      }
+      return;
+    }
     const members = activeTab === 'expiring' ? expiringMembers : overdueMembers;
     if (selectedMembers.size === members.length) {
       setSelectedMembers(new Set());
@@ -729,7 +772,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
           </div>
         )}
 
-        {selectedMembers.size > 0 && (
+        {selectedMembers.size > 0 && activeTab !== 'pending' && (
           <div className="flex items-center gap-2">
             <button
               onClick={handleBulkSendReminders}
@@ -750,8 +793,30 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
                 </>
               ) : (
                 <>
+                  <RefreshCw size={16} />
+                  Renew Selected ({selectedMembers.size})
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {selectedMembers.size > 0 && activeTab === 'pending' && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBulkMarkPaid}
+              disabled={bulkMarkingPaid}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {bulkMarkingPaid ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  Marking Paid...
+                </>
+              ) : (
+                <>
                   <CheckCircle size={16} />
-                  Renew & Mark Paid ({selectedMembers.size})
+                  Mark Paid ({selectedMembers.size})
                 </>
               )}
             </button>
@@ -778,6 +843,14 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
                 <table className="w-full">
                   <thead className="bg-slate-700/50">
                     <tr>
+                      <th className="px-4 py-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={selectedMembers.size === pendingRenewals.length && pendingRenewals.length > 0}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-slate-700 border-slate-500"
+                        />
+                      </th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Member</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Membership</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Amount</th>
@@ -789,6 +862,14 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
                   <tbody className="divide-y divide-slate-700">
                     {pendingRenewals.map((renewal) => (
                       <tr key={renewal.id} className="hover:bg-slate-700/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedMembers.has(renewal.id)}
+                            onChange={() => toggleSelectMember(renewal.id)}
+                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-slate-700 border-slate-500"
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <Avatar
