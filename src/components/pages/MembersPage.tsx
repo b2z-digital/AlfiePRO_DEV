@@ -455,9 +455,11 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       if (filterStatus === 'cancelled') {
         query = query.or('membership_status.eq.cancelled,membership_status.eq.archived');
       } else {
-        // For all, active, and expired tabs - exclude cancelled/archived at DB level
-        // The active vs expired distinction is handled client-side via is_financial
-        query = query.or('membership_status.eq.active,membership_status.is.null');
+        // For all, active, and expired tabs - show everyone except cancelled/archived.
+        // The active vs expired distinction is handled client-side via is_financial.
+        // 'expired' must be included: the grace-period cron sets membership_status='expired'
+        // on overdue members, and omitting it here hid them from every tab.
+        query = query.or('membership_status.eq.active,membership_status.eq.expired,membership_status.is.null');
       }
 
       const { data, error } = await query;

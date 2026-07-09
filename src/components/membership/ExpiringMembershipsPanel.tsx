@@ -235,6 +235,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
         .update({
           is_financial: true,
           payment_status: 'paid',
+          membership_status: 'active',
           payment_confirmed_at: new Date().toISOString(),
           renewal_date: renewalDate.toISOString().split('T')[0],
           amount_paid: member.payment_amount,

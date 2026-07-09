@@ -125,6 +125,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
       .update({
         is_financial: true,
         payment_status: 'paid',
+        membership_status: 'active',
         payment_confirmed_at: new Date().toISOString(),
         renewal_date: renewalDate.toISOString().split('T')[0],
         updated_at: new Date().toISOString(),
@@ -280,6 +281,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
         .update({
           is_financial: true,
           payment_status: 'paid',
+          membership_status: 'active',
           payment_confirmed_at: new Date().toISOString(),
           renewal_date: renewalDate.toISOString().split('T')[0],
           updated_at: new Date().toISOString(),
