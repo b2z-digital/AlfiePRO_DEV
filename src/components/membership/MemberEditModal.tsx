@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, User, Mail, Phone, House, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CircleCheck as CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, CircleAlert as AlertCircle, Star, Users, Anchor, Hash, Trophy, ChevronDown, ChevronUp, Award, UserPlus } from 'lucide-react';
+import { X, User, Mail, Phone, House, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CircleCheck as CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, CircleAlert as AlertCircle, Star, Users, Anchor, Hash, Trophy, ChevronDown, ChevronUp, Award, UserPlus, Archive } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { BoatType, MembershipLevel } from '../../types/member';
@@ -9,6 +9,8 @@ import { AvatarCropModal } from '../ui/AvatarCropModal';
 import imageCompression from 'browser-image-compression';
 import { SAILING_NATIONS, getCountryFlag } from '../../utils/countryFlags';
 import { AdminAddToClubModal } from './AdminAddToClubModal';
+import { ArchiveMemberModal } from '../ArchiveMemberModal';
+import { archiveMember } from '../../utils/storage';
 import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
 import { getBoatClasses } from '../../utils/boatClassStorage';
 import { BoatClass } from '../../types/boatClass';
@@ -102,6 +104,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const [updatingLoginEmail, setUpdatingLoginEmail] = useState(false);
   const [pendingSavedEmail, setPendingSavedEmail] = useState<string | null>(null);
   const [sendingReminder, setSendingReminder] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
 
   useEffect(() => {
     if (isOpen && memberId) {
@@ -1494,6 +1497,28 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                     </div>
                   )}
                 </div>
+
+                <div className={`border-t pt-6 mt-6 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                  <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    <Archive size={20} className="text-red-400" />
+                    Archive Member
+                  </h3>
+                  <div className={`p-4 rounded-lg ${darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'}`}>
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <p className={`text-sm ${darkMode ? 'text-red-300' : 'text-red-800'}`}>
+                        Remove this member from the club's active roster. Their history is preserved and they can be reinstated later from the Cancelled tab.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowArchiveModal(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors whitespace-nowrap"
+                      >
+                        <Archive size={16} />
+                        Archive Member
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1544,6 +1569,25 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
         onSuccess={() => {
           fetchMemberData();
           onSuccess?.();
+        }}
+      />
+
+      <ArchiveMemberModal
+        isOpen={showArchiveModal}
+        onClose={() => setShowArchiveModal(false)}
+        member={memberData as any}
+        darkMode={darkMode}
+        onConfirm={async (removeAuthAccess, reason) => {
+          if (!memberData) return;
+          const result = await archiveMember(memberData.id, removeAuthAccess, reason);
+          if (!result.success) {
+            addNotification(result.error || 'Failed to archive member', 'error');
+            return;
+          }
+          addNotification(`${memberData.first_name} ${memberData.last_name} archived successfully`, 'success');
+          setShowArchiveModal(false);
+          onSuccess?.();
+          onClose();
         }}
       />
 
