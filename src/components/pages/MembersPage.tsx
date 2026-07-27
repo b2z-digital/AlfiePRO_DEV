@@ -95,6 +95,8 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [membershipTypes, setMembershipTypes] = useState<Array<{ id: string; name: string }>>([]);
   const [bulkMembershipType, setBulkMembershipType] = useState('');
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [sendingReminderMemberId, setSendingReminderMemberId] = useState<string | null>(null);
+  const [bulkSendingReminders, setBulkSendingReminders] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -724,6 +726,73 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     setMemberToInvite(null);
   };
 
+  const handleSendRenewalReminder = async (member: Member) => {
+    if (!currentClub?.clubId) return;
+    if (!member.email) {
+      addNotification('This member has no email address on file', 'error');
+      return;
+    }
+
+    setSendingReminderMemberId(member.id);
+    try {
+      const { error } = await supabase.functions.invoke('send-renewal-reminder', {
+        body: {
+          member_id: member.id,
+          club_id: currentClub.clubId,
+          force: true,
+        },
+      });
+
+      if (error) throw error;
+
+      addNotification(`Renewal email sent to ${member.first_name} ${member.last_name}`, 'success');
+    } catch (error) {
+      console.error('Error sending renewal reminder:', error);
+      addNotification('Failed to send renewal email', 'error');
+    } finally {
+      setSendingReminderMemberId(null);
+    }
+  };
+
+  const handleBulkSendRenewalReminders = async () => {
+    if (!currentClub?.clubId) return;
+
+    const targets = members.filter(
+      m => selectedMemberIds.has(m.id) && m.email &&
+        (!m.is_financial || (m as any).payment_status === 'pending')
+    );
+
+    if (targets.length === 0) {
+      addNotification('No selected members are due for renewal with an email on file', 'error');
+      return;
+    }
+
+    setBulkSendingReminders(true);
+    let sent = 0;
+    for (const member of targets) {
+      try {
+        const { error } = await supabase.functions.invoke('send-renewal-reminder', {
+          body: {
+            member_id: member.id,
+            club_id: currentClub.clubId,
+            force: true,
+          },
+        });
+        if (!error) sent++;
+      } catch (error) {
+        console.error('Error sending renewal reminder to', member.id, error);
+      }
+    }
+    setBulkSendingReminders(false);
+    setSelectedMemberIds(new Set());
+
+    if (sent === targets.length) {
+      addNotification(`Sent ${sent} renewal email${sent !== 1 ? 's' : ''}`, 'success');
+    } else {
+      addNotification(`Sent ${sent} of ${targets.length} renewal emails`, sent > 0 ? 'success' : 'error');
+    }
+  };
+
   const handleViewInvitation = (memberId: string) => {
     const invitation = memberInvitations[memberId];
     if (invitation) {
@@ -1196,6 +1265,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
       {selectedMemberIds.size > 0 && (() => {
         const selectedUnlinkedWithEmail = members.filter(m => selectedMemberIds.has(m.id) && !m.user_id && m.email);
+        const selectedDueForRenewal = members.filter(m => selectedMemberIds.has(m.id) && m.email && (!m.is_financial || (m as any).payment_status === 'pending'));
         return (
           <div className="flex items-center gap-4 px-4 py-3 bg-blue-600/15 border border-blue-500/30 rounded-xl flex-wrap">
             <div className="flex items-center gap-2">
@@ -1247,6 +1317,23 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                     <Smartphone size={14} />
                   )}
                   Activate {selectedUnlinkedWithEmail.length} for App
+                </button>
+              </>
+            )}
+            {selectedDueForRenewal.length > 0 && (
+              <>
+                <div className="h-5 w-px bg-slate-600" />
+                <button
+                  onClick={handleBulkSendRenewalReminders}
+                  disabled={bulkSendingReminders}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 hover:bg-blue-500/25 transition-colors text-sm font-medium disabled:opacity-50"
+                >
+                  {bulkSendingReminders ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Send size={14} />
+                  )}
+                  Send Renewal Email to {selectedDueForRenewal.length}
                 </button>
               </>
             )}
@@ -1638,6 +1725,23 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                               title="Renew membership"
                             >
                               <ChevronRight size={16} />
+                            </button>
+                          )}
+                          {(isExpired || (member as any).payment_status === 'pending') && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSendRenewalReminder(member);
+                              }}
+                              disabled={sendingReminderMemberId === member.id || !member.email}
+                              className="p-1.5 rounded-lg text-blue-400 hover:bg-blue-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={member.email ? 'Send renewal email (with bank details)' : 'No email address on file'}
+                            >
+                              {sendingReminderMemberId === member.id ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Send size={16} />
+                              )}
                             </button>
                           )}
                           {member.membership_status === 'archived' ? (
