@@ -96,35 +96,36 @@ export async function generateAgendaPdf(
   const slate100: [number, number, number] = [241, 245, 249];
   const accent: [number, number, number] = [16, 185, 129];
 
-  // --- Header: logo left, text right ---
-  const logoSize = 22;
+  // --- Centred header: logo, club name, meeting title ---
+  const centreX = pageW / 2;
+  const logoSize = 24;
   if (logoDataUrl) {
     try {
-      doc.addImage(logoDataUrl, 'PNG', marginL, y, logoSize, logoSize);
+      doc.addImage(logoDataUrl, 'PNG', centreX - logoSize / 2, y, logoSize, logoSize);
     } catch (_) {}
+    y += logoSize + 3;
   }
-
-  const textX = logoDataUrl ? marginL + logoSize + 5 : marginL;
 
   // Club name
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
+  doc.setFontSize(16);
   doc.setTextColor(...slate800);
-  doc.text(org.name, textX, y + 5);
+  doc.text(org.name, centreX, y, { align: 'center' });
+  y += 6;
 
   // Meeting name
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   doc.setTextColor(...slate500);
-  doc.text(meeting.name, textX, y + 11);
+  doc.text(meeting.name, centreX, y, { align: 'center' });
+  y += 6;
 
-  // "Meeting Agenda" label
+  // "MEETING AGENDA" label
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(...accent);
-  doc.text('MEETING AGENDA', textX, y + 17);
-
-  y = Math.max(y + logoSize + 4, y + 22);
+  doc.text('MEETING AGENDA', centreX, y, { align: 'center' });
+  y += 5;
 
   // Divider line
   doc.setDrawColor(...slate300);
