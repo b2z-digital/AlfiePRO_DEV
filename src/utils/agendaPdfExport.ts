@@ -84,148 +84,149 @@ export async function generateAgendaPdf(
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
-  const marginL = 18;
-  const marginR = 18;
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginL = 16;
+  const marginR = 16;
   const contentW = pageW - marginL - marginR;
-  let y = 16;
+  let y = 14;
 
-  // --- Header band ---
-  doc.setFillColor(15, 23, 42); // slate-900
-  doc.rect(0, 0, pageW, 52, 'F');
+  const slate800: [number, number, number] = [30, 41, 59];
+  const slate500: [number, number, number] = [100, 116, 139];
+  const slate300: [number, number, number] = [203, 213, 225];
+  const slate100: [number, number, number] = [241, 245, 249];
+  const accent: [number, number, number] = [16, 185, 129];
 
-  // Accent bar
-  doc.setFillColor(16, 185, 129); // emerald-500
-  doc.rect(0, 52, pageW, 1.5, 'F');
-
-  // Logo
-  const logoSize = 28;
+  // --- Header: logo left, text right ---
+  const logoSize = 22;
   if (logoDataUrl) {
     try {
-      doc.addImage(logoDataUrl, 'PNG', marginL, y - 2, logoSize, logoSize);
+      doc.addImage(logoDataUrl, 'PNG', marginL, y, logoSize, logoSize);
     } catch (_) {}
   }
 
-  const textStartX = logoDataUrl ? marginL + logoSize + 6 : marginL;
+  const textX = logoDataUrl ? marginL + logoSize + 5 : marginL;
 
-  // Org name
-  doc.setTextColor(255, 255, 255);
+  // Club name
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text(org.name, textStartX, y + 6);
+  doc.setFontSize(15);
+  doc.setTextColor(...slate800);
+  doc.text(org.name, textX, y + 5);
 
-  // Document title
+  // Meeting name
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
-  doc.setTextColor(148, 163, 184); // slate-400
-  doc.text('Meeting Agenda', textStartX, y + 14);
+  doc.setTextColor(...slate500);
+  doc.text(meeting.name, textX, y + 11);
 
-  // Meeting name (right aligned)
+  // "Meeting Agenda" label
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(255, 255, 255);
-  const meetingNameLines = doc.splitTextToSize(meeting.name, contentW * 0.45);
-  doc.text(meetingNameLines, pageW - marginR, y + 6, { align: 'right' });
+  doc.setFontSize(9);
+  doc.setTextColor(...accent);
+  doc.text('MEETING AGENDA', textX, y + 17);
 
-  y = 62;
+  y = Math.max(y + logoSize + 4, y + 22);
 
-  // --- Meeting details grid ---
-  const detailBoxH = 38;
-  doc.setFillColor(241, 245, 249); // slate-100
-  doc.roundedRect(marginL, y, contentW, detailBoxH, 3, 3, 'F');
+  // Divider line
+  doc.setDrawColor(...slate300);
+  doc.setLineWidth(0.4);
+  doc.line(marginL, y, pageW - marginR, y);
+  y += 6;
 
-  doc.setFontSize(8);
+  // --- Meeting details (compact 2-row, 3-col grid) ---
+  const col1X = marginL;
+  const col2X = marginL + contentW * 0.33;
+  const col3X = marginL + contentW * 0.64;
+  const labelSize = 7;
+  const valueSize = 9;
+  const rowGap = 11;
+
+  // Row 1
+  doc.setFontSize(labelSize);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(100, 116, 139); // slate-500
+  doc.setTextColor(...slate500);
+  doc.text('DATE', col1X, y);
+  doc.text('TIME', col2X, y);
+  doc.text('LOCATION', col3X, y);
 
-  const col1X = marginL + 6;
-  const col2X = marginL + contentW * 0.35;
-  const col3X = marginL + contentW * 0.65;
-  const rowY1 = y + 10;
-  const rowY2 = y + 24;
-
-  // Row 1: Date | Time | Location
-  doc.text('DATE', col1X, rowY1);
-  doc.text('TIME', col2X, rowY1);
-  doc.text('LOCATION', col3X, rowY1);
-
+  doc.setFontSize(valueSize);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(30, 41, 59); // slate-800
-
-  doc.text(formatDate(meeting.date), col1X, rowY1 + 5);
+  doc.setTextColor(...slate800);
+  doc.text(formatDate(meeting.date), col1X, y + 4);
 
   const startTime = meeting.start_time ? meeting.start_time.substring(0, 5) : '';
   const endTime = meeting.end_time ? meeting.end_time.substring(0, 5) : '';
-  const timeStr = startTime && endTime ? `${startTime} - ${endTime}` : startTime || 'TBC';
-  doc.text(timeStr, col2X, rowY1 + 5);
+  const timeStr = startTime && endTime ? `${startTime} – ${endTime}` : startTime || 'TBC';
+  doc.text(timeStr, col2X, y + 4);
 
   const locationText = meeting.location || 'TBC';
-  const locationLines = doc.splitTextToSize(locationText, contentW * 0.32);
-  doc.text(locationLines[0] || 'TBC', col3X, rowY1 + 5);
+  const locLines = doc.splitTextToSize(locationText, contentW * 0.34);
+  doc.text(locLines.slice(0, 2), col3X, y + 4);
 
-  // Row 2: Chairperson | Minute Taker | Type
-  doc.setFontSize(8);
+  y += rowGap;
+
+  // Row 2
+  doc.setFontSize(labelSize);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(100, 116, 139);
+  doc.setTextColor(...slate500);
+  doc.text('CHAIRPERSON', col1X, y);
+  doc.text('MINUTE TAKER', col2X, y);
+  doc.text('TYPE', col3X, y);
 
-  doc.text('CHAIRPERSON', col1X, rowY2);
-  doc.text('MINUTE TAKER', col2X, rowY2);
-  doc.text('TYPE', col3X, rowY2);
-
+  doc.setFontSize(valueSize);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(30, 41, 59);
+  doc.setTextColor(...slate800);
 
   const chairName = meeting.chairperson
-    ? `${meeting.chairperson.first_name} ${meeting.chairperson.last_name}`
-    : '—';
-  doc.text(chairName, col1X, rowY2 + 5);
+    ? `${meeting.chairperson.first_name} ${meeting.chairperson.last_name}` : '—';
+  doc.text(chairName, col1X, y + 4);
 
   const minuteTakerName = meeting.minute_taker
-    ? `${meeting.minute_taker.first_name} ${meeting.minute_taker.last_name}`
-    : '—';
-  doc.text(minuteTakerName, col2X, rowY2 + 5);
+    ? `${meeting.minute_taker.first_name} ${meeting.minute_taker.last_name}` : '—';
+  doc.text(minuteTakerName, col2X, y + 4);
 
-  const meetingTypeLabels: Record<string, string> = {
-    in_person: 'In Person',
-    online: 'Online',
-    hybrid: 'Hybrid',
-  };
-  doc.text(meetingTypeLabels[meeting.meeting_type || 'in_person'] || 'In Person', col3X, rowY2 + 5);
+  const typeLabels: Record<string, string> = { in_person: 'In Person', online: 'Online', hybrid: 'Hybrid' };
+  doc.text(typeLabels[meeting.meeting_type || 'in_person'] || 'In Person', col3X, y + 4);
 
-  y += detailBoxH + 10;
+  y += rowGap + 2;
 
-  // --- Description (if present) ---
+  // --- Description ---
   if (meeting.description) {
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(100, 116, 139);
-    doc.text('NOTES', marginL, y);
+    doc.setDrawColor(...slate300);
+    doc.setLineWidth(0.3);
+    doc.line(marginL, y, pageW - marginR, y);
     y += 5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(51, 65, 85); // slate-700
+    doc.setFontSize(valueSize);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...slate500);
     const descLines = doc.splitTextToSize(meeting.description, contentW);
-    const maxDescLines = 3;
-    const printLines = descLines.slice(0, maxDescLines);
-    doc.text(printLines, marginL, y);
-    y += printLines.length * 4 + 6;
+    doc.text(descLines.slice(0, 3), marginL, y);
+    y += Math.min(descLines.length, 3) * 4 + 4;
   }
 
-  // --- Agenda section header ---
-  doc.setFillColor(16, 185, 129);
-  doc.rect(marginL, y, 2, 7, 'F');
+  // Divider
+  doc.setDrawColor(...slate300);
+  doc.setLineWidth(0.4);
+  doc.line(marginL, y, pageW - marginR, y);
+  y += 7;
 
+  // --- Agenda heading ---
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Agenda Items', marginL + 6, y + 5.5);
-  y += 12;
+  doc.setFontSize(11);
+  doc.setTextColor(...slate800);
+  doc.text('Agenda', marginL, y);
+
+  const totalDuration = agendaItems.reduce((sum, item) => sum + (item.duration || 0), 0);
+  if (totalDuration > 0) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...slate500);
+    doc.text(`Total duration: ${totalDuration} min`, pageW - marginR, y, { align: 'right' });
+  }
+
+  y += 4;
 
   // --- Agenda table ---
   if (agendaItems.length > 0) {
-    const totalDuration = agendaItems.reduce((sum, item) => sum + (item.duration || 0), 0);
-
     const tableBody = agendaItems.map((item) => [
       String(item.item_number),
       item.item_name,
@@ -234,76 +235,67 @@ export async function generateAgendaPdf(
       item.duration ? `${item.duration} min` : '—',
     ]);
 
-    // Footer row
-    tableBody.push(['', '', '', 'Total Duration', totalDuration > 0 ? `${totalDuration} min` : '—']);
-
     (doc as any).autoTable({
       startY: y,
-      head: [['No.', 'Item', 'Owner', 'Type', 'Duration']],
+      head: [['#', 'Agenda Item', 'Owner', 'Type', 'Dur.']],
       body: tableBody,
       margin: { left: marginL, right: marginR },
+      tableWidth: contentW,
       styles: {
-        fontSize: 9,
-        cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
-        textColor: [30, 41, 59],
+        fontSize: 8,
+        cellPadding: { top: 2.8, bottom: 2.8, left: 3, right: 3 },
+        textColor: slate800,
         lineColor: [226, 232, 240],
-        lineWidth: 0.3,
+        lineWidth: 0.25,
+        overflow: 'linebreak',
       },
       headStyles: {
-        fillColor: [15, 23, 42],
-        textColor: [255, 255, 255],
+        fillColor: slate100,
+        textColor: slate500,
         fontStyle: 'bold',
-        fontSize: 8,
-        cellPadding: { top: 5, bottom: 5, left: 4, right: 4 },
+        fontSize: 7,
+        cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
       },
       columnStyles: {
-        0: { cellWidth: 14, halign: 'center', fontStyle: 'bold' },
+        0: { cellWidth: 10, halign: 'center', fontStyle: 'bold' },
         1: { cellWidth: 'auto' },
-        2: { cellWidth: 34 },
-        3: { cellWidth: 28 },
-        4: { cellWidth: 22, halign: 'center' },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 24 },
+        4: { cellWidth: 16, halign: 'center' },
       },
       alternateRowStyles: {
-        fillColor: [248, 250, 252],
-      },
-      willDrawCell: (data: any) => {
-        const isFooter = data.row.index === tableBody.length - 1 && data.section === 'body';
-        if (isFooter) {
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fillColor = [241, 245, 249];
-          data.cell.styles.textColor = [15, 23, 42];
-        }
+        fillColor: [252, 252, 253],
       },
     });
 
-    y = (doc as any).lastAutoTable.finalY + 6;
+    y = (doc as any).lastAutoTable.finalY + 4;
   } else {
     doc.setFont('helvetica', 'italic');
-    doc.setFontSize(10);
-    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(9);
+    doc.setTextColor(...slate500);
     doc.text('No agenda items have been added.', marginL, y + 4);
-    y += 14;
+    y += 12;
   }
 
-  // --- Notes section (blank lines for handwritten notes) ---
-  const pageH = doc.internal.pageSize.getHeight();
-  const remainingSpace = pageH - y - 20;
-
-  if (remainingSpace > 40) {
-    y += 4;
-    doc.setFillColor(16, 185, 129);
-    doc.rect(marginL, y, 2, 7, 'F');
+  // --- Notes section ---
+  const remainingSpace = pageH - y - 16;
+  if (remainingSpace > 30) {
+    y += 3;
+    doc.setDrawColor(...slate300);
+    doc.setLineWidth(0.3);
+    doc.line(marginL, y, pageW - marginR, y);
+    y += 6;
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(15, 23, 42);
-    doc.text('Notes', marginL + 6, y + 5.5);
-    y += 14;
+    doc.setFontSize(9);
+    doc.setTextColor(...slate800);
+    doc.text('Notes', marginL, y);
+    y += 5;
 
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.3);
-    const lineSpacing = 9;
-    const maxLines = Math.floor((pageH - y - 18) / lineSpacing);
+    doc.setDrawColor(...slate300);
+    doc.setLineWidth(0.2);
+    const lineSpacing = 8;
+    const maxLines = Math.floor((pageH - y - 14) / lineSpacing);
     for (let i = 0; i < maxLines; i++) {
       doc.line(marginL, y, pageW - marginR, y);
       y += lineSpacing;
@@ -311,18 +303,16 @@ export async function generateAgendaPdf(
   }
 
   // --- Footer ---
-  const footerY = pageH - 10;
-  doc.setFontSize(7);
+  doc.setFontSize(6.5);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(148, 163, 184);
+  doc.setTextColor(...slate300);
   doc.text(
     `${org.name}  |  ${meeting.name}  |  ${formatDate(meeting.date)}`,
     pageW / 2,
-    footerY,
+    pageH - 8,
     { align: 'center' }
   );
 
-  // Download
   const safeName = meeting.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 40);
   doc.save(`Agenda_${safeName}_${meeting.date}.pdf`);
 }
