@@ -61,7 +61,7 @@ export const MembershipOverviewWidget: React.FC<MembershipOverviewWidgetProps> =
         .from('members')
         .select('id, membership_status, created_at, is_financial, renewal_date')
         .eq('club_id', currentClub.clubId)
-        .or('membership_status.eq.active,membership_status.is.null');
+        .or('membership_status.eq.active,membership_status.eq.expired,membership_status.is.null');
 
       console.log('[MembershipOverviewWidget] Query result:', {
         members,

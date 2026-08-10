@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, X, BarChart2 } from 'lucide-react';
+import { Users, X, ChartBar as BarChart2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
@@ -30,24 +30,23 @@ export const MembersCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode
     }
 
     try {
-      // Fetch all members across all clubs in the organization
+      // Fetch all non-archived/non-cancelled members across all clubs
       const { data, error } = await supabase
         .from('members')
-        .select('id, membership_status, payment_status')
+        .select('id, membership_status, is_financial')
         .in('club_id', orgContext.clubIds)
-        .in('membership_status', ['active', 'pending', 'expired']);
+        .or('membership_status.eq.active,membership_status.eq.expired,membership_status.is.null');
 
       if (error) throw error;
 
-      // Count active members only
-      const activeMembers = data?.filter(m => m.membership_status === 'active') || [];
-      const count = activeMembers.length;
+      const allMembers = data || [];
+      const count = allMembers.length;
       setMemberCount(count);
 
-      // Calculate participation rate (active vs all non-archived members)
-      if (data && data.length > 0) {
-        const rate = Math.round((count / data.length) * 100);
-        setParticipationRate(rate);
+      // Participation rate = financial members / total members
+      const financialCount = allMembers.filter(m => m.is_financial).length;
+      if (count > 0) {
+        setParticipationRate(Math.round((financialCount / count) * 100));
       } else {
         setParticipationRate(0);
       }

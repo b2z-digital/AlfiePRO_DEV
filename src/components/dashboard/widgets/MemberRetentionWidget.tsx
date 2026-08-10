@@ -54,10 +54,10 @@ export const MemberRetentionWidget: React.FC<MemberRetentionWidgetProps> = ({
       if (oldError) throw oldError;
 
       const renewed = oldMembers?.filter(m =>
-        m.membership_status === 'active' || m.membership_status === null
+        m.membership_status === 'active' || m.membership_status === 'expired' || m.membership_status === null
       ).length || 0;
       const notRenewed = oldMembers?.filter(m =>
-        m.membership_status !== 'active' && m.membership_status !== null
+        m.membership_status !== 'active' && m.membership_status !== 'expired' && m.membership_status !== null
       ).length || 0;
 
       setChartData({

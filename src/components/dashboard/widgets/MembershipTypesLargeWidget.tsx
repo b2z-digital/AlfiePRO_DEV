@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PieChart } from 'lucide-react';
+import { ChartPie as PieChart } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
 import { ThemedWidgetWrapper } from './ThemedWidgetWrapper';
@@ -44,7 +44,7 @@ export const MembershipTypesLargeWidget: React.FC<MembershipTypesLargeWidgetProp
         .from('members')
         .select('membership_level')
         .eq('club_id', currentClub.clubId)
-        .or('membership_status.eq.active,membership_status.is.null');
+        .or('membership_status.eq.active,membership_status.eq.expired,membership_status.is.null');
 
       if (error) throw error;
 
