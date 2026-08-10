@@ -174,8 +174,11 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
       line-height: 1.6;
       color: #222;
     }
+    .pdf-page div, .pdf-page p, .pdf-page h1, .pdf-page h2, .pdf-page h3, .pdf-page section {
+      border: none; border-radius: 0; box-shadow: none; background: transparent;
+    }
 
-    .minutes-header { text-align: center; margin-bottom: 20px; }
+    .minutes-header { text-align: center; margin-bottom: 20px; border: none !important; border-bottom: none !important; box-shadow: none !important; background: transparent !important; padding: 0 !important; }
     .org-logo { display: block; margin: 0 auto 8px; max-width: 64px; max-height: 64px; object-fit: contain; }
     .org-name { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; color: #555; margin-bottom: 6px; }
     .doc-title { font-size: 24px; font-weight: 700; color: #111; margin-bottom: 2px; }
@@ -194,7 +197,8 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
     .body-text ul, .body-text ol { margin-left: 24px; margin-bottom: 8px; }
     .body-text li { margin-bottom: 2px; }
 
-    .agenda-item { margin-top: 16px; }
+    .agenda-item { margin-top: 16px; padding-top: 12px; border: none !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; overflow: visible !important; border-top: 1px solid #ccc !important; }
+    .agenda-item:first-child { border-top: none !important; padding-top: 0; }
     .item-heading { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 6px; }
 
     .pdf-footer { position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: #999; padding-top: 6px; border-top: 1px solid #ddd; }
