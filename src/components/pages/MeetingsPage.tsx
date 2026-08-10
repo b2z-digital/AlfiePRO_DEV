@@ -103,6 +103,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
       if (fetchedMeetings.length > 0) {
         await fetchAttendanceForMeetings(fetchedMeetings);
       }
+      return fetchedMeetings;
     } catch (err) {
       console.error('Error fetching meetings:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load meetings';
@@ -156,11 +157,16 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
     }
   };
 
-  const handleFormSuccess = () => {
-    fetchMeetings();
+  const handleFormSuccess = async () => {
+    const editedId = editingMeeting?.id;
     setShowForm(false);
     addNotification('success', editingMeeting ? 'Meeting updated successfully' : 'Meeting created successfully');
     setEditingMeeting(null);
+    const fresh = await fetchMeetings();
+    if (editedId && selectedMeeting && fresh) {
+      const updated = fresh.find(m => m.id === editedId);
+      if (updated) setSelectedMeeting(updated);
+    }
   };
 
   const handleFormCancel = () => {

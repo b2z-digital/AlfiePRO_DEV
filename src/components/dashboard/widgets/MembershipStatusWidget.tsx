@@ -33,7 +33,7 @@ export const MembershipStatusWidget: React.FC<WidgetProps> = ({ widgetId, isEdit
           .from('members')
           .select('id, membership_status')
           .eq('club_id', currentClub.clubId)
-          .eq('membership_status', 'active'),
+          .or('membership_status.eq.active,membership_status.eq.expired,membership_status.is.null'),
         supabase
           .from('membership_applications')
           .select('id, status')

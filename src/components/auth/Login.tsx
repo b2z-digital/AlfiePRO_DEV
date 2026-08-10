@@ -74,8 +74,9 @@ export const Login: React.FC = () => {
     setError('');
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password: sanitizePassword(password),
       });
 
@@ -85,7 +86,12 @@ export const Login: React.FC = () => {
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to log in');
+      const msg = (err.message || '').toLowerCase();
+      if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) {
+        setError('The email or password you entered is incorrect. Please check and try again. If your password was recently reset by an administrator, make sure you are using the new password.');
+      } else {
+        setError(err.message || 'Failed to log in');
+      }
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { LogOut, Upload, Download, FileUp, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Loader, ChevronDown, ChevronUp, ArrowRight, Link2, TriangleAlert as AlertTriangle, Info } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { LogOut, Upload, Download, FileUp, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Loader, ChevronDown, ChevronUp, ArrowRight, Link2, TriangleAlert as AlertTriangle, Info, ListFilter as Filter } from 'lucide-react';
 import Papa from 'papaparse';
 import { Member, MemberBoat, BoatType, MembershipLevel } from '../types/member';
 import { supabase } from '../utils/supabase';
@@ -102,6 +102,9 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
   const [membershipTypeMappings, setMembershipTypeMappings] = useState<MembershipTypeMapping[]>([]);
   const [importErrors, setImportErrors] = useState<ImportError[]>([]);
   const [showErrorDetails, setShowErrorDetails] = useState(false);
+  const [exportFilterFinancial, setExportFilterFinancial] = useState<'all' | 'financial' | 'unfinancial'>('all');
+  const [exportFilterMembershipTypes, setExportFilterMembershipTypes] = useState<Set<string>>(new Set());
+  const [exportFilterSelectAll, setExportFilterSelectAll] = useState(true);
 
   // Reset modal state when it closes
   const resetModalState = () => {
@@ -122,6 +125,9 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     setMembershipTypeMappings([]);
     setImportErrors([]);
     setShowErrorDetails(false);
+    setExportFilterFinancial('all');
+    setExportFilterMembershipTypes(new Set());
+    setExportFilterSelectAll(true);
   };
 
   React.useEffect(() => {
@@ -294,10 +300,34 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     );
   };
 
-  const exportToCSV = () => {
-    const maxBoats = Math.max(1, ...members.map(m => m.boats?.length || 0));
+  const availableMembershipTypes = useMemo(() => {
+    const types = new Set<string>();
+    members.forEach(m => {
+      const t = m.membership_level || m.membership_level_custom;
+      if (t) types.add(t);
+    });
+    return Array.from(types).sort((a, b) => a.localeCompare(b));
+  }, [members]);
 
-    const exportData = members.map(member => {
+  const filteredExportMembers = useMemo(() => {
+    return members.filter(m => {
+      if (exportFilterFinancial === 'financial' && !m.is_financial) return false;
+      if (exportFilterFinancial === 'unfinancial' && m.is_financial) return false;
+
+      if (!exportFilterSelectAll && exportFilterMembershipTypes.size > 0) {
+        const memberType = m.membership_level || m.membership_level_custom || '';
+        if (!exportFilterMembershipTypes.has(memberType)) return false;
+      }
+
+      return true;
+    });
+  }, [members, exportFilterFinancial, exportFilterSelectAll, exportFilterMembershipTypes]);
+
+  const exportToCSV = () => {
+    const exportMembers = filteredExportMembers;
+    const maxBoats = Math.max(1, ...exportMembers.map(m => m.boats?.length || 0));
+
+    const exportData = exportMembers.map(member => {
       const row: Record<string, string | number> = {
         'First Name': member.first_name,
         'Last Name': member.last_name,
@@ -880,10 +910,7 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
               </button>
 
               <button
-                onClick={() => {
-                  setMode('export');
-                  exportToCSV();
-                }}
+                onClick={() => setMode('export')}
                 className={`p-8 rounded-xl border-2 transition-all hover:scale-105 ${
                   darkMode
                     ? 'border-gray-700 hover:border-green-500 bg-gray-750'
@@ -893,9 +920,145 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
                 <Download className="w-12 h-12 mx-auto mb-4 text-green-500" />
                 <h3 className="text-xl font-semibold mb-2">Export Members</h3>
                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Download all members and their boats as CSV
+                  Download members and their boats as CSV with optional filters
                 </p>
               </button>
+            </div>
+          )}
+
+          {mode === 'export' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Filter size={20} className="text-green-500" />
+                  Export Filters
+                </h3>
+                <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Optionally filter which members to include in the export. Leave defaults to export all members.
+                </p>
+              </div>
+
+              {/* Financial Status Filter */}
+              <div className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-750 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+                <label className="block text-sm font-medium mb-3">Financial Status</label>
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    { value: 'all' as const, label: 'All Members' },
+                    { value: 'financial' as const, label: 'Financial Only' },
+                    { value: 'unfinancial' as const, label: 'Unfinancial Only' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setExportFilterFinancial(opt.value)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        exportFilterFinancial === opt.value
+                          ? 'bg-green-500 text-white shadow-md'
+                          : darkMode
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Membership Type Filter */}
+              {availableMembershipTypes.length > 0 && (
+                <div className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-750 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium">Membership Type</label>
+                    <button
+                      onClick={() => {
+                        if (exportFilterSelectAll) {
+                          setExportFilterSelectAll(false);
+                          setExportFilterMembershipTypes(new Set());
+                        } else {
+                          setExportFilterSelectAll(true);
+                          setExportFilterMembershipTypes(new Set());
+                        }
+                      }}
+                      className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${
+                        exportFilterSelectAll
+                          ? 'bg-green-500/20 text-green-400'
+                          : darkMode ? 'bg-gray-700 text-gray-400 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                      }`}
+                    >
+                      {exportFilterSelectAll ? 'All Selected' : 'Select All'}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                    {availableMembershipTypes.map(type => {
+                      const isSelected = exportFilterSelectAll || exportFilterMembershipTypes.has(type);
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            if (exportFilterSelectAll) {
+                              const allExcept = new Set(availableMembershipTypes.filter(t => t !== type));
+                              setExportFilterSelectAll(false);
+                              setExportFilterMembershipTypes(allExcept);
+                            } else {
+                              const next = new Set(exportFilterMembershipTypes);
+                              if (next.has(type)) {
+                                next.delete(type);
+                              } else {
+                                next.add(type);
+                              }
+                              if (next.size === availableMembershipTypes.length) {
+                                setExportFilterSelectAll(true);
+                                setExportFilterMembershipTypes(new Set());
+                              } else {
+                                setExportFilterMembershipTypes(next);
+                              }
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                            isSelected
+                              ? 'bg-green-500 text-white shadow-sm'
+                              : darkMode
+                                ? 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                                : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview Count */}
+              <div className={`p-4 rounded-lg border flex items-center justify-between ${
+                darkMode ? 'bg-gray-750 border-gray-700' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <div>
+                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Members matching filters: </span>
+                  <span className="text-lg font-bold text-green-500">{filteredExportMembers.length}</span>
+                  <span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}> of {members.length}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setMode('select')}
+                  className={`px-6 py-3 rounded-lg font-medium ${
+                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
+                  }`}
+                >
+                  Back
+                </button>
+                <button
+                  onClick={exportToCSV}
+                  disabled={filteredExportMembers.length === 0}
+                  className="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <Download size={18} />
+                  Export {filteredExportMembers.length} Member{filteredExportMembers.length !== 1 ? 's' : ''} to CSV
+                </button>
+              </div>
             </div>
           )}
 

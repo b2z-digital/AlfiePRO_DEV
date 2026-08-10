@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, SquarePen as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Users, Repeat, Navigation, ExternalLink, Copy } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, SquarePen as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Users, Repeat, Navigation, ExternalLink, Copy, Printer } from 'lucide-react';
 import { Meeting, MeetingAgendaItem } from '../../types/meeting';
 import { getMeetingAgenda, lockMeetingMinutes } from '../../utils/meetingStorage';
+import { generateAgendaPdf } from '../../utils/agendaPdfExport';
 import { formatDate } from '../../utils/date';
 import { useNavigate } from 'react-router-dom';
 import { MeetingInviteModal } from './MeetingInviteModal';
@@ -41,6 +42,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showLockConfirm, setShowLockConfirm] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [attendance, setAttendance] = useState<{member: any, status: string}[]>([]);
 
   useEffect(() => {
@@ -552,10 +554,31 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
           </div>
           
           <div className="mb-6">
-            <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-emerald-500 rounded-full"></div>
-              Agenda
-            </h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-emerald-500 rounded-full"></div>
+                Agenda
+              </h3>
+              {agendaItems.length > 0 && (
+                <button
+                  onClick={async () => {
+                    setGeneratingPdf(true);
+                    try {
+                      await generateAgendaPdf(meeting, agendaItems, associationId, associationType);
+                    } catch (err) {
+                      console.error('Error generating agenda PDF:', err);
+                    } finally {
+                      setGeneratingPdf(false);
+                    }
+                  }}
+                  disabled={generatingPdf}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Printer size={16} />
+                  {generatingPdf ? 'Generating...' : 'Print Agenda'}
+                </button>
+              )}
+            </div>
 
             {loading ? (
               <div className="text-center py-12 bg-slate-700/20 rounded-xl border border-slate-600/30">

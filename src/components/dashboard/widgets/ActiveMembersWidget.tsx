@@ -37,7 +37,7 @@ export const ActiveMembersWidget: React.FC<WidgetProps> = ({
         .from('members')
         .select('*', { count: 'exact', head: true })
         .in('club_id', orgContext.clubIds)
-        .eq('membership_status', 'active');
+        .or('membership_status.eq.active,membership_status.eq.expired,membership_status.is.null');
 
       if (error) throw error;
       setCount(count || 0);
