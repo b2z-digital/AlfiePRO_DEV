@@ -321,7 +321,7 @@ function App() {
         <Route path="/stripe-oauth-callback" element={<StripeOAuthCallback />} />
         <Route path="/onboarding" element={
           isAuthenticated ? (
-            hasPendingApplication ? <Navigate to="/application-pending" /> :
+            (hasPendingApplication && userClubs.length === 0) ? <Navigate to="/application-pending" /> :
             (clubsLoaded && userClubs.length > 0 && onboardingCompleted) ? <Navigate to="/" /> :
             <OnboardingRouter darkMode={darkMode} />
           ) : <Navigate to="/login" />
@@ -367,9 +367,9 @@ function App() {
           element={
             !isAuthenticated ? (
               <Navigate to="/login" />
-            ) : hasPendingApplication ? (
+            ) : (hasPendingApplication && userClubs.length === 0) ? (
               <Navigate to="/application-pending" />
-            ) : hasPendingClubApplication ? (
+            ) : (hasPendingClubApplication && userClubs.length === 0) ? (
               <Navigate to="/club-application-pending" />
             ) : hasCancelledMembership ? (
               <CancelledMembershipScreen cancelledMemberships={cancelledMemberships} darkMode={darkMode} />
