@@ -188,14 +188,17 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
     .detail-line { font-size: 11px; color: #333; text-align: center; margin-bottom: 20px; }
     .detail-line strong { font-weight: 700; }
 
-    .body-text { font-size: 12px; color: #222; line-height: 1.6; margin-bottom: 8px; }
+    .body-text { font-size: 12px; color: #222; line-height: 1.6; margin-bottom: 12px; }
     .body-text:last-child { margin-bottom: 0; }
     .body-text strong, .body-text b { font-weight: 700; }
     .body-text em, .body-text i { font-style: italic; }
-    .body-text p { margin-bottom: 8px; }
+    .body-text p { margin-bottom: 10px; }
     .body-text p:last-child { margin-bottom: 0; }
-    .body-text ul, .body-text ol { margin-left: 24px; margin-bottom: 8px; }
-    .body-text li { margin-bottom: 2px; }
+    .body-text ul { list-style-type: disc !important; padding-left: 28px !important; margin-bottom: 10px; }
+    .body-text ol { list-style-type: decimal !important; padding-left: 28px !important; margin-bottom: 10px; }
+    .body-text ul ul { list-style-type: circle !important; }
+    .body-text li { margin-bottom: 3px; display: list-item !important; list-style-position: outside !important; }
+    .body-text li::marker { color: #333; }
 
     .agenda-item { margin-top: 16px; padding-top: 12px; border: none !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; overflow: visible !important; border-top: 1px solid #ccc !important; }
     .agenda-item:first-child { border-top: none !important; padding-top: 0; }
