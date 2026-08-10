@@ -207,6 +207,13 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
       setSaving(true);
       setError(null);
 
+      // Save attendance (members + guests) so mid-meeting changes persist
+      const presentMembers = members.filter(m => m.isPresent).map(m => ({ id: m.id, name: m.name }));
+      await supabase
+        .from('meetings')
+        .update({ members_present: presentMembers, guests_present: guests })
+        .eq('id', meetingId);
+
       // Save minutes for each agenda item
       for (const item of agendaItems) {
         await updateAgendaItemMinutes(
@@ -216,7 +223,6 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
           item.minutes_tasks,
           item.minutes_attachments
         );
-        // Note: Tasks are saved directly by AgendaTaskManager, no need to save them again here
       }
 
       setSuccess('Minutes saved successfully');

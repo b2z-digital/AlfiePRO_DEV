@@ -128,12 +128,14 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
     }).join('');
   };
 
-  // Build meeting details as inline text
-  const detailParts: string[] = [];
-  detailParts.push(`<strong>Date:</strong> ${meetingDate}`);
-  if (meeting.location) detailParts.push(`<strong>Location:</strong> ${meeting.location}`);
-  if (chairName) detailParts.push(`<strong>Chairperson:</strong> ${chairName}`);
-  if (minuteTakerName) detailParts.push(`<strong>Minute Taker:</strong> ${minuteTakerName}`);
+  // Build meeting details as two lines
+  const line1Parts: string[] = [];
+  line1Parts.push(`<strong>Date:</strong> ${meetingDate}`);
+  if (meeting.location) line1Parts.push(`<strong>Location:</strong> ${meeting.location}`);
+
+  const line2Parts: string[] = [];
+  if (chairName) line2Parts.push(`<strong>Chairperson:</strong> ${chairName}`);
+  if (minuteTakerName) line2Parts.push(`<strong>Minute Taker:</strong> ${minuteTakerName}`);
 
   const fullHTML = `
     <div class="minutes-header">
@@ -144,13 +146,14 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
       <div class="header-line"></div>
     </div>
 
-    <div class="detail-line">${detailParts.join('&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;')}</div>
+    <div class="detail-line">${line1Parts.join('&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;')}</div>
+    ${line2Parts.length ? `<div class="detail-line">${line2Parts.join('&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;')}</div>` : ''}
 
     ${presentList ? `
       <p class="body-text"><strong>Present:</strong> ${presentList}.</p>
     ` : ''}
     ${guestsList ? `
-      <p class="body-text"><strong>Guests:</strong> ${guestsList}.</p>
+      <p class="body-text"><strong>Guests/Visitors:</strong> ${guestsList}.</p>
     ` : ''}
 
     ${buildAgendaHTML()}`;
@@ -205,6 +208,7 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
     .item-heading { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 6px; }
 
     .pdf-footer { position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: #999; padding-top: 6px; border-top: 1px solid #ddd; }
+    .pdf-footer-generated { font-style: italic; color: #bbb; }
   `;
 
   // --- Measure content and calculate page breaks ---
@@ -351,7 +355,7 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
       footer.style.bottom = `${paddingPx}px`;
       footer.style.left = `${paddingPx}px`;
       footer.style.right = `${paddingPx}px`;
-      footer.innerHTML = `<span class="pdf-footer-org">${orgName} &mdash; ${meeting.name}</span><span class="pdf-footer-page">Page ${pageNum + 1} of ${totalPages}</span>`;
+      footer.innerHTML = `<span class="pdf-footer-org">${orgName} &mdash; ${meeting.name}</span><span class="pdf-footer-generated">Generated with AlfiePRO</span><span class="pdf-footer-page">Page ${pageNum + 1} of ${totalPages}</span>`;
       pageDiv.appendChild(footer);
 
       pageContainer.appendChild(pageDiv);
