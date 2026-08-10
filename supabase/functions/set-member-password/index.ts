@@ -101,9 +101,21 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const { error: updateError } = await supabase.auth.admin.updateUserById(memberRecord.user_id, {
-        password,
-      });
+      // Sync the auth user's email to match the member record email so login
+      // works with the email the admin sees.  Also update the password.
+      const updatePayload: Record<string, unknown> = { password };
+      if (email) {
+        const { data: authUser } = await supabase.auth.admin.getUserById(memberRecord.user_id);
+        if (authUser?.user && authUser.user.email?.toLowerCase() !== email.toLowerCase()) {
+          updatePayload.email = email.toLowerCase();
+          updatePayload.email_confirm = true;
+        }
+      }
+
+      const { error: updateError } = await supabase.auth.admin.updateUserById(
+        memberRecord.user_id,
+        updatePayload
+      );
 
       if (updateError) {
         console.error("Admin password set failed:", updateError.message, updateError);
@@ -114,6 +126,14 @@ Deno.serve(async (req: Request) => {
           JSON.stringify({ error: msg }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+      }
+
+      // Keep the profile email in sync too
+      if (email) {
+        await supabase
+          .from("profiles")
+          .update({ email: email.toLowerCase() })
+          .eq("id", memberRecord.user_id);
       }
 
       await supabase
