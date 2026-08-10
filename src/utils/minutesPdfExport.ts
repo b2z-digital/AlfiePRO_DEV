@@ -169,42 +169,35 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
     .pdf-page {
       width: ${A4_WIDTH_PX}px;
       background: white;
-      font-family: 'Georgia', 'Times New Roman', serif;
-      font-size: 13px;
-      line-height: 1.65;
-      color: #1e293b;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #222;
     }
 
-    /* --- Header (centred, polished) --- */
-    .minutes-header { text-align: center; margin-bottom: 24px; }
-    .org-logo { display: block; margin: 0 auto 10px; max-width: 72px; max-height: 72px; object-fit: contain; }
-    .org-name { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2.5px; color: #64748b; margin-bottom: 4px; }
-    .doc-title { font-size: 26px; font-weight: 700; color: #0f172a; margin-bottom: 2px; }
-    .meeting-name { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 400; color: #475569; margin-bottom: 12px; }
-    .header-line { width: 50px; height: 2px; background: #0ea5e9; margin: 0 auto; }
+    .minutes-header { text-align: center; margin-bottom: 20px; }
+    .org-logo { display: block; margin: 0 auto 8px; max-width: 64px; max-height: 64px; object-fit: contain; }
+    .org-name { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; color: #555; margin-bottom: 6px; }
+    .doc-title { font-size: 24px; font-weight: 700; color: #111; margin-bottom: 2px; }
+    .meeting-name { font-size: 13px; color: #444; margin-bottom: 20px; }
+    .header-line { display: none; }
 
-    /* --- Meeting detail line --- */
-    .detail-line { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11.5px; color: #475569; text-align: center; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
-    .detail-line strong { font-weight: 600; color: #334155; }
+    .detail-line { font-size: 11px; color: #333; text-align: center; margin-bottom: 20px; }
+    .detail-line strong { font-weight: 700; }
 
-    /* --- Body text --- */
-    .body-text { font-size: 13px; color: #1e293b; line-height: 1.7; margin-bottom: 10px; }
+    .body-text { font-size: 12px; color: #222; line-height: 1.6; margin-bottom: 8px; }
     .body-text:last-child { margin-bottom: 0; }
-    .body-text strong, .body-text b { font-weight: 700; color: #0f172a; }
+    .body-text strong, .body-text b { font-weight: 700; }
     .body-text em, .body-text i { font-style: italic; }
-    .body-text p { margin-bottom: 10px; }
+    .body-text p { margin-bottom: 8px; }
     .body-text p:last-child { margin-bottom: 0; }
-    .body-text ul, .body-text ol { margin-left: 22px; margin-bottom: 10px; }
-    .body-text li { margin-bottom: 3px; }
+    .body-text ul, .body-text ol { margin-left: 24px; margin-bottom: 8px; }
+    .body-text li { margin-bottom: 2px; }
 
-    /* --- Agenda items --- */
-    .agenda-item { margin-top: 18px; }
-    .item-heading { font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #cbd5e1; }
+    .agenda-item { margin-top: 16px; }
+    .item-heading { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 6px; }
 
-    /* --- Footer --- */
-    .pdf-footer { position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 8.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
-    .pdf-footer-org { font-weight: 500; }
-    .pdf-footer-page { font-weight: 500; }
+    .pdf-footer { position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: #999; padding-top: 6px; border-top: 1px solid #ddd; }
   `;
 
   // --- Measure content and calculate page breaks ---
