@@ -128,12 +128,14 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
     }).join('');
   };
 
-  // Build meeting details as inline text
-  const detailParts: string[] = [];
-  detailParts.push(`<strong>Date:</strong> ${meetingDate}`);
-  if (meeting.location) detailParts.push(`<strong>Location:</strong> ${meeting.location}`);
-  if (chairName) detailParts.push(`<strong>Chairperson:</strong> ${chairName}`);
-  if (minuteTakerName) detailParts.push(`<strong>Minute Taker:</strong> ${minuteTakerName}`);
+  // Build meeting details as two lines
+  const line1Parts: string[] = [];
+  line1Parts.push(`<strong>Date:</strong> ${meetingDate}`);
+  if (meeting.location) line1Parts.push(`<strong>Location:</strong> ${meeting.location}`);
+
+  const line2Parts: string[] = [];
+  if (chairName) line2Parts.push(`<strong>Chairperson:</strong> ${chairName}`);
+  if (minuteTakerName) line2Parts.push(`<strong>Minute Taker:</strong> ${minuteTakerName}`);
 
   const fullHTML = `
     <div class="minutes-header">
@@ -144,13 +146,14 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
       <div class="header-line"></div>
     </div>
 
-    <div class="detail-line">${detailParts.join('&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;')}</div>
+    <div class="detail-line">${line1Parts.join('&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;')}</div>
+    ${line2Parts.length ? `<div class="detail-line">${line2Parts.join('&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;')}</div>` : ''}
 
     ${presentList ? `
       <p class="body-text"><strong>Present:</strong> ${presentList}.</p>
     ` : ''}
     ${guestsList ? `
-      <p class="body-text"><strong>Guests:</strong> ${guestsList}.</p>
+      <p class="body-text"><strong>Guests/Visitors:</strong> ${guestsList}.</p>
     ` : ''}
 
     ${buildAgendaHTML()}`;
@@ -174,8 +177,11 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
       line-height: 1.6;
       color: #222;
     }
+    .pdf-page div, .pdf-page p, .pdf-page h1, .pdf-page h2, .pdf-page h3, .pdf-page section {
+      border: none; border-radius: 0; box-shadow: none; background: transparent;
+    }
 
-    .minutes-header { text-align: center; margin-bottom: 20px; }
+    .minutes-header { text-align: center; margin-bottom: 20px; border: none !important; border-bottom: none !important; box-shadow: none !important; background: transparent !important; padding: 0 !important; }
     .org-logo { display: block; margin: 0 auto 8px; max-width: 64px; max-height: 64px; object-fit: contain; }
     .org-name { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; color: #555; margin-bottom: 6px; }
     .doc-title { font-size: 24px; font-weight: 700; color: #111; margin-bottom: 2px; }
@@ -185,19 +191,24 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
     .detail-line { font-size: 11px; color: #333; text-align: center; margin-bottom: 20px; }
     .detail-line strong { font-weight: 700; }
 
-    .body-text { font-size: 12px; color: #222; line-height: 1.6; margin-bottom: 8px; }
+    .body-text { font-size: 12px; color: #222; line-height: 1.6; margin-bottom: 12px; }
     .body-text:last-child { margin-bottom: 0; }
     .body-text strong, .body-text b { font-weight: 700; }
     .body-text em, .body-text i { font-style: italic; }
-    .body-text p { margin-bottom: 8px; }
+    .body-text p { margin-bottom: 10px; }
     .body-text p:last-child { margin-bottom: 0; }
-    .body-text ul, .body-text ol { margin-left: 24px; margin-bottom: 8px; }
-    .body-text li { margin-bottom: 2px; }
+    .body-text ul { list-style-type: disc !important; padding-left: 28px !important; margin-bottom: 10px; }
+    .body-text ol { list-style-type: decimal !important; padding-left: 28px !important; margin-bottom: 10px; }
+    .body-text ul ul { list-style-type: circle !important; }
+    .body-text li { margin-bottom: 3px; display: list-item !important; list-style-position: outside !important; }
+    .body-text li::marker { color: #333; }
 
-    .agenda-item { margin-top: 16px; }
+    .agenda-item { margin-top: 16px; padding-top: 12px; border: none !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; overflow: visible !important; border-top: 1px solid #ccc !important; }
+    .agenda-item:first-child { border-top: none !important; padding-top: 0; }
     .item-heading { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 6px; }
 
     .pdf-footer { position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: #999; padding-top: 6px; border-top: 1px solid #ddd; }
+    .pdf-footer-generated { font-style: italic; color: #bbb; }
   `;
 
   // --- Measure content and calculate page breaks ---
@@ -323,18 +334,21 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
       pageDiv.style.position = 'relative';
       pageDiv.style.overflow = 'hidden';
 
-      const contentWrapper = document.createElement('div');
-      contentWrapper.style.position = 'relative';
-      contentWrapper.style.top = `-${pageOffset}px`;
-      contentWrapper.style.width = '100%';
-      contentWrapper.innerHTML = `<div class="pdf-content">${fullHTML}</div>`;
-
       const nextOffset = pageNum < totalPages - 1 ? breakOffsets[pageNum + 1] : pageOffset + contentAreaHeightPx;
       const clipHeight = Math.min(nextOffset - pageOffset, contentAreaHeightPx);
 
       const clipper = document.createElement('div');
-      clipper.style.overflow = 'hidden';
       clipper.style.height = `${clipHeight}px`;
+      clipper.style.position = 'relative';
+      clipper.style.overflow = 'hidden';
+
+      const contentWrapper = document.createElement('div');
+      contentWrapper.style.position = 'absolute';
+      contentWrapper.style.top = `-${pageOffset}px`;
+      contentWrapper.style.left = '0';
+      contentWrapper.style.width = '100%';
+      contentWrapper.innerHTML = `<div class="pdf-content">${fullHTML}</div>`;
+
       clipper.appendChild(contentWrapper);
       pageDiv.appendChild(clipper);
 
@@ -344,7 +358,7 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
       footer.style.bottom = `${paddingPx}px`;
       footer.style.left = `${paddingPx}px`;
       footer.style.right = `${paddingPx}px`;
-      footer.innerHTML = `<span class="pdf-footer-org">${orgName} &mdash; ${meeting.name}</span><span class="pdf-footer-page">Page ${pageNum + 1} of ${totalPages}</span>`;
+      footer.innerHTML = `<span class="pdf-footer-org">${orgName} &mdash; ${meeting.name}</span><span class="pdf-footer-generated">Generated with AlfiePRO</span><span class="pdf-footer-page">Page ${pageNum + 1} of ${totalPages}</span>`;
       pageDiv.appendChild(footer);
 
       pageContainer.appendChild(pageDiv);
