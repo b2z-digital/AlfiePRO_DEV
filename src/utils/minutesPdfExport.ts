@@ -39,15 +39,6 @@ async function fetchLogoDataUrl(logoUrl: string): Promise<string> {
   return '';
 }
 
-function getAgendaItemTypeLabel(type: string): string {
-  switch (type) {
-    case 'for_noting': return 'For Noting';
-    case 'for_action': return 'For Action';
-    case 'for_discussion': return 'For Discussion';
-    default: return type;
-  }
-}
-
 async function fetchOrgInfo(
   meeting: Meeting,
   associationId?: string,
@@ -101,57 +92,48 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
 
   const buildAgendaHTML = () => {
     return agendaItems.map(item => {
-      const ownerName = item.owner ? `${item.owner.first_name} ${item.owner.last_name}` : '';
-      const typeLabel = getAgendaItemTypeLabel(item.type);
-
       let minutesHTML = '';
       if (item.minutes_content) {
         const cleaned = item.minutes_content
           .replace(/class="[^"]*"/g, '')
           .replace(/style="[^"]*"/g, '');
-        minutesHTML = `<div class="minutes-content">${cleaned}</div>`;
+        minutesHTML = `<div class="body-text">${cleaned}</div>`;
       }
 
       let decisionHTML = '';
       if (item.minutes_decision) {
         const cleanDecision = item.minutes_decision
           .replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
-        decisionHTML = `
-          <div class="decision-box">
-            <div class="decision-label">DECISION</div>
-            <div class="decision-text">${cleanDecision}</div>
-          </div>`;
+        if (cleanDecision) {
+          decisionHTML = `<p class="body-text"><strong>Resolution:</strong> ${cleanDecision}</p>`;
+        }
       }
 
       let tasksHTML = '';
       if (item.minutes_tasks) {
         const cleanTasks = item.minutes_tasks
           .replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
-        tasksHTML = `
-          <div class="action-box">
-            <div class="action-label">ACTION ITEMS</div>
-            <div class="action-text">${cleanTasks}</div>
-          </div>`;
+        if (cleanTasks) {
+          tasksHTML = `<p class="body-text"><strong>Action:</strong> ${cleanTasks}</p>`;
+        }
       }
-
-      const metaItems = [];
-      if (ownerName) metaItems.push(`<span class="meta-item"><strong>Owner:</strong> ${ownerName}</span>`);
-      if (typeLabel) metaItems.push(`<span class="meta-item"><strong>Type:</strong> ${typeLabel}</span>`);
-      if (item.duration) metaItems.push(`<span class="meta-item"><strong>Duration:</strong> ${item.duration} min</span>`);
 
       return `
         <div class="agenda-item">
-          <div class="agenda-header">
-            <div class="agenda-number">${item.item_number}</div>
-            <div class="agenda-title">${item.item_name}</div>
-          </div>
-          ${metaItems.length > 0 ? `<div class="agenda-meta">${metaItems.join('<span class="meta-sep">|</span>')}</div>` : ''}
+          <h2 class="item-heading">${item.item_number}. ${item.item_name}</h2>
           ${minutesHTML}
           ${decisionHTML}
           ${tasksHTML}
         </div>`;
     }).join('');
   };
+
+  // Build meeting details as inline text
+  const detailParts: string[] = [];
+  detailParts.push(`<strong>Date:</strong> ${meetingDate}`);
+  if (meeting.location) detailParts.push(`<strong>Location:</strong> ${meeting.location}`);
+  if (chairName) detailParts.push(`<strong>Chairperson:</strong> ${chairName}`);
+  if (minuteTakerName) detailParts.push(`<strong>Minute Taker:</strong> ${minuteTakerName}`);
 
   const fullHTML = `
     <div class="minutes-header">
@@ -161,44 +143,17 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
       <div class="meeting-name">${meeting.name}</div>
       <div class="header-line"></div>
     </div>
-    <div class="info-grid">
-      <div class="info-card">
-        <div class="info-label">Date</div>
-        <div class="info-value">${meetingDate}</div>
-      </div>
-      ${meeting.location ? `
-      <div class="info-card">
-        <div class="info-label">Location</div>
-        <div class="info-value">${meeting.location}</div>
-      </div>` : ''}
-      ${chairName ? `
-      <div class="info-card">
-        <div class="info-label">Chairperson</div>
-        <div class="info-value">${chairName}</div>
-      </div>` : ''}
-      ${minuteTakerName ? `
-      <div class="info-card">
-        <div class="info-label">Minute Taker</div>
-        <div class="info-value">${minuteTakerName}</div>
-      </div>` : ''}
-    </div>
+
+    <div class="detail-line">${detailParts.join('&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;')}</div>
+
     ${presentList ? `
-    <div class="attendance-section">
-      <div class="section-heading">Attendance</div>
-      <div class="attendance-block">
-        <div class="attendance-label">Members Present (${meeting.members_present?.length || 0})</div>
-        <div class="attendance-names">${presentList}</div>
-      </div>
-      ${guestsList ? `
-      <div class="attendance-block" style="margin-top: 8px;">
-        <div class="attendance-label">Guests Present</div>
-        <div class="attendance-names">${guestsList}</div>
-      </div>` : ''}
-    </div>` : ''}
-    <div class="agenda-section">
-      <div class="section-heading">Agenda &amp; Minutes</div>
-      ${buildAgendaHTML()}
-    </div>`;
+      <p class="body-text"><strong>Present:</strong> ${presentList}.</p>
+    ` : ''}
+    ${guestsList ? `
+      <p class="body-text"><strong>Guests:</strong> ${guestsList}.</p>
+    ` : ''}
+
+    ${buildAgendaHTML()}`;
 
   const A4_WIDTH_PX = 794;
   const A4_HEIGHT_PX = 1123;
@@ -214,48 +169,40 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
     .pdf-page {
       width: ${A4_WIDTH_PX}px;
       background: white;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: 'Georgia', 'Times New Roman', serif;
       font-size: 13px;
-      line-height: 1.5;
-      color: #1a1a1a;
+      line-height: 1.65;
+      color: #1e293b;
     }
-    .minutes-header { text-align: center; margin-bottom: 20px; }
-    .org-logo { display: block; margin: 0 auto 12px; max-width: 80px; max-height: 80px; object-fit: contain; }
-    .org-name { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: #64748b; margin-bottom: 4px; }
+
+    /* --- Header (centred, polished) --- */
+    .minutes-header { text-align: center; margin-bottom: 24px; }
+    .org-logo { display: block; margin: 0 auto 10px; max-width: 72px; max-height: 72px; object-fit: contain; }
+    .org-name { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2.5px; color: #64748b; margin-bottom: 4px; }
     .doc-title { font-size: 26px; font-weight: 700; color: #0f172a; margin-bottom: 2px; }
-    .meeting-name { font-size: 16px; font-weight: 500; color: #475569; margin-bottom: 12px; }
-    .header-line { width: 60px; height: 3px; background: #0ea5e9; margin: 0 auto; border-radius: 2px; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
-    .info-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; }
-    .info-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 2px; }
-    .info-value { font-size: 13px; font-weight: 500; color: #1e293b; }
-    .section-heading { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #0f172a; padding-bottom: 8px; border-bottom: 2px solid #0ea5e9; margin-bottom: 14px; }
-    .attendance-section { margin-bottom: 20px; }
-    .attendance-block { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 14px; }
-    .attendance-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-bottom: 4px; }
-    .attendance-names { font-size: 12.5px; color: #334155; line-height: 1.6; }
-    .agenda-section { margin-bottom: 10px; }
-    .agenda-item { margin-bottom: 16px; border-left: 3px solid #e2e8f0; padding-left: 14px; }
-    .agenda-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
-    .agenda-number { font-size: 22px; font-weight: 700; color: #0ea5e9; line-height: 1; min-width: 28px; }
-    .agenda-title { font-size: 15px; font-weight: 700; color: #0f172a; }
-    .agenda-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; padding: 4px 0; }
-    .meta-item { font-size: 11px; color: #64748b; }
-    .meta-item strong { color: #475569; font-weight: 600; }
-    .meta-sep { color: #cbd5e1; font-size: 10px; margin: 0 2px; }
-    .minutes-content { font-size: 12.5px; color: #334155; line-height: 1.65; }
-    .minutes-content p { margin-bottom: 8px; }
-    .minutes-content strong, .minutes-content b { font-weight: 700; color: #1e293b; }
-    .minutes-content em, .minutes-content i { font-style: italic; }
-    .minutes-content ul, .minutes-content ol { margin-left: 20px; margin-bottom: 8px; }
-    .minutes-content li { margin-bottom: 2px; }
-    .decision-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 14px; margin-top: 8px; }
-    .decision-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #16a34a; margin-bottom: 4px; }
-    .decision-text { font-size: 12.5px; color: #166534; line-height: 1.5; }
-    .action-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px 14px; margin-top: 8px; }
-    .action-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #2563eb; margin-bottom: 4px; }
-    .action-text { font-size: 12.5px; color: #1e40af; line-height: 1.5; }
-    .pdf-footer { position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+    .meeting-name { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 400; color: #475569; margin-bottom: 12px; }
+    .header-line { width: 50px; height: 2px; background: #0ea5e9; margin: 0 auto; }
+
+    /* --- Meeting detail line --- */
+    .detail-line { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11.5px; color: #475569; text-align: center; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    .detail-line strong { font-weight: 600; color: #334155; }
+
+    /* --- Body text --- */
+    .body-text { font-size: 13px; color: #1e293b; line-height: 1.7; margin-bottom: 10px; }
+    .body-text:last-child { margin-bottom: 0; }
+    .body-text strong, .body-text b { font-weight: 700; color: #0f172a; }
+    .body-text em, .body-text i { font-style: italic; }
+    .body-text p { margin-bottom: 10px; }
+    .body-text p:last-child { margin-bottom: 0; }
+    .body-text ul, .body-text ol { margin-left: 22px; margin-bottom: 10px; }
+    .body-text li { margin-bottom: 3px; }
+
+    /* --- Agenda items --- */
+    .agenda-item { margin-top: 18px; }
+    .item-heading { font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #cbd5e1; }
+
+    /* --- Footer --- */
+    .pdf-footer { position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 8.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
     .pdf-footer-org { font-weight: 500; }
     .pdf-footer-page { font-weight: 500; }
   `;
