@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Save, Plus, Trash2, Check, TriangleAlert as AlertTriangle, User, Users, Clock, ChevronDown, ChevronUp, Paperclip, SquareCheck as CheckSquare, FileText, Download, X, Loader as Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Check, TriangleAlert as AlertTriangle, User, Users, Clock, ChevronDown, ChevronUp, Paperclip, SquareCheck as CheckSquare, FileText, Download, X, Loader as Loader2, Eye } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Meeting, MeetingAgendaItem, MeetingAttendee, MeetingGuest } from '../../types/meeting';
 import {
@@ -18,6 +18,7 @@ import { WysiwygEditor } from '../ui/WysiwygEditor';
 import { AgendaTaskManager } from './AgendaTaskManager';
 import { ActionItemsSummary } from './ActionItemsSummary';
 import { supabase } from '../../utils/supabase';
+import { generateMinutesPdf } from '../../utils/minutesPdfExport';
 import '../../styles/minutes.css';
 
 interface MinuteTakingPageProps {
@@ -60,6 +61,7 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
   });
   const [isLastItem, setIsLastItem] = useState(false);
   const [showActionItemsSummary, setShowActionItemsSummary] = useState(false);
+  const [generatingPreview, setGeneratingPreview] = useState(false);
   const [agendaItemTasks, setAgendaItemTasks] = useState<{ [agendaItemId: string]: any[] }>({});
   const [uploadingAgendaItemId, setUploadingAgendaItemId] = useState<string | null>(null);
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
@@ -660,6 +662,38 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
           </button>
           
           <div className="flex gap-2">
+            {/* Preview PDF Button */}
+            {meeting && agendaItems.length > 0 && (
+              <button
+                onClick={async () => {
+                  setGeneratingPreview(true);
+                  try {
+                    const assocId = meeting.state_association_id || meeting.national_association_id || undefined;
+                    const assocType = meeting.state_association_id ? 'state' as const : meeting.national_association_id ? 'national' as const : undefined;
+                    await generateMinutesPdf({
+                      meeting: {
+                        ...meeting,
+                        members_present: members.filter(m => m.isPresent).map(m => ({ id: m.id, name: m.name })),
+                        guests_present: guests,
+                      },
+                      agendaItems,
+                      associationId: assocId,
+                      associationType: assocType,
+                    });
+                  } catch (err) {
+                    console.error('Error generating preview PDF:', err);
+                  } finally {
+                    setGeneratingPreview(false);
+                  }
+                }}
+                disabled={generatingPreview}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Eye size={16} />
+                <span>{generatingPreview ? 'Generating...' : 'Preview PDF'}</span>
+              </button>
+            )}
+
             {/* Action Items Summary Button - Available when meeting is completed */}
             {isReadOnly && (
               <button
