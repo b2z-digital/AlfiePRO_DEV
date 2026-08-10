@@ -334,18 +334,21 @@ export async function generateMinutesPdf(options: MinutesPdfOptions): Promise<vo
       pageDiv.style.position = 'relative';
       pageDiv.style.overflow = 'hidden';
 
-      const contentWrapper = document.createElement('div');
-      contentWrapper.style.position = 'relative';
-      contentWrapper.style.top = `-${pageOffset}px`;
-      contentWrapper.style.width = '100%';
-      contentWrapper.innerHTML = `<div class="pdf-content">${fullHTML}</div>`;
-
       const nextOffset = pageNum < totalPages - 1 ? breakOffsets[pageNum + 1] : pageOffset + contentAreaHeightPx;
       const clipHeight = Math.min(nextOffset - pageOffset, contentAreaHeightPx);
 
       const clipper = document.createElement('div');
-      clipper.style.overflow = 'hidden';
       clipper.style.height = `${clipHeight}px`;
+      clipper.style.position = 'relative';
+      clipper.style.overflow = 'hidden';
+
+      const contentWrapper = document.createElement('div');
+      contentWrapper.style.position = 'absolute';
+      contentWrapper.style.top = `-${pageOffset}px`;
+      contentWrapper.style.left = '0';
+      contentWrapper.style.width = '100%';
+      contentWrapper.innerHTML = `<div class="pdf-content">${fullHTML}</div>`;
+
       clipper.appendChild(contentWrapper);
       pageDiv.appendChild(clipper);
 
