@@ -195,6 +195,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
           .from('members')
           .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status, user_id, activation_status')
           .in('club_id', clubIds)
+          .or('membership_status.eq.active,membership_status.eq.expired,membership_status.is.null')
           .order('last_name');
         clubMembers = clubMembersData || [];
       }
@@ -203,6 +204,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
         .from('members')
         .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status, user_id, activation_status')
         .eq('state_association_id', stateId)
+        .or('membership_status.eq.active,membership_status.eq.expired,membership_status.is.null')
         .order('last_name');
 
       const allMemberIds = new Set<string>();
@@ -276,10 +278,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
         renewal_date: m.renewal_date,
       }));
 
+      const latestRenewal = group
+        .filter(m => m.renewal_date)
+        .sort((a, b) => new Date(b.renewal_date!).getTime() - new Date(a.renewal_date!).getTime())[0]?.renewal_date || primary.renewal_date;
+
       consolidated.push({
         ...primary,
-        // Overall financial = financial at any club
         is_financial: group.some(m => m.is_financial),
+        renewal_date: latestRenewal,
         clubMemberships,
         memberIds: group.map(m => m.id),
       });
@@ -315,6 +321,10 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
         filtered = filtered.filter((m) => m.is_financial);
       } else if (selectedStatus === 'unfinancial') {
         filtered = filtered.filter((m) => !m.is_financial);
+      } else if (selectedStatus === 'current') {
+        filtered = filtered.filter((m) => m.is_financial && (!m.renewal_date || new Date(m.renewal_date) >= new Date()));
+      } else if (selectedStatus === 'expired') {
+        filtered = filtered.filter((m) => !m.is_financial || (m.renewal_date && new Date(m.renewal_date) < new Date()));
       }
     }
     setFilteredMembers(filtered);
@@ -529,6 +539,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       'Phone': m.phone,
       'Club': m.club_name || 'Unassigned',
       'Membership Level': m.membership_level,
+      'Status': (m.is_financial && (!m.renewal_date || new Date(m.renewal_date) >= new Date())) ? 'Current' : 'Expired',
       'Financial Status': m.is_financial ? 'Financial' : 'Unfinancial',
       'Date Joined': m.date_joined ? formatDate(m.date_joined) : '',
       'Renewal Date': m.renewal_date ? formatDate(m.renewal_date) : '',
@@ -552,10 +563,15 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   };
 
   const uniqueMemberCount = consolidateMembers(members).length;
+  const now = new Date();
+  const currentMembers = members.filter((m) => m.is_financial && (!m.renewal_date || new Date(m.renewal_date) >= now));
+  const expiredMembers = members.filter((m) => !m.is_financial || (m.renewal_date && new Date(m.renewal_date) < now));
   const stats = {
     totalMembers: members.length,
     uniqueMembers: uniqueMemberCount,
     financialMembers: members.filter((m) => m.is_financial).length,
+    currentMembers: currentMembers.length,
+    expiredMembers: expiredMembers.length,
     totalClubs: clubs.length,
     filteredCount: isConsolidatedView ? consolidatedMembers.length : filteredMembers.length
   };
@@ -631,8 +647,8 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                 <CheckCircle2 className="text-white" size={24} />
               </div>
               <div>
-                <p className="text-sm text-slate-400">Financial Members</p>
-                <p className="text-3xl font-bold text-white mt-1">{stats.financialMembers}</p>
+                <p className="text-sm text-slate-400">Current Members</p>
+                <p className="text-3xl font-bold text-white mt-1">{stats.currentMembers}</p>
               </div>
             </div>
           </div>
@@ -779,6 +795,8 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
               className="px-4 py-2 rounded-lg border bg-slate-700/50 border-slate-600/50 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             >
               <option value="all">All Status</option>
+              <option value="current">Current</option>
+              <option value="expired">Expired</option>
               <option value="financial">Financial</option>
               <option value="unfinancial">Unfinancial</option>
             </select>
