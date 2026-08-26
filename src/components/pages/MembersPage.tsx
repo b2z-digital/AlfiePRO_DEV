@@ -19,7 +19,7 @@ import { SaveFilterModal } from '../membership/SaveFilterModal';
 import { ManageFiltersModal } from '../membership/ManageFiltersModal';
 import { MemberFilterConfig, FilterPreset } from '../../types/memberFilters';
 import { filterMembers, createEmptyFilter } from '../../utils/memberFilters';
-import { activateMembers, ActivationResponse } from '../../utils/memberActivation';
+import { activateMembers, silentActivateMembers, ActivationResponse } from '../../utils/memberActivation';
 import { Avatar } from '../ui/Avatar';
 
 interface MembersPageProps {
@@ -89,6 +89,8 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [settingPassword, setSettingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [resendingActivation, setResendingActivation] = useState<string | null>(null);
+  const [silentMode, setSilentMode] = useState(false);
+  const [silentPassword, setSilentPassword] = useState('Welcome2027!');
   const activationMenuRef = useRef<HTMLDivElement>(null);
 
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
@@ -826,12 +828,14 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const handleActivateSingle = (member: Member) => {
     setMembersToActivate([member]);
     setActivationResults(null);
+    setSilentMode(false);
     setShowActivateConfirmModal(true);
   };
 
   const handleActivateBulk = () => {
     setMembersToActivate(unlinkedMembersWithEmail);
     setActivationResults(null);
+    setSilentMode(false);
     setShowActivateConfirmModal(true);
   };
 
@@ -842,7 +846,9 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     setActivating(true);
     const memberIds = membersToActivate.map(m => m.id);
 
-    const result = await activateMembers(memberIds, currentClub.clubId, clubName);
+    const result = silentMode
+      ? await silentActivateMembers(memberIds, currentClub.clubId, clubName, silentPassword)
+      : await activateMembers(memberIds, currentClub.clubId, clubName);
 
     setActivating(false);
     setActivationResults(result);
@@ -850,7 +856,9 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     if (result.success) {
       if (result.summary.created > 0) {
         addNotification(
-          `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated and invited to AlfiePRO`,
+          silentMode
+            ? `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated silently with default password`
+            : `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated and invited to AlfiePRO`,
           'success'
         );
       }
@@ -2077,42 +2085,127 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
             <div className="p-6">
               {!activationResults ? (
                 <>
-                  <p className="text-slate-300 mb-4">
-                    {membersToActivate.length === 1
-                      ? <>This will create a login account for <span className="font-semibold text-white">{membersToActivate[0].first_name} {membersToActivate[0].last_name}</span> and send them an email with a link to set their password.</>
-                      : <>This will create login accounts for <span className="font-semibold text-white">{membersToActivate.length} members</span> and email each of them with a link to set their password.</>
-                    }
-                  </p>
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
-                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-sky-400 text-xs font-bold">1</span>
-                      </div>
-                      <div>
-                        <p className="text-sm text-white font-medium">Account created</p>
-                        <p className="text-xs text-slate-400">Auth account pre-created with their email on file</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
-                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-sky-400 text-xs font-bold">2</span>
-                      </div>
-                      <div>
-                        <p className="text-sm text-white font-medium">Welcome email sent</p>
-                        <p className="text-xs text-slate-400">Contains a secure link to set their password — works on any device</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
-                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-sky-400 text-xs font-bold">3</span>
-                      </div>
-                      <div>
-                        <p className="text-sm text-white font-medium">Member sets their password</p>
-                        <p className="text-xs text-slate-400">They click the link, set a password in their browser, then sign in on web or app</p>
-                      </div>
-                    </div>
+                  {/* Mode Toggle */}
+                  <div className="flex rounded-lg bg-slate-700/50 p-1 mb-4">
+                    <button
+                      onClick={() => setSilentMode(false)}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        !silentMode ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'
+                      }`}
+                    >
+                      <Mail size={14} />
+                      Send Setup Email
+                    </button>
+                    <button
+                      onClick={() => setSilentMode(true)}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        silentMode ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'
+                      }`}
+                    >
+                      <KeyRound size={14} />
+                      Quick Activate (No Email)
+                    </button>
                   </div>
+
+                  {!silentMode ? (
+                    <>
+                      <p className="text-slate-300 mb-4">
+                        {membersToActivate.length === 1
+                          ? <>This will create a login account for <span className="font-semibold text-white">{membersToActivate[0].first_name} {membersToActivate[0].last_name}</span> and send them an email with a link to set their password.</>
+                          : <>This will create login accounts for <span className="font-semibold text-white">{membersToActivate.length} members</span> and email each of them with a link to set their password.</>
+                        }
+                      </p>
+
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                          <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-sky-400 text-xs font-bold">1</span>
+                          </div>
+                          <div>
+                            <p className="text-sm text-white font-medium">Account created</p>
+                            <p className="text-xs text-slate-400">Auth account pre-created with their email on file</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                          <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-sky-400 text-xs font-bold">2</span>
+                          </div>
+                          <div>
+                            <p className="text-sm text-white font-medium">Welcome email sent</p>
+                            <p className="text-xs text-slate-400">Contains a secure link to set their password — works on any device</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                          <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-sky-400 text-xs font-bold">3</span>
+                          </div>
+                          <div>
+                            <p className="text-sm text-white font-medium">Member sets their password</p>
+                            <p className="text-xs text-slate-400">They click the link, set a password in their browser, then sign in on web or app</p>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-slate-300 mb-4">
+                        {membersToActivate.length === 1
+                          ? <>This will create a login account for <span className="font-semibold text-white">{membersToActivate[0].first_name} {membersToActivate[0].last_name}</span> with the password below. <span className="text-emerald-400 font-medium">No email will be sent.</span></>
+                          : <>This will create login accounts for <span className="font-semibold text-white">{membersToActivate.length} members</span> all with the same default password. <span className="text-emerald-400 font-medium">No emails will be sent.</span></>
+                        }
+                      </p>
+
+                      <div className="mb-4">
+                        <label className="block text-sm text-slate-400 mb-1.5">Default Password</label>
+                        <input
+                          type="text"
+                          value={silentPassword}
+                          onChange={(e) => setSilentPassword(e.target.value)}
+                          placeholder="Enter default password (min 6 characters)"
+                          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                        {silentPassword.length > 0 && silentPassword.length < 6 && (
+                          <p className="text-xs text-red-400 mt-1">Password must be at least 6 characters</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                          <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-emerald-400 text-xs font-bold">1</span>
+                          </div>
+                          <div>
+                            <p className="text-sm text-white font-medium">Account created with password</p>
+                            <p className="text-xs text-slate-400">Auth account created and password set immediately</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                          <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-emerald-400 text-xs font-bold">2</span>
+                          </div>
+                          <div>
+                            <p className="text-sm text-white font-medium">Member ready to sign in</p>
+                            <p className="text-xs text-slate-400">They can log in using their email + the default password you set</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                          <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-emerald-400 text-xs font-bold">3</span>
+                          </div>
+                          <div>
+                            <p className="text-sm text-white font-medium">Change password later</p>
+                            <p className="text-xs text-slate-400">You or the member can change it anytime from their profile</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-emerald-900/20 border border-emerald-900/30 rounded-lg mb-4">
+                        <p className="text-xs text-emerald-400">
+                          All {membersToActivate.filter(m => m.email).length} members will use the same password. You can change individual passwords later from the member options menu.
+                        </p>
+                      </div>
+                    </>
+                  )}
 
                   {membersToActivate.length <= 5 && (
                     <div className="mb-4">
@@ -2187,7 +2280,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
             </div>
 
             <div className="p-6 border-t border-slate-700">
-              {!activationResults && (
+              {!activationResults && !silentMode && (
                 <div className="mb-4">
                   {showActivationTestEmail ? (
                     <div className="flex items-center gap-2">
@@ -2241,13 +2334,20 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                     </button>
                     <button
                       onClick={handleConfirmActivation}
-                      disabled={activating}
-                      className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={activating || (silentMode && silentPassword.trim().length < 6)}
+                      className={`btn-primary-green flex items-center gap-2 px-5 py-2.5 text-white rounded-lg font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                        silentMode ? 'from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700' : 'from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700'
+                      }`}
                     >
                       {activating ? (
                         <>
                           <Loader2 size={16} className="animate-spin" />
                           Activating...
+                        </>
+                      ) : silentMode ? (
+                        <>
+                          <KeyRound size={16} />
+                          Quick Activate {membersToActivate.filter(m => m.email).length} Member{membersToActivate.filter(m => m.email).length === 1 ? '' : 's'}
                         </>
                       ) : (
                         <>

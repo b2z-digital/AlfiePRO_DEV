@@ -78,6 +78,62 @@ export async function activateMembers(
   }
 }
 
+export async function silentActivateMembers(
+  memberIds: string[],
+  clubId: string,
+  clubName: string,
+  defaultPassword: string
+): Promise<ActivationResponse> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      return {
+        success: false,
+        summary: { created: 0, existing_linked: 0, errors: 0, no_email: 0, total: 0 },
+        results: [],
+        error: 'Not authenticated',
+      };
+    }
+
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/activate-member-account`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        member_ids: memberIds,
+        club_id: clubId,
+        club_name: clubName,
+        silent: true,
+        default_password: defaultPassword,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        summary: { created: 0, existing_linked: 0, errors: 0, no_email: 0, total: 0 },
+        results: [],
+        error: data.error || `Request failed with status ${response.status}`,
+      };
+    }
+
+    return data as ActivationResponse;
+  } catch (err: any) {
+    return {
+      success: false,
+      summary: { created: 0, existing_linked: 0, errors: 0, no_email: 0, total: 0 },
+      results: [],
+      error: err.message || 'Failed to silently activate members',
+    };
+  }
+}
+
 export function getActivationStatusConfig(
   member: { user_id?: string | null; activation_status?: string | null; activation_sent_at?: string | null }
 ) {

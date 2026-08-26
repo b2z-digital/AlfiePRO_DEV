@@ -21,6 +21,8 @@ interface ActivateRequest {
   activate_on_behalf?: boolean;
   behalf_email_recipient?: string;
   resend?: boolean;
+  silent?: boolean;
+  default_password?: string;
 }
 
 interface ActivationResult {
@@ -63,11 +65,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email, test_email_only, test_email_recipient, preview_member_email, preview_member_name, activate_on_behalf, behalf_email_recipient, resend }: ActivateRequest = await req.json();
+    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email, test_email_only, test_email_recipient, preview_member_email, preview_member_name, activate_on_behalf, behalf_email_recipient, resend, silent, default_password }: ActivateRequest = await req.json();
 
     if ((!test_email_only && (!member_ids?.length || !club_id || !club_name)) || (test_email_only && (!club_id || !club_name))) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (silent && (!default_password || default_password.trim().length < 6)) {
+      return new Response(
+        JSON.stringify({ error: "Silent activation requires a password of at least 6 characters" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -231,7 +240,7 @@ Deno.serve(async (req: Request) => {
           if (existingUser) {
             userId = existingUser.id;
           } else {
-            const tempPassword = crypto.randomUUID() + "Aa1!";
+            const tempPassword = (silent && default_password) ? default_password.trim() : crypto.randomUUID() + "Aa1!";
             const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
               email: member.email,
               password: tempPassword,
@@ -264,14 +273,27 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        await supabase
-          .from("members")
-          .update({
-            user_id: userId,
-            activation_status: "pending",
-            activation_sent_at: new Date().toISOString(),
-          })
-          .eq("id", member.id);
+        if (silent) {
+          // Silent mode: mark as activated immediately, no email
+          await supabase
+            .from("members")
+            .update({
+              user_id: userId,
+              activation_status: "activated",
+              activation_sent_at: new Date().toISOString(),
+              activated_at: new Date().toISOString(),
+            })
+            .eq("id", member.id);
+        } else {
+          await supabase
+            .from("members")
+            .update({
+              user_id: userId,
+              activation_status: "pending",
+              activation_sent_at: new Date().toISOString(),
+            })
+            .eq("id", member.id);
+        }
 
         if (!resend) {
           await supabase
@@ -299,45 +321,48 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        const webAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
+        // Skip token creation and email for silent activation
+        if (!silent) {
+          const webAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
 
-        const activationToken = crypto.randomUUID() + "-" + crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+          const activationToken = crypto.randomUUID() + "-" + crypto.randomUUID();
+          const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-        await supabase
-          .from("member_activation_tokens")
-          .insert({
-            user_id: userId,
-            email: member.email,
-            token: activationToken,
-            expires_at: expiresAt,
-          });
+          await supabase
+            .from("member_activation_tokens")
+            .insert({
+              user_id: userId,
+              email: member.email,
+              token: activationToken,
+              expires_at: expiresAt,
+            });
 
-        const webActivationLink = `${webAppUrl}/reset-password?activation=${encodeURIComponent(activationToken)}&email=${encodeURIComponent(member.email)}`;
+          const webActivationLink = `${webAppUrl}/reset-password?activation=${encodeURIComponent(activationToken)}&email=${encodeURIComponent(member.email)}`;
 
-        if (sendGridApiKey && defaultFromEmail) {
-          const deepLinkBase = (app_deep_link_base || platformConfig.app_deep_link_base || "alfiepro://").replace(/\/+$/, "");
-          const separator = deepLinkBase.endsWith("://") ? "" : "/";
-          const activationDeepLink = `${deepLinkBase}${separator}activate?activation=${encodeURIComponent(activationToken)}&email=${encodeURIComponent(member.email)}`;
+          if (sendGridApiKey && defaultFromEmail) {
+            const deepLinkBase = (app_deep_link_base || platformConfig.app_deep_link_base || "alfiepro://").replace(/\/+$/, "");
+            const separator = deepLinkBase.endsWith("://") ? "" : "/";
+            const activationDeepLink = `${deepLinkBase}${separator}activate?activation=${encodeURIComponent(activationToken)}&email=${encodeURIComponent(member.email)}`;
 
-          const appStoreUrl = platformConfig.ios_app_store_url || "";
-          const playStoreUrl = platformConfig.android_play_store_url || "";
+            const appStoreUrl = platformConfig.ios_app_store_url || "";
+            const playStoreUrl = platformConfig.android_play_store_url || "";
 
-          const emailRecipient = (activate_on_behalf && behalf_email_recipient) ? behalf_email_recipient : member.email;
+            const emailRecipient = (activate_on_behalf && behalf_email_recipient) ? behalf_email_recipient : member.email;
 
-          await sendActivationEmail({
-            sendGridApiKey,
-            fromEmail: defaultFromEmail,
-            toEmail: emailRecipient,
-            recipientName: member.first_name,
-            clubName: club_name,
-            clubLogoUrl,
-            webActivationLink,
-            activationDeepLink,
-            appStoreUrl,
-            playStoreUrl,
-            bccEmail: activate_on_behalf ? undefined : bcc_email,
-          });
+            await sendActivationEmail({
+              sendGridApiKey,
+              fromEmail: defaultFromEmail,
+              toEmail: emailRecipient,
+              recipientName: member.first_name,
+              clubName: club_name,
+              clubLogoUrl,
+              webActivationLink,
+              activationDeepLink,
+              appStoreUrl,
+              playStoreUrl,
+              bccEmail: activate_on_behalf ? undefined : bcc_email,
+            });
+          }
         }
 
         results.push({
