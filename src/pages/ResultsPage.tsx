@@ -566,7 +566,7 @@ export const ResultsPage: React.FC = () => {
         return;
       }
 
-      const event = allEvents.find(e => e.id === targetId);
+      const event = allEvents.find(e => e.id === targetId) || simulatedEvents.find(e => e.id === targetId);
       if (event) {
         setSelectedEvent(event);
         setSelectedSeries(null);
@@ -577,7 +577,7 @@ export const ResultsPage: React.FC = () => {
       setSelectedSeries(null);
       setSelectedRound(null);
     }
-  }, [id, location.state, allEvents, allSeries, roundResults, externalNationalEvents, externalStateEvents, externalWorldEvents]);
+  }, [id, location.state, allEvents, allSeries, roundResults, externalNationalEvents, externalStateEvents, externalWorldEvents, simulatedEvents]);
 
   const enrichSeriesWithRoundData = async (series: RaceSeries[]): Promise<RaceSeries[]> => {
     try {
