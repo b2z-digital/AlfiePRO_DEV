@@ -9,7 +9,7 @@ import { RaceSeries, RaceEvent } from '../types/race';
 import { HeatDesignation } from '../types/heat';
 import { LetterScore, getLetterScoreValue } from '../types';
 import { getLetterScorePointsForRace } from '../utils/scratchCalculations';
-import { getStoredRaceSeries, getStoredRaceEvents, combineAllDayResults, storeRaceSeries } from '../utils/raceStorage';
+import { getStoredRaceSeries, getStoredRaceEvents, getSimulatedRaceEvents, combineAllDayResults, storeRaceSeries } from '../utils/raceStorage';
 import { getPublicEvents, convertToRaceEvent } from '../utils/publicEventStorage';
 import { formatDate } from '../utils/date';
 import { getBoatClassImage } from '../utils/boatClassImages';
@@ -713,8 +713,15 @@ export const ResultsPage: React.FC = () => {
       }
 
       const nonSimulatedEvents = events.filter(e => !(e as any).is_simulated);
-      const simEvents = events.filter(e => (e as any).is_simulated);
-      setSimulatedEvents(simEvents);
+
+      // Fetch simulated events separately (they are excluded from getStoredRaceEvents query)
+      try {
+        const simEvents = await getSimulatedRaceEvents();
+        setSimulatedEvents(simEvents.filter(e => e.completed || e.lastCompletedRace > 0));
+      } catch (err) {
+        console.error('Error fetching simulated events:', err);
+        setSimulatedEvents([]);
+      }
 
       const allEvents = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
         ? publicEvents
