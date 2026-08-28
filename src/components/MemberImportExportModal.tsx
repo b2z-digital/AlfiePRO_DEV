@@ -4,6 +4,37 @@ import Papa from 'papaparse';
 import { Member, MemberBoat, BoatType, MembershipLevel } from '../types/member';
 import { supabase } from '../utils/supabase';
 
+function resolveBoatTypeToShortCode(
+  csvValue: string,
+  clubBoatClasses: Array<{ name: string; shortCode: string }>
+): string {
+  const input = csvValue.toLowerCase().trim();
+  
+  // Direct match on short code
+  const exactShortCode = clubBoatClasses.find(bc => bc.shortCode.toLowerCase() === input);
+  if (exactShortCode) return exactShortCode.shortCode;
+
+  // Direct match on full name
+  const exactName = clubBoatClasses.find(bc => bc.name.toLowerCase() === input);
+  if (exactName) return exactName.shortCode;
+
+  // Match on the name part before parentheses (e.g. "Dragon Force 65" matches "Dragon Force 65 (DF65)")
+  const namePrefix = clubBoatClasses.find(bc => {
+    const baseName = bc.name.replace(/\s*\([^)]+\)$/, '').toLowerCase();
+    return baseName === input;
+  });
+  if (namePrefix) return namePrefix.shortCode;
+
+  // Fuzzy: input contains the short code or vice versa
+  const fuzzy = clubBoatClasses.find(bc =>
+    input.includes(bc.shortCode.toLowerCase()) || bc.shortCode.toLowerCase().includes(input)
+  );
+  if (fuzzy) return fuzzy.shortCode;
+
+  // No match found - return original value as-is
+  return csvValue.trim();
+}
+
 interface MemberImportExportModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -497,6 +528,19 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
 
     const clubName = clubData?.name || '';
 
+    // Fetch boat classes available to this club for resolving imported boat types
+    const { data: boatClassesData } = await supabase
+      .from('club_boat_classes')
+      .select('boat_class_id, boat_classes(id, name)')
+      .eq('club_id', currentClubId);
+    
+    const clubBoatClasses: Array<{ name: string; shortCode: string }> = (boatClassesData || []).map((cbc: any) => {
+      const name = cbc.boat_classes?.name || '';
+      const match = name.match(/\(([^)]+)\)$/);
+      const shortCode = match ? match[1] : (name === 'Ten Rater' ? '10R' : name);
+      return { name, shortCode };
+    });
+
     const validMappings = fieldMappings.filter(m => m.mappedTo && m.mappedTo !== 'ignore');
     let currentResolution: 'overwrite' | 'skip' | null = null;
 
@@ -554,6 +598,8 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
         if (['boat_type', 'sail_number', 'hull', 'handicap'].includes(field)) {
           if (field === 'handicap') {
             boatData[field] = parseFloat(value) || null;
+          } else if (field === 'boat_type') {
+            boatData[field] = resolveBoatTypeToShortCode(value.toString().trim(), clubBoatClasses);
           } else {
             boatData[field] = value;
           }

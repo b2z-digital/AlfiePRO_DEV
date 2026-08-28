@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CircleCheck as CheckCircle2, Clock, ChevronRight, X, Grid2x2 as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, Circle as XCircle, Send, SquarePen as Edit2, Globe, Map as MapIcon, ArrowUpDown, ListFilter as Filter } from 'lucide-react';
+import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CircleCheck as CheckCircle2, Clock, ChevronRight, X, Grid2x2 as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, Circle as XCircle, Send, SquarePen as Edit2, Globe, Map as MapIcon, ArrowUpDown, ListFilter as Filter, FlaskConical } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Papa from 'papaparse';
@@ -9,7 +9,7 @@ import { RaceSeries, RaceEvent } from '../types/race';
 import { HeatDesignation } from '../types/heat';
 import { LetterScore, getLetterScoreValue } from '../types';
 import { getLetterScorePointsForRace } from '../utils/scratchCalculations';
-import { getStoredRaceSeries, getStoredRaceEvents, combineAllDayResults, storeRaceSeries } from '../utils/raceStorage';
+import { getStoredRaceSeries, getStoredRaceEvents, getSimulatedRaceEvents, combineAllDayResults, storeRaceSeries } from '../utils/raceStorage';
 import { getPublicEvents, convertToRaceEvent } from '../utils/publicEventStorage';
 import { formatDate } from '../utils/date';
 import { getBoatClassImage } from '../utils/boatClassImages';
@@ -30,7 +30,7 @@ import { ShareResultsExternalModal } from '../components/scoring/ShareResultsExt
 import { HeatRaceResultsModal } from '../components/HeatRaceResultsModal';
 import { SeriesEditModal } from '../components/SeriesEditModal';
 
-type MainTab = 'events' | 'leaderboards' | 'national' | 'state' | 'world';
+type MainTab = 'events' | 'leaderboards' | 'simulated' | 'national' | 'state' | 'world';
 type StatusFilter = 'all' | 'completed' | 'in-progress';
 type SortOption = 'date-asc' | 'date-desc' | 'name-asc' | 'name-desc' | 'status';
 
@@ -392,6 +392,7 @@ export const ResultsPage: React.FC = () => {
   // Data
   const [allEvents, setAllEvents] = useState<RaceEvent[]>([]);
   const [allSeries, setAllSeries] = useState<RaceSeries[]>([]);
+  const [simulatedEvents, setSimulatedEvents] = useState<RaceEvent[]>([]);
   const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [clubFeaturedImage, setClubFeaturedImage] = useState<string | null>(null);
@@ -565,7 +566,7 @@ export const ResultsPage: React.FC = () => {
         return;
       }
 
-      const event = allEvents.find(e => e.id === targetId);
+      const event = allEvents.find(e => e.id === targetId) || simulatedEvents.find(e => e.id === targetId);
       if (event) {
         setSelectedEvent(event);
         setSelectedSeries(null);
@@ -576,7 +577,7 @@ export const ResultsPage: React.FC = () => {
       setSelectedSeries(null);
       setSelectedRound(null);
     }
-  }, [id, location.state, allEvents, allSeries, roundResults, externalNationalEvents, externalStateEvents, externalWorldEvents]);
+  }, [id, location.state, allEvents, allSeries, roundResults, externalNationalEvents, externalStateEvents, externalWorldEvents, simulatedEvents]);
 
   const enrichSeriesWithRoundData = async (series: RaceSeries[]): Promise<RaceSeries[]> => {
     try {
@@ -712,6 +713,15 @@ export const ResultsPage: React.FC = () => {
       }
 
       const nonSimulatedEvents = events.filter(e => !(e as any).is_simulated);
+
+      // Fetch simulated events separately (they are excluded from getStoredRaceEvents query)
+      try {
+        const simEvents = await getSimulatedRaceEvents();
+        setSimulatedEvents(simEvents.filter(e => e.completed || e.lastCompletedRace > 0));
+      } catch (err) {
+        console.error('Error fetching simulated events:', err);
+        setSimulatedEvents([]);
+      }
 
       const allEvents = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
         ? publicEvents
@@ -2114,7 +2124,7 @@ export const ResultsPage: React.FC = () => {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-white">Results</h1>
               <p className="text-sm text-slate-400">
-                {mainTab === 'events' ? eventsToShow.length : mainTab === 'leaderboards' ? seriesToShow.length : mainTab === 'national' ? filteredNationalEvents.length : mainTab === 'state' ? filteredStateEvents.length : filteredWorldEvents.length} {mainTab === 'leaderboards' ? 'leaderboards' : 'events'}
+                {mainTab === 'events' ? eventsToShow.length : mainTab === 'leaderboards' ? seriesToShow.length : mainTab === 'simulated' ? simulatedEvents.length : mainTab === 'national' ? filteredNationalEvents.length : mainTab === 'state' ? filteredStateEvents.length : filteredWorldEvents.length} {mainTab === 'leaderboards' ? 'leaderboards' : 'events'}
               </p>
             </div>
           </div>
@@ -2418,6 +2428,22 @@ export const ResultsPage: React.FC = () => {
               {mainTab === 'world' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-400" />}
             </button>
           )}
+
+          {can('manage_races') && simulatedEvents.length > 0 && (
+            <button
+              onClick={() => { setMainTab('simulated'); setSelectedExternalEvent(null); }}
+              className={`px-4 py-3 font-medium transition-colors relative ${
+                mainTab === 'simulated' ? 'text-cyan-400' : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FlaskConical size={18} />
+                <span>Simulated Events</span>
+                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{simulatedEvents.length}</span>
+              </div>
+              {mainTab === 'simulated' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />}
+            </button>
+          )}
         </div>
 
         {/* Filters */}
@@ -2510,6 +2536,18 @@ export const ResultsPage: React.FC = () => {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {mainTab === 'simulated' && (
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-3'}>
+            {simulatedEvents.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-slate-400">
+                No simulated events found
+              </div>
+            ) : (
+              simulatedEvents.map(item => renderCard(item, 'event'))
             )}
           </div>
         )}
