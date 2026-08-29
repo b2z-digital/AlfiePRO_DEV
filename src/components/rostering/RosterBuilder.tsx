@@ -108,12 +108,7 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
     return Array.from(classes).sort();
   }, [members, availableSeries, formData.boat_class]);
 
-  const eligibleMembers = useMemo(() => {
-    if (!formData.boat_class) return members;
-    return members.filter(m =>
-      m.boats?.some(b => b.boat_type === formData.boat_class)
-    );
-  }, [members, formData.boat_class]);
+  const eligibleMembers = useMemo(() => members, [members]);
 
   const filteredMembers = useMemo(() => {
     if (!memberSearch) return eligibleMembers;
@@ -416,7 +411,7 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
               </select>
               {formData.boat_class && (
                 <p className="text-xs text-slate-500 mt-1">
-                  {eligibleMembers.length} members sail this class
+                  {members.filter(m => m.boats?.some(b => b.boat_type === formData.boat_class)).length} members sail this class
                 </p>
               )}
             </div>
