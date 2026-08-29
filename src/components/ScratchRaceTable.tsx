@@ -339,22 +339,33 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
       return aNetScore.netScore - bNetScore.netScore;
     }
 
-    // If net scores are tied, apply countback rules
-    // Count the number of 1st places, 2nd places, 3rd places, etc.
+    // If net scores are tied, apply countback rules (RRS A8.1)
+    // Only count non-dropped races with actual finishing positions
+    const aDroppedRaces = new Set(calculateNetScore(a.skipperIndex).droppedRaces);
+    const bDroppedRaces = new Set(calculateNetScore(b.skipperIndex).droppedRaces);
+
     const aPositionCounts: number[] = [];
     const bPositionCounts: number[] = [];
+    let lastRaceAPosition: number | null = null;
+    let lastRaceBPosition: number | null = null;
 
     for (let race = 1; race <= lastCompletedRace; race++) {
       const aResult = raceResults.find(r => r.race === race && r.skipperIndex === a.skipperIndex);
       const bResult = raceResults.find(r => r.race === race && r.skipperIndex === b.skipperIndex);
 
-      // Only count actual finishing positions (not letter scores) for countback
-      if (aResult && aResult.position !== null && !aResult.letterScore) {
+      if (aResult && aResult.position !== null && !aResult.letterScore && !aDroppedRaces.has(race)) {
         aPositionCounts.push(aResult.position);
       }
 
-      if (bResult && bResult.position !== null && !bResult.letterScore) {
+      if (bResult && bResult.position !== null && !bResult.letterScore && !bDroppedRaces.has(race)) {
         bPositionCounts.push(bResult.position);
+      }
+
+      if (aResult && aResult.position !== null && !aResult.letterScore) {
+        lastRaceAPosition = aResult.position;
+      }
+      if (bResult && bResult.position !== null && !bResult.letterScore) {
+        lastRaceBPosition = bResult.position;
       }
     }
 
@@ -362,7 +373,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
     aPositionCounts.sort((x, y) => x - y);
     bPositionCounts.sort((x, y) => x - y);
 
-    // Count how many 1sts, 2nds, 3rds, etc. each skipper has
+    // Compare how many 1sts, 2nds, 3rds, etc. each skipper has
     const maxPosition = Math.max(...aPositionCounts, ...bPositionCounts, 1);
 
     for (let pos = 1; pos <= maxPosition; pos++) {
@@ -370,12 +381,16 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
       const bCount = bPositionCounts.filter(p => p === pos).length;
 
       if (aCount !== bCount) {
-        // More of this position is better (so reverse the comparison)
         return bCount - aCount;
       }
     }
 
-    // If still tied after countback, maintain original order
+    // RRS A8.2: if still tied, better result in the last race wins
+    if (lastRaceAPosition !== null && lastRaceBPosition !== null && lastRaceAPosition !== lastRaceBPosition) {
+      return lastRaceAPosition - lastRaceBPosition;
+    }
+
+    // If still tied after all countback rules, maintain original order
     return a.skipperIndex - b.skipperIndex;
   };
 
