@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, Circle as HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader as Loader2, CircleCheck as CheckCircle, Radio, Upload, TriangleAlert, ClipboardList, Gavel } from 'lucide-react';
+import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, Circle as HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader as Loader2, CircleCheck as CheckCircle, Radio, Upload, TriangleAlert, ClipboardList, Gavel, Pencil } from 'lucide-react';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { setCurrentEvent } from '../utils/raceStorage';
@@ -123,6 +123,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   const [smsAlreadySent, setSmsAlreadySent] = useState(false);
   const [loadingSkipperTracking, setLoadingSkipperTracking] = useState(false);
   const [hasLiveTrackingEvent, setHasLiveTrackingEvent] = useState(false);
+  const [showEditResultsConfirm, setShowEditResultsConfirm] = useState(false);
 
   useEffect(() => {
     const checkLiveTracking = async () => {
@@ -1503,6 +1504,18 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     }
   };
 
+  const handleEditResults = () => {
+    const reopenedEvent: RaceEvent = {
+      ...event,
+      completed: false,
+    };
+    setEvent(reopenedEvent);
+    setShowEditResultsConfirm(false);
+    if (onStartScoring) {
+      onStartScoring(reopenedEvent);
+    }
+  };
+
   const handleStartScoring = async () => {
     // Use the current event state directly to avoid stale data issues
     const latestEvent = event;
@@ -2060,6 +2073,58 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
         </div>
       </div>
       
+      {onStartScoring && event.completed && !event.cancelled && can('races.score') && (
+        <div className="flex flex-col gap-3">
+          <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle size={18} className="text-green-500" />
+                <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                  Results Published
+                </span>
+              </div>
+              <button
+                onClick={() => setShowEditResultsConfirm(true)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  darkMode
+                    ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                    : 'bg-amber-500 hover:bg-amber-600 text-white'
+                }`}
+              >
+                <Pencil size={16} />
+                Edit Results
+              </button>
+            </div>
+          </div>
+
+          {showEditResultsConfirm && (
+            <div className={`p-4 rounded-lg border-2 ${
+              darkMode ? 'bg-amber-900/30 border-amber-600/50' : 'bg-amber-50 border-amber-300'
+            }`}>
+              <p className={`text-sm mb-3 ${darkMode ? 'text-amber-200' : 'text-amber-800'}`}>
+                This will reopen the scoring screen so you can make changes to the results. You will need to publish the results again when you are done editing.
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setShowEditResultsConfirm(false)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditResults}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+                >
+                  Reopen for Editing
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {onStartScoring && !event.completed && !event.cancelled && can('races.score') && (
         <div className="flex flex-col gap-3">
           {event.multiDay && event.dayResults && event.numberOfDays && (
