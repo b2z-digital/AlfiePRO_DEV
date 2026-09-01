@@ -54,6 +54,7 @@ export const createRoster = async (clubId: string, formData: RosterFormData, cre
       description: formData.description || null,
       boat_class: formData.boat_class,
       series_id: formData.series_id || null,
+      event_id: formData.event_id || null,
       start_date: formData.start_date,
       end_date: formData.end_date,
       allocation_method: formData.allocation_method,
@@ -441,4 +442,64 @@ export const getProAssignmentsForSeries = async (
       status: a.status,
     };
   });
+};
+
+export const getProAssignmentsForEvents = async (
+  eventIds: string[]
+): Promise<Map<string, ProAssignmentForDisplay>> => {
+  if (eventIds.length === 0) return new Map();
+
+  const { data: rosters } = await supabase
+    .from('pro_rosters')
+    .select('id, event_id')
+    .in('event_id', eventIds)
+    .in('status', ['active', 'draft']);
+
+  if (!rosters || rosters.length === 0) return new Map();
+
+  const rosterIds = rosters.map(r => r.id);
+  const rosterEventMap = new Map(rosters.map(r => [r.id, r.event_id]));
+
+  const { data: rounds } = await supabase
+    .from('pro_roster_rounds')
+    .select('id, date, roster_id')
+    .in('roster_id', rosterIds);
+
+  if (!rounds || rounds.length === 0) return new Map();
+
+  const roundIds = rounds.map(r => r.id);
+  const roundRosterMap = new Map(rounds.map(r => [r.id, r.roster_id]));
+
+  const { data: assignments } = await supabase
+    .from('pro_roster_assignments')
+    .select('round_id, member_id, status')
+    .in('round_id', roundIds)
+    .in('status', ['assigned', 'confirmed']);
+
+  if (!assignments || assignments.length === 0) return new Map();
+
+  const memberIds = [...new Set(assignments.map(a => a.member_id))];
+  const { data: members } = await supabase
+    .from('members')
+    .select('id, first_name, last_name, avatar_url')
+    .in('id', memberIds);
+
+  const memberMap = new Map((members || []).map(m => [m.id, m]));
+  const roundDateMap = new Map(rounds.map(r => [r.id, r.date]));
+
+  const result = new Map<string, ProAssignmentForDisplay>();
+  for (const a of assignments) {
+    const rosterId = roundRosterMap.get(a.round_id);
+    const eventId = rosterId ? rosterEventMap.get(rosterId) : null;
+    if (!eventId) continue;
+    const member = memberMap.get(a.member_id);
+    result.set(eventId, {
+      date: roundDateMap.get(a.round_id) || '',
+      member_id: a.member_id,
+      member_name: member ? `${member.first_name} ${member.last_name}` : 'Unknown',
+      member_avatar: member?.avatar_url || null,
+      status: a.status,
+    });
+  }
+  return result;
 };

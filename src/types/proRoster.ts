@@ -10,6 +10,7 @@ export interface ProRoster {
   description: string | null;
   boat_class: string;
   series_id: string | null;
+  event_id: string | null;
   start_date: string;
   end_date: string;
   status: RosterStatus;
@@ -79,6 +80,7 @@ export interface RosterFormData {
   description: string;
   boat_class: string;
   series_id: string | null;
+  event_id: string | null;
   start_date: string;
   end_date: string;
   allocation_method: AllocationMethod;
