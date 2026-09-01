@@ -3,11 +3,11 @@ import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
   DragOverlay, DragStartEvent, DragEndEvent, useDroppable, useDraggable
 } from '@dnd-kit/core';
-import { Calendar, UserCheck, Circle as XCircle, Clock, CircleCheck as CheckCircle2, RefreshCw, Shuffle, TriangleAlert as AlertTriangle, GripVertical } from 'lucide-react';
+import { Calendar, UserCheck, Circle as XCircle, Clock, CircleCheck as CheckCircle2, RefreshCw, Shuffle, TriangleAlert as AlertTriangle, X } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import {
-  manualAssign, generateFairAllocation, applyAllocation, getRosterWithDetails,
-  updateAssignmentStatus, swapAssignment
+  manualAssign, removeAssignment, generateFairAllocation, applyAllocation, getRosterWithDetails,
+  updateAssignmentStatus, swapAssignment, ensureTasksForRoster, createTasksForAssignments
 } from '../../utils/proRosterStorage';
 import type { RosterWithDetails, ProRosterAssignment } from '../../types/proRoster';
 
@@ -18,7 +18,12 @@ interface RosterGridViewProps {
   darkMode?: boolean;
 }
 
-export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members, onRefresh }) => {
+interface RosterGridViewPropsExtended extends RosterGridViewProps {
+  clubId?: string;
+  userId?: string;
+}
+
+export const RosterGridView: React.FC<RosterGridViewPropsExtended> = ({ roster, members, onRefresh, clubId, userId }) => {
   const { addNotification } = useNotifications();
   const [draggedMember, setDraggedMember] = useState<string | null>(null);
   const [reallocating, setReallocating] = useState(false);
@@ -75,11 +80,30 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
 
     try {
       await manualAssign(roster.id, roundId, memberId);
+      if (roster.status === 'active' && clubId && userId) {
+        const details = await getRosterWithDetails(roster.id);
+        const newAssignment = details.assignments.find(a => a.round_id === roundId && a.member_id === memberId);
+        if (newAssignment && !newAssignment.task_id) {
+          await createTasksForAssignments(roster, [round], [newAssignment], clubId, userId);
+        }
+      }
       addNotification('success', `PRO assigned to ${round.name || round.date}`);
       onRefresh();
     } catch (err) {
       console.error('Error assigning PRO:', err);
       addNotification('error', 'Failed to assign PRO');
+    }
+  };
+
+  const handleRemoveAssignment = async (roundId: string, roundLabel: string) => {
+    if (!confirm(`Remove the PRO assignment for ${roundLabel}?`)) return;
+    try {
+      await removeAssignment(roster.id, roundId);
+      addNotification('success', `PRO assignment removed from ${roundLabel}`);
+      onRefresh();
+    } catch (err) {
+      console.error('Error removing assignment:', err);
+      addNotification('error', 'Failed to remove assignment');
     }
   };
 
@@ -212,6 +236,7 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
                     memberInfo={memberInfo}
                     getStatusIcon={getStatusIcon}
                     getStatusBg={getStatusBg}
+                    onRemove={handleRemoveAssignment}
                   />
                 );
               })}
@@ -307,7 +332,8 @@ const DroppableRoundCell: React.FC<{
   memberInfo: { name: string; avatar: string | null | undefined } | null;
   getStatusIcon: (status: string) => React.ReactNode;
   getStatusBg: (status: string) => string;
-}> = ({ roundId, date, isPast, isToday, assignment, memberInfo, getStatusIcon, getStatusBg }) => {
+  onRemove: (roundId: string, roundLabel: string) => void;
+}> = ({ roundId, date, isPast, isToday, assignment, memberInfo, getStatusIcon, getStatusBg, onRemove }) => {
   const { setNodeRef, isOver } = useDroppable({ id: `round-${roundId}` });
 
   return (
@@ -331,7 +357,7 @@ const DroppableRoundCell: React.FC<{
       </div>
 
       {assignment && memberInfo ? (
-        <div className={`rounded-lg border p-2 ${getStatusBg(assignment.status)}`}>
+        <div className={`rounded-lg border p-2 ${getStatusBg(assignment.status)} group/cell relative`}>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[9px] font-medium text-white overflow-hidden flex-shrink-0">
               {memberInfo.avatar ? (
@@ -345,6 +371,17 @@ const DroppableRoundCell: React.FC<{
             </div>
             {getStatusIcon(assignment.status)}
           </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const label = new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+              onRemove(roundId, label);
+            }}
+            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity hover:bg-red-400 shadow-lg"
+            title="Remove assignment"
+          >
+            <X size={10} />
+          </button>
         </div>
       ) : (
         <div className={`rounded-lg border border-dashed p-3 text-center ${isOver ? 'border-cyan-400 bg-cyan-500/5' : 'border-slate-600'}`}>

@@ -310,13 +310,19 @@ export const applyAllocation = async (rosterId: string, allocations: AllocationR
 };
 
 export const manualAssign = async (rosterId: string, roundId: string, memberId: string): Promise<void> => {
-  const { error: deleteError } = await supabase
+  const { data: existing } = await supabase
     .from('pro_roster_assignments')
-    .delete()
+    .select('id, task_id')
     .eq('roster_id', rosterId)
-    .eq('round_id', roundId);
+    .eq('round_id', roundId)
+    .maybeSingle();
 
-  if (deleteError) throw deleteError;
+  if (existing?.task_id) {
+    await supabase.from('club_tasks').delete().eq('id', existing.task_id);
+  }
+  if (existing) {
+    await supabase.from('pro_roster_assignments').delete().eq('id', existing.id);
+  }
 
   const { error } = await supabase
     .from('pro_roster_assignments')
@@ -328,6 +334,76 @@ export const manualAssign = async (rosterId: string, roundId: string, memberId: 
     });
 
   if (error) throw error;
+};
+
+export const removeAssignment = async (rosterId: string, roundId: string): Promise<void> => {
+  const { data: existing } = await supabase
+    .from('pro_roster_assignments')
+    .select('id, task_id')
+    .eq('roster_id', rosterId)
+    .eq('round_id', roundId)
+    .maybeSingle();
+
+  if (!existing) return;
+
+  if (existing.task_id) {
+    await supabase.from('club_tasks').delete().eq('id', existing.task_id);
+  }
+
+  const { error } = await supabase
+    .from('pro_roster_assignments')
+    .delete()
+    .eq('id', existing.id);
+
+  if (error) throw error;
+};
+
+export const ensureTasksForRoster = async (
+  rosterId: string,
+  clubId: string,
+  createdBy: string
+): Promise<number> => {
+  const details = await getRosterWithDetails(rosterId);
+  const roster = details as ProRoster;
+  const roundMap = new Map(details.rounds.map(r => [r.id, r]));
+  let created = 0;
+
+  for (const assignment of details.assignments) {
+    if (assignment.task_id) continue;
+    const round = roundMap.get(assignment.round_id);
+    if (!round) continue;
+
+    const reminderDate = new Date(round.date);
+    reminderDate.setDate(reminderDate.getDate() - roster.reminder_days_before);
+
+    const { data: task, error } = await supabase
+      .from('club_tasks')
+      .insert({
+        title: `PRO Duty: ${roster.name} - ${round.name || round.date}`,
+        description: `You have been assigned as Principal Race Officer for ${roster.boat_class} on ${round.date}.`,
+        due_date: round.date,
+        status: 'pending',
+        priority: 'high',
+        assignee_id: assignment.member_id,
+        club_id: clubId,
+        created_by: createdBy,
+        send_reminder: true,
+        reminder_type: roster.reminder_type === 'both' ? 'both' : roster.reminder_type,
+        reminder_date: reminderDate.toISOString().split('T')[0],
+      })
+      .select('id')
+      .single();
+
+    if (!error && task) {
+      await supabase
+        .from('pro_roster_assignments')
+        .update({ task_id: task.id })
+        .eq('id', assignment.id);
+      created++;
+    }
+  }
+
+  return created;
 };
 
 export const activateRoster = async (rosterId: string): Promise<void> => {
