@@ -1675,8 +1675,16 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
         </table>
       </div>
 
-      {/* Scoring System Display */}
-      <div className="mt-4 px-4 flex justify-end">
+      {/* Scoring System & PRO Display */}
+      <div className="mt-4 px-4 flex items-center justify-between">
+        {event.proMemberName ? (
+          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${
+            isExportMode ? 'bg-slate-100 text-slate-700' : 'bg-slate-700/50 text-slate-300'
+          }`}>
+            <span className="text-sm font-medium">PRO:</span>
+            <span className="text-sm">{event.proMemberName}</span>
+          </div>
+        ) : <div />}
         <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${
           isExportMode ? 'bg-slate-100 text-slate-700' : 'bg-slate-700/50 text-slate-300'
         }`}>

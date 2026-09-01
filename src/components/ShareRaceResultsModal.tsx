@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase';
 import { Member } from '../types/member';
 import { Avatar } from './ui/Avatar';
 import { MemberSelect } from './ui/MemberSelect';
+import jsPDF from 'jspdf';
 
 interface ShareRaceResultsModalProps {
   isOpen: boolean;
@@ -119,6 +120,27 @@ ${includeAttachment && resultsImage ? `
         last_name: member.last_name
       }));
 
+      let pdfBase64: string | undefined;
+      if (includeAttachment && resultsImage) {
+        try {
+          const img = new Image();
+          img.src = resultsImage;
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Failed to load results image'));
+          });
+          const imgWidth = img.naturalWidth;
+          const imgHeight = img.naturalHeight;
+          const pdfWidth = 297;
+          const pdfHeight = (imgHeight / imgWidth) * pdfWidth;
+          const pdf = new jsPDF({ orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait', unit: 'mm', format: [pdfWidth, pdfHeight] });
+          pdf.addImage(resultsImage, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+          pdfBase64 = pdf.output('datauristring').split(',')[1];
+        } catch (pdfErr) {
+          console.error('Error generating PDF attachment:', pdfErr);
+        }
+      }
+
       const { data: responseData, error: sendError } = await supabase.functions.invoke('send-notification', {
         body: {
           type: 'race_results',
@@ -128,7 +150,8 @@ ${includeAttachment && resultsImage ? `
           body: emailBody,
           send_email: true,
           club_name: eventData.clubName || eventData.title,
-          link_url: `/results`
+          link_url: `/results`,
+          pdf_attachment: pdfBase64 ? { filename: `${eventData.title.replace(/[^a-zA-Z0-9]/g, '_')}_Results.pdf`, content: pdfBase64 } : undefined
         }
       });
 

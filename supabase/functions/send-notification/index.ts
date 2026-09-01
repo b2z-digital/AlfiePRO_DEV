@@ -47,7 +47,8 @@ Deno.serve(async (req) => {
       raw_html,
       from_email,
       from_name,
-      link_url
+      link_url,
+      pdf_attachment
     } = await req.json()
 
     const authHeader = req.headers.get('Authorization')
@@ -133,6 +134,7 @@ Deno.serve(async (req) => {
                 rawHtml: raw_html,
                 fromEmail: from_email,
                 fromName: from_name,
+                pdfAttachment: pdf_attachment,
               })
 
               if (notification?.id) {
@@ -209,6 +211,7 @@ Deno.serve(async (req) => {
               rawHtml: raw_html,
               fromEmail: from_email,
               fromName: from_name,
+              pdfAttachment: pdf_attachment,
             })
             emailsSent++
             console.log('Email sent (no notification) to:', recipient.email)
@@ -300,6 +303,7 @@ interface SendEmailOptions {
   rawHtml?: boolean;
   fromEmail?: string;
   fromName?: string;
+  pdfAttachment?: { filename: string; content: string };
 }
 
 async function sendEmail(opts: SendEmailOptions) {
@@ -512,6 +516,15 @@ async function sendEmail(opts: SendEmailOptions) {
         value: htmlContent
       }
     ]
+  }
+
+  if (opts.pdfAttachment) {
+    emailData.attachments = [{
+      content: opts.pdfAttachment.content,
+      filename: opts.pdfAttachment.filename,
+      type: 'application/pdf',
+      disposition: 'attachment'
+    }];
   }
 
   const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
