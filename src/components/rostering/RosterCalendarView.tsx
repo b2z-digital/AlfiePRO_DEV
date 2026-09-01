@@ -30,25 +30,27 @@ export const RosterCalendarView: React.FC<RosterCalendarViewProps> = ({ rosters,
 
   const calendarEvents = useMemo(() => {
     const events: CalendarEvent[] = [];
+    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+
     for (const roster of rosters) {
       if (roster.status === 'archived') continue;
       const summary = summaries.get(roster.id);
-      const start = new Date(roster.start_date);
-      const end = new Date(roster.end_date);
-      const monthStart = new Date(year, month, 1);
-      const monthEnd = new Date(year, month + 1, 0);
 
-      if (start > monthEnd || end < monthStart) continue;
-
-      if (summary && summary.member_names.length > 0) {
-        events.push({
-          date: roster.start_date,
-          roster,
-          memberName: summary.member_names[0],
-          memberAvatar: summary.member_avatars[0],
-        });
+      if (summary && summary.round_dates.length > 0) {
+        for (const roundDate of summary.round_dates) {
+          if (!roundDate.startsWith(monthPrefix)) continue;
+          const assignment = summary.round_assignments.get(roundDate);
+          events.push({
+            date: roundDate,
+            roster,
+            memberName: assignment?.member_name || null,
+            memberAvatar: assignment?.member_avatar || null,
+          });
+        }
       } else {
-        events.push({ date: roster.start_date, roster, memberName: null, memberAvatar: null });
+        if (roster.start_date.startsWith(monthPrefix)) {
+          events.push({ date: roster.start_date, roster, memberName: null, memberAvatar: null });
+        }
       }
     }
     return events;
@@ -57,9 +59,8 @@ export const RosterCalendarView: React.FC<RosterCalendarViewProps> = ({ rosters,
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const ev of calendarEvents) {
-      const key = ev.date;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(ev);
+      if (!map.has(ev.date)) map.set(ev.date, []);
+      map.get(ev.date)!.push(ev);
     }
     return map;
   }, [calendarEvents]);
@@ -106,7 +107,7 @@ export const RosterCalendarView: React.FC<RosterCalendarViewProps> = ({ rosters,
             const img = getBoatClassImage(ev.roster.boat_class);
             return (
               <button
-                key={idx}
+                key={`${ev.roster.id}-${idx}`}
                 onClick={() => onSelectRoster(ev.roster)}
                 className="w-full text-left group"
               >

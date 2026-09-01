@@ -466,13 +466,15 @@ export interface RosterAssignmentSummary {
   total_rounds: number;
   assigned_count: number;
   confirmed_count: number;
+  round_dates: string[];
+  round_assignments: Map<string, { member_id: string; member_name: string; member_avatar: string | null; status: string }>;
 }
 
 export const getRosterAssignmentSummaries = async (rosterIds: string[], clubMembers: Array<{ id: string; first_name: string; last_name: string; avatar_url?: string | null }>): Promise<Map<string, RosterAssignmentSummary>> => {
   if (rosterIds.length === 0) return new Map();
 
   const [{ data: rounds }, { data: assignments }] = await Promise.all([
-    supabase.from('pro_roster_rounds').select('id, roster_id').in('roster_id', rosterIds),
+    supabase.from('pro_roster_rounds').select('id, roster_id, date').in('roster_id', rosterIds).order('date', { ascending: true }),
     supabase.from('pro_roster_assignments').select('id, roster_id, round_id, member_id, status').in('roster_id', rosterIds),
   ]);
 
@@ -483,6 +485,20 @@ export const getRosterAssignmentSummaries = async (rosterIds: string[], clubMemb
     const rosterRounds = (rounds || []).filter(r => r.roster_id === rid);
     const rosterAssignments = (assignments || []).filter(a => a.roster_id === rid);
     const uniqueMembers = [...new Set(rosterAssignments.map(a => a.member_id))];
+
+    const roundAssignments = new Map<string, { member_id: string; member_name: string; member_avatar: string | null; status: string }>();
+    for (const round of rosterRounds) {
+      const assignment = rosterAssignments.find(a => a.round_id === round.id);
+      if (assignment) {
+        const m = memberMap.get(assignment.member_id);
+        roundAssignments.set(round.date, {
+          member_id: assignment.member_id,
+          member_name: m ? `${m.first_name} ${m.last_name}` : 'Unknown',
+          member_avatar: m?.avatar_url || null,
+          status: assignment.status,
+        });
+      }
+    }
 
     result.set(rid, {
       roster_id: rid,
@@ -495,6 +511,8 @@ export const getRosterAssignmentSummaries = async (rosterIds: string[], clubMemb
       total_rounds: rosterRounds.length,
       assigned_count: rosterAssignments.length,
       confirmed_count: rosterAssignments.filter(a => a.status === 'confirmed').length,
+      round_dates: rosterRounds.map(r => r.date),
+      round_assignments: roundAssignments,
     });
   }
   return result;
