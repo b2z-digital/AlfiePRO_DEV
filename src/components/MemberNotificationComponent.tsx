@@ -1209,7 +1209,15 @@ export const MemberNotificationComponent: React.FC<MemberNotificationComponentPr
 
               {/* Message Body */}
               <div className={`prose max-w-none mb-6 ${darkMode ? 'prose-invert' : ''}`}>
-                <div className={darkMode ? 'text-slate-300' : 'text-slate-700'} dangerouslySetInnerHTML={{ __html: selectedNotification.body }} />
+                <div
+                  className={darkMode ? 'text-slate-300' : 'text-slate-700'}
+                  style={darkMode ? {} : undefined}
+                  dangerouslySetInnerHTML={{
+                    __html: darkMode
+                      ? selectedNotification.body.replace(/color\s*:\s*#[0-9a-fA-F]{3,8}/gi, 'color: inherit')
+                      : selectedNotification.body
+                  }}
+                />
               </div>
 
               {/* Meeting Attendance Buttons */}

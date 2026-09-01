@@ -47,7 +47,8 @@ Deno.serve(async (req) => {
       raw_html,
       from_email,
       from_name,
-      link_url
+      link_url,
+      pdf_attachment
     } = await req.json()
 
     const authHeader = req.headers.get('Authorization')
@@ -76,6 +77,7 @@ Deno.serve(async (req) => {
 
     const notifications: any[] = []
     let emailsSent = 0
+    const errors: string[] = []
 
     for (const recipient of recipients) {
       try {
@@ -106,38 +108,63 @@ Deno.serve(async (req) => {
 
           if (notificationError) {
             console.error('Error creating notification:', notificationError)
+            errors.push(`Notification error for ${recipient.email}: ${notificationError.message}`)
           } else {
             notifications.push(notification)
             console.log('Created notification for:', recipient.name || recipient.email)
+          }
 
-            if (send_email && recipient.email) {
-              try {
-                await sendEmail({
-                  to: recipient.email,
-                  recipientName: recipient.name || 'Member',
-                  subject,
-                  body,
-                  clubName: club_name,
-                  clubLogo: club_logo,
-                  responseToken: type === 'meeting_invite' ? recipient.response_token : undefined,
-                  meetingName: meeting_name,
-                  meetingDate: meeting_date,
-                  meetingTime: meeting_time,
-                  meetingLocation: meeting_location,
-                  meetingConferencingUrl: meeting_conferencing_url,
-                  attachments,
-                  rawHtml: raw_html,
-                  fromEmail: from_email,
-                  fromName: from_name,
-                })
+          // Send email regardless of whether notification insert succeeded
+          if (send_email && recipient.email) {
+            try {
+              await sendEmail({
+                to: recipient.email,
+                recipientName: recipient.name || 'Member',
+                subject,
+                body,
+                clubName: club_name,
+                clubLogo: club_logo,
+                responseToken: type === 'meeting_invite' ? recipient.response_token : undefined,
+                meetingName: meeting_name,
+                meetingDate: meeting_date,
+                meetingTime: meeting_time,
+                meetingLocation: meeting_location,
+                meetingConferencingUrl: meeting_conferencing_url,
+                attachments,
+                rawHtml: raw_html,
+                fromEmail: from_email,
+                fromName: from_name,
+                pdfAttachment: pdf_attachment,
+              })
+
+              if (notification?.id) {
                 await supabaseClient
                   .from('notifications')
                   .update({ email_status: 'sent' })
                   .eq('id', notification.id)
-                emailsSent++
-                console.log('Email sent successfully to:', recipient.email)
-              } catch (emailError: any) {
-                console.error('Error sending email to', recipient.email, ':', emailError)
+              }
+              emailsSent++
+              console.log('Email sent successfully to:', recipient.email)
+
+              try {
+                await supabaseClient.from('email_logs').insert({
+                  club_id: club_id || null,
+                  user_id: recipient.user_id || null,
+                  recipient_email: recipient.email,
+                  subject,
+                  body,
+                  email_type: type || 'notification',
+                  status: 'sent',
+                  sent_at: new Date().toISOString()
+                })
+              } catch (logErr) {
+                console.error('Error logging sent email:', logErr)
+              }
+            } catch (emailError: any) {
+              console.error('Error sending email to', recipient.email, ':', emailError)
+              errors.push(`Email error for ${recipient.email}: ${emailError.message}`)
+
+              if (notification?.id) {
                 await supabaseClient
                   .from('notifications')
                   .update({
@@ -146,9 +173,26 @@ Deno.serve(async (req) => {
                   })
                   .eq('id', notification.id)
               }
+
+              try {
+                await supabaseClient.from('email_logs').insert({
+                  club_id: club_id || null,
+                  user_id: recipient.user_id || null,
+                  recipient_email: recipient.email,
+                  subject: `Failed: ${subject}`,
+                  body: 'Email failed to send',
+                  email_type: type || 'notification',
+                  status: 'failed',
+                  error_message: emailError.message,
+                  sent_at: new Date().toISOString()
+                })
+              } catch (logErr) {
+                console.error('Error logging failed email:', logErr)
+              }
             }
           }
-        } else if (recipient.email) {
+        } else if (recipient.email && send_email) {
+          // No user_id or skip_notifications - just send email directly
           try {
             await sendEmail({
               to: recipient.email,
@@ -167,15 +211,49 @@ Deno.serve(async (req) => {
               rawHtml: raw_html,
               fromEmail: from_email,
               fromName: from_name,
+              pdfAttachment: pdf_attachment,
             })
             emailsSent++
             console.log('Email sent (no notification) to:', recipient.email)
+
+            try {
+              await supabaseClient.from('email_logs').insert({
+                club_id: club_id || null,
+                user_id: recipient.user_id || null,
+                recipient_email: recipient.email,
+                subject,
+                body,
+                email_type: type || 'notification',
+                status: 'sent',
+                sent_at: new Date().toISOString()
+              })
+            } catch (logErr) {
+              console.error('Error logging sent email:', logErr)
+            }
           } catch (emailError: any) {
             console.error('Error sending email to', recipient.email, ':', emailError)
+            errors.push(`Email error for ${recipient.email}: ${emailError.message}`)
+
+            try {
+              await supabaseClient.from('email_logs').insert({
+                club_id: club_id || null,
+                user_id: recipient.user_id || null,
+                recipient_email: recipient.email,
+                subject: `Failed: ${subject}`,
+                body: 'Email failed to send',
+                email_type: type || 'notification',
+                status: 'failed',
+                error_message: emailError.message,
+                sent_at: new Date().toISOString()
+              })
+            } catch (logErr) {
+              console.error('Error logging failed email:', logErr)
+            }
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error processing recipient:', recipient.email, error)
+        errors.push(`Processing error for ${recipient.email}: ${error.message}`)
       }
     }
 
@@ -184,7 +262,8 @@ Deno.serve(async (req) => {
         success: true,
         message: `Successfully processed ${notifications.length} notifications and ${emailsSent} emails`,
         notifications_created: notifications.length,
-        emails_sent: emailsSent
+        emails_sent: emailsSent,
+        errors: errors.length > 0 ? errors : undefined
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -224,6 +303,7 @@ interface SendEmailOptions {
   rawHtml?: boolean;
   fromEmail?: string;
   fromName?: string;
+  pdfAttachment?: { filename: string; content: string };
 }
 
 async function sendEmail(opts: SendEmailOptions) {
@@ -375,9 +455,7 @@ async function sendEmail(opts: SendEmailOptions) {
                     ${headerSubtitle ? `<p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${headerSubtitle}</p>` : ''}
                   </td>
                   <td align="right" valign="top">
-                    <div style="background:rgba(255,255,255,0.2);border-radius:10px;padding:8px 14px;display:inline-block;">
-                      <span style="color:#ffffff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Alfie PRO</span>
-                    </div>
+                    <img src="https://alfiepro.com.au/alfie_app_logo.svg" alt="Alfie PRO" style="max-height:48px;width:auto;" />
                   </td>
                 </tr>
               </table>
@@ -400,10 +478,7 @@ async function sendEmail(opts: SendEmailOptions) {
               ${attachmentsHtml}
 
 
-              <div style="margin:24px 0 0;padding:20px 0 0;border-top:1px solid #e2e8f0;">
-                <p style="margin:0;font-size:15px;color:#334155;">Best regards,</p>
-                <p style="margin:6px 0 0;font-size:15px;font-weight:600;color:#0f172a;">${displayClubName}</p>
-              </div>
+
             </td>
           </tr>
 
@@ -441,6 +516,15 @@ async function sendEmail(opts: SendEmailOptions) {
         value: htmlContent
       }
     ]
+  }
+
+  if (opts.pdfAttachment) {
+    emailData.attachments = [{
+      content: opts.pdfAttachment.content,
+      filename: opts.pdfAttachment.filename,
+      type: 'application/pdf',
+      disposition: 'attachment'
+    }];
   }
 
   const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
