@@ -208,6 +208,22 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
         .eq('id', dbId);
       if (updateError) throw updateError;
 
+      // Delete existing PRO duty task for the previous assignee
+      if (event.proMemberId) {
+        const prevDate = event.date || event.startDate;
+        if (prevDate) {
+          const { data: existingTasks } = await supabase
+            .from('club_tasks')
+            .select('id')
+            .eq('club_id', currentClub.clubId)
+            .eq('assignee_id', event.proMemberId)
+            .ilike('title', `PRO Duty:%${prevDate}%`);
+          if (existingTasks?.length) {
+            await supabase.from('club_tasks').delete().in('id', existingTasks.map(t => t.id));
+          }
+        }
+      }
+
       setEvent(prev => ({ ...prev, proMemberId: memberId, proMemberName: memberName }));
       setShowProDropdown(false);
       setProSearchTerm('');
@@ -242,6 +258,23 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     setAssigningPro(true);
     try {
       const dbId = extractDbId(event.id);
+
+      // Delete existing PRO duty task for the old assignee
+      if (event.proMemberId) {
+        const eventDate = event.date || event.startDate;
+        if (eventDate) {
+          const { data: existingTasks } = await supabase
+            .from('club_tasks')
+            .select('id')
+            .eq('club_id', currentClub.clubId)
+            .eq('assignee_id', event.proMemberId)
+            .ilike('title', `PRO Duty:%${eventDate}%`);
+          if (existingTasks?.length) {
+            await supabase.from('club_tasks').delete().in('id', existingTasks.map(t => t.id));
+          }
+        }
+      }
+
       await supabase
         .from('quick_races')
         .update({ pro_member_id: null, pro_member_name: null })
@@ -1896,7 +1929,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
 
             {/* PRO Assignment Section */}
             {!event.isSeriesEvent && (
-              <div className={`relative p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+              <div className={`p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                 <div className="flex items-center gap-3">
                   <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-amber-500/20' : 'bg-amber-50'}`}>
                     <ClipboardList className={darkMode ? 'text-amber-400' : 'text-amber-600'} size={16} />
@@ -1933,7 +1966,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 </div>
 
                 {showProDropdown && (
-                  <div className={`absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border shadow-lg max-h-48 overflow-auto ${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+                  <div className={`mt-2 rounded-lg border shadow-lg max-h-48 overflow-auto ${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
                     <div className="p-2">
                       <input
                         type="text"
@@ -1963,14 +1996,18 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               </div>
             )}
 
-            {event.isSeriesEvent && event.proMemberName && (
+            {event.isSeriesEvent && (
               <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                 <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-amber-500/20' : 'bg-amber-50'}`}>
                   <ClipboardList className={darkMode ? 'text-amber-400' : 'text-amber-600'} size={16} />
                 </div>
                 <div className="flex-1">
                   <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Principal Race Officer</p>
-                  <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.proMemberName}</p>
+                  {event.proMemberName ? (
+                    <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.proMemberName}</p>
+                  ) : (
+                    <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Not assigned</p>
+                  )}
                 </div>
               </div>
             )}

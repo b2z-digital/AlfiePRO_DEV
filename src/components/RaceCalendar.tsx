@@ -947,6 +947,9 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
               console.log('✅ [RaceCalendar] Round data:', round);
 
               // Merge fresh round data with the event
+              // Look up rostered PRO for this series round
+              const proInfo = proAssignmentsByKey.get(`${event.seriesId}-${event.date}`);
+
               const freshEvent = {
                 ...event,
                 skippers: round.skippers || [],
@@ -957,7 +960,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                 completed: round.completed || false,
                 heatManagement: round.heatManagement,
                 numRaces: round.numRaces,
-                dropRules: round.dropRules
+                dropRules: round.dropRules,
+                ...(proInfo ? { proMemberId: proInfo.member_id, proMemberName: proInfo.member_name } : {})
               };
 
               console.log('✅ [RaceCalendar] Fresh event created with', freshEvent.skippers.length, 'skippers');
@@ -997,8 +1001,15 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
       }
     }
 
-    // Fallback to using the event as-is
+    // Fallback to using the event as-is, enriching series events with roster PRO
     console.log('⚠️ [handleEventClick] Using event as-is (fallback), skippers:', event.skippers?.length || 0);
+    if (event.isSeriesEvent && event.seriesId && event.date) {
+      const proInfo = proAssignmentsByKey.get(`${event.seriesId}-${event.date}`);
+      if (proInfo) {
+        setSelectedEvent({ ...event, proMemberId: proInfo.member_id, proMemberName: proInfo.member_name });
+        return;
+      }
+    }
     setSelectedEvent(event);
   };
 
