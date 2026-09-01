@@ -6,7 +6,8 @@ import {
   applyAllocation, getRosterWithDetails, createTasksForAssignments,
   deleteRosterRound
 } from '../../utils/proRosterStorage';
-import { getStoredRaceSeries } from '../../utils/raceStorage';
+import { getStoredRaceSeries, getStoredRaceEvents } from '../../utils/raceStorage';
+import type { RaceEvent } from '../../types/race';
 import { AllocationPreview } from './AllocationPreview';
 import type { RaceSeries } from '../../types/race';
 import type { ProRoster, RosterFormData } from '../../types/proRoster';
@@ -29,11 +30,13 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
   const [saving, setSaving] = useState(false);
   const [availableSeries, setAvailableSeries] = useState<RaceSeries[]>([]);
   const [linkedSeries, setLinkedSeries] = useState<RaceSeries | null>(null);
+  const [availableEvents, setAvailableEvents] = useState<RaceEvent[]>([]);
+  const [linkedEvent, setLinkedEvent] = useState<RaceEvent | null>(null);
 
   useEffect(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
     getStoredRaceSeries().then(series => {
-      const now = new Date();
-      const currentYear = now.getFullYear();
       const active = series.filter(s => {
         if (s.completed || !s.rounds || s.rounds.length === 0) return false;
         const hasCurrentOrFutureRound = s.rounds.some(r => {
@@ -45,6 +48,14 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
       });
       setAvailableSeries(active);
     }).catch(() => {});
+    getStoredRaceEvents().then(events => {
+      const upcoming = events.filter(e => {
+        if (e.completed || e.cancelled) return false;
+        if (!e.date) return false;
+        return new Date(e.date) >= new Date(now.toISOString().split('T')[0]);
+      });
+      setAvailableEvents(upcoming);
+    }).catch(() => {});
   }, []);
 
   const [formData, setFormData] = useState<RosterFormData>({
@@ -52,6 +63,7 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
     description: existingRoster?.description || '',
     boat_class: existingRoster?.boat_class || '',
     series_id: existingRoster?.series_id || null,
+    event_id: existingRoster?.event_id || null,
     start_date: existingRoster?.start_date || new Date().toISOString().split('T')[0],
     end_date: existingRoster?.end_date || '',
     allocation_method: existingRoster?.allocation_method || 'fair_random',
@@ -91,10 +103,14 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
         const series = availableSeries.find(s => s.id === existingRoster.series_id);
         if (series) setLinkedSeries(series);
       }
+      if (existingRoster.event_id) {
+        const evt = availableEvents.find(e => e.id === existingRoster.event_id);
+        if (evt) setLinkedEvent(evt);
+      }
     }).catch(err => {
       console.error('Error loading roster details:', err);
     }).finally(() => setLoadingExisting(false));
-  }, [existingRoster?.id, availableSeries]);
+  }, [existingRoster?.id, availableSeries, availableEvents]);
 
   const boatClasses = useMemo(() => {
     const classes = new Set<string>();
@@ -207,8 +223,9 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
   const handleSelectSeries = (seriesId: string) => {
     if (!seriesId) {
       setLinkedSeries(null);
-      setFormData(prev => ({ ...prev, series_id: null, name: '', boat_class: '', start_date: new Date().toISOString().split('T')[0], end_date: '' }));
+      setFormData(prev => ({ ...prev, series_id: null, event_id: null, name: '', boat_class: '', start_date: new Date().toISOString().split('T')[0], end_date: '' }));
       setSelectedDates([]);
+      setLinkedEvent(null);
       return;
     }
     const series = availableSeries.find(s => s.id === seriesId);
@@ -223,9 +240,11 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
     const startDate = roundDates[0] || new Date().toISOString().split('T')[0];
     const endDate = roundDates[roundDates.length - 1] || '';
 
+    setLinkedEvent(null);
     setFormData(prev => ({
       ...prev,
       series_id: series.id,
+      event_id: null,
       name: `${series.seriesName} PRO Roster`,
       boat_class: series.raceClass || prev.boat_class,
       start_date: startDate,
@@ -349,27 +368,72 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
           <div className="space-y-5">
             <h3 className="text-lg font-semibold text-white mb-4">Roster Details</h3>
 
-            {availableSeries.length > 0 && !existingRoster && (
+            {(availableSeries.length > 0 || availableEvents.length > 0) && (
               <div className="p-4 bg-slate-900/50 border border-cyan-500/20 rounded-xl space-y-3">
                 <div className="flex items-center gap-2 text-cyan-400 text-sm font-medium">
                   <Link2 size={14} />
-                  Link to Existing Series
+                  Link to Existing Series or Event
                 </div>
-                <select
-                  value={linkedSeries?.id || ''}
-                  onChange={e => handleSelectSeries(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-800/80 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="">Create standalone roster (manual setup)</option>
-                  {availableSeries.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.seriesName} ({s.raceClass || 'All classes'}) - {s.rounds.filter(r => !r.cancelled).length} rounds
-                    </option>
-                  ))}
-                </select>
-                {linkedSeries && (
+                {availableSeries.length > 0 && (
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Series</label>
+                    <select
+                      value={linkedSeries?.id || ''}
+                      onChange={e => handleSelectSeries(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-800/80 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                      disabled={!!linkedEvent}
+                    >
+                      <option value="">No series linked</option>
+                      {availableSeries.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.seriesName} ({s.raceClass || 'All classes'}) - {s.rounds.filter(r => !r.cancelled).length} rounds
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {availableEvents.length > 0 && (
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Single Event</label>
+                    <select
+                      value={linkedEvent?.id || ''}
+                      onChange={e => {
+                        const eventId = e.target.value;
+                        if (!eventId) {
+                          setLinkedEvent(null);
+                          setFormData(prev => ({ ...prev, event_id: null }));
+                          return;
+                        }
+                        const evt = availableEvents.find(ev => ev.id === eventId);
+                        if (!evt) return;
+                        setLinkedEvent(evt);
+                        setLinkedSeries(null);
+                        setFormData(prev => ({
+                          ...prev,
+                          event_id: evt.id,
+                          series_id: null,
+                          name: `${evt.eventName} PRO Roster`,
+                          boat_class: evt.raceClass || prev.boat_class,
+                          start_date: evt.date,
+                          end_date: evt.endDate || evt.date,
+                        }));
+                        setSelectedDates([evt.date]);
+                      }}
+                      className="w-full px-4 py-2.5 bg-slate-800/80 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                      disabled={!!linkedSeries}
+                    >
+                      <option value="">No event linked</option>
+                      {availableEvents.map(ev => (
+                        <option key={ev.id} value={ev.id}>
+                          {ev.eventName} ({ev.raceClass || 'All classes'}) - {ev.date}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {(linkedSeries || linkedEvent) && (
                   <p className="text-xs text-slate-400">
-                    Details and sailing days will be auto-populated from the series. You can still adjust settings below.
+                    Details will be auto-populated from the {linkedSeries ? 'series' : 'event'}. You can still adjust settings below.
                   </p>
                 )}
               </div>
@@ -500,6 +564,8 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
             <p className="text-sm text-slate-400 mb-4">
               {linkedSeries
                 ? `Dates have been pre-filled from "${linkedSeries.seriesName}". You can add or remove dates as needed.`
+                : linkedEvent
+                ? `Date has been set from "${linkedEvent.eventName}".`
                 : 'Add the dates that need a PRO assigned. Use quick-fill to add weekly recurring dates.'}
             </p>
 
@@ -640,10 +706,10 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
               )}
             </div>
 
-            {linkedSeries && (
+            {(linkedSeries || linkedEvent) && (
               <div className="flex items-center gap-2 px-4 py-2.5 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
                 <Link2 size={14} className="text-cyan-400" />
-                <span className="text-sm text-cyan-300">Linked to: <span className="font-medium">{linkedSeries.seriesName}</span></span>
+                <span className="text-sm text-cyan-300">Linked to: <span className="font-medium">{linkedSeries?.seriesName || linkedEvent?.eventName}</span></span>
               </div>
             )}
 

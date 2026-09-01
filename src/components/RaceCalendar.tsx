@@ -22,7 +22,7 @@ import { LocationExplorer } from './LocationExplorer';
 import { getCalendarMeetings, CalendarMeeting } from '../utils/calendarMeetingStorage';
 import { CalendarMeetingDetailsModal } from './meetings/CalendarMeetingDetailsModal';
 import { Users, Shield, Building2, Globe as Globe2, Flag } from 'lucide-react';
-import { getProAssignmentsForSeries, type ProAssignmentForDisplay } from '../utils/proRosterStorage';
+import { getProAssignmentsForSeries, getProAssignmentsForEvents, type ProAssignmentForDisplay } from '../utils/proRosterStorage';
 
 type CalendarView = 'list' | 'grid' | 'month' | 'year';
 type EventScope = 'all' | 'club' | 'my_state' | 'national' | 'all_states';
@@ -401,6 +401,15 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           } catch { /* ignore */ }
         });
         await Promise.all(proFetches);
+
+        // Fetch PRO assignments for single events (linked by event_id)
+        try {
+          const singleEventIds = allEvents.filter(e => !e.isSeriesEvent && e.id).map(e => e.id);
+          if (singleEventIds.length > 0) {
+            const eventProMap = await getProAssignmentsForEvents(singleEventIds);
+            eventProMap.forEach((val, eventId) => proMap.set(`event-${eventId}`, val));
+          }
+        } catch { /* ignore */ }
         setProAssignmentsByKey(proMap);
         
         // Convert series events into race events
@@ -1010,6 +1019,14 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
         return;
       }
     }
+    // Check single-event roster PRO
+    if (!event.isSeriesEvent && event.id) {
+      const proInfo = proAssignmentsByKey.get(`event-${event.id}`);
+      if (proInfo) {
+        setSelectedEvent({ ...event, proMemberId: proInfo.member_id, proMemberName: proInfo.member_name });
+        return;
+      }
+    }
     setSelectedEvent(event);
   };
 
@@ -1344,7 +1361,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                             {(() => {
                               const proInfo = event.isSeriesEvent
                                 ? proAssignmentsByKey.get(`${event.seriesId}-${event.date}`)
-                                : null;
+                                : proAssignmentsByKey.get(`event-${event.id}`) || null;
                               const proName = proInfo?.member_name || event.proMemberName;
                               const proAvatar = proInfo?.member_avatar || null;
                               if (!proName) return null;
@@ -1856,7 +1873,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                         {(() => {
                           const proInfo = event.isSeriesEvent
                             ? proAssignmentsByKey.get(`${event.seriesId}-${event.date}`)
-                            : null;
+                            : proAssignmentsByKey.get(`event-${event.id}`) || null;
                           const proName = proInfo?.member_name || event.proMemberName;
                           const proAvatar = proInfo?.member_avatar || null;
                           if (!proName) return null;
