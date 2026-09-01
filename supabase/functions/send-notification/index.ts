@@ -451,9 +451,7 @@ async function sendEmail(opts: SendEmailOptions) {
                     ${headerSubtitle ? `<p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${headerSubtitle}</p>` : ''}
                   </td>
                   <td align="right" valign="top">
-                    <div style="background:rgba(255,255,255,0.2);border-radius:10px;padding:8px 14px;display:inline-block;">
-                      <span style="color:#ffffff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Alfie PRO</span>
-                    </div>
+                    <img src="https://alfiepro.com.au/alfie_app_logo.svg" alt="Alfie PRO" style="max-height:48px;width:auto;" />
                   </td>
                 </tr>
               </table>
@@ -476,10 +474,7 @@ async function sendEmail(opts: SendEmailOptions) {
               ${attachmentsHtml}
 
 
-              <div style="margin:24px 0 0;padding:20px 0 0;border-top:1px solid #e2e8f0;">
-                <p style="margin:0;font-size:15px;color:#334155;">Best regards,</p>
-                <p style="margin:6px 0 0;font-size:15px;font-weight:600;color:#0f172a;">${displayClubName}</p>
-              </div>
+
             </td>
           </tr>
 
