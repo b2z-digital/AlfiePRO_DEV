@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
-  DragOverlay, DragStartEvent, DragEndEvent
+  DragOverlay, DragStartEvent, DragEndEvent, useDroppable, useDraggable
 } from '@dnd-kit/core';
-import { Calendar, UserCheck, Circle as XCircle, Clock, CircleCheck as CheckCircle2, RefreshCw, Shuffle, TriangleAlert as AlertTriangle } from 'lucide-react';
+import { Calendar, UserCheck, Circle as XCircle, Clock, CircleCheck as CheckCircle2, RefreshCw, Shuffle, TriangleAlert as AlertTriangle, X } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import {
-  manualAssign, generateFairAllocation, applyAllocation, getRosterWithDetails,
-  updateAssignmentStatus, swapAssignment
+  manualAssign, removeAssignment, generateFairAllocation, applyAllocation, getRosterWithDetails,
+  updateAssignmentStatus, swapAssignment, ensureTasksForRoster, createTasksForAssignments
 } from '../../utils/proRosterStorage';
 import type { RosterWithDetails, ProRosterAssignment } from '../../types/proRoster';
 
@@ -18,7 +18,12 @@ interface RosterGridViewProps {
   darkMode?: boolean;
 }
 
-export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members, onRefresh }) => {
+interface RosterGridViewPropsExtended extends RosterGridViewProps {
+  clubId?: string;
+  userId?: string;
+}
+
+export const RosterGridView: React.FC<RosterGridViewPropsExtended> = ({ roster, members, onRefresh, clubId, userId }) => {
   const { addNotification } = useNotifications();
   const [draggedMember, setDraggedMember] = useState<string | null>(null);
   const [reallocating, setReallocating] = useState(false);
@@ -35,7 +40,7 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
 
   const getMemberInfo = (memberId: string) => {
     const member = members.find(m => m.id === memberId);
-    return member ? { name: `${member.first_name} ${member.last_name}`, avatar: member.avatar_url } : { name: 'Unknown', avatar: null };
+    return member ? { name: `${member.first_name} ${member.last_name}`, avatar: member.avatar_url, first_name: member.first_name, last_name: member.last_name } : { name: 'Unknown', avatar: null, first_name: '', last_name: '' };
   };
 
   const getStatusIcon = (status: string) => {
@@ -67,18 +72,38 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
     if (!over || active.id === over.id) return;
 
     const memberId = active.id as string;
-    const roundId = over.id as string;
+    const droppableId = over.id as string;
 
+    const roundId = droppableId.startsWith('round-') ? droppableId.replace('round-', '') : droppableId;
     const round = roster.rounds.find(r => r.id === roundId);
     if (!round) return;
 
     try {
       await manualAssign(roster.id, roundId, memberId);
+      if (roster.status === 'active' && clubId && userId) {
+        const details = await getRosterWithDetails(roster.id);
+        const newAssignment = details.assignments.find(a => a.round_id === roundId && a.member_id === memberId);
+        if (newAssignment && !newAssignment.task_id) {
+          await createTasksForAssignments(roster, [round], [newAssignment], clubId, userId);
+        }
+      }
       addNotification('success', `PRO assigned to ${round.name || round.date}`);
       onRefresh();
     } catch (err) {
       console.error('Error assigning PRO:', err);
       addNotification('error', 'Failed to assign PRO');
+    }
+  };
+
+  const handleRemoveAssignment = async (roundId: string, roundLabel: string) => {
+    if (!confirm(`Remove the PRO assignment for ${roundLabel}?`)) return;
+    try {
+      await removeAssignment(roster.id, roundId);
+      addNotification('success', `PRO assignment removed from ${roundLabel}`);
+      onRefresh();
+    } catch (err) {
+      console.error('Error removing assignment:', err);
+      addNotification('error', 'Failed to remove assignment');
     }
   };
 
@@ -124,6 +149,14 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
     });
     return counts;
   }, [roster.assignments]);
+
+  const sortedMembersBySurname = useMemo(() => {
+    return [...roster.members].filter(m => m.is_active).sort((a, b) => {
+      const infoA = getMemberInfo(a.member_id);
+      const infoB = getMemberInfo(b.member_id);
+      return infoA.last_name.localeCompare(infoB.last_name) || infoA.first_name.localeCompare(infoB.first_name);
+    });
+  }, [roster.members, members]);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -172,25 +205,13 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
                 const info = getMemberInfo(rosterMember.member_id);
                 const duties = dutyStats.get(rosterMember.member_id) || 0;
                 return (
-                  <div
+                  <DraggableMemberItem
                     key={rosterMember.member_id}
-                    id={rosterMember.member_id}
-                    draggable
-                    onDragStart={() => setDraggedMember(rosterMember.member_id)}
-                    className="flex items-center gap-2 px-2 py-2 rounded-lg bg-slate-900/30 hover:bg-slate-700/50 cursor-grab active:cursor-grabbing transition-all group"
-                  >
-                    <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-medium text-slate-300 flex-shrink-0 overflow-hidden">
-                      {info.avatar ? (
-                        <img src={info.avatar} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        info.name.split(' ').map(n => n[0]).join('')
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-white truncate">{info.name}</div>
-                      <div className="text-[10px] text-slate-500">{duties} duties</div>
-                    </div>
-                  </div>
+                    memberId={rosterMember.member_id}
+                    name={info.name}
+                    avatar={info.avatar}
+                    duties={duties}
+                  />
                 );
               })}
             </div>
@@ -205,48 +226,18 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
                 const memberInfo = assignment ? getMemberInfo(assignment.member_id) : null;
 
                 return (
-                  <div
+                  <DroppableRoundCell
                     key={round.id}
-                    id={round.id}
-                    onDragOver={e => e.preventDefault()}
-                    onDrop={() => {}}
-                    className={`rounded-xl border p-3 transition-all ${
-                      isToday
-                        ? 'border-cyan-500/50 bg-cyan-500/5 ring-1 ring-cyan-500/20'
-                        : isPast
-                          ? 'border-slate-700/30 bg-slate-900/20 opacity-60'
-                          : 'border-slate-700/50 bg-slate-900/30 hover:border-cyan-500/30'
-                    }`}
-                  >
-                    <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
-                      {new Date(round.date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short' })}
-                    </div>
-                    <div className={`text-sm font-semibold mb-2 ${isToday ? 'text-cyan-400' : 'text-white'}`}>
-                      {new Date(round.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                    </div>
-
-                    {assignment && memberInfo ? (
-                      <div className={`rounded-lg border p-2 ${getStatusBg(assignment.status)}`}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[9px] font-medium text-white overflow-hidden flex-shrink-0">
-                            {memberInfo.avatar ? (
-                              <img src={memberInfo.avatar} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              memberInfo.name.split(' ').map(n => n[0]).join('')
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[11px] text-white truncate">{memberInfo.name}</div>
-                          </div>
-                          {getStatusIcon(assignment.status)}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-dashed border-slate-600 p-3 text-center">
-                        <div className="text-[10px] text-slate-500">Drop member here</div>
-                      </div>
-                    )}
-                  </div>
+                    roundId={round.id}
+                    date={round.date}
+                    isPast={isPast}
+                    isToday={isToday}
+                    assignment={assignment}
+                    memberInfo={memberInfo}
+                    getStatusIcon={getStatusIcon}
+                    getStatusBg={getStatusBg}
+                    onRemove={handleRemoveAssignment}
+                  />
                 );
               })}
             </div>
@@ -274,7 +265,7 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
           <h4 className="text-sm font-medium text-slate-300 mb-3">Duty Distribution</h4>
           <div className="flex flex-wrap gap-2">
-            {roster.members.filter(m => m.is_active).map(m => {
+            {sortedMembersBySurname.map(m => {
               const info = getMemberInfo(m.member_id);
               const count = dutyStats.get(m.member_id) || 0;
               const maxCount = Math.max(...Array.from(dutyStats.values()), 1);
@@ -294,6 +285,107 @@ export const RosterGridView: React.FC<RosterGridViewProps> = ({ roster, members,
               );
             })}
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DraggableMemberItem: React.FC<{
+  memberId: string;
+  name: string;
+  avatar: string | null | undefined;
+  duties: number;
+}> = ({ memberId, name, avatar, duties }) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: memberId });
+  const style = transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={style}
+      className={`flex items-center gap-2 px-2 py-2 rounded-lg bg-slate-900/30 hover:bg-slate-700/50 cursor-grab active:cursor-grabbing transition-all group select-none ${isDragging ? 'opacity-40' : ''}`}
+    >
+      <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-medium text-slate-300 flex-shrink-0 overflow-hidden">
+        {avatar ? (
+          <img src={avatar} alt="" className="w-full h-full object-cover" />
+        ) : (
+          name.split(' ').map(n => n[0]).join('')
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-white truncate">{name}</div>
+        <div className="text-[10px] text-slate-500">{duties} duties</div>
+      </div>
+    </div>
+  );
+};
+
+const DroppableRoundCell: React.FC<{
+  roundId: string;
+  date: string;
+  isPast: boolean;
+  isToday: boolean;
+  assignment: ProRosterAssignment | undefined;
+  memberInfo: { name: string; avatar: string | null | undefined } | null;
+  getStatusIcon: (status: string) => React.ReactNode;
+  getStatusBg: (status: string) => string;
+  onRemove: (roundId: string, roundLabel: string) => void;
+}> = ({ roundId, date, isPast, isToday, assignment, memberInfo, getStatusIcon, getStatusBg, onRemove }) => {
+  const { setNodeRef, isOver } = useDroppable({ id: `round-${roundId}` });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`rounded-xl border p-3 transition-all ${
+        isOver
+          ? 'border-cyan-500/50 bg-cyan-500/10 ring-1 ring-cyan-500/20'
+          : isToday
+            ? 'border-cyan-500/50 bg-cyan-500/5 ring-1 ring-cyan-500/20'
+            : isPast
+              ? 'border-slate-700/30 bg-slate-900/20 opacity-60'
+              : 'border-slate-700/50 bg-slate-900/30 hover:border-cyan-500/30'
+      }`}
+    >
+      <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+        {new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short' })}
+      </div>
+      <div className={`text-sm font-semibold mb-2 ${isToday ? 'text-cyan-400' : 'text-white'}`}>
+        {new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+      </div>
+
+      {assignment && memberInfo ? (
+        <div className={`rounded-lg border p-2 ${getStatusBg(assignment.status)} group/cell relative`}>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[9px] font-medium text-white overflow-hidden flex-shrink-0">
+              {memberInfo.avatar ? (
+                <img src={memberInfo.avatar} alt="" className="w-full h-full object-cover" />
+              ) : (
+                memberInfo.name.split(' ').map(n => n[0]).join('')
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] text-white truncate">{memberInfo.name}</div>
+            </div>
+            {getStatusIcon(assignment.status)}
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const label = new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+              onRemove(roundId, label);
+            }}
+            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity hover:bg-red-400 shadow-lg"
+            title="Remove assignment"
+          >
+            <X size={10} />
+          </button>
+        </div>
+      ) : (
+        <div className={`rounded-lg border border-dashed p-3 text-center ${isOver ? 'border-cyan-400 bg-cyan-500/5' : 'border-slate-600'}`}>
+          <div className="text-[10px] text-slate-500">Drop member here</div>
         </div>
       )}
     </div>

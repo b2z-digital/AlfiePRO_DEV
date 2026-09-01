@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ClipboardList, Plus, Calendar, Trash2, Pencil, Play, ChevronRight, CircleCheck as CheckCircle2, Circle as XCircle, Clock, UserCheck, ListFilter as Filter, Search, Layers, CalendarDays, ChevronDown, ChevronUp, Users, Anchor } from 'lucide-react';
+import { ClipboardList, Plus, Calendar, Trash2, Pencil, Play, ChevronRight, CircleCheck as CheckCircle2, Circle as XCircle, Clock, UserCheck, ListFilter as Filter, Search, Layers, CalendarDays, ChevronDown, ChevronUp, Users, Anchor, ListChecks } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { getRosters, deleteRoster, getRosterWithDetails, activateRoster, createTasksForAssignments, updateAssignmentStatus } from '../../utils/proRosterStorage';
+import { getRosters, deleteRoster, getRosterWithDetails, activateRoster, createTasksForAssignments, updateAssignmentStatus, ensureTasksForRoster } from '../../utils/proRosterStorage';
 import { useAuth } from '../../contexts/AuthContext';
 import { getStoredMembers } from '../../utils/storage';
 import type { ProRoster, RosterWithDetails } from '../../types/proRoster';
@@ -278,6 +278,27 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
                 <Play size={14} /> Activate
               </button>
             )}
+            {selectedRoster.status === 'active' && user?.id && (
+              <button
+                onClick={async () => {
+                  try {
+                    const count = await ensureTasksForRoster(selectedRoster.id, clubId, user.id);
+                    if (count > 0) {
+                      addNotification('success', `${count} missing task${count > 1 ? 's' : ''} created with reminders`);
+                      handleRefresh();
+                    } else {
+                      addNotification('info', 'All assignments already have tasks');
+                    }
+                  } catch (err) {
+                    addNotification('error', 'Failed to sync tasks');
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600 transition-all"
+                title="Create missing tasks for assignments that don't have them"
+              >
+                <ListChecks size={14} /> Sync Tasks
+              </button>
+            )}
           </div>
         </div>
 
@@ -287,6 +308,8 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
             members={members}
             onRefresh={handleRefresh}
             darkMode={darkMode}
+            clubId={clubId}
+            userId={user?.id}
           />
         ) : (
           <RosterListView
