@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ClipboardList, Plus, Calendar, Trash2, Pencil, Play, ChevronRight, CircleCheck as CheckCircle2, Clock, UserCheck, ListFilter as Filter, Search, Layers, CalendarDays, ChevronDown, ChevronUp, Users, Anchor, ListChecks, FileText, Grid3X3, List, Download } from 'lucide-react';
+import { ClipboardList, Plus, Calendar, Trash2, Pencil, Play, ChevronRight, CircleCheck as CheckCircle2, Clock, UserCheck, ListFilter as Filter, Search, Layers, CalendarDays, ChevronDown, ChevronUp, Users, Anchor, ListChecks, FileText, Grid3x2 as Grid3X3, List, Download } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { getRosters, deleteRoster, getRosterWithDetails, activateRoster, createTasksForAssignments, updateAssignmentStatus, ensureTasksForRoster, getRosterAssignmentSummaries } from '../../utils/proRosterStorage';
 import type { RosterAssignmentSummary } from '../../utils/proRosterStorage';
@@ -7,6 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getStoredMembers } from '../../utils/storage';
 import type { ProRoster, RosterWithDetails } from '../../types/proRoster';
 import { getBoatClassImage } from '../../utils/boatClassImages';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { RosterBuilder } from './RosterBuilder';
 import { RosterGridView } from './RosterGridView';
 import { RosterListView } from './RosterListView';
@@ -210,69 +212,87 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
   };
 
   const handleExportAllPDF = async () => {
-    const rosterSections: string[] = [];
-    for (const roster of filteredRosters) {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
+    let y = 20;
+
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PRO Duty Rosters', margin, y);
+    y += 8;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(107, 114, 128);
+    doc.text(`${clubName}  •  Generated ${new Date().toLocaleDateString('en-AU')}`, margin, y);
+    doc.setTextColor(0, 0, 0);
+    y += 12;
+
+    for (let i = 0; i < filteredRosters.length; i++) {
+      const roster = filteredRosters[i];
       try {
         const details = await getRosterWithDetails(roster.id);
         const assignmentsByRound = new Map(details.assignments.map(a => [a.round_id, a]));
-        const classImg = getBoatClassImage(roster.boat_class);
 
-        const rows = details.rounds.map(round => {
+        if (y > doc.internal.pageSize.getHeight() - 40) {
+          doc.addPage();
+          y = 20;
+        }
+
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(roster.name, margin, y);
+        y += 6;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(107, 114, 128);
+        doc.text(`${roster.boat_class}  •  ${new Date(roster.start_date).toLocaleDateString('en-AU')} - ${new Date(roster.end_date).toLocaleDateString('en-AU')}  •  ${roster.status}`, margin, y);
+        doc.setTextColor(0, 0, 0);
+        y += 4;
+        if (roster.description) {
+          doc.setFontSize(8);
+          doc.setTextColor(156, 163, 175);
+          doc.text(roster.description, margin, y, { maxWidth: pageWidth - margin * 2 });
+          doc.setTextColor(0, 0, 0);
+          y += 4;
+        }
+
+        const tableRows = details.rounds.map(round => {
           const a = assignmentsByRound.get(round.id);
           const member = a ? members.find(m => m.id === a.member_id) : null;
           const name = member ? `${member.first_name} ${member.last_name}` : a ? 'Unknown' : 'Unassigned';
           const dateObj = new Date(round.date + 'T00:00:00');
-          return `<tr>
-            <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:13px">${dateObj.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</td>
-            <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-weight:600;font-size:13px">${name}</td>
-            <td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:13px">${a?.status || '-'}</td>
-          </tr>`;
-        }).join('');
+          return [
+            dateObj.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }),
+            name,
+            a?.status || '-'
+          ];
+        });
 
-        rosterSections.push(`
-          <div style="page-break-inside:avoid;margin-bottom:40px">
-            <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
-              ${classImg ? `<img src="${classImg}" style="width:80px;height:56px;object-fit:cover;border-radius:8px" crossorigin="anonymous" />` : ''}
-              <div>
-                <h2 style="font-size:18px;margin:0 0 4px 0">${roster.name}</h2>
-                <p style="color:#6b7280;margin:0;font-size:13px">${roster.boat_class} &bull; ${new Date(roster.start_date).toLocaleDateString('en-AU')} - ${new Date(roster.end_date).toLocaleDateString('en-AU')} &bull; ${roster.status}</p>
-                ${roster.description ? `<p style="color:#9ca3af;margin:4px 0 0 0;font-size:12px">${roster.description}</p>` : ''}
-              </div>
-            </div>
-            <table style="width:100%;border-collapse:collapse">
-              <thead><tr style="background:#f3f4f6">
-                <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #d1d5db;font-size:12px">Date</th>
-                <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #d1d5db;font-size:12px">Principal Race Officer</th>
-                <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #d1d5db;font-size:12px">Status</th>
-              </tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>
-        `);
+        autoTable(doc, {
+          startY: y,
+          head: [['Date', 'Principal Race Officer', 'Status']],
+          body: tableRows,
+          margin: { left: margin, right: margin },
+          theme: 'grid',
+          headStyles: { fillColor: [243, 244, 246], textColor: [31, 41, 55], fontStyle: 'bold', fontSize: 9 },
+          bodyStyles: { fontSize: 9, textColor: [55, 65, 81] },
+          alternateRowStyles: { fillColor: [249, 250, 251] },
+          styles: { cellPadding: 3, lineColor: [229, 231, 235], lineWidth: 0.25 },
+        });
+
+        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
       } catch (err) {
         console.error('Error fetching roster for PDF:', err);
       }
     }
 
-    const htmlContent = `<!DOCTYPE html><html><head><title>All PRO Rosters - ${clubName}</title></head>
-      <body style="font-family:system-ui,-apple-system,sans-serif;padding:40px;max-width:900px;margin:0 auto">
-        <h1 style="font-size:24px;margin-bottom:4px">PRO Duty Rosters</h1>
-        <p style="color:#6b7280;margin-bottom:30px;font-size:14px">${clubName} &bull; Generated ${new Date().toLocaleDateString('en-AU')}</p>
-        ${rosterSections.join('')}
-        <p style="color:#9ca3af;margin-top:30px;font-size:11px;border-top:1px solid #e5e7eb;padding-top:12px">Generated by AlfiePRO on ${new Date().toLocaleDateString('en-AU')}</p>
-      </body></html>`;
+    doc.setFontSize(8);
+    doc.setTextColor(156, 163, 175);
+    doc.text(`Generated by AlfiePRO on ${new Date().toLocaleDateString('en-AU')}`, margin, doc.internal.pageSize.getHeight() - 10);
 
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const blobUrl = URL.createObjectURL(blob);
-    const printWindow = window.open(blobUrl, '_blank');
-    if (!printWindow) {
-      URL.revokeObjectURL(blobUrl);
-      addNotification('error', 'Pop-up blocked. Please allow pop-ups and try again.');
-      return;
-    }
-    printWindow.addEventListener('afterprint', () => URL.revokeObjectURL(blobUrl));
-    printWindow.onload = () => setTimeout(() => printWindow.print(), 300);
-    addNotification('success', 'PDF export prepared');
+    doc.save(`PRO_Rosters_${clubName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+    addNotification('success', 'PDF downloaded');
   };
 
   if (showBuilder || editingRoster) {
