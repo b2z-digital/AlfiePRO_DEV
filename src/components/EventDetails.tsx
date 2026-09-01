@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, Circle as HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader as Loader2, CircleCheck as CheckCircle, Radio, Upload, TriangleAlert, ClipboardList, Gavel, Pencil } from 'lucide-react';
+import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, Circle as HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader as Loader2, CircleCheck as CheckCircle, Radio, Upload, TriangleAlert, ClipboardList, Gavel, Pencil, UserPlus, ChevronDown } from 'lucide-react';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { setCurrentEvent } from '../utils/raceStorage';
@@ -26,6 +26,8 @@ import { getStoredRaceSeries, storeRaceSeries } from '../utils/raceStorage';
 import { RaceSeries } from '../types/race';
 import { RaceSignOnSheet } from './RaceSignOnSheet';
 import { ProtestBoard } from './ProtestBoard';
+import { createTask } from '../utils/taskStorage';
+import { TaskFormData } from '../types/task';
 
 // Helper function to extract database UUID from app event ID
 function extractDbId(eventId: string): string {
@@ -124,6 +126,83 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   const [loadingSkipperTracking, setLoadingSkipperTracking] = useState(false);
   const [hasLiveTrackingEvent, setHasLiveTrackingEvent] = useState(false);
   const [showEditResultsConfirm, setShowEditResultsConfirm] = useState(false);
+  const [clubMembers, setClubMembers] = useState<{id: string, name: string}[]>([]);
+  const [showProDropdown, setShowProDropdown] = useState(false);
+  const [assigningPro, setAssigningPro] = useState(false);
+  const [proSearchTerm, setProSearchTerm] = useState('');
+
+  useEffect(() => {
+    const fetchMembers = async () => {
+      if (!currentClub?.clubId || event.isSeriesEvent) return;
+      const { data } = await supabase
+        .from('members')
+        .select('id, first_name, last_name')
+        .eq('club_id', currentClub.clubId)
+        .order('first_name');
+      if (data) {
+        setClubMembers(data.map(m => ({ id: m.id, name: `${m.first_name} ${m.last_name}`.trim() })));
+      }
+    };
+    fetchMembers();
+  }, [currentClub?.clubId, event.isSeriesEvent]);
+
+  const handleAssignPro = async (memberId: string, memberName: string) => {
+    if (!currentClub?.clubId || !user) return;
+    setAssigningPro(true);
+    try {
+      const dbId = extractDbId(event.id);
+      const { error: updateError } = await supabase
+        .from('quick_races')
+        .update({ pro_member_id: memberId, pro_member_name: memberName })
+        .eq('id', dbId);
+      if (updateError) throw updateError;
+
+      setEvent(prev => ({ ...prev, proMemberId: memberId, proMemberName: memberName }));
+      setShowProDropdown(false);
+      setProSearchTerm('');
+
+      const eventDate = event.date || event.startDate;
+      if (eventDate) {
+        const reminderDate = new Date(eventDate);
+        reminderDate.setDate(reminderDate.getDate() - 3);
+        const taskData: TaskFormData = {
+          title: `PRO Duty: ${event.title} - ${eventDate}`,
+          description: `You have been assigned as Principal Race Officer for ${event.raceClass || 'the event'} on ${eventDate}.`,
+          due_date: eventDate,
+          priority: 'high',
+          assignee_id: memberId,
+          send_reminder: true,
+          reminder_type: 'both',
+          reminder_date: reminderDate.toISOString().split('T')[0],
+        };
+        await createTask(currentClub.clubId, user.id, taskData);
+      }
+
+      onEventDataUpdated?.(event.id);
+    } catch (err) {
+      console.error('Failed to assign PRO:', err);
+    } finally {
+      setAssigningPro(false);
+    }
+  };
+
+  const handleRemovePro = async () => {
+    if (!currentClub?.clubId) return;
+    setAssigningPro(true);
+    try {
+      const dbId = extractDbId(event.id);
+      await supabase
+        .from('quick_races')
+        .update({ pro_member_id: null, pro_member_name: null })
+        .eq('id', dbId);
+      setEvent(prev => ({ ...prev, proMemberId: undefined, proMemberName: undefined }));
+      onEventDataUpdated?.(event.id);
+    } catch (err) {
+      console.error('Failed to remove PRO:', err);
+    } finally {
+      setAssigningPro(false);
+    }
+  };
 
   useEffect(() => {
     const checkLiveTracking = async () => {
@@ -1811,6 +1890,87 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 <div className="flex-1">
                   <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Entry Fee</p>
                   <p className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>${event.entryFee?.toFixed(2)} AUD</p>
+                </div>
+              </div>
+            )}
+
+            {/* PRO Assignment Section */}
+            {!event.isSeriesEvent && (
+              <div className={`relative p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-amber-500/20' : 'bg-amber-50'}`}>
+                    <ClipboardList className={darkMode ? 'text-amber-400' : 'text-amber-600'} size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Principal Race Officer</p>
+                    {event.proMemberName ? (
+                      <div className="flex items-center gap-2">
+                        <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.proMemberName}</p>
+                        {(isAdmin || isEditor) && (
+                          <button
+                            onClick={handleRemovePro}
+                            disabled={assigningPro}
+                            className={`text-xs px-1.5 py-0.5 rounded ${darkMode ? 'text-red-400 hover:bg-red-500/20' : 'text-red-500 hover:bg-red-50'} transition-colors`}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    ) : (isAdmin || isEditor) ? (
+                      <button
+                        onClick={() => setShowProDropdown(!showProDropdown)}
+                        disabled={assigningPro}
+                        className={`flex items-center gap-1 text-sm font-medium ${darkMode ? 'text-amber-400 hover:text-amber-300' : 'text-amber-600 hover:text-amber-700'} transition-colors`}
+                      >
+                        <UserPlus size={14} />
+                        <span>Assign PRO</span>
+                        <ChevronDown size={12} className={`transition-transform ${showProDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+                    ) : (
+                      <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Not assigned</p>
+                    )}
+                  </div>
+                </div>
+
+                {showProDropdown && (
+                  <div className={`absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border shadow-lg max-h-48 overflow-auto ${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+                    <div className="p-2">
+                      <input
+                        type="text"
+                        value={proSearchTerm}
+                        onChange={(e) => setProSearchTerm(e.target.value)}
+                        placeholder="Search members..."
+                        autoFocus
+                        className={`w-full px-2.5 py-1.5 text-sm rounded border ${darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'} focus:outline-none focus:ring-1 focus:ring-amber-500`}
+                      />
+                    </div>
+                    {clubMembers
+                      .filter(m => m.name.toLowerCase().includes(proSearchTerm.toLowerCase()))
+                      .map(member => (
+                        <button
+                          key={member.id}
+                          onClick={() => handleAssignPro(member.id, member.name)}
+                          className={`w-full text-left px-3 py-2 text-sm ${darkMode ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'} transition-colors`}
+                        >
+                          {member.name}
+                        </button>
+                      ))}
+                    {clubMembers.filter(m => m.name.toLowerCase().includes(proSearchTerm.toLowerCase())).length === 0 && (
+                      <p className={`px-3 py-2 text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>No members found</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {event.isSeriesEvent && event.proMemberName && (
+              <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-amber-500/20' : 'bg-amber-50'}`}>
+                  <ClipboardList className={darkMode ? 'text-amber-400' : 'text-amber-600'} size={16} />
+                </div>
+                <div className="flex-1">
+                  <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Principal Race Officer</p>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.proMemberName}</p>
                 </div>
               </div>
             )}
@@ -3634,7 +3794,8 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             raceClass: event.raceClass,
             raceFormat: event.raceFormat,
             clubId: currentClub?.clubId || event.clubId,
-            eventId: event.id
+            eventId: event.id,
+            clubName: event.clubName
           }}
           resultsRef={resultsRef}
           eventResults={event.raceResults}
