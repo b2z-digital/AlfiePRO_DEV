@@ -110,7 +110,7 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
     }).catch(err => {
       console.error('Error loading roster details:', err);
     }).finally(() => setLoadingExisting(false));
-  }, [existingRoster?.id, availableSeries]);
+  }, [existingRoster?.id, availableSeries, availableEvents]);
 
   const boatClasses = useMemo(() => {
     const classes = new Set<string>();
@@ -368,7 +368,7 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
           <div className="space-y-5">
             <h3 className="text-lg font-semibold text-white mb-4">Roster Details</h3>
 
-            {(availableSeries.length > 0 || availableEvents.length > 0) && !existingRoster && (
+            {(availableSeries.length > 0 || availableEvents.length > 0) && (
               <div className="p-4 bg-slate-900/50 border border-cyan-500/20 rounded-xl space-y-3">
                 <div className="flex items-center gap-2 text-cyan-400 text-sm font-medium">
                   <Link2 size={14} />
