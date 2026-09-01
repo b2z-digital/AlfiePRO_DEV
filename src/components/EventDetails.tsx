@@ -132,6 +132,57 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   const [proSearchTerm, setProSearchTerm] = useState('');
 
   useEffect(() => {
+    const checkLiveTracking = async () => {
+      if (!event.enableLiveTracking) {
+        setHasLiveTrackingEvent(false);
+        return;
+      }
+      try {
+        const dbId = extractDbId(event.id);
+        const trackingEvent = await getLiveTrackingEvent(dbId);
+        setHasLiveTrackingEvent(!!(trackingEvent?.access_token || trackingEvent?.short_code));
+      } catch {
+        setHasLiveTrackingEvent(false);
+      }
+    };
+    checkLiveTracking();
+  }, [event.id, event.enableLiveTracking]);
+
+  const handleJoinLiveTracking = async () => {
+    setLoadingSkipperTracking(true);
+    try {
+      const dbId = extractDbId(event.id);
+      const trackingEvent = await getLiveTrackingEvent(dbId);
+      if (trackingEvent?.access_token) {
+        navigate(`/live/${trackingEvent.short_code || trackingEvent.access_token}`);
+      } else if (trackingEvent?.short_code) {
+        navigate(`/live/${trackingEvent.short_code}`);
+      } else {
+        setError('Live tracking is not yet set up for this event. Ask your race officer to enable it.');
+      }
+    } catch {
+      setError('Could not load live tracking details.');
+    } finally {
+      setLoadingSkipperTracking(false);
+    }
+  };
+
+  // Check if event has participants or has been started
+  const hasParticipants = event.skippers && event.skippers.length > 0;
+
+  // Debug logging
+  console.log('📋 [EventDetails] RENDER - Event:', event.eventName);
+  console.log('📋 [EventDetails] RENDER - showLivestreamModal:', showLivestreamModal);
+  console.log('📋 [EventDetails] Is series event:', event.isSeriesEvent);
+  console.log('📋 [EventDetails] Round name:', event.roundName);
+  console.log('📋 [EventDetails] Skippers count:', event.skippers?.length || 0);
+  console.log('📋 [EventDetails] Has participants:', hasParticipants);
+  console.log('📋 [EventDetails] Last completed race:', event.lastCompletedRace);
+
+  const { currentClub, user } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
     const fetchMembers = async () => {
       if (!currentClub?.clubId || event.isSeriesEvent) return;
       const { data } = await supabase
@@ -203,57 +254,6 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
       setAssigningPro(false);
     }
   };
-
-  useEffect(() => {
-    const checkLiveTracking = async () => {
-      if (!event.enableLiveTracking) {
-        setHasLiveTrackingEvent(false);
-        return;
-      }
-      try {
-        const dbId = extractDbId(event.id);
-        const trackingEvent = await getLiveTrackingEvent(dbId);
-        setHasLiveTrackingEvent(!!(trackingEvent?.access_token || trackingEvent?.short_code));
-      } catch {
-        setHasLiveTrackingEvent(false);
-      }
-    };
-    checkLiveTracking();
-  }, [event.id, event.enableLiveTracking]);
-
-  const handleJoinLiveTracking = async () => {
-    setLoadingSkipperTracking(true);
-    try {
-      const dbId = extractDbId(event.id);
-      const trackingEvent = await getLiveTrackingEvent(dbId);
-      if (trackingEvent?.access_token) {
-        navigate(`/live/${trackingEvent.short_code || trackingEvent.access_token}`);
-      } else if (trackingEvent?.short_code) {
-        navigate(`/live/${trackingEvent.short_code}`);
-      } else {
-        setError('Live tracking is not yet set up for this event. Ask your race officer to enable it.');
-      }
-    } catch {
-      setError('Could not load live tracking details.');
-    } finally {
-      setLoadingSkipperTracking(false);
-    }
-  };
-
-  // Check if event has participants or has been started
-  const hasParticipants = event.skippers && event.skippers.length > 0;
-
-  // Debug logging
-  console.log('📋 [EventDetails] RENDER - Event:', event.eventName);
-  console.log('📋 [EventDetails] RENDER - showLivestreamModal:', showLivestreamModal);
-  console.log('📋 [EventDetails] Is series event:', event.isSeriesEvent);
-  console.log('📋 [EventDetails] Round name:', event.roundName);
-  console.log('📋 [EventDetails] Skippers count:', event.skippers?.length || 0);
-  console.log('📋 [EventDetails] Has participants:', hasParticipants);
-  console.log('📋 [EventDetails] Last completed race:', event.lastCompletedRace);
-
-  const { currentClub, user } = useAuth();
-  const navigate = useNavigate();
 
   // Check if skippers have been added (this means the event is ready for scoring)
   // Once skippers are added, hide registration tab and show competing skippers
