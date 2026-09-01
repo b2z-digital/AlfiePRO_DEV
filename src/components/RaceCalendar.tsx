@@ -305,7 +305,9 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           otherClubName: qr.other_club_name,
           clubId: qr.club_id,
           eventLevel: 'club',
-          completed: qr.completed
+          completed: qr.completed,
+          proMemberId: qr.pro_member_id || undefined,
+          proMemberName: qr.pro_member_name || undefined
         });
       });
 
@@ -945,6 +947,9 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
               console.log('✅ [RaceCalendar] Round data:', round);
 
               // Merge fresh round data with the event
+              // Look up rostered PRO for this series round
+              const proInfo = proAssignmentsByKey.get(`${event.seriesId}-${event.date}`);
+
               const freshEvent = {
                 ...event,
                 skippers: round.skippers || [],
@@ -955,7 +960,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                 completed: round.completed || false,
                 heatManagement: round.heatManagement,
                 numRaces: round.numRaces,
-                dropRules: round.dropRules
+                dropRules: round.dropRules,
+                ...(proInfo ? { proMemberId: proInfo.member_id, proMemberName: proInfo.member_name } : {})
               };
 
               console.log('✅ [RaceCalendar] Fresh event created with', freshEvent.skippers.length, 'skippers');
@@ -995,8 +1001,15 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
       }
     }
 
-    // Fallback to using the event as-is
+    // Fallback to using the event as-is, enriching series events with roster PRO
     console.log('⚠️ [handleEventClick] Using event as-is (fallback), skippers:', event.skippers?.length || 0);
+    if (event.isSeriesEvent && event.seriesId && event.date) {
+      const proInfo = proAssignmentsByKey.get(`${event.seriesId}-${event.date}`);
+      if (proInfo) {
+        setSelectedEvent({ ...event, proMemberId: proInfo.member_id, proMemberName: proInfo.member_name });
+        return;
+      }
+    }
     setSelectedEvent(event);
   };
 
@@ -1328,21 +1341,25 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                             <span className={getBoatClassBadge(event.raceClass, darkMode).className}>
                               {event.raceClass}
                             </span>
-                            {event.isSeriesEvent && (() => {
-                              const proInfo = proAssignmentsByKey.get(`${event.seriesId}-${event.date}`);
-                              if (!proInfo) return null;
+                            {(() => {
+                              const proInfo = event.isSeriesEvent
+                                ? proAssignmentsByKey.get(`${event.seriesId}-${event.date}`)
+                                : null;
+                              const proName = proInfo?.member_name || event.proMemberName;
+                              const proAvatar = proInfo?.member_avatar || null;
+                              if (!proName) return null;
                               return (
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
                                   darkMode ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-200'
                                 }`}>
-                                  {proInfo.member_avatar ? (
-                                    <img src={proInfo.member_avatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                                  {proAvatar ? (
+                                    <img src={proAvatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
                                   ) : (
                                     <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-bold ${
                                       darkMode ? 'bg-amber-600 text-white' : 'bg-amber-200 text-amber-800'
-                                    }`}>{proInfo.member_name.split(' ').map(n => n[0]).join('')}</span>
+                                    }`}>{proName.split(' ').map((n: string) => n[0]).join('')}</span>
                                   )}
-                                  PRO: {proInfo.member_name}
+                                  PRO: {proName}
                                 </span>
                               );
                             })()}
@@ -1836,21 +1853,25 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                             Done
                           </div>
                         )}
-                        {event.isSeriesEvent && (() => {
-                          const proInfo = proAssignmentsByKey.get(`${event.seriesId}-${event.date}`);
-                          if (!proInfo) return null;
+                        {(() => {
+                          const proInfo = event.isSeriesEvent
+                            ? proAssignmentsByKey.get(`${event.seriesId}-${event.date}`)
+                            : null;
+                          const proName = proInfo?.member_name || event.proMemberName;
+                          const proAvatar = proInfo?.member_avatar || null;
+                          if (!proName) return null;
                           return (
                             <div className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${
                               darkMode ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-700'
                             }`}>
-                              {proInfo.member_avatar ? (
-                                <img src={proInfo.member_avatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                              {proAvatar ? (
+                                <img src={proAvatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
                               ) : (
                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-bold ${
                                   darkMode ? 'bg-amber-600 text-white' : 'bg-amber-200 text-amber-800'
-                                }`}>{proInfo.member_name.split(' ').map(n => n[0]).join('')}</span>
+                                }`}>{proName.split(' ').map((n: string) => n[0]).join('')}</span>
                               )}
-                              PRO: {proInfo.member_name}
+                              PRO: {proName}
                             </div>
                           );
                         })()}

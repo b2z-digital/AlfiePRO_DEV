@@ -23,6 +23,7 @@ interface EventData {
   imageUrl?: string;
   clubId?: string;
   eventId?: string;
+  clubName?: string;
 }
 
 interface PublishToMetaModalProps {
@@ -1020,8 +1021,11 @@ Stephen Walsh emerged victorious, showcasing consistent sailing despite the shif
             <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={handlePublish}
-                disabled={publishing || success || (!selectedImage && !resultsImage)}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50"
+                disabled={!pageId || publishing || success || (!selectedImage && !resultsImage)}
+                title={!pageId ? 'Connect your Facebook page in Settings > Integrations to enable' : undefined}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium transition-colors ${
+                  !pageId ? 'opacity-40 cursor-not-allowed' : 'hover:bg-blue-700 disabled:opacity-50'
+                }`}
               >
                 {publishing ? (
                   <>
@@ -1042,8 +1046,9 @@ Stephen Walsh emerged victorious, showcasing consistent sailing despite the shif
               </button>
 
               <button
-                onClick={() => alert('Instagram publishing coming soon!')}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500 text-white rounded-lg hover:opacity-90 font-medium transition-opacity"
+                disabled
+                title="Connect your Instagram account in Settings > Integrations to enable"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500 text-white rounded-lg font-medium opacity-40 cursor-not-allowed"
               >
                 <ImageIcon size={16} />
                 Instagram

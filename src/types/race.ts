@@ -148,6 +148,9 @@ export interface RaceEvent {
   otherClubName?: string;
   // Club ID for filtering
   clubId?: string;
+  // PRO (Principal Race Officer) for single events
+  proMemberId?: string;
+  proMemberName?: string;
   // Flag for public events
   isPublicEvent?: boolean;
   publicEventId?: string; // Reference to public_events table ID (camelCase for new code)
