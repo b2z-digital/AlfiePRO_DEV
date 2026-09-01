@@ -136,6 +136,21 @@ Deno.serve(async (req) => {
                   .eq('id', notification.id)
                 emailsSent++
                 console.log('Email sent successfully to:', recipient.email)
+
+                try {
+                  await supabaseClient.from('email_logs').insert({
+                    club_id: club_id || null,
+                    user_id: recipient.user_id || null,
+                    recipient_email: recipient.email,
+                    subject,
+                    body,
+                    email_type: type || 'notification',
+                    status: 'sent',
+                    sent_at: new Date().toISOString()
+                  })
+                } catch (logErr) {
+                  console.error('Error logging sent email:', logErr)
+                }
               } catch (emailError: any) {
                 console.error('Error sending email to', recipient.email, ':', emailError)
                 await supabaseClient
@@ -145,6 +160,22 @@ Deno.serve(async (req) => {
                     email_error_message: emailError.message
                   })
                   .eq('id', notification.id)
+
+                try {
+                  await supabaseClient.from('email_logs').insert({
+                    club_id: club_id || null,
+                    user_id: recipient.user_id || null,
+                    recipient_email: recipient.email,
+                    subject: `Failed: ${subject}`,
+                    body: 'Email failed to send',
+                    email_type: type || 'notification',
+                    status: 'failed',
+                    error_message: emailError.message,
+                    sent_at: new Date().toISOString()
+                  })
+                } catch (logErr) {
+                  console.error('Error logging failed email:', logErr)
+                }
               }
             }
           }
@@ -170,8 +201,39 @@ Deno.serve(async (req) => {
             })
             emailsSent++
             console.log('Email sent (no notification) to:', recipient.email)
+
+            try {
+              await supabaseClient.from('email_logs').insert({
+                club_id: club_id || null,
+                user_id: recipient.user_id || null,
+                recipient_email: recipient.email,
+                subject,
+                body,
+                email_type: type || 'notification',
+                status: 'sent',
+                sent_at: new Date().toISOString()
+              })
+            } catch (logErr) {
+              console.error('Error logging sent email:', logErr)
+            }
           } catch (emailError: any) {
             console.error('Error sending email to', recipient.email, ':', emailError)
+
+            try {
+              await supabaseClient.from('email_logs').insert({
+                club_id: club_id || null,
+                user_id: recipient.user_id || null,
+                recipient_email: recipient.email,
+                subject: `Failed: ${subject}`,
+                body: 'Email failed to send',
+                email_type: type || 'notification',
+                status: 'failed',
+                error_message: emailError.message,
+                sent_at: new Date().toISOString()
+              })
+            } catch (logErr) {
+              console.error('Error logging failed email:', logErr)
+            }
           }
         }
       } catch (error) {

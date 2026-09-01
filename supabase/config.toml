@@ -1,0 +1,5 @@
+[project]
+id = ""
+
+[functions.send-notification]
+verify_jwt = true
