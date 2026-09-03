@@ -62,12 +62,49 @@ export const getMeetingById = async (meetingId: string): Promise<Meeting | null>
   }
 };
 
-function generateRecurringDates(startDate: string, recurrenceType: RecurrenceType, endDate: string): string[] {
+function getNthWeekdayOfMonth(year: number, month: number, dayOfWeek: number, nth: number): Date | null {
+  if (nth === 5) {
+    const lastDay = new Date(year, month + 1, 0);
+    const diff = (lastDay.getDay() - dayOfWeek + 7) % 7;
+    return new Date(year, month, lastDay.getDate() - diff);
+  }
+  const first = new Date(year, month, 1);
+  const firstOccurrence = 1 + ((dayOfWeek - first.getDay() + 7) % 7);
+  const day = firstOccurrence + (nth - 1) * 7;
+  const result = new Date(year, month, day);
+  if (result.getMonth() !== month) return null;
+  return result;
+}
+
+function generateRecurringDates(
+  startDate: string,
+  recurrenceType: RecurrenceType,
+  endDate: string,
+  nthWeek?: number,
+  nthDay?: number
+): string[] {
   const dates: string[] = [];
   const start = new Date(startDate);
   const end = new Date(endDate);
-  let current = new Date(start);
 
+  if (recurrenceType === 'monthly_nth' && nthWeek != null && nthDay != null) {
+    let month = start.getMonth() + 1;
+    let year = start.getFullYear();
+    if (month > 11) { month = 0; year++; }
+    while (year - start.getFullYear() < 10) {
+      const date = getNthWeekdayOfMonth(year, month, nthDay, nthWeek);
+      if (date && date > start && date <= end) {
+        dates.push(date.toISOString().split('T')[0]);
+      } else if (date && date > end) {
+        break;
+      }
+      month++;
+      if (month > 11) { month = 0; year++; }
+    }
+    return dates;
+  }
+
+  let current = new Date(start);
   const advance = (d: Date): Date => {
     const next = new Date(d);
     switch (recurrenceType) {
@@ -114,6 +151,8 @@ export const createMeeting = async (
       visible_to_member_clubs: meetingData.visible_to_member_clubs ?? false,
       recurrence_type: meetingData.recurrence_type || 'none',
       recurrence_end_date: meetingData.recurrence_end_date || null,
+      recurrence_nth_week: meetingData.recurrence_nth_week || null,
+      recurrence_nth_day: meetingData.recurrence_nth_day ?? null,
       recurrence_index: 0,
       status: 'upcoming',
       minutes_status: 'not_started',
@@ -160,7 +199,16 @@ export const createMeeting = async (
     const recurrenceEndDate = meetingData.recurrence_end_date;
 
     if (recurrenceType !== 'none' && recurrenceEndDate) {
-      const futureDates = generateRecurringDates(meetingData.date, recurrenceType, recurrenceEndDate);
+      const futureDates = generateRecurringDates(
+        meetingData.date,
+        recurrenceType,
+        recurrenceEndDate,
+        meetingData.recurrence_nth_week,
+        meetingData.recurrence_nth_day
+      );
+
+      const isExternalUrl = insertData.conferencing_url &&
+        !insertData.conferencing_url.includes('meet.google.com');
 
       for (let i = 0; i < futureDates.length; i++) {
         const childData: any = {
@@ -170,6 +218,9 @@ export const createMeeting = async (
           recurrence_index: i + 1,
         };
         delete childData.recurrence_end_date;
+        if (isExternalUrl) {
+          childData.conferencing_url = null;
+        }
 
         const { data: childMeeting, error: childError } = await supabase
           .from('meetings')

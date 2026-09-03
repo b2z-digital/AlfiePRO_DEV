@@ -8,21 +8,41 @@ import { Member } from '../../types/member';
 import { MemberSelect } from '../ui/MemberSelect';
 import { loadGoogleMaps } from '../../utils/googleMaps';
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const NTH_LABELS = ['1st', '2nd', '3rd', '4th', 'Last'];
+
+function getWeekdayOccurrence(dateStr: string): { nth: number; dayOfWeek: number; label: string } | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return null;
+  const dayOfWeek = d.getDay();
+  const dayOfMonth = d.getDate();
+  const nth = Math.ceil(dayOfMonth / 7);
+  const nextWeek = new Date(d);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  const isLast = nextWeek.getMonth() !== d.getMonth();
+  const effectiveNth = isLast ? 5 : nth;
+  const label = `${NTH_LABELS[effectiveNth - 1]} ${DAY_NAMES[dayOfWeek]}`;
+  return { nth: effectiveNth, dayOfWeek, label };
+}
+
 const recurrenceDescriptions: Record<RecurrenceType, string> = {
   none: 'This meeting will not repeat',
   weekly: 'Repeats every week on the same day',
   fortnightly: 'Repeats every two weeks on the same day',
   monthly: 'Repeats once a month on the same date',
+  monthly_nth: 'Repeats on a specific weekday each month',
   quarterly: 'Repeats every three months',
   yearly: 'Repeats once a year on the same date'
 };
 
 const RecurrenceSelector: React.FC<{
-  formData: { recurrence_type: RecurrenceType; recurrence_end_date: string; date: string };
+  formData: { recurrence_type: RecurrenceType; recurrence_end_date: string; date: string; recurrence_nth_week?: number; recurrence_nth_day?: number };
+  hasExternalUrlWarning?: boolean;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   recurrenceLabels: Record<RecurrenceType, string>;
   recurrencePreviewDates: string[];
-}> = ({ formData, setFormData, recurrenceLabels, recurrencePreviewDates }) => {
+}> = ({ formData, setFormData, recurrenceLabels, recurrencePreviewDates, hasExternalUrlWarning }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -48,7 +68,12 @@ const RecurrenceSelector: React.FC<{
           <div>
             <p className="text-sm font-medium text-white">Recurring Meeting</p>
             <p className="text-xs text-slate-400">
-              {recurrenceDescriptions[formData.recurrence_type]}
+              {formData.recurrence_type === 'monthly_nth' && formData.date
+                ? (() => {
+                    const info = getWeekdayOccurrence(formData.date);
+                    return info ? `Repeats on the ${info.label} of every month` : recurrenceDescriptions.monthly_nth;
+                  })()
+                : recurrenceDescriptions[formData.recurrence_type]}
             </p>
           </div>
         </div>
@@ -149,6 +174,17 @@ const RecurrenceSelector: React.FC<{
               Please select an end date for the recurring series
             </p>
           )}
+
+          {hasExternalUrlWarning && formData.recurrence_end_date && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <p className="text-xs text-amber-300 flex items-start gap-2">
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                <span>
+                  Each recurring meeting will need its own video link. The link you entered will only be saved on the first meeting — you will need to add a new link to each future occurrence individually.
+                </span>
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -212,6 +248,8 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     meeting_category: MeetingCategory;
     recurrence_type: RecurrenceType;
     recurrence_end_date: string;
+    recurrence_nth_week?: number;
+    recurrence_nth_day?: number;
     visible_to_member_clubs: boolean;
   }>({
     name: '',
@@ -255,6 +293,8 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         meeting_category: meeting.meeting_category || 'general',
         recurrence_type: meeting.recurrence_type || 'none',
         recurrence_end_date: meeting.recurrence_end_date || '',
+        recurrence_nth_week: (meeting as any).recurrence_nth_week ?? undefined,
+        recurrence_nth_day: (meeting as any).recurrence_nth_day ?? undefined,
         visible_to_member_clubs: meeting.visible_to_member_clubs ?? true
       });
 
@@ -692,6 +732,8 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         meeting_category: formData.meeting_category,
         recurrence_type: formData.recurrence_type,
         recurrence_end_date: formData.recurrence_type !== 'none' ? formData.recurrence_end_date : undefined,
+        recurrence_nth_week: formData.recurrence_type === 'monthly_nth' ? formData.recurrence_nth_week : undefined,
+        recurrence_nth_day: formData.recurrence_type === 'monthly_nth' ? formData.recurrence_nth_day : undefined,
         visible_to_member_clubs: associationId ? formData.visible_to_member_clubs : undefined,
         agenda_items: agendaItems
       };
@@ -721,11 +763,40 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
 
   const recurrencePreviewDates = useMemo(() => {
     if (formData.recurrence_type === 'none' || !formData.date || !formData.recurrence_end_date) return [];
-    const dates: string[] = [];
     const start = new Date(formData.date);
     const end = new Date(formData.recurrence_end_date);
     if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return [];
 
+    if (formData.recurrence_type === 'monthly_nth' && formData.recurrence_nth_week != null && formData.recurrence_nth_day != null) {
+      const dates: string[] = [];
+      let month = start.getMonth() + 1;
+      let year = start.getFullYear();
+      if (month > 11) { month = 0; year++; }
+      while (year - start.getFullYear() < 10 && dates.length < 52) {
+        const first = new Date(year, month, 1);
+        let date: Date | null;
+        if (formData.recurrence_nth_week === 5) {
+          const lastDay = new Date(year, month + 1, 0);
+          const diff = (lastDay.getDay() - formData.recurrence_nth_day + 7) % 7;
+          date = new Date(year, month, lastDay.getDate() - diff);
+        } else {
+          const firstOcc = 1 + ((formData.recurrence_nth_day - first.getDay() + 7) % 7);
+          const day = firstOcc + (formData.recurrence_nth_week - 1) * 7;
+          date = new Date(year, month, day);
+          if (date.getMonth() !== month) date = null;
+        }
+        if (date && date > start && date <= end) {
+          dates.push(date.toISOString().split('T')[0]);
+        } else if (date && date > end) {
+          break;
+        }
+        month++;
+        if (month > 11) { month = 0; year++; }
+      }
+      return dates;
+    }
+
+    const dates: string[] = [];
     let current = new Date(start);
     const advance = () => {
       switch (formData.recurrence_type) {
@@ -743,16 +814,33 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
       advance();
     }
     return dates;
-  }, [formData.recurrence_type, formData.date, formData.recurrence_end_date]);
+  }, [formData.recurrence_type, formData.date, formData.recurrence_end_date, formData.recurrence_nth_week, formData.recurrence_nth_day]);
+
+  const nthWeekdayInfo = useMemo(() => getWeekdayOccurrence(formData.date), [formData.date]);
+
+  useEffect(() => {
+    if (formData.recurrence_type === 'monthly_nth' && nthWeekdayInfo) {
+      setFormData(prev => ({
+        ...prev,
+        recurrence_nth_week: nthWeekdayInfo.nth,
+        recurrence_nth_day: nthWeekdayInfo.dayOfWeek
+      }));
+    }
+  }, [formData.recurrence_type, formData.date]);
 
   const recurrenceLabels: Record<RecurrenceType, string> = {
     none: 'None',
     weekly: 'Weekly',
     fortnightly: 'Fortnightly',
     monthly: 'Monthly',
+    monthly_nth: nthWeekdayInfo ? `${nthWeekdayInfo.label} of month` : 'Nth weekday',
     quarterly: 'Quarterly',
     yearly: 'Yearly'
   };
+
+  const hasExternalUrlWarning = formData.recurrence_type !== 'none'
+    && !!formData.conferencing_url
+    && !formData.conferencing_url.includes('meet.google.com');
 
   return (
     <div className="h-full overflow-y-auto">
@@ -1123,6 +1211,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                   setFormData={setFormData}
                   recurrenceLabels={recurrenceLabels}
                   recurrencePreviewDates={recurrencePreviewDates}
+                  hasExternalUrlWarning={hasExternalUrlWarning}
                 />
               )}
 
