@@ -357,6 +357,8 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
           role = effectiveAssocType === 'state' ? 'state_admin' : 'national_admin';
         } else if (accessLevel === 'editor') {
           role = 'editor';
+        } else if (accessLevel === 'race_scorer') {
+          role = 'race_scorer';
         }
 
         const { data: existing } = await supabase
@@ -703,18 +705,22 @@ const SortablePositionItem: React.FC<SortablePositionItemProps> = ({
             ? 'bg-amber-500/10 border-amber-500/20'
             : position.access_level === 'editor'
               ? 'bg-blue-500/10 border-blue-500/20'
-              : 'bg-slate-500/10 border-slate-500/20'
+              : position.access_level === 'race_scorer'
+                ? 'bg-emerald-500/10 border-emerald-500/20'
+                : 'bg-slate-500/10 border-slate-500/20'
         }`}>
           <Shield size={11} className={
             position.access_level === 'admin' ? 'text-amber-400'
               : position.access_level === 'editor' ? 'text-blue-400'
-                : 'text-slate-400'
+                : position.access_level === 'race_scorer' ? 'text-emerald-400'
+                  : 'text-slate-400'
           } />
           <span className={`text-xs capitalize ${
             position.access_level === 'admin' ? 'text-amber-400'
               : position.access_level === 'editor' ? 'text-blue-400'
-                : 'text-slate-400'
-          }`}>{position.access_level}</span>
+                : position.access_level === 'race_scorer' ? 'text-emerald-400'
+                  : 'text-slate-400'
+          }`}>{position.access_level === 'race_scorer' ? 'Race Scorer' : position.access_level}</span>
         </div>
       )}
 
@@ -917,6 +923,7 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
             {[
               { value: 'admin', label: 'Admin', color: 'amber', desc: 'Full access' },
               { value: 'editor', label: 'Editor', color: 'blue', desc: 'Can edit' },
+              { value: 'race_scorer', label: 'Race Scorer', color: 'emerald', desc: 'Score races' },
               { value: 'viewer', label: 'Viewer', color: 'slate', desc: 'Read only' },
             ].map(opt => (
               <button
@@ -929,9 +936,9 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
                     : 'border-slate-600/50 text-slate-500 hover:border-slate-500'
                 }`}
                 style={formData.access_level === opt.value ? {
-                  backgroundColor: opt.color === 'amber' ? 'rgba(245, 158, 11, 0.1)' : opt.color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(100, 116, 139, 0.1)',
-                  borderColor: opt.color === 'amber' ? 'rgba(245, 158, 11, 0.3)' : opt.color === 'blue' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(100, 116, 139, 0.3)',
-                  color: opt.color === 'amber' ? '#fbbf24' : opt.color === 'blue' ? '#60a5fa' : '#94a3b8',
+                  backgroundColor: opt.color === 'amber' ? 'rgba(245, 158, 11, 0.1)' : opt.color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : opt.color === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(100, 116, 139, 0.1)',
+                  borderColor: opt.color === 'amber' ? 'rgba(245, 158, 11, 0.3)' : opt.color === 'blue' ? 'rgba(59, 130, 246, 0.3)' : opt.color === 'emerald' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(100, 116, 139, 0.3)',
+                  color: opt.color === 'amber' ? '#fbbf24' : opt.color === 'blue' ? '#60a5fa' : opt.color === 'emerald' ? '#34d399' : '#94a3b8',
                 } : {}}
               >
                 <Shield size={16} />
@@ -1171,18 +1178,22 @@ const SortablePositionCard: React.FC<SortablePositionCardProps> = ({
                   ? 'bg-amber-500/10 border-amber-500/20'
                   : position.access_level === 'editor'
                     ? 'bg-blue-500/10 border-blue-500/20'
-                    : 'bg-slate-500/10 border-slate-500/20'
+                    : position.access_level === 'race_scorer'
+                      ? 'bg-emerald-500/10 border-emerald-500/20'
+                      : 'bg-slate-500/10 border-slate-500/20'
               }`}>
                 <Shield size={10} className={
                   position.access_level === 'admin' ? 'text-amber-400'
                     : position.access_level === 'editor' ? 'text-blue-400'
-                      : 'text-slate-400'
+                      : position.access_level === 'race_scorer' ? 'text-emerald-400'
+                        : 'text-slate-400'
                 } />
                 <span className={`text-xs capitalize ${
                   position.access_level === 'admin' ? 'text-amber-400'
                     : position.access_level === 'editor' ? 'text-blue-400'
-                      : 'text-slate-400'
-                }`}>{position.access_level}</span>
+                      : position.access_level === 'race_scorer' ? 'text-emerald-400'
+                        : 'text-slate-400'
+                }`}>{position.access_level === 'race_scorer' ? 'Race Scorer' : position.access_level}</span>
               </span>
             )}
             {position.show_on_website && (

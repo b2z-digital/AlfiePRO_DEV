@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Shield, ChevronDown, ChevronRight, RotateCcw, Save,
-  Trophy, Newspaper, Zap, Wrench, Monitor, Users,
-  DollarSign, CheckSquare, Info
-} from 'lucide-react';
+import { Shield, ChevronDown, ChevronRight, RotateCcw, Save, Trophy, Newspaper, Zap, Wrench, Monitor, Users, DollarSign, SquareCheck as CheckSquare, Info } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 
@@ -23,6 +19,7 @@ interface PermissionRow {
   feature_key: string;
   admin: string;
   editor: string;
+  race_scorer: string;
   viewer: string;
 }
 
@@ -32,7 +29,7 @@ interface TemplateRow {
   capability: string;
 }
 
-const ACCESS_LEVELS = ['admin', 'editor', 'viewer'] as const;
+const ACCESS_LEVELS = ['admin', 'editor', 'race_scorer', 'viewer'] as const;
 const CAPABILITIES = ['full', 'edit', 'view', 'none'] as const;
 
 const capabilityLabels: Record<string, string> = {
@@ -52,12 +49,14 @@ const capabilityColors: Record<string, string> = {
 const accessLevelLabels: Record<string, string> = {
   admin: 'Admin',
   editor: 'Editor',
+  race_scorer: 'Race Scorer',
   viewer: 'Viewer',
 };
 
 const accessLevelColors: Record<string, string> = {
   admin: 'text-amber-400',
   editor: 'text-blue-400',
+  race_scorer: 'text-emerald-400',
   viewer: 'text-slate-400',
 };
 
@@ -163,6 +162,7 @@ export default function AccessLevelManager({ darkMode, scopeType, scopeId }: Acc
     if (template) return template;
     if (accessLevel === 'admin') return 'full';
     if (accessLevel === 'editor') return 'edit';
+    if (accessLevel === 'race_scorer') return 'none';
     return 'view';
   };
 
@@ -172,7 +172,7 @@ export default function AccessLevelManager({ darkMode, scopeType, scopeId }: Acc
 
   const handleCapabilityChange = (featureKey: string, accessLevel: string, capability: string) => {
     const templateDefault = templates[featureKey]?.[accessLevel] ||
-      (accessLevel === 'admin' ? 'full' : accessLevel === 'editor' ? 'edit' : 'view');
+      (accessLevel === 'admin' ? 'full' : accessLevel === 'editor' ? 'edit' : accessLevel === 'race_scorer' ? 'none' : 'view');
 
     const newPerms = { ...permissions };
     if (capability === templateDefault) {
@@ -318,7 +318,7 @@ export default function AccessLevelManager({ darkMode, scopeType, scopeId }: Acc
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30">
           <div className="text-2xl font-bold text-white">{features.length}</div>
           <div className="text-xs text-slate-400">Total Features</div>
@@ -348,7 +348,7 @@ export default function AccessLevelManager({ darkMode, scopeType, scopeId }: Acc
       </div>
 
       <div className="overflow-hidden rounded-lg border border-slate-700/50">
-        <div className="grid grid-cols-[1fr_140px_140px_140px] bg-slate-800/80 border-b border-slate-700/50">
+        <div className="grid grid-cols-[1fr_130px_130px_130px_130px] bg-slate-800/80 border-b border-slate-700/50">
           <div className="px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
             Feature
           </div>
@@ -370,7 +370,7 @@ export default function AccessLevelManager({ darkMode, scopeType, scopeId }: Acc
             <div key={group}>
               <button
                 onClick={() => toggleGroup(group)}
-                className="w-full grid grid-cols-[1fr_140px_140px_140px] bg-slate-700/30 hover:bg-slate-700/50 transition-colors border-b border-slate-700/30"
+                className="w-full grid grid-cols-[1fr_130px_130px_130px_130px] bg-slate-700/30 hover:bg-slate-700/50 transition-colors border-b border-slate-700/30"
               >
                 <div className="flex items-center gap-3 px-4 py-3">
                   <GroupIcon size={16} className="text-slate-400" />
@@ -387,13 +387,13 @@ export default function AccessLevelManager({ darkMode, scopeType, scopeId }: Acc
                   )}
                   {isExpanded ? <ChevronDown size={14} className="text-slate-500" /> : <ChevronRight size={14} className="text-slate-500" />}
                 </div>
-                <div className="col-span-3" />
+                <div className="col-span-4" />
               </button>
 
               {isExpanded && groupFeatures.map(feature => (
                 <div
                   key={feature.feature_key}
-                  className="grid grid-cols-[1fr_140px_140px_140px] border-b border-slate-700/20 hover:bg-slate-800/30 transition-colors"
+                  className="grid grid-cols-[1fr_130px_130px_130px_130px] border-b border-slate-700/20 hover:bg-slate-800/30 transition-colors"
                 >
                   <div className="px-4 py-3 pl-12 flex items-center">
                     <span className="text-sm text-slate-300">{feature.feature_label}</span>
