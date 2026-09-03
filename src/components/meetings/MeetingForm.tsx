@@ -68,11 +68,8 @@ const RecurrenceSelector: React.FC<{
           <div>
             <p className="text-sm font-medium text-white">Recurring Meeting</p>
             <p className="text-xs text-slate-400">
-              {formData.recurrence_type === 'monthly_nth' && formData.date
-                ? (() => {
-                    const info = getWeekdayOccurrence(formData.date);
-                    return info ? `Repeats on the ${info.label} of every month` : recurrenceDescriptions.monthly_nth;
-                  })()
+              {formData.recurrence_type === 'monthly_nth' && formData.recurrence_nth_week != null && formData.recurrence_nth_day != null
+                ? `Repeats on the ${['1st','2nd','3rd','4th','Last'][formData.recurrence_nth_week - 1]} ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][formData.recurrence_nth_day]} of every month`
                 : recurrenceDescriptions[formData.recurrence_type]}
             </p>
           </div>
@@ -125,6 +122,43 @@ const RecurrenceSelector: React.FC<{
 
       {isRecurring && (
         <div className="mt-4 pt-4 border-t border-slate-600/40 space-y-3">
+          {formData.recurrence_type === 'monthly_nth' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Week of month</label>
+                <select
+                  value={formData.recurrence_nth_week ?? ''}
+                  onChange={(e) => setFormData((prev: any) => ({ ...prev, recurrence_nth_week: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="" disabled>Select week</option>
+                  <option value={1}>1st</option>
+                  <option value={2}>2nd</option>
+                  <option value={3}>3rd</option>
+                  <option value={4}>4th</option>
+                  <option value={5}>Last</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Day of week</label>
+                <select
+                  value={formData.recurrence_nth_day ?? ''}
+                  onChange={(e) => setFormData((prev: any) => ({ ...prev, recurrence_nth_day: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="" disabled>Select day</option>
+                  <option value={1}>Monday</option>
+                  <option value={2}>Tuesday</option>
+                  <option value={3}>Wednesday</option>
+                  <option value={4}>Thursday</option>
+                  <option value={5}>Friday</option>
+                  <option value={6}>Saturday</option>
+                  <option value={0}>Sunday</option>
+                </select>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">
@@ -819,7 +853,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
   const nthWeekdayInfo = useMemo(() => getWeekdayOccurrence(formData.date), [formData.date]);
 
   useEffect(() => {
-    if (formData.recurrence_type === 'monthly_nth' && nthWeekdayInfo) {
+    if (formData.recurrence_type === 'monthly_nth' && nthWeekdayInfo && formData.recurrence_nth_week == null) {
       setFormData(prev => ({
         ...prev,
         recurrence_nth_week: nthWeekdayInfo.nth,
@@ -833,7 +867,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     weekly: 'Weekly',
     fortnightly: 'Fortnightly',
     monthly: 'Monthly',
-    monthly_nth: nthWeekdayInfo ? `${nthWeekdayInfo.label} of month` : 'Nth weekday',
+    monthly_nth: 'A set day each month',
     quarterly: 'Quarterly',
     yearly: 'Yearly'
   };
