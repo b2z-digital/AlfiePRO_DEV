@@ -250,19 +250,13 @@ Thank you.
 
       const meetingTime = meeting.start_time
         ? (() => {
-            let timeStr = String(meeting.start_time);
-            const tzMatch = timeStr.match(/([+-]\d{2})$/);
-            if (tzMatch) timeStr = timeStr.replace(/([+-]\d{2})$/, '$1:00');
-            const d = new Date(`2000-01-01T${timeStr}`);
-            if (isNaN(d.getTime())) {
-              const parts = timeStr.split(':');
-              return `${((+parts[0] % 12) || 12)}:${parts[1] || '00'} ${+parts[0] >= 12 ? 'pm' : 'am'}`;
-            }
-            return d.toLocaleTimeString('en-AU', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-            });
+            const parts = String(meeting.start_time).split(':');
+            const hour = parseInt(parts[0], 10);
+            const minute = parts[1] || '00';
+            if (isNaN(hour)) return '[Meeting Time]';
+            const h12 = hour % 12 || 12;
+            const ampm = hour >= 12 ? 'pm' : 'am';
+            return `${h12}:${minute} ${ampm}`;
           })()
         : '';
 
