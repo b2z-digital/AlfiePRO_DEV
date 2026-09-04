@@ -249,11 +249,21 @@ Thank you.
         : '';
 
       const meetingTime = meeting.start_time
-        ? new Date(`2000-01-01T${meeting.start_time}`).toLocaleTimeString('en-AU', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          })
+        ? (() => {
+            let timeStr = String(meeting.start_time);
+            const tzMatch = timeStr.match(/([+-]\d{2})$/);
+            if (tzMatch) timeStr = timeStr.replace(/([+-]\d{2})$/, '$1:00');
+            const d = new Date(`2000-01-01T${timeStr}`);
+            if (isNaN(d.getTime())) {
+              const parts = timeStr.split(':');
+              return `${((+parts[0] % 12) || 12)}:${parts[1] || '00'} ${+parts[0] >= 12 ? 'pm' : 'am'}`;
+            }
+            return d.toLocaleTimeString('en-AU', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            });
+          })()
         : '';
 
       const orgName = clubName || currentClub?.name || 'Your Organisation';
