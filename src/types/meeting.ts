@@ -1,5 +1,5 @@
 export type MeetingCategory = 'general' | 'committee';
-export type RecurrenceType = 'none' | 'weekly' | 'fortnightly' | 'monthly' | 'quarterly' | 'yearly';
+export type RecurrenceType = 'none' | 'weekly' | 'fortnightly' | 'monthly' | 'monthly_nth' | 'quarterly' | 'yearly';
 
 export interface Meeting {
   id: string;
@@ -25,6 +25,8 @@ export interface Meeting {
   recurrence_end_date?: string | null;
   recurrence_parent_id?: string | null;
   recurrence_index?: number;
+  recurrence_nth_week?: number | null;
+  recurrence_nth_day?: number | null;
   meeting_type?: 'in_person' | 'online' | 'hybrid';
   state_association_id?: string | null;
   national_association_id?: string | null;
@@ -76,6 +78,8 @@ export interface MeetingFormData {
   meeting_category?: MeetingCategory;
   recurrence_type?: RecurrenceType;
   recurrence_end_date?: string;
+  recurrence_nth_week?: number;
+  recurrence_nth_day?: number;
   meeting_type?: 'in_person' | 'online' | 'hybrid';
   visible_to_member_clubs?: boolean;
   agenda_items: {

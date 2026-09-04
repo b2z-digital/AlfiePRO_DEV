@@ -167,6 +167,16 @@ export function usePermissions() {
       return proPermissions.includes(permission);
     }
 
+    if (userRole === 'race_scorer') {
+      const scorerPermissions: Permission[] = [
+        'races.score',
+        'races.view',
+        'venues.view',
+        'dashboard.edit',
+      ];
+      return scorerPermissions.includes(permission);
+    }
+
     if (userRole === 'member') {
       const memberPermissions: Permission[] = [
         'races.view',
@@ -190,6 +200,7 @@ export function usePermissions() {
 
   const isMember = userRole === 'member';
   const isPRO = userRole === 'pro';
+  const isScorer = userRole === 'race_scorer';
   const isEditor = userRole === 'editor' || userRole === 'pro';
   const isAdmin = userRole === 'admin' || isSuperAdmin;
   const isStateAdmin = userRole === 'state_admin' || userRole === 'national_admin' || isSuperAdmin;
@@ -204,6 +215,7 @@ export function usePermissions() {
     hasPermission,
     isMember,
     isPRO,
+    isScorer,
     isEditor,
     isAdmin,
     isStateAdmin,

@@ -217,10 +217,10 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
 
               <button
                 onClick={() => setShowStatusConfirm('cancel')}
-                className="btn-primary-green flex items-center gap-2 px-4 py-2 from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-red-500/20"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-red-500/20"
               >
                 <X size={16} />
-                Cancel
+                Cancel Meeting
               </button>
             </>
           )}
