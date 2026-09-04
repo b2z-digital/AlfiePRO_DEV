@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ClipboardList, Plus, Calendar, Trash2, Pencil, Play, ChevronRight, CircleCheck as CheckCircle2, Clock, UserCheck, ListFilter as Filter, Search, Layers, CalendarDays, ChevronDown, ChevronUp, Users, Anchor, ListChecks, FileText, Grid3x2 as Grid3X3, List, Download } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { getRosters, deleteRoster, getRosterWithDetails, activateRoster, createTasksForAssignments, updateAssignmentStatus, ensureTasksForRoster, getRosterAssignmentSummaries } from '../../utils/proRosterStorage';
+import { getRosters, deleteRoster, getRosterWithDetails, activateRoster, createTasksForAssignments, updateAssignmentStatus, ensureTasksForRoster, getRosterAssignmentSummaries, sendProRosterReminderEmails } from '../../utils/proRosterStorage';
 import type { RosterAssignmentSummary } from '../../utils/proRosterStorage';
 import { useAuth } from '../../contexts/AuthContext';
 import { getStoredMembers } from '../../utils/storage';
@@ -118,6 +118,9 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
       const details = await getRosterWithDetails(rosterId);
       if (details.assignments.length > 0 && user?.id) {
         await createTasksForAssignments(details, details.rounds, details.assignments, clubId, user.id);
+        sendProRosterReminderEmails(details, details.rounds, details.assignments, clubId).catch(err =>
+          console.error('Failed to send PRO roster emails:', err)
+        );
         for (const assignment of details.assignments) {
           if (assignment.status === 'assigned') {
             await updateAssignmentStatus(assignment.id, 'confirmed');

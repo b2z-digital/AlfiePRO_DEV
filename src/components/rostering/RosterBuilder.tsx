@@ -4,7 +4,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import {
   createRoster, updateRoster, addRosterRounds, addRosterMembers,
   applyAllocation, getRosterWithDetails, createTasksForAssignments,
-  deleteRosterRound
+  deleteRosterRound, sendProRosterReminderEmails
 } from '../../utils/proRosterStorage';
 import { getStoredRaceSeries, getStoredRaceEvents } from '../../utils/raceStorage';
 import type { RaceEvent } from '../../types/race';
@@ -302,6 +302,9 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
           if (!existingRoster) {
             const updatedDetails = await getRosterWithDetails(roster.id);
             await createTasksForAssignments(roster, updatedDetails.rounds, updatedDetails.assignments, clubId, 'current_user');
+            sendProRosterReminderEmails(roster, updatedDetails.rounds, updatedDetails.assignments, clubId).catch(err =>
+              console.error('Failed to send PRO roster emails:', err)
+            );
           }
         }
       }

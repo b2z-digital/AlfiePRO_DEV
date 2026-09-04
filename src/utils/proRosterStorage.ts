@@ -639,3 +639,127 @@ export const getProAssignmentsForEvents = async (
   }
   return result;
 };
+
+export const sendProRosterReminderEmails = async (
+  roster: ProRoster,
+  rounds: ProRosterRound[],
+  assignments: ProRosterAssignment[],
+  clubId: string
+): Promise<void> => {
+  const memberIds = [...new Set(assignments.map(a => a.member_id))];
+  if (memberIds.length === 0) return;
+
+  const [{ data: members }, { data: club }] = await Promise.all([
+    supabase
+      .from('members')
+      .select('id, first_name, last_name, email, user_id')
+      .in('id', memberIds),
+    supabase
+      .from('clubs')
+      .select('name, logo')
+      .eq('id', clubId)
+      .single(),
+  ]);
+
+  if (!members || members.length === 0) return;
+
+  const memberMap = new Map(members.map(m => [m.id, m]));
+  const roundMap = new Map(rounds.map(r => [r.id, r]));
+  const clubName = club?.name || 'Your Club';
+  const clubLogo = club?.logo || null;
+
+  const assignmentsByMember = new Map<string, Array<{ date: string; roundName: string | null }>>();
+  for (const assignment of assignments) {
+    const round = roundMap.get(assignment.round_id);
+    if (!round) continue;
+    const existing = assignmentsByMember.get(assignment.member_id) || [];
+    existing.push({ date: round.date, roundName: round.name || null });
+    assignmentsByMember.set(assignment.member_id, existing);
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return;
+
+  for (const [memberId, dutyDates] of assignmentsByMember.entries()) {
+    const member = memberMap.get(memberId);
+    if (!member?.email) continue;
+
+    const sortedDates = dutyDates.sort((a, b) => a.date.localeCompare(b.date));
+    const dateRows = sortedDates.map(d => {
+      const formatted = new Date(d.date + 'T00:00:00').toLocaleDateString('en-AU', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+      return `<tr>
+        <td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;">
+          <span style="color:#0f172a;font-size:14px;font-weight:600;">${formatted}</span>
+          ${d.roundName ? `<br/><span style="color:#64748b;font-size:12px;">${d.roundName}</span>` : ''}
+        </td>
+      </tr>`;
+    }).join('');
+
+    const emailBody = `
+      <div style="margin-bottom:24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#0369a1,#0284c7);border-radius:12px;padding:24px;">
+              <p style="margin:0;color:rgba(255,255,255,0.75);font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Principal Race Officer Assignment</p>
+              <p style="margin:6px 0 0;color:#ffffff;font-size:20px;font-weight:700;">${roster.name}</p>
+              <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Boat Class: ${roster.boat_class}</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#374151;">
+        You have been assigned as <strong>Principal Race Officer (PRO)</strong> for the following date${sortedDates.length > 1 ? 's' : ''}:
+      </p>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <tr>
+          <td style="background-color:#f0f9ff;padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+            <p style="margin:0;color:#0369a1;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Your PRO Duty Date${sortedDates.length > 1 ? 's' : ''}</p>
+          </td>
+        </tr>
+        ${dateRows}
+      </table>
+
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+        <p style="margin:0;font-size:14px;color:#92400e;font-weight:600;">What does this mean?</p>
+        <p style="margin:8px 0 0;font-size:14px;color:#78350f;line-height:1.6;">
+          As PRO, you are responsible for managing the race on your assigned date${sortedDates.length > 1 ? 's' : ''}. This includes race setup, start sequences, scoring, and ensuring fair racing for all competitors.
+        </p>
+      </div>
+
+      <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#374151;">
+        If you are unable to fulfil your PRO duty, please contact your club as soon as possible so a replacement can be arranged.
+      </p>
+
+      <p style="margin:0 0 8px;font-size:14px;color:#374151;">
+        A task has also been added to your task list within the app as a reminder.
+      </p>
+    `;
+
+    try {
+      await supabase.functions.invoke('send-notification', {
+        headers: { Authorization: `Bearer ${token}` },
+        body: {
+          recipients: [{
+            email: member.email,
+            name: `${member.first_name} ${member.last_name}`,
+            user_id: member.user_id || null,
+          }],
+          subject: `PRO Duty Assignment: ${roster.name} - ${clubName}`,
+          body: emailBody,
+          type: 'pro_roster_assignment',
+          club_id: clubId,
+          send_email: true,
+          club_name: clubName,
+          club_logo: clubLogo,
+        },
+      });
+    } catch (err) {
+      console.error(`Failed to send PRO reminder email to ${member.email}:`, err);
+    }
+  }
+};
