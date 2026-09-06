@@ -20,6 +20,7 @@ interface EventResultsDisplayProps {
   isExportMode?: boolean;
   seriesName?: string;
   onEventUpdate?: (event: RaceEvent) => void;
+  clubLogoUrl?: string;
 }
 
 export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
@@ -27,7 +28,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   darkMode = true,
   isExportMode = false,
   seriesName,
-  onEventUpdate
+  onEventUpdate,
+  clubLogoUrl
 }) => {
   const [expandedSkipper, setExpandedSkipper] = useState<number | null>(null);
   const [raceReport, setRaceReport] = useState<any>(null);
@@ -37,6 +39,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [enrichedEvent, setEnrichedEvent] = useState<RaceEvent>(event);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showHandicaps, setShowHandicaps] = useState(true);
 
   // Enrich skipper data with member information
   useEffect(() => {
@@ -1079,20 +1082,32 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
     <div className={`${isExportMode ? 'bg-white text-black' : 'bg-slate-800'} p-6 rounded-lg ${containerClass}`}>
       {isExportMode ? (
         <>
-          <div className="event-title">
-            {event.eventName || event.clubName}
-          </div>
-          {seriesName ? (
-            <div className="event-series-name">
-              {seriesName}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
+            {clubLogoUrl && (
+              <img
+                src={clubLogoUrl}
+                alt="Club logo"
+                style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '6px', flexShrink: 0 }}
+                crossOrigin="anonymous"
+              />
+            )}
+            <div style={{ flex: 1, textAlign: clubLogoUrl ? 'left' : 'center' }}>
+              <div className="event-title" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
+                {event.eventName || event.clubName}
+              </div>
+              {seriesName ? (
+                <div className="event-series-name" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
+                  {seriesName}
+                </div>
+              ) : (
+                <div className="event-subtitle" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
+                  {event.raceClass} - {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+                </div>
+              )}
+              <div className="event-details" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
+                {formatDate(event.date)} - {event.venue}
+              </div>
             </div>
-          ) : (
-            <div className="event-subtitle">
-              {event.raceClass} - {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-            </div>
-          )}
-          <div className="event-details">
-            {formatDate(event.date)} - {event.venue}
           </div>
         </>
       ) : (
@@ -1114,14 +1129,29 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 {formatDate(event.date)} - {event.venue}
               </div>
             </div>
-            <button
-              onClick={() => setShowSettingsModal(true)}
-              className="p-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center gap-2"
-              title="Score Display Settings"
-            >
-              <Settings size={18} />
-              <span className="text-sm">Score Display Settings</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {event.raceFormat === 'handicap' && (
+                <button
+                  onClick={() => setShowHandicaps(!showHandicaps)}
+                  className={`p-3 rounded-lg transition-colors flex items-center gap-2 ${
+                    showHandicaps
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                  }`}
+                  title={showHandicaps ? 'Hide handicap values' : 'Show handicap values'}
+                >
+                  <span className="text-sm">{showHandicaps ? 'Handicaps On' : 'Handicaps Off'}</span>
+                </button>
+              )}
+              <button
+                onClick={() => setShowSettingsModal(true)}
+                className="p-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center gap-2"
+                title="Score Display Settings"
+              >
+                <Settings size={18} />
+                <span className="text-sm">Score Display Settings</span>
+              </button>
+            </div>
           </div>
 
           {/* Race Report Section */}
@@ -1221,7 +1251,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
               </tr>
             )}
             {/* Scratch bonus row - shows handicap seconds carried over when scratch boats finish in top 3 */}
-            {event.raceFormat === 'handicap' && !needsTwoRows && (
+            {event.raceFormat === 'handicap' && showHandicaps && !needsTwoRows && (
               <tr>
                 <th className={`sticky left-0 z-20 ${isExportMode ? '' : 'bg-slate-800'}`} style={exportSubThStyle}></th>
                 <th className={`sticky left-[60px] z-20 ${isExportMode ? '' : 'bg-slate-800'}`} style={exportSubThStyle}></th>
@@ -1496,7 +1526,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                         isDropped
                           ? isExportMode ? 'dropped-score' : 'text-red-400 line-through'
                           : isExportMode ? '' : 'text-slate-300'
-                      } ${event.raceFormat === 'handicap' && !letterScore ? 'split-cell' : ''}`}
+                      } ${event.raceFormat === 'handicap' && showHandicaps && !letterScore ? 'split-cell' : ''}`}
                       style={isExportMode ? {
                         ...exportTdBase,
                         ...(isDropped ? { backgroundColor: '#848484', color: '#ffffff' } : {})
@@ -1507,7 +1537,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                           const points = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
                           return isExportMode ? <>{points}</> : <span>{points}</span>;
                         })()
-                      ) : event.raceFormat === 'handicap' && (position || withdrawnScore) ? (
+                      ) : event.raceFormat === 'handicap' && showHandicaps && (position || withdrawnScore) ? (
                         isExportMode ? (
                           <div style={{
                             position: 'relative',

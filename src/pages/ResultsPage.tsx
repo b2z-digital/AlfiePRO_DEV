@@ -396,6 +396,7 @@ export const ResultsPage: React.FC = () => {
   const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [clubFeaturedImage, setClubFeaturedImage] = useState<string | null>(null);
+  const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
   const [previousSidebarState, setPreviousSidebarState] = useState<string | null>(null);
   const [externalNationalEvents, setExternalNationalEvents] = useState<ExternalResultEvent[]>([]);
   const [externalStateEvents, setExternalStateEvents] = useState<ExternalResultEvent[]>([]);
@@ -441,11 +442,14 @@ export const ResultsPage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('clubs')
-        .select('featured_image_url')
+        .select('featured_image_url, logo')
         .eq('id', currentClub.clubId)
         .maybeSingle();
 
       if (!error && data) {
+        if (data.logo) {
+          setClubLogoUrl(data.logo);
+        }
         setClubFeaturedImage(data.featured_image_url);
       }
     } catch (err) {
@@ -1357,7 +1361,8 @@ export const ResultsPage: React.FC = () => {
           event: displayEvent,
           darkMode: false,
           isExportMode: true,
-          seriesName: selectedRound?.seriesName
+          seriesName: selectedRound?.seriesName,
+          clubLogoUrl: clubLogoUrl || undefined
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);
@@ -1434,7 +1439,8 @@ export const ResultsPage: React.FC = () => {
           event: displayEvent,
           darkMode: false,
           isExportMode: true,
-          seriesName: selectedRound?.seriesName
+          seriesName: selectedRound?.seriesName,
+          clubLogoUrl: clubLogoUrl || undefined
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);

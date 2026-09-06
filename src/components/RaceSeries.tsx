@@ -904,10 +904,13 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
                     {series.map(s => {
                       const colors = s.raceClass ? boatTypeColors[s.raceClass] || defaultColorScheme : defaultColorScheme;
                       
-                      // Sort rounds by date
-                      const sortedRounds = [...s.rounds].sort((a, b) => 
-                        new Date(a.date).getTime() - new Date(b.date).getTime()
-                      );
+                      // Sort rounds by round_index (preserving drag-and-drop order), falling back to date
+                      const sortedRounds = [...s.rounds].sort((a, b) => {
+                        const aIdx = a.index ?? Infinity;
+                        const bIdx = b.index ?? Infinity;
+                        if (aIdx !== bIdx) return aIdx - bIdx;
+                        return new Date(a.date).getTime() - new Date(b.date).getTime();
+                      });
                       
                       // Find the next upcoming round
                       const nextRoundIndex = getNextUpcomingRound(s);
