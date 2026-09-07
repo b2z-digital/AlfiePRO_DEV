@@ -422,13 +422,15 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
         .filter(r => raceNumbers.includes(r.race)) // Only include completed races
         .map(r => {
           if (r.position !== null && !r.letterScore) {
-            return { race: r.race, score: r.position, isDNE: false, isLetterScore: false };
+            const score = enrichedEvent.raceFormat === 'handicap' ? r.position : Math.round(r.position);
+            return { race: r.race, score, isDNE: false, isLetterScore: false };
           }
 
           if (r.letterScore) {
             // Special case for RDGfix
             if (r.letterScore === 'RDGfix' && r.position !== null) {
-              return { race: r.race, score: r.position, isDNE: false, isLetterScore: true };
+              const score = enrichedEvent.raceFormat === 'handicap' ? r.position : Math.round(r.position);
+              return { race: r.race, score, isDNE: false, isLetterScore: true };
             }
 
             // For RDG and DPI with custom points, use the custom points
@@ -1517,7 +1519,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     // Show points for letter scores (with custom points support for RDG/DPI)
                     displayValue = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
                   } else if (position !== null) {
-                    displayValue = position;
+                    displayValue = event.raceFormat === 'handicap' ? position : Math.round(position);
                   } else if (withdrawnScore !== null) {
                     displayValue = withdrawnScore;
                   }
@@ -1636,14 +1638,14 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-semibold ${isExportMode ? 'text-black' : 'text-slate-300'}`}
                   style={isExportMode ? { ...exportTdBase } : undefined}
                 >
-                  {totals[skipper.index]?.gross ? Number(totals[skipper.index].gross.toFixed(1)) : 0}
+                  {totals[skipper.index]?.gross ? (event.raceFormat === 'handicap' ? Number(totals[skipper.index].gross.toFixed(1)) : Math.round(totals[skipper.index].gross)) : 0}
                 </td>
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
                   className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-bold ${isExportMode ? 'net-total' : 'text-blue-400'}`}
                   style={isExportMode ? { ...exportTdBase, fontWeight: 'bold' } : undefined}
                 >
-                  {totals[skipper.index]?.net ? Number(totals[skipper.index].net.toFixed(1)) : 0}
+                  {totals[skipper.index]?.net ? (event.raceFormat === 'handicap' ? Number(totals[skipper.index].net.toFixed(1)) : Math.round(totals[skipper.index].net)) : 0}
                 </td>
               </tr>
               {needsTwoRows && (
@@ -1658,7 +1660,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     if (ls) {
                       displayVal = getLetterScorePointsForRace(ls, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
                     } else if (pos !== null) {
-                      displayVal = pos;
+                      displayVal = event.raceFormat === 'handicap' ? pos : Math.round(pos);
                     } else if (withdrawnScore !== null) {
                       displayVal = withdrawnScore;
                     }
