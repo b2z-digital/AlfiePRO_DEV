@@ -65,6 +65,7 @@ interface RoundResult {
   raceResults: any[];
   skippers: any[];
   clubName: string;
+  clubId?: string;
   dropRules?: number[] | string;
   heatManagement?: any;
   numRaces?: number;
@@ -594,7 +595,7 @@ export const ResultsPage: React.FC = () => {
       const seriesIds = series.map(s => s.id);
       const { data: roundsData, error: roundsError } = await supabase
         .from('race_series_rounds')
-        .select('series_id, round_name, skippers, race_results, last_completed_race, completed, average_points_applied, manual_score_overrides')
+        .select('series_id, round_name, skippers, race_results, last_completed_race, completed, average_points_applied, manual_score_overrides, drop_rules, heat_management, num_races')
         .eq('club_id', currentClub.clubId)
         .in('series_id', seriesIds);
 
@@ -636,7 +637,10 @@ export const ResultsPage: React.FC = () => {
               lastCompletedRace: roundData.last_completed_race || round.lastCompletedRace || 0,
               completed: roundData.completed !== undefined ? roundData.completed : round.completed,
               averagePointsApplied: roundData.average_points_applied || round.averagePointsApplied,
-              manualScoreOverrides: roundData.manual_score_overrides || round.manualScoreOverrides
+              manualScoreOverrides: roundData.manual_score_overrides || round.manualScoreOverrides,
+              dropRules: roundData.drop_rules || round.dropRules,
+              heatManagement: roundData.heat_management || round.heatManagement,
+              numRaces: roundData.num_races || round.numRaces
             };
             // Debug log for Round 3
             if (round.name === 'Round 3') {
@@ -798,6 +802,7 @@ export const ResultsPage: React.FC = () => {
                 avatarUrl: memberAvatarMap[skipper.name] || skipper.avatarUrl
               })),
               clubName: s.clubName,
+              clubId: currentClub?.clubId,
               dropRules: round.dropRules,
               heatManagement: round.heatManagement,
               numRaces: round.numRaces
@@ -1941,7 +1946,11 @@ export const ResultsPage: React.FC = () => {
         raceFormat: selectedRound.raceFormat as any,
         completed: selectedRound.completed,
         raceResults: selectedRound.raceResults,
-        skippers: selectedRound.skippers
+        skippers: selectedRound.skippers,
+        dropRules: Array.isArray(selectedRound.dropRules) ? selectedRound.dropRules : undefined,
+        heatManagement: selectedRound.heatManagement,
+        numRaces: selectedRound.numRaces,
+        clubId: selectedRound.clubId
       };
 
       const hasResultsData = roundAsEvent.skippers && roundAsEvent.skippers.length > 0 && roundAsEvent.raceResults && roundAsEvent.raceResults.length > 0;
