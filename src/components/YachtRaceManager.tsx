@@ -3192,7 +3192,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           currentDay,
           finalHM,
           settings.numRaces,
-          settings.dropRules as number[]
+          settings.dropRules
         );
         console.log('✅ Heat management saved to database successfully');
 

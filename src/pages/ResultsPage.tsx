@@ -65,6 +65,10 @@ interface RoundResult {
   raceResults: any[];
   skippers: any[];
   clubName: string;
+  clubId?: string;
+  dropRules?: number[] | string;
+  heatManagement?: any;
+  numRaces?: number;
 }
 
 interface StandingsRow {
@@ -155,7 +159,8 @@ const computeEventStandings = (event: RaceEvent): EventStandings => {
 
     const gross = scores.reduce((sum, r) => sum + r.score, 0);
     let numDrops = 0;
-    const dropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
+    const rawDropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
+    const dropRules = Array.isArray(rawDropRules) ? rawDropRules : [4, 8, 16, 24, 32, 40];
     for (const threshold of dropRules) {
       if (scores.length >= threshold) numDrops++;
       else break;
@@ -396,6 +401,7 @@ export const ResultsPage: React.FC = () => {
   const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [clubFeaturedImage, setClubFeaturedImage] = useState<string | null>(null);
+  const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
   const [previousSidebarState, setPreviousSidebarState] = useState<string | null>(null);
   const [externalNationalEvents, setExternalNationalEvents] = useState<ExternalResultEvent[]>([]);
   const [externalStateEvents, setExternalStateEvents] = useState<ExternalResultEvent[]>([]);
@@ -441,11 +447,14 @@ export const ResultsPage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('clubs')
-        .select('featured_image_url')
+        .select('featured_image_url, logo')
         .eq('id', currentClub.clubId)
         .maybeSingle();
 
       if (!error && data) {
+        if (data.logo) {
+          setClubLogoUrl(data.logo);
+        }
         setClubFeaturedImage(data.featured_image_url);
       }
     } catch (err) {
@@ -586,7 +595,7 @@ export const ResultsPage: React.FC = () => {
       const seriesIds = series.map(s => s.id);
       const { data: roundsData, error: roundsError } = await supabase
         .from('race_series_rounds')
-        .select('series_id, round_name, skippers, race_results, last_completed_race, completed, average_points_applied, manual_score_overrides')
+        .select('series_id, round_name, skippers, race_results, last_completed_race, completed, average_points_applied, manual_score_overrides, drop_rules, heat_management, num_races')
         .eq('club_id', currentClub.clubId)
         .in('series_id', seriesIds);
 
@@ -628,7 +637,10 @@ export const ResultsPage: React.FC = () => {
               lastCompletedRace: roundData.last_completed_race || round.lastCompletedRace || 0,
               completed: roundData.completed !== undefined ? roundData.completed : round.completed,
               averagePointsApplied: roundData.average_points_applied || round.averagePointsApplied,
-              manualScoreOverrides: roundData.manual_score_overrides || round.manualScoreOverrides
+              manualScoreOverrides: roundData.manual_score_overrides || round.manualScoreOverrides,
+              dropRules: roundData.drop_rules || round.dropRules,
+              heatManagement: roundData.heat_management || round.heatManagement,
+              numRaces: roundData.num_races || round.numRaces
             };
             // Debug log for Round 3
             if (round.name === 'Round 3') {
@@ -789,7 +801,11 @@ export const ResultsPage: React.FC = () => {
                 ...skipper,
                 avatarUrl: memberAvatarMap[skipper.name] || skipper.avatarUrl
               })),
-              clubName: s.clubName
+              clubName: s.clubName,
+              clubId: currentClub?.clubId,
+              dropRules: round.dropRules,
+              heatManagement: round.heatManagement,
+              numRaces: round.numRaces
             });
           }
         });
@@ -1357,7 +1373,8 @@ export const ResultsPage: React.FC = () => {
           event: displayEvent,
           darkMode: false,
           isExportMode: true,
-          seriesName: selectedRound?.seriesName
+          seriesName: selectedRound?.seriesName,
+          clubLogoUrl: clubLogoUrl || undefined
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);
@@ -1434,7 +1451,8 @@ export const ResultsPage: React.FC = () => {
           event: displayEvent,
           darkMode: false,
           isExportMode: true,
-          seriesName: selectedRound?.seriesName
+          seriesName: selectedRound?.seriesName,
+          clubLogoUrl: clubLogoUrl || undefined
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);
@@ -1928,7 +1946,11 @@ export const ResultsPage: React.FC = () => {
         raceFormat: selectedRound.raceFormat as any,
         completed: selectedRound.completed,
         raceResults: selectedRound.raceResults,
-        skippers: selectedRound.skippers
+        skippers: selectedRound.skippers,
+        dropRules: Array.isArray(selectedRound.dropRules) ? selectedRound.dropRules : undefined,
+        heatManagement: selectedRound.heatManagement,
+        numRaces: selectedRound.numRaces,
+        clubId: selectedRound.clubId
       };
 
       const hasResultsData = roundAsEvent.skippers && roundAsEvent.skippers.length > 0 && roundAsEvent.raceResults && roundAsEvent.raceResults.length > 0;
