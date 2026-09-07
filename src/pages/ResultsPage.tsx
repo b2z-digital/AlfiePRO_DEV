@@ -423,6 +423,7 @@ export const ResultsPage: React.FC = () => {
   const [showHeatResultsModal, setShowHeatResultsModal] = useState(false);
   const [showSeriesEditModal, setShowSeriesEditModal] = useState(false);
   const [showShareExternalModal, setShowShareExternalModal] = useState(false);
+  const [handicapsVisible, setHandicapsVisible] = useState(true);
 
   useEffect(() => {
     loadData();
@@ -1377,6 +1378,7 @@ export const ResultsPage: React.FC = () => {
           event: displayEvent,
           darkMode: false,
           isExportMode: true,
+          showHandicapsProp: handicapsVisible,
           seriesName: selectedRound?.seriesName,
           clubLogoUrl: clubLogoUrl || undefined,
           clubAbbreviation: clubAbbreviation || undefined
@@ -1456,6 +1458,7 @@ export const ResultsPage: React.FC = () => {
           event: displayEvent,
           darkMode: false,
           isExportMode: true,
+          showHandicapsProp: handicapsVisible,
           seriesName: selectedRound?.seriesName,
           clubLogoUrl: clubLogoUrl || undefined,
           clubAbbreviation: clubAbbreviation || undefined
@@ -1782,6 +1785,7 @@ export const ResultsPage: React.FC = () => {
               event={displayEvent}
               darkMode={true}
               isExportMode={false}
+              onShowHandicapsChange={setHandicapsVisible}
               onEventUpdate={(updatedEvent) => {
                 setSelectedEvent(updatedEvent);
                 // Also update the event in the allEvents array
@@ -2098,6 +2102,7 @@ export const ResultsPage: React.FC = () => {
               event={roundAsEvent}
               darkMode={true}
               isExportMode={false}
+              onShowHandicapsChange={setHandicapsVisible}
               onEventUpdate={(updatedEvent) => {
                 // Update the round with the new display settings
                 const updatedRound = {
@@ -2785,6 +2790,7 @@ export const ResultsPage: React.FC = () => {
           eventResults={selectedEvent?.raceResults || selectedRound?.raceResults}
           eventSkippers={selectedEvent?.skippers || selectedRound?.skippers}
           eventMedia={selectedEvent?.media || selectedRound?.media || selectedSeries?.media || []}
+          showHandicaps={handicapsVisible}
         />
       )}
 

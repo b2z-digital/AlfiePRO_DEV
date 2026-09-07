@@ -18,18 +18,22 @@ interface EventResultsDisplayProps {
   event: RaceEvent;
   darkMode?: boolean;
   isExportMode?: boolean;
+  showHandicapsProp?: boolean;
   seriesName?: string;
   onEventUpdate?: (event: RaceEvent) => void;
   clubLogoUrl?: string;
   clubAbbreviation?: string;
+  onShowHandicapsChange?: (show: boolean) => void;
 }
 
 export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   event,
   darkMode = true,
   isExportMode = false,
+  showHandicapsProp,
   seriesName,
   onEventUpdate,
+  onShowHandicapsChange,
   clubLogoUrl,
   clubAbbreviation
 }) => {
@@ -41,7 +45,11 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [enrichedEvent, setEnrichedEvent] = useState<RaceEvent>(event);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showHandicaps, setShowHandicaps] = useState(true);
+  const [showHandicaps, setShowHandicapsState] = useState(showHandicapsProp !== undefined ? showHandicapsProp : true);
+  const setShowHandicaps = (val: boolean) => {
+    setShowHandicapsState(val);
+    onShowHandicapsChange?.(val);
+  };
 
   // Enrich skipper data with member information
   useEffect(() => {
@@ -1139,7 +1147,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 <button
                   onClick={() => setShowHandicaps(!showHandicaps)}
                   className={`p-3 rounded-lg transition-colors flex items-center gap-2 ${
-                    showHandicaps
+                    !showHandicaps
                       ? 'bg-blue-600 hover:bg-blue-700 text-white'
                       : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                   }`}
