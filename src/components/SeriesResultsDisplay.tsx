@@ -159,14 +159,15 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
         if (r.letterScore) {
           // Special case for RDGfix
           if (r.letterScore === 'RDGfix' && r.position !== null) {
-            return { race: r.race, score: r.position, isDNE: false, isLetterScore: true };
+            const score = series.raceFormat === 'handicap' ? r.position : Math.round(r.position);
+            return { race: r.race, score, isDNE: false, isLetterScore: true };
           }
 
           // For RDG and DPI with custom points, use the custom points
           if ((r.letterScore === 'RDG' || r.letterScore === 'DPI') && r.customPoints !== undefined && r.customPoints !== null) {
             return {
               race: r.race,
-              score: r.customPoints,
+              score: series.raceFormat === 'handicap' ? r.customPoints : Math.round(r.customPoints),
               isDNE: false,
               isLetterScore: true
             };
@@ -781,7 +782,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
             // For RDG and DPI with custom points, use the custom points
             if ((result.letterScore === 'RDG' || result.letterScore === 'DPI') && result.customPoints !== undefined && result.customPoints !== null) {
               raceScores.push({
-                score: result.customPoints,
+                score: series.raceFormat === 'handicap' ? result.customPoints : Math.round(result.customPoints),
                 isDNE: false,
                 isLetterScore: true
               });

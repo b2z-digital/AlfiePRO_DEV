@@ -437,7 +437,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
             if ((r.letterScore === 'RDG' || r.letterScore === 'DPI') && r.customPoints !== undefined && r.customPoints !== null) {
               return {
                 race: r.race,
-                score: r.customPoints,
+                score: enrichedEvent.raceFormat === 'handicap' ? r.customPoints : Math.round(r.customPoints),
                 isDNE: false,
                 isLetterScore: true
               };
