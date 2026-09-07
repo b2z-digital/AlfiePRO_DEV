@@ -99,7 +99,7 @@ export const calculateScratchResults = (
 };
 
 export const getLetterScorePointsForRace = (letterScore: string, race: number, raceResults: any[], skippers: any[], skipperIndex?: number): number => {
-  const customCodes = ['RDG', 'DPI', 'ZFP', 'SCP'];
+  const customCodes = ['RDG', 'DPI', 'ZFP', 'SCP', 'ROD'];
   if (customCodes.includes(letterScore) && skipperIndex !== undefined) {
     const result = raceResults.find(r => r.race === race && r.skipperIndex === skipperIndex);
     if (result && result.customPoints !== undefined && result.customPoints !== null) {

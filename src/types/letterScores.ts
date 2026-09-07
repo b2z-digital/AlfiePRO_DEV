@@ -1,4 +1,4 @@
-export type LetterScore = 'DNS' | 'DNF' | 'DSQ' | 'OCS' | 'BFD' | 'UFD' | 'RDG' | 'DPI' | 'ZFP' | 'SCP' | 'RET' | 'DNC' | 'DNE' | 'NSC' | 'WDN';
+export type LetterScore = 'DNS' | 'DNF' | 'DSQ' | 'OCS' | 'BFD' | 'UFD' | 'RDG' | 'DPI' | 'ZFP' | 'SCP' | 'RET' | 'DNC' | 'DNE' | 'NSC' | 'WDN' | 'ROD';
 
 export type HMSPointsType = 'heat_plus_one' | 'entrants_plus_one' | 'manual' | 'percentage_penalty' | 'scoring_penalty';
 
@@ -132,6 +132,14 @@ export const letterScoreDefinitions: LetterScoreDefinition[] = [
     pointsCalculation: 'manual',
     isDiscardable: false,
     countsAsStarter: true
+  },
+  {
+    code: 'ROD',
+    name: 'RO Duty',
+    description: 'Skipper taking a turn as Race Officer receives average points',
+    pointsCalculation: 'manual',
+    isDiscardable: true,
+    countsAsStarter: false
   }
 ];
 
@@ -204,5 +212,6 @@ export function getLetterScoreDisplayCode(letterScore: string | null | undefined
     if (customPoints === -3) return 'RGS';
     return 'RDG';
   }
+  if (letterScore === 'ROD') return 'ROD';
   return letterScore;
 }
