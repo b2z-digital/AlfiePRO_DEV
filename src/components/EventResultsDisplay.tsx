@@ -18,18 +18,24 @@ interface EventResultsDisplayProps {
   event: RaceEvent;
   darkMode?: boolean;
   isExportMode?: boolean;
+  showHandicapsProp?: boolean;
   seriesName?: string;
   onEventUpdate?: (event: RaceEvent) => void;
   clubLogoUrl?: string;
+  clubAbbreviation?: string;
+  onShowHandicapsChange?: (show: boolean) => void;
 }
 
 export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   event,
   darkMode = true,
   isExportMode = false,
+  showHandicapsProp,
   seriesName,
   onEventUpdate,
-  clubLogoUrl
+  onShowHandicapsChange,
+  clubLogoUrl,
+  clubAbbreviation
 }) => {
   const [expandedSkipper, setExpandedSkipper] = useState<number | null>(null);
   const [raceReport, setRaceReport] = useState<any>(null);
@@ -39,7 +45,11 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [enrichedEvent, setEnrichedEvent] = useState<RaceEvent>(event);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showHandicaps, setShowHandicaps] = useState(true);
+  const [showHandicaps, setShowHandicapsState] = useState(showHandicapsProp !== undefined ? showHandicapsProp : true);
+  const setShowHandicaps = (val: boolean) => {
+    setShowHandicapsState(val);
+    onShowHandicapsChange?.(val);
+  };
 
   // Enrich skipper data with member information
   useEffect(() => {
@@ -420,20 +430,22 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
         .filter(r => raceNumbers.includes(r.race)) // Only include completed races
         .map(r => {
           if (r.position !== null && !r.letterScore) {
-            return { race: r.race, score: r.position, isDNE: false, isLetterScore: false };
+            const score = enrichedEvent.raceFormat === 'handicap' ? r.position : Math.round(r.position);
+            return { race: r.race, score, isDNE: false, isLetterScore: false };
           }
 
           if (r.letterScore) {
             // Special case for RDGfix
             if (r.letterScore === 'RDGfix' && r.position !== null) {
-              return { race: r.race, score: r.position, isDNE: false, isLetterScore: true };
+              const score = enrichedEvent.raceFormat === 'handicap' ? r.position : Math.round(r.position);
+              return { race: r.race, score, isDNE: false, isLetterScore: true };
             }
 
             // For RDG and DPI with custom points, use the custom points
             if ((r.letterScore === 'RDG' || r.letterScore === 'DPI') && r.customPoints !== undefined && r.customPoints !== null) {
               return {
                 race: r.race,
-                score: r.customPoints,
+                score: enrichedEvent.raceFormat === 'handicap' ? r.customPoints : Math.floor(r.customPoints),
                 isDNE: false,
                 isLetterScore: true
               };
@@ -446,7 +458,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
             return {
               race: r.race,
-              score: getLetterScoreValue(r.letterScore as LetterScore, raceFinishers, skippers.length),
+              score: enrichedEvent.raceFormat === 'handicap' ? getLetterScoreValue(r.letterScore as LetterScore, raceFinishers, skippers.length) : Math.round(getLetterScoreValue(r.letterScore as LetterScore, raceFinishers, skippers.length)),
               isDNE: r.letterScore === 'DNE',
               isLetterScore: true
             };
@@ -1088,25 +1100,25 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
               <img
                 src={clubLogoUrl}
                 alt="Club logo"
-                style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '6px', flexShrink: 0 }}
+                style={{ width: '80px', height: '80px', objectFit: 'contain', borderRadius: '6px', flexShrink: 0 }}
                 crossOrigin="anonymous"
               />
             )}
-            <div style={{ flex: 1, textAlign: clubLogoUrl ? 'left' : 'center' }}>
-              <div className="event-title" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div className="event-title" style={{ textAlign: 'center' }}>
                 {event.eventName || event.clubName}
               </div>
               {seriesName ? (
-                <div className="event-series-name" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
+                <div className="event-series-name" style={{ textAlign: 'center' }}>
                   {seriesName}
                 </div>
               ) : (
-                <div className="event-subtitle" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
+                <div className="event-subtitle" style={{ textAlign: 'center' }}>
                   {event.raceClass} - {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
                 </div>
               )}
-              <div className="event-details" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
-                {formatDate(event.date)} - {event.venue}
+              <div className="event-details" style={{ textAlign: 'center' }}>
+                {formatDate(event.date)} - {event.venue}{clubAbbreviation ? ` - ${clubAbbreviation}` : ''}
               </div>
             </div>
           </div>
@@ -1135,13 +1147,13 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 <button
                   onClick={() => setShowHandicaps(!showHandicaps)}
                   className={`p-3 rounded-lg transition-colors flex items-center gap-2 ${
-                    showHandicaps
+                    !showHandicaps
                       ? 'bg-blue-600 hover:bg-blue-700 text-white'
                       : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                   }`}
                   title={showHandicaps ? 'Hide handicap values' : 'Show handicap values'}
                 >
-                  <span className="text-sm">{showHandicaps ? 'Handicaps On' : 'Handicaps Off'}</span>
+                  <span className="text-sm">{showHandicaps ? 'Handicaps Off' : 'Handicaps On'}</span>
                 </button>
               )}
               <button
@@ -1377,7 +1389,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     ${isExportMode ? '' : 'hover:bg-slate-700/30 cursor-pointer transition-colors'}
                     ${expandedSkipper === skipper.index ? 'bg-slate-700/50' : ''}
                   `}
-                  style={isExportMode ? {} : undefined}
+                  style={isExportMode ? { verticalAlign: 'middle' } : undefined}
                 >
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
@@ -1512,10 +1524,10 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
                   let displayValue: string | number = '-';
                   if (letterScore) {
-                    // Show points for letter scores (with custom points support for RDG/DPI)
-                    displayValue = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                    const lsPoints = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                    displayValue = event.raceFormat === 'handicap' ? lsPoints : Math.round(lsPoints);
                   } else if (position !== null) {
-                    displayValue = position;
+                    displayValue = event.raceFormat === 'handicap' ? position : Math.round(position);
                   } else if (withdrawnScore !== null) {
                     displayValue = withdrawnScore;
                   }
@@ -1535,7 +1547,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     >
                       {letterScore ? (
                         (() => {
-                          const points = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                          const rawPts = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                          const points = event.raceFormat === 'handicap' ? rawPts : Math.round(rawPts);
                           return isExportMode ? <>{points}</> : <span>{points}</span>;
                         })()
                       ) : event.raceFormat === 'handicap' && showHandicaps && (position || withdrawnScore) ? (
@@ -1574,7 +1587,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             {/* Handicap at top-right */}
                             <span style={{
                               position: 'absolute',
-                              top: '4px',
+                              top: '2px',
                               right: '6px',
                               fontSize: '10px',
                               fontWeight: '600',
@@ -1587,7 +1600,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             {/* Position at bottom-left */}
                             <span style={{
                               position: 'absolute',
-                              bottom: '12px',
+                              bottom: '4px',
                               left: '6px',
                               fontSize: '18px',
                               fontWeight: 'bold',
@@ -1634,18 +1647,18 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-semibold ${isExportMode ? 'text-black' : 'text-slate-300'}`}
                   style={isExportMode ? { ...exportTdBase } : undefined}
                 >
-                  {totals[skipper.index]?.gross ? Number(totals[skipper.index].gross.toFixed(1)) : 0}
+                  {totals[skipper.index]?.gross ? (event.raceFormat === 'handicap' ? Number(totals[skipper.index].gross.toFixed(1)) : Math.round(totals[skipper.index].gross)) : 0}
                 </td>
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
                   className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-bold ${isExportMode ? 'net-total' : 'text-blue-400'}`}
                   style={isExportMode ? { ...exportTdBase, fontWeight: 'bold' } : undefined}
                 >
-                  {totals[skipper.index]?.net ? Number(totals[skipper.index].net.toFixed(1)) : 0}
+                  {totals[skipper.index]?.net ? (event.raceFormat === 'handicap' ? Number(totals[skipper.index].net.toFixed(1)) : Math.round(totals[skipper.index].net)) : 0}
                 </td>
               </tr>
               {needsTwoRows && (
-                <tr style={isExportMode ? {} : undefined}>
+                <tr style={isExportMode ? { verticalAlign: 'middle' } : undefined}>
                   {row2Races.map(raceNum => {
                     const { position: pos, letterScore: ls } = getPositionForRace(raceNum, skipper.index);
                     const isDropped = drops[`${skipper.index}-${raceNum}`];
@@ -1654,9 +1667,10 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     const withdrawnScore = skipperWithdrawn ? (enrichedEvent.skippers?.length || 0) + 1 : null;
                     let displayVal: string | number = '-';
                     if (ls) {
-                      displayVal = getLetterScorePointsForRace(ls, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                      const lsPts = getLetterScorePointsForRace(ls, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                      displayVal = event.raceFormat === 'handicap' ? lsPts : Math.round(lsPts);
                     } else if (pos !== null) {
-                      displayVal = pos;
+                      displayVal = event.raceFormat === 'handicap' ? pos : Math.round(pos);
                     } else if (withdrawnScore !== null) {
                       displayVal = withdrawnScore;
                     }

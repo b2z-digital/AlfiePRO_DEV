@@ -171,6 +171,7 @@ export function usePermissions() {
       const scorerPermissions: Permission[] = [
         'races.score',
         'races.view',
+        'reports.create',
         'venues.view',
         'dashboard.edit',
       ];

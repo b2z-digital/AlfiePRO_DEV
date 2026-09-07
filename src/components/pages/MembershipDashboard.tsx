@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { Users, TrendingUp, Calendar, Settings, FileText, ListFilter as Filter, ChartBar as BarChart2, ChartPie as PieChart, Activity, UserCheck, Globe, CreditCard, Mail, Check, TriangleAlert as AlertTriangle, ClipboardList, Shield } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { onDataChange } from '../../utils/dataEvents';
 import { useAuth } from '../../contexts/AuthContext';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
@@ -102,60 +103,16 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
     }
   }, [activeTab]);
 
-  // Subscribe to realtime changes for action counts
+  // Listen for data change events (fired by the universal mutation interceptor)
+  // instead of opening 3 additional realtime channels that duplicate DashboardLayout
   useEffect(() => {
     if (!currentClub?.clubId) return;
 
-    const applicationsChannel = supabase
-      .channel('membership-apps-tab-changes')
-      .on('postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'membership_applications',
-          filter: `club_id=eq.${currentClub.clubId}`
-        },
-        () => {
-          fetchActionCounts();
-        }
-      )
-      .subscribe();
-
-    const membersChannel = supabase
-      .channel('members-tab-changes')
-      .on('postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'members',
-          filter: `club_id=eq.${currentClub.clubId}`
-        },
-        () => {
-          fetchActionCounts();
-        }
-      )
-      .subscribe();
-
-    const remittancesChannel = supabase
-      .channel('remittances-tab-changes')
-      .on('postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'membership_remittances',
-          filter: `club_id=eq.${currentClub.clubId}`
-        },
-        () => {
-          fetchActionCounts();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(applicationsChannel);
-      supabase.removeChannel(membersChannel);
-      supabase.removeChannel(remittancesChannel);
-    };
+    return onDataChange((table) => {
+      if (table === 'membership_applications' || table === 'members' || table === 'membership_remittances') {
+        fetchActionCounts();
+      }
+    });
   }, [currentClub?.clubId]);
 
   const fetchDashboardData = async () => {

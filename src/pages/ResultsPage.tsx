@@ -402,6 +402,7 @@ export const ResultsPage: React.FC = () => {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [clubFeaturedImage, setClubFeaturedImage] = useState<string | null>(null);
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
+  const [clubAbbreviation, setClubAbbreviation] = useState<string | null>(null);
   const [previousSidebarState, setPreviousSidebarState] = useState<string | null>(null);
   const [externalNationalEvents, setExternalNationalEvents] = useState<ExternalResultEvent[]>([]);
   const [externalStateEvents, setExternalStateEvents] = useState<ExternalResultEvent[]>([]);
@@ -422,6 +423,7 @@ export const ResultsPage: React.FC = () => {
   const [showHeatResultsModal, setShowHeatResultsModal] = useState(false);
   const [showSeriesEditModal, setShowSeriesEditModal] = useState(false);
   const [showShareExternalModal, setShowShareExternalModal] = useState(false);
+  const [handicapsVisible, setHandicapsVisible] = useState(true);
 
   useEffect(() => {
     loadData();
@@ -447,13 +449,16 @@ export const ResultsPage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('clubs')
-        .select('featured_image_url, logo')
+        .select('featured_image_url, logo, abbreviation')
         .eq('id', currentClub.clubId)
         .maybeSingle();
 
       if (!error && data) {
         if (data.logo) {
           setClubLogoUrl(data.logo);
+        }
+        if (data.abbreviation) {
+          setClubAbbreviation(data.abbreviation);
         }
         setClubFeaturedImage(data.featured_image_url);
       }
@@ -1373,8 +1378,10 @@ export const ResultsPage: React.FC = () => {
           event: displayEvent,
           darkMode: false,
           isExportMode: true,
+          showHandicapsProp: handicapsVisible,
           seriesName: selectedRound?.seriesName,
-          clubLogoUrl: clubLogoUrl || undefined
+          clubLogoUrl: clubLogoUrl || undefined,
+          clubAbbreviation: clubAbbreviation || undefined
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);
@@ -1451,8 +1458,10 @@ export const ResultsPage: React.FC = () => {
           event: displayEvent,
           darkMode: false,
           isExportMode: true,
+          showHandicapsProp: handicapsVisible,
           seriesName: selectedRound?.seriesName,
-          clubLogoUrl: clubLogoUrl || undefined
+          clubLogoUrl: clubLogoUrl || undefined,
+          clubAbbreviation: clubAbbreviation || undefined
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);
@@ -1776,6 +1785,7 @@ export const ResultsPage: React.FC = () => {
               event={displayEvent}
               darkMode={true}
               isExportMode={false}
+              onShowHandicapsChange={setHandicapsVisible}
               onEventUpdate={(updatedEvent) => {
                 setSelectedEvent(updatedEvent);
                 // Also update the event in the allEvents array
@@ -2092,6 +2102,7 @@ export const ResultsPage: React.FC = () => {
               event={roundAsEvent}
               darkMode={true}
               isExportMode={false}
+              onShowHandicapsChange={setHandicapsVisible}
               onEventUpdate={(updatedEvent) => {
                 // Update the round with the new display settings
                 const updatedRound = {
@@ -2779,6 +2790,7 @@ export const ResultsPage: React.FC = () => {
           eventResults={selectedEvent?.raceResults || selectedRound?.raceResults}
           eventSkippers={selectedEvent?.skippers || selectedRound?.skippers}
           eventMedia={selectedEvent?.media || selectedRound?.media || selectedSeries?.media || []}
+          showHandicaps={handicapsVisible}
         />
       )}
 

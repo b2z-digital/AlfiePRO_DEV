@@ -211,21 +211,10 @@ export const Conversations: React.FC<ConversationsProps> = ({
     };
     getOrCreateChannel(channelName, (ch) =>
       ch.on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'conversations',
-      }, () => {
-        debouncedFetchChats();
-      }).on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'conversation_messages',
-      }, () => {
-        debouncedFetchChats();
-      }).on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'conversation_participants',
+        filter: `user_id=eq.${viewingUserId}`,
       }, () => {
         debouncedFetchChats();
       }).on('postgres_changes', {

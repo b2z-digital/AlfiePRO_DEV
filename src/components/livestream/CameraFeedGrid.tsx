@@ -100,7 +100,7 @@ export const CameraFeedGrid = forwardRef<CameraFeedGridRef, CameraFeedGridProps>
         }
       };
 
-      const channelName = `viewer-${camera.id}-${Date.now()}`;
+      const channelName = `viewer-${camera.id}`;
       const channel = supabase.channel(channelName)
         .on('postgres_changes', {
           event: 'INSERT',

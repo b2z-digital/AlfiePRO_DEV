@@ -37,6 +37,7 @@ interface PublishToMetaModalProps {
   eventResults?: any[];
   eventSkippers?: any[];
   eventMedia?: any[];
+  showHandicaps?: boolean;
 }
 
 export const PublishToMetaModal: React.FC<PublishToMetaModalProps> = ({
@@ -49,7 +50,8 @@ export const PublishToMetaModal: React.FC<PublishToMetaModalProps> = ({
   resultsRef,
   eventResults,
   eventSkippers,
-  eventMedia = []
+  eventMedia,
+  showHandicaps
 }) => {
   const { addNotification } = useNotifications();
   const [message, setMessage] = useState(
@@ -135,7 +137,7 @@ Stephen Walsh emerged victorious, showcasing consistent sailing despite the shif
 
         root = createRoot(rootElement);
         root.render(
-          <EventResultsDisplay event={mockEvent} darkMode={false} isExportMode={true} />
+          <EventResultsDisplay event={mockEvent} darkMode={false} isExportMode={true} showHandicapsProp={showHandicaps} />
         );
       } else if (resultsRef?.current) {
         // If we don't have direct access to results and skippers, use the resultsRef
