@@ -52,6 +52,7 @@
 .results-export-container tbody tr {
   background-color: transparent !important;
   height: 28px !important;
+  vertical-align: middle !important;
 }
 
 .results-export-container thead tr {

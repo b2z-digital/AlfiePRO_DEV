@@ -21,6 +21,7 @@ interface EventResultsDisplayProps {
   seriesName?: string;
   onEventUpdate?: (event: RaceEvent) => void;
   clubLogoUrl?: string;
+  clubAbbreviation?: string;
 }
 
 export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
@@ -29,7 +30,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   isExportMode = false,
   seriesName,
   onEventUpdate,
-  clubLogoUrl
+  clubLogoUrl,
+  clubAbbreviation
 }) => {
   const [expandedSkipper, setExpandedSkipper] = useState<number | null>(null);
   const [raceReport, setRaceReport] = useState<any>(null);
@@ -1088,25 +1090,25 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
               <img
                 src={clubLogoUrl}
                 alt="Club logo"
-                style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '6px', flexShrink: 0 }}
+                style={{ width: '80px', height: '80px', objectFit: 'contain', borderRadius: '6px', flexShrink: 0 }}
                 crossOrigin="anonymous"
               />
             )}
-            <div style={{ flex: 1, textAlign: clubLogoUrl ? 'left' : 'center' }}>
-              <div className="event-title" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div className="event-title" style={{ textAlign: 'center' }}>
                 {event.eventName || event.clubName}
               </div>
               {seriesName ? (
-                <div className="event-series-name" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
+                <div className="event-series-name" style={{ textAlign: 'center' }}>
                   {seriesName}
                 </div>
               ) : (
-                <div className="event-subtitle" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
+                <div className="event-subtitle" style={{ textAlign: 'center' }}>
                   {event.raceClass} - {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
                 </div>
               )}
-              <div className="event-details" style={{ textAlign: clubLogoUrl ? 'left' : 'center' }}>
-                {formatDate(event.date)} - {event.venue}
+              <div className="event-details" style={{ textAlign: 'center' }}>
+                {formatDate(event.date)} - {event.venue}{clubAbbreviation ? ` - ${clubAbbreviation}` : ''}
               </div>
             </div>
           </div>
@@ -1377,7 +1379,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     ${isExportMode ? '' : 'hover:bg-slate-700/30 cursor-pointer transition-colors'}
                     ${expandedSkipper === skipper.index ? 'bg-slate-700/50' : ''}
                   `}
-                  style={isExportMode ? {} : undefined}
+                  style={isExportMode ? { verticalAlign: 'middle' } : undefined}
                 >
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
@@ -1645,7 +1647,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 </td>
               </tr>
               {needsTwoRows && (
-                <tr style={isExportMode ? {} : undefined}>
+                <tr style={isExportMode ? { verticalAlign: 'middle' } : undefined}>
                   {row2Races.map(raceNum => {
                     const { position: pos, letterScore: ls } = getPositionForRace(raceNum, skipper.index);
                     const isDropped = drops[`${skipper.index}-${raceNum}`];

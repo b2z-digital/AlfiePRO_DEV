@@ -402,6 +402,7 @@ export const ResultsPage: React.FC = () => {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [clubFeaturedImage, setClubFeaturedImage] = useState<string | null>(null);
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
+  const [clubAbbreviation, setClubAbbreviation] = useState<string | null>(null);
   const [previousSidebarState, setPreviousSidebarState] = useState<string | null>(null);
   const [externalNationalEvents, setExternalNationalEvents] = useState<ExternalResultEvent[]>([]);
   const [externalStateEvents, setExternalStateEvents] = useState<ExternalResultEvent[]>([]);
@@ -447,13 +448,16 @@ export const ResultsPage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('clubs')
-        .select('featured_image_url, logo')
+        .select('featured_image_url, logo, abbreviation')
         .eq('id', currentClub.clubId)
         .maybeSingle();
 
       if (!error && data) {
         if (data.logo) {
           setClubLogoUrl(data.logo);
+        }
+        if (data.abbreviation) {
+          setClubAbbreviation(data.abbreviation);
         }
         setClubFeaturedImage(data.featured_image_url);
       }
@@ -1374,7 +1378,8 @@ export const ResultsPage: React.FC = () => {
           darkMode: false,
           isExportMode: true,
           seriesName: selectedRound?.seriesName,
-          clubLogoUrl: clubLogoUrl || undefined
+          clubLogoUrl: clubLogoUrl || undefined,
+          clubAbbreviation: clubAbbreviation || undefined
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);
@@ -1452,7 +1457,8 @@ export const ResultsPage: React.FC = () => {
           darkMode: false,
           isExportMode: true,
           seriesName: selectedRound?.seriesName,
-          clubLogoUrl: clubLogoUrl || undefined
+          clubLogoUrl: clubLogoUrl || undefined,
+          clubAbbreviation: clubAbbreviation || undefined
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);
