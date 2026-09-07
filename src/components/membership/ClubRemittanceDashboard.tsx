@@ -171,7 +171,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [currentClub?.clubId, selectedYear, selectedStatus]);
+  }, [currentClub?.clubId]);
 
   const loadData = async () => {
     if (!currentClub?.clubId) return;

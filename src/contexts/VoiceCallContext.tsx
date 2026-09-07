@@ -141,11 +141,11 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
     subscriptionRef.current = channel;
 
-    // Polling fallback: check for ringing calls every 3 seconds
-    // This catches cases where realtime subscription misses the event
+    // Polling fallback: check for ringing calls periodically
+    // Only needed as a safety net if the realtime subscription misses an event
     pollingRef.current = setInterval(async () => {
       const currentState = voiceCallEngine.getCallState();
-      if (currentState) return; // Already in a call
+      if (currentState) return;
 
       const { data: ringingCalls } = await supabase
         .from('voice_calls')
@@ -159,7 +159,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       if (ringingCalls && ringingCalls.length > 0) {
         await handleIncomingCallRecord(ringingCalls[0]);
       }
-    }, 3000);
+    }, 30000);
 
     // Listen for incoming group calls
     const groupChannel = supabase.channel(`group-calls-incoming-${user.id}`)

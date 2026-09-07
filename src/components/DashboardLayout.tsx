@@ -349,33 +349,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     fetchUnreadCommunityCount();
   }, [currentClub]);
 
-  // Subscribe to realtime changes on members table
-  useEffect(() => {
-    if (!currentClub?.clubId) return;
-
-    const channelName = `dashboard-members-${currentClub.clubId}`;
-    const channel = getOrCreateChannel(channelName, (ch) =>
-      ch.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'members',
-          filter: `club_id=eq.${currentClub.clubId}`,
-        },
-        () => {
-          // Refresh stats when members change
-          loadStats();
-        }
-      )
-      .subscribe()
-    );
-
-    return () => {
-      removeChannelByName(channelName);
-    };
-  }, [currentClub?.clubId]);
-
   useEffect(() => {
     // Refresh counts when navigating between pages
     fetchUnreadNotificationsCount();
@@ -384,119 +357,61 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     fetchUnreadCommunityCount();
   }, [location.pathname]);
 
+  // Consolidated realtime subscriptions — 4 channels instead of 12
+  // Each channel multiplexes related listeners to reduce connection pressure
   useEffect(() => {
-    // Subscribe to notifications and tasks changes
-    // ONLY depend on IDs, not full objects - this prevents unnecessary channel recreation
     if (!user?.id || !currentClub?.clubId) return;
 
     const userId = user.id;
     const clubId = currentClub.clubId;
 
-    const channels = [
-      {
-        name: `notifications-${userId}`,
-        setup: (ch: any) => ch.on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`
-        }, () => fetchUnreadNotificationsCount()).subscribe()
-      },
-      {
-        name: `tasks-${userId}`,
-        setup: (ch: any) => ch.on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'club_tasks'
-        }, () => fetchUnreadTasksCount()).subscribe()
-      },
-      {
-        name: `task-comments-${userId}`,
-        setup: (ch: any) => ch.on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'task_comments'
-        }, () => fetchUnreadTasksCount()).subscribe()
-      },
-      {
-        name: `membership-apps-${clubId}`,
-        setup: (ch: any) => ch.on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'membership_applications',
-          filter: `club_id=eq.${clubId}`
-        }, () => fetchMembershipActionCount()).subscribe()
-      },
-      {
-        name: `members-payment-${clubId}`,
-        setup: (ch: any) => ch.on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'members',
-          filter: `club_id=eq.${clubId}`
-        }, () => fetchMembershipActionCount()).subscribe()
-      },
-      {
-        name: `remittances-${clubId}`,
-        setup: (ch: any) => ch.on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'membership_remittances',
-          filter: `club_id=eq.${clubId}`
-        }, () => fetchMembershipActionCount()).subscribe()
-      },
-      {
-        name: `conversation-messages-${userId}`,
-        setup: (ch: any) => ch.on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'conversation_messages'
-        }, () => fetchUnreadConversationsCount()).subscribe()
-      },
-      {
-        name: `conversation-participants-${userId}`,
-        setup: (ch: any) => ch.on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conversation_participants',
-          filter: `user_id=eq.${userId}`
-        }, () => fetchUnreadConversationsCount()).subscribe()
-      },
-      {
-        name: `voice-calls-unread-${userId}`,
-        setup: (ch: any) => ch.on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'voice_calls',
-          filter: `callee_id=eq.${userId}`
-        }, (payload: any) => {
+    const channelNames = [
+      `dash-user-${userId}`,
+      `dash-club-${clubId}`,
+      `dash-comms-${userId}`,
+      `dash-social-${userId}`,
+    ];
+
+    // Channel 1: User-scoped events (notifications, tasks)
+    getOrCreateChannel(channelNames[0], (ch) =>
+      ch
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, () => fetchUnreadNotificationsCount())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'club_tasks', filter: `club_id=eq.${clubId}` }, () => fetchUnreadTasksCount())
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'task_comments', filter: `club_id=eq.${clubId}` }, () => fetchUnreadTasksCount())
+        .subscribe()
+    );
+
+    // Channel 2: Club membership events (members, applications, remittances)
+    getOrCreateChannel(channelNames[1], (ch) =>
+      ch
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `club_id=eq.${clubId}` }, () => { loadStats(); fetchMembershipActionCount(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'membership_applications', filter: `club_id=eq.${clubId}` }, () => fetchMembershipActionCount())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'membership_remittances', filter: `club_id=eq.${clubId}` }, () => fetchMembershipActionCount())
+        .subscribe()
+    );
+
+    // Channel 3: Communications (conversations, voice calls)
+    getOrCreateChannel(channelNames[2], (ch) =>
+      ch
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversation_participants', filter: `user_id=eq.${userId}` }, () => fetchUnreadConversationsCount())
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'voice_calls', filter: `callee_id=eq.${userId}` }, (payload: any) => {
           const call = payload.new;
           if (call?.status === 'missed' || call?.status === 'declined' || call?.status === 'ended') {
             setTimeout(() => fetchUnreadConversationsCount(), 500);
           }
-        }).subscribe()
-      },
-      {
-        name: `social-notifications-${userId}`,
-        setup: (ch: any) => ch.on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'social_notifications',
-          filter: `user_id=eq.${userId}`
-        }, () => fetchUnreadCommunityCount()).subscribe()
-      }
-    ];
+        })
+        .subscribe()
+    );
 
-    // Create all channels
-    channels.forEach(({ name, setup }) => {
-      getOrCreateChannel(name, setup);
-    });
+    // Channel 4: Social/community notifications
+    getOrCreateChannel(channelNames[3], (ch) =>
+      ch
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'social_notifications', filter: `user_id=eq.${userId}` }, () => fetchUnreadCommunityCount())
+        .subscribe()
+    );
 
     return () => {
-      // Cleanup all channels
-      channels.forEach(({ name }) => {
-        removeChannelByName(name);
-      });
+      channelNames.forEach(name => removeChannelByName(name));
     };
   }, [user?.id, currentClub?.clubId]);
 

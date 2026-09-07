@@ -670,7 +670,7 @@ export const socialStorage = {
 
   subscribeToNotifications(userId: string, callback: (payload: any) => void) {
     const channel = supabase
-      .channel(`notifications-${userId}`)
+      .channel(`social-notifs-${userId}`)
       .on(
         'postgres_changes',
         {
