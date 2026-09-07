@@ -1,5 +1,56 @@
 import { LetterScore, isEntrantsPlusOne } from '../types/letterScores';
 
+const AVERAGE_SENTINEL = -1;
+
+export const resolveAveragePoints = (
+  skipperIndex: number,
+  raceResults: any[],
+  skippersCount: number,
+  excludeRace?: number
+): number => {
+  const skipperResults = raceResults.filter(r => r.skipperIndex === skipperIndex);
+  const normalScores: number[] = [];
+
+  for (const result of skipperResults) {
+    if (excludeRace !== undefined && result.race === excludeRace) continue;
+    if (result.letterScore === 'ROD') continue;
+    if (result.customPoints !== undefined && result.customPoints !== null && result.customPoints === AVERAGE_SENTINEL) continue;
+    if (result.letterScore === 'RDG' && result.customPoints !== undefined && result.customPoints < 0) continue;
+
+    let pts: number;
+    if (result.customPoints !== undefined && result.customPoints !== null && result.customPoints >= 0) {
+      pts = result.customPoints;
+    } else if (result.position !== null && result.position > 0) {
+      pts = result.position;
+    } else if (result.letterScore) {
+      if (isEntrantsPlusOne(result.letterScore as LetterScore)) {
+        pts = skippersCount + 1;
+      } else {
+        pts = skippersCount + 1;
+      }
+    } else {
+      continue;
+    }
+    normalScores.push(pts);
+  }
+
+  if (normalScores.length === 0) return skippersCount + 1;
+  return normalScores.reduce((a, b) => a + b, 0) / normalScores.length;
+};
+
+export const resolveCustomPoints = (
+  result: any,
+  skipperIndex: number,
+  raceResults: any[],
+  skippersCount: number
+): number => {
+  if (result.customPoints === undefined || result.customPoints === null) return result.customPoints;
+  if (result.customPoints === AVERAGE_SENTINEL && (result.letterScore === 'ROD' || result.letterScore === 'RDG')) {
+    return resolveAveragePoints(skipperIndex, raceResults, skippersCount, result.race);
+  }
+  return result.customPoints;
+};
+
 export const calculateScratchResults = (
   skippers: any[],
   results: any[],
@@ -18,8 +69,9 @@ export const calculateScratchResults = (
       const result = skipperResults.find(r => r.race === race);
       if (result) {
         let points: number;
-        if (result.customPoints !== undefined && result.customPoints !== null) {
-          points = result.customPoints;
+        const resolvedCP = resolveCustomPoints(result, skipperIndex, results, skippers.length);
+        if (resolvedCP !== undefined && resolvedCP !== null) {
+          points = resolvedCP;
         } else if (result.letterScore) {
           points = skippers.length + 1;
         } else {
@@ -103,7 +155,8 @@ export const getLetterScorePointsForRace = (letterScore: string, race: number, r
   if (customCodes.includes(letterScore) && skipperIndex !== undefined) {
     const result = raceResults.find(r => r.race === race && r.skipperIndex === skipperIndex);
     if (result && result.customPoints !== undefined && result.customPoints !== null) {
-      return result.customPoints;
+      const resolved = resolveCustomPoints(result, skipperIndex, raceResults, skippers.length);
+      return resolved !== undefined && resolved !== null ? resolved : result.customPoints;
     }
   }
 
