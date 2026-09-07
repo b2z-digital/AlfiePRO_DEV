@@ -27,6 +27,7 @@ const getLetterScoreValue = (
       return totalCompetitors + 2;
     case 'RDG':
     case 'DPI':
+    case 'ROD':
       return 0; // Manual points - handled separately
     case 'NSC':
     case 'WDN':

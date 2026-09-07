@@ -307,7 +307,7 @@ export const convertHeatResultsToRaceResults = (
         const rLargestHeat = getLargestHeatSize(rHeatSizes);
         allHeatSizesByRound.set(r.round, rLargestHeat);
         for (const res of r.results) {
-          const resIsRDGave = res.letterScore === 'RDG' && (res.customPoints === -1 || res.customPoints === -2 || res.customPoints === -3);
+          const resIsRDGave = (res.letterScore === 'RDG' && (res.customPoints === -1 || res.customPoints === -2 || res.customPoints === -3)) || res.letterScore === 'ROD';
           if (resIsRDGave) continue;
           let s: number;
           if (res.importedScore !== undefined && res.importedScore !== null) {
@@ -327,7 +327,7 @@ export const convertHeatResultsToRaceResults = (
       }
 
       round.results.forEach(result => {
-        const isRDGave = result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2 || result.customPoints === -3);
+        const isRDGave = (result.letterScore === 'RDG' && (result.customPoints === -1 || result.customPoints === -2 || result.customPoints === -3)) || result.letterScore === 'ROD';
         if (isRDGave) {
           const scores = aveScoresBySkipper.get(result.skipperIndex) || [];
           let avg: number;
@@ -378,7 +378,7 @@ export const convertHeatResultsToRaceResults = (
 
       heats.forEach(heat => {
         if (resultsByHeat[heat]) {
-          const POSITION_PRESERVING = new Set(['RDG', 'DPI', 'ZFP', 'SCP']);
+          const POSITION_PRESERVING = new Set(['RDG', 'DPI', 'ZFP', 'SCP', 'ROD']);
           const sortedResults = [...resultsByHeat[heat]]
             .filter(r => r.position !== null && skipperFinalHeat.get(r.skipperIndex) === heat)
             .sort((a, b) => (a.position || 999) - (b.position || 999));

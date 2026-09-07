@@ -37,7 +37,8 @@ const letterScores: { code: LetterScore; name: string; description: string; colo
   { code: 'RDG', name: 'Redress Given', description: 'Given redress by committee', color: 'bg-green-600', scoring: 'Custom' },
   { code: 'DPI', name: 'Discretionary Penalty', description: 'Discretionary penalty imposed', color: 'bg-pink-600', scoring: 'Custom' },
   { code: 'ZFP', name: '20% Penalty', description: 'Rule 30.2 penalty (20%)', color: 'bg-teal-600', scoring: 'Custom' },
-  { code: 'SCP', name: 'Scoring Penalty', description: 'Scoring penalty under rule 44.3', color: 'bg-cyan-700', scoring: 'Custom' }
+  { code: 'SCP', name: 'Scoring Penalty', description: 'Scoring penalty under rule 44.3', color: 'bg-cyan-700', scoring: 'Custom' },
+  { code: 'ROD', name: 'RO Duty', description: 'Taking turn as Race Officer', color: 'bg-sky-600', scoring: 'RO Duty' }
 ];
 
 type RdgMode = 'avg_event' | 'avg_penultimate' | 'avg_series' | 'manual';
@@ -107,6 +108,10 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
   const canUseRdgAvg = hasCompletedRaces;
 
   const handleLetterScoreSelect = (letterScore: LetterScore) => {
+    if (letterScore === 'ROD') {
+      onSelect(letterScore, -1);
+      return;
+    }
     if (letterScore === 'RDG') {
       setSelectedLetterScore(letterScore);
       setShowCustomPoints(true);
@@ -226,7 +231,7 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
               <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 CUSTOM POINTS
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
                 {letterScores.filter(s => s.scoring === 'Custom').map((score) => (
                   <button
                     key={score.code}
@@ -236,6 +241,26 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
                     <div className="font-bold text-lg">{score.code}</div>
                     <div className="text-[11px] opacity-90 leading-tight">{score.name}</div>
                     <div className="text-[10px] opacity-70 mt-1 leading-tight">{score.description}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div className={`text-xs font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                RACE OFFICER DUTY
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {letterScores.filter(s => s.scoring === 'RO Duty').map((score) => (
+                  <button
+                    key={score.code}
+                    onClick={() => handleLetterScoreSelect(score.code)}
+                    className={`p-3 rounded-lg text-left transition-all hover:scale-[1.02] text-white relative ${score.color}`}
+                  >
+                    <div className="font-bold text-lg">{score.code}</div>
+                    <div className="text-[11px] opacity-90 leading-tight">{score.name}</div>
+                    <div className="text-[10px] opacity-70 mt-1 leading-tight">{score.description}</div>
+                    {averagePoints !== null && (
+                      <div className="text-[10px] opacity-80 mt-1">~{averagePoints} avg pts</div>
+                    )}
                   </button>
                 ))}
               </div>
