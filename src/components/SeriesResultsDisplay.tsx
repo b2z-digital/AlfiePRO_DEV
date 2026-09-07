@@ -167,7 +167,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
           if ((r.letterScore === 'RDG' || r.letterScore === 'DPI') && r.customPoints !== undefined && r.customPoints !== null) {
             return {
               race: r.race,
-              score: series.raceFormat === 'handicap' ? r.customPoints : Math.round(r.customPoints),
+              score: series.raceFormat === 'handicap' ? r.customPoints : Math.floor(r.customPoints),
               isDNE: false,
               isLetterScore: true
             };
@@ -782,7 +782,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
             // For RDG and DPI with custom points, use the custom points
             if ((result.letterScore === 'RDG' || result.letterScore === 'DPI') && result.customPoints !== undefined && result.customPoints !== null) {
               raceScores.push({
-                score: series.raceFormat === 'handicap' ? result.customPoints : Math.round(result.customPoints),
+                score: series.raceFormat === 'handicap' ? result.customPoints : Math.floor(result.customPoints),
                 isDNE: false,
                 isLetterScore: true
               });

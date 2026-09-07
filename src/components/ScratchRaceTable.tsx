@@ -420,7 +420,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
         isDNE = result.letterScore === 'DNE';
 
         if (result.customPoints !== undefined && result.customPoints !== null) {
-          score = Math.round(result.customPoints);
+          score = Math.floor(result.customPoints);
         } else {
           score = getLetterScorePoints(result.letterScore, skippers.length);
         }
@@ -500,7 +500,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
     
     return skipperResults.reduce((total, result) => {
       if (result.customPoints !== undefined && result.customPoints !== null) {
-        return total + Math.round(result.customPoints);
+        return total + Math.floor(result.customPoints);
       } else if (result.letterScore) {
         return total + getLetterScorePoints(result.letterScore, skippers.length);
       }
@@ -515,7 +515,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
     
     let scores = skipperResults.map(result => {
       if (result.customPoints !== undefined && result.customPoints !== null) {
-        return Math.round(result.customPoints);
+        return Math.floor(result.customPoints);
       } else if (result.letterScore) {
         return getLetterScorePoints(result.letterScore, skippers.length);
       }
@@ -540,7 +540,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
 
       if (result) {
         if (result.customPoints !== undefined && result.customPoints !== null) {
-          total += Math.round(result.customPoints);
+          total += Math.floor(result.customPoints);
         }
         else if (result.letterScore) {
           total += getLetterScorePoints(result.letterScore, skippers.length);
@@ -1326,7 +1326,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                                     darkMode ? 'text-white' : 'text-slate-900'
                                   }`}>
                                     {result?.customPoints !== undefined && result?.customPoints !== null
-                                      ? Math.round(result.customPoints)
+                                      ? Math.floor(result.customPoints)
                                       : getLetterScorePoints(result?.letterScore, skippers.length)}
                                   </span>
                                 ) : skipperWithdrawn && raceHasResults ? (
@@ -1342,7 +1342,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                                   }`}>
                                     {result?.letterScore === 'WDN'
                                       ? (result?.customPoints !== undefined && result?.customPoints !== null
-                                          ? Math.round(result.customPoints)
+                                          ? Math.floor(result.customPoints)
                                           : getLetterScorePoints(result?.letterScore, skippers.length))
                                       : (result?.position ? Math.round(result.position) : '–')}
                                   </span>
@@ -1369,7 +1369,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                                     darkMode ? 'text-white' : 'text-slate-900'
                                   }`}>
                                     {result.customPoints !== undefined && result.customPoints !== null
-                                      ? Math.round(result.customPoints)
+                                      ? Math.floor(result.customPoints)
                                       : getLetterScorePoints(result.letterScore, skippers.length)}
                                   </span>
                                 </div>
@@ -1390,7 +1390,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                                   <span className={isDropped ? 'line-through' : ''}>
                                     {result.letterScore
                                       ? (result.customPoints !== undefined && result.customPoints !== null
-                                          ? Math.round(result.customPoints)
+                                          ? Math.floor(result.customPoints)
                                           : getLetterScorePoints(result.letterScore, skippers.length))
                                       : (result.position ? Math.round(result.position) : result.position)}
                                   </span>
@@ -1459,7 +1459,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                               const skipperResults = raceResults.filter(r => r.skipperIndex === skipperIndex);
                               return skipperResults.reduce((total, result) => {
                                 if (result.customPoints !== undefined) {
-                                  return total + Math.round(result.customPoints);
+                                  return total + Math.floor(result.customPoints);
                                 } else if (result.letterScore) {
                                   return total + getLetterScorePoints(result.letterScore, skippers.length);
                                 }
@@ -1524,7 +1524,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
 
             let points = 0;
             if (letterScore === 'RDG' || letterScore === 'DPI') {
-              points = (customPoints && customPoints > 0) ? Math.round(customPoints) : 0;
+              points = (customPoints && customPoints > 0) ? Math.floor(customPoints) : 0;
             } else if (position !== null && position > 0) {
               points = position;
             } else if (letterScore) {
