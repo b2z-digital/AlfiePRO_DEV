@@ -462,7 +462,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
       // Determine number of drops based on event's drop rules
       let numDrops = 0;
-      const dropRules = event.dropRules || [4, 8, 16, 24, 32, 40]; // Default to HMS rules if not set
+      const rawDropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
+      const dropRules = Array.isArray(rawDropRules) ? rawDropRules : [4, 8, 16, 24, 32, 40];
 
       for (const threshold of dropRules) {
         if (scores.length >= threshold) {
@@ -472,7 +473,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
         }
       }
 
-      console.log(`Skipper ${idx} (${skippers[idx]?.name}): numDrops=${numDrops} based on ${scores.length} races and dropRules=${dropRules.join(',')}`);
+      console.log(`Skipper ${idx} (${skippers[idx]?.name}): numDrops=${numDrops} based on ${scores.length} races and dropRules=${dropRules.join(',')}, raw=${JSON.stringify(event.dropRules)}`);
 
       if (numDrops === 0) {
         totals[idx] = { gross, net: gross };

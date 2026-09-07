@@ -65,6 +65,9 @@ interface RoundResult {
   raceResults: any[];
   skippers: any[];
   clubName: string;
+  dropRules?: number[] | string;
+  heatManagement?: any;
+  numRaces?: number;
 }
 
 interface StandingsRow {
@@ -155,7 +158,8 @@ const computeEventStandings = (event: RaceEvent): EventStandings => {
 
     const gross = scores.reduce((sum, r) => sum + r.score, 0);
     let numDrops = 0;
-    const dropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
+    const rawDropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
+    const dropRules = Array.isArray(rawDropRules) ? rawDropRules : [4, 8, 16, 24, 32, 40];
     for (const threshold of dropRules) {
       if (scores.length >= threshold) numDrops++;
       else break;
@@ -793,7 +797,10 @@ export const ResultsPage: React.FC = () => {
                 ...skipper,
                 avatarUrl: memberAvatarMap[skipper.name] || skipper.avatarUrl
               })),
-              clubName: s.clubName
+              clubName: s.clubName,
+              dropRules: round.dropRules,
+              heatManagement: round.heatManagement,
+              numRaces: round.numRaces
             });
           }
         });
