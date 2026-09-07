@@ -1153,7 +1153,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   }`}
                   title={showHandicaps ? 'Hide handicap values' : 'Show handicap values'}
                 >
-                  <span className="text-sm">{showHandicaps ? 'Handicaps On' : 'Handicaps Off'}</span>
+                  <span className="text-sm">{showHandicaps ? 'Handicaps Off' : 'Handicaps On'}</span>
                 </button>
               )}
               <button
@@ -1587,7 +1587,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             {/* Handicap at top-right */}
                             <span style={{
                               position: 'absolute',
-                              top: '4px',
+                              top: '2px',
                               right: '6px',
                               fontSize: '10px',
                               fontWeight: '600',
@@ -1600,7 +1600,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             {/* Position at bottom-left */}
                             <span style={{
                               position: 'absolute',
-                              bottom: '12px',
+                              bottom: '4px',
                               left: '6px',
                               fontSize: '18px',
                               fontWeight: 'bold',
