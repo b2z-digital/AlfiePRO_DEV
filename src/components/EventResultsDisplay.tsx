@@ -450,7 +450,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
             return {
               race: r.race,
-              score: getLetterScoreValue(r.letterScore as LetterScore, raceFinishers, skippers.length),
+              score: enrichedEvent.raceFormat === 'handicap' ? getLetterScoreValue(r.letterScore as LetterScore, raceFinishers, skippers.length) : Math.round(getLetterScoreValue(r.letterScore as LetterScore, raceFinishers, skippers.length)),
               isDNE: r.letterScore === 'DNE',
               isLetterScore: true
             };
@@ -1516,8 +1516,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
                   let displayValue: string | number = '-';
                   if (letterScore) {
-                    // Show points for letter scores (with custom points support for RDG/DPI)
-                    displayValue = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                    const lsPoints = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                    displayValue = event.raceFormat === 'handicap' ? lsPoints : Math.round(lsPoints);
                   } else if (position !== null) {
                     displayValue = event.raceFormat === 'handicap' ? position : Math.round(position);
                   } else if (withdrawnScore !== null) {
@@ -1539,7 +1539,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     >
                       {letterScore ? (
                         (() => {
-                          const points = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                          const rawPts = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                          const points = event.raceFormat === 'handicap' ? rawPts : Math.round(rawPts);
                           return isExportMode ? <>{points}</> : <span>{points}</span>;
                         })()
                       ) : event.raceFormat === 'handicap' && showHandicaps && (position || withdrawnScore) ? (
@@ -1658,7 +1659,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     const withdrawnScore = skipperWithdrawn ? (enrichedEvent.skippers?.length || 0) + 1 : null;
                     let displayVal: string | number = '-';
                     if (ls) {
-                      displayVal = getLetterScorePointsForRace(ls, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                      const lsPts = getLetterScorePointsForRace(ls, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
+                      displayVal = event.raceFormat === 'handicap' ? lsPts : Math.round(lsPts);
                     } else if (pos !== null) {
                       displayVal = event.raceFormat === 'handicap' ? pos : Math.round(pos);
                     } else if (withdrawnScore !== null) {
