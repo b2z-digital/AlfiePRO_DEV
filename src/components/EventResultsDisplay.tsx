@@ -441,11 +441,24 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
               return { race: r.race, score, isDNE: false, isLetterScore: true };
             }
 
-            // For RDG and DPI with custom points, use the custom points
-            if ((r.letterScore === 'RDG' || r.letterScore === 'DPI') && r.customPoints !== undefined && r.customPoints !== null) {
+            // For RDG, DPI, ROD with custom points, use the custom points (resolve average sentinels)
+            if ((r.letterScore === 'RDG' || r.letterScore === 'DPI' || r.letterScore === 'ROD') && r.customPoints !== undefined && r.customPoints !== null) {
+              let score = r.customPoints;
+              if (score < 0 && (r.letterScore === 'ROD' || r.letterScore === 'RDG')) {
+                const skipperRes = processedResults.filter(res => res.skipperIndex === r.skipperIndex);
+                const nScores: number[] = [];
+                for (const res of skipperRes) {
+                  if (res.letterScore === 'ROD') continue;
+                  if (res.customPoints !== undefined && res.customPoints < 0) continue;
+                  if (res.customPoints !== undefined && res.customPoints !== null && res.customPoints >= 0) { nScores.push(res.customPoints); }
+                  else if (res.position !== null && res.position > 0 && !res.letterScore) { nScores.push(res.position); }
+                }
+                score = nScores.length > 0 ? nScores.reduce((a, b) => a + b, 0) / nScores.length : 0;
+              }
+              if (enrichedEvent.raceFormat !== 'handicap') score = Math.round(score * 10) / 10;
               return {
                 race: r.race,
-                score: enrichedEvent.raceFormat === 'handicap' ? r.customPoints : Math.floor(r.customPoints),
+                score,
                 isDNE: false,
                 isLetterScore: true
               };

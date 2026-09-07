@@ -163,11 +163,24 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
             return { race: r.race, score, isDNE: false, isLetterScore: true };
           }
 
-          // For RDG and DPI with custom points, use the custom points
-          if ((r.letterScore === 'RDG' || r.letterScore === 'DPI') && r.customPoints !== undefined && r.customPoints !== null) {
+          // For RDG, DPI, ROD with custom points, use the custom points (resolve average sentinels)
+          if ((r.letterScore === 'RDG' || r.letterScore === 'DPI' || r.letterScore === 'ROD') && r.customPoints !== undefined && r.customPoints !== null) {
+            let score = r.customPoints;
+            if (score < 0 && (r.letterScore === 'ROD' || r.letterScore === 'RDG')) {
+              const skipperResults = processedResults.filter(res => res.skipperIndex === r.skipperIndex);
+              const normalScores: number[] = [];
+              for (const res of skipperResults) {
+                if (res.letterScore === 'ROD') continue;
+                if (res.customPoints !== undefined && res.customPoints < 0) continue;
+                if (res.customPoints !== undefined && res.customPoints !== null && res.customPoints >= 0) { normalScores.push(res.customPoints); }
+                else if (res.position !== null && res.position > 0 && !res.letterScore) { normalScores.push(res.position); }
+              }
+              score = normalScores.length > 0 ? normalScores.reduce((a, b) => a + b, 0) / normalScores.length : 0;
+            }
+            if (series.raceFormat !== 'handicap') score = Math.round(score * 10) / 10;
             return {
               race: r.race,
-              score: series.raceFormat === 'handicap' ? r.customPoints : Math.floor(r.customPoints),
+              score,
               isDNE: false,
               isLetterScore: true
             };
@@ -779,10 +792,23 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
           if (result.position && !result.letterScore) {
             raceScores.push({score: result.position, isDNE: false, isLetterScore: false});
           } else if (result.letterScore) {
-            // For RDG and DPI with custom points, use the custom points
-            if ((result.letterScore === 'RDG' || result.letterScore === 'DPI') && result.customPoints !== undefined && result.customPoints !== null) {
+            // For RDG, DPI, ROD with custom points, use the custom points (resolve average sentinels)
+            if ((result.letterScore === 'RDG' || result.letterScore === 'DPI' || result.letterScore === 'ROD') && result.customPoints !== undefined && result.customPoints !== null) {
+              let score = result.customPoints;
+              if (score < 0 && (result.letterScore === 'ROD' || result.letterScore === 'RDG')) {
+                const skipperRes = roundResults.filter((r: any) => r.skipperIndex === result.skipperIndex);
+                const nScores: number[] = [];
+                for (const res of skipperRes) {
+                  if (res.letterScore === 'ROD') continue;
+                  if (res.customPoints !== undefined && res.customPoints < 0) continue;
+                  if (res.customPoints !== undefined && res.customPoints !== null && res.customPoints >= 0) { nScores.push(res.customPoints); }
+                  else if (res.position !== null && res.position > 0 && !res.letterScore) { nScores.push(res.position); }
+                }
+                score = nScores.length > 0 ? nScores.reduce((a, b) => a + b, 0) / nScores.length : 0;
+              }
+              if (series.raceFormat !== 'handicap') score = Math.round(score * 10) / 10;
               raceScores.push({
-                score: series.raceFormat === 'handicap' ? result.customPoints : Math.floor(result.customPoints),
+                score,
                 isDNE: false,
                 isLetterScore: true
               });
