@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Trophy, Medal, TrendingUp, Award, ChevronDown, ChevronUp } from 'lucide-react';
 import { RaceSeries } from '../types/race';
 import { formatDate } from '../utils/date';
@@ -150,23 +150,29 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
     Object.entries(skipperGroups).forEach(([skipperIndex, results]) => {
       const idx = parseInt(skipperIndex);
       
-      // Calculate scores for each race
+      // Track which results need average resolution (ROD/RDG sentinels)
+      const avgSentinelRaces: number[] = [];
+      
+      // Calculate scores for each race (first pass: use placeholder for average sentinels)
       const scores = results.map(r => {
         if (r.position !== null && !r.letterScore) {
-          return { race: r.race, score: r.position, isDNE: false, isLetterScore: false };
+          return { race: r.race, score: r.position, isDNE: false, isLetterScore: false, isAvgSentinel: false };
         }
 
         if (r.letterScore) {
           // Special case for RDGfix
           if (r.letterScore === 'RDGfix' && r.position !== null) {
             const score = series.raceFormat === 'handicap' ? r.position : Math.round(r.position);
-            return { race: r.race, score, isDNE: false, isLetterScore: true };
+            return { race: r.race, score, isDNE: false, isLetterScore: true, isAvgSentinel: false };
           }
 
           // For RDG, DPI, ROD with custom points, use the custom points (resolve average sentinels)
           if ((r.letterScore === 'RDG' || r.letterScore === 'DPI' || r.letterScore === 'ROD') && r.customPoints !== undefined && r.customPoints !== null) {
             let score = r.customPoints;
             if (score < 0 && (r.letterScore === 'ROD' || r.letterScore === 'RDG')) {
+              // Mark for second-pass resolution after drops are determined
+              avgSentinelRaces.push(r.race);
+              // First pass: compute preliminary average from ALL normal scores
               const skipperResults = processedResults.filter(res => res.skipperIndex === r.skipperIndex);
               const normalScores: number[] = [];
               for (const res of skipperResults) {
@@ -182,7 +188,8 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
               race: r.race,
               score,
               isDNE: false,
-              isLetterScore: true
+              isLetterScore: true,
+              isAvgSentinel: avgSentinelRaces.includes(r.race)
             };
           }
 
@@ -195,19 +202,16 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
             race: r.race,
             score: getLetterScoreValue(r.letterScore as LetterScore, raceFinishers, series.skippers.length),
             isDNE: r.letterScore === 'DNE',
-            isLetterScore: true
+            isLetterScore: true,
+            isAvgSentinel: false
           };
         }
 
-        return { race: r.race, score: series.skippers.length + 1, isDNE: false, isLetterScore: false }; // Default for missing results
+        return { race: r.race, score: series.skippers.length + 1, isDNE: false, isLetterScore: false, isAvgSentinel: false };
       });
-
-      // Calculate gross score
-      const gross = scores.reduce((sum, r) => sum + r.score, 0);
 
       // Determine number of drops using drop rules from series or round
       let numDrops = 0;
-      // Fix: Empty array is truthy, so check length explicitly
       const roundDropRules = series.rounds[roundIndex]?.dropRules;
       const seriesDropRules = series.dropRules;
       const dropRules = (roundDropRules && roundDropRules.length > 0)
@@ -216,7 +220,6 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
           ? seriesDropRules
           : [4, 8, 16, 24, 32, 40]; // Default to HMS rules
 
-      // Count drops based on number of races completed in this round
       for (const threshold of dropRules) {
         if (scores.length >= threshold) {
           numDrops++;
@@ -225,24 +228,54 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
         }
       }
 
+      if (numDrops > 0) {
+        // First pass: determine drops using preliminary scores
+        const dneScoresFirst = scores.filter(s => s.isDNE);
+        const droppableFirst = scores.filter(s => !s.isDNE);
+        const sortedFirst = [...droppableFirst].sort((a, b) => b.score - a.score);
+        sortedFirst.slice(0, numDrops).forEach(r => {
+          drops[`${idx}-${r.race}`] = true;
+        });
+
+        // Second pass: recalculate average sentinels excluding dropped races
+        if (avgSentinelRaces.length > 0) {
+          const skipperResults = processedResults.filter(res => res.skipperIndex === idx);
+          const nonDroppedScores: number[] = [];
+          for (const res of skipperResults) {
+            if (res.letterScore === 'ROD') continue;
+            if (res.customPoints !== undefined && res.customPoints < 0) continue;
+            if (drops[`${idx}-${res.race}`]) continue;
+            if (res.customPoints !== undefined && res.customPoints !== null && res.customPoints >= 0) { nonDroppedScores.push(res.customPoints); }
+            else if (res.position !== null && res.position > 0 && !res.letterScore) { nonDroppedScores.push(res.position); }
+          }
+          const avg = nonDroppedScores.length > 0 ? nonDroppedScores.reduce((a, b) => a + b, 0) / nonDroppedScores.length : 0;
+          const roundedAvg = series.raceFormat !== 'handicap' ? Math.round(avg * 10) / 10 : avg;
+          
+          // Update sentinel scores and recalculate drops
+          scores.forEach(s => {
+            if (s.isAvgSentinel) {
+              s.score = roundedAvg;
+            }
+          });
+
+          // Recalculate drops with updated average scores
+          Object.keys(drops).forEach(key => {
+            if (key.startsWith(`${idx}-`)) delete drops[key];
+          });
+          const droppableSecond = scores.filter(s => !s.isDNE);
+          const sortedSecond = [...droppableSecond].sort((a, b) => b.score - a.score);
+          sortedSecond.slice(0, numDrops).forEach(r => {
+            drops[`${idx}-${r.race}`] = true;
+          });
+        }
+      }
+
+      const gross = scores.reduce((sum, r) => sum + r.score, 0);
+
       if (numDrops === 0) {
         totals[idx] = { gross, net: gross };
         return;
       }
-
-      // Separate DNE scores (not droppable) from droppable scores
-      const dneScores = scores.filter(s => s.isDNE);
-      const letterScores = scores.filter(s => s.isLetterScore && !s.isDNE);
-      const regularScores = scores.filter(s => !s.isLetterScore);
-
-      // Letter scores (except DNE) and regular scores are droppable
-      const droppableScores = [...letterScores, ...regularScores];
-
-      // Sort droppable scores by worst (highest) first and drop the worst N
-      const sortedDroppableScores = [...droppableScores].sort((a, b) => b.score - a.score);
-      sortedDroppableScores.slice(0, numDrops).forEach(r => {
-        drops[`${idx}-${r.race}`] = true;
-      });
 
       let net = gross;
       scores.forEach(r => {
@@ -787,15 +820,17 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
         const skipperRoundResults = roundResults.filter((r: any) => r.skipperIndex === roundSkipperIndex);
 
         // Calculate gross points (sum of all race scores) and track DNE scores separately
-        const raceScores: Array<{score: number, isDNE: boolean, isLetterScore: boolean}> = [];
+        const raceScores: Array<{score: number, isDNE: boolean, isLetterScore: boolean, isAvgSentinel: boolean, race?: number}> = [];
+        const avgSentinelIndices: number[] = [];
         skipperRoundResults.forEach((result: any) => {
           if (result.position && !result.letterScore) {
-            raceScores.push({score: result.position, isDNE: false, isLetterScore: false});
+            raceScores.push({score: result.position, isDNE: false, isLetterScore: false, isAvgSentinel: false, race: result.race});
           } else if (result.letterScore) {
-            // For RDG, DPI, ROD with custom points, use the custom points (resolve average sentinels)
             if ((result.letterScore === 'RDG' || result.letterScore === 'DPI' || result.letterScore === 'ROD') && result.customPoints !== undefined && result.customPoints !== null) {
               let score = result.customPoints;
+              let isSentinel = false;
               if (score < 0 && (result.letterScore === 'ROD' || result.letterScore === 'RDG')) {
+                isSentinel = true;
                 const skipperRes = roundResults.filter((r: any) => r.skipperIndex === result.skipperIndex);
                 const nScores: number[] = [];
                 for (const res of skipperRes) {
@@ -805,12 +840,15 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
                   else if (res.position !== null && res.position > 0 && !res.letterScore) { nScores.push(res.position); }
                 }
                 score = nScores.length > 0 ? nScores.reduce((a, b) => a + b, 0) / nScores.length : 0;
+                if (isSentinel) avgSentinelIndices.push(raceScores.length);
               }
               if (series.raceFormat !== 'handicap') score = Math.round(score * 10) / 10;
               raceScores.push({
                 score,
                 isDNE: false,
-                isLetterScore: true
+                isLetterScore: true,
+                isAvgSentinel: isSentinel,
+                race: result.race
               });
             } else {
               const raceFinishers = roundResults.filter((r: any) =>
@@ -819,18 +857,17 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
               raceScores.push({
                 score: getLetterScoreValue(result.letterScore as LetterScore, raceFinishers, numRoundSkippers),
                 isDNE: result.letterScore === 'DNE',
-                isLetterScore: true
+                isLetterScore: true,
+                isAvgSentinel: false,
+                race: result.race
               });
             }
           }
         });
 
-        const grossPoints = raceScores.reduce((sum, item) => sum + item.score, 0);
-
         // Calculate net points (gross minus worst scores based on drop rules)
         const numRaces = skipperRoundResults.length;
         let numDrops = 0;
-        // Fix: Empty array is truthy, so check length explicitly
         const roundDropRules = (round.dropRules && round.dropRules.length > 0) ? round.dropRules : [4, 8, 12];
 
         for (const threshold of roundDropRules) {
@@ -839,20 +876,38 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
           }
         }
 
-        // Apply drops - DNE scores cannot be dropped
+        let grossPoints = raceScores.reduce((sum, item) => sum + item.score, 0);
         let netPoints = grossPoints;
         if (numDrops > 0 && raceScores.length > 0) {
-          // Separate DNE scores (not droppable) from droppable scores
-          const dneScores = raceScores.filter(s => s.isDNE);
-          const letterScores = raceScores.filter(s => s.isLetterScore && !s.isDNE);
-          const regularScores = raceScores.filter(s => !s.isLetterScore);
+          // First pass: determine drops
+          const droppableFirst = raceScores.filter(s => !s.isDNE);
+          const sortedFirst = [...droppableFirst].sort((a, b) => b.score - a.score);
+          const droppedRaces = new Set<number>();
+          sortedFirst.slice(0, Math.min(numDrops, droppableFirst.length)).forEach(r => {
+            if (r.race !== undefined) droppedRaces.add(r.race);
+          });
 
-          // Letter scores (except DNE) and regular scores are droppable
-          const droppableScores = [...letterScores, ...regularScores];
+          // Second pass: recalculate average sentinels excluding dropped races
+          if (avgSentinelIndices.length > 0) {
+            const skipperRes = roundResults.filter((r: any) => r.skipperIndex === roundSkipperIndex);
+            const nonDroppedScores: number[] = [];
+            for (const res of skipperRes) {
+              if (res.letterScore === 'ROD') continue;
+              if (res.customPoints !== undefined && res.customPoints < 0) continue;
+              if (res.race !== undefined && droppedRaces.has(res.race)) continue;
+              if (res.customPoints !== undefined && res.customPoints !== null && res.customPoints >= 0) { nonDroppedScores.push(res.customPoints); }
+              else if (res.position !== null && res.position > 0 && !res.letterScore) { nonDroppedScores.push(res.position); }
+            }
+            const avg = nonDroppedScores.length > 0 ? nonDroppedScores.reduce((a, b) => a + b, 0) / nonDroppedScores.length : 0;
+            const roundedAvg = series.raceFormat !== 'handicap' ? Math.round(avg * 10) / 10 : avg;
+            avgSentinelIndices.forEach(i => { raceScores[i].score = roundedAvg; });
+          }
 
-          // Sort droppable scores by worst (highest) first and drop the worst N
-          const sortedDroppableScores = [...droppableScores].sort((a, b) => b.score - a.score);
-          const scoresToDrop = sortedDroppableScores.slice(0, Math.min(numDrops, droppableScores.length));
+          // Recalculate gross and net with updated scores
+          grossPoints = raceScores.reduce((sum, item) => sum + item.score, 0);
+          const droppableSecond = raceScores.filter(s => !s.isDNE);
+          const sortedSecond = [...droppableSecond].sort((a, b) => b.score - a.score);
+          const scoresToDrop = sortedSecond.slice(0, Math.min(numDrops, droppableSecond.length));
           const dropsTotal = scoresToDrop.reduce((sum, item) => sum + item.score, 0);
           netPoints = grossPoints - dropsTotal;
         }
@@ -1054,6 +1109,13 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
   const { totals: roundTotals, drops: roundDrops } = calculateRoundResults(activeRound);
   const seriesResults = calculateSeriesResultsWithDisplaySeries();
 
+  // Check if any round uses ROD letter scoring — only then show 1 decimal place
+  const hasRODScoring = useMemo(() => {
+    return displaySeries.rounds?.some(round =>
+      round.results?.some((r: any) => r.letterScore === 'ROD')
+    ) ?? false;
+  }, [displaySeries.rounds]);
+
   // Sort skippers by net total for the current round with countback
   const sortedSkippersForRound = displaySeries.skippers ? [...displaySeries.skippers].map((skipper, index) => ({
     ...skipper,
@@ -1208,7 +1270,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
                   );
                 })}
                 <td className={isExportMode ? 'net-total font-medium' : 'px-2 sm:px-4 py-3 sm:py-4 text-center font-medium text-blue-400 text-sm sm:text-base'}>
-                  {Number(skipper.total.toFixed(1))}
+                  {hasRODScoring ? skipper.total.toFixed(1) : Math.round(skipper.total)}
                 </td>
               </tr>
               {!isExportMode && expandedSkipper === skipper.index && (

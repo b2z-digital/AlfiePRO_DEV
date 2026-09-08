@@ -100,6 +100,7 @@ const SortableRoundCard: React.FC<SortableRoundCardProps> = ({
               ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-600'
               : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
           }`}
+          style={{ touchAction: 'none' }}
           title="Drag to reorder"
         >
           <GripVertical size={14} />
