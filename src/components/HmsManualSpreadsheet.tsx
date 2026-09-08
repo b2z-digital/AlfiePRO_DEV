@@ -57,6 +57,8 @@ interface HmsManualSpreadsheetProps {
   onShowOverallResults?: () => void;
 }
 
+import { isScoreDiscardable } from '../types/letterScores';
+
 const LETTER_SCORES_PATTERN = 'DNS|DNF|DSQ|OCS|BFD|UFD|RDG|DPI|ZFP|SCP|RET|DNC|DNE|NSC|WDN';
 
 const parseSmartInput = (raw: string): { sailNumber: string; letterScore: LetterScore | null } => {
@@ -728,7 +730,8 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
   }, [totalEntrantsCount, getLargestHeatEntryCount, getTotalNonPromotedFleet, getHeatEntryCount, getHeatOffset, promotionCount]);
 
   const calculateRdgAverage = useCallback((skipperIndex: number, excludeRace: number): number | null => {
-    const scores: number[] = [];
+    // Collect all scores for this skipper (excluding the AVG race itself)
+    const allScores: { race: number; score: number; isDiscardable: boolean }[] = [];
     for (let r = 2; r < excludeRace; r++) {
       let found = false;
       for (const h of heats) {
@@ -740,33 +743,59 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
           if (isProm) continue;
           if (c.letterScore === 'RDG' && (c.customPoints === -1 || c.customPoints === -2 || c.customPoints === -3)) continue;
 
+          let score: number;
           if (c.hmsPoints != null && c.hmsPoints > 0) {
-            scores.push(c.hmsPoints);
+            score = c.hmsPoints;
           } else if (c.letterScore) {
             if (c.customPoints !== undefined && c.customPoints > 0) {
-              scores.push(c.customPoints);
+              score = c.customPoints;
             } else {
-              scores.push(getLetterScorePoints(h, r, c.letterScore));
+              score = getLetterScorePoints(h, r, c.letterScore);
             }
           } else {
             const okAbove = getOkCountAbovePosition(h, p, r);
             if (r === 1 || h === 'A') {
-              scores.push(okAbove + 1);
+              score = okAbove + 1;
             } else {
               const offset = getHeatOffset(h, r);
-              scores.push(offset + okAbove + 1);
+              score = offset + okAbove + 1;
             }
           }
+          const discardable = c.letterScore ? isScoreDiscardable(c.letterScore) : true;
+          allScores.push({ race: r, score, isDiscardable: discardable });
           found = true;
           break;
         }
         if (found) break;
       }
     }
-    if (scores.length === 0) return null;
-    const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
+    if (allScores.length === 0) return null;
+
+    // Determine how many drops apply
+    let numDrops = 0;
+    const eventDropRules = currentEvent?.dropRules;
+    if (Array.isArray(eventDropRules)) {
+      for (const rule of eventDropRules) {
+        if (allScores.length >= rule) numDrops++;
+      }
+    }
+
+    // Find which races would be dropped (worst discardable scores)
+    const droppedRaces = new Set<number>();
+    if (numDrops > 0) {
+      const discardable = allScores.filter(s => s.isDiscardable);
+      discardable.sort((a, b) => b.score - a.score);
+      for (let i = 0; i < numDrops && i < discardable.length; i++) {
+        droppedRaces.add(discardable[i].race);
+      }
+    }
+
+    // Compute average excluding dropped races
+    const nonDroppedScores = allScores.filter(s => !droppedRaces.has(s.race));
+    if (nonDroppedScores.length === 0) return null;
+    const avg = nonDroppedScores.reduce((s, v) => s + v.score, 0) / nonDroppedScores.length;
     return Math.round(avg * 10) / 10;
-  }, [cells, heats, maxPositions, promotionCount, getLetterScorePoints, getOkCountAbovePosition, getHeatOffset]);
+  }, [cells, heats, maxPositions, promotionCount, getLetterScorePoints, getOkCountAbovePosition, getHeatOffset, currentEvent?.dropRules]);
 
   const getPointsForCell = useCallback((heat: HeatDesignation, position: number, race: number, cell: CellData | undefined): number | string => {
     const hasSail = !!cell?.sailNumber?.trim();

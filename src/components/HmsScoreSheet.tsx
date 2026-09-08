@@ -46,9 +46,9 @@ const SECTION_BORDER = '3px solid #333';
 const ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.75, 2.0];
 const DEFAULT_ZOOM_INDEX = 5; // 1.0
 
-function fmt1(val: number | undefined | null): string {
+function fmtScore(val: number | undefined | null, useDecimal: boolean): string {
   if (val == null || !Number.isFinite(val)) return '-';
-  return val.toFixed(1);
+  return useDecimal ? val.toFixed(1) : String(Math.round(val));
 }
 
 export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
@@ -65,6 +65,18 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
     }
     return [];
   }, [rawDropRules]);
+
+  const useDecimal = useMemo(() => {
+    if (externalRaceResults) {
+      return externalRaceResults.some((r: any) => r.letterScore === 'ROD');
+    }
+    if (!heatManagement?.heats) return false;
+    return Object.values(heatManagement.heats).some((heat: any) =>
+      heat?.races && Object.values(heat.races).some((race: any) =>
+        race?.results && Object.values(race.results).some((res: any) => res?.letterScore === 'ROD')
+      )
+    );
+  }, [externalRaceResults, heatManagement]);
 
   const tableRef = useRef<HTMLDivElement>(null);
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
@@ -219,7 +231,8 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
         const pos = result?.position;
         const isDropped = s.droppedRaceIndices?.has(raceIdx);
         if (pos == null) return '';
-        return isDropped ? `(${pos.toFixed(1)})` : pos.toFixed(1);
+        const formatted = useDecimal ? pos.toFixed(1) : String(Math.round(pos));
+        return isDropped ? `(${formatted})` : formatted;
       });
 
       return [
@@ -229,8 +242,8 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
         club,
         boat,
         myaNo,
-        s.total.toFixed(1),
-        s.net.toFixed(1),
+        useDecimal ? s.total.toFixed(1) : String(Math.round(s.total)),
+        useDecimal ? s.net.toFixed(1) : String(Math.round(s.net)),
         ...raceScores,
       ];
     });
@@ -665,10 +678,10 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                     {myaNo}
                   </td>
                   <td className={td} style={frozenCellStyle(scaledOffsets.total, '#fff', { fontSize: 10 * zoom })}>
-                    {fmt1(standing.total)}
+                    {fmtScore(standing.total, useDecimal)}
                   </td>
                   <td className={tdNoBorder} style={frozenCellStyle(scaledOffsets.score, '#90EE90', { fontWeight: 700, borderRight: SECTION_BORDER, fontSize: 10 * zoom })}>
-                    {fmt1(standing.net)}
+                    {fmtScore(standing.net, useDecimal)}
                   </td>
 
                   {completedRaces.map((race: number, raceIdx: number) => {
@@ -687,7 +700,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                           verifyTitle = `HMS: ${hmsVal} = Match`;
                         } else {
                           verifyBg = '#f8d7da';
-                          verifyTitle = `HMS: ${hmsVal} vs AlfiePRO: ${fmt1(position)}`;
+                          verifyTitle = `HMS: ${hmsVal} vs AlfiePRO: ${fmtScore(position, useDecimal)}`;
                         }
                       }
                     }
@@ -704,7 +717,7 @@ export const HmsScoreSheet: React.FC<HmsScoreSheetProps> = ({
                           ...(isLast ? { borderRight: SECTION_BORDER } : {}),
                         }}
                       >
-                        {position != null ? fmt1(position) : '-'}
+                        {position != null ? fmtScore(position, useDecimal) : '-'}
                       </td>
                     );
                   })}
