@@ -15,7 +15,7 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ImportRoundResultsModal } from './ImportRoundResultsModal';
@@ -72,7 +72,7 @@ const SortableRoundCard: React.FC<SortableRoundCardProps> = ({
   } = useSortable({ id });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: transform ? CSS.Transform.toString({ ...transform, x: 0 }) : undefined,
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 10 : undefined,
@@ -817,7 +817,7 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
                   >
                     <SortableContext
                       items={roundIds}
-                      strategy={verticalListSortingStrategy}
+                      strategy={rectSortingStrategy}
                     >
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {formData.rounds.map((round, index) => (
