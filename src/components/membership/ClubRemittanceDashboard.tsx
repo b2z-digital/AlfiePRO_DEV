@@ -184,7 +184,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
           status: selectedStatus,
           year: selectedYear !== 'all' ? selectedYear : undefined
         }),
-        getRemittancesWithMembers(currentClub.clubId, { status: 'pending' })
+        getRemittancesWithMembers(currentClub.clubId, { status: 'pending', year: new Date().getFullYear() })
       ]);
 
       setOutstanding(outstandingData);

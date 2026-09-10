@@ -410,12 +410,13 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
 
       setPaymentPendingCount(pendingCount || 0);
 
-      // Count pending remittances
+      // Count pending remittances for current year only
       const { count: remitCount } = await supabase
         .from('membership_remittances')
         .select('*', { count: 'exact', head: true })
         .eq('club_id', currentClub.clubId)
-        .eq('club_to_state_status', 'pending');
+        .eq('club_to_state_status', 'pending')
+        .eq('membership_year', new Date().getFullYear());
 
       setPendingRemittancesCount(remitCount || 0);
     } catch (err) {
