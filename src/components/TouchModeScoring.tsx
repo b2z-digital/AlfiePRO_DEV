@@ -906,8 +906,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
     for (const result of currentRaceResults) {
       const idx = result.skipperIndex;
-      if (result.adjustedHcap === undefined || result.handicap === undefined) continue;
-      const change = result.adjustedHcap - result.handicap;
+      const change = result.intendedChange ?? (result.adjustedHcap !== undefined && result.handicap !== undefined ? result.adjustedHcap - result.handicap : 0);
       if (change !== 0) {
         map.set(idx, change);
       }

@@ -148,7 +148,8 @@ export const calculateHandicaps = (
         if (resultIndex !== -1) {
           updatedResults[resultIndex] = {
             ...result,
-            adjustedHcap: result.adjustedHcap
+            adjustedHcap: result.adjustedHcap,
+            intendedChange: letterAdj
           };
         }
         return;
@@ -200,7 +201,8 @@ export const calculateHandicaps = (
       if (resultIndex !== -1) {
         updatedResults[resultIndex] = {
           ...result,
-          adjustedHcap: adjusted
+          adjustedHcap: adjusted,
+          intendedChange: adj
         };
       }
     });

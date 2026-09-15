@@ -178,7 +178,7 @@ export const calculateHandicapsWithRuleset = (
         result.adjustedHcap = Math.max(0, Math.min(capLimit, currentHcaps[idx] + letterAdj));
         const resultIndex = updatedResults.findIndex(r => r.race === race && r.skipperIndex === idx);
         if (resultIndex !== -1) {
-          updatedResults[resultIndex] = { ...result, adjustedHcap: result.adjustedHcap };
+          updatedResults[resultIndex] = { ...result, adjustedHcap: result.adjustedHcap, intendedChange: letterAdj };
         }
         return;
       }
@@ -275,7 +275,7 @@ export const calculateHandicapsWithRuleset = (
       const adjusted = Math.max(0, Math.min(capLimit, currentHcaps[idx] + adj));
       const resultIndex = updatedResults.findIndex(r => r.race === race && r.skipperIndex === idx);
       if (resultIndex !== -1) {
-        updatedResults[resultIndex] = { ...result, adjustedHcap: adjusted };
+        updatedResults[resultIndex] = { ...result, adjustedHcap: adjusted, intendedChange: adj };
       }
     });
   }
