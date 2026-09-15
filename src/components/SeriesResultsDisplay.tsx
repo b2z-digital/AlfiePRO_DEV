@@ -183,7 +183,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
               }
               score = normalScores.length > 0 ? normalScores.reduce((a, b) => a + b, 0) / normalScores.length : 0;
             }
-            if (series.raceFormat !== 'handicap') score = Math.round(score * 10) / 10;
+            if (series.raceFormat !== 'handicap') score = Math.round(score * 100) / 100;
             return {
               race: r.race,
               score,
@@ -249,7 +249,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
             else if (res.position !== null && res.position > 0 && !res.letterScore) { nonDroppedScores.push(res.position); }
           }
           const avg = nonDroppedScores.length > 0 ? nonDroppedScores.reduce((a, b) => a + b, 0) / nonDroppedScores.length : 0;
-          const roundedAvg = series.raceFormat !== 'handicap' ? Math.round(avg * 10) / 10 : avg;
+          const roundedAvg = series.raceFormat !== 'handicap' ? Math.round(avg * 100) / 100 : avg;
           
           // Update sentinel scores and recalculate drops
           scores.forEach(s => {
@@ -842,7 +842,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
                 score = nScores.length > 0 ? nScores.reduce((a, b) => a + b, 0) / nScores.length : 0;
                 if (isSentinel) avgSentinelIndices.push(raceScores.length);
               }
-              if (series.raceFormat !== 'handicap') score = Math.round(score * 10) / 10;
+              if (series.raceFormat !== 'handicap') score = Math.round(score * 100) / 100;
               raceScores.push({
                 score,
                 isDNE: false,
@@ -899,7 +899,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
               else if (res.position !== null && res.position > 0 && !res.letterScore) { nonDroppedScores.push(res.position); }
             }
             const avg = nonDroppedScores.length > 0 ? nonDroppedScores.reduce((a, b) => a + b, 0) / nonDroppedScores.length : 0;
-            const roundedAvg = series.raceFormat !== 'handicap' ? Math.round(avg * 10) / 10 : avg;
+            const roundedAvg = series.raceFormat !== 'handicap' ? Math.round(avg * 100) / 100 : avg;
             avgSentinelIndices.forEach(i => { raceScores[i].score = roundedAvg; });
           }
 
@@ -1241,7 +1241,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
                       {!isRoundCompleted ? (
                         '-'
                       ) : isExportMode ? (
-                        roundPosition !== null ? roundPosition : skipper.roundPoints[index] || '-'
+                        roundPosition !== null ? (hasRODScoring && !Number.isInteger(roundPosition) ? roundPosition.toFixed(2) : roundPosition) : (skipper.roundPoints[index] != null ? (hasRODScoring && !Number.isInteger(skipper.roundPoints[index]) ? skipper.roundPoints[index].toFixed(2) : skipper.roundPoints[index]) : '-')
                       ) : roundPosition !== null ? (
                         <span className={`
                           ${roundPosition === 1 ? 'text-yellow-400' :
@@ -1252,17 +1252,17 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
                           ${isDropped ? 'opacity-60' : ''}
                         `}>
                           {isDropped ? (
-                            <span className="line-through text-red-400">{roundPosition}</span>
+                            <span className="line-through text-red-400">{hasRODScoring && !Number.isInteger(roundPosition) ? roundPosition.toFixed(2) : roundPosition}</span>
                           ) : (
-                            roundPosition
+                            hasRODScoring && !Number.isInteger(roundPosition) ? roundPosition.toFixed(2) : roundPosition
                           )}
                         </span>
                       ) : (
                         <span className={`text-slate-300 ${isDropped ? 'opacity-60' : ''}`}>
                           {isDropped ? (
-                            <span className="line-through text-red-400">{skipper.roundPoints[index] || '-'}</span>
+                            <span className="line-through text-red-400">{skipper.roundPoints[index] != null ? (hasRODScoring && !Number.isInteger(skipper.roundPoints[index]) ? skipper.roundPoints[index].toFixed(2) : skipper.roundPoints[index]) : '-'}</span>
                           ) : (
-                            skipper.roundPoints[index] || '-'
+                            skipper.roundPoints[index] != null ? (hasRODScoring && !Number.isInteger(skipper.roundPoints[index]) ? skipper.roundPoints[index].toFixed(2) : skipper.roundPoints[index]) : '-'
                           )}
                         </span>
                       )}
