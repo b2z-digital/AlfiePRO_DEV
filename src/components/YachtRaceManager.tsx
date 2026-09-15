@@ -108,6 +108,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [lastPlaceBonus, setLastPlaceBonus] = useState(false);
   const [activeRuleset, setActiveRuleset] = useState<LoadedRuleset | null>(null);
   const [eventRulesetId, setEventRulesetId] = useState<string | null>(null);
+  const [rulesetLoading, setRulesetLoading] = useState(false);
   const [raceResults, setRaceResults] = useState<any[]>([]);
   const [lastCompletedRace, setLastCompletedRace] = useState(0);
   const [hasDeterminedInitialHcaps, setHasDeterminedInitialHcaps] = useState(false);
@@ -466,9 +467,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
       // Load club's custom handicap ruleset for handicap events
       if (currentEvent.raceFormat === 'handicap' && currentEvent.clubId) {
+        setRulesetLoading(true);
         (async () => {
           try {
-            // Check if event has a specific ruleset override first
             if (currentEvent.handicap_ruleset_id) {
               const rs = await loadRulesetById(currentEvent.handicap_ruleset_id);
               if (rs) {
@@ -479,7 +480,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 return;
               }
             }
-            // Otherwise load club default
             const rs = await loadRulesetForClub(currentEvent.clubId);
             if (rs) {
               setActiveRuleset(rs);
@@ -488,6 +488,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             }
           } catch (err) {
             console.error('Failed to load handicap ruleset:', err);
+          } finally {
+            setRulesetLoading(false);
           }
         })();
       }
@@ -1205,7 +1207,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       return;
     }
 
-    if (raceResults.length > 0 && raceType === 'handicap' && !heatManagement?.configuration.enabled) {
+    if (raceResults.length > 0 && raceType === 'handicap' && !heatManagement?.configuration.enabled && !rulesetLoading) {
       isCalculatingHandicaps.current = true;
 
       try {
@@ -1228,7 +1230,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         isCalculatingHandicaps.current = false;
       }
     }
-  }, [raceResults, skippers, capLimit, lastPlaceBonus, raceType, heatManagement, activeRuleset]);
+  }, [raceResults, skippers, capLimit, lastPlaceBonus, raceType, heatManagement, activeRuleset, rulesetLoading]);
 
   // When all handicaps are zeroed before any race (Scratch Start), clear originalHandicaps
   // so old stored handicaps don't interfere with seeding race logic
