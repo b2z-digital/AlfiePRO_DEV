@@ -908,8 +908,13 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
     const before = currentResult.handicap ?? (previousResult?.adjustedHcap ?? skippers[skipperIndex].startHcap);
     const after = currentResult.adjustedHcap ?? before;
+    const change = after - before;
 
-    return after - before;
+    if (change !== 0) {
+      console.log(`🏷️ Badge skipper ${skipperIndex} pos ${currentResult.position}: handicap=${currentResult.handicap}, adjustedHcap=${currentResult.adjustedHcap}, before=${before}, after=${after}, change=${change}`);
+    }
+
+    return change;
   };
 
   const hasR1BeenScored = raceResults.some(r => r.race === 1);

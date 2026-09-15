@@ -4315,7 +4315,21 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 raceResults={raceResults}
                 dropRules={currentDropRules}
                 updateRaceResults={(results: RaceResult[]) => {
-                  setRaceResults(results);
+                  if (raceType === 'handicap' && !heatManagement?.configuration.enabled && !rulesetLoading && results.length > 0) {
+                    try {
+                      const { updatedSkippers: newSkippers, updatedResults: newResults } = activeRuleset
+                        ? calculateHandicapsWithRuleset(skippers, results, currentNumRaces, activeRuleset, isManualHandicaps)
+                        : calculateHandicaps(skippers, results, currentNumRaces, capLimit, lastPlaceBonus, isManualHandicaps);
+                      setSkippers(newSkippers);
+                      setRaceResults(newResults);
+                      setLastUpdateTime(new Date());
+                    } catch (error) {
+                      console.error('Error calculating handicaps:', error);
+                      setRaceResults(results);
+                    }
+                  } else {
+                    setRaceResults(results);
+                  }
                 }}
                 onConfirmResults={() => {
                   console.log('✅ Touch mode: User confirmed results, marking race as complete');
