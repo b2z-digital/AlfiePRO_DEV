@@ -221,10 +221,11 @@ export const calculateHandicapsWithRuleset = (
           case 'fleet_fraction': {
             const fraction = rule.condition_value.fraction || 3;
             const segment = rule.condition_value.segment || 'top';
-            const cutoff = Math.ceil(maxPosition / fraction);
-            if (segment === 'top') applies = boat.position <= cutoff;
-            else if (segment === 'bottom') applies = boat.position > maxPosition - cutoff;
-            else if (segment === 'middle') applies = boat.position > cutoff && boat.position <= maxPosition - cutoff;
+            const topCutoff = Math.ceil(maxPosition / fraction);
+            const bottomCutoff = Math.floor(maxPosition / fraction);
+            if (segment === 'top') applies = boat.position <= topCutoff;
+            else if (segment === 'bottom') applies = boat.position > maxPosition - bottomCutoff;
+            else if (segment === 'middle') applies = boat.position > topCutoff && boat.position <= maxPosition - bottomCutoff;
             break;
           }
           case 'all':

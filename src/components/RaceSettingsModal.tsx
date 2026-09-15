@@ -94,6 +94,12 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   const [availableRulesets, setAvailableRulesets] = useState<any[]>([]);
   const [selectedRulesetId, setSelectedRulesetId] = useState<string | null>(propActiveRuleset?.id || null);
 
+  useEffect(() => {
+    if (propActiveRuleset?.id) {
+      setSelectedRulesetId(propActiveRuleset.id);
+    }
+  }, [propActiveRuleset?.id]);
+
   const [fleetManagementEnabled, setFleetManagementEnabled] = useState(
     initialHeatManagement?.configuration.fleetManagementEnabled ?? true
   );
@@ -191,7 +197,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         .select('default_handicap_ruleset_id')
         .eq('id', currentEvent.clubId)
         .maybeSingle();
-      if (mounted && clubData?.default_handicap_ruleset_id && !propActiveRuleset) {
+      if (mounted && clubData?.default_handicap_ruleset_id && !propActiveRuleset && !selectedRulesetId) {
         setSelectedRulesetId(clubData.default_handicap_ruleset_id);
       }
     };
