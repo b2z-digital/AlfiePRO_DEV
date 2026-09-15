@@ -9,6 +9,7 @@ import { HMSSeedingModal } from './HMSSeedingModal';
 import { ConfirmationModal } from './ConfirmationModal';
 import { DiversityGauge } from './DiversityGauge';
 import { supabase } from '../utils/supabase';
+import { loadRulesetById, type LoadedRuleset } from '../utils/rulesetHandicapCalculator';
 
 interface RaceSettingsModalProps {
   isOpen: boolean;
@@ -42,6 +43,8 @@ interface RaceSettingsModalProps {
   currentEvent?: any;
   autoEnableHeatRacing?: boolean;
   onShareScoring?: () => void;
+  activeRuleset?: LoadedRuleset | null;
+  onRulesetChange?: (rulesetId: string | null, ruleset: LoadedRuleset | null) => void;
 }
 
 const DROP_RULE_OPTIONS = [
@@ -73,6 +76,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   currentEvent,
   autoEnableHeatRacing = false,
   onShareScoring,
+  activeRuleset: propActiveRuleset,
+  onRulesetChange,
 }) => {
   const [currentNumRaces, setCurrentNumRaces] = useState(initialNumRaces);
   const [currentDropRules, setCurrentDropRules] = useState<number[] | string>(initialDropRules);
@@ -86,6 +91,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   const [currentHeatManagement, setCurrentHeatManagement] = useState<HeatManagement | null>(initialHeatManagement);
   const [scoringMode, setScoringMode] = useState<'pro' | 'touch' | 'spreadsheet'>('pro');
   const [nationalAssociationId, setNationalAssociationId] = useState<string | undefined>(undefined);
+  const [availableRulesets, setAvailableRulesets] = useState<any[]>([]);
+  const [selectedRulesetId, setSelectedRulesetId] = useState<string | null>(propActiveRuleset?.id || null);
 
   const [fleetManagementEnabled, setFleetManagementEnabled] = useState(
     initialHeatManagement?.configuration.fleetManagementEnabled ?? true
@@ -164,6 +171,33 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     loadNationalAssociationId();
     return () => { mounted = false; };
   }, [isOpen, currentEvent?.clubId]);
+
+  // Load available handicap rulesets for the club
+  useEffect(() => {
+    let mounted = true;
+    const loadRulesets = async () => {
+      if (!isOpen || !currentEvent?.clubId || currentEvent?.raceFormat !== 'handicap') return;
+      const { data } = await supabase
+        .from('handicap_rulesets')
+        .select('id, name, description, is_default')
+        .or(`club_id.eq.${currentEvent.clubId},club_id.is.null`)
+        .order('is_default', { ascending: false })
+        .order('name');
+      if (mounted && data) setAvailableRulesets(data);
+
+      // Also check what the club default is
+      const { data: clubData } = await supabase
+        .from('clubs')
+        .select('default_handicap_ruleset_id')
+        .eq('id', currentEvent.clubId)
+        .maybeSingle();
+      if (mounted && clubData?.default_handicap_ruleset_id && !propActiveRuleset) {
+        setSelectedRulesetId(clubData.default_handicap_ruleset_id);
+      }
+    };
+    loadRulesets();
+    return () => { mounted = false; };
+  }, [isOpen, currentEvent?.clubId, currentEvent?.raceFormat]);
 
   // Load user's scoring mode preference
   useEffect(() => {
@@ -1217,6 +1251,62 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               ))}
             </div>
           </div>
+
+          {/* Handicap Ruleset Selector - only for handicap events */}
+          {currentEvent?.raceFormat === 'handicap' && availableRulesets.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Trophy className="text-amber-400" size={20} />
+                <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                  Handicap Scoring System
+                </h3>
+              </div>
+              <div className="space-y-2">
+                <button
+                  onClick={async () => {
+                    setSelectedRulesetId(null);
+                    onRulesetChange?.(null, null);
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-all ${
+                    !selectedRulesetId
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : darkMode
+                        ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <div className="font-medium">AlfiePRO Default</div>
+                  <div className={`text-xs mt-0.5 ${!selectedRulesetId ? 'text-white/70' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Standard handicap calculation system
+                  </div>
+                </button>
+                {availableRulesets.filter(r => !r.is_default).map(rs => (
+                  <button
+                    key={rs.id}
+                    onClick={async () => {
+                      setSelectedRulesetId(rs.id);
+                      const loaded = await loadRulesetById(rs.id);
+                      onRulesetChange?.(rs.id, loaded);
+                    }}
+                    className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-all ${
+                      selectedRulesetId === rs.id
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : darkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <div className="font-medium">{rs.name}</div>
+                    {rs.description && (
+                      <div className={`text-xs mt-0.5 ${selectedRulesetId === rs.id ? 'text-white/70' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {rs.description}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Skipper Management */}
           {onManageSkippers && (

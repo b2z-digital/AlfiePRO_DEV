@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Plus, Trash2, CreditCard as Edit3, Play, Save, Wand as Wand2, ChevronRight, ChevronDown, GripVertical, Settings2, Zap, Target, TrendingUp, TrendingDown, Minus, Equal, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, RotateCcw, Copy, Send, Loader as Loader2, MessageSquare, X, Mic, MicOff } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, CreditCard as Edit3, Play, Save, Wand as Wand2, ChevronRight, ChevronDown, GripVertical, Settings2, Zap, Target, TrendingUp, TrendingDown, Minus, Equal, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, RotateCcw, Copy, Send, Loader as Loader2, MessageSquare, X, Mic, MicOff, Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 
@@ -130,6 +130,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propC
   ]);
   const [simResults, setSimResults] = useState<SimulationResult[]>([]);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [clubDefaultRulesetId, setClubDefaultRulesetId] = useState<string | null>(null);
 
   // Alfie chat state
   const [alfieMessages, setAlfieMessages] = useState<AlfieMessage[]>([
@@ -174,6 +175,18 @@ export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propC
         if (userClubs) {
           setClubId(userClubs.club_id);
           return;
+        }
+      }
+
+      // Load club's default ruleset setting
+      if (clubId) {
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('default_handicap_ruleset_id')
+          .eq('id', clubId)
+          .maybeSingle();
+        if (clubData) {
+          setClubDefaultRulesetId(clubData.default_handicap_ruleset_id);
         }
       }
 
@@ -338,6 +351,17 @@ export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propC
       alert('Failed to save ruleset. Please try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const setAsClubDefault = async (rulesetId: string | null) => {
+    if (!clubId) return;
+    const { error } = await supabase
+      .from('clubs')
+      .update({ default_handicap_ruleset_id: rulesetId })
+      .eq('id', clubId);
+    if (!error) {
+      setClubDefaultRulesetId(rulesetId);
     }
   };
 
@@ -828,7 +852,12 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                       </button>
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1 truncate">{ruleset.description || 'Custom rule set'}</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {clubDefaultRulesetId === ruleset.id && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium whitespace-nowrap">Club Default</span>
+                    )}
+                    <p className="text-[11px] text-slate-400 truncate">{ruleset.description || 'Custom rule set'}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1084,6 +1113,21 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                     <span className="flex items-center gap-1.5 text-xs text-green-400">
                       <CheckCircle2 size={14} />
                       Saved successfully
+                    </span>
+                  )}
+                  {clubId && clubDefaultRulesetId !== selectedRuleset.id && (
+                    <button
+                      onClick={() => setAsClubDefault(selectedRuleset.id)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-green-500/40 text-green-400 hover:bg-green-500/10 transition-colors"
+                    >
+                      <Star size={16} />
+                      Set as Club Default
+                    </button>
+                  )}
+                  {clubId && clubDefaultRulesetId === selectedRuleset.id && (
+                    <span className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-green-500/20 text-green-400 border border-green-500/30">
+                      <Star size={14} />
+                      Club Default
                     </span>
                   )}
                   <button

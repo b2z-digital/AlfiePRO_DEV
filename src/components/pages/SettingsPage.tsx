@@ -827,7 +827,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {/* Race Management Settings Section */}
-          {(can('settings.documents') || can('settings.startbox') || (isRaceOfficer && !currentClub)) && (
+          {(can('settings.documents') || can('settings.startbox') || can('settings.handicap_rules') || (isRaceOfficer && !currentClub)) && (
             <div>
               <button
                 onClick={() => toggleSection('raceManagement')}
@@ -937,8 +937,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </button>
                 )}
 
-                {/* Handicap Rules Card - Super Admin Only */}
-                {user?.user_metadata?.is_super_admin && (
+                {/* Handicap Rules Card */}
+                {can('settings.handicap_rules') && (
                 <button
                   onClick={() => setActiveTab('handicap-rules')}
                   className={`

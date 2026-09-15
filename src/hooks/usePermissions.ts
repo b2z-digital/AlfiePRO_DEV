@@ -29,6 +29,7 @@ export type Permission =
   | 'settings.import'
   | 'settings.membership'
   | 'settings.startbox'
+  | 'settings.handicap_rules'
   | 'dashboard.edit'
   | 'users.manage'
   | 'state.manage'
@@ -54,6 +55,7 @@ export function usePermissions() {
         'venues.view',
         'settings.documents',
         'settings.startbox',
+        'settings.handicap_rules',
         'settings.integrations',
         'dashboard.edit',
       ];
@@ -116,6 +118,29 @@ export function usePermissions() {
       return true;
     }
 
+    if (userRole === 'committee') {
+      const committeePermissions: Permission[] = [
+        'races.manage',
+        'races.score',
+        'races.view',
+        'reports.create',
+        'venues.create',
+        'venues.view',
+        'articles.view',
+        'membership.view',
+        'meetings.create',
+        'meetings.view',
+        'minutes.create',
+        'minutes.view',
+        'tasks.create',
+        'tasks.view',
+        'finance.view',
+        'settings.handicap_rules',
+        'dashboard.edit',
+      ];
+      return committeePermissions.includes(permission);
+    }
+
     if (userRole === 'editor') {
       const editorPermissions: Permission[] = [
         'races.manage',
@@ -144,6 +169,7 @@ export function usePermissions() {
         'settings.integrations',
         'settings.finance',
         'settings.documents',
+        'settings.handicap_rules',
         'settings.import',
         'settings.membership'
       ];

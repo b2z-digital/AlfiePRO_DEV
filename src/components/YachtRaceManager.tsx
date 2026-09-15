@@ -32,6 +32,7 @@ import { TouchModeScoring } from './TouchModeScoring';
 import { SpreadsheetScoring } from './SpreadsheetScoring';
 import { HmsManualSpreadsheet } from './HmsManualSpreadsheet';
 import { calculateHandicaps } from '../utils/handicapCalculator';
+import { loadRulesetForClub, loadRulesetById, calculateHandicapsWithRuleset, type LoadedRuleset } from '../utils/rulesetHandicapCalculator';
 import { calculateScratchResults } from '../utils/scratchCalculations';
 import { RaceSettingsModal } from './RaceSettingsModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
@@ -105,6 +106,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [skippers, setSkippers] = useState(defaultSkippers);
   const [capLimit, setCapLimit] = useState(150);
   const [lastPlaceBonus, setLastPlaceBonus] = useState(false);
+  const [activeRuleset, setActiveRuleset] = useState<LoadedRuleset | null>(null);
+  const [eventRulesetId, setEventRulesetId] = useState<string | null>(null);
   const [raceResults, setRaceResults] = useState<any[]>([]);
   const [lastCompletedRace, setLastCompletedRace] = useState(0);
   const [hasDeterminedInitialHcaps, setHasDeterminedInitialHcaps] = useState(false);
@@ -459,6 +462,34 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
       if (currentEvent.is_simulated || currentEvent.raceFormat === 'handicap') {
         setScoringMode('touch');
+      }
+
+      // Load club's custom handicap ruleset for handicap events
+      if (currentEvent.raceFormat === 'handicap' && currentEvent.clubId) {
+        (async () => {
+          try {
+            // Check if event has a specific ruleset override first
+            if (currentEvent.handicap_ruleset_id) {
+              const rs = await loadRulesetById(currentEvent.handicap_ruleset_id);
+              if (rs) {
+                setActiveRuleset(rs);
+                setEventRulesetId(currentEvent.handicap_ruleset_id);
+                setCapLimit(rs.config.cap_limit);
+                setLastPlaceBonus(rs.config.last_place_bonus_enabled);
+                return;
+              }
+            }
+            // Otherwise load club default
+            const rs = await loadRulesetForClub(currentEvent.clubId);
+            if (rs) {
+              setActiveRuleset(rs);
+              setCapLimit(rs.config.cap_limit);
+              setLastPlaceBonus(rs.config.last_place_bonus_enabled);
+            }
+          } catch (err) {
+            console.error('Failed to load handicap ruleset:', err);
+          }
+        })();
       }
 
       // Set currentDay FIRST before loading day-specific data
@@ -1178,14 +1209,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       isCalculatingHandicaps.current = true;
 
       try {
-        const { updatedSkippers, updatedResults } = calculateHandicaps(
-          skippers,
-          raceResults,
-          currentNumRaces,
-          capLimit,
-          lastPlaceBonus,
-          isManualHandicaps
-        );
+        const { updatedSkippers, updatedResults } = activeRuleset
+          ? calculateHandicapsWithRuleset(skippers, raceResults, currentNumRaces, activeRuleset, isManualHandicaps)
+          : calculateHandicaps(skippers, raceResults, currentNumRaces, capLimit, lastPlaceBonus, isManualHandicaps);
 
         const skippersChanged = JSON.stringify(skippers) !== JSON.stringify(updatedSkippers);
         const resultsChanged = JSON.stringify(raceResults) !== JSON.stringify(updatedResults);
@@ -1202,7 +1228,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         isCalculatingHandicaps.current = false;
       }
     }
-  }, [raceResults, skippers, capLimit, lastPlaceBonus, raceType, heatManagement]);
+  }, [raceResults, skippers, capLimit, lastPlaceBonus, raceType, heatManagement, activeRuleset]);
 
   // When all handicaps are zeroed before any race (Scratch Start), clear originalHandicaps
   // so old stored handicaps don't interfere with seeding race logic
@@ -4630,6 +4656,18 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           currentEvent={getCurrentEvent()}
           autoEnableHeatRacing={autoEnableHeatRacing}
           onShareScoring={() => setShowShareScoringModal(true)}
+          activeRuleset={activeRuleset}
+          onRulesetChange={(rulesetId, ruleset) => {
+            setActiveRuleset(ruleset);
+            setEventRulesetId(rulesetId);
+            if (ruleset) {
+              setCapLimit(ruleset.config.cap_limit);
+              setLastPlaceBonus(ruleset.config.last_place_bonus_enabled);
+            } else {
+              setCapLimit(150);
+              setLastPlaceBonus(false);
+            }
+          }}
           onSaveSettings={async (settings) => {
             await handleSaveRaceSettings(settings);
             setShowRaceSettingsModal(false);
