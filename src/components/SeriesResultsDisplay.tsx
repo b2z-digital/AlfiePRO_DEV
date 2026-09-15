@@ -1270,7 +1270,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
                   );
                 })}
                 <td className={isExportMode ? 'net-total font-medium' : 'px-2 sm:px-4 py-3 sm:py-4 text-center font-medium text-blue-400 text-sm sm:text-base'}>
-                  {hasRODScoring ? skipper.total.toFixed(1) : Math.round(skipper.total)}
+                  {hasRODScoring ? skipper.total.toFixed(2) : Math.round(skipper.total)}
                 </td>
               </tr>
               {!isExportMode && expandedSkipper === skipper.index && (

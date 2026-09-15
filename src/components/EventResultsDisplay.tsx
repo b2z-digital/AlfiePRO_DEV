@@ -446,16 +446,36 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
               let score = r.customPoints;
               if (score < 0 && (r.letterScore === 'ROD' || r.letterScore === 'RDG')) {
                 const skipperRes = processedResults.filter(res => res.skipperIndex === r.skipperIndex);
-                const nScores: number[] = [];
+                const nScoreEntries: { race: number; pts: number; isDNE: boolean }[] = [];
                 for (const res of skipperRes) {
                   if (res.letterScore === 'ROD') continue;
                   if (res.customPoints !== undefined && res.customPoints < 0) continue;
-                  if (res.customPoints !== undefined && res.customPoints !== null && res.customPoints >= 0) { nScores.push(res.customPoints); }
-                  else if (res.position !== null && res.position > 0 && !res.letterScore) { nScores.push(res.position); }
+                  let pts: number | null = null;
+                  if (res.customPoints !== undefined && res.customPoints !== null && res.customPoints >= 0) { pts = res.customPoints; }
+                  else if (res.position !== null && res.position > 0 && !res.letterScore) { pts = res.position; }
+                  if (pts !== null) {
+                    nScoreEntries.push({ race: res.race, pts, isDNE: res.letterScore === 'DNE' });
+                  }
                 }
-                score = nScores.length > 0 ? nScores.reduce((a, b) => a + b, 0) / nScores.length : 0;
+                // Apply drops before averaging so ROD reflects only kept races
+                const rawDropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
+                const activeDropRules = Array.isArray(rawDropRules) ? rawDropRules : [];
+                let numDrops = 0;
+                for (const threshold of activeDropRules) {
+                  if (nScoreEntries.length >= threshold) numDrops++;
+                  else break;
+                }
+                let kept = nScoreEntries;
+                if (numDrops > 0) {
+                  const droppable = nScoreEntries.filter(s => !s.isDNE);
+                  const nonDroppable = nScoreEntries.filter(s => s.isDNE);
+                  const sorted = [...droppable].sort((a, b) => b.pts - a.pts);
+                  const droppedRaces = new Set(sorted.slice(0, Math.min(numDrops, droppable.length)).map(s => s.race));
+                  kept = [...nonDroppable, ...droppable.filter(s => !droppedRaces.has(s.race))];
+                }
+                score = kept.length > 0 ? kept.reduce((a, b) => a + b.pts, 0) / kept.length : 0;
               }
-              if (enrichedEvent.raceFormat !== 'handicap') score = Math.round(score * 10) / 10;
+              if (enrichedEvent.raceFormat !== 'handicap') score = Math.round(score * 100) / 100;
               return {
                 race: r.race,
                 score,
@@ -535,6 +555,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   };
 
   const { totals, drops } = calculateTotals();
+
+  const hasRODScoring = raceResults.some((r: any) => r.letterScore === 'ROD');
 
   // Get scoring system name based on drop rules
   const getScoringSystemName = () => {
@@ -1660,14 +1682,14 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-semibold ${isExportMode ? 'text-black' : 'text-slate-300'}`}
                   style={isExportMode ? { ...exportTdBase } : undefined}
                 >
-                  {totals[skipper.index]?.gross ? (event.raceFormat === 'handicap' ? Number(totals[skipper.index].gross.toFixed(1)) : Math.round(totals[skipper.index].gross)) : 0}
+                  {totals[skipper.index]?.gross ? (event.raceFormat === 'handicap' ? Number(totals[skipper.index].gross.toFixed(1)) : (hasRODScoring ? totals[skipper.index].gross.toFixed(2) : Math.round(totals[skipper.index].gross))) : 0}
                 </td>
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
                   className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-bold ${isExportMode ? 'net-total' : 'text-blue-400'}`}
                   style={isExportMode ? { ...exportTdBase, fontWeight: 'bold' } : undefined}
                 >
-                  {totals[skipper.index]?.net ? (event.raceFormat === 'handicap' ? Number(totals[skipper.index].net.toFixed(1)) : Math.round(totals[skipper.index].net)) : 0}
+                  {totals[skipper.index]?.net ? (event.raceFormat === 'handicap' ? Number(totals[skipper.index].net.toFixed(1)) : (hasRODScoring ? totals[skipper.index].net.toFixed(2) : Math.round(totals[skipper.index].net))) : 0}
                 </td>
               </tr>
               {needsTwoRows && (
