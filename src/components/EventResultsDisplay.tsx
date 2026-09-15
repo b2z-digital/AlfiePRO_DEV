@@ -276,6 +276,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
     const totals: Record<number, { gross: number; net: number }> = {};
     const drops: Record<string, boolean> = {};
+    const resolvedScores: Record<string, number> = {};
 
     // Group results by skipper
     const skipperGroups: Record<number, any[]> = {};
@@ -502,6 +503,9 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
           return { race: r.race, score: skippers.length + 1, isDNE: false, isLetterScore: false }; // Default for missing results
         });
 
+      scores.forEach(s => {
+        resolvedScores[`${idx}-${s.race}`] = s.score;
+      });
       console.log(`Skipper ${idx} (${skippers[idx]?.name}): ${scores.length} races, scores:`, scores.map(s => `R${s.race}=${s.score}`));
 
       // Calculate gross score
@@ -553,10 +557,10 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
       totals[idx] = { gross, net };
     });
     
-    return { totals, drops };
+    return { totals, drops, resolvedScores };
   };
 
-  const { totals, drops } = calculateTotals();
+  const { totals, drops, resolvedScores } = calculateTotals();
 
   const hasRODScoring = (event.raceResults || []).some((r: any) => r.letterScore === 'ROD');
 
@@ -1560,7 +1564,10 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   }
 
                   let displayValue: string | number = '-';
-                  if (letterScore) {
+                  const resolved = resolvedScores[`${skipper.index}-${raceNum}`];
+                  if (resolved !== undefined) {
+                    displayValue = !Number.isInteger(resolved) ? Math.round(resolved * 100) / 100 : resolved;
+                  } else if (letterScore) {
                     const lsPoints = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
                     displayValue = event.raceFormat === 'handicap' ? lsPoints : (hasRODScoring && !Number.isInteger(lsPoints) ? Math.round(lsPoints * 100) / 100 : Math.round(lsPoints));
                   } else if (position !== null) {
@@ -1584,8 +1591,10 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     >
                       {letterScore ? (
                         (() => {
-                          const rawPts = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
-                          const points = event.raceFormat === 'handicap' ? rawPts : (hasRODScoring && !Number.isInteger(rawPts) ? Math.round(rawPts * 100) / 100 : Math.round(rawPts));
+                          const resolved = resolvedScores[`${skipper.index}-${raceNum}`];
+                          const points = resolved !== undefined
+                            ? (!Number.isInteger(resolved) ? Math.round(resolved * 100) / 100 : resolved)
+                            : (() => { const rawPts = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index); return event.raceFormat === 'handicap' ? rawPts : (hasRODScoring && !Number.isInteger(rawPts) ? Math.round(rawPts * 100) / 100 : Math.round(rawPts)); })();
                           return isExportMode ? <>{points}</> : <span>{points}</span>;
                         })()
                       ) : event.raceFormat === 'handicap' && showHandicaps && (position || withdrawnScore) ? (
