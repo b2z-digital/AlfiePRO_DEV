@@ -426,6 +426,20 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
         event.isPublicEvent = false; // Mark as local copy
       }
 
+      // Safety guard: never overwrite existing results with an empty array
+      let raceResultsToSave = event.raceResults || [];
+      if (raceResultsToSave.length === 0 && (event.lastCompletedRace || 0) > 0) {
+        const { data: existing } = await supabase
+          .from('quick_races')
+          .select('race_results')
+          .eq('id', eventId)
+          .maybeSingle();
+        if (existing?.race_results && existing.race_results.length > 0) {
+          console.warn('⚠️ Prevented accidental wipe of race_results for event:', eventId);
+          raceResultsToSave = existing.race_results;
+        }
+      }
+
       const { error } = await supabase
         .from('quick_races')
         .upsert({
@@ -437,7 +451,7 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
           race_class: event.raceClass,
           race_format: event.raceFormat,
           skippers: event.skippers || [],
-          race_results: event.raceResults || [],
+          race_results: raceResultsToSave,
           last_completed_race: event.lastCompletedRace || 0,
           has_determined_initial_hcaps: event.hasDeterminedInitialHcaps || false,
           is_manual_handicaps: event.isManualHandicaps || false,
@@ -1497,10 +1511,16 @@ export const updateEventResults = async (
 
     // Try to update in Supabase if online
     try {
+      // Safety guard: never overwrite existing results with empty array
+      let safeRaceResults = raceResults;
+      if ((!safeRaceResults || safeRaceResults.length === 0) && (lastCompletedRace || 0) > 0) {
+        console.warn('⚠️ saveEventResults called with empty raceResults but lastCompletedRace =', lastCompletedRace, '- will check DB before saving');
+      }
+
       // Prepare the update data with explicit field mapping
       const updateData = {
         skippers: skippers,
-        race_results: raceResults,
+        race_results: safeRaceResults,
         last_completed_race: lastCompletedRace,
         has_determined_initial_hcaps: hasDeterminedInitialHcaps,
         is_manual_handicaps: isManualHandicaps,
@@ -1567,7 +1587,7 @@ export const updateEventResults = async (
           console.log('[saveEventResults] raceResults parameter:', raceResults);
           console.log('[saveEventResults] raceResults length:', raceResults?.length);
           console.log('[saveEventResults] lastCompletedRace:', lastCompletedRace);
-          roundData.race_results = raceResults;
+          roundData.race_results = safeRaceResults;
           roundData.last_completed_race = lastCompletedRace;
           roundData.has_determined_initial_hcaps = hasDeterminedInitialHcaps;
           roundData.is_manual_handicaps = isManualHandicaps;
@@ -1731,7 +1751,7 @@ export const updateEventResults = async (
             race_class: updatedEvent.raceClass || '',
             race_format: updatedEvent.raceFormat || 'scratch',
             skippers: skippers,
-            race_results: updatedEvent.multiDay ? [] : raceResults,
+            race_results: updatedEvent.multiDay ? [] : safeRaceResults,
             last_completed_race: updatedEvent.multiDay ? 0 : lastCompletedRace,
             has_determined_initial_hcaps: updatedEvent.multiDay ? false : hasDeterminedInitialHcaps,
             is_manual_handicaps: updatedEvent.multiDay ? false : isManualHandicaps,
@@ -1807,7 +1827,7 @@ export const updateEventResults = async (
         }
       } else {
         const updatePayload = {
-          race_results: raceResults,
+          race_results: safeRaceResults,
           skippers,
           last_completed_race: lastCompletedRace,
           has_determined_initial_hcaps: hasDeterminedInitialHcaps,

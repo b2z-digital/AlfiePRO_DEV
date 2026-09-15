@@ -6,10 +6,11 @@ export const resolveAveragePoints = (
   skipperIndex: number,
   raceResults: any[],
   skippersCount: number,
-  excludeRace?: number
+  excludeRace?: number,
+  dropRules?: number[]
 ): number => {
   const skipperResults = raceResults.filter(r => r.skipperIndex === skipperIndex);
-  const normalScores: number[] = [];
+  const normalScores: { race: number; pts: number; isDNE: boolean }[] = [];
 
   for (const result of skipperResults) {
     if (excludeRace !== undefined && result.race === excludeRace) continue;
@@ -23,30 +24,52 @@ export const resolveAveragePoints = (
     } else if (result.position !== null && result.position > 0) {
       pts = result.position;
     } else if (result.letterScore) {
-      if (isEntrantsPlusOne(result.letterScore as LetterScore)) {
-        pts = skippersCount + 1;
-      } else {
-        pts = skippersCount + 1;
-      }
+      pts = skippersCount + 1;
     } else {
       continue;
     }
-    normalScores.push(pts);
+    normalScores.push({ race: result.race, pts, isDNE: result.letterScore === 'DNE' });
   }
 
   if (normalScores.length === 0) return skippersCount + 1;
-  return normalScores.reduce((a, b) => a + b, 0) / normalScores.length;
+
+  // Apply drops before averaging so the ROD score reflects only kept races
+  // Use total race count (including ROD races) for drop thresholds
+  if (dropRules && dropRules.length > 0) {
+    const totalRaceCount = normalScores.length + skipperResults.filter(r => r.letterScore === 'ROD').length;
+    let numDrops = 0;
+    for (const threshold of dropRules) {
+      if (totalRaceCount >= threshold) {
+        numDrops++;
+      } else {
+        break;
+      }
+    }
+
+    if (numDrops > 0) {
+      const droppable = normalScores.filter(s => !s.isDNE);
+      const nonDroppable = normalScores.filter(s => s.isDNE);
+      const sorted = [...droppable].sort((a, b) => b.pts - a.pts);
+      const droppedRaces = new Set(sorted.slice(0, Math.min(numDrops, droppable.length)).map(s => s.race));
+      const kept = [...nonDroppable, ...droppable.filter(s => !droppedRaces.has(s.race))];
+      if (kept.length === 0) return skippersCount + 1;
+      return kept.reduce((a, b) => a + b.pts, 0) / kept.length;
+    }
+  }
+
+  return normalScores.reduce((a, b) => a + b.pts, 0) / normalScores.length;
 };
 
 export const resolveCustomPoints = (
   result: any,
   skipperIndex: number,
   raceResults: any[],
-  skippersCount: number
+  skippersCount: number,
+  dropRules?: number[]
 ): number => {
   if (result.customPoints === undefined || result.customPoints === null) return result.customPoints;
   if (result.customPoints === AVERAGE_SENTINEL && (result.letterScore === 'ROD' || result.letterScore === 'RDG')) {
-    return resolveAveragePoints(skipperIndex, raceResults, skippersCount, result.race);
+    return resolveAveragePoints(skipperIndex, raceResults, skippersCount, result.race, dropRules);
   }
   return result.customPoints;
 };

@@ -1058,8 +1058,8 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
           </p>
           <div className="flex items-center gap-3 text-xs">
             <span className="flex items-center gap-1.5 text-green-400">
-              <span className="w-2 h-2 rounded-full"></span>
-              {members.filter(m => m.user_id).length} Connected
+              <span className="w-2 h-2 rounded-full bg-green-400"></span>
+              {filteredMembers.filter(m => m.user_id).length} Connected
             </span>
             {Object.keys(emailMatches).length > 0 && (
               <button
@@ -1077,18 +1077,18 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
             )}
             <span className="flex items-center gap-1.5 text-slate-500">
               <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-              {members.filter(m => !m.user_id && !emailMatches[m.id]).length} Unlinked
+              {filteredMembers.filter(m => !m.user_id && !emailMatches[m.id]).length} Unlinked
             </span>
-            {members.filter(m => (m as any).activation_status === 'pending').length > 0 && (
+            {filteredMembers.filter(m => (m as any).activation_status === 'pending').length > 0 && (
               <span className="flex items-center gap-1.5 text-sky-400">
                 <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                {members.filter(m => (m as any).activation_status === 'pending').length} Invite Sent
+                {filteredMembers.filter(m => (m as any).activation_status === 'pending').length} Invite Sent
               </span>
             )}
-            {unlinkedMembersWithEmail.length > 0 && (
+            {filteredMembers.filter(m => !m.user_id && m.email).length > 0 && (
               <span className="flex items-center gap-1.5 text-sky-400/70 text-xs">
                 <Smartphone size={12} />
-                {unlinkedMembersWithEmail.length} ready to activate
+                {filteredMembers.filter(m => !m.user_id && m.email).length} ready to activate
               </span>
             )}
           </div>
