@@ -163,7 +163,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [eventUpdateTrigger, setEventUpdateTrigger] = useState(0);
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
-  const isCalculatingHandicaps = useRef(false);
+  // Handicap calculation is now idempotent - no ref guard needed
   const liveSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { updateScoringContext, setScoringActive } = useScoringContext();
 
@@ -1203,13 +1203,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   }, [darkMode]);
 
   useEffect(() => {
-    if (isCalculatingHandicaps.current) {
-      return;
-    }
-
     if (raceResults.length > 0 && raceType === 'handicap' && !heatManagement?.configuration.enabled && !rulesetLoading) {
-      isCalculatingHandicaps.current = true;
-
       try {
         const { updatedSkippers, updatedResults } = activeRuleset
           ? calculateHandicapsWithRuleset(skippers, raceResults, currentNumRaces, activeRuleset, isManualHandicaps)
@@ -1226,8 +1220,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       } catch (error) {
         console.error('Error calculating handicaps:', error);
         setError(error instanceof Error ? error.message : 'Failed to calculate handicaps');
-      } finally {
-        isCalculatingHandicaps.current = false;
       }
     }
   }, [raceResults, skippers, capLimit, lastPlaceBonus, raceType, heatManagement, activeRuleset, rulesetLoading]);
@@ -4316,7 +4308,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 raceResults={raceResults}
                 dropRules={currentDropRules}
                 updateRaceResults={(results: RaceResult[]) => {
-                  isCalculatingHandicaps.current = false;
                   setRaceResults(results);
                 }}
                 onConfirmResults={() => {
@@ -4468,7 +4459,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 raceResults={raceResults}
                 dropRules={currentDropRules}
                 updateRaceResults={(results: any[]) => {
-                  isCalculatingHandicaps.current = false;
                   setRaceResults(results);
                 }}
                 onConfirmResults={() => {

@@ -86,7 +86,7 @@ export const calculateHandicapsWithRuleset = (
   const capLimit = config.cap_limit;
 
   const updatedSkippers = JSON.parse(JSON.stringify(skippers));
-  const updatedResults = [...raceResults];
+  const updatedResults: any[] = raceResults.map(r => ({ ...r }));
   const lastPlaceStreaks = new Array(skippers.length).fill(0);
 
   const isInitialRaceFromScratch = !isManualHandicaps && (() => {
