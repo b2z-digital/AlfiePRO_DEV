@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CircleCheck as CheckCircle2, Clock, ChevronRight, X, Grid2x2 as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, Circle as XCircle, Send, SquarePen as Edit2, Globe, Map as MapIcon, ArrowUpDown, ListFilter as Filter, FlaskConical } from 'lucide-react';
@@ -1055,11 +1055,31 @@ export const ResultsPage: React.FC = () => {
     return stateAssociationNames[assocId] || null;
   };
 
+  // Build a set of local event fingerprints (date + class keyword) to deduplicate against external results
+  const localEventFingerprints = useMemo(() => {
+    const prints = new Set<string>();
+    const allLocalEvents = [...allEvents, ...roundResults];
+    for (const ev of allLocalEvents) {
+      if ((ev.raceResults?.length || 0) > 0 && ev.date) {
+        const dateStr = typeof ev.date === 'string' ? ev.date.slice(0, 10) : '';
+        if (dateStr) {
+          prints.add(dateStr);
+        }
+      }
+    }
+    return prints;
+  }, [allEvents, roundResults]);
+
   const filterExternalEvents = (events: ExternalResultEvent[]) => events.filter(ev => {
     const year = getExternalEventYear(ev);
     if (year !== null && year !== selectedYear) return false;
     if (year === null) return false;
     if (searchTerm && !ev.event_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    // Hide external results when a local Alfie-scored event exists on the same date
+    if (ev.event_date) {
+      const extDate = ev.event_date.slice(0, 10);
+      if (localEventFingerprints.has(extDate)) return false;
+    }
     return true;
   });
 
