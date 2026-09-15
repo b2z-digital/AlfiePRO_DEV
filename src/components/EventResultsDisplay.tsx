@@ -1562,7 +1562,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   let displayValue: string | number = '-';
                   if (letterScore) {
                     const lsPoints = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
-                    displayValue = event.raceFormat === 'handicap' ? lsPoints : Math.round(lsPoints);
+                    displayValue = event.raceFormat === 'handicap' ? lsPoints : (hasRODScoring && !Number.isInteger(lsPoints) ? Math.round(lsPoints * 100) / 100 : Math.round(lsPoints));
                   } else if (position !== null) {
                     displayValue = event.raceFormat === 'handicap' ? position : Math.round(position);
                   } else if (withdrawnScore !== null) {
@@ -1585,7 +1585,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                       {letterScore ? (
                         (() => {
                           const rawPts = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
-                          const points = event.raceFormat === 'handicap' ? rawPts : Math.round(rawPts);
+                          const points = event.raceFormat === 'handicap' ? rawPts : (hasRODScoring && !Number.isInteger(rawPts) ? Math.round(rawPts * 100) / 100 : Math.round(rawPts));
                           return isExportMode ? <>{points}</> : <span>{points}</span>;
                         })()
                       ) : event.raceFormat === 'handicap' && showHandicaps && (position || withdrawnScore) ? (
