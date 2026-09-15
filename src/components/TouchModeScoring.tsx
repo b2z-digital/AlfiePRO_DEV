@@ -904,22 +904,14 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     const currentRaceResults = raceResults.filter(r => r.race === currentRace);
     if (currentRaceResults.length === 0) return map;
 
-    let withAdj = 0;
-    let withoutAdj = 0;
     for (const result of currentRaceResults) {
       const idx = result.skipperIndex;
-      if (result.adjustedHcap === undefined || result.handicap === undefined) {
-        withoutAdj++;
-        console.warn(`⚠️ Missing adjustedHcap/handicap for skipper ${idx} pos ${result.position}: handicap=${result.handicap} adjustedHcap=${result.adjustedHcap}`);
-        continue;
-      }
-      withAdj++;
+      if (result.adjustedHcap === undefined || result.handicap === undefined) continue;
       const change = result.adjustedHcap - result.handicap;
       if (change !== 0) {
         map.set(idx, change);
       }
     }
-    console.log(`🏷️ HandicapChangeMap race ${currentRace}: ${withAdj} with adjustedHcap, ${withoutAdj} without, ${map.size} non-zero changes`);
     return map;
   }, [raceResults, currentRace]);
 
