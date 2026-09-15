@@ -899,22 +899,32 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     }
   };
 
-  // Calculate handicap change for a skipper
-  const getHandicapChange = (skipperIndex: number): number => {
-    const currentResult = raceResults.find(r => r.race === currentRace && r.skipperIndex === skipperIndex);
-    const previousResult = raceResults.find(r => r.race === currentRace - 1 && r.skipperIndex === skipperIndex);
+  const handicapChangeMap = useMemo(() => {
+    const map = new Map<number, number>();
+    const currentRaceResults = raceResults.filter(r => r.race === currentRace);
+    if (currentRaceResults.length === 0) return map;
 
-    if (!currentResult) return 0;
-
-    const before = currentResult.handicap ?? (previousResult?.adjustedHcap ?? skippers[skipperIndex].startHcap);
-    const after = currentResult.adjustedHcap ?? before;
-    const change = after - before;
-
-    if (change !== 0) {
-      console.log(`🏷️ Badge skipper ${skipperIndex} pos ${currentResult.position}: handicap=${currentResult.handicap}, adjustedHcap=${currentResult.adjustedHcap}, before=${before}, after=${after}, change=${change}`);
+    let withAdj = 0;
+    let withoutAdj = 0;
+    for (const result of currentRaceResults) {
+      const idx = result.skipperIndex;
+      if (result.adjustedHcap === undefined || result.handicap === undefined) {
+        withoutAdj++;
+        console.warn(`⚠️ Missing adjustedHcap/handicap for skipper ${idx} pos ${result.position}: handicap=${result.handicap} adjustedHcap=${result.adjustedHcap}`);
+        continue;
+      }
+      withAdj++;
+      const change = result.adjustedHcap - result.handicap;
+      if (change !== 0) {
+        map.set(idx, change);
+      }
     }
+    console.log(`🏷️ HandicapChangeMap race ${currentRace}: ${withAdj} with adjustedHcap, ${withoutAdj} without, ${map.size} non-zero changes`);
+    return map;
+  }, [raceResults, currentRace]);
 
-    return change;
+  const getHandicapChange = (skipperIndex: number): number => {
+    return handicapChangeMap.get(skipperIndex) ?? 0;
   };
 
   const hasR1BeenScored = raceResults.some(r => r.race === 1);
