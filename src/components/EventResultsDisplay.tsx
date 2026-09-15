@@ -5,7 +5,7 @@ import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { LetterScore } from '../types';
 import { HeatDesignation } from '../types/heat';
-import { getLetterScorePointsForRace, compareWithCountback } from '../utils/scratchCalculations';
+import { getLetterScorePointsForRace, compareWithCountback, resolveCustomPoints } from '../utils/scratchCalculations';
 import { calculateSHRSDiscards } from '../utils/shrsHeatSystem';
 import { SkipperPerformanceInsights } from './SkipperPerformanceInsights';
 import { RaceReportModal } from './RaceReportModal';
@@ -442,42 +442,10 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
               return { race: r.race, score, isDNE: false, isLetterScore: true };
             }
 
-            // For RDG, DPI, ROD with custom points, use the custom points (resolve average sentinels)
+            // For RDG, DPI, ROD with custom points, use the canonical resolveCustomPoints
             if ((r.letterScore === 'RDG' || r.letterScore === 'DPI' || r.letterScore === 'ROD') && r.customPoints !== undefined && r.customPoints !== null) {
-              let score = r.customPoints;
-              if (score < 0 && (r.letterScore === 'ROD' || r.letterScore === 'RDG')) {
-                const skipperRes = processedResults.filter(res => res.skipperIndex === r.skipperIndex);
-                const nScoreEntries: { race: number; pts: number; isDNE: boolean }[] = [];
-                for (const res of skipperRes) {
-                  if (res.letterScore === 'ROD') continue;
-                  if (res.customPoints !== undefined && res.customPoints < 0) continue;
-                  let pts: number | null = null;
-                  if (res.customPoints !== undefined && res.customPoints !== null && res.customPoints >= 0) { pts = res.customPoints; }
-                  else if (res.position !== null && res.position > 0 && !res.letterScore) { pts = res.position; }
-                  if (pts !== null) {
-                    nScoreEntries.push({ race: res.race, pts, isDNE: res.letterScore === 'DNE' });
-                  }
-                }
-                // Apply drops before averaging so ROD reflects only kept races
-                // Use total race count (including ROD) for drop thresholds
-                const rawDropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
-                const activeDropRules = Array.isArray(rawDropRules) ? rawDropRules : [];
-                const totalRaceCount = nScoreEntries.length + skipperRes.filter(res => res.letterScore === 'ROD').length;
-                let numDrops = 0;
-                for (const threshold of activeDropRules) {
-                  if (totalRaceCount >= threshold) numDrops++;
-                  else break;
-                }
-                let kept = nScoreEntries;
-                if (numDrops > 0) {
-                  const droppable = nScoreEntries.filter(s => !s.isDNE);
-                  const nonDroppable = nScoreEntries.filter(s => s.isDNE);
-                  const sorted = [...droppable].sort((a, b) => b.pts - a.pts);
-                  const droppedRaces = new Set(sorted.slice(0, Math.min(numDrops, droppable.length)).map(s => s.race));
-                  kept = [...nonDroppable, ...droppable.filter(s => !droppedRaces.has(s.race))];
-                }
-                score = kept.length > 0 ? kept.reduce((a, b) => a + b.pts, 0) / kept.length : 0;
-              }
+              const activeDropRules = Array.isArray(event.dropRules) ? event.dropRules : [4, 8, 16, 24, 32, 40];
+              let score = resolveCustomPoints(r, r.skipperIndex, processedResults, enrichedEvent.skippers?.length || 0, activeDropRules);
               if (enrichedEvent.raceFormat !== 'handicap') score = Math.round(score * 100) / 100;
               return {
                 race: r.race,

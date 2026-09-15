@@ -5083,8 +5083,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                               const raceNum = raceIdx + 1;
                               const raceDetail = result.raceDetails?.find((d: any) => d.race === raceNum);
                               const raceResult = raceResults.find(r => r.race === raceNum && r.skipperIndex === result.skipperIndex);
+                              const rawPts = raceDetail?.points;
                               const displayValue = raceResult?.letterScore
-                                ? (raceDetail ? raceDetail.points : '')
+                                ? (raceDetail ? (Number.isInteger(rawPts) ? rawPts : rawPts?.toFixed(2)) : '')
                                 : raceResult?.position || '';
                               const isDropped = raceDetail?.isDropped;
 
@@ -5104,7 +5105,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                               );
                             })}
                             <td className={`px-4 py-2.5 text-center font-bold ${darkMode ? 'text-amber-400' : 'text-amber-700'}`}>
-                              {result.totalPoints}
+                              {Number.isInteger(result.totalPoints) ? result.totalPoints : result.totalPoints.toFixed(2)}
                             </td>
                           </tr>
                         );
