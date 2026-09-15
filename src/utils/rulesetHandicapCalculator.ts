@@ -258,7 +258,7 @@ export const calculateHandicapsWithRuleset = (
         adj += scratchBoatBonus;
       }
 
-      if (isOnScratch && pos === maxPosition) {
+      if (isOnScratch && pos === maxPosition && config.scratch_streak_threshold > 0) {
         lastPlaceStreaks[idx]++;
         if (lastPlaceStreaks[idx] >= config.scratch_streak_threshold) {
           adj = config.scratch_streak_bonus;

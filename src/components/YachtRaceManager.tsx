@@ -1209,10 +1209,17 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           ? calculateHandicapsWithRuleset(skippers, raceResults, currentNumRaces, activeRuleset, isManualHandicaps)
           : calculateHandicaps(skippers, raceResults, currentNumRaces, capLimit, lastPlaceBonus, isManualHandicaps);
 
-        const skippersChanged = JSON.stringify(skippers) !== JSON.stringify(updatedSkippers);
-        const resultsChanged = JSON.stringify(raceResults) !== JSON.stringify(updatedResults);
+        const hasResultChanges = raceResults.some((r, i) => {
+          const u = updatedResults[i];
+          return !u || r.handicap !== u.handicap || r.adjustedHcap !== u.adjustedHcap;
+        }) || raceResults.length !== updatedResults.length;
 
-        if (skippersChanged || resultsChanged) {
+        const hasSkipperChanges = skippers.some((s, i) => {
+          const u = updatedSkippers[i];
+          return !u || s.startHcap !== u.startHcap;
+        });
+
+        if (hasResultChanges || hasSkipperChanges) {
           setSkippers(updatedSkippers);
           setRaceResults(updatedResults);
           setLastUpdateTime(new Date());
