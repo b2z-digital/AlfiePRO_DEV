@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Plus, Trash2, CreditCard as Edit3, Play, Save, Wand as Wand2, ChevronRight, ChevronDown, GripVertical, Settings2, Zap, Target, TrendingUp, TrendingDown, Minus, Equal, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, RotateCcw, Copy, Send, Loader as Loader2, MessageSquare, X, Mic, MicOff } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, CreditCard as Edit3, Play, Save, Wand as Wand2, ChevronRight, ChevronDown, GripVertical, Settings2, Zap, Target, TrendingUp, TrendingDown, Minus, Equal, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, RotateCcw, Copy, Send, Loader as Loader2, MessageSquare, X, Mic, MicOff, Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 
@@ -44,6 +44,7 @@ interface RulesetConfig {
   scratch_boat_win_bonus: number;
   scratch_streak_threshold: number;
   scratch_streak_bonus: number;
+  skip_seeding_race: boolean;
 }
 
 interface SimulationBoat {
@@ -82,6 +83,7 @@ const CONDITION_TYPES = [
   { value: 'scratch_boat', label: 'Is Scratch Boat', description: 'Applies only to boats on 0 handicap' },
   { value: 'streak', label: 'Consecutive Streak', description: 'Triggers after finishing in the same position for N consecutive races' },
   { value: 'mid_fleet', label: 'Mid Fleet', description: 'Applies to boats not in top 3 and not last' },
+  { value: 'fleet_fraction', label: 'Fleet Fraction', description: 'Triggers for a fraction of the fleet (e.g. top 1/3, bottom 1/3)' },
 ];
 
 const ACTION_TYPES = [
@@ -100,9 +102,10 @@ const APPLIES_TO_OPTIONS = [
 
 interface Props {
   darkMode?: boolean;
+  clubId?: string | null;
 }
 
-export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
+export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propClubId }: Props) {
   const { user } = useAuth();
   const [rulesets, setRulesets] = useState<HandicapRuleset[]>([]);
   const [selectedRuleset, setSelectedRuleset] = useState<HandicapRuleset | null>(null);
@@ -114,7 +117,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
   const [activeTab, setActiveTab] = useState<'rules' | 'simulate' | 'alfie'>('rules');
   const [editingRule, setEditingRule] = useState<AdjustmentRule | null>(null);
   const [showNewRuleModal, setShowNewRuleModal] = useState(false);
-  const [clubId, setClubId] = useState<string | null>(null);
+  const [clubId, setClubId] = useState<string | null>(propClubId || null);
 
   // Simulation state
   const [simMode, setSimMode] = useState<'seeding' | 'handicap'>('handicap');
@@ -128,6 +131,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
   ]);
   const [simResults, setSimResults] = useState<SimulationResult[]>([]);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [clubDefaultRulesetId, setClubDefaultRulesetId] = useState<string | null>(null);
 
   // Alfie chat state
   const [alfieMessages, setAlfieMessages] = useState<AlfieMessage[]>([
@@ -145,8 +149,12 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
   const [alfieLoading, setAlfieLoading] = useState(false);
 
   useEffect(() => {
+    if (propClubId) setClubId(propClubId);
+  }, [propClubId]);
+
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [clubId]);
 
   useEffect(() => {
     alfieMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -155,25 +163,46 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Get user's club
-      const { data: userClubs } = await supabase
-        .from('user_clubs')
-        .select('club_id, role')
-        .eq('user_id', user?.id || '')
-        .in('role', ['admin', 'editor'])
-        .limit(1)
-        .maybeSingle();
+      // Get user's club if not passed as prop
+      if (!clubId) {
+        const { data: userClubs } = await supabase
+          .from('user_clubs')
+          .select('club_id, role')
+          .eq('user_id', user?.id || '')
+          .in('role', ['admin', 'editor'])
+          .limit(1)
+          .maybeSingle();
 
-      if (userClubs) {
-        setClubId(userClubs.club_id);
+        if (userClubs) {
+          setClubId(userClubs.club_id);
+          return;
+        }
       }
 
-      // Load rulesets
-      const { data: rulesetsData } = await supabase
+      // Load club's default ruleset setting
+      if (clubId) {
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('default_handicap_ruleset_id')
+          .eq('id', clubId)
+          .maybeSingle();
+        if (clubData) {
+          setClubDefaultRulesetId(clubData.default_handicap_ruleset_id);
+        }
+      }
+
+      // Load rulesets for the current club
+      let query = supabase
         .from('handicap_rulesets')
         .select('*')
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
+
+      if (clubId) {
+        query = query.or(`club_id.eq.${clubId},club_id.is.null`);
+      }
+
+      const { data: rulesetsData } = await query;
 
       if (rulesetsData) {
         setRulesets(rulesetsData);
@@ -201,7 +230,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
     else setAdjustmentRules(DEFAULT_RULES.map(r => ({ ...r, ruleset_id: ruleset.id })));
 
     if (configRes.data) setConfig(configRes.data);
-    else setConfig({ id: '', ruleset_id: ruleset.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30 });
+    else setConfig({ id: '', ruleset_id: ruleset.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false });
   };
 
   const createNewRuleset = async () => {
@@ -246,7 +275,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
       setSelectedRuleset(data);
       setAdjustmentRules([]);
       setSeedingRule({ id: '', ruleset_id: data.id, method: 'position_based', base_value: 0, increment_per_position: 10, description: 'First race seeds handicaps from positions (1st=0, 2nd=10, 3rd=20...)' });
-      setConfig({ id: '', ruleset_id: data.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30 });
+      setConfig({ id: '', ruleset_id: data.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false });
       setActiveTab('rules');
     }
   };
@@ -273,6 +302,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
             scratch_boat_win_bonus: config.scratch_boat_win_bonus,
             scratch_streak_threshold: config.scratch_streak_threshold,
             scratch_streak_bonus: config.scratch_streak_bonus,
+            skip_seeding_race: config.skip_seeding_race ?? false,
           }).eq('id', config.id);
           if (error) throw error;
         } else {
@@ -326,6 +356,17 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
     }
   };
 
+  const setAsClubDefault = async (rulesetId: string | null) => {
+    if (!clubId) return;
+    const { error } = await supabase
+      .from('clubs')
+      .update({ default_handicap_ruleset_id: rulesetId })
+      .eq('id', clubId);
+    if (!error) {
+      setClubDefaultRulesetId(rulesetId);
+    }
+  };
+
   const deleteRuleset = async (id: string) => {
     await supabase.from('handicap_rulesets').delete().eq('id', id);
     setRulesets(prev => prev.filter(r => r.id !== id));
@@ -364,6 +405,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
         scratch_boat_win_bonus: srcConfig.scratch_boat_win_bonus,
         scratch_streak_threshold: srcConfig.scratch_streak_threshold,
         scratch_streak_bonus: srcConfig.scratch_streak_bonus,
+        skip_seeding_race: srcConfig.skip_seeding_race ?? false,
       });
     }
 
@@ -451,6 +493,15 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
             case 'mid_fleet':
               applies = boat.position > 3 && boat.position < maxPosition;
               break;
+            case 'fleet_fraction': {
+              const fraction = rule.condition_value.fraction || 3;
+              const segment = rule.condition_value.segment || 'top';
+              const cutoff = Math.ceil(maxPosition / fraction);
+              if (segment === 'top') applies = boat.position <= cutoff;
+              else if (segment === 'bottom') applies = boat.position > maxPosition - cutoff;
+              else if (segment === 'middle') applies = boat.position > cutoff && boat.position <= maxPosition - cutoff;
+              break;
+            }
             case 'streak':
               applies = false;
               break;
@@ -561,6 +612,7 @@ condition_type options:
 - "streak" with condition_value: {"streak_position": "last", "streak_count": 3}
 - "scratch" (no condition_value needed — triggers for scratch/0s boat)
 - "dnf" (no condition_value needed — triggers for DNF/DNS)
+- "fleet_fraction" with condition_value: {"fraction": 3, "segment": "top"} for top 1/3, or {"fraction": 3, "segment": "bottom"} for bottom 1/3, or {"fraction": 3, "segment": "middle"} for middle 1/3
 - "all" (applies every race to everyone)
 
 IMPORTANT: When the user says "no" to further changes, or confirms the rules, you MUST output the JSON block immediately. Do NOT repeat the rules in plain text again. Just say something brief like "Done! I've created those rules for you." followed by the JSON block.`;
@@ -756,7 +808,7 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                   setSelectedRuleset(null);
                   setAdjustmentRules(DEFAULT_RULES);
                   setSeedingRule({ id: '', ruleset_id: '', method: 'position_based', base_value: 0, increment_per_position: 10, description: 'Seeded from first race positions' });
-                  setConfig({ id: '', ruleset_id: '', cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30 });
+                  setConfig({ id: '', ruleset_id: '', cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false });
                 }}
                 className={`w-full text-left p-3 rounded-lg transition-colors ${
                   !selectedRuleset ? 'bg-blue-500/20 border border-blue-500/40' : 'hover:bg-slate-700/50'
@@ -803,7 +855,12 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                       </button>
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1 truncate">{ruleset.description || 'Custom rule set'}</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {clubDefaultRulesetId === ruleset.id && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium whitespace-nowrap">Club Default</span>
+                    )}
+                    <p className="text-[11px] text-slate-400 truncate">{ruleset.description || 'Custom rule set'}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -962,6 +1019,21 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                       />
                       <label className="text-xs text-slate-300">Enable last place bonus for non-scratch boats</label>
                     </div>
+                    <div className="col-span-2 mt-2 p-3 rounded-lg bg-slate-900/50 border border-slate-600/30">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={config.skip_seeding_race ?? false}
+                          onChange={(e) => setConfig({ ...config, skip_seeding_race: e.target.checked })}
+                          className="rounded border-slate-600"
+                          disabled={!selectedRuleset}
+                        />
+                        <div>
+                          <label className="text-xs text-white font-medium">Skip seeding race</label>
+                          <p className="text-[11px] text-slate-400 mt-0.5">Apply this rule set's adjustment rules from Race 1 onwards instead of automatically assigning handicaps based on first race finishing positions.</p>
+                        </div>
+                      </div>
+                    </div>
                     {config.last_place_bonus_enabled && (
                       <div>
                         <label className="text-xs text-slate-400 mb-1 block">Last Place Bonus Value (sec)</label>
@@ -1059,6 +1131,21 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                     <span className="flex items-center gap-1.5 text-xs text-green-400">
                       <CheckCircle2 size={14} />
                       Saved successfully
+                    </span>
+                  )}
+                  {clubId && clubDefaultRulesetId !== selectedRuleset.id && (
+                    <button
+                      onClick={() => setAsClubDefault(selectedRuleset.id)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-green-500/40 text-green-400 hover:bg-green-500/10 transition-colors"
+                    >
+                      <Star size={16} />
+                      Set as Club Default
+                    </button>
+                  )}
+                  {clubId && clubDefaultRulesetId === selectedRuleset.id && (
+                    <span className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-green-500/20 text-green-400 border border-green-500/30">
+                      <Star size={14} />
+                      Club Default
                     </span>
                   )}
                   <button
@@ -1426,6 +1513,7 @@ function NewRuleModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rule: P
                 setConditionType(e.target.value);
                 if (e.target.value === 'position') setConditionValue({ position: 1 });
                 else if (e.target.value === 'position_range') setConditionValue({ from: 1, to: 3 });
+                else if (e.target.value === 'fleet_fraction') setConditionValue({ fraction: 3, segment: 'top' });
                 else if (e.target.value === 'streak') setConditionValue({ streak_position: 'last', streak_count: 3 });
                 else setConditionValue({});
               }}
@@ -1471,6 +1559,35 @@ function NewRuleModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rule: P
                   className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
                   min={1}
                 />
+              </div>
+            </div>
+          )}
+
+          {conditionType === 'fleet_fraction' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Segment</label>
+                <select
+                  value={conditionValue.segment || 'top'}
+                  onChange={(e) => setConditionValue({ ...conditionValue, segment: e.target.value })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                >
+                  <option value="top">Top</option>
+                  <option value="middle">Middle</option>
+                  <option value="bottom">Bottom</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Divide fleet into</label>
+                <select
+                  value={conditionValue.fraction || 3}
+                  onChange={(e) => setConditionValue({ ...conditionValue, fraction: parseInt(e.target.value) })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                >
+                  <option value={2}>Halves (1/2)</option>
+                  <option value={3}>Thirds (1/3)</option>
+                  <option value={4}>Quarters (1/4)</option>
+                </select>
               </div>
             </div>
           )}
@@ -1655,6 +1772,35 @@ function EditRuleModal({ rule, onClose, onSave }: { rule: AdjustmentRule; onClos
                   className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
                   min={1}
                 />
+              </div>
+            </div>
+          )}
+
+          {editedRule.condition_type === 'fleet_fraction' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Segment</label>
+                <select
+                  value={editedRule.condition_value.segment || 'top'}
+                  onChange={(e) => setEditedRule({ ...editedRule, condition_value: { ...editedRule.condition_value, segment: e.target.value } })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                >
+                  <option value="top">Top</option>
+                  <option value="middle">Middle</option>
+                  <option value="bottom">Bottom</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Divide fleet into</label>
+                <select
+                  value={editedRule.condition_value.fraction || 3}
+                  onChange={(e) => setEditedRule({ ...editedRule, condition_value: { ...editedRule.condition_value, fraction: parseInt(e.target.value) } })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                >
+                  <option value={2}>Halves (1/2)</option>
+                  <option value={3}>Thirds (1/3)</option>
+                  <option value={4}>Quarters (1/4)</option>
+                </select>
               </div>
             </div>
           )}

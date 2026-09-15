@@ -142,6 +142,13 @@ const calculateTotals = (event: RaceEvent, allResults: any[]) => {
           return { race: r.race, score: r.position, isLetterScore: true };
         }
 
+        const customCodes = ['RDG', 'DPI', 'ROD'];
+        if (customCodes.includes(r.letterScore) && r.customPoints !== undefined && r.customPoints !== null) {
+          const dropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
+          const resolved = getLetterScorePointsForRace(r.letterScore, r.race, allResults, skippers, idx, dropRules);
+          return { race: r.race, score: Math.round(resolved * 100) / 100, isLetterScore: true };
+        }
+
         return {
           race: r.race,
           score: getLetterScoreValue(r.letterScore as LetterScore, raceFinishers, totalCompetitorsForScoring),

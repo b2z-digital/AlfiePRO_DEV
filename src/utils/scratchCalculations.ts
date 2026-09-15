@@ -92,9 +92,9 @@ export const calculateScratchResults = (
       const result = skipperResults.find(r => r.race === race);
       if (result) {
         let points: number;
-        const resolvedCP = resolveCustomPoints(result, skipperIndex, results, skippers.length);
+        const resolvedCP = resolveCustomPoints(result, skipperIndex, results, skippers.length, dropRules);
         if (resolvedCP !== undefined && resolvedCP !== null) {
-          points = resolvedCP;
+          points = Math.round(resolvedCP * 100) / 100;
         } else if (result.letterScore) {
           points = skippers.length + 1;
         } else {
@@ -173,12 +173,12 @@ export const calculateScratchResults = (
   return skipperTotals.sort((a, b) => a.totalPoints - b.totalPoints);
 };
 
-export const getLetterScorePointsForRace = (letterScore: string, race: number, raceResults: any[], skippers: any[], skipperIndex?: number): number => {
+export const getLetterScorePointsForRace = (letterScore: string, race: number, raceResults: any[], skippers: any[], skipperIndex?: number, dropRules?: number[]): number => {
   const customCodes = ['RDG', 'DPI', 'ZFP', 'SCP', 'ROD'];
   if (customCodes.includes(letterScore) && skipperIndex !== undefined) {
     const result = raceResults.find(r => r.race === race && r.skipperIndex === skipperIndex);
     if (result && result.customPoints !== undefined && result.customPoints !== null) {
-      const resolved = resolveCustomPoints(result, skipperIndex, raceResults, skippers.length);
+      const resolved = resolveCustomPoints(result, skipperIndex, raceResults, skippers.length, dropRules);
       return resolved !== undefined && resolved !== null ? resolved : result.customPoints;
     }
   }

@@ -899,17 +899,23 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     }
   };
 
-  // Calculate handicap change for a skipper
+  const handicapChangeMap = useMemo(() => {
+    const map = new Map<number, number>();
+    const currentRaceResults = raceResults.filter(r => r.race === currentRace);
+    if (currentRaceResults.length === 0) return map;
+
+    for (const result of currentRaceResults) {
+      const idx = result.skipperIndex;
+      const change = result.intendedChange ?? (result.adjustedHcap !== undefined && result.handicap !== undefined ? result.adjustedHcap - result.handicap : 0);
+      if (change !== 0) {
+        map.set(idx, change);
+      }
+    }
+    return map;
+  }, [raceResults, currentRace]);
+
   const getHandicapChange = (skipperIndex: number): number => {
-    const currentResult = raceResults.find(r => r.race === currentRace && r.skipperIndex === skipperIndex);
-    const previousResult = raceResults.find(r => r.race === currentRace - 1 && r.skipperIndex === skipperIndex);
-
-    if (!currentResult) return 0;
-
-    const before = currentResult.handicap ?? (previousResult?.adjustedHcap ?? skippers[skipperIndex].startHcap);
-    const after = currentResult.adjustedHcap ?? before;
-
-    return after - before;
+    return handicapChangeMap.get(skipperIndex) ?? 0;
   };
 
   const hasR1BeenScored = raceResults.some(r => r.race === 1);
