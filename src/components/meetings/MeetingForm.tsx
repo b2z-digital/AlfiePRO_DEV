@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, TriangleAlert as AlertTriangle, Users, Shield, Repeat, Info, ChevronDown, Check } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, TriangleAlert as AlertTriangle, Users, Shield, Repeat, Info, ChevronDown, Check, GripVertical } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting, MeetingFormData, MeetingCategory, RecurrenceType } from '../../types/meeting';
 import { createMeeting, updateMeeting } from '../../utils/meetingStorage';
@@ -700,6 +700,39 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     ]);
   };
 
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const handleAgendaDragStart = (index: number) => {
+    setDragIndex(index);
+  };
+
+  const handleAgendaDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleAgendaDrop = (targetIndex: number) => {
+    if (dragIndex === null || dragIndex === targetIndex) {
+      setDragIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    setAgendaItems(prev => {
+      const items = [...prev];
+      const [moved] = items.splice(dragIndex, 1);
+      items.splice(targetIndex, 0, moved);
+      return items.map((item, i) => ({ ...item, item_number: i + 1 }));
+    });
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleAgendaDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
   const handleRemoveAgendaItem = (index: number) => {
     if (agendaItems.length <= 1) return;
     
@@ -1297,11 +1330,28 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
             <div className="space-y-4">
               {agendaItems.map((item, index) => (
                 <div
-                  key={index}
-                  className="p-4 rounded-lg bg-slate-700/50 border border-slate-600/50"
+                  key={item.item_number + '-' + index}
+                  draggable
+                  onDragStart={() => handleAgendaDragStart(index)}
+                  onDragOver={(e) => handleAgendaDragOver(e, index)}
+                  onDrop={() => handleAgendaDrop(index)}
+                  onDragEnd={handleAgendaDragEnd}
+                  className={`p-4 rounded-lg bg-slate-700/50 border transition-all duration-150 ${
+                    dragIndex === index
+                      ? 'opacity-40 border-slate-500'
+                      : dragOverIndex === index && dragIndex !== null
+                        ? 'border-blue-500 bg-blue-900/10'
+                        : 'border-slate-600/50'
+                  }`}
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-2">
+                      <div
+                        className="cursor-grab active:cursor-grabbing p-0.5 rounded text-slate-500 hover:text-slate-300 transition-colors"
+                        title="Drag to reorder"
+                      >
+                        <GripVertical size={16} />
+                      </div>
                       <span className="w-6 h-6 flex items-center justify-center bg-slate-600 text-white rounded-full text-xs">
                         {item.item_number}
                       </span>
@@ -1393,7 +1443,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
             </div>
 
             <div className="mt-4 text-xs text-slate-400">
-              <p>To re-order agenda items, you can drag-and-drop them after saving the meeting.</p>
+              <p>Drag the handle on the left of each item to reorder your agenda.</p>
             </div>
           </div>
         
