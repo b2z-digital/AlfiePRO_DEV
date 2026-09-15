@@ -2016,7 +2016,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'handicap-rules' && (
-            <HandicapRuleBuilderPage darkMode={darkMode} />
+            <HandicapRuleBuilderPage darkMode={darkMode} clubId={currentClub?.clubId || null} />
           )}
 
           {activeTab === 'import-export' && (

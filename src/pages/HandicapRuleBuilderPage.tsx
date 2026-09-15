@@ -101,9 +101,10 @@ const APPLIES_TO_OPTIONS = [
 
 interface Props {
   darkMode?: boolean;
+  clubId?: string | null;
 }
 
-export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
+export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propClubId }: Props) {
   const { user } = useAuth();
   const [rulesets, setRulesets] = useState<HandicapRuleset[]>([]);
   const [selectedRuleset, setSelectedRuleset] = useState<HandicapRuleset | null>(null);
@@ -115,7 +116,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
   const [activeTab, setActiveTab] = useState<'rules' | 'simulate' | 'alfie'>('rules');
   const [editingRule, setEditingRule] = useState<AdjustmentRule | null>(null);
   const [showNewRuleModal, setShowNewRuleModal] = useState(false);
-  const [clubId, setClubId] = useState<string | null>(null);
+  const [clubId, setClubId] = useState<string | null>(propClubId || null);
 
   // Simulation state
   const [simMode, setSimMode] = useState<'seeding' | 'handicap'>('handicap');
@@ -146,8 +147,12 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
   const [alfieLoading, setAlfieLoading] = useState(false);
 
   useEffect(() => {
+    if (propClubId) setClubId(propClubId);
+  }, [propClubId]);
+
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [clubId]);
 
   useEffect(() => {
     alfieMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -156,25 +161,34 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Get user's club
-      const { data: userClubs } = await supabase
-        .from('user_clubs')
-        .select('club_id, role')
-        .eq('user_id', user?.id || '')
-        .in('role', ['admin', 'editor'])
-        .limit(1)
-        .maybeSingle();
+      // Get user's club if not passed as prop
+      if (!clubId) {
+        const { data: userClubs } = await supabase
+          .from('user_clubs')
+          .select('club_id, role')
+          .eq('user_id', user?.id || '')
+          .in('role', ['admin', 'editor'])
+          .limit(1)
+          .maybeSingle();
 
-      if (userClubs) {
-        setClubId(userClubs.club_id);
+        if (userClubs) {
+          setClubId(userClubs.club_id);
+          return;
+        }
       }
 
-      // Load rulesets
-      const { data: rulesetsData } = await supabase
+      // Load rulesets for the current club
+      let query = supabase
         .from('handicap_rulesets')
         .select('*')
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
+
+      if (clubId) {
+        query = query.or(`club_id.eq.${clubId},club_id.is.null`);
+      }
+
+      const { data: rulesetsData } = await query;
 
       if (rulesetsData) {
         setRulesets(rulesetsData);
