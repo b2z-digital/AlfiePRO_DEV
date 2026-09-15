@@ -20,6 +20,7 @@ interface RulesetConfig {
   scratch_boat_win_bonus: number;
   scratch_streak_threshold: number;
   scratch_streak_bonus: number;
+  skip_seeding_race: boolean;
 }
 
 interface SeedingRule {
@@ -67,6 +68,7 @@ export async function loadRulesetById(rulesetId: string): Promise<LoadedRuleset 
       scratch_boat_win_bonus: 30,
       scratch_streak_threshold: 3,
       scratch_streak_bonus: 30,
+      skip_seeding_race: false,
     },
     seedingRule: seedingRes.data || null,
     adjustmentRules: rulesRes.data || [],
@@ -104,7 +106,7 @@ export const calculateHandicapsWithRuleset = (
     const raceData = updatedResults.filter(r => r.race === race);
     if (raceData.length === 0) continue;
 
-    if (race === 1 && isInitialRaceFromScratch) {
+    if (race === 1 && isInitialRaceFromScratch && !config.skip_seeding_race) {
       raceData.forEach(result => {
         if (result.handicapOverride) return;
         const idx = result.skipperIndex;
@@ -136,7 +138,7 @@ export const calculateHandicapsWithRuleset = (
 
     const allOnScratch = positions.every(p => p.isOnScratch);
 
-    if (race === 1 && allOnScratch && !isManualHandicaps) {
+    if (race === 1 && allOnScratch && !isManualHandicaps && !config.skip_seeding_race) {
       const seedIncrement = ruleset.seedingRule?.increment_per_position || 10;
       raceData.forEach(result => {
         if (result.handicapOverride) return;

@@ -44,6 +44,7 @@ interface RulesetConfig {
   scratch_boat_win_bonus: number;
   scratch_streak_threshold: number;
   scratch_streak_bonus: number;
+  skip_seeding_race: boolean;
 }
 
 interface SimulationBoat {
@@ -229,7 +230,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propC
     else setAdjustmentRules(DEFAULT_RULES.map(r => ({ ...r, ruleset_id: ruleset.id })));
 
     if (configRes.data) setConfig(configRes.data);
-    else setConfig({ id: '', ruleset_id: ruleset.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30 });
+    else setConfig({ id: '', ruleset_id: ruleset.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false });
   };
 
   const createNewRuleset = async () => {
@@ -274,7 +275,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propC
       setSelectedRuleset(data);
       setAdjustmentRules([]);
       setSeedingRule({ id: '', ruleset_id: data.id, method: 'position_based', base_value: 0, increment_per_position: 10, description: 'First race seeds handicaps from positions (1st=0, 2nd=10, 3rd=20...)' });
-      setConfig({ id: '', ruleset_id: data.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30 });
+      setConfig({ id: '', ruleset_id: data.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false });
       setActiveTab('rules');
     }
   };
@@ -301,6 +302,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propC
             scratch_boat_win_bonus: config.scratch_boat_win_bonus,
             scratch_streak_threshold: config.scratch_streak_threshold,
             scratch_streak_bonus: config.scratch_streak_bonus,
+            skip_seeding_race: config.skip_seeding_race ?? false,
           }).eq('id', config.id);
           if (error) throw error;
         } else {
@@ -403,6 +405,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propC
         scratch_boat_win_bonus: srcConfig.scratch_boat_win_bonus,
         scratch_streak_threshold: srcConfig.scratch_streak_threshold,
         scratch_streak_bonus: srcConfig.scratch_streak_bonus,
+        skip_seeding_race: srcConfig.skip_seeding_race ?? false,
       });
     }
 
@@ -805,7 +808,7 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                   setSelectedRuleset(null);
                   setAdjustmentRules(DEFAULT_RULES);
                   setSeedingRule({ id: '', ruleset_id: '', method: 'position_based', base_value: 0, increment_per_position: 10, description: 'Seeded from first race positions' });
-                  setConfig({ id: '', ruleset_id: '', cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30 });
+                  setConfig({ id: '', ruleset_id: '', cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false });
                 }}
                 className={`w-full text-left p-3 rounded-lg transition-colors ${
                   !selectedRuleset ? 'bg-blue-500/20 border border-blue-500/40' : 'hover:bg-slate-700/50'
@@ -1015,6 +1018,21 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                         disabled={!selectedRuleset}
                       />
                       <label className="text-xs text-slate-300">Enable last place bonus for non-scratch boats</label>
+                    </div>
+                    <div className="col-span-2 mt-2 p-3 rounded-lg bg-slate-900/50 border border-slate-600/30">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={config.skip_seeding_race ?? false}
+                          onChange={(e) => setConfig({ ...config, skip_seeding_race: e.target.checked })}
+                          className="rounded border-slate-600"
+                          disabled={!selectedRuleset}
+                        />
+                        <div>
+                          <label className="text-xs text-white font-medium">Skip seeding race</label>
+                          <p className="text-[11px] text-slate-400 mt-0.5">Apply this rule set's adjustment rules from Race 1 onwards instead of automatically assigning handicaps based on first race finishing positions.</p>
+                        </div>
+                      </div>
                     </div>
                     {config.last_place_bonus_enabled && (
                       <div>
