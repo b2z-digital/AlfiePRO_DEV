@@ -34,10 +34,12 @@ export const resolveAveragePoints = (
   if (normalScores.length === 0) return skippersCount + 1;
 
   // Apply drops before averaging so the ROD score reflects only kept races
+  // Use total race count (including ROD races) for drop thresholds
   if (dropRules && dropRules.length > 0) {
+    const totalRaceCount = normalScores.length + skipperResults.filter(r => r.letterScore === 'ROD').length;
     let numDrops = 0;
     for (const threshold of dropRules) {
-      if (normalScores.length >= threshold) {
+      if (totalRaceCount >= threshold) {
         numDrops++;
       } else {
         break;

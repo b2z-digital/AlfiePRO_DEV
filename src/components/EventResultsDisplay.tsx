@@ -458,11 +458,13 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   }
                 }
                 // Apply drops before averaging so ROD reflects only kept races
+                // Use total race count (including ROD) for drop thresholds
                 const rawDropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
                 const activeDropRules = Array.isArray(rawDropRules) ? rawDropRules : [];
+                const totalRaceCount = nScoreEntries.length + skipperRes.filter(res => res.letterScore === 'ROD').length;
                 let numDrops = 0;
                 for (const threshold of activeDropRules) {
-                  if (nScoreEntries.length >= threshold) numDrops++;
+                  if (totalRaceCount >= threshold) numDrops++;
                   else break;
                 }
                 let kept = nScoreEntries;
@@ -556,7 +558,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
   const { totals, drops } = calculateTotals();
 
-  const hasRODScoring = raceResults.some((r: any) => r.letterScore === 'ROD');
+  const hasRODScoring = (event.raceResults || []).some((r: any) => r.letterScore === 'ROD');
 
   // Get scoring system name based on drop rules
   const getScoringSystemName = () => {
