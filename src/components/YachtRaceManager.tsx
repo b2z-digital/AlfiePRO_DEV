@@ -1652,6 +1652,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   };
 
   const updateMemberHandicaps = async (race: number, results: any[]) => {
+    if (activeRuleset && activeRuleset.config.persist_handicaps === false) {
+      return;
+    }
     try {
       const handicapUpdates = skippers
         .map((skipper, index) => {
@@ -4449,6 +4452,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 isFullscreen={isFullscreenScoring}
                 updateSkipper={updateSkipper}
                 setSkippers={setSkippers}
+                handicapReadOnly={activeRuleset?.config.persist_handicaps === false}
               />
             ) : scoringMode === 'spreadsheet' && raceType === 'scratch' ? (
               <div className={`flex flex-col ${isFullscreenScoring ? 'h-full' : 'h-[calc(100vh-200px)]'} no-select`}>

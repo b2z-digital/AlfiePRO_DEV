@@ -45,6 +45,7 @@ interface RulesetConfig {
   scratch_streak_threshold: number;
   scratch_streak_bonus: number;
   skip_seeding_race: boolean;
+  persist_handicaps: boolean;
 }
 
 interface SimulationBoat {
@@ -230,7 +231,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propC
     else setAdjustmentRules(DEFAULT_RULES.map(r => ({ ...r, ruleset_id: ruleset.id })));
 
     if (configRes.data) setConfig(configRes.data);
-    else setConfig({ id: '', ruleset_id: ruleset.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false });
+    else setConfig({ id: '', ruleset_id: ruleset.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false, persist_handicaps: true });
   };
 
   const createNewRuleset = async () => {
@@ -275,7 +276,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propC
       setSelectedRuleset(data);
       setAdjustmentRules([]);
       setSeedingRule({ id: '', ruleset_id: data.id, method: 'position_based', base_value: 0, increment_per_position: 10, description: 'First race seeds handicaps from positions (1st=0, 2nd=10, 3rd=20...)' });
-      setConfig({ id: '', ruleset_id: data.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false });
+      setConfig({ id: '', ruleset_id: data.id, cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false, persist_handicaps: true });
       setActiveTab('rules');
     }
   };
@@ -808,7 +809,7 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                   setSelectedRuleset(null);
                   setAdjustmentRules(DEFAULT_RULES);
                   setSeedingRule({ id: '', ruleset_id: '', method: 'position_based', base_value: 0, increment_per_position: 10, description: 'Seeded from first race positions' });
-                  setConfig({ id: '', ruleset_id: '', cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false });
+                  setConfig({ id: '', ruleset_id: '', cap_limit: 150, last_place_bonus_enabled: false, last_place_bonus_value: 30, scratch_boat_win_bonus: 30, scratch_streak_threshold: 3, scratch_streak_bonus: 30, skip_seeding_race: false, persist_handicaps: true });
                 }}
                 className={`w-full text-left p-3 rounded-lg transition-colors ${
                   !selectedRuleset ? 'bg-blue-500/20 border border-blue-500/40' : 'hover:bg-slate-700/50'
@@ -1031,6 +1032,21 @@ IMPORTANT: When the user says "no" to further changes, or confirms the rules, yo
                         <div>
                           <label className="text-xs text-white font-medium">Skip seeding race</label>
                           <p className="text-[11px] text-slate-400 mt-0.5">Apply this rule set's adjustment rules from Race 1 onwards instead of automatically assigning handicaps based on first race finishing positions.</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-span-2 mt-2 p-3 rounded-lg bg-slate-900/50 border border-slate-600/30">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={config.persist_handicaps ?? true}
+                          onChange={(e) => setConfig({ ...config, persist_handicaps: e.target.checked })}
+                          className="rounded border-slate-600"
+                          disabled={!selectedRuleset}
+                        />
+                        <div>
+                          <label className="text-xs text-white font-medium">Auto-update member handicaps</label>
+                          <p className="text-[11px] text-slate-400 mt-0.5">When enabled, handicap adjustments after each race are automatically saved back to each member's boat record. When disabled, handicaps are calculated during scoring for reference but not saved — the race officer can update them manually.</p>
                         </div>
                       </div>
                     </div>

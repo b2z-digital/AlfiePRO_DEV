@@ -21,6 +21,7 @@ interface RulesetConfig {
   scratch_streak_threshold: number;
   scratch_streak_bonus: number;
   skip_seeding_race: boolean;
+  persist_handicaps: boolean;
 }
 
 interface SeedingRule {
@@ -69,6 +70,7 @@ export async function loadRulesetById(rulesetId: string): Promise<LoadedRuleset 
       scratch_streak_threshold: 3,
       scratch_streak_bonus: 30,
       skip_seeding_race: false,
+      persist_handicaps: true,
     },
     seedingRule: seedingRes.data || null,
     adjustmentRules: rulesRes.data || [],

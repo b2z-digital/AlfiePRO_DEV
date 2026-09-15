@@ -6,12 +6,14 @@ interface HandicapChangeBadgeProps {
   change: number;
   onClick?: () => void;
   darkMode: boolean;
+  readOnly?: boolean;
 }
 
 export const HandicapChangeBadge: React.FC<HandicapChangeBadgeProps> = ({
   change,
   onClick,
-  darkMode
+  darkMode,
+  readOnly = false
 }) => {
   if (change === 0) return null;
 
@@ -24,17 +26,20 @@ export const HandicapChangeBadge: React.FC<HandicapChangeBadgeProps> = ({
       whileTap={{ scale: 0.95 }}
       onClick={onClick}
       className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold shadow-lg transition-all ${
-        change > 0
-          ? 'bg-red-500 text-white hover:bg-red-600'
-          : 'bg-green-500 text-white hover:bg-green-600'
+        readOnly
+          ? 'bg-amber-500 text-white hover:bg-amber-600 border border-dashed border-amber-300'
+          : change > 0
+            ? 'bg-red-500 text-white hover:bg-red-600'
+            : 'bg-green-500 text-white hover:bg-green-600'
       }`}
+      title={readOnly ? 'Suggested only — not saved to member record' : undefined}
     >
       {change > 0 ? (
         <TrendingUp size={12} strokeWidth={3} />
       ) : (
         <TrendingDown size={12} strokeWidth={3} />
       )}
-      <span>{change > 0 ? '+' : ''}{change}</span>
+      <span>{change > 0 ? '+' : ''}{change}{readOnly ? '*' : ''}</span>
     </motion.button>
   );
 };

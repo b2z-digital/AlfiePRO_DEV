@@ -43,6 +43,7 @@ interface TouchModeScoringProps {
   allSkippers?: Skipper[];
   allRaceResults?: RaceResult[];
   isFullscreen?: boolean;
+  handicapReadOnly?: boolean;
 }
 
 interface FinishingEntry {
@@ -73,6 +74,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   roundLabel,
   allSkippers,
   allRaceResults,
+  handicapReadOnly = false,
   isFullscreen = false
 }) => {
   const [currentRace, setCurrentRace] = useState(initialRace);
@@ -1190,6 +1192,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                                 setShowProgressionModal(true);
                               }}
                               darkMode={darkMode}
+                              readOnly={handicapReadOnly}
                             />
                           )}
                         </div>
