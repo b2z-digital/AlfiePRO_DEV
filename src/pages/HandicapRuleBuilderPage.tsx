@@ -82,6 +82,7 @@ const CONDITION_TYPES = [
   { value: 'scratch_boat', label: 'Is Scratch Boat', description: 'Applies only to boats on 0 handicap' },
   { value: 'streak', label: 'Consecutive Streak', description: 'Triggers after finishing in the same position for N consecutive races' },
   { value: 'mid_fleet', label: 'Mid Fleet', description: 'Applies to boats not in top 3 and not last' },
+  { value: 'fleet_fraction', label: 'Fleet Fraction', description: 'Triggers for a fraction of the fleet (e.g. top 1/3, bottom 1/3)' },
 ];
 
 const ACTION_TYPES = [
@@ -451,6 +452,15 @@ export default function HandicapRuleBuilderPage({ darkMode = true }: Props) {
             case 'mid_fleet':
               applies = boat.position > 3 && boat.position < maxPosition;
               break;
+            case 'fleet_fraction': {
+              const fraction = rule.condition_value.fraction || 3;
+              const segment = rule.condition_value.segment || 'top';
+              const cutoff = Math.ceil(maxPosition / fraction);
+              if (segment === 'top') applies = boat.position <= cutoff;
+              else if (segment === 'bottom') applies = boat.position > maxPosition - cutoff;
+              else if (segment === 'middle') applies = boat.position > cutoff && boat.position <= maxPosition - cutoff;
+              break;
+            }
             case 'streak':
               applies = false;
               break;
@@ -561,6 +571,7 @@ condition_type options:
 - "streak" with condition_value: {"streak_position": "last", "streak_count": 3}
 - "scratch" (no condition_value needed — triggers for scratch/0s boat)
 - "dnf" (no condition_value needed — triggers for DNF/DNS)
+- "fleet_fraction" with condition_value: {"fraction": 3, "segment": "top"} for top 1/3, or {"fraction": 3, "segment": "bottom"} for bottom 1/3, or {"fraction": 3, "segment": "middle"} for middle 1/3
 - "all" (applies every race to everyone)
 
 IMPORTANT: When the user says "no" to further changes, or confirms the rules, you MUST output the JSON block immediately. Do NOT repeat the rules in plain text again. Just say something brief like "Done! I've created those rules for you." followed by the JSON block.`;
@@ -1426,6 +1437,7 @@ function NewRuleModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rule: P
                 setConditionType(e.target.value);
                 if (e.target.value === 'position') setConditionValue({ position: 1 });
                 else if (e.target.value === 'position_range') setConditionValue({ from: 1, to: 3 });
+                else if (e.target.value === 'fleet_fraction') setConditionValue({ fraction: 3, segment: 'top' });
                 else if (e.target.value === 'streak') setConditionValue({ streak_position: 'last', streak_count: 3 });
                 else setConditionValue({});
               }}
@@ -1471,6 +1483,35 @@ function NewRuleModal({ onClose, onAdd }: { onClose: () => void; onAdd: (rule: P
                   className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
                   min={1}
                 />
+              </div>
+            </div>
+          )}
+
+          {conditionType === 'fleet_fraction' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Segment</label>
+                <select
+                  value={conditionValue.segment || 'top'}
+                  onChange={(e) => setConditionValue({ ...conditionValue, segment: e.target.value })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                >
+                  <option value="top">Top</option>
+                  <option value="middle">Middle</option>
+                  <option value="bottom">Bottom</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Divide fleet into</label>
+                <select
+                  value={conditionValue.fraction || 3}
+                  onChange={(e) => setConditionValue({ ...conditionValue, fraction: parseInt(e.target.value) })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                >
+                  <option value={2}>Halves (1/2)</option>
+                  <option value={3}>Thirds (1/3)</option>
+                  <option value={4}>Quarters (1/4)</option>
+                </select>
               </div>
             </div>
           )}
@@ -1655,6 +1696,35 @@ function EditRuleModal({ rule, onClose, onSave }: { rule: AdjustmentRule; onClos
                   className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
                   min={1}
                 />
+              </div>
+            </div>
+          )}
+
+          {editedRule.condition_type === 'fleet_fraction' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Segment</label>
+                <select
+                  value={editedRule.condition_value.segment || 'top'}
+                  onChange={(e) => setEditedRule({ ...editedRule, condition_value: { ...editedRule.condition_value, segment: e.target.value } })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                >
+                  <option value="top">Top</option>
+                  <option value="middle">Middle</option>
+                  <option value="bottom">Bottom</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Divide fleet into</label>
+                <select
+                  value={editedRule.condition_value.fraction || 3}
+                  onChange={(e) => setEditedRule({ ...editedRule, condition_value: { ...editedRule.condition_value, fraction: parseInt(e.target.value) } })}
+                  className="w-full bg-slate-900/50 border border-slate-600/50 rounded-lg px-3 py-2 text-white text-sm"
+                >
+                  <option value={2}>Halves (1/2)</option>
+                  <option value={3}>Thirds (1/3)</option>
+                  <option value={4}>Quarters (1/4)</option>
+                </select>
               </div>
             </div>
           )}
