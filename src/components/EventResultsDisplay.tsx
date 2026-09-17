@@ -45,6 +45,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [enrichedEvent, setEnrichedEvent] = useState<RaceEvent>(event);
   const [rosteredCROName, setRosteredCROName] = useState<string | null>(null);
+  const [scratchWinBonus, setScratchWinBonus] = useState<number | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showHandicaps, setShowHandicapsState] = useState(showHandicapsProp !== undefined ? showHandicapsProp : true);
   const setShowHandicaps = (val: boolean) => {
@@ -97,6 +98,31 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
     };
     fetchRosteredCRO();
   }, [event.proMemberName, event.clubId, event.date]);
+
+  useEffect(() => {
+    if (event.raceFormat !== 'handicap' || !event.clubId) return;
+    const loadRulesetConfig = async () => {
+      try {
+        const { data: club } = await supabase
+          .from('clubs')
+          .select('default_handicap_ruleset_id')
+          .eq('id', event.clubId!)
+          .maybeSingle();
+        if (!club?.default_handicap_ruleset_id) return;
+        const { data: config } = await supabase
+          .from('handicap_ruleset_config')
+          .select('scratch_boat_win_bonus')
+          .eq('ruleset_id', club.default_handicap_ruleset_id)
+          .maybeSingle();
+        if (config) {
+          setScratchWinBonus(config.scratch_boat_win_bonus ?? 30);
+        }
+      } catch {
+        // Fall back to default
+      }
+    };
+    loadRulesetConfig();
+  }, [event.clubId, event.raceFormat]);
 
   // Enrich skipper data with member information
   useEffect(() => {
@@ -1371,7 +1397,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
                   let scratchBoatBonus = 0;
                   if (scratchBoatWinner) {
-                    scratchBoatBonus = 30;
+                    scratchBoatBonus = scratchWinBonus !== null ? scratchWinBonus : 30;
                   }
 
                   return (
@@ -1620,7 +1646,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             width: '100%',
                             height: '44px',
                             margin: '0',
-                            padding: '0'
+                            padding: '0',
+                            overflow: 'visible'
                           }}>
                             {/* SVG diagonal line - top-left to bottom-right */}
                             <svg
@@ -1659,10 +1686,10 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             }}>
                               {raceHandicap !== null ? `${raceHandicap}s` : ''}
                             </span>
-                            {/* Position at bottom-left */}
+                            {/* Position at bottom-left - use top instead of bottom for html2canvas */}
                             <span style={{
                               position: 'absolute',
-                              bottom: '4px',
+                              top: '22px',
                               left: '6px',
                               fontSize: '18px',
                               fontWeight: 'bold',
