@@ -12,6 +12,22 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  const appId = Deno.env.get('INSTAGRAM_APP_ID');
+  const appSecret = Deno.env.get('INSTAGRAM_APP_SECRET');
+
+  if (req.method === "GET") {
+    if (!appId) {
+      return new Response(
+        JSON.stringify({ error: "Instagram App ID not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    return new Response(
+      JSON.stringify({ appId }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     const { code, redirectUri, clubId } = await req.json();
 
@@ -19,8 +35,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('Missing required parameters');
     }
 
-    const appId = Deno.env.get('INSTAGRAM_APP_ID');
-    const appSecret = Deno.env.get('INSTAGRAM_APP_SECRET');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 

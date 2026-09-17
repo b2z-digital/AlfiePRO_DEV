@@ -508,11 +508,17 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
 
   const handleConnectFacebook = async () => {
     try {
-      const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
-      if (!appId) {
-        addNotification('error', 'Facebook integration not configured');
-        return;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const appIdRes = await fetch(`${supabaseUrl}/functions/v1/facebook-oauth-callback`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${anonKey}` },
+      });
+      const appIdData = await appIdRes.json();
+      if (!appIdData.appId) {
+        throw new Error('Facebook integration is not configured. Please contact support.');
       }
+      const appId = appIdData.appId;
 
       const redirectUri = `${window.location.origin}/settings`;
       const scope = 'pages_show_list,pages_read_engagement,pages_manage_posts';
@@ -527,13 +533,24 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       window.location.href = authUrl;
     } catch (err) {
       console.error('Error initiating Facebook OAuth:', err);
-      addNotification('error', 'Failed to connect Facebook');
+      addNotification('error', err instanceof Error ? err.message : 'Failed to connect Facebook');
     }
   };
 
   const handleConnectInstagram = async () => {
     try {
-      const appId = import.meta.env.VITE_INSTAGRAM_APP_ID || '123456789';
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const appIdRes = await fetch(`${supabaseUrl}/functions/v1/instagram-oauth-callback`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${anonKey}` },
+      });
+      const appIdData = await appIdRes.json();
+      if (!appIdData.appId) {
+        throw new Error('Instagram integration is not configured. Please contact support.');
+      }
+      const appId = appIdData.appId;
+
       const redirectUri = `${window.location.origin}/settings`;
 
       const authUrl = `https://api.instagram.com/oauth/authorize?` +
@@ -546,7 +563,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       window.location.href = authUrl;
     } catch (err) {
       console.error('Error initiating Instagram OAuth:', err);
-      addNotification('error', 'Failed to connect Instagram');
+      addNotification('error', err instanceof Error ? err.message : 'Failed to connect Instagram');
     }
   };
 
