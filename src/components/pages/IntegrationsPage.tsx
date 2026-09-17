@@ -957,7 +957,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     const sub = metaSuite?.subServices?.find(s => s.id === subServiceId);
 
     if (sub?.connected) {
-      const platform = subServiceId === 'facebook' ? 'meta' : subServiceId;
+      const platform = subServiceId;
       await handleDisconnectIntegration(platform);
     } else {
       if (subServiceId === 'facebook') {
@@ -979,7 +979,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
         idColumn = currentOrganization.type === 'national' ? 'national_association_id' : 'state_association_id';
       }
 
-      const metaPlatforms = ['meta', 'facebook', 'instagram'];
+      const metaPlatforms = ['facebook', 'instagram'];
       for (const platform of metaPlatforms) {
         await supabase
           .from('integrations')
@@ -1028,17 +1028,25 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       setSaving(true);
       setError(null);
 
-      const { error } = await supabase
-        .from('club_integrations')
-        .upsert({
-          club_id: currentClub?.clubId,
-          provider: 'google-analytics',
-          google_analytics_property_id: googleAnalyticsId,
-          is_enabled: true,
-          connected_at: new Date().toISOString()
-        }, {
-          onConflict: 'club_id,provider'
-        });
+      const { data: existingGA } = await supabase
+        .from('integrations')
+        .select('id')
+        .eq('club_id', currentClub?.clubId)
+        .eq('platform', 'google-analytics')
+        .maybeSingle();
+
+      const gaRecord = {
+        club_id: currentClub?.clubId,
+        platform: 'google-analytics',
+        is_active: true,
+        credentials: { property_id: googleAnalyticsId },
+        connected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = existingGA
+        ? await supabase.from('integrations').update(gaRecord).eq('id', existingGA.id)
+        : await supabase.from('integrations').insert(gaRecord);
 
       if (error) throw error;
 
@@ -1063,18 +1071,25 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       setSaving(true);
       setError(null);
 
-      const { error } = await supabase
-        .from('club_integrations')
-        .upsert({
-          club_id: currentClub?.clubId,
-          provider: 'paypal',
-          paypal_email: paypalEmail,
-          paypal_merchant_id: paypalClientId,
-          is_enabled: true,
-          connected_at: new Date().toISOString()
-        }, {
-          onConflict: 'club_id,provider'
-        });
+      const { data: existingPP } = await supabase
+        .from('integrations')
+        .select('id')
+        .eq('club_id', currentClub?.clubId)
+        .eq('platform', 'paypal')
+        .maybeSingle();
+
+      const ppRecord = {
+        club_id: currentClub?.clubId,
+        platform: 'paypal',
+        is_active: true,
+        credentials: { email: paypalEmail, merchant_id: paypalClientId },
+        connected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = existingPP
+        ? await supabase.from('integrations').update(ppRecord).eq('id', existingPP.id)
+        : await supabase.from('integrations').insert(ppRecord);
 
       if (error) throw error;
 
@@ -1404,19 +1419,29 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       const selectedPage = facebookPages.find(p => p.id === selectedFacebookPage);
       if (!selectedPage) throw new Error('Selected page not found');
 
-      const { error } = await supabase
-        .from('club_integrations')
-        .upsert({
-          club_id: currentClub?.clubId,
-          provider: 'meta',
+      const { data: existing } = await supabase
+        .from('integrations')
+        .select('id')
+        .eq('club_id', currentClub?.clubId)
+        .eq('platform', 'facebook')
+        .maybeSingle();
+
+      const record = {
+        club_id: currentClub?.clubId,
+        platform: 'facebook',
+        is_active: true,
+        credentials: {
           page_id: selectedPage.id,
           page_name: selectedPage.name,
           access_token: selectedPage.access_token,
-          is_enabled: true,
-          connected_at: new Date().toISOString()
-        }, {
-          onConflict: 'club_id,provider'
-        });
+        },
+        connected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = existing
+        ? await supabase.from('integrations').update(record).eq('id', existing.id)
+        : await supabase.from('integrations').insert(record);
 
       if (error) throw error;
 

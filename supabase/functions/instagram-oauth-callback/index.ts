@@ -9,10 +9,7 @@ const corsHeaders = {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -33,9 +30,7 @@ Deno.serve(async (req: Request) => {
 
     const tokenResponse = await fetch('https://api.instagram.com/oauth/access_token', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         client_id: appId,
         client_secret: appSecret,
@@ -71,19 +66,29 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { error: dbError } = await supabase
-      .from('club_integrations')
-      .upsert({
-        club_id: clubId,
-        provider: 'instagram',
-        instagram_user_id: user_id,
-        instagram_username: username,
+    const { data: existing } = await supabase
+      .from('integrations')
+      .select('id')
+      .eq('club_id', clubId)
+      .eq('platform', 'instagram')
+      .maybeSingle();
+
+    const record = {
+      club_id: clubId,
+      platform: 'instagram',
+      is_active: true,
+      credentials: {
+        user_id: user_id,
+        username: username,
         access_token: access_token,
-        is_enabled: true,
-        connected_at: new Date().toISOString()
-      }, {
-        onConflict: 'club_id,provider'
-      });
+      },
+      connected_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: dbError } = existing
+      ? await supabase.from('integrations').update(record).eq('id', existing.id)
+      : await supabase.from('integrations').insert(record);
 
     if (dbError) {
       throw new Error(`Database error: ${dbError.message}`);
@@ -94,30 +99,17 @@ Deno.serve(async (req: Request) => {
         success: true,
         userId: user_id,
         username: username,
-        message: 'Instagram integration connected successfully'
+        message: 'Instagram integration connected successfully',
       }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Instagram OAuth callback error:', error);
 
     return new Response(
-      JSON.stringify({
-        error: error.message || 'Failed to process Instagram OAuth callback'
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-        status: 400,
-      }
+      JSON.stringify({ error: error.message || 'Failed to process Instagram OAuth callback' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
     );
   }
 });
