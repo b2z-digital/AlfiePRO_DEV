@@ -44,12 +44,59 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [enrichedEvent, setEnrichedEvent] = useState<RaceEvent>(event);
+  const [rosteredCROName, setRosteredCROName] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showHandicaps, setShowHandicapsState] = useState(showHandicapsProp !== undefined ? showHandicapsProp : true);
   const setShowHandicaps = (val: boolean) => {
     setShowHandicapsState(val);
     onShowHandicapsChange?.(val);
   };
+
+  useEffect(() => {
+    if (event.proMemberName || !event.clubId || !event.date) return;
+    const fetchRosteredCRO = async () => {
+      try {
+        const eventDate = event.date?.split('T')[0];
+        if (!eventDate) return;
+        const { data } = await supabase
+          .from('pro_roster_rounds')
+          .select('id, roster_id, pro_roster_assignments(member_id, status)')
+          .eq('date', eventDate)
+          .limit(5);
+        if (!data || data.length === 0) return;
+        const rosterIds = [...new Set(data.map((r: any) => r.roster_id))];
+        const { data: rosters } = await supabase
+          .from('pro_rosters')
+          .select('id, club_id')
+          .in('id', rosterIds)
+          .eq('club_id', event.clubId!);
+        if (!rosters || rosters.length === 0) return;
+        const clubRosterIds = new Set(rosters.map((r: any) => r.id));
+        for (const round of data as any[]) {
+          if (!clubRosterIds.has(round.roster_id)) continue;
+          const assignments = round.pro_roster_assignments || [];
+          const active = assignments.find((a: any) => a.status === 'assigned' || a.status === 'confirmed');
+          if (active) {
+            const { data: member } = await supabase
+              .from('members')
+              .select('first_name, last_name')
+              .eq('id', active.member_id)
+              .maybeSingle();
+            if (member) {
+              const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ');
+              if (fullName) {
+                setRosteredCROName(fullName);
+                return;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        // Silently fail - CRO name is optional
+      }
+    };
+    fetchRosteredCRO();
+  }, [event.proMemberName, event.clubId, event.date]);
 
   // Enrich skipper data with member information
   useEffect(() => {
@@ -1554,6 +1601,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                       } ${event.raceFormat === 'handicap' && showHandicaps && !letterScore ? 'split-cell' : ''}`}
                       style={isExportMode ? {
                         ...exportTdBase,
+                        ...(event.raceFormat === 'handicap' && showHandicaps && !letterScore ? { padding: 0, height: '44px', lineHeight: 'normal' } : {}),
                         ...(isDropped ? { backgroundColor: '#848484', color: '#ffffff' } : {})
                       } : undefined}
                     >
@@ -1734,14 +1782,14 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
         </table>
       </div>
 
-      {/* Scoring System & PRO Display */}
+      {/* Scoring System & CRO Display */}
       <div className="mt-4 px-4 flex items-center justify-between">
-        {event.proMemberName ? (
+        {(event.proMemberName || rosteredCROName) ? (
           <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${
             isExportMode ? 'bg-slate-100 text-slate-700' : 'bg-slate-700/50 text-slate-300'
           }`}>
-            <span className="text-sm font-medium">PRO:</span>
-            <span className="text-sm">{event.proMemberName}</span>
+            <span className="text-sm font-medium">CRO:</span>
+            <span className="text-sm">{event.proMemberName || rosteredCROName}</span>
           </div>
         ) : <div />}
         <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${

@@ -121,7 +121,7 @@
 .results-export-container .split-cell {
   padding: 0 !important;
   position: relative !important;
-  height: 32px !important;
+  height: 44px !important;
   line-height: normal !important;
   overflow: visible !important;
   vertical-align: middle !important;
@@ -133,8 +133,8 @@
   display: block !important;
   position: relative !important;
   width: 100% !important;
-  height: 32px !important;
-  min-height: 32px !important;
+  height: 44px !important;
+  min-height: 44px !important;
 }
 
 .results-export-container .split-cell > div > div,
@@ -443,8 +443,8 @@
   display: block !important;
   position: relative !important;
   width: 100% !important;
-  height: 32px !important;
-  min-height: 32px !important;
+  height: 44px !important;
+  min-height: 44px !important;
 }
 
 .series-export-container .split-cell > div > div {
