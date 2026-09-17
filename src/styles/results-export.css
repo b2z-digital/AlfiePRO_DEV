@@ -127,17 +127,6 @@
   vertical-align: middle !important;
 }
 
-/* Reset inner table used for split cell layout */
-.results-export-container .split-cell table {
-  border: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-.results-export-container .split-cell table td {
-  border: none !important;
-  background: transparent !important;
-}
-
 .results-export-container .split-cell > div,
 .results-export-container .split-cell .split-cell-content,
 .results-export-container .split-cell .relative {
@@ -148,7 +137,7 @@
   min-height: 44px !important;
 }
 
-/* Inner content rules - only for screen-mode split cells with class-based layout */
+.results-export-container .split-cell > div > div,
 .results-export-container .split-cell .split-cell-content > div,
 .results-export-container .split-cell .relative > div {
   position: absolute !important;
@@ -158,14 +147,15 @@
   left: 0 !important;
 }
 
-/* Only target screen-mode spans with Tailwind classes, not export-mode table cells */
-.results-export-container .split-cell .split-cell-content span {
+.results-export-container .split-cell span {
   position: absolute !important;
   line-height: 1 !important;
   display: inline-block !important;
 }
 
-
+.results-export-container .split-cell span.absolute {
+  position: absolute !important;
+}
 
 /* Position number in bottom-left */
 .results-export-container .split-cell .bottom-0,
@@ -197,12 +187,13 @@
   opacity: 1 !important;
 }
 
-/* Diagonal line in split cells - for screen-mode class-based layout */
+/* Diagonal line in split cells - CRITICAL: Must show in export */
 .results-export-container .split-cell .diagonal-line,
 .results-export-container .split-cell .export-diagonal,
 .results-export-container .split-cell div.diagonal-line,
 .results-export-container .split-cell div.export-diagonal,
 .results-export-container .split-cell div[class*="diagonal"],
+.results-export-container .split-cell > div > div:first-child,
 .results-export-container .split-cell .relative > div:first-child,
 .results-export-container .split-cell .split-cell-content > div:first-child,
 .results-export-container td.split-cell .diagonal-line,
@@ -231,7 +222,7 @@
 }
 
 /* Ensure text appears above the diagonal line */
-.results-export-container .split-cell .split-cell-content span {
+.results-export-container .split-cell span {
   z-index: 2 !important;
   position: absolute !important;
 }

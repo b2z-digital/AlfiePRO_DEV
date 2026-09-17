@@ -1647,24 +1647,9 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             height: '44px',
                             margin: '0',
                             padding: '0',
-                            overflow: 'hidden'
+                            overflow: 'visible'
                           }}>
-                            {/* Use a simple 2-row table layout instead of absolute positioning for html2canvas */}
-                            <table style={{ width: '100%', height: '44px', borderCollapse: 'collapse', tableLayout: 'fixed', border: 'none' }}>
-                              <tbody>
-                                <tr>
-                                  <td style={{ border: 'none', padding: '1px 6px 0', height: '18px', textAlign: 'right', verticalAlign: 'top', fontSize: '10px', fontWeight: '600', color: isDropped ? '#ffffff' : '#333333', lineHeight: '1' }}>
-                                    {raceHandicap !== null ? `${raceHandicap}s` : ''}
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td style={{ border: 'none', padding: '0 6px 1px', height: '26px', textAlign: 'left', verticalAlign: 'bottom', fontSize: '18px', fontWeight: 'bold', color: isDropped ? '#ffffff' : '#000000', lineHeight: '1' }}>
-                                    {position || withdrawnScore}
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                            {/* Diagonal line overlay */}
+                            {/* SVG diagonal line - top-left to bottom-right */}
                             <svg
                               viewBox="0 0 100 100"
                               preserveAspectRatio="none"
@@ -1688,6 +1673,32 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                                 vectorEffect="non-scaling-stroke"
                               />
                             </svg>
+                            {/* Handicap at top-right */}
+                            <span style={{
+                              position: 'absolute',
+                              top: '2px',
+                              right: '6px',
+                              fontSize: '10px',
+                              fontWeight: '600',
+                              color: isDropped ? '#ffffff' : '#333333',
+                              lineHeight: '1',
+                              zIndex: 3
+                            }}>
+                              {raceHandicap !== null ? `${raceHandicap}s` : ''}
+                            </span>
+                            {/* Position at bottom-left - use top instead of bottom for html2canvas */}
+                            <span style={{
+                              position: 'absolute',
+                              top: '22px',
+                              left: '6px',
+                              fontSize: '18px',
+                              fontWeight: 'bold',
+                              color: isDropped ? '#ffffff' : '#000000',
+                              lineHeight: '1',
+                              zIndex: 3
+                            }}>
+                              {position || withdrawnScore}
+                            </span>
                           </div>
                         ) : (
                           <div className="relative split-cell-content" style={{ minHeight: '32px' }}>
