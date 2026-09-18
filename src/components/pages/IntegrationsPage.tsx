@@ -520,7 +520,8 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       }
       const appId = appIdData.appId;
 
-      const redirectUri = `${window.location.origin}/settings`;
+      const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+      const redirectUri = `${appUrl}/settings`;
       const scope = 'pages_show_list,pages_read_engagement,pages_manage_posts';
 
       const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
@@ -551,7 +552,8 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       }
       const appId = appIdData.appId;
 
-      const redirectUri = `${window.location.origin}/settings`;
+      const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+      const redirectUri = `${appUrl}/settings`;
 
       const authUrl = `https://api.instagram.com/oauth/authorize?` +
         `client_id=${appId}&` +
