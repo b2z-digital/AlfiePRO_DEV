@@ -509,22 +509,11 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
   const handleConnectFacebook = async () => {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('You must be signed in to connect Facebook.');
-      }
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const appIdRes = await fetch(`${supabaseUrl}/functions/v1/facebook-oauth-callback`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
+        headers: { 'Authorization': `Bearer ${anonKey}` },
       });
-      if (!appIdRes.ok) {
-        const errBody = await appIdRes.text();
-        console.error('Facebook appId fetch failed:', appIdRes.status, errBody);
-        throw new Error('Facebook integration is not configured. Please contact support.');
-      }
       const appIdData = await appIdRes.json();
       if (!appIdData.appId) {
         throw new Error('Facebook integration is not configured. Please contact support.');
@@ -551,22 +540,11 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
   const handleConnectInstagram = async () => {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('You must be signed in to connect Instagram.');
-      }
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const appIdRes = await fetch(`${supabaseUrl}/functions/v1/instagram-oauth-callback`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
+        headers: { 'Authorization': `Bearer ${anonKey}` },
       });
-      if (!appIdRes.ok) {
-        const errBody = await appIdRes.text();
-        console.error('Instagram appId fetch failed:', appIdRes.status, errBody);
-        throw new Error('Instagram integration is not configured. Please contact support.');
-      }
       const appIdData = await appIdRes.json();
       if (!appIdData.appId) {
         throw new Error('Instagram integration is not configured. Please contact support.');
