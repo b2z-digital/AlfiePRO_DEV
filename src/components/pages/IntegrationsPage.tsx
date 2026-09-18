@@ -508,11 +508,17 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
 
   const handleConnectFacebook = async () => {
     try {
-      const appId = import.meta.env.VITE_FACEBOOK_APP_ID;
-      if (!appId) {
-        addNotification('error', 'Facebook integration not configured');
-        return;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const appIdRes = await fetch(`${supabaseUrl}/functions/v1/facebook-oauth-callback`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${anonKey}` },
+      });
+      const appIdData = await appIdRes.json();
+      if (!appIdData.appId) {
+        throw new Error('Facebook integration is not configured. Please contact support.');
       }
+      const appId = appIdData.appId;
 
       const redirectUri = `${window.location.origin}/settings`;
       const scope = 'pages_show_list,pages_read_engagement,pages_manage_posts';
@@ -527,13 +533,24 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       window.location.href = authUrl;
     } catch (err) {
       console.error('Error initiating Facebook OAuth:', err);
-      addNotification('error', 'Failed to connect Facebook');
+      addNotification('error', err instanceof Error ? err.message : 'Failed to connect Facebook');
     }
   };
 
   const handleConnectInstagram = async () => {
     try {
-      const appId = import.meta.env.VITE_INSTAGRAM_APP_ID || '123456789';
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const appIdRes = await fetch(`${supabaseUrl}/functions/v1/instagram-oauth-callback`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${anonKey}` },
+      });
+      const appIdData = await appIdRes.json();
+      if (!appIdData.appId) {
+        throw new Error('Instagram integration is not configured. Please contact support.');
+      }
+      const appId = appIdData.appId;
+
       const redirectUri = `${window.location.origin}/settings`;
 
       const authUrl = `https://api.instagram.com/oauth/authorize?` +
@@ -546,7 +563,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       window.location.href = authUrl;
     } catch (err) {
       console.error('Error initiating Instagram OAuth:', err);
-      addNotification('error', 'Failed to connect Instagram');
+      addNotification('error', err instanceof Error ? err.message : 'Failed to connect Instagram');
     }
   };
 
@@ -957,7 +974,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     const sub = metaSuite?.subServices?.find(s => s.id === subServiceId);
 
     if (sub?.connected) {
-      const platform = subServiceId === 'facebook' ? 'meta' : subServiceId;
+      const platform = subServiceId;
       await handleDisconnectIntegration(platform);
     } else {
       if (subServiceId === 'facebook') {
@@ -979,7 +996,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
         idColumn = currentOrganization.type === 'national' ? 'national_association_id' : 'state_association_id';
       }
 
-      const metaPlatforms = ['meta', 'facebook', 'instagram'];
+      const metaPlatforms = ['facebook', 'instagram'];
       for (const platform of metaPlatforms) {
         await supabase
           .from('integrations')
@@ -1028,17 +1045,25 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       setSaving(true);
       setError(null);
 
-      const { error } = await supabase
-        .from('club_integrations')
-        .upsert({
-          club_id: currentClub?.clubId,
-          provider: 'google-analytics',
-          google_analytics_property_id: googleAnalyticsId,
-          is_enabled: true,
-          connected_at: new Date().toISOString()
-        }, {
-          onConflict: 'club_id,provider'
-        });
+      const { data: existingGA } = await supabase
+        .from('integrations')
+        .select('id')
+        .eq('club_id', currentClub?.clubId)
+        .eq('platform', 'google-analytics')
+        .maybeSingle();
+
+      const gaRecord = {
+        club_id: currentClub?.clubId,
+        platform: 'google-analytics',
+        is_active: true,
+        credentials: { property_id: googleAnalyticsId },
+        connected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = existingGA
+        ? await supabase.from('integrations').update(gaRecord).eq('id', existingGA.id)
+        : await supabase.from('integrations').insert(gaRecord);
 
       if (error) throw error;
 
@@ -1063,18 +1088,25 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       setSaving(true);
       setError(null);
 
-      const { error } = await supabase
-        .from('club_integrations')
-        .upsert({
-          club_id: currentClub?.clubId,
-          provider: 'paypal',
-          paypal_email: paypalEmail,
-          paypal_merchant_id: paypalClientId,
-          is_enabled: true,
-          connected_at: new Date().toISOString()
-        }, {
-          onConflict: 'club_id,provider'
-        });
+      const { data: existingPP } = await supabase
+        .from('integrations')
+        .select('id')
+        .eq('club_id', currentClub?.clubId)
+        .eq('platform', 'paypal')
+        .maybeSingle();
+
+      const ppRecord = {
+        club_id: currentClub?.clubId,
+        platform: 'paypal',
+        is_active: true,
+        credentials: { email: paypalEmail, merchant_id: paypalClientId },
+        connected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = existingPP
+        ? await supabase.from('integrations').update(ppRecord).eq('id', existingPP.id)
+        : await supabase.from('integrations').insert(ppRecord);
 
       if (error) throw error;
 
@@ -1404,19 +1436,29 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       const selectedPage = facebookPages.find(p => p.id === selectedFacebookPage);
       if (!selectedPage) throw new Error('Selected page not found');
 
-      const { error } = await supabase
-        .from('club_integrations')
-        .upsert({
-          club_id: currentClub?.clubId,
-          provider: 'meta',
+      const { data: existing } = await supabase
+        .from('integrations')
+        .select('id')
+        .eq('club_id', currentClub?.clubId)
+        .eq('platform', 'facebook')
+        .maybeSingle();
+
+      const record = {
+        club_id: currentClub?.clubId,
+        platform: 'facebook',
+        is_active: true,
+        credentials: {
           page_id: selectedPage.id,
           page_name: selectedPage.name,
           access_token: selectedPage.access_token,
-          is_enabled: true,
-          connected_at: new Date().toISOString()
-        }, {
-          onConflict: 'club_id,provider'
-        });
+        },
+        connected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = existing
+        ? await supabase.from('integrations').update(record).eq('id', existing.id)
+        : await supabase.from('integrations').insert(record);
 
       if (error) throw error;
 

@@ -3,3 +3,12 @@ id = ""
 
 [functions.send-notification]
 verify_jwt = true
+
+[functions.facebook-oauth-callback]
+verify_jwt = true
+
+[functions.instagram-oauth-callback]
+verify_jwt = true
+
+[functions.publish-to-facebook]
+verify_jwt = true

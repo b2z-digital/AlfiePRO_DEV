@@ -50,9 +50,10 @@ export const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const fetchConnectedPlatforms = async () => {
     try {
       const { data, error } = await supabase
-        .from('club_integrations')
-        .select('provider, page_name, youtube_channel_name')
-        .eq('club_id', currentClub?.clubId);
+        .from('integrations')
+        .select('platform, credentials, is_active')
+        .eq('club_id', currentClub?.clubId)
+        .eq('is_active', true);
 
       if (error) throw error;
 
@@ -61,7 +62,7 @@ export const SocialShareModal: React.FC<SocialShareModalProps> = ({
           id: 'facebook',
           name: 'Facebook',
           icon: <Facebook size={20} className="text-blue-600" />,
-          connected: data?.some(integration => integration.provider === 'meta') || false,
+          connected: data?.some(integration => integration.platform === 'facebook') || false,
           maxImages: 10,
           maxVideos: 1,
           supportsText: true,

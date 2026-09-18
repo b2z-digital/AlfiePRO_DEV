@@ -8,10 +8,23 @@ const corsHeaders = {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  const appId = Deno.env.get('FACEBOOK_APP_ID');
+  const appSecret = Deno.env.get('FACEBOOK_APP_SECRET');
+
+  if (req.method === "GET") {
+    if (!appId) {
+      return new Response(
+        JSON.stringify({ error: "Facebook App ID not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    return new Response(
+      JSON.stringify({ appId }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   try {
@@ -21,13 +34,8 @@ Deno.serve(async (req: Request) => {
       throw new Error('Missing required parameters');
     }
 
-    const appId = Deno.env.get('FACEBOOK_APP_ID');
-    const appSecret = Deno.env.get('FACEBOOK_APP_SECRET');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!appId || !appSecret || !supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing environment variables');
+    if (!appId || !appSecret) {
+      throw new Error('Missing Facebook environment variables');
     }
 
     const tokenResponse = await fetch(
@@ -74,28 +82,15 @@ Deno.serve(async (req: Request) => {
           access_token: page.access_token,
         })),
       }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Facebook OAuth callback error:', error);
 
     return new Response(
-      JSON.stringify({
-        error: error.message || 'Failed to process Facebook OAuth callback'
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-        status: 400,
-      }
+      JSON.stringify({ error: error.message || 'Failed to process Facebook OAuth callback' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
     );
   }
 });

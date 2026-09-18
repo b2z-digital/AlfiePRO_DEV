@@ -636,18 +636,19 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     try {
       // Check if the club has a Meta integration
       const { data, error } = await supabase
-        .from('club_integrations')
+        .from('integrations')
         .select('*')
         .eq('club_id', currentClub?.clubId)
-        .eq('provider', 'meta')
+        .eq('platform', 'facebook')
+        .eq('is_active', true)
         .maybeSingle();
       
       if (error) throw error;
       
       if (data) {
         setMetaConnected(true);
-        setMetaPageName(data.page_name || '');
-        setMetaPageId(data.page_id || '');
+        setMetaPageName(data.credentials?.page_name || '');
+        setMetaPageId(data.credentials?.page_id || '');
       } else {
         setMetaConnected(false);
       }
@@ -660,17 +661,18 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     try {
       // Check if the club has a YouTube integration
       const { data, error } = await supabase
-        .from('club_integrations')
+        .from('integrations')
         .select('*')
         .eq('club_id', currentClub?.clubId)
-        .eq('provider', 'youtube')
+        .eq('platform', 'youtube')
+        .eq('is_active', true)
         .maybeSingle();
       
       if (error) throw error;
       
       if (data) {
         setYoutubeConnected(true);
-        setYoutubeChannelId(data.youtube_channel_id || '');
+        setYoutubeChannelId(data.credentials?.channel_id || '');
       } else {
         setYoutubeConnected(false);
       }
