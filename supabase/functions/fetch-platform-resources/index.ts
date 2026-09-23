@@ -46,9 +46,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const isSuperAdminFromMetadata =
-      user.user_metadata?.is_super_admin === true;
-
     const { data: roleCheck } = await supabase
       .from("user_clubs")
       .select("role")
@@ -56,7 +53,14 @@ Deno.serve(async (req: Request) => {
       .eq("role", "super_admin")
       .maybeSingle();
 
-    if (!isSuperAdminFromMetadata && !roleCheck) {
+    const { data: platformAdmin } = await supabase
+      .from("platform_super_admins")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (!roleCheck && !platformAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -35,11 +35,27 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Only allow http/https
     if (!["http:", "https:"].includes(parsedUrl.protocol)) {
       return new Response(
         JSON.stringify({ error: "Only HTTP/HTTPS URLs are supported" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const blockedHosts = ["localhost", "127.0.0.1", "0.0.0.0", "[::1]", "metadata.google.internal"];
+    const hostname = parsedUrl.hostname.toLowerCase();
+    if (
+      blockedHosts.includes(hostname) ||
+      hostname.startsWith("169.254.") ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("192.168.") ||
+      hostname.match(/^172\.(1[6-9]|2\d|3[01])\./) ||
+      hostname.endsWith(".internal") ||
+      hostname.endsWith(".local")
+    ) {
+      return new Response(
+        JSON.stringify({ error: "Access to internal networks is not allowed" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

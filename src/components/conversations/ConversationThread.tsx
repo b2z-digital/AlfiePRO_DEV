@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Star, Archive, Trash2, Reply, Forward, ChevronRight, MoveHorizontal as MoreHorizontal, Bell, Paperclip, Download, ExternalLink } from 'lucide-react';
+import { sanitizeHtml } from '../../utils/sanitize';
 
 interface Notification {
   id: string;
@@ -218,7 +219,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
               <h3 className="text-lg font-semibold text-white mb-4">{notification.subject}</h3>
               <div
                 className="prose prose-invert prose-sm max-w-none text-slate-300 leading-relaxed [&_p]:mb-3 [&_a]:text-blue-400 [&_a]:no-underline hover:[&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
-                dangerouslySetInnerHTML={{ __html: notification.body }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(notification.body) }}
               />
 
               {notification.link_url && (

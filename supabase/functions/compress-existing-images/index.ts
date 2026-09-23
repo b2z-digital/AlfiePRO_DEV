@@ -30,17 +30,21 @@ async function authenticateRequest(
 
   if (authError || !user) return { error: "Invalid token", status: 401 };
 
-  const isSuperAdmin = user.user_metadata?.is_super_admin === true;
-  if (!isSuperAdmin) {
-    const { data: roleCheck } = await supabase
-      .from("user_clubs")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "super_admin")
-      .maybeSingle();
+  const { data: roleCheck } = await supabase
+    .from("user_clubs")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("role", "super_admin")
+    .maybeSingle();
 
-    if (!roleCheck) return { error: "Forbidden", status: 403 };
-  }
+  const { data: platformAdmin } = await supabase
+    .from("platform_super_admins")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!roleCheck && !platformAdmin) return { error: "Forbidden", status: 403 };
 
   return { user };
 }

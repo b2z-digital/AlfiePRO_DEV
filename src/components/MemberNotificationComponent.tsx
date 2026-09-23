@@ -10,6 +10,7 @@ import * as commsUtils from './communications/utils';
 import EmojiPicker from 'emoji-picker-react';
 import { useNotifications } from '../contexts/NotificationContext';
 import { ConfirmationModal } from './ConfirmationModal';
+import { sanitizeHtml } from '../utils/sanitize';
 
 interface Notification {
   id: string;
@@ -1213,9 +1214,9 @@ export const MemberNotificationComponent: React.FC<MemberNotificationComponentPr
                   className={darkMode ? 'text-slate-300' : 'text-slate-700'}
                   style={darkMode ? {} : undefined}
                   dangerouslySetInnerHTML={{
-                    __html: darkMode
+                    __html: sanitizeHtml(darkMode
                       ? selectedNotification.body.replace(/color\s*:\s*#[0-9a-fA-F]{3,8}/gi, 'color: inherit')
-                      : selectedNotification.body
+                      : selectedNotification.body)
                   }}
                 />
               </div>
@@ -1957,7 +1958,7 @@ export const MemberNotificationComponent: React.FC<MemberNotificationComponentPr
                       </h4>
                       <div
                         className="text-slate-400 text-sm mt-1 line-clamp-2"
-                        dangerouslySetInnerHTML={{ __html: draft.body || '(No content)' }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(draft.body || '(No content)') }}
                       />
                       <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
                         <span className="flex items-center gap-1">
