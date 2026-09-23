@@ -12,3 +12,48 @@ verify_jwt = true
 
 [functions.publish-to-facebook]
 verify_jwt = true
+
+[functions.fetch-external-html]
+verify_jwt = true
+
+[functions.database-backup]
+verify_jwt = true
+
+[functions.github-proxy]
+verify_jwt = true
+
+[functions.compress-existing-images]
+verify_jwt = true
+
+[functions.fetch-platform-resources]
+verify_jwt = true
+
+[functions.alfie-stripe-webhook]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.event-payment-webhook]
+verify_jwt = false
+
+[functions.activate-member-account]
+verify_jwt = true
+
+[functions.send-member-welcome-email]
+verify_jwt = true
+
+[functions.send-member-notification-email]
+verify_jwt = true
+
+[functions.alfie-ai]
+verify_jwt = true
+
+[functions.send-email]
+verify_jwt = true
+
+[functions.generate-og-image]
+verify_jwt = false
+
+[functions.process-push-notifications]
+verify_jwt = true

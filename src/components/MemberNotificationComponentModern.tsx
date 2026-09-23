@@ -8,6 +8,7 @@ import { RichTextEditor } from './communications/RichTextEditor';
 import EmojiPicker from 'emoji-picker-react';
 import { useNotifications } from '../contexts/NotificationContext';
 import { ConfirmationModal } from './ConfirmationModal';
+import { sanitizeHtml } from '../utils/sanitize';
 
 interface Notification {
   id: string;
@@ -1182,7 +1183,7 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
                 <div className="prose prose-invert max-w-none">
                   <div
                     className="text-slate-300 leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: selectedNotification.body }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedNotification.body) }}
                   />
                 </div>
 

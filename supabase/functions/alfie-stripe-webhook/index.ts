@@ -47,19 +47,22 @@ Deno.serve(async (req) => {
 
     let event: Stripe.Event
 
-    if (webhookSecret) {
-      try {
-        event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
-      } catch (err) {
-        console.error('Webhook signature verification failed:', err)
-        return new Response('Invalid signature', {
-          status: 400,
-          headers: corsHeaders
-        })
-      }
-    } else {
-      console.warn('No webhook secret configured, skipping signature verification')
-      event = JSON.parse(body)
+    if (!webhookSecret) {
+      console.error('STRIPE_WEBHOOK_SECRET not configured')
+      return new Response('Webhook secret not configured', {
+        status: 500,
+        headers: corsHeaders
+      })
+    }
+
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err)
+      return new Response('Invalid signature', {
+        status: 400,
+        headers: corsHeaders
+      })
     }
 
     console.log('Processing Stripe event:', event.type, event.id)

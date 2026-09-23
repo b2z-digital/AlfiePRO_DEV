@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { advertisingStorage } from '../../utils/advertisingStorage';
 import { AdBanner, PageType, DeviceType } from '../../types/advertising';
 import { useAuth } from '../../contexts/AuthContext';
+import { sanitizeHtml } from '../../utils/sanitize';
 
 interface AdDisplayProps {
   placementId?: string;
@@ -313,7 +314,7 @@ export const AdDisplay: React.FC<AdDisplayProps> = ({
       case 'html5':
         return (
           <div
-            dangerouslySetInnerHTML={{ __html: ad.html_content || '' }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(ad.html_content || '') }}
             className="w-full h-full cursor-pointer"
             onClick={handleClick}
           />
@@ -336,7 +337,7 @@ export const AdDisplay: React.FC<AdDisplayProps> = ({
         }
         return (
           <div
-            dangerouslySetInnerHTML={{ __html: ad.adsense_code || '' }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(ad.adsense_code || '') }}
             className="w-full"
           />
         );

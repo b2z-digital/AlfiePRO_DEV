@@ -31,18 +31,14 @@ async function verifySuperAdmin(req: Request) {
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-  const isSuperAdmin = user.user_metadata?.is_super_admin === true;
+  const { data: platformAdmin } = await adminClient
+    .from("platform_super_admins")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle();
 
-  if (!isSuperAdmin) {
-    const { data: platformAdmin } = await adminClient
-      .from("platform_super_admins")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (!platformAdmin) return null;
-  }
+  if (!platformAdmin) return null;
 
   return { user, adminClient };
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, RefreshCw, Trophy, Globe, Calendar, MapPin, ExternalLink } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { formatDate } from '../utils/date';
+import { sanitizeTableHtml } from '../utils/sanitize';
 
 interface ExternalResultEvent {
   id: string;
@@ -216,7 +217,7 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
                 text-decoration: underline;
               }
             `}</style>
-            <div dangerouslySetInnerHTML={{ __html: rawTableHtml }} />
+            <div dangerouslySetInnerHTML={{ __html: sanitizeTableHtml(rawTableHtml) }} />
           </div>
         ) : (
           <div className="py-16 text-center text-slate-400">
