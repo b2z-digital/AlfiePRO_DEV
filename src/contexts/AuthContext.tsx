@@ -125,13 +125,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     try {
-      // Check user metadata for super admin status first (this is the primary way)
-      const { data: { user: userData } } = await supabase.auth.getUser();
-      const isSuperAdminFromMetadata = userData?.user_metadata?.is_super_admin === true;
-
       // Execute all role checks and subscription fetch in parallel for better performance
-      const [superAdminResult, nationalAdminResult, stateAdminResult, subscriptionResult] = await Promise.all([
+      const [superAdminResult, profileAdminResult, nationalAdminResult, stateAdminResult, subscriptionResult] = await Promise.all([
         supabase.rpc('get_user_club_roles', { p_user_id: effectiveUserId }),
+        supabase
+          .from('profiles')
+          .select('is_super_admin')
+          .eq('id', effectiveUserId)
+          .maybeSingle(),
         supabase
           .from('user_national_associations')
           .select('role')
@@ -157,7 +158,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ]);
 
       const userClubRoles = superAdminResult.data || [];
-      const userIsSuperAdmin = isSuperAdminFromMetadata || (Array.isArray(userClubRoles) && userClubRoles.some((r: any) => r.role === 'super_admin'));
+      const isSuperAdminFromProfile = profileAdminResult.data?.is_super_admin === true;
+      const userIsSuperAdmin = isSuperAdminFromProfile || (Array.isArray(userClubRoles) && userClubRoles.some((r: any) => r.role === 'super_admin'));
       setIsSuperAdmin(userIsSuperAdmin);
 
       const userIsNationalAdmin = nationalAdminResult.data?.role === 'national_admin';
