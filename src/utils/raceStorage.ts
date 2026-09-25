@@ -1514,7 +1514,16 @@ export const updateEventResults = async (
       // Safety guard: never overwrite existing results with empty array
       let safeRaceResults = raceResults;
       if ((!safeRaceResults || safeRaceResults.length === 0) && (lastCompletedRace || 0) > 0) {
-        console.warn('⚠️ saveEventResults called with empty raceResults but lastCompletedRace =', lastCompletedRace, '- will check DB before saving');
+        console.warn('⚠️ saveEventResults called with empty raceResults but lastCompletedRace =', lastCompletedRace, '- fetching existing results from DB');
+        const { data: existing } = await supabase
+          .from('quick_races')
+          .select('race_results')
+          .eq('id', eventId)
+          .maybeSingle();
+        if (existing?.race_results && Array.isArray(existing.race_results) && existing.race_results.length > 0) {
+          console.warn('⚠️ Preserving', existing.race_results.length, 'existing results instead of overwriting with empty array');
+          safeRaceResults = existing.race_results;
+        }
       }
 
       // Prepare the update data with explicit field mapping

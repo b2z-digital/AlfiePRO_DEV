@@ -1992,28 +1992,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       setRaceResults(newResults);
 
       autoSaveRaceResults(newResults, highestConsecutiveRace);
-
-      (async () => {
-        try {
-          const evt = getCurrentEvent();
-          if (evt?.id) {
-            const actualId = evt.isSeriesEvent ? evt.seriesId : evt.id;
-            const clubId = localStorage.getItem('currentClubId');
-            await supabase
-              .from('quick_races')
-              .update({
-                race_results: newResults,
-                last_completed_race: highestConsecutiveRace,
-                skippers: skippers,
-                current_day: highestConsecutiveRace + 1
-              })
-              .eq('id', actualId)
-              .eq('club_id', clubId);
-          }
-        } catch (e) {
-          console.error('❌ Direct DB sync error:', e);
-        }
-      })();
     } else {
       setRaceResults(newResults);
     }
