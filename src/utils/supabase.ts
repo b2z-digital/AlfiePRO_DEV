@@ -211,11 +211,9 @@ async function detectStuckConnection(): Promise<void> {
     const timeoutId = setTimeout(() => controller.abort(), 3000);
 
     const testStart = Date.now();
-    const response = await fetch(
-      `${supabaseUrl}/rest/v1/`,
-      { signal: controller.signal, headers: { 'apikey': supabaseAnonKey } }
-    );
-    const error = response.ok ? null : { message: `HTTP ${response.status}` };
+    const { error } = await supabase.auth.getSession();
+    const abortSignal = controller.signal;
+    if (abortSignal.aborted) throw new Error('aborted');
 
     clearTimeout(timeoutId);
     const elapsed = Date.now() - testStart;
@@ -701,10 +699,8 @@ export async function forceConnectionRecovery() {
       setTimeout(() => reject(new Error('Connection test timeout')), 3000)
     );
 
-    const testPromise = fetch(
-      `${supabaseUrl}/rest/v1/`,
-      { headers: { 'apikey': supabaseAnonKey } }
-    ).then(r => ({ error: r.ok ? null : { message: `HTTP ${r.status}` } }));
+    const testPromise = supabase.auth.getSession()
+      .then(({ error }) => ({ error }));
 
     const { error } = await Promise.race([testPromise, timeoutPromise]) as any;
 
