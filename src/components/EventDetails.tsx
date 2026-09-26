@@ -130,6 +130,59 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   const [showProDropdown, setShowProDropdown] = useState(false);
   const [assigningPro, setAssigningPro] = useState(false);
   const [proSearchTerm, setProSearchTerm] = useState('');
+  const [rosteredProName, setRosteredProName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (event.proMemberName || !event.clubId || !event.date) return;
+    const fetchRosteredPro = async () => {
+      try {
+        const eventDate = event.date?.split('T')[0];
+        if (!eventDate) return;
+        const seriesId = event.isSeriesEvent && event.seriesId ? extractDbId(event.seriesId) : null;
+
+        let rosterQuery = supabase
+          .from('pro_rosters')
+          .select('id')
+          .eq('club_id', event.clubId!)
+          .eq('status', 'active');
+        if (seriesId) {
+          rosterQuery = rosterQuery.eq('series_id', seriesId);
+        }
+        const { data: rosters } = await rosterQuery;
+        if (!rosters || rosters.length === 0) return;
+
+        const rosterIds = rosters.map((r: any) => r.id);
+        const { data: rounds } = await supabase
+          .from('pro_roster_rounds')
+          .select('id, roster_id, pro_roster_assignments(member_id, status)')
+          .in('roster_id', rosterIds)
+          .eq('date', eventDate);
+        if (!rounds || rounds.length === 0) return;
+
+        for (const round of rounds as any[]) {
+          const assignments = round.pro_roster_assignments || [];
+          const active = assignments.find((a: any) => a.status === 'assigned' || a.status === 'confirmed');
+          if (active) {
+            const { data: member } = await supabase
+              .from('members')
+              .select('first_name, last_name')
+              .eq('id', active.member_id)
+              .maybeSingle();
+            if (member) {
+              const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ');
+              if (fullName) {
+                setRosteredProName(fullName);
+                return;
+              }
+            }
+          }
+        }
+      } catch {
+        // Roster PRO lookup is best-effort
+      }
+    };
+    fetchRosteredPro();
+  }, [event.proMemberName, event.clubId, event.date, event.seriesId, event.isSeriesEvent]);
 
   useEffect(() => {
     const checkLiveTracking = async () => {
@@ -1938,10 +1991,10 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Principal Race Officer</p>
-                    {event.proMemberName ? (
+                    {(event.proMemberName || rosteredProName) ? (
                       <div className="flex items-center gap-2">
-                        <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.proMemberName}</p>
-                        {(isAdmin || isEditor) && (
+                        <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.proMemberName || rosteredProName}</p>
+                        {(isAdmin || isEditor) && event.proMemberName && (
                           <button
                             onClick={handleRemovePro}
                             disabled={assigningPro}
@@ -1951,6 +2004,8 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                           </button>
                         )}
                       </div>
+                    ) : rosteredProName ? (
+                      <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{rosteredProName}</p>
                     ) : (isAdmin || isEditor) ? (
                       <button
                         onClick={() => setShowProDropdown(!showProDropdown)}
@@ -2005,8 +2060,8 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 </div>
                 <div className="flex-1">
                   <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Principal Race Officer</p>
-                  {event.proMemberName ? (
-                    <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.proMemberName}</p>
+                  {(event.proMemberName || rosteredProName) ? (
+                    <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.proMemberName || rosteredProName}</p>
                   ) : (
                     <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Not assigned</p>
                   )}
