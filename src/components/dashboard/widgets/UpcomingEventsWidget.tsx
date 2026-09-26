@@ -695,7 +695,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         if (orgContext.type === 'state' || orgContext.type === 'national' || event.isPublicEvent) {
           navigate('/calendar');
         } else {
-          navigate('/race-management', { state: { eventId: event.id, isSeriesEvent: event.isSeriesEvent, seriesId: event.seriesId } });
+          navigate('/race-management', { state: { eventId: event.id, isSeriesEvent: event.isSeriesEvent, seriesId: event.seriesId, roundName: event.roundName } });
         }
       }}
       className={`
