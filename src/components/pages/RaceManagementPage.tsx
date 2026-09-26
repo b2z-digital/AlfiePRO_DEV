@@ -138,10 +138,14 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     const navState = location.state as any;
     if (navState?.eventId && (quickRaces.length > 0 || series.length > 0)) {
       if (navState.isSeriesEvent && navState.seriesId) {
-        // Find and expand the series
         const foundSeries = series.find(s => s.id === navState.seriesId);
         if (foundSeries) {
           setExpandedSeries(foundSeries.id);
+          const roundIndex = foundSeries.rounds.findIndex((r: any) => r.name === navState.roundName);
+          if (roundIndex >= 0) {
+            handleRoundClick(foundSeries, roundIndex);
+            navigate(location.pathname, { replace: true, state: {} });
+          }
         }
       } else {
         // Find and select the quick race event
