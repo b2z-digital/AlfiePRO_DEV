@@ -56,8 +56,19 @@ export const SubdomainPublicSite: React.FC<SubdomainPublicSiteProps> = ({ subdom
         console.error('Error loading club:', clubError);
       }
 
-      if (club) {
-        setClubId(club.id);
+      // If no club found by subdomain_slug, try matching by abbreviation (case-insensitive)
+      let resolvedClub = club;
+      if (!resolvedClub && !isCustomDomain) {
+        const { data: clubByAbbrev } = await supabase
+          .from('clubs')
+          .select('id')
+          .ilike('abbreviation', subdomain)
+          .maybeSingle();
+        resolvedClub = clubByAbbrev;
+      }
+
+      if (resolvedClub) {
+        setClubId(resolvedClub.id);
         setSiteType('club');
         return;
       }
