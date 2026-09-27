@@ -33,22 +33,37 @@ export const PublicResultsListPage: React.FC = () => {
     if (clubId) loadData();
   }, [clubId]);
 
-  const getWinnerName = (raceResults: any[], skippers: any[]): string => {
+  const getWinnerName = (raceResults: any[], skippers: any[], dropRules?: number[]): string => {
     if (!raceResults?.length || !skippers?.length) return 'No results';
-    const skipperScores: Record<number, number> = {};
+
+    const rules = Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40];
+
+    const skipperRaceScores: Record<number, number[]> = {};
     raceResults.forEach((r: any) => {
       if (r.skipperIndex !== undefined && r.position) {
-        skipperScores[r.skipperIndex] = (skipperScores[r.skipperIndex] || 0) + r.position;
+        if (!skipperRaceScores[r.skipperIndex]) skipperRaceScores[r.skipperIndex] = [];
+        skipperRaceScores[r.skipperIndex].push(
+          r.letterScore ? skippers.length + 1 : r.position
+        );
       }
     });
-    let lowestScore = Infinity;
+
+    let lowestNet = Infinity;
     let winnerIdx = -1;
-    Object.entries(skipperScores).forEach(([idx, score]) => {
-      if (score < lowestScore) {
-        lowestScore = score;
+    Object.entries(skipperRaceScores).forEach(([idx, scores]) => {
+      let numDrops = 0;
+      for (const threshold of rules) {
+        if (scores.length >= threshold) numDrops++;
+        else break;
+      }
+      const sorted = [...scores].sort((a, b) => b - a);
+      const net = sorted.slice(numDrops).reduce((sum, s) => sum + s, 0);
+      if (net < lowestNet) {
+        lowestNet = net;
         winnerIdx = parseInt(idx);
       }
     });
+
     if (winnerIdx >= 0 && skippers[winnerIdx]) {
       return skippers[winnerIdx].name || 'Unknown';
     }
@@ -70,7 +85,7 @@ export const PublicResultsListPage: React.FC = () => {
 
       const { data: quickRaces } = await supabase
         .from('quick_races')
-        .select('id, event_name, race_date, race_venue, race_class, race_results, skippers, completed')
+        .select('id, event_name, race_date, race_venue, race_class, race_results, skippers, completed, drop_rules')
         .eq('club_id', clubId)
         .eq('completed', true)
         .neq('is_simulated', true)
@@ -78,7 +93,7 @@ export const PublicResultsListPage: React.FC = () => {
 
       const { data: seriesRounds } = await supabase
         .from('race_series_rounds')
-        .select('id, round_name, date, venue, race_class, race_results, skippers, completed, race_series!inner(series_name)')
+        .select('id, round_name, date, venue, race_class, race_results, skippers, completed, drop_rules, race_series!inner(series_name)')
         .eq('club_id', clubId)
         .eq('completed', true)
         .order('date', { ascending: false });
@@ -90,7 +105,7 @@ export const PublicResultsListPage: React.FC = () => {
         venue: race.race_venue || '',
         race_class: race.race_class || '',
         type: 'quick_race' as const,
-        winner: getWinnerName(race.race_results, race.skippers),
+        winner: getWinnerName(race.race_results, race.skippers, race.drop_rules),
         skipper_count: race.skippers?.length || 0,
       }));
 
@@ -102,7 +117,7 @@ export const PublicResultsListPage: React.FC = () => {
         race_class: round.race_class || '',
         type: 'series_round' as const,
         series_name: round.race_series?.series_name || '',
-        winner: getWinnerName(round.race_results, round.skippers),
+        winner: getWinnerName(round.race_results, round.skippers, round.drop_rules),
         skipper_count: round.skippers?.length || 0,
       }));
 
