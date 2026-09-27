@@ -407,15 +407,15 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
       const getWinnerFromResults = (raceResults: any[], skippers: any[], dropRules?: number[]): string => {
         if (!raceResults?.length || !skippers?.length) return 'No results';
         const rules = Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40];
+        const skipperData: { idx: number; net: number; kept: number[] }[] = [];
         const skipperRaceScores: Record<number, number[]> = {};
         raceResults.forEach((r: any) => {
-          if (r.skipperIndex !== undefined && r.position) {
+          if (r.skipperIndex !== undefined) {
             if (!skipperRaceScores[r.skipperIndex]) skipperRaceScores[r.skipperIndex] = [];
-            skipperRaceScores[r.skipperIndex].push(r.letterScore ? skippers.length + 1 : r.position);
+            const score = r.letterScore ? skippers.length + 1 : (r.position || skippers.length + 1);
+            skipperRaceScores[r.skipperIndex].push(score);
           }
         });
-        let lowestNet = Infinity;
-        let winnerIdx = -1;
         Object.entries(skipperRaceScores).forEach(([idx, scores]) => {
           let numDrops = 0;
           for (const threshold of rules) {
@@ -423,13 +423,23 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             else break;
           }
           const sorted = [...scores].sort((a, b) => b - a);
-          const net = sorted.slice(numDrops).reduce((sum, s) => sum + s, 0);
-          if (net < lowestNet) {
-            lowestNet = net;
-            winnerIdx = parseInt(idx);
-          }
+          const kept = sorted.slice(numDrops).sort((a, b) => a - b);
+          const net = kept.reduce((sum, s) => sum + s, 0);
+          skipperData.push({ idx: parseInt(idx), net, kept });
         });
-        if (winnerIdx >= 0 && skippers[winnerIdx]) return skippers[winnerIdx].name || 'Unknown';
+        skipperData.sort((a, b) => {
+          if (a.net !== b.net) return a.net - b.net;
+          const len = Math.max(a.kept.length, b.kept.length);
+          for (let i = 0; i < len; i++) {
+            const aVal = a.kept[i] ?? Infinity;
+            const bVal = b.kept[i] ?? Infinity;
+            if (aVal !== bVal) return aVal - bVal;
+          }
+          return 0;
+        });
+        if (skipperData.length > 0 && skippers[skipperData[0].idx]) {
+          return skippers[skipperData[0].idx].name || 'Unknown';
+        }
         return 'No results';
       };
 
