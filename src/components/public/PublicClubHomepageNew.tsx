@@ -372,7 +372,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
 
       const { data: completedQuickRaces, error: completedRacesError } = await supabase
         .from('quick_races')
-        .select('id, event_name, race_date, race_class, race_results, skippers, completed')
+        .select('id, event_name, race_date, race_class, race_results, skippers, completed, drop_rules')
         .eq('club_id', clubId)
         .neq('is_simulated', true)
         .eq('completed', true)
@@ -386,7 +386,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
 
       const { data: completedRoundsData } = await supabase
         .from('race_series_rounds')
-        .select('id, round_name, date, race_class, race_results, skippers, completed, race_series!inner(series_name)')
+        .select('id, round_name, date, race_class, race_results, skippers, completed, drop_rules, race_series!inner(series_name)')
         .eq('club_id', clubId)
         .eq('completed', true)
         .lt('date', today)
@@ -400,23 +400,43 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
         series_name: round.race_series?.series_name || '',
         race_class: round.race_class || '',
         race_results: round.race_results || [],
-        skippers: round.skippers || []
+        skippers: round.skippers || [],
+        drop_rules: round.drop_rules
       }));
+
+      const getWinnerFromResults = (raceResults: any[], skippers: any[], dropRules?: number[]): string => {
+        if (!raceResults?.length || !skippers?.length) return 'No results';
+        const rules = Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40];
+        const skipperRaceScores: Record<number, number[]> = {};
+        raceResults.forEach((r: any) => {
+          if (r.skipperIndex !== undefined && r.position) {
+            if (!skipperRaceScores[r.skipperIndex]) skipperRaceScores[r.skipperIndex] = [];
+            skipperRaceScores[r.skipperIndex].push(r.letterScore ? skippers.length + 1 : r.position);
+          }
+        });
+        let lowestNet = Infinity;
+        let winnerIdx = -1;
+        Object.entries(skipperRaceScores).forEach(([idx, scores]) => {
+          let numDrops = 0;
+          for (const threshold of rules) {
+            if (scores.length >= threshold) numDrops++;
+            else break;
+          }
+          const sorted = [...scores].sort((a, b) => b - a);
+          const net = sorted.slice(numDrops).reduce((sum, s) => sum + s, 0);
+          if (net < lowestNet) {
+            lowestNet = net;
+            winnerIdx = parseInt(idx);
+          }
+        });
+        if (winnerIdx >= 0 && skippers[winnerIdx]) return skippers[winnerIdx].name || 'Unknown';
+        return 'No results';
+      };
 
       const quickRaceResults: LatestResult[] = (completedQuickRaces || [])
         .map(event => {
-          let winner = 'No results';
           const skippers = event.skippers || [];
-          if (event.race_results && Array.isArray(event.race_results) && event.race_results.length > 0) {
-            const firstPlace = event.race_results.find((r: any) => r.position === 1);
-            if (firstPlace) {
-              if (firstPlace.skipperName) {
-                winner = firstPlace.skipperName;
-              } else if (firstPlace.skipperIndex !== undefined && skippers[firstPlace.skipperIndex]) {
-                winner = skippers[firstPlace.skipperIndex].name || 'Unknown';
-              }
-            }
-          }
+          const winner = getWinnerFromResults(event.race_results || [], skippers, (event as any).drop_rules);
           return {
             id: event.id,
             name: event.event_name || `Race - ${event.race_class || 'Multi-Class'}`,
@@ -428,38 +448,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
         });
 
       const seriesResults: LatestResult[] = completedSeriesRounds.map((round: any) => {
-        let winner = 'No results';
-
-        const raceResults = round.race_results || [];
-        const skippers = round.skippers || [];
-        if (raceResults.length > 0 && skippers.length > 0) {
-          const skipperScores: Record<number, number> = {};
-          raceResults.forEach((result: any) => {
-            const skipperIdx = result.skipperIndex;
-            if (skipperIdx !== undefined) {
-              if (!skipperScores[skipperIdx]) {
-                skipperScores[skipperIdx] = 0;
-              }
-              if (result.position) {
-                skipperScores[skipperIdx] += result.position;
-              }
-            }
-          });
-
-          let lowestScore = Infinity;
-          let winnerIdx = -1;
-          Object.entries(skipperScores).forEach(([idx, score]) => {
-            if (score < lowestScore) {
-              lowestScore = score;
-              winnerIdx = parseInt(idx);
-            }
-          });
-
-          if (winnerIdx >= 0 && skippers[winnerIdx]) {
-            winner = skippers[winnerIdx].name || 'Unknown';
-          }
-        }
-
+        const winner = getWinnerFromResults(round.race_results || [], round.skippers || [], round.drop_rules);
         return {
           id: round.id,
           name: `${round.round_name} - ${round.series_name}`,
