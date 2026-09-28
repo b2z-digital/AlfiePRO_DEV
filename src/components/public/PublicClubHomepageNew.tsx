@@ -748,10 +748,11 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             </h2>
             <div
               className="text-base md:text-lg text-gray-700 leading-relaxed prose prose-lg max-w-none whitespace-pre-wrap text-center"
-              dangerouslySetInnerHTML={{
-                __html: (club.club_introduction || club.description || `Welcome to ${club.name}. Join us for an amazing experience.`).replace(/\n/g, '<br>')
-              }}
-            />
+            >
+              {(club.club_introduction || club.description || `Welcome to ${club.name}. Join us for an amazing experience.`).split('\n').map((line: string, i: number) => (
+                <span key={i}>{i > 0 && <br />}{line}</span>
+              ))}
+            </div>
           </div>
         </section>
 

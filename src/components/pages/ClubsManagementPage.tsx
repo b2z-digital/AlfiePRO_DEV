@@ -612,7 +612,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
               </div>
             </div>
             ${club.club_introduction
-              ? `<p style="margin: 0 0 12px 0; font-size: 14px; color: #475569; line-height: 1.5;">${club.club_introduction.substring(0, 100)}${club.club_introduction.length > 100 ? '...' : ''}</p>`
+              ? `<p style="margin: 0 0 12px 0; font-size: 14px; color: #475569; line-height: 1.5;">${club.club_introduction.substring(0, 100).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c] || c))}${club.club_introduction.length > 100 ? '...' : ''}</p>`
               : ''
             }
             ${club.boat_classes && club.boat_classes.length > 0

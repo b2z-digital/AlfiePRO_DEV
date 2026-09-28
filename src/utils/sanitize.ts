@@ -1,31 +1,37 @@
 import DOMPurify from 'dompurify';
 
-const SAFE_TAGS = [
-  'p', 'br', 'b', 'i', 'u', 'em', 'strong', 'a', 'ul', 'ol', 'li',
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'code',
-  'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'span', 'div',
-  'sub', 'sup', 'hr', 'figure', 'figcaption', 'caption', 'colgroup', 'col',
-];
-
-const SAFE_ATTRS = [
-  'href', 'target', 'rel', 'src', 'alt', 'width', 'height',
-  'class', 'style', 'colspan', 'rowspan', 'align', 'valign',
-];
-
-export function sanitizeHtml(dirty: string): string {
-  return DOMPurify.sanitize(dirty, {
-    ALLOWED_TAGS: SAFE_TAGS,
-    ALLOWED_ATTR: SAFE_ATTRS,
+export function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      'a', 'b', 'i', 'u', 'em', 'strong', 'p', 'br', 'ul', 'ol', 'li',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'code',
+      'span', 'div', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+      'hr', 'sub', 'sup', 'small', 'mark', 'del', 'ins', 'figure', 'figcaption',
+    ],
+    ALLOWED_ATTR: [
+      'href', 'target', 'rel', 'src', 'alt', 'width', 'height',
+      'class', 'style', 'id', 'colspan', 'rowspan', 'align', 'valign',
+    ],
     ALLOW_DATA_ATTR: false,
-    ADD_ATTR: ['target'],
-  } as Record<string, unknown>);
+  });
 }
 
-export function sanitizeTableHtml(dirty: string): string {
-  return DOMPurify.sanitize(dirty, {
-    ALLOWED_TAGS: [...SAFE_TAGS, 'caption', 'colgroup', 'col'],
-    ALLOWED_ATTR: SAFE_ATTRS,
+export function sanitizeTableHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption',
+      'colgroup', 'col', 'a', 'b', 'i', 'u', 'em', 'strong', 'span',
+      'br', 'p', 'div', 'img', 'sup', 'sub', 'small',
+    ],
+    ALLOWED_ATTR: [
+      'href', 'target', 'rel', 'src', 'alt', 'width', 'height',
+      'class', 'style', 'id', 'colspan', 'rowspan', 'align', 'valign',
+      'scope', 'border', 'cellpadding', 'cellspacing',
+    ],
     ALLOW_DATA_ATTR: false,
-    ADD_ATTR: ['target'],
-  } as Record<string, unknown>);
+  });
+}
+
+export function stripHtml(input: string): string {
+  return DOMPurify.sanitize(input, { ALLOWED_TAGS: [] });
 }
