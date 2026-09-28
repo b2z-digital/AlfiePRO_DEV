@@ -1584,9 +1584,26 @@ export const ResultsPage: React.FC = () => {
     };
 
     const sortRoundSkippers = (roundIndex: number, netScores: Record<number, number>): number[] => {
+      const round = rounds[roundIndex];
+      const roundResults = round?.results || (round as any)?.raceResults || [];
       return Object.entries(netScores)
         .map(([idx, net]) => ({ idx: parseInt(idx), net }))
-        .sort((a, b) => a.net !== b.net ? a.net - b.net : a.idx - b.idx)
+        .sort((a, b) => {
+          if (a.net !== b.net) return a.net - b.net;
+          const aPos = roundResults
+            .filter((r: any) => r.skipperIndex === a.idx && r.position !== null && !r.letterScore)
+            .map((r: any) => r.position as number).sort((x: number, y: number) => x - y);
+          const bPos = roundResults
+            .filter((r: any) => r.skipperIndex === b.idx && r.position !== null && !r.letterScore)
+            .map((r: any) => r.position as number).sort((x: number, y: number) => x - y);
+          const maxP = Math.max(...aPos, ...bPos, 1);
+          for (let p = 1; p <= maxP; p++) {
+            const ac = aPos.filter((v: number) => v === p).length;
+            const bc = bPos.filter((v: number) => v === p).length;
+            if (ac !== bc) return bc - ac;
+          }
+          return a.idx - b.idx;
+        })
         .map(s => s.idx);
     };
 
