@@ -1532,26 +1532,16 @@ export const ResultsPage: React.FC = () => {
     // (mirrors SeriesResultsDisplay's effectiveSkippers logic)
     let skippers = series.skippers && series.skippers.length > 0 ? [...series.skippers] : [];
     if (skippers.length === 0) {
-      const skipperByName = new Map<string, any>();
+      const skipperMap = new Map<string, any>();
       rounds.forEach(round => {
         if (round.completed && ((round.results && round.results.length > 0) || ((round as any).raceResults && (round as any).raceResults.length > 0))) {
           (round.skippers || []).forEach((skipper: any) => {
             const sailNum = skipper.sailNumber || skipper.sailNo;
-            const name = (skipper.name || '').trim();
-            if (!name && !sailNum) return;
-            const key = name || sailNum;
-            if (!skipperByName.has(key)) {
-              skipperByName.set(key, { ...skipper, allSailNumbers: sailNum ? [String(sailNum)] : [] });
-            } else {
-              const existing = skipperByName.get(key);
-              if (sailNum && !existing.allSailNumbers.includes(String(sailNum))) {
-                existing.allSailNumbers.push(String(sailNum));
-              }
-            }
+            if (sailNum && !skipperMap.has(sailNum)) skipperMap.set(sailNum, skipper);
           });
         }
       });
-      skippers = Array.from(skipperByName.values());
+      skippers = Array.from(skipperMap.values());
     }
 
     if (skippers.length === 0) {
@@ -1617,22 +1607,18 @@ export const ResultsPage: React.FC = () => {
         .map(s => s.idx);
     };
 
-    type SkipperRow = { idx: number; name: string; sailNo: string; allSailNumbers: string[]; club: string; design: string; roundPoints: (number | null)[]; total: number; positionCounts: Record<number, number> };
+    type SkipperRow = { idx: number; name: string; sailNo: string; club: string; design: string; roundPoints: (number | null)[]; total: number; positionCounts: Record<number, number> };
 
-    const skipperRows: SkipperRow[] = skippers.map((skipper: any, idx: number) => {
-      const sailNo = (skipper.sailNo || skipper.sailNumber || '').toString();
-      return {
-        idx,
-        name: (skipper.name || '').trim(),
-        sailNo,
-        allSailNumbers: skipper.allSailNumbers || (sailNo ? [sailNo] : []),
-        club: skipper.club || skipper.clubName || '',
-        design: skipper.hull || skipper.boatModel || skipper.design || '',
-        roundPoints: [],
-        total: 0,
-        positionCounts: {},
-      };
-    });
+    const skipperRows: SkipperRow[] = skippers.map((skipper: any, idx: number) => ({
+      idx,
+      name: (skipper.name || '').trim(),
+      sailNo: (skipper.sailNo || skipper.sailNumber || '').toString(),
+      club: skipper.club || skipper.clubName || '',
+      design: skipper.hull || skipper.boatModel || skipper.design || '',
+      roundPoints: [],
+      total: 0,
+      positionCounts: {},
+    }));
 
     rounds.forEach((round, roundIndex) => {
       if (!round.completed) {
@@ -1647,18 +1633,12 @@ export const ResultsPage: React.FC = () => {
       const roundCompetitors = new Set(roundResults.map((r: any) => r.skipperIndex)).size;
 
       skipperRows.forEach(sd => {
-        // Find all matching round skipper indices (handles multi-boat skippers)
-        const matchingIndices: number[] = [];
-        roundSkippers.forEach((rs: any, idx: number) => {
-          const rSail = (rs.sailNo || rs.sailNumber || '').toString();
-          if (sd.allSailNumbers.includes(rSail)) matchingIndices.push(idx);
-        });
-        if (matchingIndices.length === 0) {
-          const nameIdx = roundSkippers.findIndex((rs: any) => (rs.name || '').trim() === sd.name);
-          if (nameIdx !== -1) matchingIndices.push(nameIdx);
+        let roundSkipperIndex = roundSkippers.findIndex((rs: any) => (rs.sailNo || rs.sailNumber || '').toString() === sd.sailNo);
+        if (roundSkipperIndex === -1) {
+          roundSkipperIndex = roundSkippers.findIndex((rs: any) => (rs.name || '').trim() === sd.name);
         }
 
-        const participated = matchingIndices.length > 0 && roundResults.some((r: any) => matchingIndices.includes(r.skipperIndex));
+        const participated = roundSkipperIndex !== -1 && roundResults.some((r: any) => r.skipperIndex === roundSkipperIndex);
 
         if (!participated) {
           const pts = roundCompetitors + 1;
@@ -1667,31 +1647,21 @@ export const ResultsPage: React.FC = () => {
           return;
         }
 
-        // For multi-boat: pick the best (lowest net) matching index
-        let bestIdx = matchingIndices[0];
-        if (matchingIndices.length > 1) {
-          let bestNet = Infinity;
-          for (const mi of matchingIndices) {
-            const net = roundNetScores[mi] ?? Infinity;
-            if (net < bestNet) { bestNet = net; bestIdx = mi; }
-          }
-        }
-
-        const hasAvg = round.averagePointsApplied?.[bestIdx] !== undefined;
-        const hasManual = round.manualScoreOverrides?.[bestIdx] !== undefined;
+        const hasAvg = round.averagePointsApplied?.[roundSkipperIndex] !== undefined;
+        const hasManual = round.manualScoreOverrides?.[roundSkipperIndex] !== undefined;
 
         let netPoints: number;
         let position: number;
 
         if (hasAvg) {
-          netPoints = round.averagePointsApplied![bestIdx];
+          netPoints = round.averagePointsApplied![roundSkipperIndex];
           position = netPoints;
         } else if (hasManual) {
-          netPoints = round.manualScoreOverrides![bestIdx];
+          netPoints = round.manualScoreOverrides![roundSkipperIndex];
           position = netPoints;
         } else {
-          position = roundSorted.indexOf(bestIdx) + 1;
-          netPoints = roundNetScores[bestIdx] ?? (roundCompetitors + 1);
+          position = roundSorted.indexOf(roundSkipperIndex) + 1;
+          netPoints = roundNetScores[roundSkipperIndex] ?? (roundCompetitors + 1);
         }
 
         if (position > 0) {
@@ -1733,7 +1703,7 @@ export const ResultsPage: React.FC = () => {
       const row: Record<string, any> = {
         Position: position + 1,
         Name: sd.name,
-        'Sail Number': sd.allSailNumbers.length > 1 ? sd.allSailNumbers.join(' / ') : sd.sailNo,
+        'Sail Number': sd.sailNo,
         Club: sd.club,
         Design: sd.design,
       };
