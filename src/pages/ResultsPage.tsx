@@ -1607,39 +1607,18 @@ export const ResultsPage: React.FC = () => {
         .map(s => s.idx);
     };
 
-    type SkipperRow = { idx: number; name: string; sailNos: Set<string>; club: string; designs: Set<string>; roundPoints: (number | null)[]; total: number; positionCounts: Record<number, number> };
+    type SkipperRow = { idx: number; name: string; sailNo: string; club: string; design: string; roundPoints: (number | null)[]; total: number; positionCounts: Record<number, number> };
 
-    // Group skippers by name to merge multi-boat entries
-    const skipperByName = new Map<string, SkipperRow>();
-    const indexToName = new Map<number, string>();
-
-    skippers.forEach((skipper: any, idx: number) => {
-      const name = (skipper.name || '').trim();
-      const sailNo = (skipper.sailNo || skipper.sailNumber || '').toString();
-      const design = skipper.hull || skipper.boatModel || skipper.design || '';
-      const club = skipper.club || skipper.clubName || '';
-
-      indexToName.set(idx, name);
-
-      if (skipperByName.has(name)) {
-        const existing = skipperByName.get(name)!;
-        if (sailNo) existing.sailNos.add(sailNo);
-        if (design) existing.designs.add(design);
-      } else {
-        skipperByName.set(name, {
-          idx,
-          name,
-          sailNos: new Set(sailNo ? [sailNo] : []),
-          club,
-          designs: new Set(design ? [design] : []),
-          roundPoints: [],
-          total: 0,
-          positionCounts: {},
-        });
-      }
-    });
-
-    const skipperRows = Array.from(skipperByName.values());
+    const skipperRows: SkipperRow[] = skippers.map((skipper: any, idx: number) => ({
+      idx,
+      name: (skipper.name || '').trim(),
+      sailNo: (skipper.sailNo || skipper.sailNumber || '').toString(),
+      club: skipper.club || skipper.clubName || '',
+      design: skipper.hull || skipper.boatModel || skipper.design || '',
+      roundPoints: [],
+      total: 0,
+      positionCounts: {},
+    }));
 
     rounds.forEach((round, roundIndex) => {
       if (!round.completed) {
@@ -1654,13 +1633,7 @@ export const ResultsPage: React.FC = () => {
       const roundCompetitors = new Set(roundResults.map((r: any) => r.skipperIndex)).size;
 
       skipperRows.forEach(sd => {
-        // Find this skipper in the round by matching any of their sail numbers
-        let roundSkipperIndex = -1;
-        for (const sailNo of sd.sailNos) {
-          const idx = roundSkippers.findIndex((rs: any) => (rs.sailNo || rs.sailNumber || '').toString() === sailNo);
-          if (idx !== -1) { roundSkipperIndex = idx; break; }
-        }
-        // Also try matching by name if sail number didn't match
+        let roundSkipperIndex = roundSkippers.findIndex((rs: any) => (rs.sailNo || rs.sailNumber || '').toString() === sd.sailNo);
         if (roundSkipperIndex === -1) {
           roundSkipperIndex = roundSkippers.findIndex((rs: any) => (rs.name || '').trim() === sd.name);
         }
@@ -1674,14 +1647,6 @@ export const ResultsPage: React.FC = () => {
           return;
         }
 
-        // Collect any new sail/design info from this round
-        const roundSkipper = roundSkippers[roundSkipperIndex];
-        if (roundSkipper) {
-          const rSail = (roundSkipper.sailNo || roundSkipper.sailNumber || '').toString();
-          const rDesign = roundSkipper.hull || roundSkipper.boatModel || roundSkipper.design || '';
-          if (rSail) sd.sailNos.add(rSail);
-          if (rDesign) sd.designs.add(rDesign);
-        }
 
         const hasAvg = round.averagePointsApplied?.[roundSkipperIndex] !== undefined;
         const hasManual = round.manualScoreOverrides?.[roundSkipperIndex] !== undefined;
@@ -1739,9 +1704,9 @@ export const ResultsPage: React.FC = () => {
       const row: Record<string, any> = {
         Position: position + 1,
         Name: sd.name,
-        'Sail Number': Array.from(sd.sailNos).join(' / '),
+        'Sail Number': sd.sailNo,
         Club: sd.club,
-        Design: Array.from(sd.designs).join(' / '),
+        Design: sd.design,
       };
       rounds.forEach((round, ri) => {
         const label = (round as any).roundName || (round as any).name || `Round ${ri + 1}`;
