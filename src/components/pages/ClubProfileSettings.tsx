@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Save, Upload, X, Image as ImageIcon, CircleAlert as AlertCircle, Check, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { stripHtml } from '../../utils/sanitize';
 import { supabase } from '../../utils/supabase';
 import imageCompression from 'browser-image-compression';
 import CoverImageUploadModal from '../CoverImageUploadModal';
@@ -324,7 +325,7 @@ export const ClubProfileSettings: React.FC<ClubProfileSettingsProps> = ({ darkMo
         .update({
           name: clubName.trim(),
           abbreviation: abbreviatedName.trim(),
-          club_introduction: clubIntroduction.trim() || null,
+          club_introduction: clubIntroduction.trim() ? stripHtml(clubIntroduction.trim()) : null,
           logo: newLogoUrl,
           featured_image_url: newFeaturedImageUrl,
           cover_image_url: newFeaturedImageUrl, // Sync with cover_image_url

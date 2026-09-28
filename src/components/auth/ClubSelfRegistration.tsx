@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building, ChevronRight, ChevronLeft, Palette, MapPin, Users, DollarSign, CircleCheck as CheckCircle, Loader as Loader2, Globe } from 'lucide-react';
+import { stripHtml } from '../../utils/sanitize';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Logo } from '../Logo';
@@ -145,7 +146,7 @@ export const ClubSelfRegistration: React.FC<ClubSelfRegistrationProps> = ({ dark
         registered_by_user_id: user.id,
         approval_status: 'pending_approval',
         onboarding_completed: false,
-        club_introduction: formData.clubIntroduction || null,
+        club_introduction: formData.clubIntroduction ? stripHtml(formData.clubIntroduction) : null,
         cover_image_url: '/lmryc_slide.jpeg',
       };
 

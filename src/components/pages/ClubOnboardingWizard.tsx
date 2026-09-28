@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronRight, ChevronLeft, Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CircleCheck as CheckCircle, Loader as Loader2, Calendar } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { stripHtml } from '../../utils/sanitize';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { BasicInfoStep } from './club-onboarding/BasicInfoStep';
@@ -396,7 +397,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       address: formData.location || null,
       contact_email: formData.email || null,
       contact_phone: formData.phone || null,
-      club_introduction: formData.clubIntroduction || null,
+      club_introduction: formData.clubIntroduction ? stripHtml(formData.clubIntroduction) : null,
       tax_enabled: formData.taxEnabled,
       tax_name: formData.taxName || null,
       tax_rate: formData.taxRate / 100,
@@ -614,7 +615,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       created_by_user_id: user?.id,
       assigned_by_user_id: user?.id,
       onboarding_completed: !formData.assignAdmin,
-      club_introduction: formData.clubIntroduction || null,
+      club_introduction: formData.clubIntroduction ? stripHtml(formData.clubIntroduction) : null,
       cover_image_url: '/lmryc_slide.jpeg',
     };
 
