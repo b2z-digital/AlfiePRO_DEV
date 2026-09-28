@@ -1526,27 +1526,26 @@ export const ResultsPage: React.FC = () => {
     } as RaceEvent : null);
 
   const buildSeriesCsvRows = (series: RaceSeries): Record<string, any>[] => {
-    const skippers = series.skippers && series.skippers.length > 0 ? series.skippers : [];
     const rounds = series.rounds || [];
 
+    // Build effective skippers from rounds when series.skippers is empty
+    // (mirrors SeriesResultsDisplay's effectiveSkippers logic)
+    let skippers = series.skippers && series.skippers.length > 0 ? [...series.skippers] : [];
     if (skippers.length === 0) {
       const skipperMap = new Map<string, any>();
       rounds.forEach(round => {
-        if (round.completed && round.skippers) {
-          round.skippers.forEach((skipper: any) => {
+        if (round.completed && ((round.results && round.results.length > 0) || ((round as any).raceResults && (round as any).raceResults.length > 0))) {
+          (round.skippers || []).forEach((skipper: any) => {
             const sailNum = skipper.sailNumber || skipper.sailNo;
             if (sailNum && !skipperMap.has(sailNum)) skipperMap.set(sailNum, skipper);
           });
         }
       });
-      return Array.from(skipperMap.values()).map((skipper, i) => ({
-        Position: i + 1,
-        Name: skipper.name || '',
-        'Sail Number': skipper.sailNo || skipper.sailNumber || '',
-        Club: skipper.club || skipper.clubName || '',
-        Design: skipper.hull || skipper.boatModel || skipper.design || '',
-        'Total Points': '',
-      }));
+      skippers = Array.from(skipperMap.values());
+    }
+
+    if (skippers.length === 0) {
+      return [{ Position: '', Name: 'No results available', 'Sail Number': '', Club: '', Design: '', 'Total Points': '' }];
     }
 
     const completedRounds = rounds.filter(r => r.completed);
@@ -1554,12 +1553,11 @@ export const ResultsPage: React.FC = () => {
     const calcRoundNet = (roundIndex: number): Record<number, number> => {
       const round = rounds[roundIndex];
       if (!round?.completed) return {};
-      const roundResults = round.results || [];
+      const roundResults = round.results || (round as any).raceResults || [];
       if (roundResults.length === 0) return {};
 
       const roundSkippers = round.skippers || skippers;
-      const numRoundSkippers = roundSkippers.length;
-      const skipperCount = numRoundSkippers || skippers.length;
+      const skipperCount = roundSkippers.length || skippers.length;
       const processed = roundResults.map((r: any, idx: number) => (r.race !== undefined ? r : { ...r, race: Math.floor(idx / skipperCount) + 1 }));
       const groups: Record<number, any[]> = {};
       processed.forEach((r: any) => { if (!groups[r.skipperIndex]) groups[r.skipperIndex] = []; groups[r.skipperIndex].push(r); });
@@ -1576,7 +1574,6 @@ export const ResultsPage: React.FC = () => {
         for (const t of dropRules) { if (scores.length >= t) numDrops++; else break; }
         if (numDrops > 0) {
           const sorted = [...scores].sort((a: number, b: number) => b - a);
-          const dropped = sorted.slice(0, numDrops);
           const kept = sorted.slice(numDrops);
           totals[idx] = kept.reduce((s: number, v: number) => s + v, 0);
         } else {
@@ -1593,32 +1590,64 @@ export const ResultsPage: React.FC = () => {
         .map(s => s.idx);
     };
 
-    const skipperData: { idx: number; name: string; sailNo: string; club: string; design: string; roundPoints: (number | null)[]; total: number; positionCounts: Record<number, number> }[] = skippers.map((skipper, idx) => ({
-      idx,
-      name: skipper.name || '',
-      sailNo: (skipper as any).sailNo || (skipper as any).sailNumber || '',
-      club: skipper.club || (skipper as any).clubName || '',
-      design: (skipper as any).hull || (skipper as any).boatModel || (skipper as any).design || '',
-      roundPoints: [],
-      total: 0,
-      positionCounts: {},
-    }));
+    type SkipperRow = { idx: number; name: string; sailNos: Set<string>; club: string; designs: Set<string>; roundPoints: (number | null)[]; total: number; positionCounts: Record<number, number> };
+
+    // Group skippers by name to merge multi-boat entries
+    const skipperByName = new Map<string, SkipperRow>();
+    const indexToName = new Map<number, string>();
+
+    skippers.forEach((skipper: any, idx: number) => {
+      const name = (skipper.name || '').trim();
+      const sailNo = (skipper.sailNo || skipper.sailNumber || '').toString();
+      const design = skipper.hull || skipper.boatModel || skipper.design || '';
+      const club = skipper.club || skipper.clubName || '';
+
+      indexToName.set(idx, name);
+
+      if (skipperByName.has(name)) {
+        const existing = skipperByName.get(name)!;
+        if (sailNo) existing.sailNos.add(sailNo);
+        if (design) existing.designs.add(design);
+      } else {
+        skipperByName.set(name, {
+          idx,
+          name,
+          sailNos: new Set(sailNo ? [sailNo] : []),
+          club,
+          designs: new Set(design ? [design] : []),
+          roundPoints: [],
+          total: 0,
+          positionCounts: {},
+        });
+      }
+    });
+
+    const skipperRows = Array.from(skipperByName.values());
 
     rounds.forEach((round, roundIndex) => {
       if (!round.completed) {
-        skipperData.forEach(sd => { sd.roundPoints[roundIndex] = null; });
+        skipperRows.forEach(sd => { sd.roundPoints[roundIndex] = null; });
         return;
       }
 
       const roundSkippers = round.skippers || skippers;
       const roundNetScores = calcRoundNet(roundIndex);
       const roundSorted = sortRoundSkippers(roundIndex, roundNetScores);
-      const roundResults = round.results || [];
+      const roundResults = round.results || (round as any).raceResults || [];
       const roundCompetitors = new Set(roundResults.map((r: any) => r.skipperIndex)).size;
 
-      skipperData.forEach(sd => {
-        const seriesSailNum = (skippers[sd.idx] as any).sailNo || (skippers[sd.idx] as any).sailNumber;
-        const roundSkipperIndex = roundSkippers.findIndex((rs: any) => (rs.sailNo || rs.sailNumber) === seriesSailNum);
+      skipperRows.forEach(sd => {
+        // Find this skipper in the round by matching any of their sail numbers
+        let roundSkipperIndex = -1;
+        for (const sailNo of sd.sailNos) {
+          const idx = roundSkippers.findIndex((rs: any) => (rs.sailNo || rs.sailNumber || '').toString() === sailNo);
+          if (idx !== -1) { roundSkipperIndex = idx; break; }
+        }
+        // Also try matching by name if sail number didn't match
+        if (roundSkipperIndex === -1) {
+          roundSkipperIndex = roundSkippers.findIndex((rs: any) => (rs.name || '').trim() === sd.name);
+        }
+
         const participated = roundSkipperIndex !== -1 && roundResults.some((r: any) => r.skipperIndex === roundSkipperIndex);
 
         if (!participated) {
@@ -1626,6 +1655,15 @@ export const ResultsPage: React.FC = () => {
           sd.roundPoints[roundIndex] = pts;
           sd.total += pts;
           return;
+        }
+
+        // Collect any new sail/design info from this round
+        const roundSkipper = roundSkippers[roundSkipperIndex];
+        if (roundSkipper) {
+          const rSail = (roundSkipper.sailNo || roundSkipper.sailNumber || '').toString();
+          const rDesign = roundSkipper.hull || roundSkipper.boatModel || roundSkipper.design || '';
+          if (rSail) sd.sailNos.add(rSail);
+          if (rDesign) sd.designs.add(rDesign);
         }
 
         const hasAvg = round.averagePointsApplied?.[roundSkipperIndex] !== undefined;
@@ -1663,14 +1701,14 @@ export const ResultsPage: React.FC = () => {
     for (const t of seriesDropRules) { if (numCompleted >= t) seriesDrops++; }
 
     if (seriesDrops > 0) {
-      skipperData.forEach(sd => {
+      skipperRows.forEach(sd => {
         const pts = sd.roundPoints.filter((p): p is number => p !== null).sort((a, b) => b - a);
         const dropsTotal = pts.slice(0, seriesDrops).reduce((s, v) => s + v, 0);
         sd.total -= dropsTotal;
       });
     }
 
-    skipperData.sort((a, b) => {
+    skipperRows.sort((a, b) => {
       if (a.total !== b.total) return a.total - b.total;
       for (let pos = 1; pos <= 20; pos++) {
         const ac = a.positionCounts[pos] || 0;
@@ -1680,16 +1718,16 @@ export const ResultsPage: React.FC = () => {
       return 0;
     });
 
-    return skipperData.map((sd, position) => {
+    return skipperRows.map((sd, position) => {
       const row: Record<string, any> = {
         Position: position + 1,
         Name: sd.name,
-        'Sail Number': sd.sailNo,
+        'Sail Number': Array.from(sd.sailNos).join(' / '),
         Club: sd.club,
-        Design: sd.design,
+        Design: Array.from(sd.designs).join(' / '),
       };
       rounds.forEach((round, ri) => {
-        const label = round.roundName || round.name || `Round ${ri + 1}`;
+        const label = (round as any).roundName || (round as any).name || `Round ${ri + 1}`;
         row[label] = sd.roundPoints[ri] !== null ? sd.roundPoints[ri] : '';
       });
       row['Total Points'] = sd.total;
