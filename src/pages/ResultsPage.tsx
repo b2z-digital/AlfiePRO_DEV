@@ -1684,8 +1684,8 @@ export const ResultsPage: React.FC = () => {
         }
 
         if (position > 0) {
-          sd.roundPoints[roundIndex] = netPoints;
-          sd.total += netPoints;
+          sd.roundPoints[roundIndex] = position;
+          sd.total += position;
           sd.positionCounts[position] = (sd.positionCounts[position] || 0) + 1;
         } else {
           const pts = roundCompetitors + 1;
