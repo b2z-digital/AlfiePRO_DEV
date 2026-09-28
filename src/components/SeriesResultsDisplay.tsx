@@ -698,22 +698,26 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
   // If series has no series-level skippers, try to get unique skippers from COMPLETED rounds only
   let effectiveSkippers = series.skippers || [];
   if ((!effectiveSkippers || effectiveSkippers.length === 0) && hasAnyResults) {
-    // Collect all unique skippers from COMPLETED rounds only (not in-progress rounds)
-    const skipperMap = new Map();
+    const skipperByName = new Map<string, any>();
     series.rounds.forEach(round => {
-      // Only include skippers from completed rounds
       if (round.completed && ((round.raceResults && round.raceResults.length > 0) || (round.results && round.results.length > 0))) {
-        (round.skippers || []).forEach((skipper: any, index: number) => {
-          // Use index as key to get the first N skippers (where N = number of unique skipperIndex values)
-          // This handles the case where the skippers array has duplicates
+        (round.skippers || []).forEach((skipper: any) => {
           const sailNum = skipper.sailNumber || skipper.sailNo;
-          if (sailNum && !skipperMap.has(sailNum)) {
-            skipperMap.set(sailNum, skipper);
+          const name = (skipper.name || '').trim();
+          if (!name && !sailNum) return;
+          const key = name || sailNum;
+          if (!skipperByName.has(key)) {
+            skipperByName.set(key, { ...skipper, allSailNumbers: sailNum ? [String(sailNum)] : [] });
+          } else {
+            const existing = skipperByName.get(key);
+            if (sailNum && !existing.allSailNumbers.includes(String(sailNum))) {
+              existing.allSailNumbers.push(String(sailNum));
+            }
           }
         });
       }
     });
-    effectiveSkippers = Array.from(skipperMap.values());
+    effectiveSkippers = Array.from(skipperByName.values());
   }
 
   if ((!effectiveSkippers || effectiveSkippers.length === 0) || !hasAnyResults) {
@@ -794,14 +798,17 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
       // Calculate totals for each skipper in this round
       const skipperTotals = displaySeries.skippers.map((skipper, skipperIndex) => {
         const sailNum = skipper.sailNumber || skipper.sailNo;
+        const allSails: string[] = skipper.allSailNumbers || (sailNum ? [String(sailNum)] : []);
 
-        // Check if this skipper competed in this round by matching sail number
-        const roundSkipper = roundSkippers.find((rs: any) =>
-          (rs.sailNumber || rs.sailNo) === sailNum
-        );
+        // Find all matching round skipper indices for this person (may have multiple boats)
+        const matchingRoundIndices: number[] = [];
+        roundSkippers.forEach((rs: any, idx: number) => {
+          const rSail = String(rs.sailNumber || rs.sailNo || '');
+          if (allSails.includes(rSail)) matchingRoundIndices.push(idx);
+        });
 
         // If skipper didn't compete in this round, assign DNS points (number of competitors + 1)
-        if (!roundSkipper) {
+        if (matchingRoundIndices.length === 0) {
           return {
             skipperIndex,
             totalPoints: numRoundSkippers + 1,
@@ -811,13 +818,8 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
           };
         }
 
-        // Find the skipper's index in the round's skippers array
-        const roundSkipperIndex = roundSkippers.findIndex((rs: any) =>
-          (rs.sailNumber || rs.sailNo) === sailNum
-        );
-
-        // Calculate this skipper's gross and net points for the round
-        const skipperRoundResults = roundResults.filter((r: any) => r.skipperIndex === roundSkipperIndex);
+        // Collect race results from ALL matching round indices (handles multi-boat)
+        const skipperRoundResults = roundResults.filter((r: any) => matchingRoundIndices.includes(r.skipperIndex));
 
         // Calculate gross points (sum of all race scores) and track DNE scores separately
         const raceScores: Array<{score: number, isDNE: boolean, isLetterScore: boolean, isAvgSentinel: boolean, race?: number}> = [];
@@ -889,7 +891,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
 
           // Second pass: recalculate average sentinels excluding dropped races
           if (avgSentinelIndices.length > 0) {
-            const skipperRes = roundResults.filter((r: any) => r.skipperIndex === roundSkipperIndex);
+            const skipperRes = roundResults.filter((r: any) => matchingRoundIndices.includes(r.skipperIndex));
             const nonDroppedScores: number[] = [];
             for (const res of skipperRes) {
               if (res.letterScore === 'ROD') continue;
