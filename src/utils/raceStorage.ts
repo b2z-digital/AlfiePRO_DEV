@@ -1526,9 +1526,37 @@ export const updateEventResults = async (
         }
       }
 
+      // Results reference skippers by index, so saving an empty skipper list over existing results orphans them
+      let safeSkippers = skippers;
+      if ((!safeSkippers || safeSkippers.length === 0) && Array.isArray(safeRaceResults) && safeRaceResults.length > 0) {
+        const isSeriesRound = updatedEvent.isSeriesEvent && updatedEvent.seriesId && updatedEvent.roundName;
+        const { data: existing } = isSeriesRound
+          ? await supabase
+              .from('race_series_rounds')
+              .select('skippers')
+              .eq('series_id', updatedEvent.seriesId!)
+              .eq('round_name', updatedEvent.roundName!)
+              .eq('club_id', currentClubId)
+              .maybeSingle()
+          : await supabase
+              .from('quick_races')
+              .select('skippers')
+              .eq('id', eventId)
+              .maybeSingle();
+        if (Array.isArray(existing?.skippers) && existing.skippers.length > 0) {
+          console.warn('⚠️ Preserving', existing.skippers.length, 'existing skippers instead of overwriting with empty list');
+          safeSkippers = existing.skippers;
+          updatedEvent.skippers = safeSkippers;
+          setCurrentEvent(updatedEvent);
+          await offlineStorage.saveEvent(updatedEvent);
+        } else {
+          throw new Error('Refusing to save results without skippers');
+        }
+      }
+
       // Prepare the update data with explicit field mapping
       const updateData = {
-        skippers: skippers,
+        skippers: safeSkippers,
         race_results: safeRaceResults,
         last_completed_race: lastCompletedRace,
         has_determined_initial_hcaps: hasDeterminedInitialHcaps,
@@ -1568,7 +1596,7 @@ export const updateEventResults = async (
           venue: updatedEvent.venue,
           race_class: updatedEvent.raceClass,
           race_format: updatedEvent.raceFormat,
-          skippers: skippers,
+          skippers: safeSkippers,
           completed: completed,
           heat_management: heatManagement,
           num_races: numRaces,
@@ -1759,7 +1787,7 @@ export const updateEventResults = async (
             race_venue: updatedEvent.venue || '',
             race_class: updatedEvent.raceClass || '',
             race_format: updatedEvent.raceFormat || 'scratch',
-            skippers: skippers,
+            skippers: safeSkippers,
             race_results: updatedEvent.multiDay ? [] : safeRaceResults,
             last_completed_race: updatedEvent.multiDay ? 0 : lastCompletedRace,
             has_determined_initial_hcaps: updatedEvent.multiDay ? false : hasDeterminedInitialHcaps,
@@ -1798,7 +1826,7 @@ export const updateEventResults = async (
         updateData['day_results'] = updatedEvent.dayResults;
 
         const updatePayload = {
-          skippers: skippers,
+          skippers: safeSkippers,
           day_results: updatedEvent.dayResults,
           current_day: currentDay,
           completed: updatedEvent.completed,
@@ -1837,7 +1865,7 @@ export const updateEventResults = async (
       } else {
         const updatePayload = {
           race_results: safeRaceResults,
-          skippers,
+          skippers: safeSkippers,
           last_completed_race: lastCompletedRace,
           has_determined_initial_hcaps: hasDeterminedInitialHcaps,
           is_manual_handicaps: isManualHandicaps,
