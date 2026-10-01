@@ -507,7 +507,7 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
       seriesRoundId: round.id || undefined,
       roundName: round.name,
       skippers: roundSkippers,
-      raceResults: round.results || [],
+      raceResults: round.raceResults || round.results || [],
       lastCompletedRace: round.lastCompletedRace || 0,
       hasDeterminedInitialHcaps: round.hasDeterminedInitialHcaps || false,
       isManualHandicaps: round.isManualHandicaps || false,

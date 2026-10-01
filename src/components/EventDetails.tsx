@@ -1684,8 +1684,50 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   };
 
   const handleStartScoring = async () => {
-    // Use the current event state directly to avoid stale data issues
-    const latestEvent = event;
+    let latestEvent = event;
+
+    // The details view may still hold a stale or blank copy if its background refetch hasn't finished
+    if (latestEvent.isSeriesEvent && latestEvent.seriesId && latestEvent.roundName && currentClub?.clubId) {
+      const { data: freshRound, error: freshError } = await supabase
+        .from('race_series_rounds')
+        .select('id, skippers, race_results, last_completed_race, has_determined_initial_hcaps, is_manual_handicaps, heat_management, num_races, drop_rules, multi_day, number_of_days, day_results, current_day')
+        .eq('series_id', latestEvent.seriesId)
+        .eq('round_name', latestEvent.roundName)
+        .eq('club_id', currentClub.clubId)
+        .maybeSingle();
+
+      if (freshError) {
+        alert('Could not load the latest scoring for this round. Please check your connection and try again.');
+        return;
+      }
+
+      if (freshRound) {
+        const dbSkippers = Array.isArray(freshRound.skippers) ? freshRound.skippers : [];
+        const dbResults = Array.isArray(freshRound.race_results) ? freshRound.race_results : [];
+        const hasSavedScoring = dbSkippers.length > 0 && (dbResults.length > 0 || (freshRound.last_completed_race || 0) > 0 || !!freshRound.day_results);
+        const localIsBlank = !latestEvent.skippers?.length;
+        if (hasSavedScoring || localIsBlank) {
+          latestEvent = {
+            ...latestEvent,
+            seriesRoundId: freshRound.id,
+            skippers: dbSkippers.length > 0 ? dbSkippers : latestEvent.skippers || [],
+            raceResults: dbResults,
+            lastCompletedRace: freshRound.last_completed_race || 0,
+            hasDeterminedInitialHcaps: freshRound.has_determined_initial_hcaps || false,
+            isManualHandicaps: freshRound.is_manual_handicaps || false,
+            heatManagement: freshRound.heat_management || latestEvent.heatManagement || null,
+            numRaces: freshRound.num_races || latestEvent.numRaces,
+            dropRules: freshRound.drop_rules || latestEvent.dropRules,
+            multiDay: freshRound.multi_day ?? latestEvent.multiDay,
+            numberOfDays: freshRound.number_of_days || latestEvent.numberOfDays,
+            dayResults: freshRound.day_results || latestEvent.dayResults || {},
+            currentDay: freshRound.current_day || latestEvent.currentDay || 1
+          };
+          setEvent(latestEvent);
+        }
+      }
+    }
+
     console.log('🎯 [EventDetails handleStartScoring] Called with:');
     console.log('  - eventName:', latestEvent.eventName);
     console.log('  - isSeriesEvent:', latestEvent.isSeriesEvent);
