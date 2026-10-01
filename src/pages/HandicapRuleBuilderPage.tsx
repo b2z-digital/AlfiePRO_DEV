@@ -304,6 +304,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propC
             scratch_streak_threshold: config.scratch_streak_threshold,
             scratch_streak_bonus: config.scratch_streak_bonus,
             skip_seeding_race: config.skip_seeding_race ?? false,
+            persist_handicaps: config.persist_handicaps ?? true,
           }).eq('id', config.id);
           if (error) throw error;
         } else {
@@ -407,6 +408,7 @@ export default function HandicapRuleBuilderPage({ darkMode = true, clubId: propC
         scratch_streak_threshold: srcConfig.scratch_streak_threshold,
         scratch_streak_bonus: srcConfig.scratch_streak_bonus,
         skip_seeding_race: srcConfig.skip_seeding_race ?? false,
+        persist_handicaps: srcConfig.persist_handicaps ?? true,
       });
     }
 

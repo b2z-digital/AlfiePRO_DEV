@@ -1332,7 +1332,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 }`} style={{ minWidth: '60px', ...exportThStyle }}>{getShrsRaceLabel(raceNum)}</th>
               ))}
               <th rowSpan={needsTwoRows ? 2 : undefined} className={`${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? 'GROSS' : 'Gross'}</th>
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? 'NET' : 'Net'}</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`${isExportMode ? '' : 'sticky right-0 z-20 px-3 py-3 bg-slate-800 shadow-[-2px_0_4px_rgba(0,0,0,0.2)]'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? 'NET' : 'Net'}</th>
             </tr>
             {needsTwoRows && (
               <tr className={isExportMode ? '' : 'bg-gradient-to-r from-slate-700 to-slate-800'}>
@@ -1740,7 +1740,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 </td>
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
-                  className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-bold ${isExportMode ? 'net-total' : 'text-blue-400'}`}
+                  className={`px-3 ${isExportMode ? '' : 'py-1.5 sticky right-0 z-10 bg-slate-800 shadow-[-2px_0_4px_rgba(0,0,0,0.2)]'} text-center font-bold ${isExportMode ? 'net-total' : 'text-blue-400'}`}
                   style={isExportMode ? { ...exportTdBase, fontWeight: 'bold' } : undefined}
                 >
                   {totals[skipper.index]?.net ? (event.raceFormat === 'handicap' ? Number(totals[skipper.index].net.toFixed(1)) : (hasRODScoring ? totals[skipper.index].net.toFixed(2) : Math.round(totals[skipper.index].net))) : 0}
