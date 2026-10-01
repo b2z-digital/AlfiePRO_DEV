@@ -9,6 +9,7 @@ import { RaceSeries, RaceEvent } from '../types/race';
 import { HeatDesignation } from '../types/heat';
 import { LetterScore, getLetterScoreValue } from '../types';
 import { getLetterScorePointsForRace } from '../utils/scratchCalculations';
+import { mergeSeriesSkippersByName, findRoundSkipperIndex, MergedSeriesSkipper } from '../utils/seriesSkipperMerge';
 import { getStoredRaceSeries, getStoredRaceEvents, getSimulatedRaceEvents, combineAllDayResults, storeRaceSeries } from '../utils/raceStorage';
 import { getPublicEvents, convertToRaceEvent } from '../utils/publicEventStorage';
 import { formatDate } from '../utils/date';
@@ -1607,14 +1608,15 @@ export const ResultsPage: React.FC = () => {
         .map(s => s.idx);
     };
 
-    type SkipperRow = { idx: number; name: string; sailNo: string; club: string; design: string; roundPoints: (number | null)[]; total: number; positionCounts: Record<number, number> };
+    type SkipperRow = { idx: number; merged: MergedSeriesSkipper; name: string; sailNo: string; club: string; design: string; roundPoints: (number | null)[]; total: number; positionCounts: Record<number, number> };
 
-    const skipperRows: SkipperRow[] = skippers.map((skipper: any, idx: number) => ({
+    const skipperRows: SkipperRow[] = mergeSeriesSkippersByName(skippers).map((skipper, idx: number) => ({
       idx,
+      merged: skipper,
       name: (skipper.name || '').trim(),
-      sailNo: (skipper.sailNo || skipper.sailNumber || '').toString(),
+      sailNo: skipper.displaySailNo,
       club: skipper.club || skipper.clubName || '',
-      design: skipper.hull || skipper.boatModel || skipper.design || '',
+      design: skipper.displayHull,
       roundPoints: [],
       total: 0,
       positionCounts: {},
@@ -1633,10 +1635,7 @@ export const ResultsPage: React.FC = () => {
       const roundCompetitors = new Set(roundResults.map((r: any) => r.skipperIndex)).size;
 
       skipperRows.forEach(sd => {
-        let roundSkipperIndex = roundSkippers.findIndex((rs: any) => (rs.sailNo || rs.sailNumber || '').toString() === sd.sailNo);
-        if (roundSkipperIndex === -1) {
-          roundSkipperIndex = roundSkippers.findIndex((rs: any) => (rs.name || '').trim() === sd.name);
-        }
+        const roundSkipperIndex = findRoundSkipperIndex(roundSkippers, sd.merged);
 
         const participated = roundSkipperIndex !== -1 && roundResults.some((r: any) => r.skipperIndex === roundSkipperIndex);
 

@@ -5,6 +5,7 @@ import { formatDate } from '../utils/date';
 import { LetterScore } from '../types';
 import { getLetterScorePointsForRace } from '../utils/scratchCalculations';
 import { SeriesSkipperPerformanceInsights } from './SeriesSkipperPerformanceInsights';
+import { mergeSeriesSkippersByName, findRoundSkipperIndex, getMergedOverride, getSkipperSailNumber } from '../utils/seriesSkipperMerge';
 import '../styles/results-export.css';
 
 interface SeriesResultsDisplayProps {
@@ -759,10 +760,12 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
       return [];
     }
 
+    const mergedSkippers = mergeSeriesSkippersByName(displaySeries.skippers);
+
     // Initialize skipper points tracking
-    const skipperPoints: any[] = displaySeries.skippers.map((skipper, index) => ({
+    const skipperPoints: any[] = mergedSkippers.map((skipper) => ({
       ...skipper,
-      index,
+      index: skipper.sourceIndices[0],
       roundPoints: new Array(displaySeries.rounds.length).fill(null),
       roundPositions: new Array(displaySeries.rounds.length).fill(null),
       droppedRounds: new Set<number>(),
@@ -788,29 +791,23 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
       }
 
       // Calculate totals for each skipper in this round
-      const skipperTotals = displaySeries.skippers.map((skipper, skipperIndex) => {
-        const sailNum = skipper.sailNumber || skipper.sailNo;
-
-        // Check if this skipper competed in this round by matching sail number
-        const roundSkipper = roundSkippers.find((rs: any) =>
-          (rs.sailNumber || rs.sailNo) === sailNum
-        );
+      const skipperTotals = mergedSkippers.map((skipper, skipperIndex) => {
+        const roundSkipperIndex = findRoundSkipperIndex(roundSkippers, skipper);
+        const sailNum = roundSkipperIndex !== -1
+          ? getSkipperSailNumber(roundSkippers[roundSkipperIndex])
+          : skipper.displaySailNo;
 
         // If skipper didn't compete in this round, assign DNS points (number of competitors + 1)
-        if (!roundSkipper) {
+        if (roundSkipperIndex === -1) {
           return {
             skipperIndex,
+            roundSkipperIndex,
             totalPoints: numRoundSkippers + 1,
             netPoints: numRoundSkippers + 1,
             sailNumber: sailNum,
             didNotCompete: true
           };
         }
-
-        // Find the skipper's index in the round's skippers array
-        const roundSkipperIndex = roundSkippers.findIndex((rs: any) =>
-          (rs.sailNumber || rs.sailNo) === sailNum
-        );
 
         // Collect race results from this skipper
         const skipperRoundResults = roundResults.filter((r: any) => r.skipperIndex === roundSkipperIndex);
@@ -910,6 +907,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
 
         return {
           skipperIndex,
+          roundSkipperIndex,
           totalPoints: grossPoints,
           netPoints: netPoints,
           sailNumber: sailNum,
@@ -940,14 +938,9 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
         const bPositions: number[] = [];
 
         // Get all race positions for both skippers in this round
+        const aRoundSkipperIndex = a.roundSkipperIndex;
+        const bRoundSkipperIndex = b.roundSkipperIndex;
         roundResults.forEach((result: any) => {
-          const aRoundSkipperIndex = roundSkippers.findIndex((rs: any) =>
-            (rs.sailNumber || rs.sailNo) === a.sailNumber
-          );
-          const bRoundSkipperIndex = roundSkippers.findIndex((rs: any) =>
-            (rs.sailNumber || rs.sailNo) === b.sailNumber
-          );
-
           if (result.skipperIndex === aRoundSkipperIndex && result.position !== null && !result.letterScore) {
             aPositions.push(result.position);
           }
@@ -986,26 +979,13 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
           console.log(`🔴 Rd4 Position ${roundPosition}: Series Skipper ${item.skipperIndex} (Sail ${item.sailNumber}, Net: ${item.netPoints})`);
         }
 
-        // Debug for round 3
-        if (roundIndex === 2) {
-          console.log(`🔍 Skipper ${item.skipperIndex} (Sail ${item.sailNumber}):`, {
-            hasAverageApplied: round.averagePointsApplied?.[item.skipperIndex] !== undefined,
-            averageValue: round.averagePointsApplied?.[item.skipperIndex],
-            hasManualOverride: round.manualScoreOverrides?.[item.skipperIndex] !== undefined,
-            manualValue: round.manualScoreOverrides?.[item.skipperIndex]
-          });
-        }
+        const averageOverride = getMergedOverride(round.averagePointsApplied, mergedSkippers[item.skipperIndex]);
+        const manualOverride = getMergedOverride(round.manualScoreOverrides, mergedSkippers[item.skipperIndex]);
 
-        // Check if this skipper has average points or manual override applied
-        const hasAverageApplied = round.averagePointsApplied?.[item.skipperIndex] !== undefined;
-        const hasManualOverride = round.manualScoreOverrides?.[item.skipperIndex] !== undefined;
-
-        if (hasAverageApplied) {
-          roundPoints = round.averagePointsApplied![item.skipperIndex];
-          console.log(`🎯 APPLYING AVERAGE for skipper ${item.skipperIndex}: ${roundPoints} instead of ${roundPosition}`);
-        } else if (hasManualOverride) {
-          roundPoints = round.manualScoreOverrides![item.skipperIndex];
-          console.log(`🎯 APPLYING MANUAL OVERRIDE for skipper ${item.skipperIndex}: ${roundPoints} instead of ${roundPosition}`);
+        if (averageOverride !== undefined) {
+          roundPoints = averageOverride;
+        } else if (manualOverride !== undefined) {
+          roundPoints = manualOverride;
         }
 
         skipperPoints[item.skipperIndex].roundPositions[roundIndex] = roundPosition;
@@ -1019,16 +999,13 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
       didNotCompete.forEach(item => {
         let dncPoints = item.totalPoints;
 
-        // Check if this non-competing skipper has average points or manual override applied
-        const hasAverageApplied = round.averagePointsApplied?.[item.skipperIndex] !== undefined;
-        const hasManualOverride = round.manualScoreOverrides?.[item.skipperIndex] !== undefined;
+        const averageOverride = getMergedOverride(round.averagePointsApplied, mergedSkippers[item.skipperIndex]);
+        const manualOverride = getMergedOverride(round.manualScoreOverrides, mergedSkippers[item.skipperIndex]);
 
-        if (hasAverageApplied) {
-          dncPoints = round.averagePointsApplied![item.skipperIndex];
-          console.log(`🎯 APPLYING AVERAGE (DNC) for skipper ${item.skipperIndex}: ${dncPoints} instead of ${item.totalPoints}`);
-        } else if (hasManualOverride) {
-          dncPoints = round.manualScoreOverrides![item.skipperIndex];
-          console.log(`🎯 APPLYING MANUAL OVERRIDE (DNC) for skipper ${item.skipperIndex}: ${dncPoints} instead of ${item.totalPoints}`);
+        if (averageOverride !== undefined) {
+          dncPoints = averageOverride;
+        } else if (manualOverride !== undefined) {
+          dncPoints = manualOverride;
         }
 
         skipperPoints[item.skipperIndex].roundPositions[roundIndex] = null;
@@ -1201,7 +1178,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
                     </div>
                   )}
                 </td>
-                <td className={isExportMode ? '' : 'px-2 sm:px-4 py-3 sm:py-4 text-slate-300 text-sm sm:text-base'}>{skipper.sailNo}</td>
+                <td className={isExportMode ? '' : 'px-2 sm:px-4 py-3 sm:py-4 text-slate-300 text-sm sm:text-base'}>{skipper.displaySailNo || skipper.sailNo}</td>
                 <td className={isExportMode ? '' : 'px-2 sm:px-4 py-3 sm:py-4 text-white text-left text-sm sm:text-base'}>
                   {isExportMode ? (
                     skipper.name
@@ -1223,7 +1200,7 @@ export const SeriesResultsDisplay: React.FC<SeriesResultsDisplayProps> = ({
                   )}
                 </td>
                 <td className={isExportMode ? '' : 'px-2 sm:px-4 py-3 sm:py-4 text-slate-300 text-sm sm:text-base'}>{getClubAbbreviation(skipper)}</td>
-                <td className={isExportMode ? '' : 'px-2 sm:px-4 py-3 sm:py-4 text-slate-300 text-sm sm:text-base'}>{getHullDesign(skipper)}</td>
+                <td className={isExportMode ? '' : 'px-2 sm:px-4 py-3 sm:py-4 text-slate-300 text-sm sm:text-base'}>{skipper.displayHull || getHullDesign(skipper)}</td>
                 {displaySeries.rounds.map((round, index) => {
                   // Check if the round is completed
                   const isRoundCompleted = round.completed;
