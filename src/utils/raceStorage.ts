@@ -746,7 +746,9 @@ export const getStoredRaceSeries = async (): Promise<RaceSeries[]> => {
         );
 
         if (roundsError) {
+          // Without the rounds table the legacy copy would show scored rounds as blank
           console.error('Error fetching series rounds:', roundsError);
+          throw roundsError;
         }
 
       // Group rounds by series_id
@@ -977,10 +979,14 @@ export const storeRaceSeries = async (series: RaceSeries): Promise<void> => {
         console.log('=== SYNCING ROUNDS TO race_series_rounds TABLE ===');
 
         // First, get existing rounds for this series
-        const { data: existingRounds } = await supabase
+        const { data: existingRounds, error: existingRoundsError } = await supabase
           .from('race_series_rounds')
-          .select('id, round_index')
+          .select('id, round_index, skippers, race_results, last_completed_race, has_determined_initial_hcaps, is_manual_handicaps, heat_management, day_results, completed, average_points_applied, manual_score_overrides')
           .eq('series_id', series.id);
+
+        if (existingRoundsError) {
+          throw existingRoundsError;
+        }
 
         const existingRoundIndices = new Set(existingRounds?.map(r => r.round_index) || []);
 
@@ -1014,6 +1020,28 @@ export const storeRaceSeries = async (series: RaceSeries): Promise<void> => {
             manual_score_overrides: round.manualScoreOverrides || {},
             enable_livestream: round.enableLiveStream ?? (series.enableLiveStream || false)
           };
+
+          // A stale copy of the series must never wipe a round that has already been scored
+          const existing = existingRounds?.find(r => r.round_index === index);
+          const existingHasScoring = !!existing && (
+            (Array.isArray(existing.race_results) && existing.race_results.length > 0) ||
+            (existing.last_completed_race || 0) > 0
+          );
+          const incomingIsBlank = roundData.race_results.length === 0 && roundData.last_completed_race === 0;
+          if (existing && existingHasScoring && incomingIsBlank) {
+            Object.assign(roundData, {
+              skippers: existing.skippers,
+              race_results: existing.race_results,
+              last_completed_race: existing.last_completed_race,
+              has_determined_initial_hcaps: existing.has_determined_initial_hcaps,
+              is_manual_handicaps: existing.is_manual_handicaps,
+              heat_management: existing.heat_management,
+              day_results: existing.day_results,
+              completed: roundData.completed || existing.completed,
+              average_points_applied: existing.average_points_applied,
+              manual_score_overrides: existing.manual_score_overrides
+            });
+          }
 
           return roundData;
         });
@@ -1355,7 +1383,7 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
  * Refresh the current event from the database before the scoring screen opens.
  * Keeps the local copy only when it is ahead of the database (e.g. scored offline).
  */
-export const refreshCurrentEventForScoring = async (timeoutMs = 8000): Promise<void> => {
+export const refreshCurrentEventForScoring = async (timeoutMs = 15000): Promise<void> => {
   const local = getCurrentEvent();
   if (!local?.id || !navigator.onLine) return;
 

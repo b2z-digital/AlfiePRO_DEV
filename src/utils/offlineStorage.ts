@@ -446,7 +446,9 @@ class OfflineStorageManager {
     });
 
     // Queue for sync only if not skipping (used when caching from Supabase)
-    if (!skipSync) {
+    // Series rounds are stored in race_series_rounds; syncing them here would create a duplicate standalone event
+    const isSeriesRound = event.isSeriesEvent || !!event.seriesId || !!(event as any).seriesRoundId;
+    if (!skipSync && !isSeriesRound) {
       await this.addToSyncQueue({
         operation: event.id ? 'update' : 'create',
         table: 'quick_races',
