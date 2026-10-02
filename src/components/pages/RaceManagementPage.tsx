@@ -550,122 +550,108 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
 
       console.log(`✓ Base data loaded in ${Date.now() - startTime}ms`);
 
-      // Also fetch approved state/national public events to display
-      let publicEvents: RaceEvent[] = [];
-      try {
-        // Use centralized getPublicEvents function which includes registrations
-        const approvedPublicEvents = await getPublicEvents(
-          false, // only approved events
-          currentOrganization?.type as 'state' | 'national' | undefined,
-          currentOrganization?.id
-        );
+      const isAssociation = currentOrganization?.type === 'state' || currentOrganization?.type === 'national';
+      const baseSeries = isAssociation ? [] : raceSeries;
 
-        if (approvedPublicEvents) {
-          // Use convertToRaceEvent which includes registrations as attendees
-          publicEvents = approvedPublicEvents.map(pe => convertToRaceEvent(pe));
+      // Show the club's own events straight away; attendance and public events fill in afterwards
+      if (!isAssociation) {
+        setQuickRaces(raceEvents.filter(event => !event.isSeriesEvent));
+        setSeries(baseSeries);
+        setVenues(storedVenues);
+        setLoading(false);
+      }
 
-          // Fetch local copies of public events (for scoring data)
-          // These are quick_races entries with public_event_id set
+      const loadPublicEvents = async (): Promise<RaceEvent[]> => {
+        try {
+          const approvedPublicEvents = await getPublicEvents(
+            false,
+            currentOrganization?.type as 'state' | 'national' | undefined,
+            currentOrganization?.id
+          );
+          if (!approvedPublicEvents) return [];
+
+          let publicEvents = approvedPublicEvents.map(pe => convertToRaceEvent(pe));
+
+          // Local copies in quick_races hold the scoring data for public events
           if (currentClub?.clubId) {
-            try {
-              const { data: localCopies } = await supabase
-                .from('quick_races')
-                .select('id, public_event_id, skippers, race_results, last_completed_race, completed')
-                .eq('club_id', currentClub.clubId)
-                .not('public_event_id', 'is', null)
-                .neq('is_simulated', true);
+            const { data: localCopies, error: localCopiesError } = await supabase
+              .from('quick_races')
+              .select('id, public_event_id, skippers, race_results, last_completed_race, completed')
+              .eq('club_id', currentClub.clubId)
+              .not('public_event_id', 'is', null)
+              .neq('is_simulated', true);
 
-              console.log('📋 [fetchRaces] Found', localCopies?.length || 0, 'local copies of public events');
-
-              // Merge local copy data into public events
-              if (localCopies && localCopies.length > 0) {
-                publicEvents = publicEvents.map(pe => {
-                  const localCopy = localCopies.find(lc => lc.public_event_id === pe.publicEventId);
-                  if (localCopy) {
-                    console.log(`✅ [fetchRaces] Merging local copy data for ${pe.eventName}:`, {
-                      skipperCount: localCopy.skippers?.length || 0,
-                      resultCount: localCopy.race_results?.length || 0,
-                      lastCompletedRace: localCopy.last_completed_race || 0
-                    });
-                    return {
-                      ...pe,
-                      id: localCopy.id, // Use local copy ID for scoring actions
-                      skippers: localCopy.skippers || pe.skippers || [],
-                      raceResults: localCopy.race_results || [],
-                      lastCompletedRace: localCopy.last_completed_race || 0,
-                      completed: localCopy.completed || false
-                    };
-                  }
-                  return pe;
-                });
-              }
-            } catch (err) {
-              console.error('Error fetching local copies of public events:', err);
+            if (localCopiesError) {
+              console.error('Error fetching local copies of public events:', localCopiesError);
+            } else if (localCopies && localCopies.length > 0) {
+              publicEvents = publicEvents.map(pe => {
+                const localCopy = localCopies.find(lc => lc.public_event_id === pe.publicEventId);
+                if (!localCopy) return pe;
+                return {
+                  ...pe,
+                  id: localCopy.id,
+                  skippers: localCopy.skippers || pe.skippers || [],
+                  raceResults: localCopy.race_results || [],
+                  lastCompletedRace: localCopy.last_completed_race || 0,
+                  completed: localCopy.completed || false
+                };
+              });
             }
           }
-        }
-      } catch (err) {
-        console.error('Error fetching public events:', err);
-      }
-
-      // Combine club events with approved public events
-      // For state/national associations, only show public events (not club events)
-      const allRaceEvents = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
-        ? publicEvents
-        : [...raceEvents, ...publicEvents];
-
-      // Filter out series events from quickRaces
-      const standaloneRaces = allRaceEvents.filter(event => !event.isSeriesEvent);
-
-      // Enrich with attendance data and skippers (with longer timeouts and better error handling)
-      let enrichedRaces = standaloneRaces;
-      // For state/national associations, don't show club series
-      let enrichedSeries = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
-        ? []
-        : raceSeries;
-
-      try {
-        console.log('🚀 [fetchRaces] About to call enrichEventsWithAttendance with', standaloneRaces.length, 'events');
-        enrichedRaces = await enrichEventsWithAttendance(standaloneRaces);
-        console.log('✅ [fetchRaces] enrichEventsWithAttendance completed successfully');
-      } catch (err) {
-        console.error('❌ [fetchRaces] Error enriching races with attendance, using base data:', err);
-        enrichedRaces = standaloneRaces;
-      }
-
-      // Only enrich series if not an association (enrichedSeries will be empty array for associations)
-      if (enrichedSeries.length > 0) {
-        try {
-          console.log('🚀 [fetchRaces] About to call enrichSeriesWithAttendance');
-          enrichedSeries = await enrichSeriesWithAttendance(enrichedSeries);
-          console.log('✅ [fetchRaces] enrichSeriesWithAttendance completed successfully');
+          return publicEvents;
         } catch (err) {
-          console.error('❌ [fetchRaces] Error enriching series with attendance, using base data:', err);
-          // Keep enrichedSeries as is (already filtered)
+          console.error('Error fetching public events:', err);
+          return [];
         }
+      };
 
+      const loadRaces = async () => {
+        const publicEvents = await loadPublicEvents();
+        const allRaceEvents = isAssociation ? publicEvents : [...raceEvents, ...publicEvents];
+        const standaloneRaces = allRaceEvents.filter(event => !event.isSeriesEvent);
         try {
-          console.log('🚀 [fetchRaces] About to call enrichSeriesWithSkippers');
-          enrichedSeries = await enrichSeriesWithSkippers(enrichedSeries);
-          console.log('✅ [fetchRaces] enrichSeriesWithSkippers completed successfully');
+          return await enrichEventsWithAttendance(standaloneRaces);
         } catch (err) {
-          console.error('❌ [fetchRaces] Error enriching series with skippers, using base data:', err);
-          // Keep enrichedSeries as is (already filtered)
+          console.error('Error enriching races with attendance, using base data:', err);
+          return standaloneRaces;
         }
-      }
+      };
+
+      const loadSeries = async () => {
+        if (baseSeries.length === 0) return baseSeries;
+        let enriched = baseSeries;
+        try {
+          enriched = await enrichSeriesWithAttendance(enriched);
+        } catch (err) {
+          console.error('Error enriching series with attendance, using base data:', err);
+        }
+        try {
+          enriched = await enrichSeriesWithSkippers(enriched);
+        } catch (err) {
+          console.error('Error enriching series with skippers, using base data:', err);
+        }
+        return enriched;
+      };
+
+      const loadSimulated = async () => {
+        try {
+          return await getSimulatedRaceEvents();
+        } catch (simErr) {
+          console.error('Error fetching simulated events:', simErr);
+          return [];
+        }
+      };
+
+      const [enrichedRaces, enrichedSeries, simEvents] = await Promise.all([
+        loadRaces(),
+        loadSeries(),
+        loadSimulated()
+      ]);
 
       setQuickRaces(enrichedRaces);
       setSeries(enrichedSeries);
       setVenues(storedVenues);
-
-      // Fetch simulated events separately (they're excluded from getStoredRaceEvents)
-      try {
-        const simEvents = await getSimulatedRaceEvents();
-        setSimulatedEvents(simEvents);
-      } catch (simErr) {
-        console.error('Error fetching simulated events:', simErr);
-        setSimulatedEvents([]);
-      }
+      setSimulatedEvents(simEvents);
     } catch (err: any) {
       console.error(`❌ Error fetching races after ${Date.now() - startTime}ms:`, err);
 

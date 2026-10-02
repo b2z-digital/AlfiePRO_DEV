@@ -43,7 +43,9 @@ const getVenuesFromLocalStorage = (): Venue[] => {
 
 const saveVenuesToLocalStorage = (venues: Venue[]): void => {
   try {
-    localStorage.setItem('venues', JSON.stringify(venues));
+    // Embedded photos can be megabytes each and would crowd out the scoring data sharing this storage
+    const slim = venues.map(v => (typeof v.image === 'string' && v.image.startsWith('data:') ? { ...v, image: '' } : v));
+    localStorage.setItem('venues', JSON.stringify(slim));
   } catch (error) {
     console.error('Error saving venues to local storage:', error);
   }
@@ -77,15 +79,6 @@ export const getStoredVenues = async (): Promise<Venue[]> => {
       }
 
       return (data || []) as Venue[];
-    }
-
-    // Test connection first
-    const isConnected = await testSupabaseConnection();
-
-    if (!isConnected) {
-      console.warn('Supabase connection failed, using local storage');
-      const allVenues = getVenuesFromLocalStorage();
-      return allVenues.filter(venue => venue.club_id === clubId);
     }
 
     try {

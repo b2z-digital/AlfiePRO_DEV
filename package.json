@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "GOGC=10 GOMEMLIMIT=100MiB vite build",
     "build:check": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
