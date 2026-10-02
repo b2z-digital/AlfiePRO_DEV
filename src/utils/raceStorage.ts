@@ -846,7 +846,13 @@ export const getStoredRaceSeries = async (): Promise<RaceSeries[]> => {
       const allSeries = stored ? JSON.parse(stored) : [];
       const otherClubSeries = allSeries.filter((s: RaceSeries) => s.clubId !== currentClubId);
       const updatedAllSeries = [...otherClubSeries, ...series];
-      localStorage.setItem(RACE_SERIES_KEY, JSON.stringify(updatedAllSeries));
+      try {
+        localStorage.setItem(RACE_SERIES_KEY, JSON.stringify(updatedAllSeries));
+      } catch (cacheError) {
+        // Storage full: drop the stale cache so it can never be served instead of fresh data
+        console.warn('Could not cache series locally:', cacheError);
+        localStorage.removeItem(RACE_SERIES_KEY);
+      }
 
       return series;
     } catch (supabaseError) {
@@ -1175,7 +1181,17 @@ export const setCurrentEvent = (event: RaceEvent): void => {
       enable_observers: event.enable_observers,
       observers_per_heat: event.observers_per_heat
     });
-    localStorage.setItem(CURRENT_EVENT_KEY, JSON.stringify(event));
+    const serialized = JSON.stringify(event);
+    try {
+      localStorage.setItem(CURRENT_EVENT_KEY, serialized);
+    } catch (quotaError) {
+      // Storage full: free the bulky caches and retry so scoring never opens a previous event
+      console.warn('Storage full while saving current event, clearing caches and retrying:', quotaError);
+      localStorage.removeItem(RACE_SERIES_KEY);
+      localStorage.removeItem(RACE_EVENTS_KEY);
+      localStorage.removeItem(CURRENT_EVENT_KEY);
+      localStorage.setItem(CURRENT_EVENT_KEY, serialized);
+    }
 
     // Verify what was actually saved
     const saved = localStorage.getItem(CURRENT_EVENT_KEY);
@@ -1332,6 +1348,35 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
   } catch (error) {
     console.error('❌ Error reloading event from database:', error);
     return null;
+  }
+};
+
+/**
+ * Refresh the current event from the database before the scoring screen opens.
+ * Keeps the local copy only when it is ahead of the database (e.g. scored offline).
+ */
+export const refreshCurrentEventForScoring = async (timeoutMs = 8000): Promise<void> => {
+  const local = getCurrentEvent();
+  if (!local?.id || !navigator.onLine) return;
+
+  const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), timeoutMs));
+  const fresh = await Promise.race([reloadCurrentEventFromDatabase(), timeout]);
+  if (!fresh) {
+    setCurrentEvent(local);
+    return;
+  }
+
+  const localRaces = local.lastCompletedRace || 0;
+  const freshRaces = fresh.lastCompletedRace || 0;
+  const localResults = local.raceResults?.length || 0;
+  const freshResults = fresh.raceResults?.length || 0;
+  if (localRaces > freshRaces || (localRaces === freshRaces && localResults > freshResults)) {
+    setCurrentEvent(local);
+    return;
+  }
+
+  if ((!fresh.skippers || fresh.skippers.length === 0) && local.skippers?.length) {
+    setCurrentEvent({ ...fresh, skippers: local.skippers });
   }
 };
 

@@ -4,6 +4,7 @@ import { DashboardLayout } from './components/DashboardLayout';
 import { YachtRaceManager } from './components/YachtRaceManager';
 import { ModalProvider } from './contexts/ModalContext';
 import { RaceEvent } from './types/race';
+import { refreshCurrentEventForScoring } from './utils/raceStorage';
 import { Login } from './components/auth/Login';
 import { Register } from './components/auth/Register';
 import { ForgotPassword } from './components/auth/ForgotPassword';
@@ -100,6 +101,7 @@ function App() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
   const [showScoring, setShowScoring] = useState(false);
+  const [preparingScoring, setPreparingScoring] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
   const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, hasPendingClubApplication, userClubs, hasCancelledMembership, cancelledMemberships, hasUnfinancialMember, unfinancialMemberData, isRaceOfficer } = useAuth();
   const { notifications, removeNotification } = useNotifications();
@@ -140,8 +142,16 @@ function App() {
     setSelectedEvent(event);
   };
 
-  const handleStartScoring = () => {
-    setShowScoring(true);
+  const handleStartScoring = async () => {
+    setPreparingScoring(true);
+    try {
+      await refreshCurrentEventForScoring();
+    } catch (error) {
+      console.error('Could not refresh event before scoring:', error);
+    } finally {
+      setPreparingScoring(false);
+      setShowScoring(true);
+    }
   };
 
   const handleExitScoring = () => {
@@ -180,6 +190,17 @@ function App() {
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <div className="text-white text-xl">{isLoggingOut ? 'Signing out...' : 'Loading...'}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (preparingScoring) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <div className="text-white text-xl">Loading latest results...</div>
         </div>
       </div>
     );
