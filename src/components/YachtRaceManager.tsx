@@ -971,6 +971,37 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     // See the skipper loading code above
   }, []);
 
+  const [skipperRecoveryTried, setSkipperRecoveryTried] = useState(false);
+
+  // Safety net: a series round with results but no skippers on screen is always a loading gap, never a real state
+  useEffect(() => {
+    if (skipperRecoveryTried || !isDataFullyLoaded || skippers.length > 0) return;
+    const ev = getCurrentEvent();
+    if (!ev?.isSeriesEvent || !ev.seriesId || !ev.roundName) return;
+    setSkipperRecoveryTried(true);
+    (async () => {
+      const { data: round, error: roundError } = await supabase
+        .from('race_series_rounds')
+        .select('id, skippers, race_results, last_completed_race')
+        .eq('series_id', ev.seriesId)
+        .eq('round_name', ev.roundName)
+        .maybeSingle();
+      if (roundError) {
+        setError('Could not load the skippers for this round. Please go back and try again.');
+        return;
+      }
+      const dbSkippers = Array.isArray(round?.skippers) ? round.skippers : [];
+      if (dbSkippers.length === 0) return;
+      const dbResults = Array.isArray(round?.race_results) && round.race_results.length > 0 ? round.race_results : raceResults;
+      const lastRace = Math.max(round?.last_completed_race || 0, lastCompletedRace);
+      setCurrentEvent({ ...ev, seriesRoundId: round!.id, skippers: dbSkippers, raceResults: dbResults, lastCompletedRace: lastRace });
+      setSkippers(dbSkippers);
+      setRaceResults(dbResults);
+      setLastCompletedRace(lastRace);
+      setIsSkipperModalOpen(false);
+    })();
+  }, [isDataFullyLoaded, skippers.length, raceResults, lastCompletedRace, skipperRecoveryTried]);
+
   useEffect(() => {
     // Skip auto-save during initial load to prevent overwriting loaded data
     if (isInitialLoad) {
@@ -1242,7 +1273,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   }, [darkMode]);
 
   useEffect(() => {
-    if (raceResults.length > 0 && raceType === 'handicap' && !heatManagement?.configuration.enabled && !rulesetLoading) {
+    // Must wait for skippers: running against an empty list wipes the loaded skippers when the ruleset loads first
+    if (isDataFullyLoaded && skippers.length > 0 && raceResults.length > 0 && raceType === 'handicap' && !heatManagement?.configuration.enabled && !rulesetLoading) {
       try {
         const { updatedSkippers, updatedResults } = activeRuleset
           ? calculateHandicapsWithRuleset(skippers, raceResults, currentNumRaces, activeRuleset, isManualHandicaps)
@@ -1268,7 +1300,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         setError(error instanceof Error ? error.message : 'Failed to calculate handicaps');
       }
     }
-  }, [raceResults, skippers, capLimit, lastPlaceBonus, raceType, heatManagement, activeRuleset, rulesetLoading]);
+  }, [raceResults, skippers, capLimit, lastPlaceBonus, raceType, heatManagement, activeRuleset, rulesetLoading, isDataFullyLoaded]);
 
   // When all handicaps are zeroed before any race (Scratch Start), clear originalHandicaps
   // so old stored handicaps don't interfere with seeding race logic
