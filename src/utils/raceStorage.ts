@@ -1240,7 +1240,7 @@ export const setCurrentEvent = (event: RaceEvent): void => {
  * Reload the current event from the database to pick up any changes
  * This is useful after saving settings that update database fields
  */
-export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null> => {
+export const reloadCurrentEventFromDatabase = async (persist = true): Promise<RaceEvent | null> => {
   try {
     const currentEvent = getCurrentEvent();
     if (!currentEvent || !currentEvent.id) {
@@ -1371,8 +1371,7 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
       dropRules: reloadedEvent.dropRules
     });
 
-    // Update localStorage with fresh data
-    setCurrentEvent(reloadedEvent);
+    if (persist) setCurrentEvent(reloadedEvent);
 
     return reloadedEvent;
   } catch (error) {
@@ -1390,7 +1389,8 @@ export const refreshCurrentEventForScoring = async (timeoutMs = 15000): Promise<
   if (!local?.id || !navigator.onLine) return;
 
   const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), timeoutMs));
-  const fresh = await Promise.race([reloadCurrentEventFromDatabase(), timeout]);
+  // Don't let the reload write on its own: a late reply after the timeout must not replace the handed-over copy
+  const fresh = await Promise.race([reloadCurrentEventFromDatabase(false), timeout]);
   if (!fresh) {
     setCurrentEvent(local);
     return;
@@ -1400,14 +1400,9 @@ export const refreshCurrentEventForScoring = async (timeoutMs = 15000): Promise<
   const freshRaces = fresh.lastCompletedRace || 0;
   const localResults = local.raceResults?.length || 0;
   const freshResults = fresh.raceResults?.length || 0;
-  if (localRaces > freshRaces || (localRaces === freshRaces && localResults > freshResults)) {
-    setCurrentEvent(local);
-    return;
-  }
-
-  if ((!fresh.skippers || fresh.skippers.length === 0) && local.skippers?.length) {
-    setCurrentEvent({ ...fresh, skippers: local.skippers });
-  }
+  const freshIsBehind = localRaces > freshRaces || (localRaces === freshRaces && localResults > freshResults);
+  const freshLostSkippers = !!local.skippers?.length && !fresh.skippers?.length;
+  setCurrentEvent(freshIsBehind || freshLostSkippers ? local : fresh);
 };
 
 // Clear current event

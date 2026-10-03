@@ -621,15 +621,18 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setTimeout(() => setIsDataFullyLoaded(true), 100);
           }
         })();
-      } else if (currentEvent.isSeriesEvent && currentEvent.seriesId && currentEvent.roundName) {
+      } else if (currentEvent.isSeriesEvent && (currentEvent.seriesRoundId || (currentEvent.seriesId && currentEvent.roundName))) {
         // The handed-over copy can arrive without skippers when scoring is opened quickly; recover from the saved round
         (async () => {
-          const fetchRound = () => supabase
-            .from('race_series_rounds')
-            .select('id, skippers, race_results, last_completed_race')
-            .eq('series_id', currentEvent.seriesId)
-            .eq('round_name', currentEvent.roundName)
-            .maybeSingle();
+          const fetchRound = () => {
+            const query = supabase
+              .from('race_series_rounds')
+              .select('id, skippers, race_results, last_completed_race');
+            return (currentEvent.seriesRoundId
+              ? query.eq('id', currentEvent.seriesRoundId)
+              : query.eq('series_id', currentEvent.seriesId).eq('round_name', currentEvent.roundName)
+            ).maybeSingle();
+          };
           let { data: round, error: roundError } = await fetchRound();
           if (roundError) {
             await new Promise(resolve => setTimeout(resolve, 1500));
