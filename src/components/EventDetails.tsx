@@ -131,6 +131,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   const [assigningPro, setAssigningPro] = useState(false);
   const [proSearchTerm, setProSearchTerm] = useState('');
   const [rosteredProName, setRosteredProName] = useState<string | null>(null);
+  const [startingScoring, setStartingScoring] = useState(false);
 
   useEffect(() => {
     if (event.proMemberName || !event.clubId || !event.date) return;
@@ -1684,7 +1685,18 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   };
 
   const handleStartScoring = async () => {
+    if (startingScoring) return;
+    setStartingScoring(true);
+    try {
+      await prepareAndStartScoring();
+    } finally {
+      setStartingScoring(false);
+    }
+  };
+
+  const prepareAndStartScoring = async () => {
     let latestEvent = event;
+    let dbHasSavedScoring = false;
 
     // The details view may still hold a stale or blank copy if its background refetch hasn't finished
     if (latestEvent.isSeriesEvent && latestEvent.seriesId && latestEvent.roundName && currentClub?.clubId) {
@@ -1705,6 +1717,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
         const dbSkippers = Array.isArray(freshRound.skippers) ? freshRound.skippers : [];
         const dbResults = Array.isArray(freshRound.race_results) ? freshRound.race_results : [];
         const hasSavedScoring = dbSkippers.length > 0 && (dbResults.length > 0 || (freshRound.last_completed_race || 0) > 0 || !!freshRound.day_results);
+        dbHasSavedScoring = hasSavedScoring;
         const localIsBlank = !latestEvent.skippers?.length;
         if (hasSavedScoring || localIsBlank) {
           latestEvent = {
@@ -1739,7 +1752,8 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     console.log('  - Full skippers array:', latestEvent.skippers);
 
     // For series rounds, ensure skippers are saved to race_series_rounds table before starting scoring
-    if (latestEvent.isSeriesEvent && latestEvent.seriesId && latestEvent.roundName && latestEvent.skippers && latestEvent.skippers.length > 0 && currentClub?.clubId) {
+    // Skip when the round already holds saved scoring: latestEvent was just loaded from it, so re-saving only adds delay
+    if (!dbHasSavedScoring && latestEvent.isSeriesEvent && latestEvent.seriesId && latestEvent.roundName && latestEvent.skippers && latestEvent.skippers.length > 0 && currentClub?.clubId) {
       console.log('🎯 [handleStartScoring] Saving series round skippers to race_series_rounds table before scoring');
       try {
         // Check if round already exists
@@ -2591,9 +2605,15 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 )}
                 <button
                   onClick={handleStartScoring}
-                  className="btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg transition-all duration-200 animate-pulse"
+                  disabled={startingScoring}
+                  className={`btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg transition-all duration-200 ${startingScoring ? 'opacity-75 cursor-wait' : 'animate-pulse'}`}
                 >
-                  {getButtonText()}
+                  {startingScoring ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      Loading latest results...
+                    </>
+                  ) : getButtonText()}
                 </button>
               </>
             )}

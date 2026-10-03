@@ -621,6 +621,45 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setTimeout(() => setIsDataFullyLoaded(true), 100);
           }
         })();
+      } else if (currentEvent.isSeriesEvent && currentEvent.seriesId && currentEvent.roundName) {
+        // The handed-over copy can arrive without skippers when scoring is opened quickly; recover from the saved round
+        (async () => {
+          const fetchRound = () => supabase
+            .from('race_series_rounds')
+            .select('id, skippers, race_results, last_completed_race')
+            .eq('series_id', currentEvent.seriesId)
+            .eq('round_name', currentEvent.roundName)
+            .maybeSingle();
+          let { data: round, error: roundError } = await fetchRound();
+          if (roundError) {
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            ({ data: round, error: roundError } = await fetchRound());
+          }
+
+          if (roundError) {
+            console.error('Error recovering series round skippers:', roundError);
+            setError('Could not load the skippers for this round. Please go back and try again.');
+            return;
+          }
+
+          const dbSkippers = Array.isArray(round?.skippers) ? round.skippers : [];
+          const dbResults = Array.isArray(round?.race_results) ? round.race_results : [];
+          if (dbSkippers.length > 0) {
+            setCurrentEvent({
+              ...currentEvent,
+              seriesRoundId: round!.id,
+              skippers: dbSkippers,
+              raceResults: dbResults,
+              lastCompletedRace: round!.last_completed_race || 0
+            });
+            setSkippers(dbSkippers);
+            setRaceResults(dbResults);
+            setLastCompletedRace(round!.last_completed_race || 0);
+          } else {
+            setSkippers([]);
+          }
+          setTimeout(() => setIsDataFullyLoaded(true), 100);
+        })();
       } else {
         console.log('No skippers in event, using empty array');
         setSkippers([]);

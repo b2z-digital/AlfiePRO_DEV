@@ -1325,6 +1325,8 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
     const reloadedEvent: RaceEvent = {
       ...currentEvent, // Keep existing in-memory data
       ...data, // Overlay with fresh database data
+      // A series round row's own id must not replace the event id, or saves get routed as a standalone event
+      id: currentEvent.isSeriesEvent ? currentEvent.id : data.id,
       eventName: data.event_name,
       clubName: data.club_name || currentEvent.clubName,
       date: data.race_date,
