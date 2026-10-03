@@ -5,7 +5,7 @@ import { offlineStorage } from './offlineStorage';
 
 const testSupabaseConnection = async (): Promise<boolean> => {
   try {
-    const { error } = await supabase.from('members').select('id', { count: 'exact', head: true }).limit(1);
+    const { error } = await supabase.from('members').select('id').limit(1);
     return !error;
   } catch (error) {
     console.warn('Supabase connection test failed:', error);
