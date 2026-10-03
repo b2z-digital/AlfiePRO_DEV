@@ -621,18 +621,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setTimeout(() => setIsDataFullyLoaded(true), 100);
           }
         })();
-      } else if (currentEvent.isSeriesEvent && (currentEvent.seriesRoundId || (currentEvent.seriesId && currentEvent.roundName))) {
+      } else if (currentEvent.isSeriesEvent && currentEvent.seriesId && currentEvent.roundName) {
         // The handed-over copy can arrive without skippers when scoring is opened quickly; recover from the saved round
         (async () => {
-          const fetchRound = () => {
-            const query = supabase
-              .from('race_series_rounds')
-              .select('id, skippers, race_results, last_completed_race');
-            return (currentEvent.seriesRoundId
-              ? query.eq('id', currentEvent.seriesRoundId)
-              : query.eq('series_id', currentEvent.seriesId).eq('round_name', currentEvent.roundName)
-            ).maybeSingle();
-          };
+          const fetchRound = () => supabase
+            .from('race_series_rounds')
+            .select('id, skippers, race_results, last_completed_race')
+            .eq('series_id', currentEvent.seriesId)
+            .eq('round_name', currentEvent.roundName)
+            .maybeSingle();
           let { data: round, error: roundError } = await fetchRound();
           if (roundError) {
             await new Promise(resolve => setTimeout(resolve, 1500));
@@ -973,6 +970,37 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     // Note: isDataFullyLoaded is now set after async skipper enrichment completes
     // See the skipper loading code above
   }, []);
+
+  const [skipperRecoveryTried, setSkipperRecoveryTried] = useState(false);
+
+  // Safety net: a series round with results but no skippers on screen is always a loading gap, never a real state
+  useEffect(() => {
+    if (skipperRecoveryTried || !isDataFullyLoaded || skippers.length > 0 || raceResults.length === 0) return;
+    const ev = getCurrentEvent();
+    if (!ev?.isSeriesEvent || !ev.seriesId || !ev.roundName) return;
+    setSkipperRecoveryTried(true);
+    (async () => {
+      const { data: round, error: roundError } = await supabase
+        .from('race_series_rounds')
+        .select('id, skippers, race_results, last_completed_race')
+        .eq('series_id', ev.seriesId)
+        .eq('round_name', ev.roundName)
+        .maybeSingle();
+      if (roundError) {
+        setError('Could not load the skippers for this round. Please go back and try again.');
+        return;
+      }
+      const dbSkippers = Array.isArray(round?.skippers) ? round.skippers : [];
+      if (dbSkippers.length === 0) return;
+      const dbResults = Array.isArray(round?.race_results) && round.race_results.length > 0 ? round.race_results : raceResults;
+      const lastRace = Math.max(round?.last_completed_race || 0, lastCompletedRace);
+      setCurrentEvent({ ...ev, seriesRoundId: round!.id, skippers: dbSkippers, raceResults: dbResults, lastCompletedRace: lastRace });
+      setSkippers(dbSkippers);
+      setRaceResults(dbResults);
+      setLastCompletedRace(lastRace);
+      setIsSkipperModalOpen(false);
+    })();
+  }, [isDataFullyLoaded, skippers.length, raceResults, lastCompletedRace, skipperRecoveryTried]);
 
   useEffect(() => {
     // Skip auto-save during initial load to prevent overwriting loaded data
