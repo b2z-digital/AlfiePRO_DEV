@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { SubdomainProvider } from '../contexts/SubdomainContext';
 import { PublicClubHomepageNew } from './public/PublicClubHomepageNew';
@@ -13,6 +13,7 @@ import { PublicRaceCalendarPage } from './public/PublicRaceCalendarPage';
 import { PublicResultsPage } from './public/PublicResultsPage';
 import { PublicResultsListPage } from './public/PublicResultsListPage';
 import { PublicEventWebsitePage } from './public/PublicEventWebsitePage';
+import { PublicSiteErrorBoundary } from './public/PublicSiteErrorBoundary';
 
 interface SubdomainPublicSiteProps {
   subdomain: string;
@@ -24,6 +25,7 @@ export const SubdomainPublicSite: React.FC<SubdomainPublicSiteProps> = ({ subdom
   const [siteType, setSiteType] = useState<'club' | 'event' | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const location = useLocation();
 
   useEffect(() => {
     loadClubBySubdomain();
@@ -142,6 +144,7 @@ export const SubdomainPublicSite: React.FC<SubdomainPublicSiteProps> = ({ subdom
   if (siteType === 'club' && clubId) {
     return (
       <SubdomainProvider clubId={clubId} isSubdomainMode={true}>
+        <PublicSiteErrorBoundary key={location.pathname} pathname={location.pathname}>
         <Routes>
           <Route path="/" element={<PublicClubHomepageNew clubIdOverride={clubId} />} />
           <Route path="/news" element={<PublicNewsPage />} />
@@ -155,6 +158,7 @@ export const SubdomainPublicSite: React.FC<SubdomainPublicSiteProps> = ({ subdom
           <Route path="/results/:eventId" element={<PublicResultsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </PublicSiteErrorBoundary>
       </SubdomainProvider>
     );
   }
