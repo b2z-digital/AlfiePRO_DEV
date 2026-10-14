@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Trophy, Calendar, MapPin, ChevronRight, ListFilter as Filter } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { PUBLIC_CLUB_COLUMNS } from '../../utils/publicClubColumns';
 import { Club } from '../../types/club';
 import { formatDate } from '../../utils/date';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
@@ -84,7 +85,7 @@ export const PublicResultsListPage: React.FC = () => {
 
       const { data: clubData } = await supabase
         .from('clubs')
-        .select('*')
+        .select(PUBLIC_CLUB_COLUMNS)
         .eq('id', clubId)
         .maybeSingle();
 

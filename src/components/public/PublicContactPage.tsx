@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Send, CheckCircle, User } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { PUBLIC_CLUB_COLUMNS } from '../../utils/publicClubColumns';
 import { Club } from '../../types/club';
 import { PublicHeader } from './PublicHeader';
 import { PublicFooter } from './PublicFooter';
@@ -49,7 +50,7 @@ export const PublicContactPage: React.FC = () => {
       setLoading(true);
 
       const [clubResult, committeeResult] = await Promise.all([
-        supabase.from('clubs').select('*').eq('id', clubId).maybeSingle(),
+        supabase.from('clubs').select(PUBLIC_CLUB_COLUMNS).eq('id', clubId).maybeSingle(),
         supabase
           .from('committee_position_definitions')
           .select(`

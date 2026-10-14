@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Menu, X, Sailboat } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { PUBLIC_CLUB_COLUMNS } from '../../utils/publicClubColumns';
 import { Club } from '../../types/club';
 import { BoatClass } from '../../types/boatClass';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
@@ -38,7 +39,7 @@ export const PublicYachtClassesPage: React.FC = () => {
 
       const { data: clubData, error: clubError } = await supabase
         .from('clubs')
-        .select('*')
+        .select(PUBLIC_CLUB_COLUMNS)
         .eq('id', clubId)
         .maybeSingle();
 

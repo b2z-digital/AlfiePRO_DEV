@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
 import { Search, Calendar, ChevronRight } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { PUBLIC_CLUB_COLUMNS } from '../../utils/publicClubColumns';
 import { Club } from '../../types/club';
 import { formatDate } from '../../utils/date';
 import { PublicHeader } from './PublicHeader';
@@ -74,7 +75,7 @@ export const PublicNewsPage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('clubs')
-        .select('*')
+        .select(PUBLIC_CLUB_COLUMNS)
         .eq('id', clubId)
         .maybeSingle();
 
