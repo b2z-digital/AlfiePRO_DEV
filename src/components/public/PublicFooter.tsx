@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { MapPin } from 'lucide-react';
 import { Club } from '../../types/club';
 import { supabase } from '../../utils/supabase';
+import { PUBLIC_CLUB_COLUMNS } from '../../utils/publicClubColumns';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
 
 interface PublicFooterProps {
@@ -32,7 +33,7 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({ club: propClub, club
     try {
       const { data } = await supabase
         .from('clubs')
-        .select('*')
+        .select(PUBLIC_CLUB_COLUMNS)
         .eq('id', clubId)
         .maybeSingle();
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Menu, X, MapPin, ChevronLeft, ChevronRight, Calendar, Clock, Award } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { PUBLIC_CLUB_COLUMNS } from '../../utils/publicClubColumns';
 import { Club } from '../../types/club';
 import { formatDate } from '../../utils/date';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
@@ -148,7 +149,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
 
       const { data: clubData, error: clubError } = await supabase
         .from('clubs')
-        .select('*')
+        .select(PUBLIC_CLUB_COLUMNS)
         .eq('id', clubId)
         .maybeSingle();
 

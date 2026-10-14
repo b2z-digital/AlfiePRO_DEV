@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MapPin, Navigation } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { PUBLIC_CLUB_COLUMNS } from '../../utils/publicClubColumns';
 import { Club } from '../../types/club';
 import { PublicHeader } from './PublicHeader';
 import { PublicFooter } from './PublicFooter';
@@ -46,7 +47,7 @@ export const PublicVenuesPage: React.FC = () => {
     try {
       setLoading(true);
       const [clubRes, venuesRes] = await Promise.all([
-        supabase.from('clubs').select('*').eq('id', clubId).maybeSingle(),
+        supabase.from('clubs').select(PUBLIC_CLUB_COLUMNS).eq('id', clubId).maybeSingle(),
         supabase.from('venues').select('*').eq('club_id', clubId)
       ]);
 

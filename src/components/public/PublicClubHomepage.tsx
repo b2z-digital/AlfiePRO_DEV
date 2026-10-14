@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Calendar, Trophy, ChevronDown, Menu, X, ArrowRight, Users, Award, BookOpen } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { PUBLIC_CLUB_COLUMNS } from '../../utils/publicClubColumns';
 import { Club } from '../../types/club';
 
 interface UpcomingEvent {
@@ -49,7 +50,7 @@ export const PublicClubHomepage: React.FC = () => {
 
       const { data: clubData, error: clubError } = await supabase
         .from('clubs')
-        .select('*')
+        .select(PUBLIC_CLUB_COLUMNS)
         .eq('id', clubId)
         .maybeSingle();
 

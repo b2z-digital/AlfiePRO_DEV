@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Menu, X, Calendar, Clock, MapPin, Trophy, ListFilter as Filter, ChevronDown, Users, Award, List, Grid2x2 as Grid, CalendarDays, CalendarRange, Link2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { PUBLIC_CLUB_COLUMNS } from '../../utils/publicClubColumns';
 import { Club } from '../../types/club';
 import { formatDate } from '../../utils/date';
 import { generateICalFile, downloadICalFile } from '../../utils/calendarSync';
@@ -82,7 +83,7 @@ export const PublicRaceCalendarPage: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('clubs')
-        .select('*')
+        .select(PUBLIC_CLUB_COLUMNS)
         .eq('id', clubId)
         .single();
 

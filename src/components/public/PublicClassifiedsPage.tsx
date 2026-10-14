@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Search, Tag, Filter, MapPin, Calendar } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { PUBLIC_CLUB_COLUMNS } from '../../utils/publicClubColumns';
 import { Club } from '../../types/club';
 import { formatDate } from '../../utils/date';
 import { PublicHeader } from './PublicHeader';
@@ -66,7 +67,7 @@ export const PublicClassifiedsPage: React.FC = () => {
       console.log('Loading classifieds for club:', clubId);
 
       const [clubRes, classifiedsRes] = await Promise.all([
-        supabase.from('clubs').select('*').eq('id', clubId).maybeSingle(),
+        supabase.from('clubs').select(PUBLIC_CLUB_COLUMNS).eq('id', clubId).maybeSingle(),
         supabase.from('classifieds').select('*').eq('status', 'active').order('created_at', { ascending: false })
       ]);
 
