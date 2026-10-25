@@ -708,10 +708,6 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
         'https://www.googleapis.com/auth/userinfo.email',
         'https://www.googleapis.com/auth/userinfo.profile',
         'https://www.googleapis.com/auth/calendar',
-        'https://www.googleapis.com/auth/drive.file',
-        'https://www.googleapis.com/auth/drive.metadata.readonly',
-        'https://www.googleapis.com/auth/youtube',
-        'https://www.googleapis.com/auth/youtube.upload',
       ].join(' ');
 
       const stateData: any = { integration: 'google' };
@@ -948,6 +944,12 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
           .update({ is_active: !existing.is_active, updated_at: new Date().toISOString() })
           .eq('id', existing.id);
         if (error) throw error;
+      } else if (subServiceId === 'google_drive') {
+        await handleConnectGoogleDrive();
+        return;
+      } else if (subServiceId === 'youtube' && currentClub?.clubId && !currentOrganization) {
+        await handleConnectYoutube();
+        return;
       }
 
       await fetchIntegrationStatus();
