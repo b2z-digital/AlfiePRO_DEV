@@ -541,52 +541,14 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         return (data as Member[]) || [];
       }
 
-      const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
-      const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
-
-      const { data: userAssociations, error: assocError } = await supabase
-        .from(tableName)
-        .select('user_id')
-        .eq(idColumn, associationId);
-
-      if (assocError) throw assocError;
-      if (!userAssociations || userAssociations.length === 0) return [];
-
-      const userIds = userAssociations.map(ua => ua.user_id);
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .in('id', userIds)
-        .order('first_name', { ascending: true });
-
-      if (profilesError) throw profilesError;
-
-      return (profiles || []).map((profile: any) => ({
-        id: profile.id,
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        email: profile.email,
-        club_id: '',
-        phone: '',
-        club: '',
-        street: '',
-        city: '',
-        state: '',
-        postcode: '',
-        date_joined: '',
-        membership_level: 'Full',
-        is_financial: true,
-        amount_paid: 0,
-        created_at: '',
-        updated_at: ''
-      })) as Member[];
+      return fetchAllMembers();
     }
 
     return [];
   };
 
   const fetchAllMembers = async (): Promise<Member[]> => {
-    const memberFields = 'id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url';
+    const memberFields = 'id, user_id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url';
 
     if (clubId) {
       const { data, error } = await supabase
@@ -600,42 +562,41 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
       const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
       const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
 
-      const { data: userAssociations, error: assocError } = await supabase
-        .from(tableName)
-        .select('user_id')
-        .eq(idColumn, associationId);
+      const [{ data: positions, error: posError }, { data: userAssociations, error: assocError }] = await Promise.all([
+        supabase.from('committee_positions').select('member_id').eq(idColumn, associationId),
+        supabase.from(tableName).select('user_id').eq(idColumn, associationId)
+      ]);
 
+      if (posError) throw posError;
       if (assocError) throw assocError;
-      if (!userAssociations || userAssociations.length === 0) return [];
 
-      const userIds = userAssociations.map(ua => ua.user_id);
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .in('id', userIds)
-        .order('first_name', { ascending: true });
+      const committeeMemberIds = (positions || []).map(p => p.member_id).filter(Boolean);
+      const userIds = (userAssociations || []).map(ua => ua.user_id).filter(Boolean);
 
-      if (profilesError) throw profilesError;
+      const [committeeResult, userResult] = await Promise.all([
+        committeeMemberIds.length > 0
+          ? supabase.from('members').select(memberFields).in('id', committeeMemberIds)
+          : Promise.resolve({ data: [], error: null }),
+        userIds.length > 0
+          ? supabase.from('members').select(memberFields).in('user_id', userIds)
+          : Promise.resolve({ data: [], error: null })
+      ]);
 
-      return (profiles || []).map((profile: any) => ({
-        id: profile.id,
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        email: profile.email,
-        club_id: '',
-        phone: '',
-        club: '',
-        street: '',
-        city: '',
-        state: '',
-        postcode: '',
-        date_joined: '',
-        membership_level: 'Full',
-        is_financial: true,
-        amount_paid: 0,
-        created_at: '',
-        updated_at: ''
-      })) as Member[];
+      if (committeeResult.error) throw committeeResult.error;
+      if (userResult.error) throw userResult.error;
+
+      // A person can hold a member record in several clubs; list them once, preferring their committee record.
+      const seenUsers = new Set<string>();
+      const seenIds = new Set<string>();
+      const result: Member[] = [];
+      for (const m of [...(committeeResult.data || []), ...(userResult.data || [])] as (Member & { user_id?: string | null })[]) {
+        if (seenIds.has(m.id) || (m.user_id && seenUsers.has(m.user_id))) continue;
+        seenIds.add(m.id);
+        if (m.user_id) seenUsers.add(m.user_id);
+        result.push(m);
+      }
+
+      return result.sort((a, b) => (a.first_name || '').localeCompare(b.first_name || ''));
     }
 
     return [];
