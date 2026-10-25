@@ -215,6 +215,17 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       return;
     }
 
+    const oauthError = urlParams.get('error');
+    if (oauthError && state) {
+      const message = oauthError === 'access_denied'
+        ? 'Google did not allow the connection. If you did not cancel it yourself, this Google account may not be approved for AlfiePRO yet - please contact AlfiePRO support.'
+        : `Google connection failed: ${oauthError}`;
+      setError(message);
+      addNotification('error', message);
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
     if (code && state) {
       try {
         const stateData = JSON.parse(decodeURIComponent(state));

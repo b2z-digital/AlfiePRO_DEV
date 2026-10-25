@@ -109,7 +109,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
     const code = urlParams.get('code');
     const state = urlParams.get('state');
 
-    if (code && state) {
+    if ((code || urlParams.get('error')) && state) {
       try {
         const stateData = JSON.parse(decodeURIComponent(state));
         if (stateData.integration) {
