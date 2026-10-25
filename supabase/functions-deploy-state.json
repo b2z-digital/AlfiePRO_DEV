@@ -1,0 +1,305 @@
+{
+  "projectId": "63286364",
+  "functions": {
+    "activate-member-account": {
+      "hasChanged": false,
+      "hash": "476be52e58195174571677b77f6ce4063e896e17d97458480348d094e671df79"
+    },
+    "alfie-stripe-webhook": {
+      "hasChanged": false,
+      "hash": "a92aaeadbb6e9217dbe92c4498ea3020431a53e2aba48a5d84edcf00b20100cb"
+    },
+    "ask-alfie-chat": {
+      "hasChanged": false,
+      "hash": "c9b3a70e3af4f235ac82cd52efceacda941c67ccd0039926da462b8521a5a580"
+    },
+    "check-amplify-ssl-status": {
+      "hasChanged": false,
+      "hash": "783aa35af6617cde09f1e60e7b9666ac142c402c6e9a4d9de271c3f8c7594f6e"
+    },
+    "compress-existing-images": {
+      "hasChanged": false,
+      "hash": "efa8dbd8fe0a6463bac13ee721850a6d2b0d7ded6a87354f991540e39a7650b6"
+    },
+    "connect-default-youtube": {
+      "hasChanged": false,
+      "hash": "adda5872ba34f102e26102b5686ce1c811d61e17ec3f15ebb9a7e3b42f773b7f"
+    },
+    "connect-stripe": {
+      "hasChanged": false,
+      "hash": "f484d2604eba0e670f78e8e0a12a49c029a9376dd0f0cf1d3e43657025871c84"
+    },
+    "create-alfie-checkout": {
+      "hasChanged": false,
+      "hash": "aadfaee66f7838ab245718ff0c33cfb88dc2b736849396646aa09d36dccf2cc4"
+    },
+    "create-event-checkout": {
+      "hasChanged": false,
+      "hash": "31b328ce398e90594f48131846f36d5221e9f692ad7566586c86f8e70748aaee"
+    },
+    "create-google-meet": {
+      "hasChanged": false,
+      "hash": "c9cc51593e98879846530b357df0b3ba9fc46b2562d74c50115f27cff6fa9d46"
+    },
+    "create-portal-session": {
+      "hasChanged": false,
+      "hash": "3d93718d80ba1dff8d1e3b015c2ff370fdf8f98cb2a1dddd373e631bc7a24eee"
+    },
+    "create-stripe-checkout": {
+      "hasChanged": false,
+      "hash": "201c9a93a83d6ffb85adbe61e4865cee9f48ebb8185976bf55e842351a4da4b2"
+    },
+    "database-backup": {
+      "hasChanged": false,
+      "hash": "fe775d15a128dfca2419f83935241bd0cd730535ddd07184e0b2d855e1f0665a"
+    },
+    "dropbox-oauth-callback": {
+      "hasChanged": false,
+      "hash": "6d3dfa1690e7c1516a8eff0eb811e22ee9573c239e68deb72f151fce456099aa"
+    },
+    "event-data-feed": {
+      "hasChanged": false,
+      "hash": "e3ed9567d531ed3f4cdded8eec54b206a307b1b30f8d9de477d31ac53be8abcc"
+    },
+    "event-payment-webhook": {
+      "hasChanged": false,
+      "hash": "a32e91f8bc9b5c6f4827d419a23f262c48282966fde0c64217867309e2647abc"
+    },
+    "facebook-oauth-callback": {
+      "hasChanged": false,
+      "hash": "f1568975c1d53774372e7b593904fb748061475c4a9d34dad79b48659fe081ed"
+    },
+    "fetch-external-html": {
+      "hasChanged": false,
+      "hash": "70e745ffce5afa0162332e868af3405225075082c19827678dfb798e8c704d9d"
+    },
+    "fetch-platform-resources": {
+      "hasChanged": false,
+      "hash": "f37d71619acb264b3368c70a3dc396ee866b32dc56683663d939c8487beee56d"
+    },
+    "generate-and-store-race-report": {
+      "hasChanged": false,
+      "hash": "54dd48060969f53b88e38ccc813e8bb0fb97b7b016048cf5a09ca105fee4179c"
+    },
+    "generate-platform-billing": {
+      "hasChanged": false,
+      "hash": "545a142557bb0d5114e93798f372d87bcecb0cb52caa7976088fec983be683d0"
+    },
+    "generate-race-document": {
+      "hasChanged": false,
+      "hash": "518e5d178b28f03a29e384a245c44024d80e384437a64e2bdb428666c714384c"
+    },
+    "generate-race-report": {
+      "hasChanged": false,
+      "hash": "59e5f1e0226efa07087b358adbcf1bf6f458998a10863d6ea16ab4597e0baaf9"
+    },
+    "get-table-columns": {
+      "hasChanged": false,
+      "hash": "2dfddfac15ef2c43585ff2345d3bc9b6c74eb0fcf7cb2d92a9eff6477b46162b"
+    },
+    "get-youtube-channel-info": {
+      "hasChanged": false,
+      "hash": "0de802473a95b7f1bf367b0a4f33253aa59a5b2c4fe4304e5ad80692983ba7e1"
+    },
+    "get-youtube-metadata": {
+      "hasChanged": false,
+      "hash": "7cce6ad0b156495099c1e9bf23929956e3a14137f60bcd8522ab819a42675839"
+    },
+    "github-proxy": {
+      "hasChanged": false,
+      "hash": "6d81541f03efd3f3010564d2db74170c16b7720879cd4165401b89bc1d365679"
+    },
+    "google-drive-oauth-callback": {
+      "hasChanged": false,
+      "hash": "a323cfa764eeb80826a8f8f02a86d4a67b3aed5cb366e2d766f61344061ce7e3"
+    },
+    "google-oauth-callback": {
+      "hasChanged": false,
+      "hash": "e536e8185b8905bdcb00667ca37514b8385529f46d2fdcd289f0b96ba4bcbaae"
+    },
+    "instagram-oauth-callback": {
+      "hasChanged": false,
+      "hash": "249dcef4ed3d1531b7de1e29b2cb6bf19f7a5337dd23c6d8c090722cb2d13c69"
+    },
+    "invite-race-officer": {
+      "hasChanged": false,
+      "hash": "8c76d0404bd285d95fc571cf61ec08419727e8c17342b0dfe18c55404388f19b"
+    },
+    "manage-aws-amplify": {
+      "hasChanged": false,
+      "hash": "7c049db02a961085df50a64599471061166308c9c189b394e44eb0a849117704"
+    },
+    "manage-cloudflare-dns": {
+      "hasChanged": false,
+      "hash": "25a5a2c4d3f3d334e57cf8425d0a263256671993ccb61767adc02f68c51c4b5f"
+    },
+    "manage-cloudflare-stream": {
+      "hasChanged": false,
+      "hash": "46e57351f891540d491053ff537b3238e917578138ab792110614ee7b836c261"
+    },
+    "manage-dropbox-files": {
+      "hasChanged": false,
+      "hash": "f85b6cdf9c6419a34baba20c3b3cdfe59916eb38f950062878821b181110254c"
+    },
+    "manage-google-drive-files": {
+      "hasChanged": false,
+      "hash": "73c66cffff48ba67dac713116f9c738dffaa101cb74b564f7d39b83e70b5cf3c"
+    },
+    "manage-youtube-livestream": {
+      "hasChanged": false,
+      "hash": "863a2861260ca6802de503ebf56c9559fb647f269b9f8f0515bc0c2948246911"
+    },
+    "meeting-attendance-response": {
+      "hasChanged": false,
+      "hash": "e3b73f816f1146d87a9a3eb83ce110cd609a7e9049c48a78f9056a328bac0cc2"
+    },
+    "process-alfie-document": {
+      "hasChanged": false,
+      "hash": "77316c63a40f6c6c505615ec38d8e64164fdb51c33185d2791a9eb31466f11f7"
+    },
+    "process-automation-flows": {
+      "hasChanged": false,
+      "hash": "47f838cf6a36c133651d566a672600d852e52d4ed6a69147c7cc9006cf3bd5a4"
+    },
+    "process-race-segment": {
+      "hasChanged": false,
+      "hash": "139c718aa23d4b2edadeda893d526ff4b2312489ed4019f93912ae5c4fc4b6aa"
+    },
+    "process-renewal-notifications": {
+      "hasChanged": false,
+      "hash": "d8b29a22a4ae3e4115bb3b4e95e4661230d087058028d9ba76f9e40ce8fa518c"
+    },
+    "publish-to-facebook": {
+      "hasChanged": false,
+      "hash": "17369664998941db6371a866eb42150542bd75256ce7efed5fee70f514b8b566"
+    },
+    "reset-password-request": {
+      "hasChanged": false,
+      "hash": "d371dc5cce7e567b5ead8879f4365f5ae01b541c1cb9a3262235790f17fbd18e"
+    },
+    "schedule-event-sms": {
+      "hasChanged": false,
+      "hash": "f9de6f35881adfb636a0119d5a30427365d8716450a574c5c4db9af35040b4b4"
+    },
+    "scrape-classifieds": {
+      "hasChanged": false,
+      "hash": "8500b7da54ca6873806022df18cb094e1863b26b09489a58396415281e06ad73"
+    },
+    "scrape-events": {
+      "hasChanged": false,
+      "hash": "cb079a510b186759fa82ddbff47ff079de30eb7b2ef639497514b45436e30f96"
+    },
+    "scrape-external-results": {
+      "hasChanged": false,
+      "hash": "74a377725becde4127811c90dbb797bc13e81d39d44880f0beb2c9ac435cc0db"
+    },
+    "scrape-national-rankings": {
+      "hasChanged": false,
+      "hash": "e3395284355c6c9449e33565c40a546a249ccd9cee93c10afbeed3fefa5daaaa"
+    },
+    "scrape-news-sources": {
+      "hasChanged": false,
+      "hash": "b71dc526e61f0bdaba73353fe9b7d2d35680110acfb1f1ed874b643dec532b49"
+    },
+    "send-channel-suggestion": {
+      "hasChanged": false,
+      "hash": "dd194cb180d593e87e3c972e876a739284e6231c839f9191ea26c9a70ef74a82"
+    },
+    "send-club-request-email": {
+      "hasChanged": false,
+      "hash": "177856a408265e3808b9fc402a5316d38b79497cc789e7eff6221eb339e6d027"
+    },
+    "send-contact-form": {
+      "hasChanged": false,
+      "hash": "e90846d9fa730feabd2b5d69940ff190b242291d56c5cadd297fb627446c6f25"
+    },
+    "send-event-invitation": {
+      "hasChanged": false,
+      "hash": "4196b91cbf8e63f138a56648833e92c6b2bb5a3e74ad250c03c663ccfa641f69"
+    },
+    "send-event-sms": {
+      "hasChanged": false,
+      "hash": "55ca4042fc706ee2d05b5ffb2989c2daf2a861986431d488cc111fa7af22652d"
+    },
+    "send-invoice-email": {
+      "hasChanged": false,
+      "hash": "7df7e8c98f5f2ff889d66c5c0735f7cd30a038f2ba28f7ab49efe8e3a8beed8b"
+    },
+    "send-member-invitation": {
+      "hasChanged": false,
+      "hash": "1eb3bdaba075cb52ccb8fe4c180b76ffd4871fdede63aa75cc43b832a06511c2"
+    },
+    "send-membership-notifications": {
+      "hasChanged": false,
+      "hash": "41e8e6e009080c07ed76d022bff4ec217ddbdbaa762af6d7e6065ef27af075d4"
+    },
+    "send-national-report": {
+      "hasChanged": false,
+      "hash": "4b8b2cf261bcf04eaa097f153364c71e9479b4b8b1fc09a1d2abb30874f4d378"
+    },
+    "send-notification": {
+      "hasChanged": false,
+      "hash": "fb97730246a12ee843cf1b05ce0457713f3f7337124ac8fd49cb777af4c1d9b3"
+    },
+    "send-platform-billing-invoice": {
+      "hasChanged": false,
+      "hash": "c87bf4da4a7a32f3720bdadd699e867c80a4c11aa5456d553287c35d74a70497"
+    },
+    "send-renewal-reminder": {
+      "hasChanged": false,
+      "hash": "5f8eeaad37906e60e8c88681bbab006c30ee477caa47587442395981916dcd2c"
+    },
+    "send-task-reminders": {
+      "hasChanged": false,
+      "hash": "d76ffad5f4f59676a14957fa608277b43dd25132d42f6af125f59478c1b73695"
+    },
+    "set-member-password": {
+      "hasChanged": false,
+      "hash": "e5cf008636ddc386bd0779856cd1d9569efea9de87055139bd389d840ccb0d98"
+    },
+    "share-classified": {
+      "hasChanged": false,
+      "hash": "cfa9de3afbad8fb590153088813be752ba50f5c9f5d6c856c517a596fe07e20a"
+    },
+    "share-media-with-clubs": {
+      "hasChanged": false,
+      "hash": "ee0a1c0a85c855e317ea4a014e28e4de8633483195665730f97f522755cfb064"
+    },
+    "sms-attendance-webhook": {
+      "hasChanged": false,
+      "hash": "d44353f46f10dcf12ef3e0ef14b255a05c25a3f50e79c9e7b0059d881865c727"
+    },
+    "stripe-webhook": {
+      "hasChanged": false,
+      "hash": "330d8bac457f8e98978208bfc7251e8e1601c80ffe702f07de535b2612ac2fb6"
+    },
+    "sync-rankings-weekly": {
+      "hasChanged": false,
+      "hash": "bad664bbfbf4ea533564a5071cc8661fef4b0439d4c1ea7117d733ea7d0a7412"
+    },
+    "sync-youtube-channel": {
+      "hasChanged": false,
+      "hash": "f920a31fa37cfd00096e1bfe5e084b5c5d9abd82ded75ff2b4006f5323b82685"
+    },
+    "track-platform-usage": {
+      "hasChanged": false,
+      "hash": "438aad35a7405b405a9dbb7ca17f20e20e4d6216f085d9353785fc4ec24444a1"
+    },
+    "update-member-auth-email": {
+      "hasChanged": false,
+      "hash": "3bad75771a7e59b3610158f7021fa013c8dd90fd7e723547918396b6f013bda1"
+    },
+    "uwb-position-ingest": {
+      "hasChanged": false,
+      "hash": "b65cdb25e5698c6763f1c4e9f287c6e99d2c8cb70abe8276023ebb1a6b9b8fa6"
+    },
+    "youtube-oauth-callback": {
+      "hasChanged": false,
+      "hash": "ce3bf49a086f82cd5e11623930a6e231973c682c68802e3608eece9aaa6611f7"
+    },
+    "youtube-upload": {
+      "hasChanged": false,
+      "hash": "6c1cda1c6eca5cf48b687f3666cb4dad13fd1f17bf46ec2b86ca38b40295bbd1"
+    }
+  }
+}

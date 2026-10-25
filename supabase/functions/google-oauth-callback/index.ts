@@ -15,11 +15,22 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  if (req.method === "GET") {
+    const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+    return new Response(
+      JSON.stringify(clientId ? { clientId } : { error: 'Google is not configured' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: clientId ? 200 : 500 }
+    );
+  }
+
   try {
     const { code, redirectUri, clubId, associationId, associationType } = await req.json();
 
     if (!code || !redirectUri || (!clubId && !associationId)) {
       throw new Error('Missing required parameters');
+    }
+    if (!clubId && associationType !== 'state' && associationType !== 'national') {
+      throw new Error('Invalid association type');
     }
 
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
@@ -29,6 +40,38 @@ Deno.serve(async (req: Request) => {
 
     if (!clientId || !clientSecret || !supabaseUrl || !supabaseServiceKey) {
       throw new Error('Missing environment variables');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const jwt = (req.headers.get('Authorization') || '').replace('Bearer ', '');
+    const { data: { user } } = await supabase.auth.getUser(jwt);
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Please sign in again and retry' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+
+    const membership = clubId
+      ? supabase.from('user_clubs').select('role').eq('club_id', clubId).eq('user_id', user.id).eq('role', 'admin')
+      : associationType === 'state'
+        ? supabase.from('user_state_associations').select('role').eq('state_association_id', associationId).eq('user_id', user.id).eq('role', 'state_admin')
+        : supabase.from('user_national_associations').select('role').eq('national_association_id', associationId).eq('user_id', user.id).eq('role', 'national_admin');
+    const { data: adminRows } = await membership.limit(1);
+
+    if (!adminRows || adminRows.length === 0) {
+      const { data: superAdmin } = await supabase
+        .from('profiles')
+        .select('is_super_admin')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!superAdmin?.is_super_admin) {
+        return new Response(JSON.stringify({ error: 'Only administrators can connect Google for this organisation' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
+        });
+      }
     }
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -74,8 +117,6 @@ Deno.serve(async (req: Request) => {
     const userInfo = await userInfoResponse.json();
     const email = userInfo.email;
     const expiresAt = new Date(Date.now() + (expires_in * 1000)).toISOString();
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const idColumn = clubId ? 'club_id' :
       associationType === 'state' ? 'state_association_id' : 'national_association_id';
@@ -201,6 +242,10 @@ Deno.serve(async (req: Request) => {
       } else {
         results.push(p.platform);
       }
+    }
+
+    if (results.length === 0) {
+      throw new Error('Google sign-in worked, but the connection could not be saved. Please try again.');
     }
 
     return new Response(

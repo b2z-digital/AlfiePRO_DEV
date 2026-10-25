@@ -681,7 +681,17 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
 
   const handleConnectGoogle = async () => {
     try {
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '230273275079-723coi1ukfg2vngapur5djnug1cer6hd.apps.googleusercontent.com';
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const clientIdRes = await fetch(`${supabaseUrl}/functions/v1/google-oauth-callback`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${anonKey}` },
+      });
+      const clientIdData = await clientIdRes.json().catch(() => ({}));
+      if (!clientIdData.clientId) {
+        throw new Error('Google is not configured. Please contact support.');
+      }
+      const clientId = clientIdData.clientId;
       const redirectUri = `${window.location.origin}/settings`;
       const scopes = [
         'https://www.googleapis.com/auth/userinfo.email',
@@ -694,11 +704,12 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       ].join(' ');
 
       const stateData: any = { integration: 'google' };
-      if (currentClub?.clubId) {
-        stateData.clubId = currentClub.clubId;
-      } else if (currentOrganization?.id) {
+      // Association context takes priority over club context
+      if (currentOrganization?.id) {
         stateData.associationId = currentOrganization.id;
         stateData.associationType = currentOrganization.type;
+      } else if (currentClub?.clubId) {
+        stateData.clubId = currentClub.clubId;
       }
 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
@@ -714,7 +725,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       window.location.href = authUrl;
     } catch (err) {
       console.error('Error initiating Google OAuth:', err);
-      addNotification('error', 'Failed to connect Google');
+      addNotification('error', err instanceof Error ? err.message : 'Failed to connect Google');
     }
   };
 
