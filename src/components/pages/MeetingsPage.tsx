@@ -26,6 +26,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [detailsVersion, setDetailsVersion] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [meetingToDelete, setMeetingToDelete] = useState<Meeting | null>(null);
   const { addNotification } = useNotifications();
@@ -159,14 +160,13 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
 
   const handleFormSuccess = async () => {
     const editedId = editingMeeting?.id;
-    setShowForm(false);
-    addNotification('success', editingMeeting ? 'Meeting updated successfully' : 'Meeting created successfully');
-    setEditingMeeting(null);
+    addNotification('success', editedId ? 'Meeting updated successfully' : 'Meeting created successfully');
     const fresh = await fetchMeetings();
-    if (editedId && selectedMeeting && fresh) {
-      const updated = fresh.find(m => m.id === editedId);
-      if (updated) setSelectedMeeting(updated);
-    }
+    const updated = editedId ? fresh?.find(m => m.id === editedId) : undefined;
+    setSelectedMeeting(updated || null);
+    setDetailsVersion(v => v + 1);
+    setEditingMeeting(null);
+    setShowForm(false);
   };
 
   const handleFormCancel = () => {
@@ -273,6 +273,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
       <div className="h-full overflow-y-auto">
         <div className="p-16">
           <MeetingDetails
+          key={`${selectedMeeting.id}-${detailsVersion}`}
           meeting={selectedMeeting}
           darkMode={darkMode}
           associationId={currentOrganization?.id}
