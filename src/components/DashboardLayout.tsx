@@ -797,6 +797,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           description: 'Manage association meetings',
           path: '/meetings'
         },
+        {
+          id: 'resources-assoc',
+          label: 'Documents',
+          icon: FolderOpen,
+          description: 'Manage association documents, files, and links',
+          path: '/resources'
+        },
         ...(currentOrganization?.type === 'national' ? [{
           id: 'rankings',
           label: 'National Rankings',
