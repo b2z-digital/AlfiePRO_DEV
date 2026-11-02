@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, Plus, SquarePen as Edit2, Check, X, Clock, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Receipt, Coins, Calendar, RefreshCw, ChevronDown, ChevronUp, Users, Building2, Globe as Globe2, Target, Mail, Send, Loader as Loader2, MailCheck } from 'lucide-react';
+import { DollarSign, Plus, SquarePen as Edit2, Check, X, Clock, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Receipt, Coins, Calendar, RefreshCw, ChevronDown, ChevronUp, Users, Building2, Globe as Globe2, Target, Mail, Send, Loader as Loader2, MailCheck, Eye } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { supabase } from '../../utils/supabase';
@@ -8,6 +8,39 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
 
 interface PlatformBillingTabProps {
   darkMode: boolean;
+}
+
+type GenerateFrequency = 'monthly' | 'quarterly' | 'half_yearly' | 'annually' | 'custom';
+
+const FREQUENCY_MONTHS: Record<Exclude<GenerateFrequency, 'custom'>, number> = {
+  monthly: 1,
+  quarterly: 3,
+  half_yearly: 6,
+  annually: 12,
+};
+
+const parseDate = (s: string) => new Date(s + 'T00:00:00');
+
+const toIsoDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+function periodLabel(start: string, end: string): string {
+  const s = parseDate(start);
+  const e = parseDate(end);
+  const isSingleMonth = s.getDate() === 1 && s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear()
+    && new Date(e.getFullYear(), e.getMonth() + 1, 0).getDate() === e.getDate();
+  if (isSingleMonth) return s.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+  const fmt = (d: Date) => d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${fmt(s)} - ${fmt(e)}`;
+}
+
+function computeRange(frequency: GenerateFrequency, startMonth: string, customStart: string, customEnd: string) {
+  if (frequency === 'custom') return { start: customStart, end: customEnd };
+  const [year, month] = startMonth.split('-').map(Number);
+  return {
+    start: toIsoDate(new Date(year, month - 1, 1)),
+    end: toIsoDate(new Date(year, month - 1 + FREQUENCY_MONTHS[frequency], 0)),
+  };
 }
 
 interface BillingRate {
@@ -84,10 +117,17 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
   const [editingRate, setEditingRate] = useState<BillingRate | null>(null);
   const [viewMode, setViewMode] = useState<'overview' | 'rates' | 'records' | 'periods'>('overview');
   const [generating, setGenerating] = useState(false);
+  const [generateFrequency, setGenerateFrequency] = useState<GenerateFrequency>('quarterly');
   const [generateMonth, setGenerateMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const generateRange = computeRange(generateFrequency, generateMonth, customStart, customEnd);
+  const generateRangeValid = !!generateRange.start && !!generateRange.end && generateRange.end >= generateRange.start;
   const [expandedPeriod, setExpandedPeriod] = useState<string | null>(null);
   const [periodRecords, setPeriodRecords] = useState<Record<string, BillingRecord[]>>({});
   const [targetMode, setTargetMode] = useState<'all' | 'specific'>('all');
@@ -257,6 +297,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
         ? rateForm.annual_rate
         : rateForm.billing_frequency === 'monthly' ? rateForm.rate_per_member * 12
         : rateForm.billing_frequency === 'quarterly' ? rateForm.rate_per_member * 4
+        : rateForm.billing_frequency === 'half_yearly' ? rateForm.rate_per_member * 2
         : rateForm.rate_per_member;
 
       const payload = {
@@ -308,7 +349,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session?.session?.access_token}`,
           },
-          body: JSON.stringify({ month: generateMonth }),
+          body: JSON.stringify({ period_start: generateRange.start, period_end: generateRange.end }),
         }
       );
 
@@ -323,7 +364,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
       } else {
         setGenerateMessage({
           type: 'success',
-          text: `Generated ${result.total_records} billing record(s) totalling $${result.total_amount.toFixed(2)} for ${new Date(generateMonth + '-01').toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}.`,
+          text: `Generated ${result.total_records} billing record(s) totalling $${result.total_amount.toFixed(2)} for ${periodLabel(generateRange.start, generateRange.end)}.`,
         });
       }
 
@@ -370,12 +411,47 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
     loadBillingData();
   };
 
-  const openInvoiceModal = (record: BillingRecord) => {
+  const openInvoiceModal = async (record: BillingRecord) => {
     setInvoiceModal({ record });
-    setInvoiceEmail('');
+    setInvoiceEmail(record.invoice_sent_to || '');
     setInvoiceName(record.target_name);
     setInvoiceMessage('');
     setInvoiceSent(null);
+    if (record.invoice_sent_to || record.target_type === 'club') return;
+    const table = record.target_type === 'state_association' ? 'state_associations' : 'national_associations';
+    const { data } = await supabase.from(table).select('email').eq('id', record.target_id).maybeSingle();
+    if (data?.email) setInvoiceEmail(prev => prev || data.email);
+  };
+
+  const previewInvoice = async () => {
+    if (!invoiceModal) return;
+    setLoadingPreview(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-platform-billing-invoice`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            record_id: invoiceModal.record.id,
+            recipient_name: invoiceName,
+            message: invoiceMessage,
+            preview: true,
+          }),
+        }
+      );
+      const result = await res.json();
+      if (!res.ok || typeof result.html !== 'string') throw new Error(result.error || 'Could not load preview');
+      setPreviewHtml(result.html);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not load preview');
+    } finally {
+      setLoadingPreview(false);
+    }
   };
 
   const sendInvoiceEmail = async () => {
@@ -443,7 +519,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
 
   const monthlyTrendData = {
     labels: periods.slice(0, 6).reverse().map(p =>
-      new Date(p.period_start).toLocaleDateString('en-AU', { month: 'short', year: '2-digit' })
+      periodLabel(p.period_start, p.period_end)
     ),
     datasets: [{
       label: 'Billed Amount',
@@ -860,6 +936,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                   >
                     <option value="monthly">Monthly</option>
                     <option value="quarterly">Quarterly</option>
+                    <option value="half_yearly">Half-yearly</option>
                     <option value="annually">Annually</option>
                   </select>
                 </div>
@@ -1002,21 +1079,59 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
         <div className="space-y-6">
           <div className={`rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
             <div className="flex items-center justify-between mb-6">
-              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Generate Monthly Billing</h3>
+              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Generate Billing</h3>
             </div>
-            <div className="flex items-end gap-4">
+            <div className="flex flex-wrap items-end gap-4">
               <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Billing Month</label>
-                <input
-                  type="month"
-                  value={generateMonth}
-                  onChange={e => setGenerateMonth(e.target.value)}
+                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Period Length</label>
+                <select
+                  value={generateFrequency}
+                  onChange={e => setGenerateFrequency(e.target.value as GenerateFrequency)}
                   className={`px-3 py-2 rounded-lg border text-sm ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-                />
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="half_yearly">Half-yearly</option>
+                  <option value="annually">Annually</option>
+                  <option value="custom">Custom dates</option>
+                </select>
               </div>
+              {generateFrequency === 'custom' ? (
+                <>
+                  <div>
+                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>From</label>
+                    <input
+                      type="date"
+                      value={customStart}
+                      onChange={e => setCustomStart(e.target.value)}
+                      className={`px-3 py-2 rounded-lg border text-sm ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>To</label>
+                    <input
+                      type="date"
+                      value={customEnd}
+                      min={customStart || undefined}
+                      onChange={e => setCustomEnd(e.target.value)}
+                      className={`px-3 py-2 rounded-lg border text-sm ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Starting Month</label>
+                  <input
+                    type="month"
+                    value={generateMonth}
+                    onChange={e => setGenerateMonth(e.target.value)}
+                    className={`px-3 py-2 rounded-lg border text-sm ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                  />
+                </div>
+              )}
               <button
                 onClick={generateBillingRecords}
-                disabled={generating}
+                disabled={generating || !generateRangeValid}
                 className="btn-primary-green flex items-center gap-2 px-5 py-2 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {generating ? (
@@ -1027,9 +1142,14 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                 {generating ? 'Generating...' : 'Generate Billing'}
               </button>
             </div>
-            <p className={`text-xs mt-3 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-              Billing is automatically generated on the 1st of each month. Use this to manually generate or re-generate a specific month.
-              Existing members are billed at the monthly rate. New members joining mid-cycle are billed the full annual rate.
+            {generateRangeValid && (
+              <p className={`text-sm mt-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                Billing period: <span className="font-semibold">{periodLabel(generateRange.start, generateRange.end)}</span>
+              </p>
+            )}
+            <p className={`text-xs mt-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+              On the 1st of each month, billing starts automatically for any rate whose period begins that month (quarters run Jul, Oct, Jan and Apr), and the invoices are emailed to each organisation's contact email.
+              Use this to manually generate or re-generate any period. Existing members are charged their share of the annual rate for the period. New members joining during the period are charged the full annual rate.
             </p>
 
             {generateMessage && (
@@ -1066,7 +1186,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                         </div>
                         <div>
                           <p className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            {new Date(period.period_start).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}
+                            {periodLabel(period.period_start, period.period_end)}
                           </p>
                           <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                             {period.total_records} records
@@ -1211,7 +1331,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                         <p className={`text-xs capitalize ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{record.target_type.replace(/_/g, ' ')}</p>
                       </td>
                       <td className={`p-4 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                        {new Date(record.billing_period_start).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}
+                        {periodLabel(record.billing_period_start, record.billing_period_end)}
                       </td>
                       <td className={`p-4 text-right ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{record.member_count}</td>
                       <td className={`p-4 text-right ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{formatCurrency(record.rate_per_member)}</td>
@@ -1280,7 +1400,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                 <div>
                   <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Send Invoice Email</h3>
                   <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {invoiceModal.record.target_name} - {new Date(invoiceModal.record.billing_period_start).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}
+                    {invoiceModal.record.target_name} - {periodLabel(invoiceModal.record.billing_period_start, invoiceModal.record.billing_period_end)}
                   </p>
                 </div>
               </div>
@@ -1356,6 +1476,14 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                     Cancel
                   </button>
                   <button
+                    onClick={previewInvoice}
+                    disabled={loadingPreview}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 ${darkMode ? 'border-slate-600 text-slate-200 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
+                  >
+                    {loadingPreview ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+                    Preview
+                  </button>
+                  <button
                     onClick={sendInvoiceEmail}
                     disabled={!invoiceEmail || sendingInvoice}
                     className="flex items-center gap-2 px-5 py-2 bg-sky-500 text-white rounded-lg text-sm font-medium hover:bg-sky-600 transition-colors disabled:opacity-50"
@@ -1366,6 +1494,23 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {previewHtml && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={() => setPreviewHtml(null)}>
+          <div
+            className={`w-full max-w-3xl h-[85vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className={`flex items-center justify-between px-5 py-3 border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+              <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Invoice Email Preview</h3>
+              <button onClick={() => setPreviewHtml(null)} className={`p-1.5 rounded-lg ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+                <X size={16} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+              </button>
+            </div>
+            <iframe title="Invoice email preview" srcDoc={previewHtml} sandbox="" className="flex-1 w-full bg-white" />
           </div>
         </div>
       )}
