@@ -217,27 +217,16 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
 
           let memberCount = 0;
 
+          let clubIds: string[] = [];
+
           if (targetType === 'club') {
-            const { count } = await supabase
-              .from('members')
-              .select('id', { count: 'exact', head: true })
-              .eq('club_id', entity.id)
-              .eq('membership_status', 'active');
-            memberCount = count || 0;
+            clubIds = [entity.id];
           } else if (targetType === 'state_association') {
             const { data: clubs } = await supabase
               .from('clubs')
               .select('id')
               .eq('state_association_id', entity.id);
-            const clubIds = (clubs || []).map(c => c.id);
-            if (clubIds.length > 0) {
-              const { count } = await supabase
-                .from('members')
-                .select('id', { count: 'exact', head: true })
-                .in('club_id', clubIds)
-                .eq('membership_status', 'active');
-              memberCount = count || 0;
-            }
+            clubIds = (clubs || []).map(c => c.id);
           } else {
             const { data: states } = await supabase
               .from('state_associations')
@@ -249,16 +238,15 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                 .from('clubs')
                 .select('id')
                 .in('state_association_id', stateIds);
-              const clubIds = (clubs || []).map(c => c.id);
-              if (clubIds.length > 0) {
-                const { count } = await supabase
-                  .from('members')
-                  .select('id', { count: 'exact', head: true })
-                  .in('club_id', clubIds)
-                  .eq('membership_status', 'active');
-                memberCount = count || 0;
-              }
+              clubIds = (clubs || []).map(c => c.id);
             }
+          }
+
+          if (clubIds.length > 0) {
+            const { data: counts, error: countError } = await supabase.rpc('count_billable_people', { p_club_ids: clubIds });
+            if (countError) throw countError;
+            const row = Array.isArray(counts) ? counts[0] : counts;
+            memberCount = row?.total_people || 0;
           }
 
           const annualRate = applicableRate.annual_rate || applicableRate.rate_per_member * 12;

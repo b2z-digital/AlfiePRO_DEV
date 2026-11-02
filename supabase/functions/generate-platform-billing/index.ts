@@ -229,21 +229,15 @@ async function generatePeriod(
       let memberCount = 0;
       let newMembersCount = 0;
       if (clubIds.length > 0) {
-        const { count } = await adminClient
-          .from("members")
-          .select("id", { count: "exact", head: true })
-          .in("club_id", clubIds)
-          .eq("membership_status", "active");
-        memberCount = count || 0;
-
-        const { count: newCount } = await adminClient
-          .from("members")
-          .select("id", { count: "exact", head: true })
-          .in("club_id", clubIds)
-          .eq("membership_status", "active")
-          .gte("created_at", periodStartStr)
-          .lt("created_at", periodEndExclusive);
-        newMembersCount = newCount || 0;
+        const { data: counts, error: countError } = await adminClient.rpc("count_billable_people", {
+          p_club_ids: clubIds,
+          p_period_start: periodStartStr,
+          p_period_end: periodEndExclusive,
+        });
+        if (countError) throw new Error(`Failed to count members for ${entity.name}: ${countError.message}`);
+        const row = Array.isArray(counts) ? counts[0] : counts;
+        memberCount = row?.total_people || 0;
+        newMembersCount = row?.new_people || 0;
       }
 
       const annualRate = Number(applicableRate.annual_rate) || Number(applicableRate.rate_per_member) * 12;
