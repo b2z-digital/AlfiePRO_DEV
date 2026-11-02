@@ -8,7 +8,7 @@ import { formatDate } from '../../utils/date';
 import Papa from 'papaparse';
 import { AdvancedMemberFilter } from './AdvancedMemberFilter';
 import { MemberFilterConfig } from '../../types/memberFilters';
-import { filterMembers as applyMemberFilters } from '../../utils/memberFilters';
+import { filterMembers as applyMemberFilters, getMembershipCategory } from '../../utils/memberFilters';
 import { ManageFiltersModal } from './ManageFiltersModal';
 import { SaveFilterModal } from './SaveFilterModal';
 import AssociationMemberImportModal from './AssociationMemberImportModal';
@@ -563,6 +563,15 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   };
 
   const uniqueMemberCount = consolidateMembers(members).length;
+  const memberCategoryBreakdown = consolidateMembers(members).reduce(
+    (acc, m) => {
+      const categories = m.clubMemberships.map(cm => getMembershipCategory(cm.membership_level));
+      if (categories.includes('full') || categories.includes('life')) acc.full++;
+      else if (categories.includes('associate')) acc.associateOnly++;
+      return acc;
+    },
+    { full: 0, associateOnly: 0 }
+  );
   const now = new Date();
   const currentMembers = members.filter((m) => m.is_financial && (!m.renewal_date || new Date(m.renewal_date) >= now));
   const expiredMembers = members.filter((m) => !m.is_financial || (m.renewal_date && new Date(m.renewal_date) < now));
@@ -638,6 +647,9 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
               <div>
                 <p className="text-sm text-slate-400">Unique Members</p>
                 <p className="text-3xl font-bold text-white mt-1">{stats.uniqueMembers}</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  {memberCategoryBreakdown.full} full &middot; {memberCategoryBreakdown.associateOnly} associate only
+                </p>
               </div>
             </div>
           </div>

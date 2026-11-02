@@ -166,6 +166,20 @@ export const MEMBER_FILTER_FIELDS: FilterField[] = [
     placeholder: 'Enter membership level'
   },
   {
+    id: 'membership_category',
+    label: 'Membership Type (Full / Associate)',
+    type: 'select',
+    operators: ['equals', 'not_equals', 'in', 'not_in'],
+    options: [
+      { value: 'full', label: 'Full Member' },
+      { value: 'associate', label: 'Associate / Secondary' },
+      { value: 'guest', label: 'Guest / Casual' },
+      { value: 'life', label: 'Life Member' },
+      { value: 'unspecified', label: 'Not Specified' }
+    ],
+    description: 'Grouped from each club membership name, e.g. "26/27 - Associate - IRYC" counts as Associate'
+  },
+  {
     id: 'category',
     label: 'Member Category',
     type: 'text',

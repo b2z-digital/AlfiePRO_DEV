@@ -1,6 +1,17 @@
 import { Member } from '../types/member';
 import { FilterCondition, FilterGroup, MemberFilterConfig, FilterOperator } from '../types/memberFilters';
 
+export type MembershipCategory = 'full' | 'associate' | 'guest' | 'life' | 'unspecified';
+
+export const getMembershipCategory = (membershipLevel: string | null | undefined): MembershipCategory => {
+  const level = (membershipLevel || '').toLowerCase();
+  if (!level.trim()) return 'unspecified';
+  if (level.includes('associate') || level.includes('secondary') || level.includes('affiliate')) return 'associate';
+  if (level.includes('guest') || level.includes('casual')) return 'guest';
+  if (level.includes('life')) return 'life';
+  return 'full';
+};
+
 /**
  * Apply a single filter condition to a member
  */
@@ -31,6 +42,10 @@ export const applyFilterCondition = (member: any, condition: FilterCondition): b
 
   if (field === 'boat_count') {
     fieldValue = member.boats?.length || 0;
+  }
+
+  if (field === 'membership_category') {
+    fieldValue = getMembershipCategory(member.membership_level);
   }
 
   if (field === 'user_id') {
