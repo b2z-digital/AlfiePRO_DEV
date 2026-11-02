@@ -243,10 +243,9 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
           }
 
           if (clubIds.length > 0) {
-            const { data: counts, error: countError } = await supabase.rpc('count_billable_people', { p_club_ids: clubIds });
-            if (countError) throw countError;
-            const row = Array.isArray(counts) ? counts[0] : counts;
-            memberCount = row?.total_people || 0;
+            const { data: people, error: peopleError } = await supabase.rpc('billable_people_join_dates', { p_club_ids: clubIds });
+            if (peopleError) throw peopleError;
+            memberCount = Array.isArray(people) ? people.length : 0;
           }
 
           const annualRate = applicableRate.annual_rate || applicableRate.rate_per_member * 12;

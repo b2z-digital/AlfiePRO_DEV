@@ -92,9 +92,17 @@ const calcRow = (label: string, value: string) => `
     <td align="right" style="padding:6px 0;color:#0f172a;font-size:13px;font-weight:500;">${value}</td>
   </tr>`;
 
+interface FeeLine {
+  label: string;
+  members: number;
+  rate: number;
+  amount: number;
+}
+
 function buildEmailHtml(
   record: BillingRecord,
   newMembers: number,
+  feeLines: FeeLine[],
   recipientName: string,
   message: string
 ): string {
@@ -177,8 +185,10 @@ function buildEmailHtml(
                 <tr>
                   <td style="padding:16px 20px;">
                     <table width="100%" cellpadding="0" cellspacing="0">
-                      ${calcRow(`${existingMembers} existing members x ${formatCurrency(periodRate)} for this period`, formatCurrency(existingMembers * periodRate))}
-                      ${newMembers > 0 ? calcRow(`${newMembers} new members this period x ${formatCurrency(annualRate)} (full annual rate)`, formatCurrency(newMembers * annualRate)) : ""}
+                      ${feeLines.length > 0
+                        ? feeLines.map((l) => calcRow(`${l.members} ${escapeHtml(l.label)} x ${formatCurrency(l.rate)}`, formatCurrency(l.amount))).join("")
+                        : `${calcRow(`${existingMembers} existing members x ${formatCurrency(periodRate)} for this period`, formatCurrency(existingMembers * periodRate))}
+                      ${newMembers > 0 ? calcRow(`${newMembers} new members this period x ${formatCurrency(annualRate)} (full annual rate)`, formatCurrency(newMembers * annualRate)) : ""}`}
                       <tr><td colspan="2" style="border-top:1px solid #e2e8f0;padding-top:10px;"></td></tr>
                       <tr>
                         <td style="padding:6px 0;color:#0f172a;font-size:15px;font-weight:700;">Total Due</td>
@@ -277,7 +287,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: snapshot } = await adminClient
       .from("platform_billing_member_snapshots")
-      .select("new_members_this_period")
+      .select("new_members_this_period, fee_breakdown")
       .eq("billing_record_id", record_id)
       .maybeSingle();
 
@@ -289,6 +299,7 @@ Deno.serve(async (req: Request) => {
     const emailHtml = buildEmailHtml(
       billingRecord,
       snapshot?.new_members_this_period || 0,
+      Array.isArray(snapshot?.fee_breakdown) ? (snapshot.fee_breakdown as FeeLine[]) : [],
       recipient_name || record.target_name,
       message || ""
     );

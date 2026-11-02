@@ -66,6 +66,96 @@ function frequencyForRange(startStr: string, endStr: string): string {
   return match ? match[0] : "custom";
 }
 
+const sydneyDate = (iso: string) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Sydney" }).format(new Date(iso));
+
+const monthsBetween = (fromStr: string, toStr: string) =>
+  (Number(toStr.slice(0, 4)) - Number(fromStr.slice(0, 4))) * 12 +
+  (Number(toStr.slice(5, 7)) - Number(fromStr.slice(5, 7)));
+
+const addMonths = (dateStr: string, months: number) =>
+  toDateStr(new Date(Date.UTC(Number(dateStr.slice(0, 4)), Number(dateStr.slice(5, 7)) - 1 + months, 1)));
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthName = (dateStr: string) => MONTHS[Number(dateStr.slice(5, 7)) - 1];
+
+const PERIOD_UNIT: Record<number, [string, string]> = {
+  1: ["month", "months"],
+  3: ["quarter", "quarters"],
+  6: ["half-year", "half-years"],
+  12: ["year", "years"],
+};
+
+interface FeeLine {
+  label: string;
+  members: number;
+  rate: number;
+  amount: number;
+}
+
+// Each person pays the annual rate once per July-June financial year. Someone who joins
+// part-way through has it spread over the periods remaining from the period they joined in.
+function buildFeeLines(
+  joinDates: string[],
+  periodStartStr: string,
+  periodEndStr: string,
+  periodEndExclusive: string,
+  annualRate: number
+): FeeLine[] {
+  const startYear = Number(periodStartStr.slice(0, 4));
+  const fyStart = `${Number(periodStartStr.slice(5, 7)) >= 7 ? startYear : startYear - 1}-07-01`;
+  const periodMonths = monthsBetween(periodStartStr, periodEndExclusive);
+  const periodOffset = monthsBetween(fyStart, periodStartStr);
+  const aligned =
+    periodStartStr.endsWith("-01") &&
+    periodEndExclusive.endsWith("-01") &&
+    PERIOD_UNIT[periodMonths] !== undefined &&
+    periodOffset % periodMonths === 0 &&
+    periodOffset + periodMonths <= 12;
+
+  const round = (l: FeeLine): FeeLine => ({ ...l, rate: parseFloat(l.rate.toFixed(4)), amount: parseFloat(l.amount.toFixed(2)) });
+
+  if (!aligned) {
+    const rate = annualRate * periodFraction(periodStartStr, periodEndStr);
+    return [round({ label: "Active members", members: joinDates.length, rate, amount: joinDates.length * rate })];
+  }
+
+  const buckets = new Map<number, number>();
+  let continuing = 0;
+  for (const joined of joinDates) {
+    if (joined < fyStart) {
+      continuing++;
+      continue;
+    }
+    const bucket = Math.floor(monthsBetween(fyStart, joined) / periodMonths) * periodMonths;
+    buckets.set(bucket, (buckets.get(bucket) || 0) + 1);
+  }
+
+  const [unit, units] = PERIOD_UNIT[periodMonths];
+  const lines: FeeLine[] = [];
+  if (continuing > 0) {
+    const rate = (annualRate * periodMonths) / 12;
+    lines.push({ label: "Continuing members", members: continuing, rate, amount: continuing * rate });
+  }
+  for (const bucket of [...buckets.keys()].sort((a, b) => a - b)) {
+    const members = buckets.get(bucket)!;
+    const remaining = (12 - bucket) / periodMonths;
+    const rate = (annualRate * periodMonths) / (12 - bucket);
+    const bucketStart = addMonths(fyStart, bucket);
+    const bucketLast = addMonths(fyStart, bucket + periodMonths - 1);
+    const joinedLabel = periodMonths === 1
+      ? `${monthName(bucketStart)} ${bucketStart.slice(0, 4)}`
+      : `${monthName(bucketStart)} - ${monthName(bucketLast)} ${bucketLast.slice(0, 4)}`;
+    lines.push({
+      label: `Joined ${joinedLabel} (${"$" + annualRate.toFixed(2)} spread over ${remaining} ${remaining === 1 ? unit : units})`,
+      members,
+      rate,
+      amount: members * rate,
+    });
+  }
+  return lines.map(round);
+}
+
 async function isAuthorized(
   req: Request,
   adminClient: SupabaseClient,
@@ -226,26 +316,24 @@ async function generatePeriod(
       if (!applicableRate) continue;
 
       const clubIds = await clubIdsFor(adminClient, targetType, entity.id);
-      let memberCount = 0;
-      let newMembersCount = 0;
+      let joinDates: string[] = [];
       if (clubIds.length > 0) {
-        const { data: counts, error: countError } = await adminClient.rpc("count_billable_people", {
+        const { data: people, error: peopleError } = await adminClient.rpc("billable_people_join_dates", {
           p_club_ids: clubIds,
-          p_period_start: periodStartStr,
-          p_period_end: periodEndExclusive,
         });
-        if (countError) throw new Error(`Failed to count members for ${entity.name}: ${countError.message}`);
-        const row = Array.isArray(counts) ? counts[0] : counts;
-        memberCount = row?.total_people || 0;
-        newMembersCount = row?.new_people || 0;
+        if (peopleError) throw new Error(`Failed to count members for ${entity.name}: ${peopleError.message}`);
+        joinDates = ((people || []) as { first_joined: string | null }[])
+          .filter((p) => p.first_joined)
+          .map((p) => sydneyDate(p.first_joined as string))
+          .filter((d) => d < periodEndExclusive);
       }
+      const memberCount = joinDates.length;
+      const newMembersCount = joinDates.filter((d) => d >= periodStartStr).length;
 
       const annualRate = Number(applicableRate.annual_rate) || Number(applicableRate.rate_per_member) * 12;
-      const periodRatePerMember = annualRate * fraction;
-      const existingMembers = memberCount - newMembersCount;
-      const billingTotal = parseFloat(
-        (existingMembers * periodRatePerMember + newMembersCount * annualRate).toFixed(2)
-      );
+      const standardRate = annualRate * fraction;
+      const feeLines = buildFeeLines(joinDates, periodStartStr, periodEndStr, periodEndExclusive, annualRate);
+      const billingTotal = parseFloat(feeLines.reduce((sum, l) => sum + l.amount, 0).toFixed(2));
 
       const { data: record } = await adminClient
         .from("platform_billing_records")
@@ -258,7 +346,7 @@ async function generatePeriod(
           billing_period_start: periodStartStr,
           billing_period_end: periodEndStr,
           member_count: memberCount,
-          rate_per_member: parseFloat(periodRatePerMember.toFixed(4)),
+          rate_per_member: parseFloat(standardRate.toFixed(4)),
           annual_rate: annualRate,
           total_amount: billingTotal,
           payment_status: "pending",
@@ -275,6 +363,7 @@ async function generatePeriod(
         target_name: entity.name,
         total_active_members: memberCount,
         new_members_this_period: newMembersCount,
+        fee_breakdown: feeLines,
         snapshot_date: periodStartStr,
       });
 
