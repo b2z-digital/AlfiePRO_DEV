@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { DollarSign, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Download, RefreshCw, ArrowUpRight, Check, X, SquareCheck as CheckSquare, Square, Wallet, TriangleAlert as AlertTriangle, ChevronDown, Calendar, ListFilter as Filter } from 'lucide-react';
+import { CircleCheck as CheckCircle, Clock, Download, RefreshCw, Check, X, Wallet, TriangleAlert as AlertTriangle, ChevronDown, Calendar } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { Avatar } from '../ui/Avatar';
+import { AAvatar, AStatus, ASwitch } from '../alfie/Kit';
 import {
   getClubOutstandingTotal,
   getRemittancesWithMembers,
@@ -28,7 +28,8 @@ const ClubAppDropdown: React.FC<{
   icon?: React.ReactNode;
   placeholder?: string;
   minWidth?: number;
-}> = ({ value, options, onChange, icon, placeholder = 'Select...', minWidth = 160 }) => {
+  block?: boolean;
+}> = ({ value, options, onChange, icon, placeholder = 'Select...', minWidth = 160, block = false }) => {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -68,48 +69,36 @@ const ClubAppDropdown: React.FC<{
         ref={btnRef}
         type="button"
         onClick={() => setOpen(!open)}
-        className={`
-          flex items-center justify-between gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
-          bg-slate-800/80 text-slate-200 border border-slate-700/60
-          ${open ? 'ring-2 ring-blue-500/40 border-blue-500/50' : 'hover:bg-slate-700/80 hover:border-slate-600'}
-          cursor-pointer
-        `}
-        style={{ minWidth }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className={`a-pick ${block ? 'w-full' : ''}`}
+        style={{ minWidth, height: block ? 46 : undefined }}
       >
-        <div className="flex items-center gap-2">
-          {icon && <span className="text-slate-400 flex-shrink-0">{icon}</span>}
-          <span className={selected ? 'text-slate-200' : 'text-slate-500'}>
-            {selected ? selected.label : placeholder}
-          </span>
-        </div>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+        {icon && <span className="a-mute flex">{icon}</span>}
+        <span className="flex-1 text-left">{selected ? selected.label : placeholder}</span>
+        <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && createPortal(
         <div
           ref={menuRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999 }}
-          className="rounded-xl shadow-2xl border bg-slate-800 border-slate-700 shadow-black/50"
+          className="a-pop"
+          role="listbox"
         >
-          <div className="py-1 max-h-[280px] overflow-y-auto overscroll-contain rounded-xl
-            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
-            [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/50"
-          >
+          <div className="p-1.5 max-h-[280px] overflow-y-auto overscroll-contain flex flex-col gap-0.5">
             {options.map(opt => (
               <button
                 key={opt.value}
                 type="button"
+                role="option"
+                aria-selected={value === opt.value}
                 onClick={() => { onChange(opt.value); setOpen(false); }}
-                className={`
-                  w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors text-left
-                  ${value === opt.value ? 'bg-blue-500/15 text-blue-400' : 'text-slate-300 hover:bg-slate-700/80'}
-                `}
+                className={`a-pop-item ${value === opt.value ? 'a-pop-item-on' : ''}`}
               >
-                <div className="flex items-center gap-2.5">
-                  {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
-                  <span>{opt.label}</span>
-                </div>
-                {value === opt.value && <Check size={14} className="text-blue-400 flex-shrink-0" />}
+                {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
+                <span className="flex-1">{opt.label}</span>
+                {value === opt.value && <Check size={14} className="a-txt-b flex-shrink-0" />}
               </button>
             ))}
           </div>
@@ -125,10 +114,7 @@ interface ClubRemittanceDashboardProps {
   onRecordPayment: () => void;
 }
 
-export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = ({
-  darkMode,
-  onRecordPayment
-}) => {
+export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = () => {
   const { currentClub } = useAuth();
   const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(true);
@@ -500,581 +486,231 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
 
   if (loading) {
     return (
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8">
+      <div className="a-card p-8">
         <div className="flex items-center justify-center py-12">
-          <RefreshCw className="w-8 h-8 animate-spin text-blue-400" />
-          <span className="ml-3 text-slate-300">
-            Loading remittance data...
-          </span>
+          <RefreshCw className="w-7 h-7 animate-spin a-txt-b" />
+          <span className="ml-3 a-mute">Loading remittance data...</span>
         </div>
       </div>
     );
   }
 
+  const hasPending = !!outstanding && outstanding.pending_count > 0;
+  const RCOLS = '20px minmax(240px,1.6fr) 80px 120px 140px 130px 150px';
+  const allSelected = selectedIds.size === remittances.length && remittances.length > 0;
+  const someSelected = selectedIds.size > 0 && !allSelected;
+  const totalShown = remittances.reduce((sum, r) => sum + (r.state_contribution_amount || 0), 0);
+  const statusLabel: Record<string, string> = { pending: 'pending', paid: 'paid', overdue: 'overdue', waived: 'waived' };
+  const money = (n?: number | null) => `$${(n || 0).toFixed(2)}`;
+  const Chk = ({ on, mixed, onClick, label }: { on: boolean; mixed?: boolean; onClick: () => void; label: string }) => (
+    <button type="button" role="checkbox" aria-checked={mixed ? 'mixed' : on} aria-label={label} onClick={onClick} className={`a-chk ${on || mixed ? 'a-chk-on' : ''}`}>
+      {mixed ? <span style={{ width: 9, height: 2, borderRadius: 1, background: '#fff' }} /> : on ? <Check size={13} strokeWidth={3} /> : null}
+    </button>
+  );
+
   return (
-    <div className="space-y-6">
-      {/* Outstanding Summary Card - Slate Styling */}
-      <div className={`bg-slate-800/50 backdrop-blur-sm rounded-xl border ${
-        outstanding && outstanding.pending_count > 0 ? 'border-orange-500/50' : 'border-green-500/50'
-      } overflow-hidden`}>
-        <div className="p-6">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-white">
-                Outstanding to State Association
-              </h3>
-              <p className="text-sm text-slate-400 mt-1">
-                Membership fees pending remittance
-              </p>
-            </div>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 transition-colors"
-            >
-              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
+    <div className="flex flex-col gap-[22px]">
+      <div className={`a-card a-hero ${hasPending ? 'a-hero-a' : 'a-hero-g'} flex flex-wrap items-center gap-[22px]`} style={{ padding: 22 }}>
+        <span className="a-tile" style={{ width: 56, height: 56 }}>{hasPending ? <Wallet size={24} /> : <CheckCircle size={24} />}</span>
+        <div className="flex-1 min-w-[240px]">
+          <p className="a-cap">Outstanding to State Association</p>
+          <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1 mt-1.5">
+            <span className="a-num a-ink text-[40px] font-semibold leading-none">{money(outstanding?.state_contribution_total)}</span>
+            {hasPending
+              ? <AStatus tone="a">{outstanding!.pending_count} member{outstanding!.pending_count !== 1 ? 's' : ''} pending</AStatus>
+              : <AStatus tone="g">All remittances up to date</AStatus>}
           </div>
-
-          {outstanding && outstanding.pending_count > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="w-5 h-5 text-orange-400" />
-                  <span className="text-sm font-medium text-orange-300">
-                    Pending Members
-                  </span>
-                </div>
-                <p className="text-3xl font-bold text-white">
-                  {outstanding.pending_count}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="w-5 h-5 text-purple-400" />
-                  <span className="text-sm font-medium text-purple-300">
-                    National Fee
-                  </span>
-                </div>
-                <p className="text-3xl font-bold text-white">
-                  ${outstanding.national_contribution_total?.toFixed(2) || '0.00'}
-                </p>
-                <p className="text-xs text-purple-300/60 mt-1">
-                  To national association
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="w-5 h-5 text-blue-400" />
-                  <span className="text-sm font-medium text-blue-300">
-                    State Fee
-                  </span>
-                </div>
-                <p className="text-3xl font-bold text-white">
-                  ${((outstanding.state_contribution_total || 0) - (outstanding.national_contribution_total || 0)).toFixed(2)}
-                </p>
-                <p className="text-xs text-blue-300/60 mt-1">
-                  To state association
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                <div className="flex items-center gap-2 mb-2">
-                  <Wallet className="w-5 h-5 text-emerald-400" />
-                  <span className="text-sm font-medium text-emerald-300">
-                    Total Outstanding
-                  </span>
-                </div>
-                <p className="text-3xl font-bold text-white">
-                  ${outstanding.state_contribution_total?.toFixed(2) || '0.00'}
-                </p>
-                <p className="text-xs text-emerald-300/60 mt-1">
-                  Amount to remit to state
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="p-6 rounded-xl bg-green-500/10 border border-green-500/20">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-green-400" />
-                <div>
-                  <p className="font-medium text-white">
-                    All remittances up to date
-                  </p>
-                  <p className="text-sm text-slate-400 mt-1">
-                    No pending payments to state association
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          <p className="a-mute mt-1.5 mb-0 text-[13.5px]">
+            {hasPending
+              ? `Includes ${money(outstanding!.national_contribution_total)} national fee and ${money((outstanding!.state_contribution_total || 0) - (outstanding!.national_contribution_total || 0))} state fee`
+              : 'No pending payments to the state association'}
+          </p>
         </div>
+        <button onClick={handleRefresh} disabled={refreshing} className="a-ib a-ib-box" aria-label="Refresh" title="Refresh">
+          <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+        </button>
       </div>
 
-      {/* Overdue Warning Banner */}
       {overdueCount > 0 && (
-        <div className="bg-red-500/10 backdrop-blur-sm rounded-xl border border-red-500/30 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-red-400" />
-              </div>
-              <div>
-                <p className="font-medium text-red-300">
-                  {overdueCount} overdue remittance{overdueCount !== 1 ? 's' : ''}
-                </p>
-                <p className="text-sm text-red-400/70">
-                  Association fees unpaid for 4+ weeks from membership start date
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setSelectedStatus('overdue')}
-              className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 font-medium transition-colors text-sm"
-            >
-              View Overdue
+        <div className="a-card flex flex-wrap items-center gap-3.5" style={{ padding: '14px 18px' }}>
+          <span className="a-tile a-tile-sm a-txt-r"><AlertTriangle size={17} /></span>
+          <div className="flex-1 min-w-0">
+            <div className="a-ink text-[14.5px] font-semibold">{overdueCount} overdue remittance{overdueCount !== 1 ? 's' : ''}</div>
+            <div className="a-mute text-[13px] mt-0.5">Association fees unpaid for 4+ weeks from membership start date</div>
+          </div>
+          <button onClick={() => setSelectedStatus('overdue')} className="a-btn a-btn-d a-btn-sm">View overdue</button>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2.5">
+        <ClubAppDropdown
+          value={String(selectedYear)}
+          onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
+          icon={<Calendar size={16} />}
+          options={[
+            { value: 'all', label: 'All years' },
+            ...availableYears.map(year => ({ value: String(year), label: String(year) }))
+          ]}
+          minWidth={120}
+        />
+        <div className="a-seg" role="tablist" aria-label="Status">
+          {(['pending', 'paid', 'overdue', 'waived'] as const).map(st => (
+            <button key={st} role="tab" aria-selected={selectedStatus === st} onClick={() => setSelectedStatus(st)} className={`a-seg-i ${selectedStatus === st ? 'a-seg-on' : ''}`}>
+              {st.charAt(0).toUpperCase() + st.slice(1)}
+              {selectedStatus === st && remittances.length > 0 && <span className="a-cnt">{remittances.length}</span>}
             </button>
-          </div>
+          ))}
         </div>
-      )}
-
-      {/* Filters with Export Button */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <ClubAppDropdown
-            value={String(selectedYear)}
-            onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
-            icon={<Calendar size={15} />}
-            options={[
-              { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
-              ...availableYears.map(year => ({
-                value: String(year),
-                label: String(year),
-                icon: <Calendar size={14} className="text-blue-400" />
-              }))
-            ]}
-            minWidth={160}
-          />
-
-          <ClubAppDropdown
-            value={selectedStatus}
-            onChange={(v) => setSelectedStatus(v)}
-            icon={<Filter size={15} />}
-            options={[
-              { value: 'pending', label: 'Pending', icon: <Clock size={14} className="text-orange-400" /> },
-              { value: 'paid', label: 'Paid', icon: <CheckCircle size={14} className="text-green-400" /> },
-              { value: 'overdue', label: 'Overdue', icon: <AlertTriangle size={14} className="text-red-400" /> },
-              { value: 'waived', label: 'Waived', icon: <X size={14} className="text-slate-400" /> }
-            ]}
-            minWidth={160}
-          />
-
-          <button
-            onClick={handleExport}
-            disabled={remittances.length === 0}
-            className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2 border ${
-              remittances.length === 0
-                ? 'bg-slate-800/80 border-slate-700/60 text-slate-500 cursor-not-allowed'
-                : 'bg-slate-800/80 border-slate-700/60 hover:bg-slate-700/80 hover:border-slate-600 text-slate-300 hover:text-white'
-            }`}
-          >
-            <Download className="w-4 h-4" />
-            Export CSV
-          </button>
-        </div>
+        <div className="flex-1" />
+        <button onClick={handleExport} disabled={remittances.length === 0} className="a-btn"><Download size={16} />Export CSV</button>
       </div>
 
-      {/* Bulk Actions Toolbar - Only show when items are selected */}
       {selectedIds.size > 0 && (
-        <div className="bg-blue-500/10 backdrop-blur-sm rounded-xl border border-blue-500/30 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <CheckSquare className="w-5 h-5 text-blue-400" />
-              <span className="text-white font-medium">
-                {selectedIds.size} {selectedIds.size === 1 ? 'remittance' : 'remittances'} selected
-              </span>
+        <div className="a-bulkbar flex flex-wrap items-center gap-3">
+          <Chk on onClick={() => setSelectedIds(new Set())} label="Clear selection" />
+          <span className="flex-1 a-ink text-[14.5px]"><b className="a-num font-semibold">{selectedIds.size}</b> {selectedIds.size === 1 ? 'remittance' : 'remittances'} selected</span>
+          <button onClick={handleBulkMarkAsPaid} disabled={bulkActionInProgress} className="a-btn a-btn-g"><Check size={16} />Mark as paid</button>
+          <button onClick={handleBulkMarkAsPending} disabled={bulkActionInProgress} className="a-btn a-btn-a"><Clock size={16} />Mark as pending</button>
+          <button onClick={() => setSelectedIds(new Set())} className="a-btn a-btn-q">Clear</button>
+        </div>
+      )}
+
+      {remittances.length === 0 ? (
+        <div className="a-card a-empty" style={{ padding: '36px 24px' }}>
+          <span className="a-tile" style={{ width: 56, height: 56 }}><Clock size={24} /></span>
+          <div className="a-display a-ink text-lg font-semibold">No {statusLabel[selectedStatus] || ''} remittances</div>
+          <p className="a-mute m-0 text-sm">Nothing matches {selectedYear === 'all' ? 'any year' : selectedYear} and this status.</p>
+        </div>
+      ) : (
+        <div className="a-card overflow-x-auto">
+          <div className="min-w-[980px]">
+            <div className="grid gap-4 items-center px-[18px] py-3 a-thead" style={{ gridTemplateColumns: RCOLS }}>
+              <Chk on={allSelected} mixed={someSelected} onClick={toggleSelectAll} label="Select all" />
+              <p className="a-cap">Member</p><p className="a-cap">Year</p><p className="a-cap">To remit</p><p className="a-cap">Status</p><p className="a-cap">Paid</p><p className="a-cap text-right">Action</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleBulkMarkAsPaid}
-                disabled={bulkActionInProgress}
-                className="btn-primary-green px-4 py-2 rounded-lg text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Check className="w-4 h-4" />
-                Mark as Paid
-              </button>
-              <button
-                onClick={handleBulkMarkAsPending}
-                disabled={bulkActionInProgress}
-                className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Clock className="w-4 h-4" />
-                Mark as Pending
-              </button>
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                className="px-4 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 hover:text-white font-medium transition-colors"
-              >
-                Clear Selection
-              </button>
+            {remittances.map((remittance) => {
+              const overdue = isRemittanceOverdue(remittance);
+              const overdueWeeks = overdue ? Math.floor(getOverdueDays(remittance) / 7) : 0;
+              const st = remittance.club_to_state_status;
+              const sel = selectedIds.has(remittance.id);
+              return (
+                <div key={remittance.id} className={`a-row a-row-hover gap-4 ${sel ? 'a-row-sel' : ''}`} style={{ display: 'grid', gridTemplateColumns: RCOLS, paddingTop: 12, paddingBottom: 12 }}>
+                  <Chk on={sel} onClick={() => toggleSelection(remittance.id)} label={`Select ${remittance.member?.first_name ?? ''} ${remittance.member?.last_name ?? ''}`} />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <AAvatar url={remittance.member?.avatar_url} first={remittance.member?.first_name} last={remittance.member?.last_name} />
+                    <div className="min-w-0">
+                      <div className="a-ink text-[14.5px] font-semibold truncate">{remittance.member ? `${remittance.member.first_name} ${remittance.member.last_name}` : 'Unknown'}</div>
+                      <div className="a-dim text-[12.5px] truncate">{remittance.member?.email}</div>
+                    </div>
+                  </div>
+                  <span className="a-mute a-num text-[13.5px]" style={{ letterSpacing: 0 }}>{remittance.membership_year}</span>
+                  <span className={`a-num text-base font-semibold ${overdue ? 'a-txt-r' : 'a-ink'}`}>{money(remittance.state_contribution_amount)}</span>
+                  {overdue
+                    ? <AStatus tone="r">Overdue · {overdueWeeks} wk{overdueWeeks !== 1 ? 's' : ''}</AStatus>
+                    : st === 'paid' ? <AStatus tone="g">Paid</AStatus>
+                    : st === 'waived' ? <AStatus>Waived</AStatus>
+                    : <AStatus tone="a">Pending</AStatus>}
+                  <span className="a-mute a-num text-[13px]" style={{ letterSpacing: 0 }}>
+                    {remittance.club_to_state_paid_date
+                      ? new Date(remittance.club_to_state_paid_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : '—'}
+                  </span>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => toggleRemittanceStatus(remittance.id, st)}
+                      className={`a-btn ${st === 'paid' ? 'a-btn-q' : 'a-btn-g'}`}
+                      style={{ height: 34, padding: '0 12px', fontSize: 13 }}
+                    >
+                      {st === 'paid' ? <><Clock size={14} />Mark pending</> : <><CheckCircle size={14} />Mark paid</>}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="flex justify-between px-[18px] py-3.5 a-tfoot">
+              <span className="a-mute text-[13.5px]">{remittances.length} {statusLabel[selectedStatus] || ''} remittance{remittances.length !== 1 ? 's' : ''}</span>
+              <span className="text-[13.5px]"><span className="a-mute">{selectedStatus === 'paid' ? 'Total remitted ' : 'Total '}</span><b className="a-num a-ink font-semibold">{money(totalShown)}</b></span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Remittances Table - Slate Styling */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-700/50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
-                  Member
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
-                  Year
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
-                  Amount to Remit
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
-                  Paid Date
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
-                  Actions
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <button
-                    onClick={toggleSelectAll}
-                    className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors"
-                  >
-                    {selectedIds.size === remittances.length && remittances.length > 0 ? (
-                      <CheckSquare className="w-5 h-5" />
-                    ) : (
-                      <Square className="w-5 h-5" />
-                    )}
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {remittances.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
-                    <Clock className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-                    <p className="text-sm text-slate-400">
-                      No remittances found for the selected filters
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                remittances.map((remittance) => {
-                  const overdue = isRemittanceOverdue(remittance);
-                  const overdueDays = overdue ? getOverdueDays(remittance) : 0;
-                  const overdueWeeks = Math.floor(overdueDays / 7);
-
-                  return (
-                  <tr
-                    key={remittance.id}
-                    className={`hover:bg-slate-700/30 transition-colors ${
-                      selectedIds.has(remittance.id)
-                        ? 'bg-blue-500/10'
-                        : overdue
-                        ? 'bg-red-500/5 border-l-2 border-l-red-500'
-                        : ''
-                    }`}
-                  >
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <Avatar
-                            imageUrl={remittance.member?.avatar_url}
-                            firstName={remittance.member?.first_name || ''}
-                            lastName={remittance.member?.last_name || ''}
-                            size="sm"
-                          />
-                          {overdue && (
-                            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
-                              <AlertTriangle className="w-2.5 h-2.5 text-white" />
-                            </div>
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-medium text-white">
-                            {remittance.member ? `${remittance.member.first_name} ${remittance.member.last_name}` : 'Unknown'}
-                          </div>
-                          <div className="text-sm text-slate-400">
-                            {remittance.member?.email}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-slate-300">
-                      {remittance.membership_year}
-                    </td>
-                    <td className={`px-4 py-4 font-medium ${overdue ? 'text-red-400' : 'text-blue-400'}`}>
-                      ${remittance.state_contribution_amount.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-4">
-                      {overdue ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-900/30 text-red-400 border border-red-500/30">
-                            <AlertTriangle className="w-3 h-3" />
-                            Overdue
-                          </span>
-                          <span className="text-[10px] text-red-400/70">
-                            {overdueWeeks} week{overdueWeeks !== 1 ? 's' : ''} overdue
-                          </span>
-                        </div>
-                      ) : (
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          remittance.club_to_state_status === 'paid'
-                            ? 'bg-green-900/30 text-green-400'
-                            : remittance.club_to_state_status === 'waived'
-                            ? 'bg-slate-700/50 text-slate-400'
-                            : 'bg-orange-900/30 text-orange-400'
-                        }`}>
-                          {remittance.club_to_state_status}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-slate-400">
-                      {remittance.club_to_state_paid_date
-                        ? new Date(remittance.club_to_state_paid_date).toLocaleDateString()
-                        : overdue
-                        ? <span className="text-red-400">Overdue</span>
-                        : 'Pending'}
-                    </td>
-                    <td className="px-4 py-4">
-                      <button
-                        onClick={() => toggleRemittanceStatus(remittance.id, remittance.club_to_state_status)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          remittance.club_to_state_status === 'paid'
-                            ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30'
-                            : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                        }`}
-                        title={remittance.club_to_state_status === 'paid' ? 'Mark as Pending' : 'Mark as Paid'}
-                      >
-                        {remittance.club_to_state_status === 'paid' ? (
-                          <>
-                            <X size={14} />
-                            Pending
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle size={14} />
-                            Mark Paid
-                          </>
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-4 py-4">
-                      <button
-                        onClick={() => toggleSelection(remittance.id)}
-                        className="text-slate-400 hover:text-blue-400 transition-colors"
-                      >
-                        {selectedIds.has(remittance.id) ? (
-                          <CheckSquare className="w-5 h-5 text-blue-400" />
-                        ) : (
-                          <Square className="w-5 h-5" />
-                        )}
-                      </button>
-                    </td>
-                  </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Bulk Payment Modal */}
       {showBulkPaymentModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-700">
-              <h2 className="text-2xl font-bold text-white">Record Bulk Payment</h2>
-              <p className="text-slate-400 mt-1">
-                Recording payment for {selectedIds.size} member{selectedIds.size !== 1 ? 's' : ''}
-              </p>
+          <div className="a-sheet max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="a-panel-head">
+              <span className="a-tile a-tile-rim"><Wallet size={18} /></span>
+              <div className="flex-1 min-w-0">
+                <p className="a-cap">Record bulk payment</p>
+                <h2 className="a-display a-ink text-[22px] font-semibold mt-[3px]">{selectedIds.size} member{selectedIds.size !== 1 ? 's' : ''}</h2>
+              </div>
+              <button onClick={() => setShowBulkPaymentModal(false)} disabled={bulkActionInProgress} className="a-ib" aria-label="Close"><X size={20} /></button>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* Payment Summary */}
-              <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+            <div className="p-[22px] flex flex-col gap-5">
+              <div className="a-inset">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-slate-400">Members</p>
-                    <p className="text-2xl font-bold text-white">{selectedIds.size}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-400">Total Amount</p>
-                    <p className="text-2xl font-bold text-white">
-                      ${remittances
-                        .filter(r => selectedIds.has(r.id))
-                        .reduce((sum, r) => sum + (r.state_contribution_amount || 0), 0)
-                        .toFixed(2)}
-                    </p>
-                  </div>
+                  <div><p className="a-cap">Members</p><p className="a-num a-ink text-2xl font-semibold mt-1">{selectedIds.size}</p></div>
+                  <div><p className="a-cap">Total amount</p><p className="a-num a-ink text-2xl font-semibold mt-1">{money(remittances.filter(r => selectedIds.has(r.id)).reduce((sum, r) => sum + (r.state_contribution_amount || 0), 0))}</p></div>
                 </div>
-
-                <div className="mt-4 pt-4 border-t border-slate-700 space-y-3">
-                  <div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">State Association Fee:</span>
-                      <span className="text-white font-medium">
-                        ${remittances
-                          .filter(r => selectedIds.has(r.id))
-                          .reduce((sum, r) => sum + (r.state_contribution_amount || 0), 0)
-                          .toFixed(2)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      This is the amount you pay to the State Association
-                    </p>
-                  </div>
-
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-blue-300">Included: National Association portion</span>
-                      <span className="text-blue-300 font-medium">
-                        ${remittances
-                          .filter(r => selectedIds.has(r.id))
-                          .reduce((sum, r) => sum + (r.national_contribution_amount || 0), 0)
-                          .toFixed(2)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-blue-400/70 mt-1">
-                      The State Association will remit this to the National Association
-                    </p>
-                  </div>
+                <div className="mt-4 pt-4 a-card-rule border-t border-white/[0.06] text-sm flex justify-between">
+                  <span className="a-mute">Includes National Association portion</span>
+                  <span className="a-num a-ink font-semibold">{money(remittances.filter(r => selectedIds.has(r.id)).reduce((sum, r) => sum + (r.national_contribution_amount || 0), 0))}</span>
                 </div>
+                <p className="a-dim text-xs mt-1 mb-0">The State Association remits this portion to the National Association.</p>
               </div>
 
-              {/* Payment Details Form */}
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label>
+                  <span className="a-flab">Payment date</span>
+                  <input type="date" value={bulkPaymentDetails.paymentDate} onChange={(e) => setBulkPaymentDetails({ ...bulkPaymentDetails, paymentDate: e.target.value })} className="a-inp a-inp-date" />
+                </label>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Payment Date
-                  </label>
-                  <input
-                    type="date"
-                    value={bulkPaymentDetails.paymentDate}
-                    onChange={(e) => setBulkPaymentDetails({...bulkPaymentDetails, paymentDate: e.target.value})}
-                    className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Payment Method
-                  </label>
+                  <span className="a-flab">Payment method</span>
                   <ClubAppDropdown
                     value={bulkPaymentDetails.paymentMethod}
-                    onChange={(v) => setBulkPaymentDetails({...bulkPaymentDetails, paymentMethod: v})}
-                    icon={<Wallet size={15} />}
+                    onChange={(v) => setBulkPaymentDetails({ ...bulkPaymentDetails, paymentMethod: v })}
+                    icon={<Wallet size={16} />}
                     options={[
-                      { value: 'bank_transfer', label: 'Bank Transfer', icon: <ArrowUpRight size={14} className="text-blue-400" /> },
-                      { value: 'credit_card', label: 'Credit Card', icon: <Wallet size={14} className="text-green-400" /> },
-                      { value: 'debit_card', label: 'Debit Card', icon: <Wallet size={14} className="text-teal-400" /> },
-                      { value: 'cash', label: 'Cash', icon: <DollarSign size={14} className="text-yellow-400" /> },
-                      { value: 'check', label: 'Check', icon: <CheckCircle size={14} className="text-slate-400" /> },
-                      { value: 'other', label: 'Other', icon: <Clock size={14} className="text-slate-400" /> }
+                      { value: 'bank_transfer', label: 'Bank transfer' },
+                      { value: 'credit_card', label: 'Credit card' },
+                      { value: 'debit_card', label: 'Debit card' },
+                      { value: 'cash', label: 'Cash' },
+                      { value: 'check', label: 'Cheque' },
+                      { value: 'other', label: 'Other' }
                     ]}
                     minWidth={220}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Payment Reference
-                  </label>
-                  <input
-                    type="text"
-                    value={bulkPaymentDetails.reference}
-                    onChange={(e) => setBulkPaymentDetails({...bulkPaymentDetails, reference: e.target.value})}
-                    placeholder="e.g., Transaction ID, Check number"
-                    className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    value={bulkPaymentDetails.notes}
-                    onChange={(e) => setBulkPaymentDetails({...bulkPaymentDetails, notes: e.target.value})}
-                    placeholder="Any additional notes about this payment"
-                    rows={3}
-                    className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    block
                   />
                 </div>
               </div>
+              <label>
+                <span className="a-flab">Payment reference</span>
+                <input type="text" value={bulkPaymentDetails.reference} onChange={(e) => setBulkPaymentDetails({ ...bulkPaymentDetails, reference: e.target.value })} placeholder="e.g., transaction ID or cheque number" className="a-inp" />
+              </label>
+              <label>
+                <span className="a-flab">Notes (optional)</span>
+                <textarea value={bulkPaymentDetails.notes} onChange={(e) => setBulkPaymentDetails({ ...bulkPaymentDetails, notes: e.target.value })} placeholder="Any additional notes about this payment" rows={3} className="a-inp" />
+              </label>
 
-              {/* Already Paid Externally Toggle */}
-              <div
-                onClick={() => setBulkPaymentDetails({...bulkPaymentDetails, skipFinanceTransactions: !bulkPaymentDetails.skipFinanceTransactions})}
-                className={`rounded-xl p-4 border cursor-pointer transition-colors ${
-                  bulkPaymentDetails.skipFinanceTransactions
-                    ? 'bg-amber-500/10 border-amber-500/30'
-                    : 'bg-slate-900/30 border-slate-700 hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                    bulkPaymentDetails.skipFinanceTransactions
-                      ? 'bg-amber-500 border-amber-500'
-                      : 'border-slate-500'
-                  }`}>
-                    {bulkPaymentDetails.skipFinanceTransactions && <Check className="w-3 h-3 text-white" />}
-                  </div>
-                  <div className="flex-1">
-                    <p className={`text-sm font-medium ${bulkPaymentDetails.skipFinanceTransactions ? 'text-amber-300' : 'text-slate-300'}`}>
-                      Already paid externally (before import)
-                    </p>
-                    <p className={`text-xs mt-1 ${bulkPaymentDetails.skipFinanceTransactions ? 'text-amber-400/70' : 'text-slate-500'}`}>
-                      Check this if the club already paid these association fees before being imported into the system. This will mark remittances as paid without creating duplicate finance transactions.
-                    </p>
-                  </div>
+              <div className="a-well">
+                <span className="a-tile a-tile-sm"><Wallet size={16} /></span>
+                <div className="flex-1 min-w-0">
+                  <div className="a-ink text-[14.5px] font-semibold">Already paid externally (before import)</div>
+                  <div className="a-dim text-[12.5px] mt-0.5">Marks these remittances as paid without creating finance transactions, for fees already recorded before the import.</div>
                 </div>
+                <ASwitch
+                  checked={!!bulkPaymentDetails.skipFinanceTransactions}
+                  onChange={(v) => setBulkPaymentDetails({ ...bulkPaymentDetails, skipFinanceTransactions: v })}
+                  label="Already paid externally"
+                />
               </div>
-
-              {/* Finance Integration Notice */}
-              {!bulkPaymentDetails.skipFinanceTransactions ? (
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-                  <div className="flex gap-3">
-                    <Wallet className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-300">Finance Integration</p>
-                      <p className="text-sm text-blue-400/80 mt-1">
-                        This payment will be automatically recorded in your finances as an expense under "Association Fees" category.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
-                  <div className="flex gap-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-amber-300">No Finance Transactions</p>
-                      <p className="text-sm text-amber-400/80 mt-1">
-                        Remittances will be marked as paid but no expense or income transactions will be created. Use this when fees were already recorded in finances before the system import.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {bulkPaymentDetails.skipFinanceTransactions
+                ? <AStatus tone="a" className="text-[13px] whitespace-normal"><span className="a-mute">No expense or income transactions will be created.</span></AStatus>
+                : <AStatus tone="b" className="text-[13px] whitespace-normal"><span className="a-mute">This payment is recorded in your finances as an expense under "Association Fees".</span></AStatus>}
             </div>
 
-            <div className="p-6 border-t border-slate-700 flex gap-3 justify-end">
+            <div className="a-panel-foot">
               <button
                 onClick={() => {
                   setShowBulkPaymentModal(false);
@@ -1086,26 +722,12 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
                   });
                 }}
                 disabled={bulkActionInProgress}
-                className="px-6 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="a-btn"
               >
                 Cancel
               </button>
-              <button
-                onClick={confirmBulkPayment}
-                disabled={bulkActionInProgress}
-                className="btn-primary-green px-6 py-2 rounded-lg text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {bulkActionInProgress ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    Confirm Payment
-                  </>
-                )}
+              <button onClick={confirmBulkPayment} disabled={bulkActionInProgress} className="a-btn a-btn-p">
+                {bulkActionInProgress ? <><RefreshCw className="w-4 h-4 animate-spin" />Processing…</> : <><Check className="w-4 h-4" />Confirm payment</>}
               </button>
             </div>
           </div>
