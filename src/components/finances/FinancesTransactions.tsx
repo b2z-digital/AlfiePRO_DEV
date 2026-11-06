@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Plus, CreditCard as Edit, Trash2, DollarSign, TrendingUp, TrendingDown, Calendar, ChevronDown, FileText, Minus, Upload, ListFilter as Filter, Tag, Check } from 'lucide-react';
+import { Search, Plus, CreditCard as Edit, Trash2, DollarSign, TrendingUp, TrendingDown, ChevronDown, FileText, Minus, Upload, Tag, Check, Receipt, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
@@ -64,7 +64,7 @@ const CustomDropdown: React.FC<{
   label: string;
   options: DropdownOption[];
   onChange: (value: string) => void;
-}> = ({ darkMode, icon, value, label, options, onChange }) => {
+}> = ({ icon, value, label, options, onChange }) => {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -108,54 +108,37 @@ const CustomDropdown: React.FC<{
       <button
         ref={buttonRef}
         onClick={() => setOpen(!open)}
-        className={`
-          flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
-          ${darkMode
-            ? 'bg-slate-700/80 hover:bg-slate-600/80 text-slate-200 border border-slate-600/50'
-            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'}
-          ${open ? (darkMode ? 'ring-2 ring-blue-500/40' : 'ring-2 ring-blue-500/30') : ''}
-        `}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="a-pick"
       >
-        <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>{icon}</span>
+        <span className="a-mute flex">{icon}</span>
         <span className="whitespace-nowrap">{label}</span>
-        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''} ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+        <ChevronDown size={15} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && createPortal(
         <div
           ref={menuRef}
           style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, minWidth: menuPos.minWidth, zIndex: 9999 }}
-          className={`
-            rounded-xl shadow-xl border
-            ${darkMode
-              ? 'bg-slate-800 border-slate-700 shadow-black/40'
-              : 'bg-white border-slate-200 shadow-slate-200/60'}
-          `}
+          className="a-pop"
+          role="listbox"
         >
-          <div className={`
-            py-1 max-h-[280px] overflow-y-auto overscroll-contain rounded-xl
-            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
-            [&::-webkit-scrollbar-thumb]:rounded-full
-            ${darkMode ? '[&::-webkit-scrollbar-thumb]:bg-slate-600/50' : '[&::-webkit-scrollbar-thumb]:bg-slate-300'}
-          `}>
+          <div className="p-1.5 max-h-[280px] overflow-y-auto overscroll-contain flex flex-col gap-0.5">
             {options.map((opt) => (
               <button
                 key={opt.value}
+                role="option"
+                aria-selected={value === opt.value}
                 onClick={() => {
                   onChange(opt.value);
                   if (opt.value !== '__add_category__') setOpen(false);
                 }}
-                className={`
-                  w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left
-                  ${opt.className || ''}
-                  ${value === opt.value
-                    ? (darkMode ? 'bg-blue-500/15 text-blue-400' : 'bg-blue-50 text-blue-600')
-                    : (darkMode ? 'text-slate-300 hover:bg-slate-700/80' : 'text-slate-700 hover:bg-slate-50')}
-                `}
+                className={`a-pop-item ${opt.className || ''} ${value === opt.value ? 'a-pop-item-on' : ''}`}
               >
                 {opt.icon && <span>{opt.icon}</span>}
                 <span className="flex-1">{opt.label}</span>
-                {value === opt.value && <Check size={14} className="text-blue-400" />}
+                {value === opt.value && <Check size={14} className="a-txt-b" />}
               </button>
             ))}
           </div>
@@ -180,6 +163,8 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showNewTransactionModal, setShowNewTransactionModal] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => { setHeaderSlot(document.getElementById('alfie-page-actions')); }, []);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -495,19 +480,11 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
     }).format(Math.abs(amount));
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-AU', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/10 border-t-[#0A84FF]"></div>
       </div>
     );
   }
@@ -523,320 +500,136 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
     );
   }
 
+  const isInc = (t: Transaction) => t.type === 'deposit' || t.type === 'income';
+  const isPaid = (t: Transaction) => t.payment_status === 'paid' || t.payment_status === 'completed';
+  const months: { key: string; label: string; items: Transaction[]; net: number }[] = [];
+  filteredTransactions.forEach((t) => {
+    const d = new Date(t.date);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    let g = months.find((m) => m.key === key);
+    if (!g) { g = { key, label: d.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }), items: [], net: 0 }; months.push(g); }
+    g.items.push(t);
+    g.net += isInc(t) ? Math.abs(t.amount) : -Math.abs(t.amount);
+  });
+  const TX_COLS = '44px 36px minmax(0,1fr) minmax(0,210px) 80px 120px 84px';
+  const newTxButton = (
+    <div className="relative inline-flex" ref={dropdownRef}>
+      <button onClick={() => setShowNewTransactionModal(true)} className="a-btn a-btn-p" style={{ height: 42, borderRadius: '13px 0 0 13px', paddingRight: 14 }}>
+        <Plus size={16} />New transaction
+      </button>
+      <button onClick={() => setShowDropdown(!showDropdown)} className="a-btn a-btn-p" aria-label="More transaction types" aria-haspopup="menu" aria-expanded={showDropdown} style={{ height: 42, borderRadius: '0 13px 13px 0', padding: '0 10px', borderLeft: '1px solid rgba(255,255,255,0.25)' }}>
+        <ChevronDown size={16} />
+      </button>
+      {showDropdown && (
+        <div className="a-pop absolute right-0 top-full mt-2 w-72 z-50 p-1.5 flex flex-col gap-0.5" role="menu">
+          {([
+            ['invoice', <FileText size={16} />, 'New invoice', 'Create an invoice for services or products'],
+            ['deposit', <Plus size={16} />, 'New deposit', 'Record incoming money or payments'],
+            ['expense', <Minus size={16} />, 'New expense', 'Record money spent or outgoing payments'],
+          ] as const).map(([k, icon, title, desc]) => (
+            <button key={k} role="menuitem" onClick={() => handleTransactionTypeClick(k)} className="a-pop-item" style={{ alignItems: 'flex-start', padding: 10 }}>
+              <span className="a-tile a-tile-sm" style={{ width: 32, height: 32 }}>{icon}</span>
+              <span className="flex-1 min-w-0"><span className="block a-ink font-semibold text-[13.5px]">{title}</span><span className="block a-dim text-xs mt-0.5">{desc}</span></span>
+            </button>
+          ))}
+          <div className="a-pop-rule" />
+          <button role="menuitem" onClick={() => { setShowImportModal(true); setShowDropdown(false); }} className="a-pop-item" style={{ alignItems: 'flex-start', padding: 10 }}>
+            <span className="a-tile a-tile-sm" style={{ width: 32, height: 32 }}><Upload size={16} /></span>
+            <span className="flex-1 min-w-0"><span className="block a-ink font-semibold text-[13.5px]">Import transactions</span><span className="block a-dim text-xs mt-0.5">Import from CSV file with smart mapping</span></span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className={`
-          p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
-        `}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Income</p>
-              <p className="text-2xl font-bold text-green-500">{formatCurrency(totalIncome)}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-green-500/15">
-              <DollarSign className="text-green-500" size={24} />
-            </div>
-          </div>
-        </div>
+    <div className="flex flex-col gap-[22px]">
+      {headerSlot ? createPortal(newTxButton, headerSlot) : <div className="flex justify-end">{newTxButton}</div>}
 
-        <div className={`
-          p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
-        `}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Expenses</p>
-              <p className="text-2xl font-bold text-red-500">{formatCurrency(totalExpenses)}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-red-500/15">
-              <DollarSign className="text-red-500" size={24} />
-            </div>
+      <div className="a-card grid grid-cols-1 md:grid-cols-3">
+        {([
+          ['Total income', <TrendingUp size={19} />, formatCurrency(totalIncome), 'a-txt-g'],
+          ['Total expenses', <TrendingDown size={19} />, formatCurrency(totalExpenses), 'a-txt-r'],
+          ['Net amount', <DollarSign size={19} />, `${netAmount < 0 ? '−' : ''}${formatCurrency(Math.abs(netAmount))}`, netAmount < 0 ? 'a-txt-r' : 'a-ink'],
+        ] as const).map(([label, icon, value, tone], i) => (
+          <div key={label} className={`flex items-center gap-3.5 ${i > 0 ? 'a-split' : ''}`} style={{ padding: '18px 22px' }}>
+            <span className="a-tile">{icon}</span>
+            <div><p className="a-cap">{label}</p><div className={`a-big mt-1.5 ${tone}`} style={{ fontSize: 28 }}>{value}</div></div>
           </div>
-        </div>
-
-        <div className={`
-          p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
-        `}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Net Amount</p>
-              <p className={`text-2xl font-bold ${netAmount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {netAmount >= 0 ? '' : '-'}{formatCurrency(Math.abs(netAmount))}
-              </p>
-            </div>
-            <div className={`p-3 rounded-lg ${netAmount >= 0 ? 'bg-green-500/15' : 'bg-red-500/15'}`}>
-              <DollarSign className={netAmount >= 0 ? 'text-green-500' : 'text-red-500'} size={24} />
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Filters and Search */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-4 flex-1">
-          <div className="relative flex-1 max-w-md">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search transactions..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`
-                w-full pl-10 pr-4 py-2 rounded-lg border
-                ${darkMode 
-                  ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
-                  : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'}
-              `}
-            />
-          </div>
-
-          <CustomDropdown
-            darkMode={darkMode}
-            icon={<Filter size={15} />}
-            value={typeFilter}
-            label={typeFilter === 'all' ? 'All Types' : typeFilter === 'deposit' ? 'Income' : 'Expense'}
-            options={[
-              { value: 'all', label: 'All Types' },
-              { value: 'deposit', label: 'Income', icon: <TrendingUp size={14} className="text-green-400" /> },
-              { value: 'expense', label: 'Expense', icon: <TrendingDown size={14} className="text-red-400" /> },
-            ]}
-            onChange={(val) => setTypeFilter(val as 'all' | 'deposit' | 'expense')}
-          />
-
-          <CustomDropdown
-            darkMode={darkMode}
-            icon={<Tag size={15} />}
-            value={categoryFilter}
-            label={categoryFilter === 'all' ? 'All Categories' : categories.find(c => c.id === categoryFilter)?.name || 'All Categories'}
-            options={[
-              { value: 'all', label: 'All Categories' },
-              ...categories.map(c => ({ value: c.id, label: c.name })),
-              { value: '__add_category__', label: '+ Add Category', className: 'text-blue-400 font-medium' },
-            ]}
-            onChange={(val) => {
-              if (val === '__add_category__') {
-                setShowCategoryModal(true);
-              } else {
-                setCategoryFilter(val);
-              }
-            }}
-          />
+      <div className="flex flex-wrap items-center gap-2.5">
+        <label className="a-field flex-1 min-w-[220px]">
+          <Search size={17} />
+          <span className="sr-only">Search transactions</span>
+          <input type="text" placeholder="Search transactions" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        </label>
+        <div className="a-seg" role="tablist" aria-label="Type">
+          <button role="tab" aria-selected={typeFilter === 'all'} onClick={() => setTypeFilter('all')} className={`a-seg-i ${typeFilter === 'all' ? 'a-seg-on' : ''}`}>All</button>
+          <button role="tab" aria-selected={typeFilter === 'deposit'} onClick={() => setTypeFilter('deposit')} className={`a-seg-i ${typeFilter === 'deposit' ? 'a-seg-on' : ''}`}><span className="a-light" style={{ background: '#30D158', boxShadow: 'none' }} />Income</button>
+          <button role="tab" aria-selected={typeFilter === 'expense'} onClick={() => setTypeFilter('expense')} className={`a-seg-i ${typeFilter === 'expense' ? 'a-seg-on' : ''}`}><span className="a-light" style={{ background: '#FF6B6B', boxShadow: 'none' }} />Expense</button>
         </div>
-
-        <div className="relative" ref={dropdownRef}>
-          <div className="flex rounded-lg overflow-hidden shadow-md cursor-pointer" style={{ background: 'linear-gradient(to right, #16a34a, #059669)' }}>
-            <button
-              onClick={() => setShowNewTransactionModal(true)}
-              className="flex items-center gap-2 px-4 py-2 text-white text-sm font-medium whitespace-nowrap hover:brightness-110 transition-all"
-            >
-              <Plus size={16} />
-              New Transaction
-            </button>
-            <div className="w-px bg-white/20 self-stretch my-1" />
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="px-2.5 py-2 text-white hover:brightness-110 transition-all"
-            >
-              <ChevronDown size={16} />
-            </button>
-          </div>
-
-          {showDropdown && (
-            <div className={`absolute right-0 mt-2 w-64 rounded-lg shadow-xl border py-2 z-50 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <button
-                onClick={() => handleTransactionTypeClick('invoice')}
-                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
-              >
-                <div className="p-2 rounded-lg bg-blue-500/15">
-                  <FileText className="text-blue-500" size={18} />
-                </div>
-                <div>
-                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Invoice</div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Create an invoice for services or products</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleTransactionTypeClick('deposit')}
-                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
-              >
-                <div className="p-2 rounded-lg bg-green-500/15">
-                  <Plus className="text-green-500" size={18} />
-                </div>
-                <div>
-                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Deposit</div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Record incoming money or payments</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleTransactionTypeClick('expense')}
-                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
-              >
-                <div className="p-2 rounded-lg bg-red-500/15">
-                  <Minus className="text-red-500" size={18} />
-                </div>
-                <div>
-                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Expense</div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Record money spent or outgoing payments</div>
-                </div>
-              </button>
-
-              <div className={`my-2 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}></div>
-
-              <button
-                onClick={() => {
-                  setShowImportModal(true);
-                  setShowDropdown(false);
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
-              >
-                <div className="p-2 rounded-lg bg-blue-500/15">
-                  <Upload className="text-blue-500" size={18} />
-                </div>
-                <div>
-                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>Import Transactions</div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Import from CSV file with smart mapping</div>
-                </div>
-              </button>
-            </div>
-          )}
-        </div>
+        <CustomDropdown
+          darkMode={darkMode}
+          icon={<Tag size={16} />}
+          value={categoryFilter}
+          label={categoryFilter === 'all' ? 'All categories' : categories.find(c => c.id === categoryFilter)?.name || 'All categories'}
+          options={[
+            { value: 'all', label: 'All categories' },
+            ...categories.map(c => ({ value: c.id, label: c.name })),
+            { value: '__add_category__', label: '+ Add category', className: 'a-link-item' },
+          ]}
+          onChange={(val) => {
+            if (val === '__add_category__') setShowCategoryModal(true);
+            else setCategoryFilter(val);
+          }}
+        />
       </div>
 
-      {/* Transactions Table */}
-      <div className={`
-        rounded-xl border backdrop-blur-sm overflow-hidden
-        ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}
-      `}>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className={darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}>
-              <tr>
-                <th className={`text-left p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Date
-                </th>
-                <th className={`text-left p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Description
-                </th>
-                <th className={`text-left p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Type
-                </th>
-                <th className={`text-left p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Category
-                </th>
-                <th className={`text-right p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Amount
-                </th>
-                <th className={`text-center p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Status
-                </th>
-                <th className={`text-center p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className={`divide-y ${darkMode ? 'divide-slate-700/50' : 'divide-slate-100'}`}>
-              {filteredTransactions.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className={`p-8 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    No transactions found
-                  </td>
-                </tr>
-              ) : (
-                filteredTransactions.map((transaction) => (
-                  <tr
-                    key={transaction.id}
-                    className={`transition-colors cursor-pointer ${darkMode ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'}`}
-                    onClick={() => {
-                      setSelectedTransaction(transaction);
-                      setShowDetailModal(true);
-                    }}
-                  >
-                    <td className="p-4">
-                      <div className={`flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                        <Calendar size={14} />
-                        {formatDate(transaction.date)}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {transaction.description}
-                      </div>
-                      {transaction.line_items && transaction.line_items.length > 1 && (
-                        <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {transaction.line_items.length} line items
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <span className={`
-                        px-2 py-1 rounded-full text-xs font-medium
-                        ${transaction.type === 'deposit' || transaction.type === 'income'
-                          ? 'bg-green-500/15 text-green-600'
-                          : 'bg-red-500/15 text-red-600'}
-                      `}>
-                        {transaction.type === 'deposit' || transaction.type === 'income' ? 'Income' : 'Expense'}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <div className={`flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                        <div className="w-2 h-2 rounded-full bg-slate-400"></div>
-                        {transaction.category_name}
-                      </div>
-                    </td>
-                    <td className="p-4 text-right">
-                      <span className={`font-medium ${
-                        transaction.type === 'deposit' || transaction.type === 'income' ? 'text-green-500' : 'text-red-500'
-                      }`}>
-                        {transaction.type === 'deposit' || transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className={`
-                        px-2 py-1 rounded-full text-xs font-medium
-                        ${(transaction.payment_status === 'paid' || transaction.payment_status === 'completed')
-                          ? 'bg-green-500/15 text-green-600'
-                          : 'bg-amber-500/15 text-amber-600'}
-                      `}>
-                        {(transaction.payment_status === 'paid' || transaction.payment_status === 'completed') ? 'Paid' : 'Awaiting Payment'}
-                      </span>
-                    </td>
-                    <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedTransaction(transaction);
-                            setShowDetailModal(true);
-                          }}
-                          className={`p-2 transition-colors ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
-                          title="View/Edit transaction"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteClick(transaction.id);
-                          }}
-                          className="p-2 text-red-400 hover:text-red-300 transition-colors"
-                          title="Delete transaction"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="a-card overflow-hidden">
+        {months.length === 0 ? (
+          <div className="a-empty py-12 px-6">
+            <span className="a-tile" style={{ width: 56, height: 56 }}><Receipt size={24} /></span>
+            <div className="a-display a-ink text-lg font-semibold">No transactions found</div>
+            <p className="a-mute m-0 text-sm">{searchTerm || typeFilter !== 'all' || categoryFilter !== 'all' ? 'Try a different search or filter.' : 'Add a transaction to get started.'}</p>
+          </div>
+        ) : months.map((m, mi) => (
+          <React.Fragment key={m.key}>
+            {mi > 0 && <div className="a-month-rule" />}
+            <div className="a-mhead">
+              <span className="a-display a-ink text-[15px] font-semibold">{m.label}</span>
+              <span className="a-cnt">{m.items.length}</span>
+              <div className="flex-1" />
+              <span className="a-dim text-[12.5px]">Net</span>
+              <span className={`a-num text-sm font-semibold ${m.net < 0 ? 'a-txt-r' : 'a-txt-g'}`}>{m.net < 0 ? '−' : '+'}{formatCurrency(Math.abs(m.net))}</span>
+            </div>
+            {m.items.map((t) => {
+              const d = new Date(t.date);
+              const inc = isInc(t);
+              const open = () => { setSelectedTransaction(t); setShowDetailModal(true); };
+              return (
+                <div key={t.id} className="a-tx" style={{ gridTemplateColumns: TX_COLS, cursor: 'pointer' }} onClick={open}>
+                  <div className="a-chip-d"><b>{d.getDate()}</b><i>{d.toLocaleDateString('en-AU', { weekday: 'short' })}</i></div>
+                  <span className={`a-tile a-tile-sm ${inc ? 'a-txt-g' : 'a-txt-r'}`}>{inc ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}</span>
+                  <div className="min-w-0">
+                    <div className="a-ink text-[14.5px] font-medium truncate">{t.description}</div>
+                    {t.line_items && t.line_items.length > 1 && <div className="a-dim text-xs mt-0.5">{t.line_items.length} line items</div>}
+                  </div>
+                  {t.category_name
+                    ? <span className="a-lb-fmt justify-self-start max-w-full"><span className="a-light" style={{ background: inc ? '#30D158' : '#FF6B6B', boxShadow: 'none' }} /><span className="truncate">{t.category_name}</span></span>
+                    : <span />}
+                  <span className="a-st text-[12.5px]"><span className={`a-light ${isPaid(t) ? 'a-light-g' : 'a-light-a'}`} />{isPaid(t) ? 'Paid' : 'Awaiting'}</span>
+                  <span className={`a-num text-right text-[15.5px] font-semibold ${inc ? 'a-txt-g' : 'a-txt-r'}`}>{inc ? '+' : '−'}{formatCurrency(t.amount)}</span>
+                  <div className="flex justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={open} className="a-ib" aria-label="View or edit" title="View or edit"><Edit size={16} /></button>
+                    <button onClick={() => handleDeleteClick(t.id)} className="a-ib a-ib-d" aria-label="Delete" title="Delete"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+              );
+            })}
+          </React.Fragment>
+        ))}
       </div>
 
       {/* New Transaction Modal */}

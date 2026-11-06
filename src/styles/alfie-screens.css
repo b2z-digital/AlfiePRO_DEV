@@ -218,3 +218,13 @@ html.alfie-light .a-chip-d i { color: #64748B; }
 .a-link { border: 0; background: none; padding: 0; color: #6FB4FF; cursor: pointer; text-decoration: none; }
 .a-link:hover { text-decoration: underline; }
 html.alfie-light .a-link { color: #0A6FD6; }
+.a-split { border-left: 1px solid rgba(255, 255, 255, 0.07); }
+html.alfie-light .a-split { border-left-color: rgba(15, 23, 42, 0.08); }
+@media (max-width: 767px) { .a-split { border-left: 0; border-top: 1px solid rgba(255, 255, 255, 0.07); } html.alfie-light .a-split { border-top-color: rgba(15, 23, 42, 0.08); } }
+.a-mhead { display: flex; align-items: center; gap: 10px; padding: 16px 18px 8px; }
+.a-month-rule { height: 1px; background: rgba(255, 255, 255, 0.08); }
+html.alfie-light .a-month-rule { background: rgba(15, 23, 42, 0.08); }
+.a-pop-rule { height: 1px; margin: 4px 6px; background: rgba(255, 255, 255, 0.08); }
+html.alfie-light .a-pop-rule { background: rgba(15, 23, 42, 0.08); }
+.a-link-item { color: #6FB4FF !important; font-weight: 600 !important; }
+html.alfie-light .a-link-item { color: #0A6FD6 !important; }
