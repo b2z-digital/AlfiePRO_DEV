@@ -514,3 +514,104 @@ html.alfie-theme .alfie-switch-panel button .alfie-pin:focus-visible { opacity: 
 }
 html.alfie-light .alfie-kbd { background: rgba(15, 23, 42, 0.05); box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.12), inset 0 0 0 1px rgba(15, 23, 42, 0.08); color: #475569; }
 html:not(.alfie-theme) .alfie-kbd { display: none; }
+
+/* ── Count badges inside tab bars → Alfie count chips ── */
+html.alfie-theme :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2 .rounded-full:is(.bg-green-500, .bg-orange-500, .bg-red-500, .bg-blue-500, .bg-amber-500, .bg-blue-600) {
+  border-radius: 5px;
+  height: 18px;
+  min-width: 20px;
+  padding: 0 5px;
+  background: rgba(0, 0, 0, 0.34);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+  color: rgba(235, 240, 255, 0.85);
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 11.5px;
+}
+html.alfie-theme :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2 .rounded-full:is(.bg-orange-500, .bg-amber-500) { background: rgba(255, 179, 64, 0.16); color: #FFC56B; box-shadow: none; }
+html.alfie-theme :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2 .rounded-full.bg-red-500 { background: rgba(255, 107, 107, 0.16); color: #FF8A8A; box-shadow: none; }
+html.alfie-theme :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2:not(.border-transparent) .rounded-full:is(.bg-green-500, .bg-blue-500, .bg-blue-600) { background: #0A84FF; color: #fff; box-shadow: none; }
+html.alfie-light :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2 .rounded-full:is(.bg-green-500, .bg-blue-500, .bg-blue-600) { background: rgba(15, 23, 42, 0.08); color: #334155 !important; box-shadow: none; }
+html.alfie-light :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2:not(.border-transparent) .rounded-full:is(.bg-green-500, .bg-blue-500, .bg-blue-600) { background: #0A84FF; color: #fff !important; }
+html.alfie-light :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2 .rounded-full:is(.bg-orange-500, .bg-amber-500) { color: #B25E00 !important; }
+
+/* ── Joined button groups (Month | Quarter | Year) → segmented control ── */
+html.alfie-theme .flex:is(.rounded-lg, .rounded-xl):is(.overflow-hidden.border, .p-1):has(> button + button):not(:has(> :not(button))) {
+  gap: 2px;
+  padding: 3px;
+  border: 0 !important;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+html.alfie-theme .flex:is(.rounded-lg, .rounded-xl):is(.overflow-hidden.border, .p-1):has(> button + button):not(:has(> :not(button))) > button {
+  border: 0 !important;
+  border-radius: 9px;
+  background-image: none;
+  box-shadow: none;
+}
+html.alfie-theme .flex:is(.rounded-lg, .rounded-xl):is(.overflow-hidden.border, .p-1):has(> button + button):not(:has(> :not(button))) > button:is(.bg-blue-600, .bg-blue-500, .bg-cyan-600, .bg-sky-600, .bg-slate-600, .bg-slate-800, .bg-white) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08)) !important;
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+html.alfie-light .flex:is(.rounded-lg, .rounded-xl):is(.overflow-hidden.border, .p-1):has(> button + button):not(:has(> :not(button))) {
+  background: rgba(15, 23, 42, 0.06) !important;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+html.alfie-light .flex:is(.rounded-lg, .rounded-xl):is(.overflow-hidden.border, .p-1):has(> button + button):not(:has(> :not(button))) > button:is(.bg-blue-600, .bg-blue-500, .bg-cyan-600, .bg-sky-600, .bg-slate-600, .bg-slate-800, .bg-white) {
+  background: #fff !important;
+  color: #0B1220 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10), 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+/* Count chips on the active underline tab */
+html.alfie-theme :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2:not(.border-transparent) .a-cnt:not(.a-cnt-amber) { background: #0A84FF; color: #fff; box-shadow: none; }
+
+/* ═══════════════════ Tables: caps headers, hairline rows ═══════════════════ */
+html.alfie-theme table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+html.alfie-dark table thead th { color: rgba(235, 240, 255, 0.55); }
+html.alfie-light table thead th { color: #64748B !important; }
+html.alfie-dark table thead:is(.bg-slate-700\/50, .bg-slate-700, .bg-slate-800, .bg-slate-800\/50, .bg-slate-800\/80, .bg-slate-900\/50),
+html.alfie-dark table thead tr:is(.bg-slate-700\/50, .bg-slate-700, .bg-slate-800, .bg-slate-800\/50, .bg-slate-900\/50) {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+html.alfie-dark table :is(thead, thead tr) { border-color: rgba(255, 255, 255, 0.07); }
+html.alfie-dark table tbody tr { border-color: rgba(255, 255, 255, 0.055); }
+html.alfie-dark table tbody.divide-y > tr + tr,
+html.alfie-dark table.divide-y > * + * { border-color: rgba(255, 255, 255, 0.055); }
+html.alfie-dark table tbody tr:is([class*="hover:bg-slate-7"], [class*="hover:bg-slate-8"]):hover { background-color: rgba(255, 255, 255, 0.025); }
+
+/* ═══════════════════ Status pills → status lights ═══════════════════
+ * Small tinted rounded-full text pills in the semantic colours become the
+ * board's "● Label" status lights. Pills with icons are left as they are. */
+html.alfie-theme span.rounded-full.text-xs:is([class*="bg-green-5"], [class*="bg-emerald-5"], [class*="bg-red-5"], [class*="bg-amber-5"], [class*="bg-yellow-5"], [class*="bg-orange-5"], [class*="bg-green-9"], [class*="bg-emerald-9"], [class*="bg-red-9"], [class*="bg-amber-9"], [class*="bg-yellow-9"], [class*="bg-orange-9"]):is([class*="/10"], [class*="/15"], [class*="/20"], [class*="/30"]):not(:has(svg)):not(:empty) {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent !important;
+  border-color: transparent !important;
+  padding-left: 2px;
+  padding-right: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+html.alfie-theme span.rounded-full.text-xs:is([class*="bg-green-5"], [class*="bg-emerald-5"], [class*="bg-red-5"], [class*="bg-amber-5"], [class*="bg-yellow-5"], [class*="bg-orange-5"], [class*="bg-green-9"], [class*="bg-emerald-9"], [class*="bg-red-9"], [class*="bg-amber-9"], [class*="bg-yellow-9"], [class*="bg-orange-9"]):is([class*="/10"], [class*="/15"], [class*="/20"], [class*="/30"]):not(:has(svg)):not(:empty)::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 20%, transparent);
+}
+
+html.alfie-light .a-light:not([class*="a-light-"]) { background: #CBD5E1; }
+html.alfie-light table tbody tr { border-color: rgba(15, 23, 42, 0.07) !important; }
+html.alfie-light table :is(thead, thead tr) { border-color: rgba(15, 23, 42, 0.08) !important; }

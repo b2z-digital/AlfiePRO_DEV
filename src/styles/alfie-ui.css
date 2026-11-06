@@ -200,3 +200,10 @@ html.alfie-light .a-txt-g { color: #167A3A; } html.alfie-light .a-txt-a { color:
 html.alfie-light .a-chk { background: #fff; box-shadow: inset 0 0 0 1.5px rgba(15, 23, 42, 0.25); }
 html.alfie-light .a-chk-on { background: #0A84FF; box-shadow: none; }
 html.alfie-light .a-sheet { background: #fff; border-color: rgba(15, 23, 42, 0.08); box-shadow: 0 30px 80px rgba(15, 23, 42, 0.18); }
+
+/* Summary chip (count + label + light) */
+.a-chip { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border-radius: 11px; background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.07); font-size: 13px; white-space: nowrap; color: #F1F4FA; }
+.a-chip b { font-size: 15px; font-weight: 600; }
+.a-chip-rim { border-color: transparent; background: linear-gradient(#0E1424, #0E1424) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-chip { background: #fff; border-color: rgba(15, 23, 42, 0.08); color: #0B1220; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+html.alfie-light .a-chip-rim { border-color: transparent; background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; }
