@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Download, ListFilter as Filter, TrendingUp, TrendingDown, DollarSign, FileText, ChartPie as PieChartIcon, ChartBar as BarChart3, ChartLine as LineChartIcon, ArrowUpRight, ArrowDownRight, Sparkles, Target, Wallet, CreditCard, MousePointerClick, Landmark } from 'lucide-react';
+import { Calendar, Download, TrendingUp, TrendingDown, DollarSign, ChartPie as PieChartIcon, ChartBar as BarChart3, ChartLine as LineChartIcon, ArrowUpRight, ArrowDownRight, Wallet, CreditCard, Landmark, Share2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend, Filler } from 'chart.js';
-import { Line, Doughnut, Bar } from 'react-chartjs-2';
+import { Line, Bar } from 'react-chartjs-2';
 import DetailedReportModal from './DetailedReportModal';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend, Filler);
@@ -692,379 +692,144 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
     };
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header with Tabs and Actions */}
-      <div className="flex items-center justify-between">
-        <div className={`flex border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-          <button
-            onClick={() => setActiveTab('cash-flow')}
-            className={`
-              px-4 py-3 text-sm font-medium transition-colors border-b-2
-              ${activeTab === 'cash-flow'
-                ? 'border-cyan-500 text-cyan-400'
-                : `border-transparent ${darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`}
-            `}
-          >
-            Financial Analytics
-          </button>
-          <button
-            onClick={() => setActiveTab('shared')}
-            className={`
-              px-4 py-3 text-sm font-medium transition-colors border-b-2
-              ${activeTab === 'shared'
-                ? 'border-cyan-500 text-cyan-400'
-                : `border-transparent ${darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`}
-            `}
-          >
-            Shared (0)
-          </button>
+  const RING = ['#40C8C0', '#8A4DFF', '#FF3E9A', '#FFB340', '#0A84FF'];
+  const ring = (rows: CategoryData[]) => {
+    const total = rows.reduce((s, r) => s + r.amount, 0) || 1;
+    let acc = 0;
+    return rows.map((r, i) => {
+      const from = (acc / total) * 360; acc += r.amount; const to = (acc / total) * 360;
+      return `${RING[i % RING.length]} ${from}deg ${to}deg`;
+    }).join(', ');
+  };
+  const Delta = ({ now, prev, goodWhenUp = true }: { now: number; prev: number; goodWhenUp?: boolean }) => {
+    const c = calculateChange(now, prev);
+    const good = goodWhenUp ? c.isPositive : !c.isPositive;
+    return (
+      <span className={`a-delta ${good ? 'a-delta-g' : 'a-delta-r'}`}>
+        {c.isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{c.percent.toFixed(1)}%
+      </span>
+    );
+  };
+  const Kpi = ({ icon, label, value, sub, delta, tone = 'a-ink', onClick }: { icon: React.ReactNode; label: string; value: string; sub: string; delta?: React.ReactNode; tone?: string; onClick?: () => void }) => {
+    const body = (
+      <>
+        <div className="flex items-center justify-between w-full"><span className="a-tile">{icon}</span>{delta}</div>
+        <div>
+          <p className="a-cap">{label}</p>
+          <div className={`a-big mt-2 ${tone}`} style={{ fontSize: 32 }}>{value}</div>
+          <div className="a-dim text-[12.5px] mt-[7px]">{sub}</div>
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-slate-700/50 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
-            title="Filter"
-          >
-            <Filter size={18} />
-          </button>
-          <button
-            onClick={exportToPDF}
-            className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white transition-all shadow-lg shadow-cyan-500/20"
-            title="Export PDF"
-          >
-            <Download size={18} />
-            <span className="hidden sm:inline">Export</span>
-          </button>
+      </>
+    );
+    return onClick
+      ? <button onClick={onClick} className="a-card a-hov flex flex-col gap-3.5 text-left w-full cursor-pointer" style={{ padding: 20 }} title="Open detailed report">{body}</button>
+      : <div className="a-card flex flex-col gap-3.5" style={{ padding: 20 }}>{body}</div>;
+  };
+  const Breakdown = ({ title, sub, rows, empty, label }: { title: string; sub: string; rows: CategoryData[]; empty: string; label: string }) => {
+    const total = rows.reduce((s, r) => s + r.amount, 0);
+    return (
+      <div className="a-card flex flex-col gap-4" style={{ padding: 22 }}>
+        <div className="flex items-center gap-3">
+          <span className="a-tile a-tile-sm"><PieChartIcon size={17} /></span>
+          <div className="flex-1 min-w-0"><h2 className="a-display a-ink m-0 text-lg font-semibold">{title}</h2><p className="a-dim mt-0.5 mb-0 text-[12.5px]">{sub}</p></div>
         </div>
-      </div>
-
-      {/* Filters Panel */}
-      {showFilters && (
-        <div className={`rounded-xl border p-4 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex-1 min-w-[200px]">
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Period</label>
-              <div className="relative">
-                <Calendar size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
-                <select
-                  value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value)}
-                  className={`w-full pl-10 pr-10 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all appearance-none ${darkMode ? 'bg-slate-700 text-slate-200 border-slate-600/50' : 'bg-white text-slate-900 border-slate-300'}`}
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1rem' }}
-                >
-                  <option value="this-year">This Financial Year (Jul-Jun)</option>
-                  <option value="last-year">Last Financial Year (Jul-Jun)</option>
-                  <option value="custom">Custom Range</option>
-                </select>
+        {rows.length === 0 ? (
+          <div className="a-mute text-sm py-12 text-center">{empty}</div>
+        ) : (
+          <div className="flex flex-col sm:flex-row items-center gap-7">
+            <div className="relative flex-shrink-0" style={{ width: 160, height: 160 }}>
+              <div className="a-ring a-ring-lg" style={{ background: `conic-gradient(${ring(rows)})` }} />
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="a-big a-ink" style={{ fontSize: 22 }}>{formatCurrency(total).replace(/\.00$/, '')}</span>
+                <span className="a-dim text-[11.5px] mt-[3px]">{label}</span>
               </div>
             </div>
-
-            <div className="flex-1 min-w-[200px]">
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Start Date</label>
-              <div className="relative">
-                <Calendar size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    setDateRange('custom');
-                  }}
-                  className={`w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${darkMode ? 'bg-slate-700 text-slate-200 border-slate-600/50' : 'bg-white text-slate-900 border-slate-300'}`}
-                  style={{ colorScheme: darkMode ? 'dark' : 'light' }}
-                />
-              </div>
-            </div>
-
-            <div className="flex-1 min-w-[200px]">
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>End Date</label>
-              <div className="relative">
-                <Calendar size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => {
-                    setEndDate(e.target.value);
-                    setDateRange('custom');
-                  }}
-                  className={`w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${darkMode ? 'bg-slate-700 text-slate-200 border-slate-600/50' : 'bg-white text-slate-900 border-slate-300'}`}
-                  style={{ colorScheme: darkMode ? 'dark' : 'light' }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Income Card */}
-        <button
-          onClick={() => openDetailedReport('income', 'Income Report')}
-          className="group relative overflow-hidden bg-emerald-500/[0.08] rounded-2xl border border-emerald-500/20 p-6 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/10 cursor-pointer text-left w-full hover:scale-105 backdrop-blur-sm"
-        >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-            <MousePointerClick size={20} className="text-emerald-400" />
-          </div>
-          <div className="relative">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-emerald-500/10 rounded-xl">
-                <TrendingUp className="text-emerald-400" size={24} />
-              </div>
-              {(() => {
-                const change = calculateChange(reportData.thisPeriod.income, reportData.previousPeriod.income);
-                return (
-                  <div className={`flex items-center gap-1 text-sm font-medium ${change.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {change.isPositive ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                    {change.percent.toFixed(1)}%
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="space-y-1">
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Income</p>
-              <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(reportData.thisPeriod.income)}</p>
-              <p className="text-xs text-slate-500">vs {formatCurrency(reportData.previousPeriod.income)} last period</p>
-              <p className="text-xs text-emerald-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Click for detailed report →</p>
-            </div>
-          </div>
-        </button>
-
-        {/* Total Expenses Card */}
-        <button
-          onClick={() => openDetailedReport('expenses', 'Expenses Report')}
-          className="group relative overflow-hidden bg-red-500/[0.08] rounded-2xl border border-red-500/20 p-6 hover:border-red-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer text-left w-full hover:scale-105 backdrop-blur-sm"
-        >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-            <MousePointerClick size={20} className="text-red-400" />
-          </div>
-          <div className="relative">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-red-500/10 rounded-xl">
-                <TrendingDown className="text-red-400" size={24} />
-              </div>
-              {(() => {
-                const change = calculateChange(reportData.thisPeriod.expenses, reportData.previousPeriod.expenses);
-                return (
-                  <div className={`flex items-center gap-1 text-sm font-medium ${!change.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {change.isPositive ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                    {change.percent.toFixed(1)}%
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="space-y-1">
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Expenses</p>
-              <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(reportData.thisPeriod.expenses)}</p>
-              <p className="text-xs text-slate-500">vs {formatCurrency(reportData.previousPeriod.expenses)} last period</p>
-              <p className="text-xs text-red-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Click for detailed report →</p>
-            </div>
-          </div>
-        </button>
-
-        {/* Net Cash Flow Card */}
-        <button
-          onClick={() => openDetailedReport('cash-flow', 'Cash Flow Report')}
-          className="group relative overflow-hidden bg-cyan-500/[0.08] rounded-2xl border border-cyan-500/20 p-6 hover:border-cyan-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer text-left w-full hover:scale-105 backdrop-blur-sm"
-        >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-            <MousePointerClick size={20} className="text-cyan-400" />
-          </div>
-          <div className="relative">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-cyan-500/10 rounded-xl">
-                <Wallet className="text-cyan-400" size={24} />
-              </div>
-              {(() => {
-                const change = calculateChange(reportData.thisPeriod.netCash, reportData.previousPeriod.netCash);
-                return (
-                  <div className={`flex items-center gap-1 text-sm font-medium ${change.isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {change.isPositive ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                    {change.percent.toFixed(1)}%
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="space-y-1">
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Net Cash Flow</p>
-              <p className={`text-3xl font-bold ${reportData.thisPeriod.netCash >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {formatCurrency(reportData.thisPeriod.netCash)}
-              </p>
-              <p className="text-xs text-slate-500">vs {formatCurrency(reportData.previousPeriod.netCash)} last period</p>
-              <p className="text-xs text-cyan-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Click for detailed report →</p>
-            </div>
-          </div>
-        </button>
-
-        {/* Bank Position Card */}
-        <div
-          className={`group relative overflow-hidden rounded-2xl border p-6 text-left w-full backdrop-blur-sm ${
-            bankPosition.currentBalance >= 0
-              ? 'bg-blue-500/[0.08] border-blue-500/20'
-              : 'bg-red-500/[0.08] border-red-500/20'
-          }`}
-        >
-          <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 ${
-            bankPosition.currentBalance >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'
-          }`}></div>
-          <div className="relative">
-            <div className="flex items-center justify-between mb-4">
-              <div className={`p-3 rounded-xl ${
-                bankPosition.currentBalance >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'
-              }`}>
-                <Landmark className={bankPosition.currentBalance >= 0 ? 'text-blue-400' : 'text-red-400'} size={24} />
-              </div>
-              {bankPosition.openingBalance > 0 && (
-                <div className={`flex items-center gap-1 text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <Sparkles size={16} />
+            <div className="flex-1 w-full a-divide">
+              {rows.map((r, i) => (
+                <div key={r.name} className="flex items-center gap-2.5 py-2.5">
+                  <span className="a-light" style={{ background: RING[i % RING.length], boxShadow: 'none' }} />
+                  <span className="flex-1 a-ink text-[13.5px] truncate">{r.name}</span>
+                  <span className="a-num a-ink text-sm font-semibold">{formatCurrency(r.amount)}</span>
+                  <span className="a-dim a-num text-right text-[12.5px]" style={{ width: 44 }}>{Math.round(r.percentage)}%</span>
                 </div>
-              )}
-            </div>
-            <div className="space-y-1">
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Bank Position</p>
-              <p className={`text-3xl font-bold ${bankPosition.currentBalance >= 0 ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-red-400'}`}>
-                {formatCurrency(bankPosition.currentBalance)}
-              </p>
-              {bankPosition.openingBalance > 0 ? (
-                <p className="text-xs text-slate-500">Opening bal: {formatCurrency(bankPosition.openingBalance)}</p>
-              ) : (
-                <p className="text-xs text-slate-500">No opening balance set</p>
-              )}
+              ))}
             </div>
           </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-[22px]">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="a-seg" role="tablist" aria-label="Reports">
+          <button role="tab" aria-selected={activeTab === 'cash-flow'} onClick={() => setActiveTab('cash-flow')} className={`a-seg-i ${activeTab === 'cash-flow' ? 'a-seg-on' : ''}`}><BarChart3 size={16} />Financial analytics</button>
+          <button role="tab" aria-selected={activeTab === 'shared'} onClick={() => setActiveTab('shared')} className={`a-seg-i ${activeTab === 'shared' ? 'a-seg-on' : ''}`}><Share2 size={16} />Shared<span className="a-cnt">0</span></button>
+        </div>
+        <div className="flex-1" />
+        <label className="relative inline-flex">
+          <span className="sr-only">Period</span>
+          <Calendar size={16} className="a-mute absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="a-pick" style={{ paddingLeft: 36 }}>
+            <option value="this-year">This financial year (Jul–Jun)</option>
+            <option value="last-year">Last financial year (Jul–Jun)</option>
+            <option value="custom">Custom range</option>
+          </select>
+        </label>
+        {dateRange === 'custom' && (
+          <>
+            <label><span className="sr-only">Start date</span><input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setDateRange('custom'); }} className="a-inp a-inp-date" style={{ height: 42, width: 160 }} /></label>
+            <label><span className="sr-only">End date</span><input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setDateRange('custom'); }} className="a-inp a-inp-date" style={{ height: 42, width: 160 }} /></label>
+          </>
+        )}
+        <button onClick={exportToPDF} className="a-btn a-btn-p" style={{ height: 42, borderRadius: 13 }}><Download size={16} />Export PDF</button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <Kpi icon={<TrendingUp size={19} />} label="Total income" value={formatCurrency(reportData.thisPeriod.income)} sub={`vs ${formatCurrency(reportData.previousPeriod.income)} last period`} delta={<Delta now={reportData.thisPeriod.income} prev={reportData.previousPeriod.income} />} onClick={() => openDetailedReport('income', 'Income Report')} />
+        <Kpi icon={<TrendingDown size={19} />} label="Total expenses" value={formatCurrency(reportData.thisPeriod.expenses)} sub={`vs ${formatCurrency(reportData.previousPeriod.expenses)} last period`} delta={<Delta now={reportData.thisPeriod.expenses} prev={reportData.previousPeriod.expenses} goodWhenUp={false} />} onClick={() => openDetailedReport('expenses', 'Expenses Report')} />
+        <Kpi icon={<Wallet size={19} />} label="Net cash flow" value={formatCurrency(reportData.thisPeriod.netCash)} tone={reportData.thisPeriod.netCash >= 0 ? 'a-txt-g' : 'a-txt-r'} sub={`vs ${formatCurrency(reportData.previousPeriod.netCash)} last period`} delta={<Delta now={reportData.thisPeriod.netCash} prev={reportData.previousPeriod.netCash} />} onClick={() => openDetailedReport('cash-flow', 'Cash Flow Report')} />
+        <Kpi icon={<Landmark size={19} />} label="Bank position" value={formatCurrency(bankPosition.currentBalance)} tone={bankPosition.currentBalance >= 0 ? 'a-ink' : 'a-txt-r'} sub={bankPosition.openingBalance > 0 ? `Opening balance ${formatCurrency(bankPosition.openingBalance)}` : 'No opening balance set'} />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="a-card flex flex-col gap-3" style={{ padding: 22 }}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="a-tile a-tile-sm"><LineChartIcon size={17} /></span>
+            <div className="flex-1 min-w-0"><h2 className="a-display a-ink m-0 text-lg font-semibold">Income vs expenses</h2><p className="a-dim mt-0.5 mb-0 text-[12.5px]">Monthly · {dateRange === 'last-year' ? 'last financial year' : dateRange === 'custom' ? 'custom range' : 'this financial year'}</p></div>
+            <span className="a-st text-[12.5px]"><span className="a-light" style={{ background: '#30D158', boxShadow: 'none' }} />Income</span>
+            <span className="a-st text-[12.5px] ml-3"><span className="a-light" style={{ background: '#FF6B6B', boxShadow: 'none' }} />Expenses</span>
+          </div>
+          <div className="h-[280px]"><Line data={trendChartData} options={chartOptions} /></div>
+        </div>
+        <div className="a-card flex flex-col gap-3" style={{ padding: 22 }}>
+          <div className="flex items-center gap-3">
+            <span className="a-tile a-tile-sm"><BarChart3 size={17} /></span>
+            <div className="flex-1 min-w-0"><h2 className="a-display a-ink m-0 text-lg font-semibold">Net cash flow</h2><p className="a-dim mt-0.5 mb-0 text-[12.5px]">Monthly net position</p></div>
+          </div>
+          <div className="h-[280px]"><Bar data={netCashChartData} options={chartOptions} /></div>
+        </div>
+        <Breakdown title="Income by category" sub="Top 5 sources" rows={categoryBreakdown.income} empty="No income data for this period" label="income" />
+        <Breakdown title="Expenses by category" sub="Top 5 categories" rows={categoryBreakdown.expenses} empty="No expense data for this period" label="expenses" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="a-card flex items-center gap-3.5" style={{ padding: '18px 20px' }}>
+          <span className="a-tile"><DollarSign size={19} /></span>
+          <div className="flex-1 min-w-0"><p className="a-cap">Average monthly burn</p><div className="a-dim text-[12.5px] mt-1">Average monthly expenses this period</div></div>
+          <div className="a-big a-txt-a" style={{ fontSize: 26 }}>{formatCurrency(burnRate)}</div>
+        </div>
+        <div className="a-card flex flex-col gap-2" style={{ padding: '18px 20px' }}>
+          <div className="flex items-center gap-3.5">
+            <span className="a-tile"><CreditCard size={19} /></span>
+            <div className="flex-1 min-w-0"><p className="a-cap">Year to date</p><div className="a-dim text-[12.5px] mt-1">FY {(() => { const t = new Date(); const s = t.getMonth() >= 6 ? t.getFullYear() : t.getFullYear() - 1; return `${s}/${s + 1}`; })()}</div></div>
+            <div className={`a-big ${reportData.yearToDate.netCash >= 0 ? 'a-txt-g' : 'a-txt-r'}`} style={{ fontSize: 26 }}>{formatCurrency(reportData.yearToDate.netCash)}</div>
+          </div>
+          <div className="a-dim text-xs text-right">{formatCurrency(reportData.yearToDate.income)} income − {formatCurrency(reportData.yearToDate.expenses)} expenses</div>
         </div>
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Income vs Expenses Trend */}
-        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className={`text-lg font-semibold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                <LineChartIcon size={20} className="text-cyan-400" />
-                Income vs Expenses Trend
-              </h3>
-              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Monthly comparison</p>
-            </div>
-          </div>
-          <div className="h-[300px]">
-            <Line data={trendChartData} options={chartOptions} />
-          </div>
-        </div>
-
-        {/* Net Cash Flow Chart */}
-        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className={`text-lg font-semibold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                <BarChart3 size={20} className="text-cyan-400" />
-                Net Cash Flow
-              </h3>
-              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Monthly net position</p>
-            </div>
-          </div>
-          <div className="h-[300px]">
-            <Bar data={netCashChartData} options={chartOptions} />
-          </div>
-        </div>
-
-        {/* Income Breakdown */}
-        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/40 border-slate-700/40' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className={`text-lg font-semibold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                <PieChartIcon size={20} className="text-emerald-400" />
-                Income by Category
-              </h3>
-              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Top 5 sources</p>
-            </div>
-          </div>
-          <div className="h-[300px]">
-            {categoryBreakdown.income.length > 0 ? (
-              <Doughnut data={incomePieData} options={pieOptions} />
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-sm">No income data for this period</div>
-            )}
-          </div>
-        </div>
-
-        {/* Expenses Breakdown */}
-        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/40 border-slate-700/40' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className={`text-lg font-semibold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                <PieChartIcon size={20} className="text-red-400" />
-                Expenses by Category
-              </h3>
-              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Top 5 categories</p>
-            </div>
-          </div>
-          <div className="h-[300px]">
-            {categoryBreakdown.expenses.length > 0 ? (
-              <Doughnut data={expensesPieData} options={pieOptions} />
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-sm">No expense data for this period</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Financial Health Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Cash Runway */}
-        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-amber-500/10 rounded-xl">
-              <DollarSign className="text-amber-400" size={24} />
-            </div>
-            <div>
-              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Average Monthly Burn</h3>
-              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Based on current period</p>
-            </div>
-          </div>
-          <div className="mt-4">
-            <p className="text-3xl font-bold text-amber-400">{formatCurrency(burnRate)}</p>
-            <p className="text-sm text-slate-500 mt-2">Average monthly expenses</p>
-          </div>
-        </div>
-
-        {/* Year to Date Summary */}
-        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-blue-500/10 rounded-xl">
-              <CreditCard className="text-blue-400" size={24} />
-            </div>
-            <div>
-              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Year to Date Summary</h3>
-              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>FY {(() => { const t = new Date(); const s = t.getMonth() >= 6 ? t.getFullYear() : t.getFullYear() - 1; return `${s}/${s + 1}`; })()}</p>
-            </div>
-          </div>
-          <div className="space-y-3 mt-4">
-            <div className="flex items-center justify-between">
-              <span className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Income</span>
-              <span className="font-semibold text-emerald-400">{formatCurrency(reportData.yearToDate.income)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Expenses</span>
-              <span className="font-semibold text-red-400">{formatCurrency(reportData.yearToDate.expenses)}</span>
-            </div>
-            <div className={`pt-3 border-t flex items-center justify-between ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
-              <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>Net Position</span>
-              <span className={`font-bold text-lg ${reportData.yearToDate.netCash >= 0 ? 'text-cyan-400' : 'text-red-400'}`}>
-                {formatCurrency(reportData.yearToDate.netCash)}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Detailed Report Modal */}
       {selectedReport && getReportData() && (
         <DetailedReportModal
           isOpen={true}
