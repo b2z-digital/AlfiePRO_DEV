@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader as Loader2, Trash2, ArrowLeft, Clock, Pencil, Circle as HelpCircle, Volume2, VolumeX, Share2, ImagePlus, Camera, Image as ImageIcon, X as XIcon, Mic, MicOff, TriangleAlert as AlertTriangle, Trophy, Scale } from 'lucide-react';
+import { Send, Loader as Loader2, Trash2, ArrowLeft, Clock, Pencil, ChevronRight, Circle as HelpCircle, Volume2, VolumeX, Share2, ImagePlus, Camera, Image as ImageIcon, X as XIcon, Mic, MicOff, TriangleAlert as AlertTriangle, Trophy, Scale } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useScoringContext } from '../../contexts/ScoringContext';
@@ -717,55 +717,37 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
 
   const containerClass = embedded
     ? 'w-full h-full flex flex-col'
-    : 'fixed bottom-24 right-6 z-[9989] w-[420px] max-h-[700px] flex flex-col rounded-2xl shadow-2xl border overflow-hidden';
+    : 'a-aa fixed bottom-24 right-6 z-[9989] w-[440px] max-w-[calc(100vw-32px)] max-h-[min(820px,calc(100vh-120px))] flex flex-col overflow-hidden';
 
   // Welcome screen
   if (viewMode === 'welcome' && messages.length === 0) {
     return (
-      <div className={`${containerClass} bg-[#0b1120] ${!embedded ? 'border-slate-700/50' : ''}`}>
+      <div className={`${containerClass} ${embedded ? 'bg-[#0b1120]' : ''}`}>
         {isListening && <ListeningOverlay />}
         {/* Header bar */}
         {!embedded && (
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/30">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center">
-                <AlfieLogo size={16} />
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-white">Ask Alfie</span>
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[10px] text-slate-500">Online</span>
-                </div>
-              </div>
+          <div className="a-aa-hd">
+            <span className="a-aa-logo"><AlfieLogo size={18} /></span>
+            <div className="flex-1 min-w-0">
+              <p className="a-display a-ink m-0 text-[16px] font-semibold">Ask Alfie</p>
+              <p className="a-dim m-0 mt-0.5 flex items-center gap-[7px] text-[12px]"><span className="a-light a-light-g" />Online</p>
             </div>
             {hasHistory && (
-              <button
-                onClick={handleViewHistory}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-slate-800 transition-colors"
-                title="View history"
-              >
-                <Clock size={14} />
-              </button>
+              <button onClick={handleViewHistory} className="a-ib" title="Chat history" aria-label="Chat history"><Clock size={17} /></button>
             )}
           </div>
         )}
 
         {/* Welcome content */}
-        <div className="flex-1 overflow-y-auto flex flex-col items-center px-6 pt-8 pb-6">
-          <div className="mb-3">
+        <div className="flex-1 overflow-y-auto flex flex-col items-center" style={{ padding: '28px 20px 8px' }}>
+          <div className="a-aa-orb mb-3.5">
             <MiniOrb size={80} />
           </div>
 
-          <div className="flex items-center gap-1.5 mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="text-xs text-slate-400">Ask Alfie</span>
-          </div>
-
-          <h2 className="text-2xl font-bold text-white mb-2">
+          <h2 className="a-display a-ink m-0 text-[30px] font-semibold">
             Hi {userName || 'there'},
           </h2>
-          <p className="text-sm text-slate-400 text-center mb-4 leading-relaxed">
+          <p className="a-mute text-center mt-2 mb-5 text-[15px] leading-[1.5]" style={{ maxWidth: 320 }}>
             {scoringSnapshot?.isActive
               ? <>I can see your live scoring session.<br />Ask me about results, handicaps, or rules</>
               : <>I'm your sailing assistant for racing rules,<br />rig tuning, app help, and more</>
@@ -787,15 +769,13 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
 
           {/* Action tiles — contextual to scoring mode */}
           {scoringSnapshot?.isActive ? (
-            <div className="grid grid-cols-3 gap-3 w-full mb-6">
+            <div className="grid grid-cols-3 gap-2.5 w-full mb-[22px]">
               <button
                 onClick={() => { setDrawingCourseMode(false); setViewMode('drawing'); }}
-                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-amber-600/40 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/60 transition-all group"
+                className="a-aa-tool group"
               >
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
-                </div>
-                <span className="text-xs font-medium text-white text-center leading-tight">
+                <span className="a-tile a-aa-tt"><AlertTriangle size={19} /></span>
+                <span className="a-ink text-[13px] font-semibold text-center leading-tight">
                   Draw<br />Protest
                 </span>
               </button>
@@ -804,12 +784,10 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                   setViewMode('chat');
                   setTimeout(() => sendMessage('Explain the current standings and any close battles'), 50);
                 }}
-                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+                className="a-aa-tool group"
               >
-                <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
-                  <Trophy className="w-5 h-5 text-cyan-400" />
-                </div>
-                <span className="text-xs font-medium text-white text-center leading-tight">
+                <span className="a-tile a-aa-tt"><Trophy size={19} /></span>
+                <span className="a-ink text-[13px] font-semibold text-center leading-tight">
                   Explain<br />Standings
                 </span>
               </button>
@@ -818,37 +796,31 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                   setViewMode('chat');
                   setTimeout(() => sendMessage('Are there any tie-breaks in the current results? Show me the details.'), 50);
                 }}
-                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+                className="a-aa-tool group"
               >
-                <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
-                  <Scale className="w-5 h-5 text-cyan-400" />
-                </div>
-                <span className="text-xs font-medium text-white text-center leading-tight">
+                <span className="a-tile a-aa-tt"><Scale size={19} /></span>
+                <span className="a-ink text-[13px] font-semibold text-center leading-tight">
                   Check<br />Tie-breaks
                 </span>
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-3 w-full mb-6">
+            <div className="grid grid-cols-3 gap-2.5 w-full mb-[22px]">
               <button
                 onClick={() => handleQuickAction('draw')}
-                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+                className="a-aa-tool group"
               >
-                <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
-                  <Pencil className="w-5 h-5 text-cyan-400" />
-                </div>
-                <span className="text-xs font-medium text-white text-center leading-tight">
+                <span className="a-tile a-aa-tt"><Pencil size={19} /></span>
+                <span className="a-ink text-[13px] font-semibold text-center leading-tight">
                   Draw<br />Scenario
                 </span>
               </button>
               <button
                 onClick={() => { setDrawingCourseMode(true); setViewMode('drawing'); }}
-                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+                className="a-aa-tool group"
               >
-                <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
-                  <ImagePlus className="w-5 h-5 text-cyan-400" />
-                </div>
-                <span className="text-xs font-medium text-white text-center leading-tight">
+                <span className="a-tile a-aa-tt"><ImagePlus size={19} /></span>
+                <span className="a-ink text-[13px] font-semibold text-center leading-tight">
                   Draw<br />Course
                 </span>
               </button>
@@ -859,12 +831,10 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                     sendMessage('What are the key racing rules I should know about?');
                   }, 100);
                 }}
-                className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/30 hover:bg-slate-800/60 hover:border-cyan-600/40 transition-all group"
+                className="a-aa-tool group"
               >
-                <div className="w-10 h-10 rounded-xl bg-slate-700/50 flex items-center justify-center group-hover:bg-cyan-500/15 transition-colors">
-                  <HelpCircle className="w-5 h-5 text-cyan-400" />
-                </div>
-                <span className="text-xs font-medium text-white text-center leading-tight">
+                <span className="a-tile a-aa-tt"><HelpCircle size={19} /></span>
+                <span className="a-ink text-[13px] font-semibold text-center leading-tight">
                   Racing<br />Rules
                 </span>
               </button>
@@ -872,7 +842,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
           )}
 
           {/* Quick questions */}
-          <div className="w-full space-y-2">
+          <p className="a-cap self-start mb-2 ml-1">Try asking</p>
+          <div className="a-aa-sugs w-full">
             {activeQuestions.slice(0, 4).map((q, i) => (
               <button
                 key={i}
@@ -880,9 +851,10 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                   setViewMode('chat');
                   setTimeout(() => sendMessage(q), 50);
                 }}
-                className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs text-slate-300 hover:text-cyan-400 transition-colors border border-slate-700/40 bg-slate-800/20 hover:bg-slate-800/50 hover:border-cyan-600/30"
+                className="a-aa-sug"
               >
-                {q}
+                <span className="flex-1">{q}</span>
+                <ChevronRight size={16} className="a-dim flex-shrink-0" />
               </button>
             ))}
           </div>
@@ -893,23 +865,18 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
           <div className="px-4 pb-2">
             <button
               onClick={handleViewHistory}
-              className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-slate-500 hover:text-cyan-400 transition-colors"
+              className="a-dim w-full flex items-center justify-center gap-1.5 py-2 text-[12.5px] hover:text-white transition-colors"
             >
-              <Clock size={12} />
+              <Clock size={13} />
               View conversation history
             </button>
           </div>
         )}
 
         {/* Input bar */}
-        <div className="px-3 pt-2 pb-3 border-t border-slate-700/30">
-          <div
-            className="rounded-xl p-[1.5px]"
-            style={{
-              background: 'linear-gradient(135deg, rgba(56,189,248,0.35), rgba(14,165,233,0.2), rgba(6,182,212,0.35), rgba(56,189,248,0.2))',
-            }}
-          >
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-[10px] bg-slate-800/90">
+        <div>
+          <div>
+            <div className="a-aa-comp">
               <input
                 type="text"
                 value={input}
@@ -924,20 +891,17 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                   }
                 }}
                 onFocus={startChatFromWelcome}
-                placeholder={isListening ? 'Listening...' : 'Tap here to chat with Alfie'}
-                className="flex-1 bg-transparent text-sm outline-none text-white placeholder-slate-500"
+                placeholder={isListening ? 'Listening…' : 'Ask Alfie…'}
+                aria-label="Message Alfie"
+                className="a-aa-input"
               />
               {hasSpeechRecognition && (
                 <button
                   onClick={isListening ? stopListening : startListening}
-                  className={`p-1.5 rounded-lg transition-all ${
-                    isListening
-                      ? 'bg-red-500/20 text-red-400 animate-pulse'
-                      : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-700/50'
-                  }`}
+                  className={`a-ib ${isListening ? 'a-txt-r animate-pulse' : ''}`}
                   title={isListening ? 'Stop listening' : 'Voice input'}
                 >
-                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                  {isListening ? <MicOff size={18} /> : <Mic size={18} />}
                 </button>
               )}
               <button
@@ -949,13 +913,9 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                   }
                 }}
                 disabled={!input.trim()}
-                className={`p-1.5 rounded-lg transition-all ${
-                  input.trim()
-                    ? 'bg-cyan-500 text-white hover:bg-cyan-600 shadow-sm'
-                    : 'text-slate-500 cursor-not-allowed'
-                }`}
+                className={`a-aa-send ${!input.trim() ? 'opacity-50 cursor-not-allowed' : ''}`} aria-label="Send"
               >
-                <Send size={16} />
+                <Send size={17} />
               </button>
             </div>
           </div>
@@ -966,71 +926,52 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
 
   // Chat view
   return (
-    <div className={`${containerClass} ${!embedded ? 'bg-[#0b1120] border-slate-700/50' : ''}`}>
+    <div className={`${containerClass}`}>
       {isListening && <ListeningOverlay />}
       {/* Chat header */}
       {!embedded && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/30 bg-[#0b1120]">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                if (messages.length === 0) {
-                  setViewMode('welcome');
-                } else {
-                  onClose();
-                }
-              }}
-              className="p-1 text-slate-400 hover:text-white transition-colors"
-            >
-              <ArrowLeft size={18} />
-            </button>
-            <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">
-              <AlfieLogo size={16} />
-            </div>
-            <div>
-              <span className="text-sm font-semibold text-white">Ask Alfie</span>
-              <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[10px] text-slate-500">Ask Alfie</span>
-              </div>
-            </div>
+        <div className="a-aa-hd">
+          <button
+            onClick={() => {
+              if (messages.length === 0) {
+                setViewMode('welcome');
+              } else {
+                onClose();
+              }
+            }}
+            className="a-ib"
+            style={{ marginLeft: -6 }}
+            aria-label="Back"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <span className="a-aa-logo"><AlfieLogo size={18} /></span>
+          <div className="flex-1 min-w-0">
+            <p className="a-display a-ink m-0 text-[16px] font-semibold">Ask Alfie</p>
+            <p className="a-dim m-0 mt-0.5 flex items-center gap-[7px] text-[12px]"><span className="a-light a-light-g" />Online</p>
           </div>
-          <div className="flex items-center gap-1">
-            {messages.length > 0 && (
-              <button
-                onClick={clearConversation}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors"
-                title="Clear conversation"
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
-            <button
-              onClick={handleViewHistory}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-slate-800 transition-colors"
-              title="History"
-            >
-              <Clock size={14} />
-            </button>
-          </div>
+          <button onClick={handleViewHistory} className="a-ib" title="Chat history" aria-label="Chat history"><Clock size={17} /></button>
+          {messages.length > 0 && (
+            <button onClick={clearConversation} className="a-ib a-ib-d" title="Clear conversation" aria-label="Delete chat"><Trash2 size={17} /></button>
+          )}
         </div>
       )}
 
       {/* Messages */}
       <div
         ref={messagesContainerRef}
-        className={`flex-1 overflow-y-auto p-4 space-y-4 ${embedded && darkMode ? 'bg-slate-800/50' : embedded ? '' : 'bg-[#0b1120]'}`}
-        style={!embedded ? { maxHeight: '520px' } : undefined}
+        className={`flex-1 overflow-y-auto flex flex-col gap-[18px] ${embedded && darkMode ? 'bg-slate-800/50' : ''}`}
+        style={{ padding: '22px 18px 8px', ...(!embedded ? { maxHeight: '620px' } : {}) }}
       >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center pt-4">
             <div className="mb-3">
               <MiniOrb size={44} />
             </div>
-            <p className="text-sm font-medium mb-1 text-white">
+            <p className="a-ink text-[15px] font-semibold mb-1">
               {userName ? `Hi ${userName}!` : 'Hi there!'}
             </p>
-            <p className="text-xs text-center mb-3 text-slate-400">
+            <p className="a-mute text-[13.5px] text-center mb-4">
               {scoringSnapshot?.isActive
                 ? 'I can see your live scoring session. Ask me about results, handicaps, or rules.'
                 : 'I\'m Alfie. Ask me anything about racing rules or using AlfiePRO.'}
@@ -1047,14 +988,14 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                 </span>
               </div>
             )}
-            <div className="w-full space-y-2">
+            <div className="a-aa-sugs w-full">
               {activeQuestions.map((q, i) => (
                 <button
                   key={i}
                   onClick={() => sendMessage(q)}
-                  className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs transition-colors border border-slate-700/40 bg-slate-800/20 text-slate-300 hover:bg-slate-800/50 hover:text-cyan-400 hover:border-cyan-600/30"
+                  className="a-aa-sug"
                 >
-                  {q}
+                  <span className="flex-1">{q}</span>
                 </button>
               ))}
             </div>
@@ -1072,7 +1013,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {msg.role === 'assistant' && (
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center mr-2 mt-1 flex-shrink-0 bg-slate-800 border border-slate-700/50">
+                  <div className="a-aa-logo a-aa-logo-sm mr-2.5 flex-shrink-0">
                     <AlfieLogo size={14} />
                   </div>
                 )}
@@ -1091,42 +1032,34 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                     </div>
                   )}
                   <div
-                    className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                      msg.role === 'user'
-                        ? 'bg-cyan-600 text-white rounded-br-md'
-                        : 'bg-slate-800/80 text-slate-200 border border-slate-700/50 rounded-bl-md'
-                    }`}
+                    className={msg.role === 'user' ? 'a-aa-bout' : 'a-aa-bin'}
                   >
                     {formatMessageContent(msg.content)}
                   </div>
                   {msg.role === 'assistant' && isLastAssistant && !isLoading && (
-                    <div className="flex items-center gap-3 mt-1.5 ml-1">
+                    <div className="flex items-center gap-0.5 mt-1.5">
                       {hasSpeechSynthesis && (
                         <button
                           onClick={() => speakText(msg.content, msg.id)}
-                          className={`flex items-center gap-1 text-[10px] transition-colors ${
-                            speakingMessageId === msg.id && isSpeaking
-                              ? 'text-cyan-400'
-                              : 'text-slate-500 hover:text-cyan-400'
-                          }`}
+                          className={`a-aa-act ${speakingMessageId === msg.id && isSpeaking ? 'a-txt-b' : ''}`}
                         >
                           {speakingMessageId === msg.id && isSpeaking ? (
-                            <><VolumeX size={11} /> Stop</>
+                            <><VolumeX size={14} />Stop</>
                           ) : (
-                            <><Volume2 size={11} /> Listen</>
+                            <><Volume2 size={14} />Listen</>
                           )}
                         </button>
                       )}
-                      <button className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-cyan-400 transition-colors">
-                        <Share2 size={11} />
+                      <button className="a-aa-act">
+                        <Share2 size={14} />
                         Share
                       </button>
                       {onFileProtest && messages.length >= 2 && (
                         <button
                           onClick={handleFileAsProtest}
-                          className="flex items-center gap-1 text-[10px] text-amber-500 hover:text-amber-400 transition-colors font-medium"
+                          className="a-aa-act a-txt-a"
                         >
-                          <AlertTriangle size={11} />
+                          <AlertTriangle size={14} />
                           File as Protest
                         </button>
                       )}
@@ -1151,16 +1084,12 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
 
         {isLoading && (
           <div className="flex items-start gap-2">
-            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-slate-800 border border-slate-700/50">
+            <div className="a-aa-logo a-aa-logo-sm flex-shrink-0">
               <AlfieLogo size={14} />
             </div>
-            <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-md border bg-slate-800/80 border-slate-700/50">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-            </div>
+            <span className="a-mute flex items-center gap-2 text-[14px] mt-1.5">
+              <span className="a-aa-dots"><i /><i /><i /></span>Alfie is thinking…
+            </span>
           </div>
         )}
       </div>
@@ -1168,7 +1097,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
       {/* Drawing/Photo attachment preview */}
       {attachedDrawing && (
         <div className="px-3 pt-2">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-xl border border-slate-700/50 bg-slate-800/60">
+          <div className="a-grp flex items-center gap-3" style={{ padding: '8px 12px' }}>
             <div
               className="w-10 h-10 rounded-lg overflow-hidden bg-[#0f1729] cursor-pointer flex-shrink-0"
               onClick={() => setPreviewImage(attachedDrawing)}
@@ -1208,59 +1137,53 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
       />
 
       {/* Input area */}
-      <div className="px-3 pt-2 pb-3 border-t border-slate-700/30 bg-[#0b1120]">
+      <div>
         {showHistory && messages.length > 0 && (
           <button
             onClick={() => { setMessages([]); setShowHistory(false); setViewMode('welcome'); }}
-            className="w-full flex items-center justify-center gap-1.5 py-1.5 mb-2 text-xs text-slate-500 hover:text-cyan-400 transition-colors"
+            className="a-dim w-full flex items-center justify-center gap-1.5 pt-2 text-[12.5px] hover:text-white transition-colors"
           >
             <ArrowLeft size={12} />
             Start new conversation
           </button>
         )}
-        <div className="flex items-center gap-2">
+        <div className="a-aa-comp">
           <button
             onClick={() => { setDrawingCourseMode(false); setViewMode('drawing'); }}
-            className="p-2 rounded-xl text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors border border-slate-700/40"
+            className="a-ib"
             title="Draw scenario"
+            aria-label="Draw"
           >
             <Pencil size={18} />
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 rounded-xl text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors border border-slate-700/40"
+            className="a-ib"
             title="Upload photo"
+            aria-label="Camera"
           >
             <Camera size={18} />
           </button>
-          <div
-            className="flex-1 rounded-xl p-[1.5px]"
-            style={{
-              background: 'linear-gradient(135deg, rgba(56,189,248,0.35), rgba(14,165,233,0.2), rgba(6,182,212,0.35), rgba(56,189,248,0.2))',
-            }}
-          >
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-[10px] bg-slate-800/90">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1">
               <input
                 ref={inputRef}
                 type="text"
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isListening ? 'Listening...' : 'Ask Alfie...'}
+                placeholder={isListening ? 'Listening…' : 'Ask Alfie…'}
+                aria-label="Message Alfie"
                 disabled={isLoading}
-                className="flex-1 bg-transparent text-sm outline-none text-white placeholder-slate-500"
+                className="a-aa-input"
               />
               {hasSpeechRecognition && !isLoading && (
                 <button
                   onClick={isListening ? stopListening : startListening}
-                  className={`p-1.5 rounded-lg transition-all ${
-                    isListening
-                      ? 'bg-red-500/20 text-red-400 animate-pulse'
-                      : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-700/50'
-                  }`}
+                  className={`a-ib ${isListening ? 'a-txt-r animate-pulse' : ''}`}
                   title={isListening ? 'Stop listening' : 'Voice input'}
                 >
-                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                  {isListening ? <MicOff size={18} /> : <Mic size={18} />}
                 </button>
               )}
               <button
@@ -1269,16 +1192,12 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                   sendMessage();
                 }}
                 disabled={!input.trim() || isLoading}
-                className={`p-1.5 rounded-lg transition-all ${
-                  input.trim() && !isLoading
-                    ? 'bg-cyan-500 text-white hover:bg-cyan-600 shadow-sm'
-                    : 'text-slate-500 cursor-not-allowed'
-                }`}
+                className={`a-aa-send ${!(input.trim() && !isLoading) ? 'opacity-50 cursor-not-allowed' : ''}`} aria-label="Send"
               >
                 {isLoading ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  <Send size={16} />
+                  <Send size={17} />
                 )}
               </button>
             </div>
