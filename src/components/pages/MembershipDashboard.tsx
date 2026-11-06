@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { MembersPage } from './MembersPage';
+import { MembershipOverviewBoard } from '../membership/MembershipOverviewBoard';
 import { ModernApplicationsManager } from '../membership/ModernApplicationsManager';
 import { ExpiringMembershipsPanel } from '../membership/ExpiringMembershipsPanel';
 import { ClubRemittanceDashboard } from '../membership/ClubRemittanceDashboard';
@@ -70,6 +71,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
   const [memberActivity, setMemberActivity] = useState<{singleEvents: number, seriesEvents: number}>({ singleEvents: 0, seriesEvents: 0 });
   const [retentionData, setRetentionData] = useState<{[key: string]: number}>({});
   const [timeRange, setTimeRange] = useState<'month' | 'quarter' | 'year'>('year');
+  const [memberJoinDates, setMemberJoinDates] = useState<string[]>([]);
   const [codeOfConduct, setCodeOfConduct] = useState('');
   const [success, setSuccess] = useState<string | null>(null);
   const [bankDetails, setBankDetails] = useState({
@@ -124,7 +126,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
       // Fetch basic stats
       const { data: membersData, error: membersError } = await supabase
         .from('members')
-        .select('id, is_financial, renewal_date, created_at, membership_level')
+        .select('id, is_financial, renewal_date, created_at, date_joined, membership_level')
         .eq('club_id', currentClub?.clubId)
         .or('membership_status.eq.active,membership_status.is.null');
 
@@ -140,6 +142,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(now.getDate() - 30);
 
+      setMemberJoinDates((membersData || []).map((m: any) => m.date_joined || m.created_at).filter(Boolean));
       const totalMembers = membersData?.length || 0;
       const activeMembers = membersData?.filter(m => m.is_financial).length || 0;
 
@@ -739,173 +742,16 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
   };
 
   const renderDashboard = () => (
-    <div className="space-y-8">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-blue-600/20 flex items-center justify-center">
-              <Users className="text-blue-400" size={24} />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-white">{stats.totalMembers}</div>
-              <div className="text-sm text-slate-400">Total Members</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-green-600/20 flex items-center justify-center">
-              <UserCheck className="text-green-400" size={24} />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-white">{stats.activeMembers}</div>
-              <div className="text-sm text-slate-400">Active Members</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-amber-600/20 flex items-center justify-center">
-              <Calendar className="text-amber-400" size={24} />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-white">{stats.pendingRenewals}</div>
-              <div className="text-sm text-slate-400">Pending Renewals</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-purple-600/20 flex items-center justify-center">
-              <Users className="text-purple-400" size={24} />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-white">{stats.newMembersThisMonth}</div>
-              <div className="text-sm text-slate-400">New This Month</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Time Range Selector */}
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-white">Membership Trends</h3>
-        <div className="flex rounded-lg overflow-hidden border border-slate-700">
-          <button
-            onClick={() => setTimeRange('month')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              timeRange === 'month' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            Month
-          </button>
-          <button
-            onClick={() => setTimeRange('quarter')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              timeRange === 'quarter' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            Quarter
-          </button>
-          <button
-            onClick={() => setTimeRange('year')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              timeRange === 'year' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            Year
-          </button>
-        </div>
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Membership Types */}
-        <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <PieChart className="text-blue-400" size={20} />
-              <h3 className="text-lg font-medium text-white">Membership Types</h3>
-            </div>
-          </div>
-          <div className="h-64">
-            <Doughnut data={membershipCategoryChartData} options={chartOptions} />
-          </div>
-        </div>
-
-        {/* Members by Class */}
-        <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <BarChart2 className="text-green-400" size={20} />
-              <h3 className="text-lg font-medium text-white">Members by Class</h3>
-            </div>
-          </div>
-          <div className="h-64">
-            <Bar data={boatClassChartData} options={boatClassChartOptions} />
-          </div>
-        </div>
-
-        {/* Member Activity */}
-        <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Activity className="text-amber-400" size={20} />
-              <h3 className="text-lg font-medium text-white">Event Participation</h3>
-            </div>
-          </div>
-          <div className="h-64">
-            <Bar data={{
-              labels: ['Single Events', 'Pointscore Series'],
-              datasets: [{
-                label: 'Event Count',
-                data: [memberActivity.singleEvents, memberActivity.seriesEvents],
-                backgroundColor: [colors.blue, colors.orange],
-                borderRadius: 6
-              }]
-            }} options={{
-              ...barChartOptions,
-              plugins: {
-                ...barChartOptions.plugins,
-                legend: {
-                  display: false
-                }
-              }
-            }} />
-          </div>
-        </div>
-
-        {/* Member Retention */}
-        <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <UserCheck className="text-purple-400" size={20} />
-              <h3 className="text-lg font-medium text-white">Member Retention</h3>
-            </div>
-          </div>
-          <div className="h-64">
-            <Doughnut data={{
-              labels: Object.keys(retentionData),
-              datasets: [{
-                data: Object.values(retentionData),
-                backgroundColor: [colors.green, colors.red],
-                borderWidth: 0
-              }]
-            }} options={chartOptions} />
-          </div>
-        </div>
-      </div>
-    </div>
+    <MembershipOverviewBoard
+      stats={stats}
+      membersByCategory={membersByCategory}
+      membersByClass={membersByClass}
+      memberActivity={memberActivity}
+      retentionData={retentionData}
+      joinDates={memberJoinDates}
+      timeRange={timeRange}
+      onTimeRangeChange={setTimeRange}
+    />
   );
 
   const renderApplications = () => (
