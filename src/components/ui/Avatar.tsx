@@ -64,6 +64,7 @@ export const Avatar: React.FC<AvatarProps> = ({
           src={avatarImage}
           alt={displayName}
           className="w-full h-full object-cover"
+          referrerPolicy="no-referrer"
           onError={() => setImgFailed(true)}
         />
       ) : (

@@ -28,7 +28,7 @@ export const AAvatar: React.FC<{
   };
   return (
     <span className={`a-av ${className}`} style={style} aria-hidden="true">
-      {url ? <img src={url} alt="" /> : initialsOf(first, last)}
+      {url ? <img src={url} alt={`${first || ''} ${last || ''}`.trim()} referrerPolicy="no-referrer" /> : initialsOf(first, last)}
     </span>
   );
 };
