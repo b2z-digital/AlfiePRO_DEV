@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard as Edit2, Trash2, CalendarPlus, User, Flag, Users, Paperclip, MessageCircle, Building2, TriangleAlert as AlertTriangle } from 'lucide-react';
+import { SquarePen as Edit2, Trash2, CalendarPlus, User, Flag, Users, Paperclip, MessageCircle, Building2, TriangleAlert as AlertTriangle, Check } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { Task as TaskType } from '../../types/task';
 import { exportTaskToCalendar } from '../../utils/calendarExport';
@@ -174,252 +174,134 @@ export const TaskListItem: React.FC<TaskListItemProps> = ({
   const dateParts = task.due_date ? getDateParts(task.due_date) : null;
   const dueLabel = getDueLabel();
 
-  return (
-    <div className={`
-      group relative rounded-xl transition-all cursor-pointer overflow-hidden
-      ${darkMode
-        ? 'bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800 hover:shadow-lg hover:shadow-black/20'
-        : 'bg-white border border-slate-200/80 hover:border-slate-300/80 shadow-sm hover:shadow-lg'}
-      ${isCompleted ? 'opacity-60' : ''}
-      ${isOverdue ? darkMode ? 'border-red-500/40' : 'border-red-300/60' : ''}
-    `}>
+  const dbTone = isCompleted ? 'done' : daysUntilDue !== null && daysUntilDue < 0 ? 'late' : daysUntilDue !== null && daysUntilDue <= 3 && daysUntilDue >= 0 ? 'soon' : 'up';
+  const priorityTone: Record<string, string> = { urgent: '#FF6B6B', high: '#FF8A2B', medium: '#FFB340', low: '#30D158' };
 
-      <div className="relative flex">
-        {/* Date Callout */}
-        <div
-          className={`
-            flex-shrink-0 w-20 flex flex-col items-center justify-center border-r py-4
-            ${getDateCalloutStyle()}
-          `}
-          onClick={() => onClick(task)}
-        >
-          {dateParts ? (
-            <>
-              <span className={`text-[10px] font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'} ${isOverdue ? (darkMode ? 'text-red-400/70' : 'text-red-500/70') : ''}`}>
-                {dateParts.month}
-              </span>
-              <span className={`text-2xl font-bold leading-none mt-0.5 ${getDateTextColor()}`}>
-                {dateParts.day}
-              </span>
-              <span className={`text-[10px] font-medium mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'} ${isOverdue ? (darkMode ? 'text-red-400/70' : 'text-red-500/70') : ''}`}>
-                {dateParts.weekday}
-              </span>
-              {dueLabel && (
-                <span className={`
-                  text-[9px] font-bold mt-1.5 px-1.5 py-0.5 rounded-full uppercase tracking-wide
-                  ${isOverdue
-                    ? darkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600'
-                    : daysUntilDue !== null && daysUntilDue <= 3
-                      ? darkMode ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600'
-                      : darkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600'}
-                `}>
-                  {dueLabel}
-                </span>
-              )}
-            </>
-          ) : (
-            <span className={`text-xs font-medium ${darkMode ? 'text-slate-600' : 'text-slate-300'}`}>
-              No date
+  return (
+    <div
+      className={`a-tk group ${isCompleted ? 'a-tk-done' : ''}`}
+      onClick={() => onClick(task)}
+    >
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={isCompleted}
+        aria-label={isCompleted ? 'Reopen task' : 'Mark complete'}
+        title={isCompleted ? 'Reopen task' : 'Mark complete'}
+        className={`a-done-c ${isCompleted ? 'a-done-on' : ''}`}
+        onClick={(e) => { e.stopPropagation(); onToggleComplete(task.id, !isCompleted); }}
+      >
+        {isCompleted && <Check size={13} strokeWidth={3} />}
+      </button>
+
+      {/* Date Callout */}
+      <div className={`a-db a-db-${dbTone}`}>
+        {dateParts ? (
+          <>
+            <div className="a-db-m">{dateParts.month}</div>
+            <div className="a-db-d a-num">{dateParts.day}</div>
+            <div className="a-db-w">{dateParts.weekday}</div>
+          </>
+        ) : (
+          <div className="a-db-w" style={{ padding: '12px 0' }}>No date</div>
+        )}
+      </div>
+
+      {/* Task Content */}
+      <div className="flex-1 min-w-0 flex flex-col gap-1.5 pt-0.5">
+        <div className={`a-tk-title ${isCompleted ? 'a-tk-strike' : ''}`}>
+          {task.title}
+        </div>
+        {task.description && (
+          <div className="a-mute text-[13.5px] truncate">
+            {task.description}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-3 mt-1">
+          {organizationName && (
+            <span className="a-org"><Building2 size={12} />{organizationName}</span>
+          )}
+          {task.assignee ? (
+            <span className="flex items-center gap-1.5">
+              <Avatar
+                firstName={task.assignee.first_name}
+                lastName={task.assignee.last_name}
+                imageUrl={task.assignee.avatar_url}
+                size="xs"
+              />
+              {(() => {
+                const assigneeUserId = (task as any).assignee?.user_id;
+                const filteredFollowers = assigneeUserId ? followerProfiles.filter(f => f.id !== assigneeUserId) : followerProfiles;
+                if (filteredFollowers.length === 0) return null;
+                return (
+                  <span className="flex -space-x-1.5">
+                    {filteredFollowers.slice(0, 3).map((follower) => (
+                      <Avatar
+                        key={follower.id}
+                        firstName={follower.first_name}
+                        lastName={follower.last_name}
+                        imageUrl={follower.avatar_url}
+                        size="xs"
+                      />
+                    ))}
+                    {filteredFollowers.length > 3 && (
+                      <span className="a-cnt">+{filteredFollowers.length - 3}</span>
+                    )}
+                  </span>
+                );
+              })()}
             </span>
+          ) : (
+            <span className="a-meta" title="Unassigned"><User size={13} /><span className="a-dim">Unassigned</span></span>
+          )}
+          <span className="a-meta" style={{ color: priorityTone[task.priority] }}>
+            <Flag size={13} />{priorityLabels[task.priority]}
+          </span>
+          {(task.attachment_count ?? 0) > 0 && (
+            <span className="a-meta"><Paperclip size={13} />{task.attachment_count}</span>
+          )}
+          {(task.comment_count ?? 0) > 0 && (
+            <span className="a-meta"><MessageCircle size={13} />{task.comment_count}</span>
           )}
         </div>
+      </div>
 
-        {/* Task Content */}
-        <div className="flex-1 min-w-0 p-4">
-          <div
-            className="cursor-pointer"
-            onClick={() => onClick(task)}
+      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+        {dueLabel && !isCompleted && (
+          <span className={`a-due a-due-${dbTone}`}>
+            <span className={`a-light ${dbTone === 'late' ? 'a-light-r' : dbTone === 'soon' ? 'a-light-a' : 'a-light-g'}`} />
+            {dueLabel}
+          </span>
+        )}
+        {/* Actions */}
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+          {task.due_date && (
+            <button onClick={handleExportToCalendar} className="a-ib" title="Add to calendar" aria-label="Add to calendar">
+              <CalendarPlus size={16} />
+            </button>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(task);
+            }}
+            className="a-ib"
+            title="Edit task"
+            aria-label="Edit task"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  {isOverdue && !isCompleted && (
-                    <AlertTriangle size={14} className={darkMode ? 'text-red-400' : 'text-red-500'} />
-                  )}
-                  <h3 className={`
-                    font-bold text-base leading-tight tracking-tight
-                    ${isCompleted
-                      ? darkMode ? 'text-slate-500 line-through' : 'text-slate-400 line-through'
-                      : darkMode ? 'text-white' : 'text-slate-900'}
-                  `}>
-                    {task.title}
-                  </h3>
-                </div>
-
-                {task.description && (
-                  <p className={`
-                    text-sm mb-3 line-clamp-1
-                    ${darkMode ? 'text-slate-400' : 'text-slate-500'}
-                  `}>
-                    {task.description}
-                  </p>
-                )}
-
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  {organizationName && (
-                    <div className={`
-                      flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium
-                      ${darkMode ? 'bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-400/20' : 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200/50'}
-                    `}>
-                      <Building2 size={12} />
-                      <span>{organizationName}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-1.5">
-                    {task.assignee ? (
-                      <>
-                        <Avatar
-                          firstName={task.assignee.first_name}
-                          lastName={task.assignee.last_name}
-                          imageUrl={task.assignee.avatar_url}
-                          size="xs"
-                        />
-                        {(() => {
-                          const assigneeUserId = (task as any).assignee?.user_id;
-                          const filteredFollowers = assigneeUserId ? followerProfiles.filter(f => f.id !== assigneeUserId) : followerProfiles;
-                          if (filteredFollowers.length === 0) return null;
-                          return (
-                            <div className="flex -space-x-1.5">
-                              {filteredFollowers.slice(0, 3).map((follower) => (
-                                <Avatar
-                                  key={follower.id}
-                                  firstName={follower.first_name}
-                                  lastName={follower.last_name}
-                                  imageUrl={follower.avatar_url}
-                                  size="xs"
-                                />
-                              ))}
-                              {filteredFollowers.length > 3 && (
-                                <div className={`
-                                  w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium
-                                  ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700'}
-                                `}>
-                                  +{filteredFollowers.length - 3}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </>
-                    ) : (
-                      <User size={12} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
-                    )}
-                  </div>
-
-                  {(task.attachment_count ?? 0) > 0 && (
-                    <div className={`
-                      flex items-center gap-1 px-2 py-1 rounded-lg font-medium
-                      ${darkMode ? 'bg-slate-700/50 text-slate-400 ring-1 ring-slate-600/50' : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200/50'}
-                    `}>
-                      <Paperclip size={12} />
-                      <span className="font-semibold">{task.attachment_count}</span>
-                    </div>
-                  )}
-
-                  <div className={`
-                    flex items-center gap-1 px-2 py-1 rounded-lg font-medium
-                    ${task.priority === 'urgent'
-                      ? darkMode ? 'bg-red-500/15 text-red-400 ring-1 ring-red-400/20' : 'bg-red-50 text-red-600 ring-1 ring-red-200/50'
-                      : task.priority === 'high'
-                      ? darkMode ? 'bg-orange-500/15 text-orange-400 ring-1 ring-orange-400/20' : 'bg-orange-50 text-orange-600 ring-1 ring-orange-200/50'
-                      : task.priority === 'medium'
-                      ? darkMode ? 'bg-yellow-500/15 text-yellow-400 ring-1 ring-yellow-400/20' : 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200/50'
-                      : darkMode ? 'bg-green-500/15 text-green-400 ring-1 ring-green-400/20' : 'bg-green-50 text-green-600 ring-1 ring-green-200/50'}
-                  `}>
-                    <div className={`w-1.5 h-1.5 rounded-full ${priorityColors[task.priority]}`} />
-                    <span>{priorityLabels[task.priority]}</span>
-                  </div>
-
-                  {(task.comment_count ?? 0) > 0 && (
-                    <div className={`
-                      flex items-center gap-1 px-2 py-1 rounded-lg font-medium
-                      ${darkMode ? 'bg-green-500/15 text-green-400 ring-1 ring-green-400/20' : 'bg-green-50 text-green-600 ring-1 ring-green-200/50'}
-                    `}>
-                      <MessageCircle size={12} />
-                      <span className="font-semibold">{task.comment_count}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                {!isCompleted && (
-                  <button
-                    onClick={() => onToggleComplete(task.id, true)}
-                    className={`
-                      px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200
-                      ${darkMode
-                        ? 'bg-green-500/15 hover:bg-green-500/25 text-green-400 ring-1 ring-green-400/20'
-                        : 'bg-green-50 hover:bg-green-100 text-green-700 ring-1 ring-green-200/50'}
-                    `}
-                    title="Mark complete"
-                  >
-                    Done
-                  </button>
-                )}
-                {isCompleted && (
-                  <button
-                    onClick={() => onToggleComplete(task.id, false)}
-                    className={`
-                      px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200
-                      ${darkMode
-                        ? 'bg-slate-700/50 hover:bg-slate-600/50 text-slate-400 ring-1 ring-slate-600/50'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-500 ring-1 ring-slate-200/50'}
-                    `}
-                    title="Reopen task"
-                  >
-                    Reopen
-                  </button>
-                )}
-                {task.due_date && (
-                  <button
-                    onClick={handleExportToCalendar}
-                    className={`
-                      p-2 rounded-lg transition-all duration-200
-                      ${darkMode
-                        ? 'hover:bg-slate-700/50 text-slate-400 hover:text-slate-300'
-                        : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'}
-                    `}
-                    title="Add to calendar"
-                  >
-                    <CalendarPlus size={15} />
-                  </button>
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit(task);
-                  }}
-                  className={`
-                    p-2 rounded-lg transition-all duration-200
-                    ${darkMode
-                      ? 'hover:bg-slate-700/50 text-slate-400 hover:text-cyan-300'
-                      : 'hover:bg-slate-100 text-slate-400 hover:text-cyan-600'}
-                  `}
-                  title="Edit task"
-                >
-                  <Edit2 size={15} />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete();
-                  }}
-                  className={`
-                    p-2 rounded-lg transition-all duration-200
-                    ${darkMode
-                      ? 'hover:bg-red-500/15 text-slate-400 hover:text-red-400'
-                      : 'hover:bg-red-50 text-slate-400 hover:text-red-600'}
-                  `}
-                  title="Delete task"
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            </div>
-          </div>
+            <Edit2 size={16} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="a-ib a-ib-d"
+            title="Delete task"
+            aria-label="Delete task"
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
       </div>
     </div>
