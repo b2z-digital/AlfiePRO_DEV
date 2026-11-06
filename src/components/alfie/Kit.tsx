@@ -67,3 +67,37 @@ export const AStatus: React.FC<{ tone?: 'g' | 'a' | 'r' | 'b' | 't' | 'n'; child
 export const ASwitch: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }> = ({ checked, onChange, label, disabled }) => (
   <button type="button" role="switch" aria-checked={checked} aria-label={label} className="a-sw" disabled={disabled} onClick={() => onChange(!checked)} />
 );
+
+/** Board chart palette (Main board bars). */
+export const ALFIE_CHART_COLORS = ['#2E7BFF', '#8A4DFF', '#30D158', '#FF8A2B', '#FF6B6B', '#40C8C0', '#5AB0FF'];
+
+/** True while the Alfie light theme is on; follows theme switches. Used to pick chart tick/grid colours. */
+export function useAlfieLight(): boolean {
+  const read = () => typeof document !== 'undefined' && document.documentElement.classList.contains('alfie-light');
+  const [light, setLight] = React.useState(read);
+  React.useEffect(() => {
+    const o = new MutationObserver(() => setLight(read()));
+    o.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => o.disconnect();
+  }, []);
+  return light;
+}
+
+/** Chart.js axis styling that matches the board (quiet ticks, faint gridlines, base axis line). */
+export const alfieChartScales = (light: boolean) => {
+  const tick = light ? 'rgba(15,23,42,0.55)' : 'rgba(235,240,255,0.55)';
+  const grid = light ? 'rgba(15,23,42,0.06)' : 'rgba(255,255,255,0.05)';
+  const base = light ? 'rgba(15,23,42,0.12)' : 'rgba(255,255,255,0.1)';
+  return {
+    y: { beginAtZero: true, grid: { color: grid }, border: { display: false }, ticks: { color: tick, font: { size: 11 }, padding: 8 } },
+    x: { grid: { display: false }, border: { color: base }, ticks: { color: tick, font: { size: 11 }, maxRotation: 0, autoSkip: false } },
+  };
+};
+
+export const alfieTooltip = (light: boolean) => ({
+  backgroundColor: light ? '#fff' : 'rgba(14,21,38,0.96)',
+  titleColor: light ? '#0B1220' : '#F1F4FA',
+  bodyColor: light ? 'rgba(15,23,42,0.7)' : 'rgba(235,240,255,0.75)',
+  borderColor: light ? 'rgba(15,23,42,0.1)' : 'rgba(255,255,255,0.1)',
+  borderWidth: 1, padding: 10, cornerRadius: 10, displayColors: false,
+});

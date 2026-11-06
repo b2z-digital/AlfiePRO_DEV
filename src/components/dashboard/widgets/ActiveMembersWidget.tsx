@@ -65,24 +65,17 @@ export const ActiveMembersWidget: React.FC<WidgetProps> = ({
       <button
         onClick={() => !isEditMode && navigate('/membership-dashboard?tab=members')}
         disabled={isEditMode}
-        className={`relative rounded-2xl p-4 text-left transition-all w-full h-full flex items-center gap-3 border backdrop-blur-sm ${themeColors.background} ${isEditMode ? '' : 'cursor-pointer transform hover:scale-[1.02]'}`}
+        className={`a-wstat relative rounded-2xl text-left transition-all w-full h-full flex items-center border backdrop-blur-sm ${themeColors.background} ${isEditMode ? '' : 'cursor-pointer'}`}
       >
-        <div className="flex-shrink-0">
-          <div className="p-3 rounded-xl bg-green-500/20">
-            <UserCheck className="text-green-400" size={24} />
-          </div>
-        </div>
+        <span className="a-tile flex-shrink-0" style={{ width: 48, height: 48 }}><UserCheck size={22} /></span>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-400 mb-0.5">Active {getContextLabel(orgContext.type)} Members</p>
-          <p className="text-2xl font-bold text-white mb-0.5">
+          <p className="a-mute text-[12.5px]">Active {getContextLabel(orgContext.type)} Members</p>
+          <p className="a-num a-ink text-[28px] font-semibold leading-[1.1]">
             {loading || orgContext.isLoading ? '...' : count}
           </p>
-          <p className="text-xs text-slate-400">
+          <p className="a-mute text-[12.5px]">
             {count > 0 ? 'Currently active' : 'No active members'}
           </p>
-        </div>
-        <div className="flex-shrink-0">
-          <TrendingUp className="text-green-400/40" size={32} />
         </div>
       </button>
     </div>

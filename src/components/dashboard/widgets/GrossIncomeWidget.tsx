@@ -138,19 +138,15 @@ export const GrossIncomeWidget: React.FC<GrossIncomeWidgetProps> = ({
           <X size={16} />
         </button>
       )}
-      <div className={`relative rounded-2xl p-4 w-full h-full flex items-center gap-3 border backdrop-blur-sm ${themeColors.background}`}>
-        <div className="flex-shrink-0">
-          <div className="p-3 rounded-xl bg-green-500/20">
-            <DollarSign className="text-green-400" size={24} />
-          </div>
-        </div>
+      <div className={`a-wstat relative rounded-2xl w-full h-full flex items-center border backdrop-blur-sm ${themeColors.background}`}>
+        <span className="a-tile flex-shrink-0" style={{ width: 48, height: 48 }}><DollarSign size={22} /></span>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-400 mb-0.5">Gross Income</p>
+          <p className="a-mute text-[12.5px]">Gross Income</p>
           {loading ? (
-            <p className="text-2xl font-bold text-white">...</p>
+            <p className="a-num a-ink text-[28px] font-semibold leading-[1.1]">...</p>
           ) : (
             <>
-              <p className="text-2xl font-bold text-white mb-0.5">
+              <p className="a-num a-ink text-[28px] font-semibold leading-[1.1]">
                 ${formatCurrency(grossIncome)}
               </p>
               <p className={`text-xs flex items-center gap-1 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
