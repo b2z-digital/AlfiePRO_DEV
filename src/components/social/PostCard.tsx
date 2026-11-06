@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { SocialPost } from '../../utils/socialStorage';
 import { socialStorage } from '../../utils/socialStorage';
 import CommentSection from './CommentSection';
+import { AAvatar } from '../alfie/Kit';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -96,257 +97,176 @@ export default function PostCard({ post, onUpdate, darkMode = false, onAuthorCli
   const getPrivacyIcon = () => {
     switch (post.privacy) {
       case 'public':
-        return <Globe className="w-3 h-3" />;
+        return <Globe size={13} />;
       case 'friends':
-        return <Users className="w-3 h-3" />;
+        return <Users size={13} />;
       case 'group':
-        return <Lock className="w-3 h-3" />;
+        return <Lock size={13} />;
       default:
-        return <Globe className="w-3 h-3" />;
+        return <Globe size={13} />;
     }
   };
 
+  const authorClick = () => onAuthorClick && post.author && onAuthorClick({ id: post.author_id, name: post.author.full_name, avatar: post.author.avatar_url });
+  const [aFirst, ...aRest] = (post.author?.full_name || 'Unknown User').split(' ');
+  const atts = post.attachments || [];
+  const multi = atts.length > 1;
+  const corner = (i: number) => {
+    if (!multi) return '14px';
+    const n = atts.length;
+    const lastRow = Math.floor((n - 1) / 2);
+    const row = Math.floor(i / 2), col = i % 2;
+    const tl = row === 0 && col === 0 ? 14 : 4;
+    const tr = row === 0 && (col === 1 || n === 1) ? 14 : 4;
+    const bl = row === lastRow && col === 0 ? 14 : 4;
+    const br = row === lastRow && (col === 1 || i === n - 1) ? 14 : 4;
+    return `${tl}px ${tr}px ${br}px ${bl}px`;
+  };
+
   return (
-    <div className={`rounded-xl border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
-      <div className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3 flex-1">
-            <div
-              className={onAuthorClick ? 'cursor-pointer' : ''}
-              onClick={() => onAuthorClick && post.author && onAuthorClick({ id: post.author_id, name: post.author.full_name, avatar: post.author.avatar_url })}
-            >
-              {post.author?.avatar_url ? (
-                <img
-                  src={post.author.avatar_url}
-                  alt={post.author.full_name}
-                  className="w-12 h-12 rounded-full object-cover shadow-lg"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg">
-                  {post.author?.full_name?.charAt(0) || 'U'}
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1">
-              <div
-                className={`font-semibold ${lightMode ? 'text-gray-900' : 'text-white'} ${onAuthorClick ? 'cursor-pointer hover:underline' : ''}`}
-                onClick={() => onAuthorClick && post.author && onAuthorClick({ id: post.author_id, name: post.author.full_name, avatar: post.author.avatar_url })}
-              >
-                {post.author?.full_name || 'Unknown User'}
-              </div>
-              <div className={`flex items-center space-x-2 text-sm ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>
-                <span>
-                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                </span>
-                <span>•</span>
-                <div className="flex items-center space-x-1">
-                  {getPrivacyIcon()}
-                  <span className="capitalize">{post.privacy}</span>
-                </div>
-              </div>
-            </div>
+    <div className="a-card overflow-hidden">
+      <div className="flex items-center gap-3" style={{ padding: '18px 18px 12px' }}>
+        <span className={onAuthorClick ? 'cursor-pointer' : ''} onClick={authorClick}>
+          <AAvatar url={post.author?.avatar_url} first={aFirst} last={aRest.join(' ')} size={44} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className={`a-ink text-[15px] font-semibold truncate ${onAuthorClick ? 'cursor-pointer hover:underline' : ''}`} onClick={authorClick}>
+            {post.author?.full_name || 'Unknown User'}
           </div>
-
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className={`p-2 rounded-full transition-colors ${lightMode ? 'hover:bg-gray-100' : 'hover:bg-slate-700/50'}`}
-            >
-              <Ellipsis className={`w-5 h-5 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`} />
-            </button>
-
-            {showMenu && (
-              <div className={`absolute right-0 mt-2 w-48 rounded-xl shadow-xl border z-10 ${lightMode ? 'bg-white border-gray-200' : 'bg-slate-800 border-slate-700'}`}>
-                {canDelete && (
-                  <button
-                    onClick={handleDeleteClick}
-                    className={`w-full flex items-center space-x-2 px-4 py-3 text-red-600 first:rounded-t-xl last:rounded-b-xl transition-colors ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
-                  >
-                    {isPostOwner ? (
-                      <>
-                        <Trash2 className="w-4 h-4" />
-                        <span>Delete Post</span>
-                      </>
-                    ) : (
-                      <>
-                        <ShieldAlert className="w-4 h-4" />
-                        <span>Delete Post (Admin)</span>
-                      </>
-                    )}
-                  </button>
-                )}
-                {!isPostOwner && (
-                  <button
-                    onClick={handleReportClick}
-                    className={`w-full flex items-center space-x-2 px-4 py-3 first:rounded-t-xl last:rounded-b-xl transition-colors ${lightMode ? 'text-gray-700 hover:bg-gray-50' : 'text-slate-300 hover:bg-slate-700/50'}`}
-                  >
-                    <Flag className="w-4 h-4" />
-                    <span>Report Post</span>
-                  </button>
-                )}
-              </div>
-            )}
+          <div className="a-dim flex items-center gap-1.5 text-[12.5px] mt-0.5">
+            <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+            <span>·</span>
+            {getPrivacyIcon()}
+            <span className="capitalize">{post.privacy}</span>
           </div>
         </div>
 
-        <div className="mt-4">
-          <p className={`whitespace-pre-wrap ${lightMode ? 'text-gray-800' : 'text-slate-200'}`}>{post.content}</p>
-
-          {/* Display location and feeling */}
-          {(post.location || post.feeling) && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {post.location && (
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm ${lightMode ? 'bg-orange-50 text-orange-700' : 'bg-orange-900/30 text-orange-300'}`}>
-                  <MapPin size={14} />
-                  <span>{post.location}</span>
-                </div>
+        <div className="relative">
+          <button onClick={() => setShowMenu(!showMenu)} className="a-ib" aria-label="More" aria-expanded={showMenu}>
+            <Ellipsis size={18} />
+          </button>
+          {showMenu && (
+            <div className="a-pop absolute right-0 mt-2 w-52 z-10">
+              {canDelete && (
+                <button onClick={handleDeleteClick} className="a-pop-item a-txt-r w-full">
+                  {isPostOwner ? <Trash2 size={16} /> : <ShieldAlert size={16} />}
+                  {isPostOwner ? 'Delete post' : 'Delete post (admin)'}
+                </button>
               )}
-              {post.feeling && (
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm ${lightMode ? 'bg-yellow-50 text-yellow-700' : 'bg-yellow-900/30 text-yellow-300'}`}>
-                  <Smile size={14} />
-                  <span>feeling {post.feeling}</span>
-                </div>
+              {!isPostOwner && (
+                <button onClick={handleReportClick} className="a-pop-item w-full">
+                  <Flag size={16} />
+                  Report post
+                </button>
               )}
             </div>
           )}
         </div>
+      </div>
 
-        {/* Display link preview */}
-        {post.link_url && (
-          <a
-            href={post.link_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`mt-4 block rounded-xl border overflow-hidden transition-all hover:shadow-lg ${lightMode ? 'bg-gray-50 border-gray-200 hover:bg-gray-100' : 'bg-slate-700/50 border-slate-600 hover:bg-slate-700'}`}
-          >
-            <div className="p-4">
-              <div className={`flex items-start justify-between gap-3`}>
-                <div className="flex-1">
-                  <div className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                    {post.link_title || 'Link'}
-                  </div>
-                  <div className={`text-sm line-clamp-2 ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                    {post.link_url}
-                  </div>
-                </div>
-                <ExternalLink size={16} className={lightMode ? 'text-gray-400' : 'text-slate-500'} />
-              </div>
-            </div>
-          </a>
-        )}
+      {post.content && <p className="a-ink m-0 whitespace-pre-wrap text-[15px] leading-[1.5]" style={{ padding: '0 18px 14px' }}>{post.content}</p>}
 
-        {post.attachments && post.attachments.length > 0 && (
-          <div className={`mt-4 grid gap-2 ${post.attachments.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            {post.attachments.map((attachment, index) => {
-              const youtubeId = attachment.file_type === 'video' ? extractYouTubeId(attachment.file_url) : null;
-              const isBlobUrl = attachment.file_url?.startsWith('blob:');
+      {(post.location || post.feeling) && (
+        <div className="flex flex-wrap gap-1.5" style={{ padding: '0 18px 14px' }}>
+          {post.location && <span className="a-lb-fmt" style={{ height: 26 }}><MapPin size={13} className="a-txt-a" />{post.location}</span>}
+          {post.feeling && <span className="a-lb-fmt" style={{ height: 26 }}><Smile size={13} className="a-txt-a" />feeling {post.feeling}</span>}
+        </div>
+      )}
 
-              return (
-                <div key={attachment.id} className="relative">
-                  {attachment.file_type === 'image' ? (
-                    isBlobUrl ? (
-                      <div
-                        className={`w-full rounded-xl flex items-center justify-center ${lightMode ? 'bg-gray-100 text-gray-400' : 'bg-slate-700/50 text-slate-500'}`}
-                        style={{ height: post.attachments!.length === 1 ? '300px' : '200px' }}
-                      >
-                        <span className="text-sm">Image unavailable</span>
-                      </div>
-                    ) : (
-                    <img
-                      src={attachment.file_url}
-                      alt={`Attachment ${index + 1}`}
-                      className="w-full rounded-xl object-cover shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
-                      style={{ maxHeight: post.attachments!.length === 1 ? '500px' : '300px' }}
-                      onClick={() => {
-                        const imageAttachments = post.attachments!.filter(a => a.file_type === 'image' && !a.file_url?.startsWith('blob:'));
-                        const imageIndex = imageAttachments.findIndex(a => a.id === attachment.id);
-                        setLightboxIndex(imageIndex >= 0 ? imageIndex : 0);
-                        setLightboxOpen(true);
-                      }}
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        target.style.display = 'none';
-                        const placeholder = document.createElement('div');
-                        placeholder.className = `w-full rounded-xl flex items-center justify-center ${lightMode ? 'bg-gray-100 text-gray-400' : 'bg-slate-700/50 text-slate-500'}`;
-                        placeholder.style.height = '200px';
-                        placeholder.innerHTML = '<span class="text-sm">Image unavailable</span>';
-                        target.parentNode?.appendChild(placeholder);
-                      }}
-                    />
-                    )
-                  ) : youtubeId ? (
-                    <div className="relative w-full rounded-xl overflow-hidden shadow-lg" style={{ paddingTop: '56.25%' }}>
-                      <iframe
-                        src={`https://www.youtube.com/embed/${youtubeId}`}
-                        title={`YouTube video ${index + 1}`}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        className="absolute top-0 left-0 w-full h-full"
-                      />
+      {post.link_url && (
+        <a href={post.link_url} target="_blank" rel="noopener noreferrer" className="a-grp flex items-start gap-3" style={{ margin: '0 18px 14px', padding: 14 }}>
+          <div className="flex-1 min-w-0">
+            <div className="a-ink text-[14.5px] font-semibold mb-0.5">{post.link_title || 'Link'}</div>
+            <div className="a-dim text-[12.5px] line-clamp-2 break-all">{post.link_url}</div>
+          </div>
+          <ExternalLink size={16} className="a-dim flex-shrink-0" />
+        </a>
+      )}
+
+      {atts.length > 0 && (
+        <div className="grid" style={{ gridTemplateColumns: multi ? '1fr 1fr' : '1fr', gap: 4, padding: '0 12px' }}>
+          {atts.map((attachment, index) => {
+            const youtubeId = attachment.file_type === 'video' ? extractYouTubeId(attachment.file_url) : null;
+            const isBlobUrl = attachment.file_url?.startsWith('blob:');
+            const radius = corner(index);
+            const h = multi ? 190 : undefined;
+
+            return (
+              <div key={attachment.id} className="relative overflow-hidden" style={{ borderRadius: radius }}>
+                {attachment.file_type === 'image' ? (
+                  isBlobUrl ? (
+                    <div className="a-empty w-full flex items-center justify-center" style={{ height: multi ? 190 : 300 }}>
+                      <span className="a-dim text-[13px]">Image unavailable</span>
                     </div>
                   ) : (
-                    <video
-                      src={attachment.file_url}
-                      controls
-                      className="w-full rounded-xl shadow-lg"
-                      style={{ maxHeight: '500px' }}
+                  <img
+                    src={attachment.file_url}
+                    alt={`Attachment ${index + 1}`}
+                    className="w-full object-cover block cursor-pointer hover:opacity-90 transition-opacity"
+                    style={{ height: h, maxHeight: multi ? undefined : 500 }}
+                    onClick={() => {
+                      const imageAttachments = atts.filter(a => a.file_type === 'image' && !a.file_url?.startsWith('blob:'));
+                      const imageIndex = imageAttachments.findIndex(a => a.id === attachment.id);
+                      setLightboxIndex(imageIndex >= 0 ? imageIndex : 0);
+                      setLightboxOpen(true);
+                    }}
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      target.style.display = 'none';
+                      const placeholder = document.createElement('div');
+                      placeholder.className = 'a-empty a-dim w-full flex items-center justify-center text-[13px]';
+                      placeholder.style.height = '190px';
+                      placeholder.textContent = 'Image unavailable';
+                      target.parentNode?.appendChild(placeholder);
+                    }}
+                  />
+                  )
+                ) : youtubeId ? (
+                  <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+                    <iframe
+                      src={`https://www.youtube.com/embed/${youtubeId}`}
+                      title={`YouTube video ${index + 1}`}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="absolute top-0 left-0 w-full h-full"
                     />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                  </div>
+                ) : (
+                  <video src={attachment.file_url} controls className="w-full block" style={{ maxHeight: 500 }} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="a-dim flex justify-between text-[13px]" style={{ padding: '12px 18px 8px' }}>
+        <span className="inline-flex items-center gap-1.5">
+          {likeCount > 0 && <span className="inline-flex items-center justify-center rounded-full text-white" style={{ width: 20, height: 20, background: '#FF3E9A' }}><Heart size={11} className="fill-current" /></span>}
+          {likeCount} {likeCount === 1 ? 'like' : 'likes'}
+        </span>
+        <button onClick={() => setShowComments(!showComments)} className="hover:underline">
+          {commentCount} {commentCount === 1 ? 'comment' : 'comments'}
+        </button>
       </div>
 
-      <div className={`px-6 py-3 border-t border-b ${lightMode ? 'border-gray-200' : 'border-slate-700/50'}`}>
-        <div className={`flex items-center justify-between text-sm ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>
-          <button className={`transition-colors ${lightMode ? 'hover:text-blue-600 hover:underline' : 'hover:text-blue-400 hover:underline'}`}>
-            {likeCount} {likeCount === 1 ? 'like' : 'likes'}
-          </button>
-          <button
-            onClick={() => setShowComments(!showComments)}
-            className={`transition-colors ${lightMode ? 'hover:text-blue-600 hover:underline' : 'hover:text-blue-400 hover:underline'}`}
-          >
-            {commentCount} {commentCount === 1 ? 'comment' : 'comments'}
-          </button>
-        </div>
-      </div>
-
-      <div className="px-6 py-3">
-        <div className="flex items-center justify-around">
-          <button
-            onClick={handleLike}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${
-              isLiked
-                ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                : lightMode
-                ? 'text-gray-600 hover:bg-gray-100'
-                : 'text-slate-300 hover:bg-slate-700/50'
-            }`}
-          >
-            <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
-            <span className="font-medium">Like</span>
-          </button>
-
-          <button
-            onClick={() => setShowComments(!showComments)}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-colors ${lightMode ? 'text-gray-600 hover:bg-gray-100' : 'text-slate-300 hover:bg-slate-700/50'}`}
-          >
-            <MessageCircle className="w-5 h-5" />
-            <span className="font-medium">Comment</span>
-          </button>
-
-          <button className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-colors ${lightMode ? 'text-gray-600 hover:bg-gray-100' : 'text-slate-300 hover:bg-slate-700/50'}`}>
-            <Share2 className="w-5 h-5" />
-            <span className="font-medium">Share</span>
-          </button>
-        </div>
+      <div className="flex gap-1 border-t a-bd" style={{ padding: '6px 10px 8px' }}>
+        <button onClick={handleLike} className={`a-ab ${isLiked ? 'a-ab-liked' : ''}`} aria-pressed={isLiked}>
+          <Heart size={18} className={isLiked ? 'fill-current' : ''} />
+          {isLiked ? 'Liked' : 'Like'}
+        </button>
+        <button onClick={() => setShowComments(!showComments)} className="a-ab">
+          <MessageCircle size={18} />
+          Comment
+        </button>
+        <button className="a-ab">
+          <Share2 size={18} />
+          Share
+        </button>
       </div>
 
       {showComments && (
-        <div className={`border-t ${lightMode ? 'border-gray-200' : 'border-slate-700/50'}`}>
+        <div className="border-t a-bd">
           <CommentSection postId={post.id} darkMode={darkMode} onCommentAdded={() => setCommentCount(prev => prev + 1)} onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))} />
         </div>
       )}

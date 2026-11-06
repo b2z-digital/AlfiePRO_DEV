@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, MoveHorizontal as MoreHorizontal, Pencil, Trash2, X, Check } from 'lucide-react';
+import { AAvatar } from '../alfie/Kit';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { socialStorage, SocialComment } from '../../utils/socialStorage';
@@ -116,52 +117,42 @@ export default function CommentSection({ postId, darkMode = false, onCommentAdde
   }
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="flex flex-col gap-3" style={{ padding: '12px 14px 14px' }}>
       {comments.map(comment => {
         const isOwner = user?.id === comment.author_id;
         const isEditing = editingId === comment.id;
 
         return (
-          <div key={comment.id} className="flex space-x-3 group">
-            {comment.author?.avatar_url ? (
-              <img
-                src={comment.author.avatar_url}
-                alt={comment.author.full_name}
-                className="w-10 h-10 rounded-full object-cover flex-shrink-0 shadow-lg"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg">
-                {comment.author?.full_name?.charAt(0) || 'U'}
-              </div>
-            )}
+          <div key={comment.id} className="flex gap-2.5 group">
+            <AAvatar url={comment.author?.avatar_url} first={(comment.author?.full_name || 'U').split(' ')[0]} last={(comment.author?.full_name || '').split(' ').slice(1).join(' ')} size={32} />
 
             <div className="flex-1 min-w-0">
               <div className="relative">
-                <div className={`rounded-2xl px-4 py-3 ${lightMode ? 'bg-gray-100' : 'bg-slate-700/40'}`}>
+                <div className="a-cmt">
                   <div className="flex items-center justify-between">
-                    <div className={`font-semibold text-sm ${lightMode ? 'text-gray-900' : 'text-white'}`}>
+                    <div className="a-ink font-semibold text-[13.5px]">
                       {comment.author?.full_name || 'Unknown User'}
                     </div>
                     {isOwner && !isEditing && (
                       <div className="relative" ref={menuOpenId === comment.id ? menuRef : undefined}>
                         <button
                           onClick={() => setMenuOpenId(menuOpenId === comment.id ? null : comment.id)}
-                          className={`opacity-0 group-hover:opacity-100 p-1 rounded-full transition-all ${lightMode ? 'hover:bg-gray-200 text-gray-400' : 'hover:bg-slate-600/50 text-slate-500'}`}
+                          className="a-dim opacity-0 group-hover:opacity-100 p-1 rounded-full transition-all" aria-label="Comment options"
                         >
                           <MoreHorizontal className="w-4 h-4" />
                         </button>
                         {menuOpenId === comment.id && (
-                          <div className={`absolute right-0 top-full mt-1 z-50 rounded-xl shadow-xl border min-w-[140px] py-1 ${lightMode ? 'bg-white border-gray-200' : 'bg-slate-800 border-slate-700'}`}>
+                          <div className="a-pop absolute right-0 top-full mt-1 z-50 min-w-[150px]">
                             <button
                               onClick={() => handleEdit(comment)}
-                              className={`w-full flex items-center space-x-2 px-4 py-2 text-sm transition-colors ${lightMode ? 'text-gray-700 hover:bg-gray-100' : 'text-slate-300 hover:bg-slate-700/50'}`}
+                              className="a-pop-item w-full"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                               <span>Edit</span>
                             </button>
                             <button
                               onClick={() => { setMenuOpenId(null); handleDelete(comment.id); }}
-                              className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+                              className="a-pop-item a-txt-r w-full"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               <span>Delete</span>
@@ -180,33 +171,33 @@ export default function CommentSection({ postId, darkMode = false, onCommentAdde
                         onChange={(e) => setEditContent(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(comment.id); if (e.key === 'Escape') setEditingId(null); }}
                         autoFocus
-                        className={`flex-1 px-3 py-1.5 rounded-lg text-sm border-0 focus:ring-2 focus:ring-blue-500 ${lightMode ? 'bg-white' : 'bg-slate-600/50 text-white'}`}
+                        className="a-inp flex-1" style={{ height: 34 }}
                       />
-                      <button onClick={() => handleSaveEdit(comment.id)} className="p-1.5 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors">
+                      <button onClick={() => handleSaveEdit(comment.id)} className="a-ib a-txt-b" style={{ width: 32, height: 32 }} aria-label="Save">
                         <Check className="w-4 h-4" />
                       </button>
-                      <button onClick={() => setEditingId(null)} className={`p-1.5 rounded-lg transition-colors ${lightMode ? 'text-gray-400 hover:bg-gray-200' : 'text-slate-400 hover:bg-slate-600/50'}`}>
+                      <button onClick={() => setEditingId(null)} className="a-ib" style={{ width: 32, height: 32 }} aria-label="Cancel">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                   ) : (
-                    <p className={`text-sm mt-1 ${lightMode ? 'text-gray-800' : 'text-slate-200'}`}>{comment.content}</p>
+                    <p className="a-ink text-[14px] mt-0.5 m-0">{comment.content}</p>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center space-x-4 mt-2 px-4">
-                <button className={`text-xs font-medium transition-colors ${lightMode ? 'text-gray-500 hover:text-red-600' : 'text-slate-400 hover:text-red-400'}`}>
+              <div className="a-dim flex items-center gap-3.5 mt-1 px-3 text-[12px]">
+                <button className="font-semibold hover:underline">
                   Like
                 </button>
-                <button className={`text-xs font-medium transition-colors ${lightMode ? 'text-gray-500 hover:text-blue-600' : 'text-slate-400 hover:text-blue-400'}`}>
+                <button className="font-semibold hover:underline">
                   Reply
                 </button>
-                <span className={`text-xs ${lightMode ? 'text-gray-500' : 'text-slate-500'}`}>
+                <span>
                   {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
                 </span>
                 {comment.updated_at && comment.updated_at !== comment.created_at && (
-                  <span className={`text-xs italic ${lightMode ? 'text-gray-400' : 'text-slate-600'}`}>edited</span>
+                  <span className="italic">edited</span>
                 )}
               </div>
             </div>
@@ -214,26 +205,24 @@ export default function CommentSection({ postId, darkMode = false, onCommentAdde
         );
       })}
 
-      <form onSubmit={handleSubmit} className="flex items-start space-x-3 pt-2">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-lg">
-          {user?.email?.charAt(0).toUpperCase()}
-        </div>
-
-        <div className="flex-1 flex items-center space-x-2">
+      <form onSubmit={handleSubmit} className="flex items-center gap-2.5">
+        <AAvatar first={user?.email?.charAt(0)} size={32} />
+        <div className="a-cmt-field flex-1">
           <input
             type="text"
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Write a comment..."
-            className={`flex-1 px-4 py-2.5 rounded-full border-0 focus:ring-2 focus:ring-blue-500 transition-all ${lightMode ? 'bg-gray-100' : 'bg-slate-700/40 text-white placeholder-slate-400'}`}
+            placeholder="Write a comment…"
             disabled={isSubmitting}
           />
           <button
             type="submit"
             disabled={isSubmitting || !newComment.trim()}
-            className="btn-primary-green p-2.5 from-blue-500 to-blue-600 text-white rounded-full hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+            className="a-ib a-txt-b disabled:opacity-40"
+            style={{ width: 30, height: 30 }}
+            aria-label="Send comment"
           >
-            <Send className="w-5 h-5" />
+            <Send size={16} />
           </button>
         </div>
       </form>

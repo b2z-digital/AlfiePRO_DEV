@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, MessageCircle } from 'lucide-react';
 import { socialStorage, SocialPost } from '../../utils/socialStorage';
 import PostCard from './PostCard';
 
@@ -107,13 +107,13 @@ export default function ActivityFeed({ groupId, privacy, darkMode = false, autho
     return (
       <div className="space-y-4">
         {[1, 2, 3].map(i => (
-          <div key={i} className={`rounded-xl p-6 animate-pulse border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
+          <div key={i} className="a-card animate-pulse" style={{ padding: 18 }}>
             <div className="flex items-start space-x-4">
-              <div className={`w-12 h-12 rounded-full ${lightMode ? 'bg-gray-200' : 'bg-slate-700/50'}`}></div>
+              <div className={`w-12 h-12 rounded-full a-skel`}></div>
               <div className="flex-1 space-y-3">
-                <div className={`h-4 rounded w-1/4 ${lightMode ? 'bg-gray-200' : 'bg-slate-700/50'}`}></div>
-                <div className={`h-4 rounded w-3/4 ${lightMode ? 'bg-gray-200' : 'bg-slate-700/50'}`}></div>
-                <div className={`h-4 rounded w-1/2 ${lightMode ? 'bg-gray-200' : 'bg-slate-700/50'}`}></div>
+                <div className={`h-4 rounded w-1/4 a-skel`}></div>
+                <div className={`h-4 rounded w-3/4 a-skel`}></div>
+                <div className={`h-4 rounded w-1/2 a-skel`}></div>
               </div>
             </div>
           </div>
@@ -124,28 +124,24 @@ export default function ActivityFeed({ groupId, privacy, darkMode = false, autho
 
   if (posts.length === 0) {
     return (
-      <div className={`rounded-xl p-12 text-center border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
-        <div className={`mb-4 ${lightMode ? 'text-gray-400' : 'text-slate-500'}`}>
-          <svg className="w-16 h-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-        </div>
-        <h3 className={`text-lg font-medium mb-2 ${lightMode ? 'text-gray-900' : 'text-white'}`}>No posts yet</h3>
-        <p className={lightMode ? 'text-gray-500' : 'text-slate-400'}>Be the first to share something with the community!</p>
+      <div className="a-card a-empty text-center" style={{ padding: 48 }}>
+        <span className="a-tile mx-auto mb-3" style={{ width: 52, height: 52 }}><MessageCircle size={22} /></span>
+        <h3 className="a-ink text-[16px] font-semibold mb-1">No posts yet</h3>
+        <p className="a-dim text-[13.5px]">Be the first to share something with the community!</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>Recent Activity</h2>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2.5">
+        <h2 className="a-display a-ink flex-1 m-0 text-[17px] font-semibold">Recent activity</h2>
         <button
           onClick={() => loadPosts(true)}
           disabled={isRefreshing}
-          className={`flex items-center space-x-2 px-4 py-2 text-sm rounded-xl transition-all ${lightMode ? 'text-gray-600 hover:bg-gray-100' : 'text-slate-300 hover:bg-slate-700/50'}`}
+          className="a-btn a-btn-q" style={{ height: 34, fontSize: 13 }}
         >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
           <span>Refresh</span>
         </button>
       </div>
@@ -164,7 +160,7 @@ export default function ActivityFeed({ groupId, privacy, darkMode = false, autho
         <button
           onClick={handleLoadMore}
           disabled={isLoading}
-          className={`w-full py-3 rounded-xl transition-all font-medium border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50 hover:shadow-xl text-gray-700' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl text-white hover:border-slate-600/50'}`}
+          className="a-btn w-full justify-center"
         >
           {isLoading ? 'Loading...' : 'Load More'}
         </button>
