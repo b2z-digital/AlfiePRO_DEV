@@ -661,3 +661,41 @@ html.alfie-dark button.a-wstat:not(:disabled):hover { filter: none; border-color
 /* Level labels with bars (board .lb-lvl): State and National both amber */
 html.alfie-theme .a-wlvl.a-wlvl-lv { gap: 6px; color: #FFC56B; border-color: rgba(255,179,64,0.35); background: rgba(255,179,64,0.06); }
 html.alfie-light .a-wlvl.a-wlvl-lv { color: #B45309; border-color: rgba(217,119,6,0.35); background: rgba(217,119,6,0.06); }
+
+/* ── Website domain card (board S_ev_overview "Domain") ── */
+.a-domain-status { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; color: rgba(235,240,255,0.85); white-space: nowrap; }
+.a-domain-light { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; }
+.a-domain-light.bg-emerald-400 { background: #30D158 !important; box-shadow: 0 0 0 3px rgba(48,209,88,0.18); }
+.a-domain-light.bg-amber-400 { background: #FFB340 !important; box-shadow: 0 0 0 3px rgba(255,179,64,0.18); }
+.a-domain-light.bg-red-400 { background: #FF6B6B !important; box-shadow: 0 0 0 3px rgba(255,107,107,0.18); }
+.a-domain-light.bg-slate-400 { background: rgba(235,240,255,0.35) !important; }
+html.alfie-theme .a-domain :is(.rounded-lg.border, .p-4.rounded-lg) { border-radius: 14px !important; }
+html.alfie-dark .a-domain :is(.bg-slate-700\/50, .bg-slate-700\/30, .bg-slate-800, .bg-slate-900\/50) { background-color: rgba(255,255,255,0.03) !important; }
+html.alfie-dark .a-domain :is(.border-slate-600, .border-slate-600\/50, .border-slate-700) { border-color: rgba(255,255,255,0.07) !important; }
+html.alfie-dark .a-domain :is(input[type="text"]) { background-color: rgba(0,0,0,0.26) !important; border-color: rgba(255,255,255,0.10) !important; border-radius: 12px !important; height: 42px; }
+html.alfie-light .a-domain-status { color: #334155; }
+
+/* ── Option tiles (board "Menu style" Horizontal / Hamburger): chosen tile gets the Spectrum rim ── */
+.a-otile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.03); color: rgba(235,240,255,0.75); font-size: 13px; font-weight: 500; cursor: pointer; transition: background-color .15s ease; }
+.a-otile:hover { background: rgba(255,255,255,0.055); }
+.a-otile :is(svg) { color: rgba(235,240,255,0.8); margin: 0 auto; }
+.a-otile :is(span, p) { color: inherit !important; }
+.a-otile.a-otile-on { border-color: transparent; color: #fff; background: linear-gradient(#141A28, #141A28) padding-box, var(--alfie-spectrum) border-box; }
+.a-otile .bg-slate-700 { background: rgba(255,255,255,0.06) !important; }
+html.alfie-light .a-otile { border-color: rgba(15,23,42,0.1); background: #fff; color: #334155; }
+html.alfie-light .a-otile :is(svg) { color: #334155; }
+html.alfie-light .a-otile.a-otile-on { color: #0B1220; background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-otile .bg-slate-700 { background: rgba(15,23,42,0.06) !important; }
+
+/* Calendar month: selected day + side panel (board S_cal_month) */
+.a-month-cell { cursor: pointer; }
+.a-month-cell.a-month-blank { cursor: default; }
+html.alfie-dark .a-month-cell.a-month-sel { box-shadow: inset 0 0 0 1.5px rgba(10,132,255,0.75); background: #101A30; }
+html.alfie-light .a-month-cell.a-month-sel { box-shadow: inset 0 0 0 1.5px rgba(10,132,255,0.6); background: #F3F8FF; }
+.a-month-side { padding: 18px; }
+@media (min-width: 1280px) { .a-month-side { position: sticky; top: 16px; } }
+.a-month-si { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 10px 8px; border: 0; border-radius: 12px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
+.a-month-si:hover { background: rgba(255,255,255,0.04); }
+html.alfie-light .a-month-si:hover { background: rgba(15,23,42,0.04); }
+html.alfie-theme .a-month-si:hover .a-tile { border-color: transparent; background: linear-gradient(#0C1220, #0C1220) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-month-si:hover .a-tile { background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; }

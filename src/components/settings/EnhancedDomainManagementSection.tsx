@@ -570,26 +570,24 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
 
   return (
     <>
-      <div className={`${darkMode ? 'bg-slate-800/50' : 'bg-white'} rounded-xl p-6 border ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-600/20">
-              <Globe size={20} className={darkMode ? 'text-blue-400' : 'text-blue-600'} />
-            </div>
-            <div>
-              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                Domain Management
+      <div className="a-card a-domain p-5">
+        <div className="flex items-center justify-between gap-3 mb-5">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="a-tile" style={{ width: 38, height: 38 }}><Globe size={19} /></span>
+            <div className="min-w-0">
+              <h3 className="a-display a-ink text-[16px] font-semibold">
+                Domain
               </h3>
-              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Configure your website domain settings
+              <p className="a-dim text-[12.5px]">
+                Where your website lives
               </p>
             </div>
           </div>
 
-          <div className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${statusConfig.bgColor} ${statusConfig.color} border ${statusConfig.borderColor}`}>
-            <div className={`w-2 h-2 rounded-full ${statusConfig.dotColor} ${websiteStatus === 'live' || websiteStatus === 'pending' ? 'animate-pulse' : ''}`} />
+          <span className="a-domain-status">
+            <span className={`a-domain-light ${statusConfig.dotColor}`} />
             {statusConfig.label}
-          </div>
+          </span>
         </div>
 
         {dnsRecord && dnsRecord.status !== 'pending' && (
@@ -1049,16 +1047,12 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
           </div>
         )}
 
-        <div className="flex gap-3">
+        <div className="flex gap-2.5 flex-wrap items-center">
           {!isPublished ? (
             <button
               onClick={publishWebsite}
               disabled={loading || (!subdomain.trim() && !customDomain.trim())}
-              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                loading || (!subdomain.trim() && !customDomain.trim())
-                  ? 'bg-slate-600 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
+              className="a-btn a-btn-p flex-1 disabled:opacity-45 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
@@ -1078,11 +1072,7 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
                 <button
                   onClick={verifyDomain}
                   disabled={verifying}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                    darkMode
-                      ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                      : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
-                  }`}
+                  className="a-btn"
                 >
                   {verifying ? (
                     <Loader2 size={18} className="animate-spin" />
@@ -1097,11 +1087,7 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
                 <button
                   onClick={verifyCustomDomain}
                   disabled={checkingCustomDomain}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                    darkMode
-                      ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                      : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
-                  }`}
+                  className="a-btn"
                 >
                   {checkingCustomDomain ? (
                     <Loader2 size={18} className="animate-spin" />
@@ -1115,11 +1101,7 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
               <button
                 onClick={takeWebsiteOffline}
                 disabled={takingOffline}
-                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                  takingOffline
-                    ? 'bg-slate-600 cursor-not-allowed'
-                    : 'bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/30'
-                }`}
+                className="a-btn a-btn-d ml-auto disabled:opacity-45 disabled:cursor-not-allowed"
               >
                 {takingOffline ? (
                   <>
@@ -1128,8 +1110,8 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
                   </>
                 ) : (
                   <>
-                    <XCircle size={18} />
-                    Take Website Offline
+                    <XCircle size={17} />
+                    Take website offline
                   </>
                 )}
               </button>
