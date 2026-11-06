@@ -1862,6 +1862,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         darkMode={darkMode}
         onSuccess={handleMembershipFormSuccess}
         readOnly={viewMode === 'view'}
+        onEdit={selectedMemberId ? () => { setShowMembershipForm(false); handleEditMember(selectedMemberId); } : undefined}
       />
       
       {/* Admin Add Member Modal (for adding new members) */}
