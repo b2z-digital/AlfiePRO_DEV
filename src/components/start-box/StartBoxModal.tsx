@@ -1,5 +1,6 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Minus, Play, Square, Megaphone } from 'lucide-react';
+import { X, Minus, Play, Square, Megaphone, Maximize2 } from 'lucide-react';
 import type { StartSequence, StartBoxState } from '../../types/startBox';
 import type { TimerTickData } from '../../utils/startBoxAudio';
 import { getStartBoxEngine, destroyStartBoxEngine } from '../../utils/startBoxAudio';
@@ -418,138 +419,47 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     const isIdleOrArmed = timerState === 'idle' || timerState === 'armed';
     const showQuickControls = showElapsed || isIdleOrArmed;
 
-    return (
-      <div className="fixed bottom-4 left-0 right-0 z-[100] flex justify-center pointer-events-none">
-        <div
-          className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-2xl animate-slideUp ${
-            darkMode
-              ? 'bg-slate-900 border-slate-700/60'
-              : 'bg-white border-slate-200'
-          }`}
-        >
-          {/* Status dot */}
-          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-            showElapsed ? 'bg-green-500 animate-pulse' : stateColor
-          } ${timerState === 'running' ? 'animate-pulse' : ''}`} />
-
-          {/* Logo - click to expand */}
-          <button
-            onClick={() => setIsMinimized(false)}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-            title="Expand StartBox"
-          >
-            <AlfieLogo size={13} />
-          </button>
-
-          {/* Timer display - click to expand */}
-          <button
-            onClick={() => setIsMinimized(false)}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-            title="Expand StartBox"
-          >
-            <span className={`font-bold tabular-nums text-lg ${
-              showElapsed ? 'text-green-400' :
-              timerState === 'running' && remainingSec <= 5 ? 'text-red-500' :
-              timerState === 'running' && remainingSec <= 10 ? 'text-orange-500' :
-              timerState === 'running' && remainingSec <= 30 ? 'text-amber-400' :
-              timerState === 'running' ? 'text-cyan-400' :
-              timerState === 'paused' ? 'text-amber-400' :
-              darkMode ? 'text-white' : 'text-slate-900'
-            }`}>
-              {showElapsed
-                ? `+${elapsedMin}:${elapsedSecRemainder.toString().padStart(2, '0')}`
-                : timerState === 'completed'
-                  ? 'GO!'
-                  : `${Math.floor(remainingSec / 60)}:${(remainingSec % 60).toString().padStart(2, '0')}`
-              }
-            </span>
-            <span className={`text-xs uppercase tracking-wider font-medium ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-              {showElapsed ? 'RACING' : botwPhase ? 'BOTW' : currentSequence?.name || 'StartBox'}
-            </span>
-          </button>
-
-          {/* Quick controls */}
-          {showQuickControls && (
-            <>
-              <div className={`w-px h-5 mx-1 ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`} />
-
-              {showElapsed ? (
-                <>
-                  {/* During race: Stop race, Whistle, Bell */}
-                  <button
-                    onClick={handleStopRace}
-                    className="p-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
-                    title="Stop Race Timer"
-                  >
-                    <Square size={14} />
-                  </button>
-                  <button
-                    onClick={handleWhistle}
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      darkMode ? 'text-amber-400/70 hover:bg-slate-800 hover:text-amber-400' : 'text-amber-600 hover:bg-slate-100'
-                    }`}
-                    title="Whistle"
-                  >
-                    <Megaphone size={14} />
-                  </button>
-                  <button
-                    onClick={handleBell}
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100'
-                    }`}
-                    title="Bell"
-                  >
-                    <BellIcon size={14} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Idle/Armed: Start, Whistle, Bell */}
-                  <button
-                    onClick={handleMinimizedStart}
-                    className="p-1.5 rounded-lg bg-green-600/20 text-green-400 hover:bg-green-600/30 transition-colors"
-                    title="Start Sequence"
-                  >
-                    <Play size={14} className="ml-0.5" />
-                  </button>
-                  <button
-                    onClick={handleWhistle}
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      darkMode ? 'text-amber-400/70 hover:bg-slate-800 hover:text-amber-400' : 'text-amber-600 hover:bg-slate-100'
-                    }`}
-                    title="Whistle"
-                  >
-                    <Megaphone size={14} />
-                  </button>
-                  <button
-                    onClick={handleBell}
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100'
-                    }`}
-                    title="Bell"
-                  >
-                    <BellIcon size={14} />
-                  </button>
-                </>
-              )}
-            </>
-          )}
-
-          {/* Running state: show stop button */}
-          {timerState === 'running' && !showElapsed && (
-            <>
-              <div className={`w-px h-5 mx-1 ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`} />
-              <button
-                onClick={handleStop}
-                className="p-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
-                title="Stop"
-              >
-                <Square size={14} />
-              </button>
-            </>
-          )}
-        </div>
+    const timeTone = showElapsed ? 'a-txt-g'
+      : timerState === 'running' && remainingSec <= 10 ? 'a-txt-r'
+      : timerState === 'running' && remainingSec <= 30 ? 'a-txt-a'
+      : timerState === 'paused' ? 'a-txt-a' : 'a-ink';
+    const lightTone = showElapsed ? 'a-light-g' : timerState === 'running' ? 'a-light-t' : timerState === 'paused' ? 'a-light-a' : '';
+    const pill = (
+      <div className="a-sb-pill pointer-events-auto" role="group" aria-label="StartBox">
+        <span className={`a-light ${lightTone} ${timerState === 'running' || showElapsed ? 'animate-pulse' : ''}`} />
+        <button onClick={() => setIsMinimized(false)} className="a-sb-pill-label" title="Expand StartBox">
+          {showElapsed ? 'Racing' : botwPhase ? 'BOTW' : currentSequence?.name || 'StartBox'}
+        </button>
+        <button onClick={() => setIsMinimized(false)} className={`a-sb-pill-time ${timeTone}`} title="Expand StartBox">
+          {showElapsed
+            ? `+${elapsedMin}:${elapsedSecRemainder.toString().padStart(2, '0')}`
+            : timerState === 'completed'
+              ? 'GO!'
+              : `${Math.floor(remainingSec / 60)}:${(remainingSec % 60).toString().padStart(2, '0')}`}
+        </button>
+        {showQuickControls && (showElapsed ? (
+          <>
+            <button onClick={handleStopRace} className="a-ib a-txt-r" aria-label="Stop race timer" title="Stop race timer"><Square size={15} /></button>
+            <button onClick={handleWhistle} className="a-ib a-txt-a" aria-label="Whistle" title="Whistle"><Megaphone size={15} /></button>
+            <button onClick={handleBell} className="a-ib" aria-label="Bell" title="Bell"><BellIcon size={15} /></button>
+          </>
+        ) : (
+          <>
+            <button onClick={handleMinimizedStart} className="a-ib a-txt-g" aria-label="Start sequence" title="Start sequence"><Play size={15} /></button>
+            <button onClick={handleWhistle} className="a-ib a-txt-a" aria-label="Whistle" title="Whistle"><Megaphone size={15} /></button>
+            <button onClick={handleBell} className="a-ib" aria-label="Bell" title="Bell"><BellIcon size={15} /></button>
+          </>
+        ))}
+        {timerState === 'running' && !showElapsed && (
+          <button onClick={handleStop} className="a-ib a-txt-r" aria-label="Stop" title="Stop"><Square size={15} /></button>
+        )}
+        <button onClick={() => setIsMinimized(false)} className="a-ib" aria-label="Expand" title="Expand"><Maximize2 size={15} /></button>
       </div>
+    );
+    const slot = typeof document !== 'undefined' ? document.getElementById('alfie-startbox-slot') : null;
+    if (slot) return createPortal(pill, slot);
+    return (
+      <div className="fixed bottom-4 left-0 right-0 z-[100] flex justify-center pointer-events-none">{pill}</div>
     );
   }
 
