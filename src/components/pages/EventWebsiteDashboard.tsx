@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Globe, Eye, Settings, FileText, Image, Trophy, Users, Newspaper, ChartBar as BarChart3, ExternalLink, Loader as Loader2, CircleCheck as CheckCircle, CircleAlert as AlertCircle, X, CreditCard as Edit, Plus, Trash2, Menu, MapPin, Link2, Search, Calendar } from 'lucide-react';
+import { Globe, Eye, Settings, FileText, Image, Trophy, Users, Newspaper, ChartBar as BarChart3, ExternalLink, Loader as Loader2, CircleCheck as CheckCircle, CircleAlert as AlertCircle, X, CreditCard as Edit, Plus, Trash2, Menu, MapPin, Link2, Search, Calendar , Lock } from 'lucide-react';
 import type { EventWebsite, EventWebsiteSettings } from '../../types/eventWebsite';
 import { eventWebsiteStorage } from '../../utils/eventWebsiteStorage';
 import { EventWebsitePageManager } from '../events/EventWebsitePageManager';
@@ -252,139 +252,118 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-16">
+      <div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
-                <Globe className="text-white" size={28} />
-              </div>
-              <div>
-                <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {eventName}
-                </h1>
-                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} mt-1`}>
-                  Event Website Dashboard
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {!isOrphaned && website.event_id && (
-                <button
-                  onClick={() => {
-                    navigate(`/event-command-center/${website.event_id}`);
-                  }}
-                  className="btn-primary-green flex items-center gap-2 px-6 py-3 from-blue-600 to-cyan-600 text-white rounded-xl hover:shadow-lg transition-all hover:scale-[1.02] font-medium"
-                >
-                  <Menu size={18} />
-                  Task Manager
-                </button>
-              )}
-              {isOrphaned && (
-                <button
-                  onClick={handleOpenLinkModal}
-                  className="flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl hover:shadow-lg transition-all hover:scale-[1.02] font-medium"
-                >
-                  <Link2 size={18} />
-                  Link to Event
-                </button>
-              )}
-              {website.enabled && (
-                <a
-                  href={getSiteUrl()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-6 py-3 text-white rounded-xl hover:shadow-lg transition-all hover:scale-[1.02] font-medium"
-                >
-                  <Eye size={18} />
-                  View Website
-                  <ExternalLink size={14} />
-                </a>
-              )}
-              <button
-                onClick={() => navigate('/event-websites')}
-                className={`p-3 rounded-xl transition-colors ${
-                  darkMode
-                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900'
-                }`}
-                title="Exit"
-              >
-                <X size={20} />
-              </button>
-            </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="a-ew-mark">
+            {(website as any).logo_url ? <img src={(website as any).logo_url} alt="" className="max-h-[40px] max-w-[52px] object-contain" /> : <Globe size={24} className="text-slate-400" />}
+          </span>
+          <div className="flex-1 min-w-[220px]">
+            <p className="a-cap">Event website</p>
+            <h1 className="a-display a-ink mt-[3px] text-[28px] font-bold">
+              {eventName}
+            </h1>
           </div>
+
+          {!isOrphaned && website.event_id && (
+            <button
+              onClick={() => {
+                navigate(`/event-command-center/${website.event_id}`);
+              }}
+              className="a-btn"
+            >
+              <Menu size={16} />
+              Task manager
+            </button>
+          )}
+          {website.enabled && (
+            <a
+              href={getSiteUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="a-btn"
+            >
+              <Eye size={16} />
+              View website
+              <ExternalLink size={14} />
+            </a>
+          )}
+          <button
+            onClick={() => navigate('/event-websites')}
+            className="a-ib"
+            style={{ width: 42, height: 42 }}
+            title="Exit"
+            aria-label="Close"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Orphaned Website Banner */}
         {isOrphaned && (
-          <div className={`mb-6 p-4 rounded-xl border flex items-center justify-between ${
-            darkMode
-              ? 'bg-amber-900/20 border-amber-600/30'
-              : 'bg-amber-50 border-amber-200'
-          }`}>
-            <div className="flex items-center gap-3">
-              <AlertCircle className="text-amber-500 flex-shrink-0" size={20} />
-              <div>
-                <p className={`font-medium ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
-                  This website is not linked to an event
-                </p>
-                <p className={`text-sm ${darkMode ? 'text-amber-400/70' : 'text-amber-600'}`}>
-                  Some features (media, competitors, news) require a linked event. Link this website to an event to unlock all features.
-                </p>
-              </div>
+          <div className="a-banner-a">
+            <AlertCircle className="a-txt-a flex-shrink-0" size={18} />
+            <div className="flex-1 min-w-0">
+              <span className="a-txt-a text-[14px] font-semibold">Not linked to an event</span>
+              <span className="a-mute text-[13px]"> — Media, Competitors and News unlock once you link one.</span>
             </div>
             <button
               onClick={handleOpenLinkModal}
-              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors"
+              className="a-btn a-btn-a flex-shrink-0"
+              style={{ height: 36 }}
             >
-              <Link2 size={16} />
-              Link to Event
+              <Link2 size={15} />
+              Link to event
             </button>
           </div>
         )}
 
         {/* Tabs */}
-        <div className={`flex gap-2 mb-8 border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'} overflow-x-auto pb-px`}>
+        <nav className="a-seg a-seg-lg self-start max-w-full overflow-x-auto" aria-label="Website sections">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            const locked = isOrphaned && (tab.id === 'media' || tab.id === 'competitors' || tab.id === 'news');
 
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all whitespace-nowrap rounded-t-lg
-                  ${isActive
-                    ? darkMode
-                      ? 'bg-cyan-500/10 text-cyan-400 border-b-2 border-cyan-500'
-                      : 'bg-cyan-50 text-cyan-600 border-b-2 border-cyan-600'
-                    : darkMode
-                      ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }
-                `}
+                className={`a-seg-i ${isActive ? 'a-seg-on' : ''}`}
+                style={{ padding: '0 11px' }}
               >
-                <Icon size={18} />
+                <Icon size={16} />
                 {tab.label}
+                {locked && <span className="a-txt-a flex" title="Needs a linked event"><Lock size={13} /></span>}
               </button>
             );
           })}
-        </div>
+        </nav>
 
         {/* Content */}
         <div>
           {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Status Card */}
+            <div className="flex flex-col gap-4">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {([
+                  ['Pages', stats.pagesCount, FileText],
+                  ['Sponsors', stats.sponsorsCount, Trophy],
+                  ['Media', stats.mediaCount, Image],
+                  ['Visitors', stats.pageViews, Eye],
+                ] as const).map(([label, value, Icon]) => (
+                  <div key={label} className="a-card flex items-center gap-3.5" style={{ padding: '16px 18px' }}>
+                    <span className="a-tile"><Icon size={18} /></span>
+                    <div>
+                      <p className="a-cap">{label}</p>
+                      <div className={`a-num text-[28px] font-semibold leading-[1.1] mt-1 ${value ? 'a-ink' : 'a-dim'}`}>{value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               {/* Domain Management */}
               <div>
-                <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  Domain Management
-                </h3>
                 <EnhancedDomainManagementSection
                   entityType="event"
                   entityId={website.id}
@@ -393,65 +372,6 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
                   currentCustomDomain={website.custom_domain || undefined}
                   onDomainUpdate={loadWebsiteData}
                 />
-              </div>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className={`p-6 rounded-xl border ${
-                  darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Pages
-                    </h4>
-                    <FileText className="text-cyan-500" size={20} />
-                  </div>
-                  <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    {stats.pagesCount}
-                  </p>
-                </div>
-
-                <div className={`p-6 rounded-xl border ${
-                  darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Sponsors
-                    </h4>
-                    <Trophy className="text-cyan-500" size={20} />
-                  </div>
-                  <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    {stats.sponsorsCount}
-                  </p>
-                </div>
-
-                <div className={`p-6 rounded-xl border ${
-                  darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Media
-                    </h4>
-                    <Image className="text-cyan-500" size={20} />
-                  </div>
-                  <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    {stats.mediaCount}
-                  </p>
-                </div>
-
-                <div className={`p-6 rounded-xl border ${
-                  darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Visitors
-                    </h4>
-                    <Eye className="text-cyan-500" size={20} />
-                  </div>
-                  <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    {stats.pageViews}
-                  </p>
-                </div>
               </div>
             </div>
           )}
