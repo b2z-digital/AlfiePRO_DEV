@@ -32,9 +32,9 @@ export const QuickActionsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode
         </button>
       )}
 
-      <div className="flex items-center gap-2 mb-4">
-        <Zap className={darkMode ? "text-yellow-400" : "text-yellow-500"} size={20} />
-        <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-700'}`}>Quick Actions</h2>
+      <div className="flex items-center gap-3 mb-4">
+        <span className="a-tile flex-shrink-0" style={{ width: 36, height: 36 }}><Zap size={19} /></span>
+        <h2 className="a-display a-ink text-[18px] font-semibold">Quick Actions</h2>
       </div>
 
       <div className="space-y-2">

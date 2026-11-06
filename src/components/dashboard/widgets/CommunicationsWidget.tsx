@@ -86,9 +86,9 @@ export const CommunicationsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         </button>
       )}
 
-      <div className="flex items-center gap-2 mb-4">
-        <MessageSquare className="text-cyan-400" size={20} />
-        <h2 className="text-lg font-semibold text-white">Communications</h2>
+      <div className="flex items-center gap-3 mb-4">
+        <span className="a-tile flex-shrink-0" style={{ width: 36, height: 36 }}><MessageSquare size={19} /></span>
+        <h2 className="a-display a-ink text-[18px] font-semibold">Communications</h2>
       </div>
 
       {loading ? (
