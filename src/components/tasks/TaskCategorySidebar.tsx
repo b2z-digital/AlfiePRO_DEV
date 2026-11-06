@@ -1,14 +1,21 @@
 import React from 'react';
-import { 
-  Clock, 
-  AlertTriangle, 
-  Calendar, 
-  CalendarDays, 
-  CalendarRange, 
-  CheckCircle, 
-  List, 
-  User 
-} from 'lucide-react';
+import { AlfieIcon } from '../brand/AlfieIcon';
+
+/* Board TaskList glyphs: calendar nodes coloured per list (orange today, violet week, blue month) */
+const glyphIcon = (glyph: string, node?: string) => {
+  const C = ({ size = 16 }: { size?: number }) => (
+    <AlfieIcon glyph={glyph} size={size} className={node ? `a-node-${node}` : undefined} />
+  );
+  return C;
+};
+const Clock = glyphIcon('clock');
+const AlertTriangle = glyphIcon('warn', 'r');
+const Calendar = glyphIcon('cal', 'o');
+const CalendarDays = glyphIcon('cal', 'v');
+const CalendarRange = glyphIcon('cal', 'b');
+const CheckCircle = glyphIcon('check');
+const List = glyphIcon('filter');
+const User = glyphIcon('team');
 
 interface TaskCategorySidebarProps {
   activeCategory: string;
