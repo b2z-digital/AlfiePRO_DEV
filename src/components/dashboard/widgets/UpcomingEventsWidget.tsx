@@ -568,11 +568,12 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
     return `${displayHour}:${min} ${suffix}`;
   };
 
-  const renderMeetingCard = (event: RaceEvent) => (
+  const renderMeetingCard = (event: RaceEvent, hero = false) => (
     <div
       key={event.id}
       onClick={() => handleMeetingClick(event)}
       className={`
+        a-ev ${hero ? 'a-ev-hero' : 'a-ev-row'}
         group relative overflow-hidden rounded-xl border transition-all duration-300
         ${isEditMode ? 'pointer-events-none' : 'hover:shadow-xl hover:scale-[1.02] cursor-pointer'}
         bg-slate-800/50 border-slate-700/50 hover:border-slate-600/70
@@ -682,7 +683,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
     </div>
   );
 
-  const renderEventCard = (event: RaceEvent) => (
+  const renderEventCard = (event: RaceEvent, hero = false) => (
     <div
       key={event.id}
       onClick={() => {
@@ -699,6 +700,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         }
       }}
       className={`
+        a-ev ${hero ? 'a-ev-hero' : 'a-ev-row'}
         group relative overflow-hidden rounded-xl border transition-all duration-300
         ${isEditMode ? 'pointer-events-none' : 'hover:shadow-xl hover:scale-[1.02] cursor-pointer'}
         bg-slate-800/50 border-slate-700/50 hover:border-slate-600/70
@@ -821,9 +823,9 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       )}
 
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
-          <Calendar className="text-blue-400" size={20} />
-          <h2 className="text-lg font-semibold text-white">{getWidgetTitle()}</h2>
+        <div className="flex items-center gap-3">
+          <span className="a-tile" style={{ width: 36, height: 36 }}><Calendar size={19} /></span>
+          <h2 className="a-display text-lg font-semibold text-white">{getWidgetTitle()}</h2>
         </div>
         {!isEditMode && (
           <button
@@ -847,8 +849,8 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         </div>
       ) : (
         <div className="space-y-3">
-          {upcomingEvents.map((event) => (
-            event.isMeeting ? renderMeetingCard(event) : renderEventCard(event)
+          {upcomingEvents.map((event, i) => (
+            event.isMeeting ? renderMeetingCard(event, i === 0) : renderEventCard(event, i === 0)
           ))}
         </div>
       )}
