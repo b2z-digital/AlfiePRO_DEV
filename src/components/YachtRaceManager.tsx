@@ -3896,7 +3896,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
   if (isRaceManagementOpen) {
     return (
-      <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50'}`}>
+      <div className={`alfie-app-bg min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50'}`}>
         {selectedEvent ? (
           <div className="w-full px-20 py-12">
             <button
@@ -3954,7 +3954,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
   return (
     <AlfieIconContext.Provider value={true}>
-    <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50'}`}>
+    <div className={`alfie-app-bg min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50'}`}>
       <div className={`w-full ${isFullscreenScoring ? (useAlfieTopBar ? 'a-scoring-fs' : 'px-0 py-0') : useAlfieTopBar ? 'px-5 pt-5 pb-6' : 'px-20 py-12'}`}>
         <div className={`flex-1 flex flex-col ${useAlfieTopBar ? 'justify-start' : 'justify-center'} ${isFullscreenScoring ? (useAlfieTopBar ? 'min-h-0 gap-3' : '') : 'min-h-[calc(100vh-24rem)]'}`}>
           {getCurrentEvent() && useAlfieTopBar && (
