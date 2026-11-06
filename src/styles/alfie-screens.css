@@ -677,3 +677,27 @@ html.alfie-light .a-pill-st-g { background: rgba(48,209,88,0.1); color: #1E8E3E;
 .a-pg-drag { background: rgba(10,132,255,0.08); box-shadow: inset 0 0 0 1px rgba(10,132,255,0.4); }
 html.alfie-light .a-pg + .a-pg { border-color: rgba(15,23,42,0.07); }
 html.alfie-light .a-pg:hover { background: rgba(15,23,42,0.02); }
+
+/* ── Comms (boards C_inbox / C_chats) ───────────────────────── */
+html.alfie-theme .a-pane { display: flex; border-radius: 24px; overflow: hidden; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); }
+html.alfie-theme .a-lp { border-right: 1px solid rgba(255,255,255,0.07); background: rgba(0,0,0,0.12); }
+html.alfie-theme .a-ghd { padding: 14px 22px 6px; font: 600 11px 'Instrument Sans', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: rgba(235,240,255,0.45); }
+html.alfie-theme .a-it { position: relative; display: flex; gap: 12px; padding: 12px 14px 12px 11px; margin: 0 8px; border-radius: 16px; border: 0; border-left: 3px solid transparent; cursor: pointer; background: transparent; width: calc(100% - 16px); text-align: left; }
+html.alfie-theme .a-it:hover { background: rgba(255,255,255,0.04); }
+html.alfie-theme .a-it.a-it-on { background: linear-gradient(#1B2232,#1B2232) padding-box, linear-gradient(180deg,#2E7BFF 0%,#8A4DFF 38%,#FF3E9A 70%,#FF8A2B 100%) border-box; }
+html.alfie-theme .a-it.a-it-chk { background: rgba(46,123,255,0.10); }
+html.alfie-theme .a-unread { position: absolute; left: 4px; top: 24px; width: 7px; height: 7px; border-radius: 999px; background: #0A84FF; box-shadow: 0 0 0 3px rgba(10,132,255,0.2); }
+html.alfie-theme .a-sys { display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 999px; color: #fff; background: linear-gradient(135deg,#2E7BFF,#8A4DFF); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2); }
+html.alfie-theme .a-it-chkbox { position: absolute; right: 12px; bottom: 12px; display: none; padding: 2px; background: none; border: 0; }
+html.alfie-theme .a-it:hover .a-it-chkbox, html.alfie-theme .a-it-chkbox.a-it-chkbox-on { display: flex; }
+html.alfie-theme .a-bulkbar { border-radius: 12px; background: rgba(46,123,255,0.10); border: 1px solid rgba(46,123,255,0.22); }
+html.alfie-theme .a-msg-body p { margin: 0 0 12px; }
+html.alfie-theme .a-msg-body a { color: #6FB4FF; }
+html.alfie-theme .a-msg-body ul { list-style: disc; padding-left: 20px; }
+html.alfie-theme .a-msg-body ol { list-style: decimal; padding-left: 20px; }
+html.alfie-light .a-pane { background: #fff; border-color: rgba(15,23,42,0.08); box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.06); }
+html.alfie-light .a-lp { border-right-color: rgba(15,23,42,0.07); background: #F6F8FB; }
+html.alfie-light .a-ghd { color: rgba(15,23,42,0.45); }
+html.alfie-light .a-it:hover { background: rgba(15,23,42,0.04); }
+html.alfie-light .a-it.a-it-on { background: linear-gradient(#fff,#fff) padding-box, linear-gradient(180deg,#2E7BFF 0%,#8A4DFF 38%,#FF3E9A 70%,#FF8A2B 100%) border-box; box-shadow: 0 1px 2px rgba(15,23,42,0.06), 0 4px 14px rgba(15,23,42,0.06); }
+html.alfie-light .a-msg-body a { color: #0A64D8; }

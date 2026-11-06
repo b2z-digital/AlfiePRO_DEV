@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, Inbox, Send, FileText, Star, MessageCircle, X, MessageSquare, Trash2, UserPlus, SquareCheck as CheckSquare, Square } from 'lucide-react';
+import { Search, Plus, Inbox, Send, FileText, Star, MessageCircle, X, MessageSquare, Trash2, UserPlus, SquareCheck as CheckSquare, Square , Bell } from 'lucide-react';
 
 export type SidebarTab = 'inbox' | 'sent' | 'starred' | 'drafts';
 export type TopLevelTab = 'inbox' | 'chats';
@@ -164,10 +164,10 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
   );
 
   const tabs: { id: SidebarTab; label: string; icon: React.ReactNode; count?: number }[] = [
-    { id: 'inbox', label: 'Inbox', icon: <Inbox size={18} />, count: unreadCount || undefined },
-    { id: 'sent', label: 'Sent', icon: <Send size={18} /> },
-    { id: 'starred', label: 'Starred', icon: <Star size={18} /> },
-    { id: 'drafts', label: 'Drafts', icon: <FileText size={18} />, count: drafts.length || undefined },
+    { id: 'inbox', label: 'Inbox', icon: <Inbox size={16} />, count: unreadCount || undefined },
+    { id: 'sent', label: 'Sent', icon: <Send size={16} /> },
+    { id: 'starred', label: 'Starred', icon: <Star size={16} /> },
+    { id: 'drafts', label: 'Drafts', icon: <FileText size={16} />, count: drafts.length || undefined },
   ];
 
   const handlePlusClick = () => {
@@ -211,102 +211,41 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-slate-800/80 via-slate-800/60 to-slate-900/80 backdrop-blur-sm border-r border-slate-700/50 overflow-hidden">
-      <div className="flex-shrink-0 p-4 pt-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-              <MessageCircle size={18} className="text-white" />
-            </div>
-            <h2 className="text-lg font-bold text-white tracking-tight">Conversations</h2>
-          </div>
-          <button
-            onClick={handlePlusClick}
-            title={topLevelTab === 'chats' ? 'New Chat' : 'Compose Message'}
-            className="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all hover:scale-105 shadow-lg shadow-blue-600/20"
-          >
-            {topLevelTab === 'chats' ? <UserPlus size={17} /> : <Plus size={18} />}
-          </button>
-        </div>
-
-        <div className="flex gap-1 p-1 bg-slate-900/60 rounded-xl border border-slate-700/40">
-          <button
-            onClick={() => onTopLevelTabChange('inbox')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
-              topLevelTab === 'inbox'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
-            }`}
-          >
-            <Inbox size={16} />
-            Inbox
-            {unreadCount > 0 && (
-              <span className={`min-w-[20px] h-[20px] px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center ${
-                topLevelTab === 'inbox' ? 'bg-white/20 text-white' : 'bg-blue-500 text-white'
-              }`}>
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => onTopLevelTabChange('chats')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
-              topLevelTab === 'chats'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
-            }`}
-          >
-            <MessageSquare size={16} />
-            Chats
-            {unreadChatsCount > 0 && (
-              <span className={`min-w-[20px] h-[20px] px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center ${
-                topLevelTab === 'chats' ? 'bg-white/20 text-white' : 'bg-blue-500 text-white'
-              }`}>
-                {unreadChatsCount > 99 ? '99+' : unreadChatsCount}
-              </span>
-            )}
-          </button>
-        </div>
-
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+    <div className="a-lp flex flex-col h-full overflow-hidden">
+      <div className="flex-shrink-0 flex flex-col gap-2.5" style={{ padding: '16px 16px 10px' }}>
+        <label className="a-field" style={{ height: 40 }}>
+          <Search size={16} />
           <input
             type="text"
-            placeholder={topLevelTab === 'chats' ? 'Search chats...' : 'Search conversations...'}
+            placeholder={topLevelTab === 'chats' ? 'Search chats' : 'Search messages'}
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
           />
           {searchTerm && (
             <button
               onClick={() => onSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+              className="a-dim flex"
+              aria-label="Clear search"
             >
               <X size={14} />
             </button>
           )}
-        </div>
+        </label>
 
         {topLevelTab === 'inbox' && (
-          <div className="flex gap-1 p-1 bg-slate-800/60 rounded-xl border border-slate-700/30">
+          <div className="a-seg" style={{ display: 'flex' }} role="tablist">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-slate-700/80 text-white shadow-sm'
-                    : 'text-slate-500 hover:text-slate-300'
-                }`}
+                className={`a-seg-i flex-1 justify-center ${activeTab === tab.id ? 'a-seg-on' : ''}`}
+                style={{ padding: '0 6px', gap: 6 }}
+                title={tab.label}
               >
                 {tab.icon}
-                <span className="hidden xl:inline">{tab.label}</span>
+                <span>{tab.label}</span>
                 {tab.count && tab.count > 0 && (
-                  <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
-                    tab.id === 'inbox' ? 'bg-blue-500 text-white' : 'bg-slate-600 text-slate-300'
-                  }`}>
-                    {tab.count > 99 ? '99+' : tab.count}
-                  </span>
+                  <span className="a-cnt">{tab.count > 99 ? '99+' : tab.count}</span>
                 )}
               </button>
             ))}
@@ -314,11 +253,11 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
+      <div className="flex-1 overflow-y-auto pb-2">
         {topLevelTab === 'chats' ? (
           filteredChats.length === 0 ? (
             <EmptyState
-              icon={<MessageSquare size={32} />}
+              icon={<MessageSquare size={22} />}
               title={searchTerm ? 'No matching chats' : 'No chats yet'}
               subtitle={searchTerm ? 'Try a different search' : 'Start a chat from the Community page'}
             />
@@ -335,14 +274,9 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                   >
                     <button
                       onClick={() => onSelectChat(chat)}
-                      className={`w-full text-left p-3 rounded-xl transition-all relative ${
-                        isSelected
-                          ? 'bg-blue-600/15 border border-blue-500/30'
-                          : chat.is_unread
-                            ? 'bg-slate-700/30 hover:bg-slate-700/50 border border-transparent'
-                            : 'hover:bg-slate-700/30 border border-transparent'
-                      }`}
+                      className={`a-it w-full text-left ${isSelected ? 'a-it-on' : ''}`}
                     >
+                      {chat.is_unread && <span className="a-unread" />}
                       <div className="flex items-center gap-3">
                         <div className="relative">
                           <UserAvatar
@@ -350,24 +284,21 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                             avatarUrl={chat.participant_avatar}
                             size={44}
                           />
-                          {chat.is_unread && (
-                            <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-[#131c31]" />
-                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
-                            <p className={`text-sm truncate ${chat.is_unread ? 'font-semibold text-white' : 'font-medium text-slate-300'}`}>
+                            <p className={`a-ink text-[14.5px] truncate ${chat.is_unread ? 'font-semibold' : 'font-medium'}`}>
                               {chat.participant_name}
                             </p>
                             <div className="flex items-center gap-1 ml-2 flex-shrink-0">
                               {chat.last_message_at && (
-                                <span className={`text-[11px] ${chat.is_unread ? 'text-blue-400 font-medium' : 'text-slate-600'}`}>
+                                <span className={`text-[12px] ${chat.is_unread ? 'a-txt-b' : 'a-dim'}`}>
                                   {formatTimeAgo(chat.last_message_at)}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <p className={`text-xs truncate mt-0.5 pr-6 ${chat.is_unread ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>
+                          <p className={`text-[13px] truncate mt-0.5 pr-6 ${chat.is_unread ? 'a-ink' : 'a-dim'}`}>
                             {chat.last_message_text || 'No messages yet'}
                           </p>
                         </div>
@@ -390,7 +321,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
           )
         ) : activeTab === 'drafts' ? (
           drafts.length === 0 ? (
-            <EmptyState icon={<FileText size={32} />} title="No drafts" subtitle="Saved drafts will appear here" />
+            <EmptyState icon={<FileText size={22} />} title="No drafts" subtitle="Saved drafts will appear here" />
           ) : (
             <div className="space-y-0.5">
               {drafts.map(draft => (
@@ -423,14 +354,14 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
           )
         ) : displayList.length === 0 ? (
           <EmptyState
-            icon={activeTab === 'inbox' ? <Inbox size={32} /> : activeTab === 'sent' ? <Send size={32} /> : <Star size={32} />}
+            icon={activeTab === 'inbox' ? <Inbox size={22} /> : activeTab === 'sent' ? <Send size={22} /> : <Star size={22} />}
             title={searchTerm ? 'No results' : `No ${activeTab} messages`}
             subtitle={searchTerm ? 'Try a different search term' : activeTab === 'inbox' ? 'New messages will appear here' : undefined}
           />
         ) : (
           <>
             {selectionMode && (
-              <div className="flex items-center gap-2 px-2 py-2 mb-1 rounded-xl bg-blue-600/10 border border-blue-500/20">
+              <div className="a-bulkbar flex items-center gap-2 mx-2 mb-1" style={{ padding: '6px 8px' }}>
                 <button
                   onClick={toggleSelectAll}
                   className="p-1 rounded hover:bg-slate-700/50 transition-colors"
@@ -460,126 +391,114 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                 </button>
               </div>
             )}
-            <div className="space-y-0.5">
-              {displayList.map(notification => {
+            {(() => {
+              const now = new Date();
+              const weekAgo = new Date(now.getTime() - 7 * 86400000);
+              const groupLabel = (d: string) => {
+                const dt = new Date(d);
+                if (dt >= weekAgo) return 'This week';
+                return dt.getFullYear() === now.getFullYear()
+                  ? dt.toLocaleDateString('en-AU', { month: 'long' })
+                  : dt.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+              };
+              let lastGroup = '';
+              return displayList.map(notification => {
                 const isSent = activeTab === 'sent';
                 const displayName = isSent
                   ? (notification.recipient_name || 'Unknown')
-                  : (notification.sender_name || 'System');
+                  : (notification.sender_name || 'AlfiePRO');
                 const displayAvatar = isSent
                   ? notification.recipient_avatar_url
                   : notification.sender_avatar_url;
+                const isSystem = !isSent && !notification.sender_name;
                 const isSelected = selectedId === notification.id;
                 const isChecked = selectedIds.has(notification.id);
                 const isUnread = !notification.read && activeTab === 'inbox';
+                const g = groupLabel(notification.sent_at);
+                const showGroup = g !== lastGroup;
+                lastGroup = g;
+                const sentDate = new Date(notification.sent_at);
+                const when = sentDate >= weekAgo ? sentDate.toLocaleDateString('en-AU', { weekday: 'short' }) : `${sentDate.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][sentDate.getMonth()]}`;
 
                 return (
+                  <React.Fragment key={notification.id}>
+                  {showGroup && <div className="a-ghd">{g}</div>}
                   <div
-                    key={notification.id}
-                    className={`relative flex items-center rounded-xl transition-all group ${
-                      isChecked
-                        ? 'bg-blue-600/10 border border-blue-500/20'
-                        : isSelected
-                          ? 'bg-blue-600/15 border border-blue-500/30'
-                          : isUnread
-                            ? 'bg-slate-700/30 hover:bg-slate-700/50 border border-transparent'
-                            : 'hover:bg-slate-700/30 border border-transparent'
-                    }`}
+                    className={`a-it group ${isSelected ? 'a-it-on' : ''} ${isChecked ? 'a-it-chk' : ''}`}
+                    onClick={() => {
+                      if (selectionMode) {
+                        setSelectedIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(notification.id)) next.delete(notification.id);
+                          else next.add(notification.id);
+                          if (next.size === 0) setSelectionMode(false);
+                          return next;
+                        });
+                      } else {
+                        onSelect(notification);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
                   >
+                    {isUnread && <span className="a-unread" />}
                     <button
                       onClick={(e) => {
                         if (!selectionMode) setSelectionMode(true);
                         toggleSelection(notification.id, e);
                       }}
-                      className={`flex-shrink-0 p-2 pl-2.5 rounded-l-xl transition-all ${
-                        selectionMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                      }`}
+                      className={`a-it-chkbox ${selectionMode || isChecked ? 'a-it-chkbox-on' : ''}`}
+                      aria-label={isChecked ? 'Deselect' : 'Select'}
                     >
                       {isChecked ? (
-                        <CheckSquare size={16} className="text-blue-400" />
+                        <CheckSquare size={16} className="a-txt-b" />
                       ) : (
-                        <Square size={16} className="text-slate-600 hover:text-slate-400" />
+                        <Square size={16} className="a-dim" />
                       )}
                     </button>
-                    <button
-                      onClick={() => {
-                        if (selectionMode) {
-                          setSelectedIds(prev => {
-                            const next = new Set(prev);
-                            if (next.has(notification.id)) next.delete(notification.id);
-                            else next.add(notification.id);
-                            if (next.size === 0) setSelectionMode(false);
-                            return next;
-                          });
-                        } else {
-                          onSelect(notification);
-                        }
-                      }}
-                      className="flex-1 text-left p-3 pl-1 min-w-0"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <UserAvatar
-                            name={displayName}
-                            avatarUrl={displayAvatar}
-                            size={44}
-                          />
-                          {isUnread && (
-                            <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-[#131c31]" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className={`text-sm truncate ${isUnread ? 'font-semibold text-white' : 'font-medium text-slate-300'}`}>
-                              {displayName}
-                            </p>
-                            <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
-                              {notification.is_starred && (
-                                <Star size={12} className="fill-amber-400 text-amber-400" />
-                              )}
-                              <span className={`text-[11px] ${isUnread ? 'text-blue-400 font-medium' : 'text-slate-600'}`}>
-                                {formatTimeAgo(notification.sent_at)}
-                              </span>
-                            </div>
-                          </div>
-                          <p className={`text-xs truncate mt-0.5 ${isUnread ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>
-                            {notification.subject}
-                          </p>
-                          <p className="text-[11px] text-slate-600 truncate mt-0.5">
-                            {notification.body.replace(/<[^>]*>/g, '').slice(0, 60)}
-                          </p>
-                        </div>
+                    {isSystem ? (
+                      <span className="a-sys" style={{ width: 40, height: 40 }}><Bell size={18} /></span>
+                    ) : (
+                      <UserAvatar name={displayName} avatarUrl={displayAvatar} size={40} />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <span className={`a-ink flex-1 truncate text-[14.5px] ${isUnread ? 'font-semibold' : 'font-medium'}`}>{displayName}</span>
+                        {notification.is_starred && <Star size={12} className="fill-amber-400 text-amber-400 self-center" />}
+                        <span className={`text-[12px] ${isUnread ? 'a-txt-b' : 'a-dim'}`}>{when}</span>
                       </div>
-                      {notification.club_name && (
-                        <div className="mt-2 ml-[56px]">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded-md text-[10px] text-cyan-400 font-medium">
-                            {notification.club_name}
-                          </span>
+                      <div className={`text-[13.5px] mt-0.5 truncate ${isUnread ? 'a-ink' : 'a-mute'}`}>{notification.subject}</div>
+                      <div className="a-dim text-[12.5px] mt-0.5 truncate">{notification.body.replace(/<[^>]*>/g, '').slice(0, 80)}</div>
+                      {(notification.club_name || (notification.type && notification.type !== 'general')) && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {notification.club_name && <span className="a-lb-fmt" style={{ height: 22, fontSize: 11.5 }}><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: '#2E7BFF' }} /><span className="truncate max-w-[180px]">{notification.club_name}</span></span>}
+                          {notification.type && notification.type !== 'general' && <span className="a-lb-fmt capitalize" style={{ height: 22, fontSize: 11.5 }}><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: notification.type === 'results' ? '#30D158' : notification.type === 'meeting' ? '#40C8C0' : '#9AA6BD' }} />{notification.type.replace(/_/g, ' ')}</span>}
                         </div>
                       )}
-                    </button>
+                    </div>
                   </div>
+                  </React.Fragment>
                 );
-              })}
-            </div>
+              });
+            })()}
           </>
         )}
       </div>
 
-      <div className="flex-shrink-0 p-3 border-t border-slate-700/50">
-        <div className="flex items-center justify-between text-xs text-slate-500">
+      <div className="flex-shrink-0 border-t a-bd" style={{ padding: '10px 16px' }}>
+        <div className="a-dim flex items-center justify-between text-[12px]">
           {topLevelTab === 'chats' ? (
             <>
               <span>{chatConversations.length} chats</span>
               {unreadChatsCount > 0 && (
-                <span className="text-blue-400 font-medium">{unreadChatsCount} unread</span>
+                <span className="a-txt-b font-medium">{unreadChatsCount} unread</span>
               )}
             </>
           ) : (
             <>
               <span>{notifications.length} conversations</span>
               {unreadCount > 0 && (
-                <span className="text-blue-400 font-medium">{unreadCount} unread</span>
+                <span className="a-txt-b font-medium">{unreadCount} unread</span>
               )}
             </>
           )}
@@ -590,12 +509,12 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
 };
 
 const EmptyState = ({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle?: string }) => (
-  <div className="flex flex-col items-center justify-center py-16 px-4">
-    <div className="w-16 h-16 rounded-2xl bg-slate-700/40 flex items-center justify-center mb-4 text-slate-600">
+  <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+    <span className="a-tile mb-3" style={{ width: 52, height: 52 }}>
       {icon}
-    </div>
-    <p className="text-slate-400 font-medium text-sm">{title}</p>
-    {subtitle && <p className="text-slate-600 text-xs mt-1">{subtitle}</p>}
+    </span>
+    <p className="a-ink font-semibold text-[14px]">{title}</p>
+    {subtitle && <p className="a-dim text-[12.5px] mt-1">{subtitle}</p>}
   </div>
 );
 
