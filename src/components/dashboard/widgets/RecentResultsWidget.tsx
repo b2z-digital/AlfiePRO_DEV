@@ -445,9 +445,9 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
       )}
 
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="text-green-400" size={20} />
-          <h2 className="text-lg font-semibold text-white">Recent Results</h2>
+        <div className="flex items-center gap-3">
+          <span className="a-tile" style={{ width: 36, height: 36 }}><Trophy size={19} /></span>
+          <h2 className="a-display text-lg font-semibold text-white">Recent Results</h2>
         </div>
         {!isEditMode && (
           <button
@@ -471,7 +471,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
         </div>
       ) : (
         <div className="space-y-3">
-          {recentResults.map((race) => (
+          {recentResults.map((race, raceIdx) => (
             <div
               key={race.id}
               onClick={() => {
@@ -483,6 +483,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
                 }
               }}
               className={`
+                a-ev ${raceIdx === 0 ? 'a-ev-hero a-ev-latest' : 'a-ev-row'}
                 group relative overflow-hidden rounded-xl border transition-all duration-300
                 ${isEditMode ? 'pointer-events-none' : 'hover:shadow-xl hover:scale-[1.02] cursor-pointer'}
                 bg-slate-800/50 border-slate-700/50 hover:border-slate-600
