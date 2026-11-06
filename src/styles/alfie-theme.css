@@ -77,6 +77,13 @@ html.alfie-dark body {
   background-color: #060B16;
 }
 
+/* One card surface for the whole app (design board .card) */
+html.alfie-dark {
+  --a-card: rgba(255, 255, 255, 0.025);
+  --a-card-border: rgba(255, 255, 255, 0.07);
+  --a-card-hover-border: rgba(255, 255, 255, 0.13);
+}
+
 html.alfie-dark .alfie-app-bg {
   background-color: #060B16;
   background-image:
@@ -302,8 +309,8 @@ html.alfie-light :is(.rounded-xl, .rounded-2xl).bg-gradient-to-br:has(> svg:only
 
 /* ── Dark glass cards: lift bordered translucent cards off the navy ── */
 html.alfie-dark :is(.rounded-xl, .rounded-2xl).border:is(.bg-slate-800\/30, .bg-slate-800\/40, .bg-slate-800\/50) {
-  background-color: rgba(20, 28, 46, 0.66);
-  border-color: rgba(255, 255, 255, 0.075);
+  background-color: var(--a-card);
+  border-color: var(--a-card-border);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px rgba(0, 0, 0, 0.22);
 }
 
@@ -417,7 +424,7 @@ html.alfie-theme .alfie-chrome.fixed {
 html.alfie-theme .alfie-chrome.fixed::before {
   content: '';
   position: absolute;
-  inset: 10px 8px 10px 8px;
+  inset: 12px;
   z-index: -1;
   pointer-events: none;
   border-radius: 22px;
@@ -432,7 +439,8 @@ html.alfie-light .alfie-chrome.fixed::before {
   border-color: rgba(15, 23, 42, 0.08);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 36px rgba(15, 23, 42, 0.10);
 }
-html.alfie-theme .alfie-chrome.fixed .px-3 { padding-left: 13px; padding-right: 13px; }
+html.alfie-theme .alfie-chrome.fixed .px-3 { padding-left: 20px; padding-right: 20px; }
+html.alfie-theme .alfie-chrome.fixed.w-\[92px\] .px-3 { padding-left: 24px; padding-right: 24px; }
 html.alfie-theme .alfie-chrome.fixed .border-t { border-top-color: transparent !important; position: relative; }
 html.alfie-theme .alfie-chrome.fixed .border-t::before {
   content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
@@ -720,8 +728,8 @@ html.alfie-theme :is(div, nav).border-b:has(> button.border-b-2):has(> button + 
 
 /* ── Tinted KPI cards (bg-*-500/[0.08] + corner blob) → neutral glass cards; colour stays in the icon and figures ── */
 html.alfie-dark .group.relative.overflow-hidden:is(.rounded-xl, .rounded-2xl)[class*="-500/[0.0"] {
-  background: rgba(20, 28, 46, 0.66) !important;
-  border-color: rgba(255, 255, 255, 0.075) !important;
+  background: var(--a-card) !important;
+  border-color: var(--a-card-border) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px rgba(0, 0, 0, 0.22);
 }
 html.alfie-dark .group.relative.overflow-hidden:is(.rounded-xl, .rounded-2xl)[class*="-500/[0.0"]:hover { border-color: rgba(255, 255, 255, 0.14) !important; }
@@ -739,8 +747,8 @@ html.alfie-light .group.relative.overflow-hidden:is(.rounded-xl, .rounded-2xl)[c
 /* ── Tinted gradient stat cards (from-*-500/20 to-*-600/10 + coloured border) → neutral cards ── */
 html.alfie-dark .bg-gradient-to-br:is(.rounded-xl, .rounded-2xl):is([class*="-500/10 to-"], [class*="-500/20 to-"], [class*="-600/20 to-"], [class*="-600/10 to-"]):is([class*="border-red-500/"], [class*="border-blue-500/"], [class*="border-cyan-500/"], [class*="border-teal-500/"], [class*="border-green-500/"], [class*="border-emerald-500/"], [class*="border-amber-500/"], [class*="border-orange-500/"], [class*="border-purple-500/"], [class*="border-yellow-500/"]) {
   background-image: none !important;
-  background-color: rgba(20, 28, 46, 0.66) !important;
-  border-color: rgba(255, 255, 255, 0.075) !important;
+  background-color: var(--a-card) !important;
+  border-color: var(--a-card-border) !important;
 }
 html.alfie-light .bg-gradient-to-br:is(.rounded-xl, .rounded-2xl):is([class*="-500/10 to-"], [class*="-500/20 to-"], [class*="-600/20 to-"], [class*="-600/10 to-"]):is([class*="border-red-500/"], [class*="border-blue-500/"], [class*="border-cyan-500/"], [class*="border-teal-500/"], [class*="border-green-500/"], [class*="border-emerald-500/"], [class*="border-amber-500/"], [class*="border-orange-500/"], [class*="border-purple-500/"], [class*="border-yellow-500/"]) {
   background-image: none !important;
@@ -748,3 +756,18 @@ html.alfie-light .bg-gradient-to-br:is(.rounded-xl, .rounded-2xl):is([class*="-5
   border-color: rgba(15, 23, 42, 0.08) !important;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
 }
+
+
+/* ═══════════════════ Card surfaces: identical everywhere (board .card) ═══════════════════
+ * Screens set their own slate fills (bg-slate-800, /30, /50, bg-slate-900/50 …), so cards drifted
+ * between sections. Every rounded card container now resolves to the same board surface. Floating
+ * things (dropdowns, sticky cells, modals) keep their own solid fills. */
+html.alfie-dark :is(div, section, article, li, a):is(.rounded-xl, .rounded-2xl, .rounded-3xl):is(.bg-slate-800, .bg-slate-800\/20, .bg-slate-800\/30, .bg-slate-800\/40, .bg-slate-800\/50, .bg-slate-800\/60, .bg-slate-800\/70, .bg-slate-800\/80, .bg-slate-900, .bg-slate-900\/30, .bg-slate-900\/40, .bg-slate-900\/50, .bg-slate-900\/60, .bg-slate-900\/80, .bg-slate-700\/30, .bg-slate-700\/20):not(.absolute):not(.fixed):not(.sticky) {
+  background-color: var(--a-card) !important;
+  border-color: var(--a-card-border) !important;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+html.alfie-dark .fixed.inset-0 > :is(.rounded-xl, .rounded-2xl, .rounded-3xl):is(.bg-slate-800, .bg-slate-900, [class*="bg-slate-800/"], [class*="bg-slate-900/"]) {
+  background-color: #111A2C !important;
+}
+html.alfie-dark .a-card-hi, html.alfie-dark .a-card { background: var(--a-card); border-color: var(--a-card-border); }
