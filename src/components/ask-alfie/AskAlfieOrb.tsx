@@ -28,17 +28,21 @@ export const AskAlfieOrb: React.FC<AskAlfieOrbProps> = ({ darkMode }) => {
     <>
       <button
         onClick={handleToggle}
-        className={`fixed bottom-6 right-6 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${
-          isOpen ? 'w-14 h-14 bg-slate-700 hover:bg-slate-600 z-[9990]' : 'w-[68px] h-[68px] z-40'
+        className={`fixed bottom-6 right-6 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 w-[68px] h-[68px] ${
+          isOpen ? 'z-[9990]' : 'z-40'
         }`}
-        title="Ask Alfie"
-        style={!isOpen ? { background: 'transparent', filter: 'drop-shadow(0 10px 24px rgba(138, 77, 255, 0.35))' } : undefined}
+        title={isOpen ? 'Close Ask Alfie' : 'Ask Alfie'}
+        aria-label={isOpen ? 'Close Ask Alfie' : 'Ask Alfie'}
+        style={{ background: 'transparent', filter: 'drop-shadow(0 10px 24px rgba(138, 77, 255, 0.35))' }}
       >
-        {isOpen ? (
-          <X className="w-6 h-6 text-white" />
-        ) : (
+        <span className="relative inline-flex">
           <AlfieMark size={60} className="cursor-pointer" />
-        )}
+          {isOpen && (
+            <span className="absolute inset-0 flex items-center justify-center" style={{ paddingRight: 4, paddingBottom: 4 }}>
+              <X className="w-7 h-7 text-white" strokeWidth={2.6} />
+            </span>
+          )}
+        </span>
       </button>
 
       {!isOpen && !hasInteracted && (
