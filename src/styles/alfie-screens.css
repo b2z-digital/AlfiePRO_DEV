@@ -588,3 +588,34 @@ html.alfie-light .a-duty { background: rgba(15,23,42,0.03); border-color: rgba(1
 .a-duty-empty { padding: 14px 10px; border-radius: 14px; border: 1.5px dashed rgba(255,255,255,0.16); text-align: center; font-size: 12.5px; color: rgba(235,240,255,0.45); }
 .a-duty-empty-on { border-color: #0A84FF; background: rgba(10,132,255,0.06); color: #6FB4FF; }
 html.alfie-light .a-duty-empty { border-color: rgba(15,23,42,0.18); color: rgba(15,23,42,0.45); }
+/* Race calendar list (board S_cal_list) */
+.a-dc { width: 56px; flex-shrink: 0; padding: 7px 0 8px; border-radius: 14px; text-align: center; border: 1px solid transparent; background: linear-gradient(#0E1424,#0E1424) padding-box, var(--alfie-spectrum) border-box; }
+.a-dc b { display: block; font: 600 10.5px 'Instrument Sans', sans-serif; letter-spacing: 0.1em; color: rgba(235,240,255,0.6); }
+.a-dc span { display: block; font: 600 22px 'Bricolage Grotesque', sans-serif; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums; }
+.a-dc i { display: block; font-style: normal; font-size: 11px; color: rgba(235,240,255,0.45); }
+.a-dc-past { background: rgba(255,255,255,0.025); border-color: rgba(255,255,255,0.07); }
+.a-dc-past span { color: rgba(235,240,255,0.5); }
+.a-dc-meet { background: rgba(64,200,192,0.08); border-color: rgba(64,200,192,0.35); }
+.a-dc-meet b, .a-dc-meet span { color: #7FE0D9; }
+html.alfie-light .a-dc { background: linear-gradient(#fff,#fff) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-dc b { color: rgba(15,23,42,0.55); } html.alfie-light .a-dc span { color: #0B1220; } html.alfie-light .a-dc i { color: rgba(15,23,42,0.45); }
+html.alfie-light .a-dc-past { background: rgba(15,23,42,0.03); border-color: rgba(15,23,42,0.08); }
+html.alfie-light .a-dc-past span { color: rgba(15,23,42,0.45); }
+html.alfie-light .a-dc-meet { background: rgba(64,200,192,0.1); border-color: rgba(20,150,140,0.35); }
+html.alfie-light .a-dc-meet b, html.alfie-light .a-dc-meet span { color: #0F766E; }
+.a-cal-ev { display: flex; align-items: center; gap: 16px; padding: 14px 18px; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.a-cal-ev + .a-cal-ev { border-top: 1px solid rgba(255,255,255,0.055); }
+.a-cal-ev:hover { background: rgba(255,255,255,0.025); }
+html.alfie-light .a-cal-ev + .a-cal-ev { border-color: rgba(15,23,42,0.07); }
+html.alfie-light .a-cal-ev:hover { background: rgba(15,23,42,0.02); }
+.a-cal-hero { border: 1px solid transparent; background: linear-gradient(#0D1424,#0D1424) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-cal-hero { background: linear-gradient(#fff,#fff) padding-box, var(--alfie-spectrum) border-box; }
+.a-cal-hero-img { background: #0A0F1A; }
+html.alfie-light .a-cal-hero-img { background: #E9EEF5; }
+.a-glass { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: 999px; background: rgba(10,16,30,0.7); border: 1px solid rgba(255,255,255,0.16); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font: 600 12px 'Instrument Sans', sans-serif; color: #fff; }
+.a-glass-g { background: rgba(48,209,88,0.2); border-color: rgba(48,209,88,0.45); }
+html.alfie-light .a-glass-g { background: rgba(255,255,255,0.85); color: #1E8E3E; }
+.a-pro { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px 0 3px; border-radius: 999px; background: rgba(255,179,64,0.08); border: 1px solid rgba(255,179,64,0.22); font: 500 12px 'Instrument Sans', sans-serif; color: rgba(235,240,255,0.88); white-space: nowrap; }
+html.alfie-light .a-pro { background: rgba(255,179,64,0.1); color: #0B1220; }
+.a-txt-t { color: #7FE0D9; }
+html.alfie-light .a-txt-t { color: #0F766E; }
