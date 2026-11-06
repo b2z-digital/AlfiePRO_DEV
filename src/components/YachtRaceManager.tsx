@@ -3938,11 +3938,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   }
 
   // Alfie theme: single scoring top bar (board SC_pro) for every non-heat scoring view.
-  const useAlfieTopBar = !heatManagement?.configuration.enabled && !(scoringMode === 'spreadsheet' && raceType === 'scratch');
-  const stepperRace = scoringMode === 'pro' ? (proFocusRace ?? Math.min(lastCompletedRace + 1, currentNumRaces || 1)) : touchModeCurrentRace;
+  const useAlfieTopBar = !heatManagement?.configuration.enabled;
+  const isScratchSheet = scoringMode === 'spreadsheet' && raceType === 'scratch';
+  const stepperRace = (scoringMode === 'pro' || isScratchSheet) ? (proFocusRace ?? Math.min(lastCompletedRace + 1, currentNumRaces || 1)) : touchModeCurrentRace;
   const stepRace = (d: number) => {
     const next = Math.min(Math.max(stepperRace + d, 1), currentNumRaces || 1);
-    if (scoringMode === 'pro') {
+    if (scoringMode === 'pro' || isScratchSheet) {
       setProFocusRace(next);
       document.querySelector(`[data-race-col="${next}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     } else {
@@ -3976,7 +3977,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 onNextRace={() => stepRace(1)}
                 compact={isFullscreenScoring}
                 onBack={() => setShowExitConfirm(true)}
-                onStartBox={scoringMode === 'pro' ? () => setShowStartBoxModal(true) : undefined}
+                onStartBox={(scoringMode === 'pro' || isScratchSheet) ? () => setShowStartBoxModal(true) : undefined}
                 onOverallResults={raceType === 'scratch' ? () => setShowOverallResults(true) : undefined}
                 onCheckpoints={() => setShowCheckpointModal(true)}
                 onSettings={() => setShowRaceSettingsModal(true)}
@@ -3995,7 +3996,10 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                       <span className="inline-flex items-center gap-1.5"><span className="a-sc-leg a-sc-leg-1" aria-hidden="true">1</span><span className="a-sc-leg a-sc-leg-2" aria-hidden="true">2</span><span className="a-sc-leg a-sc-leg-3" aria-hidden="true">3</span>Podium finishes</span>
                     </>
                   )}
-                  {(scoringMode === 'pro' || scoringMode === 'touch') && (() => {
+                  {isScratchSheet && (
+                    <span>Type sail numbers in finish order · <span className="a-kbd">Enter</span> or <span className="a-kbd">Tab</span> moves down, <span className="a-kbd">↑</span> <span className="a-kbd">↓</span> step between places</span>
+                  )}
+                  {(scoringMode === 'pro' || scoringMode === 'touch' || isScratchSheet) && (() => {
                     const evt = getCurrentEvent();
                     if (!evt?.id || (!evt.enableLiveTracking && !evt.enableLiveStream) || evt.completed) return null;
                     return <LiveStatusControl eventId={evt.id} darkMode={darkMode} />;
@@ -4566,7 +4570,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 handicapReadOnly={activeRuleset?.config.persist_handicaps === false}
               />
             ) : scoringMode === 'spreadsheet' && raceType === 'scratch' ? (
-              <div className={`flex flex-col ${isFullscreenScoring ? 'h-full' : 'h-[calc(100vh-200px)]'} no-select`}>
+              <div className={`flex flex-col ${isFullscreenScoring ? 'h-full' : useAlfieTopBar ? 'h-[calc(100vh-190px)] min-h-[420px]' : 'h-[calc(100vh-200px)]'} no-select`}>
                 <HmsManualSpreadsheet
                   skippers={skippers}
                   darkMode={darkMode}
@@ -4577,14 +4581,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   isFullscreen={isFullscreenScoring}
                   singleFleetMode={true}
                   numRaces={currentNumRaces}
-                  onScoringModeChange={async (mode) => {
+                  onOpenStartBox={() => setShowStartBoxModal(true)}
+                  onScoringModeChange={useAlfieTopBar ? undefined : async (mode) => {
                     setScoringMode(mode);
                     const { data: { user } } = await supabase.auth.getUser();
                     if (user) {
                       await supabase.from('profiles').update({ scoring_mode_preference: mode }).eq('id', user.id);
                     }
                   }}
-                  onShowOverallResults={() => setShowOverallResults(true)}
+                  onShowOverallResults={useAlfieTopBar ? undefined : () => setShowOverallResults(true)}
                 />
               </div>
             ) : scoringMode === 'spreadsheet' ? (
