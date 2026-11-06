@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Building, Check, MapPin, Globe, Search, X, Shield } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsUpDown, Building, Check, MapPin, Globe, Search, X, Shield, Star, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase } from '../utils/supabase';
@@ -242,6 +242,56 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ── Quick switching: pinned + recent places, ⌘O to open, ⌘⇧O to jump back ──
+  const readIds = (key: string): string[] => {
+    try {
+      const v = JSON.parse(localStorage.getItem(key) || '[]');
+      return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  };
+  const [pinnedIds, setPinnedIds] = useState<string[]>(() => readIds('alfie.switcher.pinned'));
+  const [recentIds, setRecentIds] = useState<string[]>(() => readIds('alfie.switcher.recent'));
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!currentClubId) return;
+    setRecentIds((prev) => {
+      if (prev[0] === currentClubId) return prev;
+      const next = [currentClubId, ...prev.filter((id) => id !== currentClubId)].slice(0, 6);
+      try { localStorage.setItem('alfie.switcher.recent', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, [currentClubId]);
+
+  const togglePinned = (id: string) => {
+    setPinnedIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id].slice(-6);
+      try { localStorage.setItem('alfie.switcher.pinned', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const isSlideoutHost = isCollapsed || className.includes('w-10 h-10');
+  useEffect(() => {
+    if (!isSlideoutHost) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 'o') return;
+      if (organizations.length < 2) return;
+      e.preventDefault();
+      if (e.shiftKey) {
+        const previous = recentIds.find((id) => id !== currentClubId && organizations.some((o) => o.id === id));
+        if (previous) onClubChange(previous);
+        return;
+      }
+      setShowSlideout(true);
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isSlideoutHost, organizations, recentIds, currentClubId, onClubChange]);
+
   // Return null if no organizations are available
   if (!organizations || organizations.length === 0) {
     return null;
@@ -277,12 +327,60 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
       );
     }
 
+    const pinStar = (id: string) => (
+      <span
+        role="button"
+        tabIndex={0}
+        aria-label={pinnedIds.includes(id) ? 'Unpin' : 'Pin to top'}
+        title={pinnedIds.includes(id) ? 'Unpin' : 'Pin to top'}
+        onClick={(e) => { e.stopPropagation(); togglePinned(id); }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); togglePinned(id); } }}
+        className={`alfie-pin p-1 rounded-md flex-shrink-0 transition-opacity ${pinnedIds.includes(id) ? 'text-amber-400 opacity-100' : 'text-slate-500 hover:text-amber-300'}`}
+      >
+        <Star size={14} fill={pinnedIds.includes(id) ? 'currentColor' : 'none'} />
+      </span>
+    );
+    const orgById = (id: string) => organizations.find((o) => o.id === id);
+    const pinnedOrgs = pinnedIds.map(orgById).filter(Boolean) as Organization[];
+    const recentOrgs = recentIds
+      .filter((id) => id !== currentClubId && !pinnedIds.includes(id))
+      .map(orgById)
+      .filter(Boolean)
+      .slice(0, 4) as Organization[];
+    const selectOrg = (id: string) => {
+      onClubChange(id);
+      setShowSlideout(false);
+      setSearchQuery('');
+    };
+    const quickRow = (o: Organization) => (
+      <button
+        key={`quick-${o.id}`}
+        onClick={() => selectOrg(o.id)}
+        className={`alfie-switch-row w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-700 transition-colors ${o.id === currentClubId ? 'bg-slate-700' : ''}`}
+      >
+        {o.logo ? (
+          <img src={o.logo} alt={o.name} className="w-9 h-9 rounded-lg object-cover flex-shrink-0 bg-white" />
+        ) : (
+          <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0 p-1.5"><Logo size="small" /></div>
+        )}
+        <div className="flex-1 text-left min-w-0">
+          <div className="text-white font-medium text-sm truncate">{o.name}</div>
+          <div className="text-slate-400 text-xs">{formatRoleDisplay(o.role || 'member')}</div>
+        </div>
+        {pinStar(o.id)}
+      </button>
+    );
+    const firstMatch = () =>
+      [...nationalAssocs, ...stateAssocs, ...clubs].find((o) => o.id !== currentClubId) ||
+      [...nationalAssocs, ...stateAssocs, ...clubs][0];
+
     return (
       <>
+        <div className={`alfie-switch ${hasMultipleOrgs ? 'alfie-switch-multi' : ''}`}>
         <div
-          className={`${className} rounded-lg overflow-hidden flex items-center justify-center bg-slate-700 ${hasMultipleOrgs ? 'cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all' : ''}`}
+          className={`${className} alfie-switch-tile rounded-lg overflow-hidden flex items-center justify-center bg-slate-700 ${hasMultipleOrgs ? 'cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all' : ''}`}
           onClick={() => hasMultipleOrgs && setShowSlideout(true)}
-          title={hasMultipleOrgs ? "Switch organization" : undefined}
+          title={hasMultipleOrgs ? "Switch club or association (⌘O)" : undefined}
         >
           {org.logo ? (
             <img
@@ -295,6 +393,10 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
               <Logo size="small" />
             </div>
           )}
+        </div>
+        {hasMultipleOrgs && (
+          <span className="alfie-switch-badge" aria-hidden="true"><ChevronsUpDown size={11} strokeWidth={2.4} /></span>
+        )}
         </div>
 
         {/* Slide-out panel for multiple organizations */}
@@ -309,21 +411,30 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
             {/* Slide-out panel */}
             <div
               ref={slideoutRef}
-              className="fixed left-[70px] top-0 bottom-0 w-80 bg-slate-800 border-r border-slate-700 shadow-2xl z-[70] animate-slide-in-left"
+              className="alfie-switch-panel fixed left-[70px] top-0 bottom-0 w-80 bg-slate-800 border-r border-slate-700 shadow-2xl z-[70] animate-slide-in-left flex flex-col"
             >
               <div className="p-4 border-b border-slate-700">
                 <h3 className="text-white font-semibold text-sm">Switch View</h3>
-                <p className="text-slate-400 text-xs mt-1">Select an organization to manage</p>
+                <p className="text-slate-400 text-xs mt-1">Select an organization to manage <span className="alfie-kbd">⌘O</span></p>
 
                 {/* Search Box */}
                 {organizations.length > 5 && (
                   <div className="mt-3 relative">
                     <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
                     <input
+                      ref={searchInputRef}
                       type="text"
                       placeholder="Search organizations..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && searchQuery) {
+                          const o = firstMatch();
+                          if (o) selectOrg(o.id);
+                        } else if (e.key === 'Escape') {
+                          setShowSlideout(false);
+                        }
+                      }}
                       className="w-full pl-9 pr-9 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     {searchQuery && (
@@ -338,7 +449,27 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
                 )}
               </div>
 
-              <div className="overflow-y-auto max-h-[calc(100vh-140px)]">
+              <div className="overflow-y-auto flex-1 min-h-0">
+                {/* Pinned + recent places */}
+                {!searchQuery && pinnedOrgs.length > 0 && (
+                  <>
+                    <div className="alfie-switch-sec px-4 pt-3 pb-1 flex items-center gap-2">
+                      <Star size={13} className="text-amber-400" />
+                      <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Pinned</h4>
+                    </div>
+                    {pinnedOrgs.map(quickRow)}
+                  </>
+                )}
+                {!searchQuery && recentOrgs.length > 0 && (
+                  <>
+                    <div className="alfie-switch-sec px-4 pt-3 pb-1 flex items-center gap-2">
+                      <Clock size={13} className="text-slate-400" />
+                      <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Recent</h4>
+                      <span className="ml-auto text-[11px] text-slate-500"><span className="alfie-kbd">⌘⇧O</span> jump back</span>
+                    </div>
+                    {recentOrgs.map(quickRow)}
+                  </>
+                )}
                 {/* AlfiePRO Management - Super Admin Only */}
                 {isSuperAdmin && (
                   <>
@@ -427,6 +558,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
                             <div className="text-white font-medium text-sm">{org.name}</div>
                             <div className="text-slate-400 text-xs">{formatRoleDisplay(org.role || 'member')}</div>
                           </div>
+                          {pinStar(org.id)}
                           {org.id === currentClubId && (
                             <Check size={16} className="text-blue-400 flex-shrink-0" />
                           )}
@@ -482,6 +614,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
                             <div className="text-white font-medium text-sm">{org.name}</div>
                             <div className="text-slate-400 text-xs">{formatRoleDisplay(org.role || 'member')}</div>
                           </div>
+                          {pinStar(org.id)}
                           {org.id === currentClubId && (
                             <Check size={16} className="text-blue-400 flex-shrink-0" />
                           )}
@@ -537,6 +670,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
                             <div className="text-white font-medium text-sm">{org.name}</div>
                             <div className="text-slate-400 text-xs">{formatRoleDisplay(org.role || 'member')}</div>
                           </div>
+                          {pinStar(org.id)}
                           {org.id === currentClubId && (
                             <Check size={16} className="text-blue-400 flex-shrink-0" />
                           )}

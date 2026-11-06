@@ -12,10 +12,16 @@ export default defineConfig(({ command }) => ({
   resolve: {
     alias: [
       { find: "@", replacement: path.resolve(__dirname, "./src") },
+      // Alfie theme: 'lucide-react' resolves to a shim that re-exports the library and
+      // swaps in Alfie glyphs inside the signed-in app (see src/lib/lucide-alfie.tsx).
+      { find: /^lucide-react$/, replacement: path.resolve(__dirname, "./src/lib/lucide-alfie.tsx") },
       // The icon picker needs every icon; the single-file bundle avoids parsing ~3900 modules and keeps build memory in check
-      ...(command === 'build'
-        ? [{ find: /^lucide-react$/, replacement: path.resolve(__dirname, "node_modules/lucide-react/dist/cjs/lucide-react.js") }]
-        : [])
+      {
+        find: /^lucide-react-original$/,
+        replacement: command === 'build'
+          ? path.resolve(__dirname, "node_modules/lucide-react/dist/cjs/lucide-react.js")
+          : path.resolve(__dirname, "node_modules/lucide-react/dist/esm/lucide-react.js")
+      }
     ]
   },
   optimizeDeps: {

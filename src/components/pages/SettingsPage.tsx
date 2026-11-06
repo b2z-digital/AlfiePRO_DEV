@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark, Flag, SlidersHorizontal, Share2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark, Flag, SlidersHorizontal, Share2, Search, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { updateUserProfile } from '../../utils/auth';
@@ -60,7 +60,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [lightMode, setLightMode] = useState(false);
+  const [lightMode, setLightMode] = useState(() => {
+    try { return localStorage.getItem('lightMode') === 'true'; } catch { return false; }
+  });
+  const [settingsQuery, setSettingsQuery] = useState('');
+  const settingsListRef = useRef<HTMLDivElement>(null);
+
+  // Settings search: hide setting rows (and empty sections) that don't match the query.
+  useEffect(() => {
+    const root = settingsListRef.current;
+    if (!root) return;
+    const q = settingsQuery.trim().toLowerCase();
+    root.querySelectorAll<HTMLElement>(':scope > div').forEach((section) => {
+      const rows = Array.from(section.querySelectorAll<HTMLElement>(':scope > div.grid > button'));
+      let visible = 0;
+      rows.forEach((row) => {
+        const hit = !q || (row.textContent || '').toLowerCase().includes(q);
+        row.toggleAttribute('data-alfie-hide', !hit);
+        if (hit) visible++;
+      });
+      section.toggleAttribute('data-alfie-hide', !!q && visible === 0);
+    });
+  }, [settingsQuery]);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [membershipStatus, setMembershipStatus] = useState<'active' | 'expired' | 'none'>('none');
@@ -85,12 +106,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
     membership: boolean;
     system: boolean;
   }>({
-    account: true,  // Default to first section expanded
-    club: false,
-    raceManagement: false,
-    finance: false,
-    membership: false,
-    system: false,
+    account: true,  // All sections open by default (board layout); users can still collapse
+    club: true,
+    raceManagement: true,
+    finance: true,
+    membership: true,
+    system: true,
   });
 
   useEffect(() => {
@@ -464,7 +485,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   };
 
   return (
-    <div className={`h-full overflow-y-auto ${lightMode ? 'bg-gray-50' : ''}`}>
+    <div className="h-full overflow-y-auto">
       <div className="p-16">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
@@ -478,28 +499,27 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Dark Mode Toggle */}
-            <button
-              onClick={() => setLightMode(!lightMode)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                lightMode
-                  ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-              }`}
-              aria-label="Toggle dark mode"
-            >
-              {lightMode ? (
-                <>
-                  <Moon size={20} />
-                  <span className="text-sm font-medium">Dark Mode</span>
-                </>
-              ) : (
-                <>
-                  <Sun size={20} />
-                  <span className="text-sm font-medium">Light Mode</span>
-                </>
-              )}
-            </button>
+            {/* Appearance: Dark / Light */}
+            <div className="a-seg" role="radiogroup" aria-label="Appearance">
+              <button
+                role="radio"
+                aria-checked={!lightMode}
+                onClick={() => setLightMode(false)}
+                className={`a-seg-i ${!lightMode ? 'a-seg-on' : ''}`}
+              >
+                <Moon size={16} />
+                Dark
+              </button>
+              <button
+                role="radio"
+                aria-checked={lightMode}
+                onClick={() => setLightMode(true)}
+                className={`a-seg-i ${lightMode ? 'a-seg-on' : ''}`}
+              >
+                <Sun size={16} />
+                Light
+              </button>
+            </div>
 
             {/* Close Button - shown when viewing a specific setting */}
             {activeTab !== null && (
@@ -518,7 +538,61 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
         {/* Settings Cards - only show when no tab is selected */}
         {!activeTab && (
-          <div className="space-y-8">
+          <div className="a-card a-settings-profile flex items-center gap-4 flex-wrap mb-4">
+            <span className="a-settings-avatar">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" />
+              ) : (
+                <span className="a-display">{`${(firstName || '?')[0] || ''}${(lastName || '')[0] || ''}`.toUpperCase()}</span>
+              )}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="a-display a-ink text-xl font-semibold truncate">{[firstName, lastName].filter(Boolean).join(' ') || 'Your profile'}</div>
+              <div className="a-mute text-sm truncate">{email}</div>
+            </div>
+            {(currentOrganization?.name || currentClub?.club?.name) && (
+              <div className="a-settings-org">
+                <span className="a-settings-org-logo">
+                  {(currentClub?.club as any)?.logo && !currentOrganization ? (
+                    <img src={(currentClub?.club as any).logo} alt="" />
+                  ) : (
+                    <Building size={18} />
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <div className="a-ink text-sm font-semibold truncate">
+                    {currentOrganization?.name || (currentClub?.club as any)?.abbreviation || currentClub?.club?.name}
+                  </div>
+                  <div className="a-dim text-xs capitalize">{(currentOrganization?.role || currentClub?.role || '').replace(/_/g, ' ')}</div>
+                </div>
+              </div>
+            )}
+            <button type="button" className="a-btn" onClick={() => setActiveTab('profile')}>
+              <User size={17} />
+              Edit profile
+            </button>
+          </div>
+        )}
+
+        {!activeTab && (
+          <label className="a-field a-settings-search mb-6">
+            <Search size={19} />
+            <input
+              value={settingsQuery}
+              onChange={(e) => setSettingsQuery(e.target.value)}
+              placeholder="Search settings, e.g. bank details, start system, renewals"
+              aria-label="Search settings"
+            />
+            {settingsQuery && (
+              <button type="button" className="a-ib" style={{ width: 28, height: 28 }} onClick={() => setSettingsQuery('')} aria-label="Clear search">
+                <X size={15} />
+              </button>
+            )}
+          </label>
+        )}
+
+        {!activeTab && (
+          <div ref={settingsListRef} className={`alfie-settings space-y-8 ${settingsQuery.trim() ? 'alfie-settings-searching' : ''}`}>
 
             {/* Account Settings Section */}
             <div>

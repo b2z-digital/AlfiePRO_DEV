@@ -130,7 +130,7 @@ export const getBoatClassBadge = (boatClass: string, darkMode = false) => {
   };
 
   return {
-    className: `inline-flex items-center px-2 py-1 rounded-md text-xs font-bold ${darkMode ? colors.darkBg : colors.bg} ${darkMode ? colors.darkText : colors.text} shadow-sm`,
+    className: `a-badge-cls inline-flex items-center px-2 py-1 rounded-md text-xs font-bold ${darkMode ? colors.darkBg : colors.bg} ${darkMode ? colors.darkText : colors.text} shadow-sm`,
     gradient: colors.gradient
   };
 };
@@ -140,7 +140,7 @@ export const getRaceFormatBadge = (format: string, darkMode = false) => {
   const colors = raceFormatColors[format as keyof typeof raceFormatColors] || raceFormatColors['Scratch'];
 
   return {
-    className: `inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${darkMode ? colors.darkBg : colors.bg} ${darkMode ? colors.darkText : colors.text}`,
+    className: `a-badge-fmt ${format === 'Handicap' ? 'a-fmt-handicap' : 'a-fmt-scratch'} inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${darkMode ? colors.darkBg : colors.bg} ${darkMode ? colors.darkText : colors.text}`,
     gradient: colors.gradient
   };
 };
@@ -163,6 +163,6 @@ export const getEventTypeBadge = (event: any, darkMode = false) => {
 
   return {
     label,
-    className: `inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${darkMode ? colors.darkBg : colors.bg} ${darkMode ? colors.darkText : colors.text}`
+    className: `a-badge-lvl inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${darkMode ? colors.darkBg : colors.bg} ${darkMode ? colors.darkText : colors.text}`
   };
 };

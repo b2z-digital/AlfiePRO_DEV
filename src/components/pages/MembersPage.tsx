@@ -1041,57 +1041,65 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
-          <p className="text-slate-400 text-sm">
-            {members.filter(m => m.is_financial === true && !(m.renewal_date && new Date(m.renewal_date) < new Date())).length} Financial
-            {members.filter(m => m.is_financial === true && m.renewal_date && new Date(m.renewal_date) < new Date()).length > 0 && (
-              <span className="ml-2 text-amber-400">
-                · {members.filter(m => m.is_financial === true && m.renewal_date && new Date(m.renewal_date) < new Date()).length} Renewal Due
-              </span>
-            )}
-            {members.filter(m => m.is_financial === false || m.is_financial === null).length > 0 && (
-              <span className="ml-2 text-red-400">
-                · {members.filter(m => m.is_financial === false || m.is_financial === null).length} Unfinancial
-              </span>
-            )}
-          </p>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="flex items-center gap-1.5 text-green-400">
-              <span className="w-2 h-2 rounded-full bg-green-400"></span>
-              {filteredMembers.filter(m => m.user_id).length} Connected
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="a-chip">
+            <span className="a-light a-light-g"></span>
+            <b className="a-num">{members.filter(m => m.is_financial === true && !(m.renewal_date && new Date(m.renewal_date) < new Date())).length}</b>
+            <span className="a-mute">Financial</span>
+          </span>
+          {members.filter(m => m.is_financial === true && m.renewal_date && new Date(m.renewal_date) < new Date()).length > 0 && (
+            <span className="a-chip">
+              <span className="a-light a-light-a"></span>
+              <b className="a-num">{members.filter(m => m.is_financial === true && m.renewal_date && new Date(m.renewal_date) < new Date()).length}</b>
+              <span className="a-mute">Renewal due</span>
             </span>
-            {Object.keys(emailMatches).length > 0 && (
-              <button
-                onClick={handleAutoLinkAll}
-                disabled={autoLinking}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
-              >
-                {autoLinking ? (
-                  <div className="animate-spin h-3 w-3 border-2 border-amber-400 border-t-transparent rounded-full"></div>
-                ) : (
-                  <Zap size={12} />
-                )}
-                Link {Object.keys(emailMatches).length} Match{Object.keys(emailMatches).length === 1 ? '' : 'es'}
-              </button>
-            )}
-            <span className="flex items-center gap-1.5 text-slate-500">
-              <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-              {filteredMembers.filter(m => !m.user_id && !emailMatches[m.id]).length} Unlinked
+          )}
+          {members.filter(m => m.is_financial === false || m.is_financial === null).length > 0 && (
+            <span className="a-chip">
+              <span className="a-light a-light-r"></span>
+              <b className="a-num">{members.filter(m => m.is_financial === false || m.is_financial === null).length}</b>
+              <span className="a-mute">Unfinancial</span>
             </span>
-            {filteredMembers.filter(m => (m as any).activation_status === 'pending').length > 0 && (
-              <span className="flex items-center gap-1.5 text-sky-400">
-                <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                {filteredMembers.filter(m => (m as any).activation_status === 'pending').length} Invite Sent
-              </span>
-            )}
-            {filteredMembers.filter(m => !m.user_id && m.email).length > 0 && (
-              <span className="flex items-center gap-1.5 text-sky-400/70 text-xs">
-                <Smartphone size={12} />
-                {filteredMembers.filter(m => !m.user_id && m.email).length} ready to activate
-              </span>
-            )}
-          </div>
+          )}
+          <span className="a-chip">
+            <span className="a-light a-light-b"></span>
+            <b className="a-num">{filteredMembers.filter(m => m.user_id).length}</b>
+            <span className="a-mute">On the app</span>
+          </span>
+          {Object.keys(emailMatches).length > 0 && (
+            <button
+              onClick={handleAutoLinkAll}
+              disabled={autoLinking}
+              className="a-btn a-btn-a a-btn-sm"
+            >
+              {autoLinking ? (
+                <div className="animate-spin h-3 w-3 border-2 border-amber-400 border-t-transparent rounded-full"></div>
+              ) : (
+                <Zap size={14} />
+              )}
+              Link {Object.keys(emailMatches).length} Match{Object.keys(emailMatches).length === 1 ? '' : 'es'}
+            </button>
+          )}
+          <span className="a-chip">
+            <span className="a-light"></span>
+            <b className="a-num">{filteredMembers.filter(m => !m.user_id && !emailMatches[m.id]).length}</b>
+            <span className="a-mute">Not linked</span>
+          </span>
+          {filteredMembers.filter(m => (m as any).activation_status === 'pending').length > 0 && (
+            <span className="a-chip">
+              <span className="a-light a-light-t"></span>
+              <b className="a-num">{filteredMembers.filter(m => (m as any).activation_status === 'pending').length}</b>
+              <span className="a-mute">Invite sent</span>
+            </span>
+          )}
+          {filteredMembers.filter(m => !m.user_id && m.email).length > 0 && (
+            <span className="a-chip a-chip-rim">
+              <Smartphone size={15} className="a-txt-b" />
+              <b className="a-num">{filteredMembers.filter(m => !m.user_id && m.email).length}</b>
+              <span className="a-mute">ready to activate</span>
+            </span>
+          )}
         </div>
 
         {/* Search and Filter Section */}
@@ -1154,7 +1162,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
             <div className="relative" ref={filterDropdownRef}>
               <button
                 onClick={() => setShowAdvancedFilter(true)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors border ${
                   hasActiveFilter
                     ? 'bg-blue-600 border-blue-500 hover:bg-blue-700 text-white'
                     : 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200'
@@ -1242,10 +1250,17 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
           const labels: Record<string, string> = {
             all: `All Members`,
-            active: `Financial (${activeCnt})`,
-            renewal_due: `Renewal Due (${renewalDueCnt})`,
-            expired: `Unfinancial (${expiredCnt})`,
+            active: `Financial`,
+            renewal_due: `Renewal Due`,
+            expired: `Unfinancial`,
             cancelled: 'Cancelled',
+          };
+          const counts: Record<string, number | null> = {
+            all: allNonCancelled.length,
+            active: activeCnt,
+            renewal_due: renewalDueCnt,
+            expired: expiredCnt,
+            cancelled: null,
           };
           const activeStyles: Record<string, string> = {
             all: 'border-blue-500 text-blue-400',
@@ -1265,7 +1280,12 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                   : 'border-transparent text-slate-500 hover:text-slate-300'
               }`}
             >
-              {labels[status]}
+              <span className="inline-flex items-center gap-2">
+                {labels[status]}
+                {counts[status] !== null && (
+                  <span className={`a-cnt ${status === 'renewal_due' && renewalDueCnt > 0 ? 'a-cnt-amber' : ''}`}>{counts[status]}</span>
+                )}
+              </span>
             </button>
           );
         })}
@@ -1506,17 +1526,18 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
                           {(member as any).membership_status === 'cancelled' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-900/30 text-red-400">
-                              <UserX size={11} />
+                            <span className="a-st a-txt-r">
+                              <span className="a-light a-light-r"></span>
                               Cancelled
                             </span>
                           ) : (member.is_financial && member.renewal_date && new Date(member.renewal_date) < new Date()) ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-900/30 text-amber-400 border border-amber-500/30">
-                              <Clock size={11} />
-                              Renewal Due
+                            <span className="a-st a-txt-a">
+                              <span className="a-light a-light-a"></span>
+                              Renewal due
                             </span>
                           ) : (
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${member.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+                            <span className={`a-st ${member.is_financial ? 'a-ink' : 'a-txt-r'}`}>
+                              <span className={`a-light ${member.is_financial ? 'a-light-g' : 'a-light-r'}`}></span>
                               {member.is_financial ? 'Financial' : 'Unfinancial'}
                             </span>
                           )}
