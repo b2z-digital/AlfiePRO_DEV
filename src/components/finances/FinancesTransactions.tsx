@@ -638,6 +638,7 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
           isOpen={showNewTransactionModal}
           onClose={() => setShowNewTransactionModal(false)}
           darkMode={darkMode}
+          onImport={() => setShowImportModal(true)}
           onSuccess={() => {
             setShowNewTransactionModal(false);
             loadTransactions();

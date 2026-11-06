@@ -228,3 +228,24 @@ html.alfie-light .a-month-rule { background: rgba(15, 23, 42, 0.08); }
 html.alfie-light .a-pop-rule { background: rgba(15, 23, 42, 0.08); }
 .a-link-item { color: #6FB4FF !important; font-weight: 600 !important; }
 html.alfie-light .a-link-item { color: #0A6FD6 !important; }
+.a-opt { display: flex; align-items: center; gap: 16px; width: 100%; padding: 16px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.03); cursor: pointer; color: inherit; font: inherit; }
+.a-opt:hover { border-color: transparent; background: linear-gradient(#151B2A, #151B2A) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-opt { background: #fff; border-color: rgba(15, 23, 42, 0.1); }
+html.alfie-light .a-opt:hover { border-color: transparent; background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; }
+.a-ir { display: flex; align-items: center; gap: 12px; padding: 13px 16px; }
+.a-ir + .a-ir { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.a-ir-l { width: 130px; flex-shrink: 0; font-size: 13px; color: rgba(235, 240, 255, 0.55); display: flex; align-items: center; gap: 9px; }
+.a-ir-v { flex: 1; min-width: 0; font-size: 14.5px; color: #fff; overflow-wrap: anywhere; }
+.a-mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; letter-spacing: 0; }
+html.alfie-light .a-ir + .a-ir { border-top-color: rgba(15, 23, 42, 0.07); }
+html.alfie-light .a-ir-l { color: #64748B; }
+html.alfie-light .a-ir-v { color: #0B1220; }
+.a-amt-hero { padding: 26px 20px; border-radius: 22px; text-align: center; background: radial-gradient(300px 140px at 50% 0%, var(--amt-glow, rgba(48, 209, 88, 0.16)), transparent 75%), rgba(255, 255, 255, 0.025); border: 1px solid rgba(255, 255, 255, 0.07); }
+html.alfie-light .a-amt-hero { background: radial-gradient(300px 140px at 50% 0%, var(--amt-glow, rgba(48, 209, 88, 0.12)), transparent 75%), #F8FAFC; border-color: rgba(15, 23, 42, 0.08); }
+.a-bare { width: 100%; min-width: 0; border: 0; background: transparent; color: inherit; font: inherit; outline: none; padding: 0; box-shadow: none; resize: vertical; }
+select.a-bare { cursor: pointer; }
+select.a-bare option { background: #111A2C; color: #F1F4FA; }
+html.alfie-light select.a-bare option { background: #fff; color: #0B1220; }
+.a-ir:focus-within { background: rgba(10, 132, 255, 0.06); }
+.a-amt-inp { width: 180px; border: 0; background: transparent; outline: none; text-align: left; -moz-appearance: textfield; }
+.a-amt-inp::-webkit-inner-spin-button { -webkit-appearance: none; }
