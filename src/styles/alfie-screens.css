@@ -1250,3 +1250,7 @@ html.alfie-theme body .a-evm-hero .a-badge-cls.a-badge-cls { background: rgba(10
 html.alfie-theme body .a-evm-hero :is(.a-badge-fmt, .a-badge-lvl):is(.a-badge-fmt, .a-badge-lvl) { background: rgba(10,16,30,0.55) !important; color: #fff !important; }
 html.alfie-light .a-evm-hero .a-wlvl { color: #FFC56B; border-color: rgba(255,179,64,0.45); }
 html.alfie-light .a-evm-hero .a-wlvl-n { color: #6FB4FF; border-color: rgba(10,132,255,0.5); }
+
+/* Ask Alfie header avatar is the Alfie orb itself (board) */
+html.alfie-theme .a-aa-logo { background: transparent !important; border: 0 !important; overflow: visible; }
+html.alfie-theme .a-aa-orb::before { inset: -26px; }

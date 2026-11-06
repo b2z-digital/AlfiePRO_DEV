@@ -1,80 +1,16 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader as Loader2, Trash2, ArrowLeft, Clock, Pencil, ChevronRight, Circle as HelpCircle, Volume2, VolumeX, Share2, ImagePlus, Camera, Image as ImageIcon, X as XIcon, Mic, MicOff, TriangleAlert as AlertTriangle, Trophy, Scale } from 'lucide-react';
+import { AlfieMark } from '../brand/AlfieMark';
+import { ArrowUp, ArrowUpRight, BookOpen, Spline, X, Send, Loader as Loader2, Trash2, ArrowLeft, Clock, Pencil, ChevronRight, Circle as HelpCircle, Volume2, VolumeX, Share2, ImagePlus, Camera, Image as ImageIcon, X as XIcon, Mic, MicOff, TriangleAlert as AlertTriangle, Trophy, Scale } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useScoringContext } from '../../contexts/ScoringContext';
 import { RaceScenarioCanvas } from './RaceScenarioCanvas';
 
 const AlfieLogo: React.FC<{ size?: number; className?: string }> = ({ size = 16, className = '' }) => (
-  <svg viewBox="0 0 129.34 201.37" width={size} height={size * 1.56} className={className}>
-    <path fill="#0066b4" d="M92.55,0s-33.42,35.95-46.9,76.95-17.97,123.01-17.97,123.01c53.92-26.12,87.06-5.06,101.66,1.42C75.98,145.19,92.55,0,92.55,0Z"/>
-    <path fill="#01a2e9" d="M45.37,35.39s-23.87,31.11-37.35,61.22c-13.48,30.11-5.9,88.18-5.9,88.18,22.19-23.87,68.8-19.1,68.8-19.1C33.86,122.72,45.37,35.39,45.37,35.39Z"/>
-  </svg>
+  <AlfieMark size={Math.round(size * 2)} className={className} />
 );
 
-const MiniOrb: React.FC<{ size?: number }> = ({ size = 48 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef = useRef<number>(0);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
-    canvas.width = size * 2;
-    canvas.height = size * 2;
-    ctx.scale(2, 2);
-    let time = 0;
-
-    const draw = () => {
-      ctx.clearRect(0, 0, size, size);
-      const cx = size / 2;
-      const cy = size / 2;
-      const radius = size / 2 - 2;
-
-      const gradient = ctx.createRadialGradient(
-        cx - 3 + Math.sin(time * 0.8) * 1.5,
-        cy - 4 + Math.cos(time * 0.6) * 1.5,
-        1, cx, cy, radius + 1
-      );
-      gradient.addColorStop(0, 'rgba(180, 230, 255, 0.95)');
-      gradient.addColorStop(0.3, 'rgba(56, 189, 248, 0.9)');
-      gradient.addColorStop(0.6, 'rgba(14, 165, 233, 0.85)');
-      gradient.addColorStop(1, 'rgba(2, 132, 199, 0.8)');
-
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.fillStyle = gradient;
-      ctx.fill();
-
-      const shineGrad = ctx.createRadialGradient(
-        cx - 4 + Math.sin(time * 0.5) * 2,
-        cy - 5 + Math.cos(time * 0.7) * 1.5,
-        1, cx - 3, cy - 4, 10
-      );
-      shineGrad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
-      shineGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.12)');
-      shineGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
-      ctx.fillStyle = shineGrad;
-      ctx.fill();
-
-      time += 0.03;
-      animRef.current = requestAnimationFrame(draw);
-    };
-
-    draw();
-    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
-  }, [size]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: size, height: size, imageRendering: 'auto' }}
-    />
-  );
-};
+const MiniOrb: React.FC<{ size?: number }> = ({ size = 48 }) => <AlfieMark size={size} />;
 
 interface ChatMessage {
   id: string;
@@ -735,6 +671,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
             {hasHistory && (
               <button onClick={handleViewHistory} className="a-ib" title="Chat history" aria-label="Chat history"><Clock size={17} /></button>
             )}
+            <button onClick={() => handleQuickAction('draw')} className="a-ib" title="Draw a scenario" aria-label="Draw a scenario"><Pencil size={17} /></button>
+            <button onClick={onClose} className="a-ib" title="Close" aria-label="Close"><X size={18} /></button>
           </div>
         )}
 
@@ -812,16 +750,16 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
               >
                 <span className="a-tile a-aa-tt"><Pencil size={19} /></span>
                 <span className="a-ink text-[13px] font-semibold text-center leading-tight">
-                  Draw<br />Scenario
+                  Draw Scenario
                 </span>
               </button>
               <button
                 onClick={() => { setDrawingCourseMode(true); setViewMode('drawing'); }}
                 className="a-aa-tool group"
               >
-                <span className="a-tile a-aa-tt"><ImagePlus size={19} /></span>
+                <span className="a-tile a-aa-tt"><Spline size={19} /></span>
                 <span className="a-ink text-[13px] font-semibold text-center leading-tight">
-                  Draw<br />Course
+                  Draw Course
                 </span>
               </button>
               <button
@@ -833,9 +771,9 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                 }}
                 className="a-aa-tool group"
               >
-                <span className="a-tile a-aa-tt"><HelpCircle size={19} /></span>
+                <span className="a-tile a-aa-tt"><BookOpen size={19} /></span>
                 <span className="a-ink text-[13px] font-semibold text-center leading-tight">
-                  Racing<br />Rules
+                  Racing Rules
                 </span>
               </button>
             </div>
@@ -854,7 +792,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                 className="a-aa-sug"
               >
                 <span className="flex-1">{q}</span>
-                <ChevronRight size={16} className="a-dim flex-shrink-0" />
+                <ArrowUpRight size={15} className="a-dim flex-shrink-0" />
               </button>
             ))}
           </div>
@@ -877,6 +815,22 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
         <div>
           <div>
             <div className="a-aa-comp">
+              <button
+                onClick={() => handleQuickAction('draw')}
+                className="a-ib"
+                title="Draw a scenario"
+                aria-label="Draw"
+              >
+                <Pencil size={18} />
+              </button>
+              <button
+                onClick={() => { setViewMode('chat'); setTimeout(() => fileInputRef.current?.click(), 80); }}
+                className="a-ib"
+                title="Add a photo"
+                aria-label="Camera"
+              >
+                <Camera size={18} />
+              </button>
               <input
                 type="text"
                 value={input}
@@ -915,7 +869,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                 disabled={!input.trim()}
                 className={`a-aa-send ${!input.trim() ? 'opacity-50 cursor-not-allowed' : ''}`} aria-label="Send"
               >
-                <Send size={17} />
+                <ArrowUp size={18} strokeWidth={2.4} />
               </button>
             </div>
           </div>
@@ -1197,7 +1151,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                 {isLoading ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  <Send size={17} />
+                  <ArrowUp size={18} strokeWidth={2.4} />
                 )}
               </button>
             </div>
