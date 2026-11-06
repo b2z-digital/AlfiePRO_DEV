@@ -83,6 +83,7 @@ export interface RaceSeries {
   // New fields for documents and payment
   noticeOfRaceUrl?: string;
   sailingInstructionsUrl?: string;
+  additionalDocuments?: Array<{ name: string; url: string; type?: string }>;
   isPaid?: boolean;
   entryFee?: number;
   // Club ID for filtering
@@ -134,6 +135,7 @@ export interface RaceEvent {
   // New fields for documents and payment
   noticeOfRaceUrl?: string;
   sailingInstructionsUrl?: string;
+  additionalDocuments?: Array<{ name: string; url: string; type?: string }>;
   isPaid?: boolean;
   entryFee?: number;
   // Heat management

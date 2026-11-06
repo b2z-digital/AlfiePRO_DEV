@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Trophy, Calendar, Building, Sailboat, Plus, Trash2, X, FileText, CalendarRange, Upload, DollarSign, Users, Globe, Clock, Map, ChevronDown, Wand as Wand2, Download, CreditCard as Edit, Radio, Video, Info, Link2, GripVertical } from 'lucide-react';
+import { Trophy, Calendar, Building, Sailboat, Plus, Trash2, X, FileText, CalendarRange, Upload, DollarSign, Users, Globe, Clock, Map, ChevronDown, Wand as Wand2, Download, CreditCard as Edit, Radio, Video, Info, Link2, GripVertical, ExternalLink } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -336,6 +336,62 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const [showDocuments, setShowDocuments] = useState(false);
   const [currentStep, setCurrentStep] = useState<'details' | 'documents' | 'payments' | 'results'>('details');
   const [additionalDocuments, setAdditionalDocuments] = useState<Array<{name: string; file: File | null; url: string}>>([]);
+
+  // Additional documents: load what is already saved when editing (props first, then the table row)
+  useEffect(() => {
+    const fromProps = (editingSeries as any)?.additionalDocuments || (editingEvent as any)?.additionalDocuments;
+    if (Array.isArray(fromProps) && fromProps.length > 0) {
+      setAdditionalDocuments(fromProps.map((d: any) => ({ name: d.name || '', file: null, url: d.url || '' })));
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        let row: any = null;
+        if (editingSeries?.id) {
+          ({ data: row } = await supabase.from('race_series').select('additional_documents').eq('id', editingSeries.id).maybeSingle());
+        } else if (editingEvent) {
+          const publicId = (editingEvent as any).public_event_id || (editingEvent as any).publicEventId;
+          if (publicId) ({ data: row } = await supabase.from('public_events').select('additional_documents').eq('id', publicId).maybeSingle());
+          if (!row && editingEvent.id) ({ data: row } = await supabase.from('quick_races').select('additional_documents').eq('id', editingEvent.id).maybeSingle());
+        }
+        const docs = Array.isArray(row?.additional_documents) ? row.additional_documents : [];
+        if (!cancelled && docs.length > 0) {
+          setAdditionalDocuments(docs.map((d: any) => ({ name: d.name || '', file: null, url: d.url || '' })));
+        }
+      } catch {
+        /* column may not exist yet; nothing to load */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [editingEvent?.id, editingSeries?.id]);
+
+  // Upload any newly chosen additional documents and return the list to save
+  const resolveAdditionalDocuments = async (): Promise<Array<{ name: string; url: string; type: string }>> => {
+    const out: Array<{ name: string; url: string; type: string }> = [];
+    for (const doc of additionalDocuments) {
+      let url = doc.url;
+      if (doc.file) url = await handleFileUpload(doc.file, 'doc');
+      if (!url) continue;
+      const name = (doc.name || '').trim() || (doc.file?.name || 'Document').replace(/\.pdf$/i, '');
+      out.push({ name, url, type: 'other' });
+    }
+    return out;
+  };
+
+  // Save additional documents on the saved row. Never blocks the main save.
+  const persistAdditionalDocuments = async (table: 'quick_races' | 'race_series' | 'public_events', id: string | undefined | null, docs: Array<{ name: string; url: string; type: string }>) => {
+    if (!id) return;
+    const hadDocs = additionalDocuments.length > 0 || docs.length > 0 || !!((editingSeries as any)?.additionalDocuments?.length || (editingEvent as any)?.additionalDocuments?.length);
+    if (!hadDocs && !isEditing) return;
+    try {
+      const { error } = await supabase.from(table).update({ additional_documents: docs }).eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Could not save additional documents:', err);
+      if (docs.length > 0) addNotification('error', 'The event was saved, but the additional documents could not be saved.');
+    }
+  };
   const roundRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
 
   const dndSensors = useSensors(
@@ -778,7 +834,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
     }
   }, [formData.raceDate, formData.numberOfDays, formData.isMultiDay]);
 
-  const handleFileUpload = async (file: File, type: 'nor' | 'si'): Promise<string> => {
+  const handleFileUpload = async (file: File, type: 'nor' | 'si' | 'doc'): Promise<string> => {
     if (!file) return '';
 
     try {
@@ -916,6 +972,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         sailingInstructionsUrl = await handleFileUpload(formData.sailingInstructionsFile, 'si');
         console.log('✅ SI uploaded:', sailingInstructionsUrl);
       }
+
+      // Upload any additional documents (Entry Form, Course Maps …)
+      const additionalDocsToSave = await resolveAdditionalDocuments();
 
       let otherClubName = formData.otherClubName;
       let otherClubId = formData.otherClubId;
@@ -1077,6 +1136,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
               // Don't throw - the event was created successfully, linking is just for preventing duplicates
             }
           }
+
+          await persistAdditionalDocuments('public_events', result?.id || publicEventIdToUpdate, additionalDocsToSave);
         } else {
           // Regular club event - save to quick_races table
           const event: RaceEvent = {
@@ -1140,7 +1201,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
             attendees: editingEvent?.attendees
           } as any;
 
+          const storedQuickRaceId = event.isPublicEvent ? null : event.id;
           await storeRaceEvent(event);
+          await persistAdditionalDocuments('quick_races', storedQuickRaceId, additionalDocsToSave);
         }
       } else {
         // Create series
@@ -1226,6 +1289,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         } as any;
 
         await storeRaceSeries(series);
+        await persistAdditionalDocuments('race_series', series.id, additionalDocsToSave);
       }
 
       console.log('✅ Event created successfully');
@@ -2532,6 +2596,15 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                               {formData.noticeOfRaceFile ? formData.noticeOfRaceFile.name : 'Choose PDF'}
                             </span>
                           </label>
+                          {formData.noticeOfRaceFile && (
+                            <button
+                              type="button"
+                              onClick={() => setFormData(prev => ({ ...prev, noticeOfRaceFile: null }))}
+                              className="a-doc-clear"
+                            >
+                              <X size={13} />Remove file
+                            </button>
+                          )}
                         </div>
 
                         {/* Generate Option */}
@@ -2685,6 +2758,15 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                             {formData.sailingInstructionsFile ? formData.sailingInstructionsFile.name : 'Choose PDF'}
                           </span>
                         </label>
+                        {formData.sailingInstructionsFile && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, sailingInstructionsFile: null }))}
+                            className="a-doc-clear"
+                          >
+                            <X size={13} />Remove file
+                          </button>
+                        )}
                       </div>
 
                       {/* Generate Option */}
@@ -2743,39 +2825,53 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                     </div>
                     )}
                     {formData.sailingInstructionsUrl && (
-                      <a
-                        href={formData.sailingInstructionsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                      >
-                        <FileText size={16} />
-                        View Generated SI
-                      </a>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <a
+                          href={formData.sailingInstructionsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="a-btn a-btn-p"
+                        >
+                          <FileText size={16} />
+                          View SI
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, sailingInstructionsUrl: '', sailingInstructionsFile: null }))}
+                          className="a-btn a-btn-d"
+                          title="Delete SI"
+                        >
+                          <Trash2 size={16} />
+                          Delete SI
+                        </button>
+                      </div>
                     )}
                   </div>
 
                   {/* Additional Documents */}
                   <div className={`p-6 rounded-xl border ${darkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                    <h4 className={`font-medium mb-4 ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
+                    <h4 className={`font-medium mb-1 ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
                       Additional Documents
                     </h4>
                     <p className={`text-sm mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Add any other race documents (e.g., Entry Form, Course Maps, Safety Plan)
+                      Add any other race documents (e.g., Entry Form, Course Maps, Safety Plan). They show on the event's Documents tab.
                     </p>
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       {additionalDocuments.map((doc, index) => (
-                        <div key={index} className="flex items-center gap-3">
+                        <div key={index} className="a-doc-row">
+                          <span className="a-tile a-tile-sm"><FileText size={16} /></span>
                           <input
                             type="text"
                             value={doc.name}
                             onChange={(e) => {
                               const newDocs = [...additionalDocuments];
-                              newDocs[index].name = e.target.value;
+                              newDocs[index] = { ...newDocs[index], name: e.target.value };
                               setAdditionalDocuments(newDocs);
                             }}
-                            placeholder="Document name"
-                            className={`flex-1 px-3 py-2 rounded-lg ${darkMode ? 'bg-slate-700 text-slate-200' : 'bg-white text-slate-900 border border-slate-200'}`}
+                            placeholder={doc.file ? doc.file.name.replace(/\.pdf$/i, '') : 'Document name'}
+                            aria-label="Document name"
+                            className="a-inp flex-1 min-w-0"
+                            style={{ height: 40 }}
                           />
                           <input
                             type="file"
@@ -2784,31 +2880,50 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                               const file = e.target.files?.[0];
                               if (file) {
                                 const newDocs = [...additionalDocuments];
-                                newDocs[index].file = file;
+                                newDocs[index] = { ...newDocs[index], file };
                                 setAdditionalDocuments(newDocs);
                               }
+                              e.target.value = '';
                             }}
                             className="hidden"
                             id={`additional-doc-${index}`}
                           />
-                          <label
-                            htmlFor={`additional-doc-${index}`}
-                            className={`px-4 py-2 rounded-lg cursor-pointer transition-colors text-sm font-medium ${
-                              doc.file
-                                ? 'bg-green-500/20 text-green-600'
-                                : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                            }`}
-                          >
-                            {doc.file ? 'Uploaded' : 'Choose PDF'}
+                          {doc.file ? (
+                            <span className="a-doc-file" title={doc.file.name}>
+                              <span className="truncate">{doc.file.name}</span>
+                              <button
+                                type="button"
+                                className="a-ib"
+                                style={{ width: 24, height: 24 }}
+                                aria-label="Remove chosen file"
+                                title="Remove chosen file"
+                                onClick={() => {
+                                  const newDocs = [...additionalDocuments];
+                                  newDocs[index] = { ...newDocs[index], file: null };
+                                  setAdditionalDocuments(newDocs);
+                                }}
+                              >
+                                <X size={14} />
+                              </button>
+                            </span>
+                          ) : doc.url ? (
+                            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="a-btn" style={{ height: 40 }}>
+                              <ExternalLink size={15} />View
+                            </a>
+                          ) : null}
+                          <label htmlFor={`additional-doc-${index}`} className="a-btn cursor-pointer" style={{ height: 40 }}>
+                            <Upload size={15} />{doc.file || doc.url ? 'Replace' : 'Choose PDF'}
                           </label>
                           <button
                             type="button"
                             onClick={() => {
                               setAdditionalDocuments(additionalDocuments.filter((_, i) => i !== index));
                             }}
-                            className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-600'}`}
+                            className="a-ib a-ib-d"
+                            aria-label="Delete document"
+                            title="Delete document"
                           >
-                            <Trash2 size={18} />
+                            <Trash2 size={17} />
                           </button>
                         </div>
                       ))}
@@ -3334,7 +3449,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
               </div>
             )}
 
-            <div className="flex justify-between items-center gap-3 pt-6 sticky bottom-0 bg-white dark:bg-slate-800 pb-4 -mb-4 border-t border-slate-200 dark:border-slate-700 mt-6">
+            <div className={`flex justify-between items-center gap-3 pt-6 sticky bottom-0 pb-4 -mb-4 border-t mt-6 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
               <button
                 type="button"
                 onClick={onClose}
