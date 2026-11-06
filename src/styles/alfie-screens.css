@@ -671,3 +671,9 @@ html.alfie-light .a-banner-a { background: rgba(255,179,64,0.08); border-color: 
 .a-pill-st-g { background: rgba(48,209,88,0.1); color: #6BE38C; }
 html.alfie-light .a-pill-st { background: rgba(15,23,42,0.05); color: rgba(15,23,42,0.6); }
 html.alfie-light .a-pill-st-g { background: rgba(48,209,88,0.1); color: #1E8E3E; }
+.a-pg { display: grid; grid-template-columns: 22px minmax(0,1fr) auto auto; align-items: center; gap: 16px; padding: 14px 18px; }
+.a-pg + .a-pg { border-top: 1px solid rgba(255,255,255,0.055); }
+.a-pg:hover { background: rgba(255,255,255,0.025); }
+.a-pg-drag { background: rgba(10,132,255,0.08); box-shadow: inset 0 0 0 1px rgba(10,132,255,0.4); }
+html.alfie-light .a-pg + .a-pg { border-color: rgba(15,23,42,0.07); }
+html.alfie-light .a-pg:hover { background: rgba(15,23,42,0.02); }
