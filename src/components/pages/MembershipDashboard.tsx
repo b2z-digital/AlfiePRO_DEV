@@ -1219,7 +1219,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
             />
           )}
           {activeTab === 'committee' && (
-            <CommitteeManagement darkMode={darkMode} />
+            <CommitteeManagement darkMode={darkMode} embedded />
           )}
         </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, UserPlus, Shield, Trash2, SquarePen as Edit2, GripVertical, Plus, Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown, Globe, LayoutGrid, Check, Minus } from 'lucide-react';
-import { Avatar } from '../ui/Avatar';
+import { Users, Shield, Trash2, SquarePen as Edit2, GripVertical, Plus, Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown, Globe, LayoutGrid, Check, Minus, Eye, Search } from 'lucide-react';
+import { AAvatar, ALevel, AStatus, ASwitch, accessLevelLabel } from '../alfie/Kit';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -21,6 +21,7 @@ import {
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
+  rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -29,6 +30,8 @@ interface CommitteeManagementProps {
   associationId?: string;
   associationType?: 'state' | 'national';
   onSaveComplete?: () => void;
+  /** Rendered inside the Membership page, which already shows the page header. */
+  embedded?: boolean;
 }
 
 interface PositionDefinition {
@@ -62,7 +65,7 @@ interface Member {
   avatar_url?: string | null;
 }
 
-export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMode, associationId, associationType, onSaveComplete }) => {
+export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMode, associationId, associationType, onSaveComplete, embedded = false }) => {
   const { currentClub, currentOrganization } = useAuth();
   const { addNotification } = useNotifications();
   const { isAdmin, isEditor, isStateAdmin, isNationalAdmin } = usePermissions();
@@ -466,173 +469,137 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-slate-400">Loading committee data...</div>
+        <div className="a-mute">Loading committee data...</div>
       </div>
     );
   }
 
+  const positionsTab = activeTab === 'positions' && canManage;
+  const selectedPosition = showPositionForm ? editingPosition : null;
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-[22px]">
+      {!embedded && (
         <div>
-          <h2 className="text-2xl font-bold text-white">
+          <h2 className="a-display text-2xl font-bold text-white">
             {isAssociationContext ? 'Association Committee Management' : 'Committee Management'}
           </h2>
-          <p className="text-slate-400 mt-1">
+          <p className="a-mute mt-1">
             {isAssociationContext
               ? 'Define positions and assign members to your association committee'
               : 'Define positions and assign members to your committee'}
           </p>
         </div>
-      </div>
+      )}
 
-      <div className="flex items-center gap-2 border-b border-slate-700">
-        <button
-          onClick={() => setActiveTab('assignments')}
-          className={`px-4 py-2 font-medium transition-colors ${
-            activeTab === 'assignments'
-              ? 'text-blue-400 border-b-2 border-blue-400'
-              : 'text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Users size={16} />
-            Assign Members
-          </div>
-        </button>
-        {canManage && (
-          <button
-            onClick={() => setActiveTab('positions')}
-            className={`px-4 py-2 font-medium transition-colors ${
-              activeTab === 'positions'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-slate-400 hover:text-slate-300'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Shield size={16} />
-              Manage Positions
-            </div>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="a-seg self-start" role="tablist" aria-label="Committee">
+          <button role="tab" aria-selected={activeTab === 'assignments'} onClick={() => setActiveTab('assignments')} className={`a-seg-i ${activeTab === 'assignments' ? 'a-seg-on' : ''}`}>
+            <Users size={16} />Assign members
           </button>
-        )}
-        {(isAdmin || isStateAdmin || isNationalAdmin) && (
-          <button
-            onClick={() => setActiveTab('access-levels')}
-            className={`px-4 py-2 font-medium transition-colors ${
-              activeTab === 'access-levels'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-slate-400 hover:text-slate-300'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <LayoutGrid size={16} />
-              Manage Access Levels
-            </div>
-          </button>
-        )}
-        {activeTab === 'positions' && canManage && !showPositionForm && (
-          <button
-            onClick={() => {
-              setEditingPosition(null);
-              setShowPositionForm(true);
-            }}
-            className="btn-primary-green ml-auto mb-1 flex items-center gap-2 px-5 py-2.5 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl whitespace-nowrap"
-          >
-            <Plus size={20} strokeWidth={2.5} />
-            Add Position
-          </button>
+          {canManage && (
+            <button
+              role="tab"
+              aria-selected={activeTab === 'positions'}
+              onClick={() => {
+                setActiveTab('positions');
+                if (!showPositionForm && positions[0]) { setEditingPosition(positions[0]); setShowPositionForm(true); }
+              }}
+              className={`a-seg-i ${activeTab === 'positions' ? 'a-seg-on' : ''}`}
+            >
+              <Shield size={16} />Manage positions
+            </button>
+          )}
+          {(isAdmin || isStateAdmin || isNationalAdmin) && (
+            <button role="tab" aria-selected={activeTab === 'access-levels'} onClick={() => setActiveTab('access-levels')} className={`a-seg-i ${activeTab === 'access-levels' ? 'a-seg-on' : ''}`}>
+              <LayoutGrid size={16} />Manage access levels
+            </button>
+          )}
+        </div>
+        {activeTab === 'assignments' && canManage && positions.length > 1 && (
+          <span className="a-dim text-[13px]">Drag to set the order shown on the club website</span>
         )}
       </div>
 
       {activeTab === 'assignments' && (
-        <div className="space-y-4">
-          {positions.length === 0 ? (
-            <div className="text-center py-12 bg-slate-800/30 rounded-lg border border-slate-700/50">
-              <Shield className="mx-auto text-slate-500 mb-3" size={48} />
-              <p className="text-slate-400 mb-4">No committee positions defined yet</p>
-              {canManage && (
-                <button
-                  onClick={() => setActiveTab('positions')}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                >
-                  Define Positions
-                </button>
-              )}
-            </div>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={positions.map(p => p.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="grid gap-4">
-                  {positions.map(position => {
-                    const positionAssignments = assignments.filter(
-                      a => a.position_definition_id === position.id
-                    );
-
-                    return (
-                      <SortablePositionCard
-                        key={position.id}
-                        position={position}
-                        positionAssignments={positionAssignments}
-                        members={members}
-                        canManage={canManage}
-                        onAddMember={handleAddMember}
-                        onRemoveMember={handleRemoveMember}
-                        getPositionIcon={getPositionIcon}
-                      />
-                    );
-                  })}
-                </div>
-              </SortableContext>
-            </DndContext>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'positions' && canManage && (
-        <div className="space-y-4">
-          {showPositionForm && (
-            <PositionForm
-              position={editingPosition}
-              onSave={handleSavePosition}
-              onCancel={() => {
-                setShowPositionForm(false);
-                setEditingPosition(null);
-              }}
-            />
-          )}
-
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={positions.map(p => p.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="grid gap-3">
+        positions.length === 0 ? (
+          <div className="a-card a-empty py-12 px-6">
+            <span className="a-tile"><Shield size={20} /></span>
+            <p className="text-[15px] font-semibold a-ink">No committee positions yet</p>
+            <p className="a-mute text-[13.5px]">Create positions like President or Treasurer, then assign members to them.</p>
+            {canManage && (
+              <button onClick={() => { setActiveTab('positions'); setEditingPosition(null); setShowPositionForm(true); }} className="a-btn a-btn-p mt-1">
+                <Plus size={16} />Define positions
+              </button>
+            )}
+          </div>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={positions.map(p => p.id)} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {positions.map(position => (
-                  <SortablePositionItem
+                  <SortablePositionCard
                     key={position.id}
                     position={position}
-                    onEdit={() => {
-                      setEditingPosition(position);
-                      setShowPositionForm(true);
-                    }}
-                    onDelete={() => handleDeletePosition(position.id)}
+                    positionAssignments={assignments.filter(a => a.position_definition_id === position.id)}
+                    members={members}
+                    canManage={canManage}
+                    onAddMember={handleAddMember}
+                    onRemoveMember={handleRemoveMember}
                     getPositionIcon={getPositionIcon}
                   />
                 ))}
               </div>
             </SortableContext>
           </DndContext>
+        )
+      )}
+
+      {positionsTab && (
+        <div className="flex flex-col lg:flex-row gap-4 items-stretch">
+          <div className="a-card lg:flex-[0_0_400px] p-3 flex flex-col gap-1 self-start w-full">
+            <div className="flex items-center justify-between px-2 pt-1.5 pb-2.5">
+              <p className="a-cap">{positions.length} {positions.length === 1 ? 'position' : 'positions'}</p>
+              <button
+                onClick={() => { setEditingPosition(null); setShowPositionForm(true); }}
+                className="a-btn a-btn-p a-btn-sm"
+              >
+                <Plus size={16} />New position
+              </button>
+            </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={positions.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                {positions.map(position => (
+                  <SortablePositionItem
+                    key={position.id}
+                    position={position}
+                    selected={selectedPosition?.id === position.id}
+                    onEdit={() => { setEditingPosition(position); setShowPositionForm(true); }}
+                    onDelete={() => handleDeletePosition(position.id)}
+                    getPositionIcon={getPositionIcon}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+            {positions.length > 1 && <p className="a-dim mx-2 mt-2 mb-1 text-[12.5px]">Drag to reorder how positions appear on the club website.</p>}
+          </div>
+
+          {showPositionForm ? (
+            <PositionForm
+              key={editingPosition?.id ?? 'new'}
+              position={editingPosition}
+              icon={getPositionIcon(editingPosition?.position_name || '')}
+              onSave={handleSavePosition}
+              onCancel={() => { setShowPositionForm(false); setEditingPosition(null); }}
+            />
+          ) : (
+            <div className="a-panel flex-1 min-w-0 a-empty py-16 px-6">
+              <span className="a-tile"><Shield size={20} /></span>
+              <p className="text-[15px] font-semibold a-ink">Pick a position to edit</p>
+              <p className="a-mute text-[13.5px]">Or create a new one for your committee.</p>
+              <button onClick={() => { setEditingPosition(null); setShowPositionForm(true); }} className="a-btn a-btn-p mt-1"><Plus size={16} />New position</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -654,6 +621,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
 // Sortable Position Item Component
 interface SortablePositionItemProps {
   position: PositionDefinition;
+  selected?: boolean;
   onEdit: () => void;
   onDelete: () => void;
   getPositionIcon: (positionName: string) => React.ReactNode;
@@ -661,6 +629,7 @@ interface SortablePositionItemProps {
 
 const SortablePositionItem: React.FC<SortablePositionItemProps> = ({
   position,
+  selected,
   onEdit,
   onDelete,
   getPositionIcon,
@@ -684,69 +653,24 @@ const SortablePositionItem: React.FC<SortablePositionItemProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-slate-800/30 rounded-xl border border-slate-700/50 px-4 py-3 flex items-center gap-3"
+      className={`a-prow ${selected ? 'a-prow-on' : ''}`}
+      aria-current={selected ? 'true' : undefined}
+      onClick={onEdit}
     >
-      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400 transition-colors">
-        <GripVertical size={18} />
-      </div>
-
-      <span className="text-blue-400">{getPositionIcon(position.position_name)}</span>
-
+      <span {...attributes} {...listeners} className="a-dim flex cursor-grab active:cursor-grabbing" aria-label="Drag to reorder" onClick={(e) => e.stopPropagation()}>
+        <GripVertical size={16} />
+      </span>
+      <span className="a-tile a-tile-sm">{getPositionIcon(position.position_name)}</span>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-white text-sm">{position.position_name}</p>
-        {position.description && (
-          <p className="text-xs text-slate-500 truncate">{position.description}</p>
-        )}
+        <div className="text-[14.5px] font-semibold a-ink truncate">{position.position_name}</div>
+        <div className="a-dim text-xs mt-0.5">{accessLevelLabel(position.access_level)} access</div>
       </div>
-
-      {position.access_level && (
-        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${
-          position.access_level === 'admin'
-            ? 'bg-amber-500/10 border-amber-500/20'
-            : position.access_level === 'editor'
-              ? 'bg-blue-500/10 border-blue-500/20'
-              : position.access_level === 'race_scorer'
-                ? 'bg-emerald-500/10 border-emerald-500/20'
-                : 'bg-slate-500/10 border-slate-500/20'
-        }`}>
-          <Shield size={11} className={
-            position.access_level === 'admin' ? 'text-amber-400'
-              : position.access_level === 'editor' ? 'text-blue-400'
-                : position.access_level === 'race_scorer' ? 'text-emerald-400'
-                  : 'text-slate-400'
-          } />
-          <span className={`text-xs capitalize ${
-            position.access_level === 'admin' ? 'text-amber-400'
-              : position.access_level === 'editor' ? 'text-blue-400'
-                : position.access_level === 'race_scorer' ? 'text-emerald-400'
-                  : 'text-slate-400'
-          }`}>{position.access_level === 'race_scorer' ? 'Race Scorer' : position.access_level}</span>
-        </div>
-      )}
-
-      {position.show_on_website && (
-        <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 border border-green-500/20 rounded-full">
-          <Globe size={11} className="text-green-400" />
-          <span className="text-xs text-green-400">Website</span>
-        </div>
-      )}
-
-      <div className="flex items-center gap-1">
-        <button
-          onClick={onEdit}
-          className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-700 rounded-lg transition-colors"
-          title="Edit position"
-        >
-          <Edit2 size={15} />
-        </button>
-        <button
-          onClick={onDelete}
-          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors"
-          title="Delete position"
-        >
-          <Trash2 size={15} />
-        </button>
-      </div>
+      <button type="button" onClick={(e) => { e.stopPropagation(); onEdit(); }} className="a-ib" style={{ width: 32, height: 32 }} aria-label={`Edit ${position.position_name}`} title="Edit position">
+        <Edit2 size={15} />
+      </button>
+      <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(); }} className="a-ib a-ib-d" style={{ width: 32, height: 32 }} aria-label={`Delete ${position.position_name}`} title="Delete position">
+        <Trash2 size={15} />
+      </button>
     </div>
   );
 };
@@ -754,6 +678,7 @@ const SortablePositionItem: React.FC<SortablePositionItemProps> = ({
 // Position Form Component
 interface PositionFormProps {
   position: PositionDefinition | null;
+  icon?: React.ReactNode;
   onSave: (data: Partial<PositionDefinition>) => void;
   onCancel: () => void;
 }
@@ -764,7 +689,7 @@ interface DashboardTemplate {
   description: string;
 }
 
-const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel }) => {
+const PositionForm: React.FC<PositionFormProps> = ({ position, icon, onSave, onCancel }) => {
   const isPresident = (name: string) => /president/i.test(name);
   const isSecretary = (name: string) => /secretary/i.test(name);
   const isTreasurer = (name: string) => /treasurer/i.test(name);
@@ -865,261 +790,161 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
     onSave(formData);
   };
 
+  const accessOptions = [
+    { value: 'admin', label: 'Admin', desc: 'Full access', icon: <Crown size={17} /> },
+    { value: 'editor', label: 'Editor', desc: 'Can edit content', icon: <Edit2 size={17} /> },
+    { value: 'race_scorer', label: 'Race Scorer', desc: 'Can score races', icon: <Calendar size={17} /> },
+    { value: 'viewer', label: 'Viewer', desc: 'Read only', icon: <Eye size={17} /> },
+  ];
+  const stepPriority = (d: number) =>
+    setFormData(prev => ({ ...prev, position_priority: Math.min(100, Math.max(0, (prev.position_priority ?? 0) + d)) }));
+
   return (
-    <form onSubmit={handleSubmit} className="bg-slate-800/40 rounded-xl border border-slate-700/50 overflow-hidden">
-      {/* Form header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
-        <h3 className="font-semibold text-white">
-          {position ? 'Edit Position' : 'New Position'}
-        </h3>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="p-1 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-700"
-        >
-          <X size={18} />
-        </button>
+    <form onSubmit={handleSubmit} className="a-panel flex-1 min-w-0 flex flex-col">
+      <div className="a-panel-head">
+        <span className="a-tile a-tile-rim" style={{ width: 44, height: 44 }}>{icon || <Shield size={20} />}</span>
+        <div className="flex-1 min-w-0">
+          <p className="a-cap">{position ? 'Edit position' : 'New position'}</p>
+          <h2 className="a-display a-ink text-[22px] font-semibold mt-[3px] truncate">{formData.position_name || 'Untitled position'}</h2>
+        </div>
+        <button type="button" onClick={onCancel} className="a-ib" aria-label="Close"><X size={18} /></button>
       </div>
 
-      <div className="p-5 space-y-5">
-        {/* Position Name */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-            Position Name *
-          </label>
-          <input
-            type="text"
-            value={formData.position_name}
-            onChange={(e) => setFormData({ ...formData, position_name: e.target.value })}
-            className="w-full px-3 py-2.5 bg-slate-700/60 border border-slate-600/60 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-700 text-sm transition-colors"
-            placeholder="e.g., Commodore, Treasurer, Race Officer"
-            required
-          />
-        </div>
-
-        {/* Description */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-            Description
-          </label>
-          <textarea
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            className="w-full px-3 py-2.5 bg-slate-700/60 border border-slate-600/60 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-700 text-sm transition-colors resize-none"
-            placeholder="Brief description of the role"
-            rows={2}
-          />
-        </div>
-
-        <div>
-          <label className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-            <Shield size={13} />
-            System Access Level
-          </label>
-          <p className="text-xs text-slate-500 mb-3">
-            Members assigned to this position will receive this access level in the club
-          </p>
-          <div className="flex gap-2">
-            {[
-              { value: 'admin', label: 'Admin', color: 'amber', desc: 'Full access' },
-              { value: 'editor', label: 'Editor', color: 'blue', desc: 'Can edit' },
-              { value: 'race_scorer', label: 'Race Scorer', color: 'emerald', desc: 'Score races' },
-              { value: 'viewer', label: 'Viewer', color: 'slate', desc: 'Read only' },
-            ].map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setFormData(prev => ({ ...prev, access_level: opt.value }))}
-                className={`flex-1 flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl border transition-all ${
-                  formData.access_level === opt.value
-                    ? `bg-${opt.color}-500/10 border-${opt.color}-500/30 text-${opt.color}-400`
-                    : 'border-slate-600/50 text-slate-500 hover:border-slate-500'
-                }`}
-                style={formData.access_level === opt.value ? {
-                  backgroundColor: opt.color === 'amber' ? 'rgba(245, 158, 11, 0.1)' : opt.color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : opt.color === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(100, 116, 139, 0.1)',
-                  borderColor: opt.color === 'amber' ? 'rgba(245, 158, 11, 0.3)' : opt.color === 'blue' ? 'rgba(59, 130, 246, 0.3)' : opt.color === 'emerald' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(100, 116, 139, 0.3)',
-                  color: opt.color === 'amber' ? '#fbbf24' : opt.color === 'blue' ? '#60a5fa' : opt.color === 'emerald' ? '#34d399' : '#94a3b8',
-                } : {}}
-              >
-                <Shield size={16} />
-                <span className="text-xs font-medium">{opt.label}</span>
-                <span className="text-[10px] opacity-60">{opt.desc}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Show on Website toggle */}
-        <div className="flex items-center justify-between py-3 px-4 bg-slate-700/30 rounded-xl border border-slate-600/30">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center">
-              <Globe size={15} className="text-green-400" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-white">Show on Club Website</p>
-              <p className="text-xs text-slate-500">Display this position on the public contact page</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setFormData(prev => ({ ...prev, show_on_website: !prev.show_on_website }))}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-              formData.show_on_website ? 'bg-green-500' : 'bg-slate-600'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                formData.show_on_website ? 'translate-x-6' : 'translate-x-1'
-              }`}
+      <div className="p-[22px] flex flex-col gap-[22px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label>
+            <span className="a-flab">Position name</span>
+            <input
+              type="text"
+              value={formData.position_name}
+              onChange={(e) => setFormData({ ...formData, position_name: e.target.value })}
+              className="a-inp"
+              placeholder="e.g., Commodore, Treasurer, Race Officer"
+              required
             />
-          </button>
+          </label>
+          <label>
+            <span className="a-flab">Description</span>
+            <input
+              type="text"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="a-inp"
+              placeholder="Brief description of the role"
+            />
+          </label>
         </div>
 
-        {/* Dashboard Template — visual card picker */}
         <div>
-          <label className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-            <LayoutGrid size={13} />
-            Dashboard Template
-          </label>
-          <p className="text-xs text-slate-500 mb-3">
-            Members with this position will see this dashboard layout by default
-          </p>
-
-          {loadingTemplates ? (
-            <div className="text-slate-500 text-sm">Loading templates...</div>
-          ) : (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
-                className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-700/60 border border-slate-600/60 rounded-lg text-sm transition-colors hover:bg-slate-700 focus:outline-none focus:border-blue-500"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <LayoutGrid size={14} className="text-blue-400 flex-shrink-0" />
-                  <span className={`truncate ${formData.dashboard_template_id ? 'text-white' : 'text-slate-500'}`}>
-                    {selectedTemplate ? selectedTemplate.name : 'No template (use club default)'}
+          <span className="a-flab">System access level</span>
+          <div role="radiogroup" aria-label="System access level" className="grid grid-cols-2 xl:grid-cols-4 gap-2.5">
+            {accessOptions.map(opt => {
+              const on = formData.access_level === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setFormData(prev => ({ ...prev, access_level: opt.value }))}
+                  className={`a-acc ${on ? 'a-acc-on' : ''}`}
+                >
+                  <span className="a-radio" />
+                  <span className="a-tile a-tile-sm">{opt.icon}</span>
+                  <span>
+                    <span className="block text-[14.5px] font-semibold">{opt.label}</span>
+                    <span className="block a-dim text-[12.5px] mt-0.5">{opt.desc}</span>
                   </span>
-                </div>
-                <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${showTemplateDropdown ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showTemplateDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl z-20 overflow-hidden">
-                  <div className="max-h-64 overflow-y-auto p-2 space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData({ ...formData, dashboard_template_id: null });
-                        setShowTemplateDropdown(false);
-                      }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                        !formData.dashboard_template_id
-                          ? 'bg-blue-600/20 border border-blue-500/30'
-                          : 'hover:bg-slate-700'
-                      }`}
-                    >
-                      <div className="w-7 h-7 rounded-md bg-slate-700 flex items-center justify-center flex-shrink-0">
-                        <LayoutGrid size={14} className="text-slate-400" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-white">Club Default</p>
-                        <p className="text-xs text-slate-500">Use the club's default dashboard</p>
-                      </div>
-                      {!formData.dashboard_template_id && (
-                        <Check size={14} className="text-blue-400 flex-shrink-0" />
-                      )}
-                    </button>
-
-                    {templates.map(template => (
-                      <button
-                        key={template.id}
-                        type="button"
-                        onClick={() => {
-                          setFormData({ ...formData, dashboard_template_id: template.id });
-                          setShowTemplateDropdown(false);
-                        }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                          formData.dashboard_template_id === template.id
-                            ? 'bg-blue-600/20 border border-blue-500/30'
-                            : 'hover:bg-slate-700'
-                        }`}
-                      >
-                        <div className="w-7 h-7 rounded-md bg-blue-600/20 border border-blue-500/20 flex items-center justify-center flex-shrink-0">
-                          <LayoutGrid size={14} className="text-blue-400" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-white">{template.name}</p>
-                          {template.description && (
-                            <p className="text-xs text-slate-500 truncate">{template.description}</p>
-                          )}
-                        </div>
-                        {formData.dashboard_template_id === template.id && (
-                          <Check size={14} className="text-blue-400 flex-shrink-0" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="a-dim text-[12.5px] mt-2">Members assigned to this position get this access level in the club.</p>
         </div>
 
-        {/* Position Priority — compact number input */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-            Position Priority
-          </label>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="a-seg" role="group" aria-label="Dashboard priority">
-              <button
-                type="button"
-                className="a-seg-i"
-                aria-label="Lower priority"
-                onClick={() => setFormData({ ...formData, position_priority: Math.max(0, (formData.position_priority ?? 0) - 5) })}
-              >
-                <Minus size={16} />
-              </button>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                aria-label="Priority (0 to 100)"
-                value={formData.position_priority}
-                onChange={(e) => setFormData({ ...formData, position_priority: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
-                className="a-num w-12 bg-transparent text-white text-base font-semibold text-center focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-              <button
-                type="button"
-                className="a-seg-i"
-                aria-label="Higher priority"
-                onClick={() => setFormData({ ...formData, position_priority: Math.min(100, (formData.position_priority ?? 0) + 5) })}
-              >
-                <Plus size={16} />
-              </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="a-well self-start">
+            <span className="a-tile a-tile-sm"><Globe size={17} /></span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[14.5px] font-semibold a-ink">Show on club website</div>
+              <div className="a-dim text-[12.5px] mt-0.5">Listed on the committee page</div>
             </div>
-            <p className="text-xs text-slate-500 flex-1 min-w-[180px]">
-              If a member holds two positions, the higher number picks their dashboard (0–100).
-            </p>
+            <ASwitch
+              checked={formData.show_on_website}
+              onChange={(v) => setFormData(prev => ({ ...prev, show_on_website: v }))}
+              label="Show on club website"
+            />
+          </div>
+
+          <div>
+            <span className="a-flab">Dashboard template</span>
+            <div className="flex gap-2.5">
+              <div className="relative flex-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                  className="a-pick w-full justify-start"
+                  style={{ height: 46 }}
+                  aria-haspopup="listbox"
+                  aria-expanded={showTemplateDropdown}
+                  disabled={loadingTemplates}
+                >
+                  <LayoutGrid size={16} />
+                  <span className="flex-1 text-left truncate">
+                    {loadingTemplates ? 'Loading templates…' : selectedTemplate ? selectedTemplate.name : 'Club default'}
+                  </span>
+                  <ChevronDown size={16} className={`transition-transform ${showTemplateDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                {showTemplateDropdown && (
+                  <div className="a-pop absolute top-full left-0 right-0 mt-1.5 z-20" role="listbox">
+                    <div className="max-h-64 overflow-y-auto p-1.5 flex flex-col gap-0.5">
+                      {[{ id: null as string | null, name: 'Club default', description: "Use the club's default dashboard" }, ...templates].map(t => (
+                        <button
+                          key={t.id ?? 'default'}
+                          type="button"
+                          role="option"
+                          aria-selected={formData.dashboard_template_id === t.id}
+                          onClick={() => { setFormData({ ...formData, dashboard_template_id: t.id }); setShowTemplateDropdown(false); }}
+                          className={`a-pop-item ${formData.dashboard_template_id === t.id ? 'a-pop-item-on' : ''}`}
+                        >
+                          <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}><LayoutGrid size={14} /></span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block truncate">{t.name}</span>
+                            {t.description && <span className="block a-dim text-xs truncate">{t.description}</span>}
+                          </span>
+                          {formData.dashboard_template_id === t.id && <Check size={15} className="a-txt-b" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="a-seg flex-nowrap" role="group" aria-label="Dashboard priority" title="Dashboard priority" style={{ height: 46, padding: 4 }}>
+                <button type="button" className="a-seg-i" aria-label="Lower priority" style={{ height: 38, padding: '0 9px' }} onClick={() => stepPriority(-5)} disabled={formData.position_priority <= 0}>
+                  <Minus size={16} />
+                </button>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  aria-label="Priority"
+                  value={formData.position_priority}
+                  onChange={(e) => setFormData({ ...formData, position_priority: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+                  className="a-num a-ink bg-transparent border-0 outline-none text-center text-base font-semibold w-10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <button type="button" className="a-seg-i" aria-label="Higher priority" style={{ height: 38, padding: '0 9px' }} onClick={() => stepPriority(5)} disabled={formData.position_priority >= 100}>
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+            <p className="a-dim text-[12.5px] mt-2">Priority {formData.position_priority} · if a member holds two positions, the higher number picks their dashboard</p>
           </div>
         </div>
       </div>
 
-      {/* Footer actions */}
-      <div className="flex items-center gap-3 px-5 py-4 border-t border-slate-700/50 bg-slate-800/20">
-        <button
-          type="submit"
-          className="btn-primary-green flex-1 px-4 py-2.5 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl"
-        >
-          {position ? 'Save Changes' : 'Create Position'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg font-medium text-sm transition-colors"
-        >
-          Cancel
-        </button>
+      <div className="a-panel-foot mt-auto">
+        <button type="button" onClick={onCancel} className="a-btn">Cancel</button>
+        <button type="submit" className="a-btn a-btn-p"><Check size={16} />{position ? 'Save changes' : 'Create position'}</button>
       </div>
     </form>
   );
@@ -1163,124 +988,68 @@ const SortablePositionCard: React.FC<SortablePositionCardProps> = ({
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className="bg-slate-800/30 rounded-xl border border-slate-700/50 p-4 relative"
+      style={{ ...style, padding: '18px 18px 18px 10px' }}
+      className="a-card a-hov flex gap-2.5 relative"
     >
-      <div className="flex items-start justify-between gap-4">
-        {canManage && (
-          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing pt-1">
-            <GripVertical size={20} className="text-slate-500" />
-          </div>
-        )}
+      {canManage ? (
+        <span {...attributes} {...listeners} className="a-dim flex items-start pt-2.5 cursor-grab active:cursor-grabbing" aria-label="Drag to reorder">
+          <GripVertical size={16} />
+        </span>
+      ) : <span className="w-1" />}
 
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-blue-400">{getPositionIcon(position.position_name)}</span>
-            <h3 className="font-semibold text-white">{position.position_name}</h3>
-            {position.access_level && (
-              <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full border ${
-                position.access_level === 'admin'
-                  ? 'bg-amber-500/10 border-amber-500/20'
-                  : position.access_level === 'editor'
-                    ? 'bg-blue-500/10 border-blue-500/20'
-                    : position.access_level === 'race_scorer'
-                      ? 'bg-emerald-500/10 border-emerald-500/20'
-                      : 'bg-slate-500/10 border-slate-500/20'
-              }`}>
-                <Shield size={10} className={
-                  position.access_level === 'admin' ? 'text-amber-400'
-                    : position.access_level === 'editor' ? 'text-blue-400'
-                      : position.access_level === 'race_scorer' ? 'text-emerald-400'
-                        : 'text-slate-400'
-                } />
-                <span className={`text-xs capitalize ${
-                  position.access_level === 'admin' ? 'text-amber-400'
-                    : position.access_level === 'editor' ? 'text-blue-400'
-                      : position.access_level === 'race_scorer' ? 'text-emerald-400'
-                        : 'text-slate-400'
-                }`}>{position.access_level === 'race_scorer' ? 'Race Scorer' : position.access_level}</span>
+      <div className="flex-1 min-w-0 flex flex-col gap-3.5">
+        <div className="flex items-center gap-3">
+          <span className="a-tile">{getPositionIcon(position.position_name)}</span>
+          <div className="flex-1 min-w-0">
+            <h3 className="a-display a-ink m-0 text-[17px] font-semibold truncate">{position.position_name}</h3>
+            {position.description && <p className="a-dim mt-0.5 text-[12.5px] truncate">{position.description}</p>}
+          </div>
+          {position.access_level && <ALevel level={position.access_level} />}
+        </div>
+
+        <div className="flex flex-wrap gap-2 items-center">
+          {positionAssignments.map(assignment => {
+            const [first, ...rest] = (assignment.member_name || '').split(' ');
+            return (
+              <span key={assignment.id} className="a-pill">
+                <AAvatar url={assignment.avatar_url} first={first} last={rest.join(' ')} size="sm" />
+                <span>{assignment.member_name}</span>
+                {canManage ? (
+                  <button onClick={() => onRemoveMember(assignment.id)} className="a-ib" aria-label={`Remove ${assignment.member_name}`} title="Remove member">
+                    <X size={14} />
+                  </button>
+                ) : <span className="w-1.5" />}
               </span>
-            )}
-            {position.show_on_website && (
-              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-green-500/10 border border-green-500/20 rounded-full">
-                <Globe size={10} className="text-green-400" />
-                <span className="text-xs text-green-400">Website</span>
-              </span>
-            )}
-          </div>
-          {position.description && (
-            <p className="text-sm text-slate-400 mb-3">{position.description}</p>
-          )}
-
-          <div className="space-y-2">
-            {positionAssignments.length === 0 ? (
-              <div className="text-slate-500 italic text-sm mb-3">No members assigned</div>
-            ) : (
-              positionAssignments.map(assignment => (
-                <div
-                  key={assignment.id}
-                  className="flex items-center justify-between bg-slate-700/50 rounded-lg p-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <Avatar
-                      imageUrl={assignment.avatar_url}
-                      firstName={assignment.member_name?.split(' ')[0] || ''}
-                      lastName={assignment.member_name?.split(' ').slice(1).join(' ') || ''}
-                      size="sm"
-                    />
-                    <span className="text-white text-sm">{assignment.member_name}</span>
-                  </div>
-                  {canManage && (
-                    <button
-                      onClick={() => onRemoveMember(assignment.id)}
-                      className="text-slate-400 hover:text-red-400 transition-colors"
-                      title="Remove member"
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-
-          {canManage && showAddMember && (
-            <div className="mt-3">
-              <MemberSelector
-                members={members}
-                onSelect={(memberId) => {
-                  onAddMember(position.id, memberId);
-                  setShowAddMember(false);
-                }}
-                excludedMemberIds={positionAssignments.map(a => a.member_id).filter(Boolean) as string[]}
-                onClose={() => setShowAddMember(false)}
-              />
+            );
+          })}
+          {positionAssignments.length === 0 && !canManage && <span className="a-dim text-[13px]">No one assigned yet</span>}
+          {canManage && (
+            <div className="relative">
+              <button onClick={() => setShowAddMember(!showAddMember)} className="a-pill-add" aria-expanded={showAddMember}>
+                <Plus size={15} />Assign
+              </button>
+              {showAddMember && (
+                <MemberSelector
+                  members={members}
+                  onSelect={(memberId) => {
+                    onAddMember(position.id, memberId);
+                    setShowAddMember(false);
+                  }}
+                  excludedMemberIds={positionAssignments.map(a => a.member_id).filter(Boolean) as string[]}
+                  onClose={() => setShowAddMember(false)}
+                />
+              )}
             </div>
           )}
         </div>
 
-        {canManage && positionAssignments.length > 0 && !showAddMember && (
-          <button
-            onClick={() => setShowAddMember(true)}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-700 border border-slate-600 text-slate-400 hover:text-blue-400 hover:bg-slate-600 hover:border-blue-500 transition-all"
-            title="Add another member"
-          >
-            <Plus size={16} />
-          </button>
-        )}
-      </div>
-
-      {canManage && positionAssignments.length === 0 && !showAddMember && (
-        <div className="mt-3">
-          <button
-            onClick={() => setShowAddMember(true)}
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm text-left flex items-center justify-between hover:bg-slate-600 transition-colors"
-          >
-            <span className="text-slate-300">+ Add member to this position</span>
-            <ChevronDown size={16} />
-          </button>
+        <div className="flex items-center justify-between pt-3 border-t border-white/[0.055] a-card-rule">
+          {position.show_on_website
+            ? <AStatus tone="g" className="text-[12.5px]">On website</AStatus>
+            : <AStatus className="text-[12.5px]">Hidden</AStatus>}
+          <span className="a-dim text-[12.5px]">{positionAssignments.length} assigned</span>
         </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -1326,47 +1095,34 @@ const MemberSelector: React.FC<MemberSelectorProps> = ({ members, onSelect, excl
   if (!isOpen) return null;
 
   return (
-    <div className="relative w-full max-w-md" ref={dropdownRef}>
-      {isOpen && (
-        <div className="bg-slate-700 border border-slate-600 rounded-lg shadow-xl max-h-80 overflow-hidden flex flex-col">
-          <div className="p-2 border-b border-slate-600">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search members..."
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white text-sm placeholder-slate-400 focus:outline-none focus:border-blue-500"
-              autoFocus
-            />
+    <div className="a-pop absolute left-0 top-full mt-2 z-30 w-[300px] flex flex-col max-h-80" ref={dropdownRef}>
+      <div className="p-2">
+        <label className="a-field" style={{ height: 38 }}>
+          <Search size={15} />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search members"
+            aria-label="Search members"
+            autoFocus
+          />
+        </label>
+      </div>
+      <div className="overflow-y-auto px-1.5 pb-1.5 flex flex-col gap-0.5">
+        {filteredMembers.length === 0 ? (
+          <div className="px-3 py-4 text-center a-mute text-sm">
+            {availableMembers.length === 0 ? 'Everyone is already assigned' : 'No members match'}
           </div>
-          <div className="overflow-y-auto">
-            {filteredMembers.length === 0 ? (
-              <div className="px-3 py-4 text-center text-slate-400 text-sm">
-                {availableMembers.length === 0 ? 'All members assigned' : 'No members found'}
-              </div>
-            ) : (
-              filteredMembers.map(member => (
-                <button
-                  key={member.id}
-                  type="button"
-                  onClick={() => handleSelect(member.id)}
-                  className="w-full px-3 py-2 flex items-center gap-3 hover:bg-slate-600 transition-colors text-left"
-                >
-                  <Avatar
-                    imageUrl={member.avatar_url}
-                    firstName={member.first_name}
-                    lastName={member.last_name}
-                    size="sm"
-                  />
-                  <span className="text-white text-sm">
-                    {member.first_name} {member.last_name}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+        ) : (
+          filteredMembers.map(member => (
+            <button key={member.id} type="button" onClick={() => handleSelect(member.id)} className="a-pop-item">
+              <AAvatar url={member.avatar_url} first={member.first_name} last={member.last_name} size="sm" />
+              <span className="truncate">{member.first_name} {member.last_name}</span>
+            </button>
+          ))
+        )}
+      </div>
     </div>
   );
 };
