@@ -73,114 +73,95 @@ export const HomepageTileModal: React.FC<HomepageTileModalProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div
-        className={`w-full max-w-2xl rounded-xl shadow-2xl ${
-          darkMode ? 'bg-slate-800 text-white' : 'bg-white text-gray-900'
-        }`}
+        className="a-sheet w-full max-w-2xl max-h-[90vh] overflow-y-auto"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
-          <h2 className="text-xl font-semibold">
-            {tile ? 'Edit Tile' : 'Add New Tile'}
+        <div className="flex items-center justify-between" style={{ padding: '20px 24px 4px' }}>
+          <h2 className="a-display a-ink m-0 text-[20px] font-semibold">
+            {tile ? 'Edit tile' : 'Add tile'}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
+            className="a-ib" aria-label="Close">
+            <X size={18} />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4" style={{ padding: '16px 24px 24px' }}>
           {/* Image */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Tile Image <span className="text-red-500">*</span>
+            <label className="a-flab">
+              Tile image <span className="a-txt-r">*</span>
             </label>
             {formData.image_url ? (
               <div className="relative">
                 <img
                   src={formData.image_url}
                   alt="Tile preview"
-                  className="w-full h-48 object-cover rounded-lg"
+                  className="w-full h-48 object-cover" style={{ borderRadius: 14 }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowImageUpload(true)}
-                  className="absolute top-2 right-2 px-3 py-1.5 bg-white text-gray-900 rounded shadow hover:bg-gray-100 transition-colors text-sm font-medium"
+                  className="a-gb absolute top-2.5 right-2.5 text-[13px] font-medium" style={{ width: 'auto', padding: '0 14px' }}
                 >
-                  Change Image
+                  Change image
                 </button>
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => setShowImageUpload(true)}
-                className={`w-full h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 transition-colors ${
-                  darkMode
-                    ? 'border-slate-600 hover:border-slate-500 hover:bg-slate-700/50'
-                    : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                }`}
+                className="a-dropzone w-full h-48 flex flex-col items-center justify-center gap-2"
               >
-                <Upload className="w-8 h-8 text-gray-400" />
-                <span className="text-sm text-gray-500">Click to upload image</span>
+                <span className="a-tile" style={{ width: 44, height: 44 }}><Upload size={20} /></span>
+                <span className="a-mute text-[13.5px]">Click to upload image</span>
               </button>
             )}
           </div>
 
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Title <span className="text-red-500">*</span>
+            <label className="a-flab">
+              Title <span className="a-txt-r">*</span>
             </label>
             <input
               type="text"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg border ${
-                darkMode
-                  ? 'bg-slate-700 border-slate-600 text-white'
-                  : 'bg-white border-gray-300 text-gray-900'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              className="a-inp w-full"
               placeholder="e.g., MEMBERSHIP"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium mb-2">Description</label>
+            <label className="a-flab">Description</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={2}
-              className={`w-full px-4 py-2 rounded-lg border ${
-                darkMode
-                  ? 'bg-slate-700 border-slate-600 text-white'
-                  : 'bg-white border-gray-300 text-gray-900'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              className="a-inp w-full"
               placeholder="Brief description shown on hover"
             />
           </div>
 
           {/* Link URL */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Link URL <span className="text-red-500">*</span>
+            <label className="a-flab">
+              Link URL <span className="a-txt-r">*</span>
             </label>
             <input
               type="text"
               value={formData.link_url}
               onChange={(e) => setFormData({ ...formData, link_url: e.target.value })}
-              className={`w-full px-4 py-2 rounded-lg border ${
-                darkMode
-                  ? 'bg-slate-700 border-slate-600 text-white'
-                  : 'bg-white border-gray-300 text-gray-900'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              className="a-inp w-full"
               placeholder="https://... or /page-path"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="a-dim text-[12px] mt-1.5">
               Use full URLs (https://...) for external links, or page paths (/membership) for internal links
             </p>
           </div>
@@ -192,32 +173,28 @@ export const HomepageTileModal: React.FC<HomepageTileModalProps> = ({
               id="is_active"
               checked={formData.is_active}
               onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              className="w-4 h-4 rounded accent-blue-500 cursor-pointer"
             />
-            <label htmlFor="is_active" className="text-sm font-medium cursor-pointer">
+            <label htmlFor="is_active" className="a-ink text-[14px] cursor-pointer">
               Show this tile on the homepage
             </label>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
-                darkMode
-                  ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                  : 'bg-gray-200 hover:bg-gray-300 text-gray-900'
-              }`}
+              className="a-btn flex-1 justify-center"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="a-btn a-btn-p flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? 'Saving...' : tile ? 'Update Tile' : 'Add Tile'}
+              {saving ? 'Saving…' : tile ? 'Save tile' : 'Add tile'}
             </button>
           </div>
         </form>

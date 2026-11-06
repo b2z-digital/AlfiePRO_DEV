@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, SquarePen as Edit2, Trash2, Image as ImageIcon, MoveUp, MoveDown, Eye, EyeOff } from 'lucide-react';
+import { Plus, SquarePen as Edit2, Trash2, Image as ImageIcon, Eye, EyeOff, ChevronLeft, ChevronRight, House as Home, GalleryHorizontal, LayoutGrid } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ASwitch } from '../alfie/Kit';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -30,6 +32,7 @@ interface HomepageTile {
 export const WebsiteHomepageManager: React.FC = () => {
   const { currentClub, darkMode } = useAuth();
   const { addNotification } = useNotifications();
+  const navigate = useNavigate();
   const [slides, setSlides] = useState<HomepageSlide[]>([]);
   const [tiles, setTiles] = useState<HomepageTile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,196 +226,136 @@ export const WebsiteHomepageManager: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="p-6 text-center">Loading...</div>;
+    return <div className="a-dim p-6 text-center">Loading…</div>;
   }
+
+  const atMax = tiles.length >= 6;
+  const previewHref = `/club/${currentClub?.clubId}/public`;
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-6 md:p-8 lg:p-16">
-        {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-white">
-            Homepage Management
-          </h1>
-          <p className="mt-2 text-slate-400">
-            Customize your club's public homepage with carousel slides and quick link tiles
-          </p>
+      <div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        <div className="a-mute flex items-center gap-2 text-[13.5px]">
+          <button onClick={() => navigate('/website')} className="a-txt-b inline-flex items-center gap-1 font-medium">
+            <ChevronLeft size={16} />Website
+          </button>
+          <span>/</span>
+          <span className="a-ink">Homepage</span>
         </div>
 
-        <div className="space-y-8">
-          {/* Homepage Slides Section */}
-          <div className="rounded-xl border p-6 bg-slate-800/50 border-slate-700">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-semibold text-white">
-                  Homepage Carousel Slides
-                </h2>
-                <p className="text-sm mt-1 text-slate-400">
-                  Manage the image carousel on your club homepage
-                </p>
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><Home size={22} /></span>
+          <div className="flex-1 min-w-0">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">Homepage</h1>
+            <p className="a-mute mt-1 text-[14.5px]">Customise your club's public homepage with carousel slides and quick link tiles</p>
+          </div>
+          <a href={previewHref} target="_blank" rel="noopener noreferrer" className="a-btn"><Eye size={17} />Preview homepage</a>
+        </div>
+
+        {/* Carousel slides */}
+        <div className="a-card overflow-hidden">
+          <div style={{ padding: '20px 20px 12px' }}>
+            <div className="flex items-center gap-3">
+              <span className="a-tile a-tile-sm"><GalleryHorizontal size={18} /></span>
+              <div className="flex-1 min-w-0">
+                <h2 className="a-display a-ink m-0 text-[18px] font-semibold">Carousel slides</h2>
+                <p className="a-dim mt-0.5 text-[12.5px]">The rotating hero images on your homepage</p>
               </div>
               <button
-                onClick={() => {
-                  setEditingSlide(null);
-                  setShowSlideModal(true);
-                }}
-                className="btn-primary-green inline-flex items-center gap-2 px-4 py-2 text-white font-medium rounded-lg transition-colors"
+                onClick={() => { setEditingSlide(null); setShowSlideModal(true); }}
+                className="a-btn a-btn-p" style={{ height: 40 }}
               >
-                <Plus className="w-4 h-4" />
-                Add Slide
+                <Plus size={16} />Add slide
               </button>
             </div>
+          </div>
 
-        <div className="space-y-3">
           {slides.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed rounded-lg border-slate-700 text-slate-400">
-              <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No slides yet. Add your first slide to get started.</p>
+            <div className="flex flex-col items-center text-center" style={{ padding: '28px 20px 36px' }}>
+              <span className="a-tile mb-3" style={{ width: 52, height: 52 }}><ImageIcon size={22} /></span>
+              <p className="a-ink font-semibold mb-1">No slides yet</p>
+              <p className="a-dim text-[13.5px]">Add your first slide to get started</p>
             </div>
           ) : (
-            slides.map((slide) => (
+            slides.map((slide, i) => (
               <div
                 key={slide.id}
-                onClick={() => {
-                  setEditingSlide(slide);
-                  setShowSlideModal(true);
-                }}
-                className={`flex items-center gap-4 p-4 rounded-lg border bg-slate-700/50 border-slate-600 cursor-pointer hover:bg-slate-700 hover:border-blue-500 transition-all ${!slide.is_active ? 'opacity-50' : ''}`}
+                onClick={() => { setEditingSlide(slide); setShowSlideModal(true); }}
+                className="a-hsl cursor-pointer"
+                style={!slide.is_active ? { opacity: 0.55 } : undefined}
               >
-                <img
-                  src={slide.image_url}
-                  alt={slide.title}
-                  className="w-24 h-16 object-cover rounded"
-                />
-                <div className="flex-1 pointer-events-none">
-                  <h3 className="font-medium text-white">
-                    {slide.title}
-                  </h3>
-                  <p className="text-sm text-slate-400">
-                    {slide.subtitle}
-                  </p>
+                <div className="relative">
+                  <img src={slide.image_url} alt="" className="block object-cover" style={{ width: 120, height: 72, borderRadius: 12 }} />
+                  <span className="a-hsl-num">{i + 1}</span>
                 </div>
-                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => toggleSlideActive(slide.id, slide.is_active)}
-                    className="p-2 rounded transition-colors hover:bg-slate-600"
-                    title={slide.is_active ? 'Hide slide' : 'Show slide'}
-                  >
-                    {slide.is_active ? (
-                      <Eye className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <EyeOff className="w-4 h-4 text-gray-400" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingSlide(slide);
-                      setShowSlideModal(true);
-                    }}
-                    className="p-2 rounded transition-colors hover:bg-slate-600"
-                  >
-                    <Edit2 className="w-4 h-4 text-blue-500" />
-                  </button>
-                  <button
-                    onClick={() => deleteSlide(slide.id)}
-                    className="p-2 rounded transition-colors hover:bg-slate-600"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </button>
+                <div className="min-w-0">
+                  <div className="a-ink text-[15px] font-semibold truncate">{slide.title}</div>
+                  {slide.subtitle && <div className="a-mute text-[13px] mt-1 line-clamp-2 leading-[1.45]">{slide.subtitle}</div>}
+                </div>
+                <div className="flex items-center gap-2.5" onClick={(e) => e.stopPropagation()}>
+                  <span className="a-dim text-[12.5px] max-sm:hidden">{slide.is_active ? 'Visible' : 'Hidden'}</span>
+                  <ASwitch checked={slide.is_active} onChange={() => toggleSlideActive(slide.id, slide.is_active)} label={slide.is_active ? 'Hide slide' : 'Show slide'} />
+                  <button onClick={() => { setEditingSlide(slide); setShowSlideModal(true); }} className="a-ib" aria-label="Edit slide" title="Edit slide"><Edit2 size={16} /></button>
+                  <button onClick={() => deleteSlide(slide.id)} className="a-ib a-ib-d" aria-label="Delete slide" title="Delete slide"><Trash2 size={16} /></button>
                 </div>
               </div>
             ))
           )}
         </div>
-      </div>
 
-      {/* Homepage Tiles Section */}
-      <div className="rounded-xl border p-6 bg-slate-800/50 border-slate-700">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold text-white">
-              Quick Link Tiles
-            </h2>
-            <p className="text-sm mt-1 text-slate-400">
-              Manage up to 6 clickable tiles that link to key pages
-            </p>
+        {/* Quick link tiles */}
+        <div className="a-card flex flex-col gap-4" style={{ padding: 20 }}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="a-tile a-tile-sm"><LayoutGrid size={18} /></span>
+            <div className="flex-1 min-w-0">
+              <h2 className="a-display a-ink m-0 text-[18px] font-semibold">Quick link tiles</h2>
+              <p className="a-dim mt-0.5 text-[12.5px]">Clickable tiles that link to key pages</p>
+            </div>
+            <span className="a-mute text-[13px] mr-2.5"><b className="a-ink">{tiles.length}</b>/6 used</span>
+            <button
+              onClick={() => { setEditingTile(null); setShowTileModal(true); }}
+              disabled={atMax}
+              className="a-btn disabled:opacity-45 disabled:cursor-not-allowed" style={{ height: 40 }}
+              title={atMax ? 'Maximum of 6 tiles' : 'Add a new tile'}
+            >
+              <Plus size={16} />Add tile
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setEditingTile(null);
-              setShowTileModal(true);
-            }}
-            disabled={tiles.length >= 6}
-            className={`inline-flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-colors ${
-              tiles.length >= 6
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-green-500 hover:bg-green-600 text-white'
-            }`}
-            title={tiles.length >= 6 ? 'Maximum of 6 tiles reached' : 'Add a new tile'}
-          >
-            <Plus className="w-4 h-4" />
-            Add Tile
-          </button>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {tiles.length === 0 ? (
-            <div className="col-span-full text-center py-12 border-2 border-dashed rounded-lg border-slate-700 text-slate-400">
-              <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No tiles yet. Add your first tile to get started.</p>
+            <div className="a-grp flex flex-col items-center text-center" style={{ padding: 32 }}>
+              <span className="a-tile mb-3" style={{ width: 52, height: 52 }}><ImageIcon size={22} /></span>
+              <p className="a-ink font-semibold mb-1">No tiles yet</p>
+              <p className="a-dim text-[13.5px]">Add your first tile to get started</p>
             </div>
           ) : (
-            tiles.map((tile) => (
-              <div
-                key={tile.id}
-                onClick={() => {
-                  setEditingTile(tile);
-                  setShowTileModal(true);
-                }}
-                className={`relative group rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all ${!tile.is_active ? 'opacity-50' : ''}`}
-              >
-                <img
-                  src={tile.image_url}
-                  alt={tile.title}
-                  className="w-full h-48 object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-                <div className="absolute inset-0 flex flex-col justify-end p-4 text-white pointer-events-none">
-                  <h3 className="font-bold uppercase">{tile.title}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {tiles.map((tile) => (
+                <div
+                  key={tile.id}
+                  onClick={() => { setEditingTile(tile); setShowTileModal(true); }}
+                  className="a-qt"
+                  style={!tile.is_active ? { opacity: 0.55 } : undefined}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <img src={tile.image_url} alt="" />
+                  <div className="a-qt-ov" />
+                  <div className="a-qt-ctl" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => toggleTileActive(tile.id, tile.is_active)} className="a-gb" aria-label={tile.is_active ? 'Hide tile' : 'Show tile'} title={tile.is_active ? 'Hide tile' : 'Show tile'}>
+                      {tile.is_active ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    <button onClick={() => { setEditingTile(tile); setShowTileModal(true); }} className="a-gb" aria-label="Edit tile" title="Edit tile"><Edit2 size={16} /></button>
+                    <button onClick={() => deleteTile(tile.id)} className="a-gb a-gb-d" aria-label="Delete tile" title="Delete tile"><Trash2 size={16} /></button>
+                  </div>
+                  <div className="absolute flex items-center justify-between" style={{ left: 16, right: 16, bottom: 13 }}>
+                    <span className="a-display a-qt-t text-[17px] font-semibold truncate">{tile.title}</span>
+                    <ChevronRight size={18} style={{ color: 'rgba(255,255,255,0.7)' }} />
+                  </div>
                 </div>
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => toggleTileActive(tile.id, tile.is_active)}
-                    className="p-1.5 bg-white rounded shadow"
-                    title={tile.is_active ? 'Hide tile' : 'Show tile'}
-                  >
-                    {tile.is_active ? (
-                      <Eye className="w-3.5 h-3.5 text-green-600" />
-                    ) : (
-                      <EyeOff className="w-3.5 h-3.5 text-gray-600" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingTile(tile);
-                      setShowTileModal(true);
-                    }}
-                    className="p-1.5 bg-white rounded shadow"
-                  >
-                    <Edit2 className="w-3.5 h-3.5 text-blue-600" />
-                  </button>
-                  <button
-                    onClick={() => deleteTile(tile.id)}
-                    className="p-1.5 bg-white rounded shadow"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
-                  </button>
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
-        </div>
-      </div>
         </div>
 
         {/* Modals */}
