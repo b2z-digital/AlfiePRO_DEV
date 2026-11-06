@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
+import { useAlfieTheme } from '../hooks/useAlfieTheme';
 import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle, RotateCcw } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
@@ -125,6 +126,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     const savedLightMode = localStorage.getItem('lightMode');
     return savedLightMode !== 'true'; // darkMode is inverse of lightMode
   });
+
+  // Alfie theme while scoring, dark and light (see src/styles/alfie-theme.css)
+  useAlfieTheme(true, darkMode ? 'dark' : 'light');
 
   // Update darkMode when prop changes
   useEffect(() => {

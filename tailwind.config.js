@@ -22,7 +22,13 @@ export default {
           '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
         },
       },
+      fontFamily: {
+        display: ['"Bricolage Grotesque"', '"Instrument Sans"', 'system-ui', 'sans-serif'],
+      },
       colors: {
+        // 700–950 and blue 400–700 read from CSS variables so the Alfie theme
+        // (html.alfie-theme, signed-in app only) can retint them. Defaults in
+        // src/styles/alfie-theme.css match the previous hard-coded values exactly.
         slate: {
           50: '#f8fafc',
           100: '#f1f5f9',
@@ -31,10 +37,23 @@ export default {
           400: '#94a3b8',
           500: '#64748b',
           600: '#475569',
-          700: '#1e293b',
-          800: '#1a2332',
-          900: '#0f1419',
-          950: '#020617',
+          700: 'rgb(var(--slate-700) / <alpha-value>)',
+          800: 'rgb(var(--slate-800) / <alpha-value>)',
+          900: 'rgb(var(--slate-900) / <alpha-value>)',
+          950: 'rgb(var(--slate-950) / <alpha-value>)',
+        },
+        blue: {
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: 'rgb(var(--blue-400) / <alpha-value>)',
+          500: 'rgb(var(--blue-500) / <alpha-value>)',
+          600: 'rgb(var(--blue-600) / <alpha-value>)',
+          700: 'rgb(var(--blue-700) / <alpha-value>)',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
         },
       },
     },
