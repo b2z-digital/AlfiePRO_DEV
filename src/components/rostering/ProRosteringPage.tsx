@@ -308,23 +308,36 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
 
   if (selectedRoster && (view === 'grid' || view === 'list')) {
     return (
-      <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-16 space-y-4">
-        <div className="flex items-center gap-3 mb-4">
-          <button onClick={() => { setSelectedRoster(null); setView('dashboard'); }} className="text-slate-400 hover:text-white transition-colors">Rosters</button>
-          <ChevronRight size={16} className="text-slate-600" />
-          <span className="text-white font-medium">{selectedRoster.name}</span>
-          <div className={`ml-2 px-2 py-0.5 text-xs rounded-full border ${getStatusColor(selectedRoster.status)}`}>{selectedRoster.status}</div>
-          <div className="flex-1" />
+      <div className="h-full overflow-y-auto"><div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        <div className="flex items-center text-[13.5px]">
+          <button onClick={() => { setSelectedRoster(null); setView('dashboard'); }} className="a-link inline-flex items-center gap-1"><ChevronRight size={15} className="rotate-180" />Rosters</button>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><ClipboardList size={24} /></span>
+          <div className="flex-1 min-w-[220px]">
+            <h1 className="a-display a-ink m-0 text-[28px] font-bold">{selectedRoster.name}</h1>
+            <div className="a-mute flex flex-wrap items-center gap-2 mt-1.5 text-[13.5px]">
+              <span className="a-st text-[13px]"><span className={`a-light ${selectedRoster.status === 'active' ? 'a-light-g' : selectedRoster.status === 'draft' ? 'a-light-a' : selectedRoster.status === 'completed' ? 'a-light-b' : 'a-light-n'}`} />{selectedRoster.status.charAt(0).toUpperCase() + selectedRoster.status.slice(1)}</span>
+              <span className="a-dim">·</span>
+              <span className="a-lb-cls"><svg width="9" height="11" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M1 .75v10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M1.75 1.25h6.5L1.75 5.5z" fill="currentColor" /></svg>{selectedRoster.boat_class}</span>
+              <span className="a-dim">·</span>
+              <span>{selectedRoster.rounds.length} sailing day{selectedRoster.rounds.length !== 1 ? 's' : ''}</span>
+              <span className="a-dim">·</span>
+              <span className={selectedRoster.assignments.length > 0 && selectedRoster.assignments.every(a => a.status === 'confirmed') ? 'a-txt-g' : ''}>{selectedRoster.assignments.filter(a => a.status === 'confirmed').length}/{selectedRoster.assignments.length} confirmed</span>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setView('grid')} className={`px-3 py-1.5 rounded-lg text-sm transition-all ${view === 'grid' ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
-              <Calendar size={14} className="inline mr-1" /> Grid
-            </button>
-            <button onClick={() => setView('list')} className={`px-3 py-1.5 rounded-lg text-sm transition-all ${view === 'list' ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
-              <ClipboardList size={14} className="inline mr-1" /> List
-            </button>
+            <div className="a-seg" role="radiogroup" aria-label="View">
+              <button onClick={() => setView('grid')} className={`a-seg-i ${view === 'grid' ? 'a-seg-on' : ''}`} style={{ padding: '0 10px' }} aria-label="Grid" title="Grid">
+                <Grid3X3 size={16} />
+              </button>
+              <button onClick={() => setView('list')} className={`a-seg-i ${view === 'list' ? 'a-seg-on' : ''}`} style={{ padding: '0 10px' }} aria-label="List" title="List">
+                <List size={16} />
+              </button>
+            </div>
             {selectedRoster.status === 'draft' && (
-              <button onClick={() => handleActivateRoster(selectedRoster.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-500 transition-all">
-                <Play size={14} /> Activate
+              <button onClick={() => handleActivateRoster(selectedRoster.id)} className="a-btn a-btn-g">
+                <Play size={15} /> Activate
               </button>
             )}
             {selectedRoster.status === 'active' && user?.id && (
@@ -336,10 +349,10 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
                     else { addNotification('info', 'All assignments already have tasks'); }
                   } catch { addNotification('error', 'Failed to sync tasks'); }
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600 transition-all"
+                className="a-btn"
                 title="Create missing tasks for assignments that don't have them"
               >
-                <ListChecks size={14} /> Sync Tasks
+                <ListChecks size={16} /> Sync tasks
               </button>
             )}
           </div>
