@@ -80,9 +80,9 @@ export const MediaCenterWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode,
         </button>
       )}
 
-      <div className="flex items-center gap-2 mb-4">
-        <Image className="text-emerald-400" size={20} />
-        <h2 className="text-lg font-semibold text-white">Media Center</h2>
+      <div className="flex items-center gap-3 mb-4">
+        <span className="a-tile flex-shrink-0" style={{ width: 36, height: 36 }}><Image size={19} /></span>
+        <h2 className="a-display a-ink text-[18px] font-semibold">Media Center</h2>
       </div>
 
       {loading ? (
@@ -124,7 +124,7 @@ export const MediaCenterWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode,
           <button
             onClick={handleNavigate}
             disabled={isEditMode}
-            className={`mt-auto w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-colors font-medium ${isEditMode ? 'pointer-events-none opacity-50' : ''}`}
+            className={`a-btn a-btn-p mt-auto w-full justify-center ${isEditMode ? 'pointer-events-none opacity-50' : ''}`}
           >
             Manage Media
           </button>

@@ -89,9 +89,9 @@ export const MembershipStatusWidget: React.FC<WidgetProps> = ({ widgetId, isEdit
       )}
 
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Users className={darkMode ? "text-purple-400" : "text-purple-500"} size={18} />
-          <h2 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-700'}`}>Membership Status</h2>
+        <div className="flex items-center gap-3">
+          <span className="a-tile flex-shrink-0" style={{ width: 32, height: 32 }}><Users size={16} /></span>
+          <h2 className="a-display a-ink text-[16px] font-semibold">Membership Status</h2>
         </div>
         {!isEditMode && <ChevronRight size={14} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />}
       </div>
