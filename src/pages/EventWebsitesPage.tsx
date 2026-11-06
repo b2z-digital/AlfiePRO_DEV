@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Globe, Plus, CreditCard as Edit, Trash2, Eye, Search, Calendar, MapPin, MoveVertical as MoreVertical, LayoutTemplate as BookTemplate, Loader as Loader2, Trophy } from 'lucide-react';
+import { Globe, Plus, SquarePen as Edit, Trash2, Eye, Search, Calendar, MapPin, EllipsisVertical as MoreVertical, LayoutTemplate as BookTemplate, Loader as Loader2, Trophy } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useNavigate } from 'react-router-dom';
@@ -470,70 +470,34 @@ export const EventWebsitesPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Tabs */}
-      <div className={`border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-        <div className="flex gap-4">
-          <button
-            onClick={() => setActiveTab('websites')}
-            className={`px-4 py-3 border-b-2 font-medium transition-colors ${
-              activeTab === 'websites'
-                ? darkMode
-                  ? 'border-cyan-500 text-cyan-400'
-                  : 'border-cyan-600 text-cyan-600'
-                : darkMode
-                  ? 'border-transparent text-slate-400 hover:text-slate-300'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Globe size={18} />
-              <span>Event Websites</span>
-            </div>
+    <div className="flex flex-col gap-[22px]">
+      {/* Tabs + Search + Add */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="a-seg" role="tablist">
+          <button role="tab" aria-selected={activeTab === 'websites'} onClick={() => setActiveTab('websites')} className={`a-seg-i ${activeTab === 'websites' ? 'a-seg-on' : ''}`}>
+            <Globe size={16} />Event websites{activeTab === 'websites' && !loading && <span className="a-cnt">{eventWebsites.length}</span>}
           </button>
-          <button
-            onClick={() => setActiveTab('templates')}
-            className={`px-4 py-3 border-b-2 font-medium transition-colors ${
-              activeTab === 'templates'
-                ? darkMode
-                  ? 'border-cyan-500 text-cyan-400'
-                  : 'border-cyan-600 text-cyan-600'
-                : darkMode
-                  ? 'border-transparent text-slate-400 hover:text-slate-300'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <BookTemplate size={18} />
-              <span>Templates</span>
-            </div>
+          <button role="tab" aria-selected={activeTab === 'templates'} onClick={() => setActiveTab('templates')} className={`a-seg-i ${activeTab === 'templates' ? 'a-seg-on' : ''}`}>
+            <BookTemplate size={16} />Templates
           </button>
         </div>
-      </div>
-
-      {/* Search Bar + Add Button */}
-      <div className="flex items-center gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+        <label className="a-field flex-1 min-w-[200px]">
+          <Search size={17} />
           <input
             type="text"
-            placeholder={activeTab === 'websites' ? 'Search event websites...' : 'Search templates...'}
+            placeholder={activeTab === 'websites' ? 'Search event websites' : 'Search templates'}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
-              darkMode
-                ? 'bg-slate-800/50 border-slate-700 text-white placeholder-slate-400'
-                : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'
-            } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
           />
-        </div>
+        </label>
         {activeTab === 'websites' && (
           <button
             onClick={handleAddEventWebsite}
-            className="flex items-center gap-2 px-5 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium transition-colors whitespace-nowrap shadow-lg shadow-cyan-600/20"
+            className="a-btn a-btn-p"
+            style={{ height: 42, borderRadius: 13 }}
           >
-            <Plus size={18} />
-            Add Event Website
+            <Plus size={17} />
+            Add event website
           </button>
         )}
       </div>
@@ -546,16 +510,12 @@ export const EventWebsitesPage: React.FC = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
         </div>
       ) : filteredWebsites.length === 0 ? (
-        <div className={`text-center py-12 rounded-lg border ${
-          darkMode
-            ? 'bg-slate-800/50 border-slate-700'
-            : 'bg-white border-slate-200'
-        }`}>
-          <Globe className={`mx-auto mb-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} size={48} />
-          <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+        <div className="a-card a-empty text-center py-12">
+          <span className="a-tile mx-auto" style={{ width: 48, height: 48 }}><Globe size={22} /></span>
+          <h3 className="a-ink text-[16px] font-semibold mt-2">
             {searchTerm ? 'No websites found' : 'No event websites yet'}
           </h3>
-          <p className={`mb-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+          <p className="a-dim text-[13.5px] mb-4">
             {searchTerm
               ? 'Try adjusting your search terms'
               : 'Create dedicated websites for your state and national events'}
@@ -563,127 +523,76 @@ export const EventWebsitesPage: React.FC = () => {
           {!searchTerm && (
             <button
               onClick={handleAddEventWebsite}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium transition-colors"
+              className="a-btn a-btn-p"
             >
-              <Plus size={18} />
-              Add Event Website
+              <Plus size={17} />
+              Add event website
             </button>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredWebsites.map((website) => {
             const event = website.public_events;
             const isActive = website.enabled;
 
             const isOrphaned = !event;
             const displayName = event?.event_name || website.slug?.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || 'Untitled Event';
+            const logo = website.logo_url || website.theme_config?.logo_url || website.settings?.logo_url;
 
             return (
-              <div
-                key={website.id}
-                className={`rounded-xl border overflow-hidden transition-all hover:shadow-lg ${
-                  isOrphaned
-                    ? darkMode
-                      ? 'bg-slate-800/50 border-amber-600/30 hover:border-amber-500/50'
-                      : 'bg-white border-amber-300 hover:border-amber-400'
-                    : darkMode
-                      ? 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
-                      : 'bg-white border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                  {/* Status Badge */}
-                  <div className={`p-4 border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          isActive
-                            ? 'bg-emerald-500/20 text-emerald-400'
-                            : darkMode
-                              ? 'bg-slate-500/20 text-slate-400'
-                              : 'bg-slate-200 text-slate-600'
-                        }`}>
-                          {isActive ? 'Active' : 'Draft'}
-                        </span>
-                        {isOrphaned && (
-                          <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-medium">
-                            No linked event
-                          </span>
-                        )}
-                      </div>
-                      {event?.event_level && (
-                        <span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded text-xs font-medium capitalize">
-                          {event.event_level}
-                        </span>
-                      )}
+              <div key={website.id} className="a-cc" style={{ cursor: 'default' }}>
+                  <div className="a-ew-logo">
+                    {logo ? <img src={logo} alt="" className="max-h-[84px] max-w-[70%] object-contain" /> : <Globe size={40} className="text-slate-300" />}
+                  </div>
+                  <div className="flex flex-col gap-2.5" style={{ padding: '16px 18px 18px' }}>
+                    <div className="flex flex-wrap gap-3">
+                      <span className="a-st text-[12.5px]"><span className={`a-light ${isActive ? 'a-light-g' : 'a-light-n'}`} />{isActive ? 'Live' : 'Draft'}</span>
+                      {isOrphaned && <span className="a-st a-txt-a text-[12.5px]"><span className="a-light a-light-a" />No linked event</span>}
+                      {event?.event_level && <span className="a-lb-fmt capitalize">{event.event_level}</span>}
                     </div>
-
-                    <h3 className={`text-lg font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      {displayName}
-                    </h3>
-
-                    {event && (
-                      <div className={`space-y-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {event.date && (
-                          <div className="flex items-center gap-2">
-                            <Calendar size={14} />
-                            <span>{new Date(event.date).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        {event.venue && (
-                          <div className="flex items-center gap-2">
-                            <MapPin size={14} />
-                            <span>{event.venue}</span>
-                          </div>
-                        )}
+                    <h3 className="a-display a-ink text-[19px] font-semibold">{displayName}</h3>
+                    {event && (event.date || event.venue) && (
+                      <div className="a-dim flex flex-wrap gap-x-3 gap-y-1 text-[12.5px]">
+                        {event.date && <span className="inline-flex items-center gap-1.5"><Calendar size={13} />{new Date(event.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                        {event.venue && <span className="inline-flex items-center gap-1.5"><MapPin size={13} />{event.venue}</span>}
                       </div>
                     )}
-                  </div>
-
-                  {/* Website Info */}
-                  <div className="p-4">
-                    <div className={`mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      <p className="text-xs mb-1">Website URL:</p>
-                      <p className="text-sm font-mono truncate text-cyan-400">
-                        /events/{website.slug}
-                      </p>
-                    </div>
+                    <span className="a-mono a-txt-b text-[12.5px] truncate">/events/{website.slug}</span>
 
                     {/* Action Buttons */}
-                    <div className="space-y-2">
+                    <div className="flex items-center gap-2 mt-1.5">
                       <button
                         onClick={() => {
                           console.log('Navigating to event website dashboard:', website.id);
                           navigate(`/event-websites/${website.id}`);
                         }}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors"
+                        className="a-btn a-btn-p flex-1"
                       >
                         <Edit size={16} />
-                        Edit Website
+                        Edit website
                       </button>
-                      <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleDuplicate(website)}
-                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg text-sm font-medium transition-colors"
+                          className="a-btn"
+                          title="Save as template"
                         >
                           <BookTemplate size={16} />
-                          Save as Template
+                          Save as template
                         </button>
                         <div className="relative" ref={openDropdown === website.id ? dropdownRef : null}>
                           <button
                             onClick={() => setOpenDropdown(openDropdown === website.id ? null : website.id)}
-                            className="px-3 py-2 rounded-lg transition-colors bg-slate-700 hover:bg-slate-600 text-slate-300"
+                            className="a-ib a-ib-box"
+                            style={{ width: 40, height: 40 }}
                             title="More options"
+                            aria-label="More options"
                           >
                             <MoreVertical size={16} />
                           </button>
 
                           {openDropdown === website.id && (
-                            <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg border z-10 ${
-                              darkMode
-                                ? 'bg-slate-800 border-slate-700'
-                                : 'bg-white border-slate-200'
-                            }`}>
+                            <div className="a-pop absolute right-0 mt-2 w-48 z-10">
                               {isActive && (
                                 <button
                                   onClick={() => {
@@ -737,7 +646,6 @@ export const EventWebsitesPage: React.FC = () => {
                             </div>
                           )}
                         </div>
-                      </div>
                     </div>
                   </div>
                 </div>

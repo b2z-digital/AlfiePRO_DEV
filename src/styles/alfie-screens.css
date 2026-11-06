@@ -660,3 +660,5 @@ html.alfie-light .a-cc-img::after { background: linear-gradient(180deg, rgba(255
 .a-sheet-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6,11,22,0.1), #111A2C 98%); pointer-events: none; }
 html.alfie-light .a-sheet-hero { background: #E9EEF5; }
 html.alfie-light .a-sheet-hero::after { background: linear-gradient(180deg, rgba(255,255,255,0), #fff 98%); }
+.a-ew-logo { height: 120px; background: #fff; display: flex; align-items: center; justify-content: center; }
+html.alfie-light .a-ew-logo { border-bottom: 1px solid rgba(15,23,42,0.07); }
