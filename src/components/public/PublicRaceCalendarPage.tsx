@@ -24,6 +24,8 @@ interface RaceEvent {
   race_format: 'handicap' | 'scratch';
   type: 'single' | 'series_round';
   series_name?: string;
+  series_id?: string;
+  pro_name?: string;
   registered_count: number;
   cover_image?: string;
   entry_fee?: number;
@@ -152,6 +154,7 @@ export const PublicRaceCalendarPage: React.FC = () => {
             const roundDate = round.date;
             const roundData = {
               id: `${series.id}-round-${index}`,
+              series_id: series.id,
               round_name: round.name,
               date: roundDate,
               venue: round.venue,
@@ -253,6 +256,7 @@ export const PublicRaceCalendarPage: React.FC = () => {
           race_format: round.race_format || 'handicap',
           type: 'series_round' as const,
           series_name: round.series_name,
+          series_id: round.series_id,
           registered_count: 0,
           entry_fee: round.entry_fee,
           currency: 'AUD'
@@ -284,6 +288,7 @@ export const PublicRaceCalendarPage: React.FC = () => {
           race_format: round.race_format || 'handicap',
           type: 'series_round' as const,
           series_name: round.series_name,
+          series_id: round.series_id,
           registered_count: 0,
           entry_fee: round.entry_fee,
           currency: 'AUD'
@@ -293,6 +298,30 @@ export const PublicRaceCalendarPage: React.FC = () => {
 
       console.log('Transformed upcoming events:', transformedUpcoming.length);
       console.log('Transformed past events:', transformedPast.length);
+
+      // PRO for each round/event (same source as the logged-in calendar). Public-safe RPC returns names only.
+      try {
+        const { data: proRows, error: proError } = await supabase.rpc('get_public_pro_assignments', { p_club_id: clubId });
+        if (!proError && Array.isArray(proRows)) {
+          const bySeriesDate = new Map<string, string>();
+          const byEvent = new Map<string, string>();
+          for (const row of proRows as any[]) {
+            if (!row?.member_name) continue;
+            if (row.series_id && row.duty_date) bySeriesDate.set(`${row.series_id}-${String(row.duty_date).slice(0, 10)}`, row.member_name);
+            if (row.event_id) byEvent.set(String(row.event_id), row.member_name);
+          }
+          const withPro = (e: RaceEvent): RaceEvent => {
+            const name = e.type === 'series_round' && e.series_id
+              ? bySeriesDate.get(`${e.series_id}-${(e.date || '').slice(0, 10)}`)
+              : byEvent.get(e.id);
+            return name ? { ...e, pro_name: name } : e;
+          };
+          transformedUpcoming.splice(0, transformedUpcoming.length, ...transformedUpcoming.map(withPro));
+          transformedPast.splice(0, transformedPast.length, ...transformedPast.map(withPro));
+        }
+      } catch (proErr) {
+        console.warn('PRO names unavailable on the public calendar:', proErr);
+      }
 
       setUpcomingEvents(transformedUpcoming);
       setPastEvents(transformedPast);
@@ -456,6 +485,12 @@ export const PublicRaceCalendarPage: React.FC = () => {
                                 <span className="truncate">{event.venue}</span>
                               </div>
                             )}
+                            {event.pro_name && (
+                              <div className="flex items-center gap-1.5">
+                                <Award size={14} className="flex-shrink-0" />
+                                <span><span className="font-semibold text-gray-700">PRO</span> {event.pro_name}</span>
+                              </div>
+                            )}
                             <div className="flex items-center gap-1.5">
                               <Trophy size={14} className="flex-shrink-0" />
                               <span>Class: {event.race_class}</span>
@@ -560,6 +595,12 @@ export const PublicRaceCalendarPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <MapPin size={14} />
                         <span className="truncate">{event.venue}</span>
+                      </div>
+                    )}
+                    {event.pro_name && (
+                      <div className="flex items-center gap-2">
+                        <Award size={14} />
+                        <span className="truncate"><span className="font-semibold text-gray-700">PRO</span> {event.pro_name}</span>
                       </div>
                     )}
                     <div className="flex items-center gap-2">
@@ -676,6 +717,11 @@ export const PublicRaceCalendarPage: React.FC = () => {
                           {event.venue && (
                             <div className="text-gray-600 truncate">
                               {event.venue}
+                            </div>
+                          )}
+                          {event.pro_name && (
+                            <div className="text-gray-600 truncate">
+                              PRO: {event.pro_name}
                             </div>
                           )}
                         </div>

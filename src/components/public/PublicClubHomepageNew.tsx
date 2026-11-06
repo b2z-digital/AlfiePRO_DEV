@@ -42,6 +42,8 @@ interface UpcomingEvent {
   venue: string;
   race_class: string;
   type: 'quick_race' | 'series_round';
+  series_id?: string;
+  pro_name?: string;
 }
 
 interface LatestResult {
@@ -281,6 +283,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             if (isUpcoming && isNotCompleted && isNotCancelled) {
               upcomingSeriesRounds.push({
                 id: `${series.id}-${round.name}`,
+                series_id: series.id,
                 round_name: round.name,
                 date: roundDate,
                 venue: round.venue,
@@ -362,10 +365,33 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             date: round.date,
             venue: round.venue || '',
             race_class: round.race_class || '',
-            type: 'series_round' as const
+            type: 'series_round' as const,
+            series_id: round.series_id
           })),
         ...associationEventItems
       ];
+
+      // PRO names (same source as the logged-in calendar) via a public-safe RPC
+      try {
+        const { data: proRows, error: proError } = await supabase.rpc('get_public_pro_assignments', { p_club_id: clubId });
+        if (!proError && Array.isArray(proRows)) {
+          const bySeriesDate = new Map<string, string>();
+          const byEvent = new Map<string, string>();
+          for (const row of proRows as any[]) {
+            if (!row?.member_name) continue;
+            if (row.series_id && row.duty_date) bySeriesDate.set(`${row.series_id}-${String(row.duty_date).slice(0, 10)}`, row.member_name);
+            if (row.event_id) byEvent.set(String(row.event_id), row.member_name);
+          }
+          for (const e of allUpcomingEvents) {
+            const name = e.type === 'series_round' && e.series_id
+              ? bySeriesDate.get(`${e.series_id}-${(e.date || '').slice(0, 10)}`)
+              : byEvent.get(e.id);
+            if (name) e.pro_name = name;
+          }
+        }
+      } catch (proErr) {
+        console.warn('PRO names unavailable on the public homepage:', proErr);
+      }
 
       // Sort by date and take first 4
       allUpcomingEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -843,6 +869,12 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
                           {event.race_class && (
                             <div className="text-gray-500">
                               Class: {event.race_class}
+                            </div>
+                          )}
+                          {event.pro_name && (
+                            <div className="flex items-center gap-2">
+                              <Award className="w-3.5 h-3.5" />
+                              <span><span className="font-semibold text-gray-700">PRO</span> {event.pro_name}</span>
                             </div>
                           )}
                         </div>
