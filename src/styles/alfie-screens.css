@@ -495,3 +495,12 @@ html.alfie-light .a-sheet .text-white:not([class*="bg-"]):not(.a-btn):not(button
 html.alfie-light .a-sheet :is(.border-slate-700, .border-slate-600, .border-slate-500, .divide-slate-600 > *) { border-color: rgba(15,23,42,0.1) !important; }
 html.alfie-theme select.a-inp.a-inp-sel { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239AA6BD' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
 .a-opt > span { text-align: left; }
+/* Race settings tray (board SC_settings) */
+.a-tray { border-radius: 28px; }
+.a-opt-on, .a-opt-on:hover { border-color: transparent; background: linear-gradient(#141B2B,#141B2B) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-opt-on, html.alfie-light .a-opt-on:hover { background: linear-gradient(#fff,#fff) padding-box, var(--alfie-spectrum) border-box; }
+.a-sw[data-on="true"] { background: #30D158; }
+.a-sw[data-on="true"]::after { left: 20px; }
+span.a-sw { display: inline-block; }
+.a-hov-row:hover { background: rgba(255,255,255,0.03); }
+html.alfie-light .a-hov-row:hover { background: rgba(15,23,42,0.025); }
