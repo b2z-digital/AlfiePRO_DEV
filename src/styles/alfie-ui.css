@@ -709,3 +709,27 @@ html.alfie-theme .a-addtile:hover .a-tile { border-color: transparent; backgroun
 html.alfie-light .a-addtile { border-color: rgba(15,23,42,0.16); background: rgba(15,23,42,0.015); }
 html.alfie-light .a-addtile:hover { background: #fff; }
 html.alfie-light .a-addtile:hover .a-tile { background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; }
+
+/* Event/series modal: document rows */
+.a-doc-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); }
+.a-doc-file { display: inline-flex; align-items: center; gap: 6px; max-width: 220px; height: 40px; padding: 0 6px 0 12px; border-radius: 12px; background: rgba(48,209,88,0.10); border: 1px solid rgba(48,209,88,0.35); color: #6BE38C; font-size: 13px; font-weight: 500; }
+.a-doc-clear { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 2px 6px; border: 0; background: transparent; color: #FF8A8A; font-size: 12px; font-weight: 500; cursor: pointer; border-radius: 6px; }
+.a-doc-clear:hover { background: rgba(255,107,107,0.1); }
+html.alfie-light .a-doc-row { background: #fff; border-color: rgba(15,23,42,0.08); }
+html.alfie-light .a-doc-file { color: #15803D; background: rgba(34,167,87,0.08); border-color: rgba(34,167,87,0.3); }
+html.alfie-light .a-doc-clear { color: #C8323A; }
+
+/* Event modal Documents tab */
+.a-evdocs { padding: 18px; }
+.a-evdoc { display: flex; align-items: center; gap: 14px; padding: 12px 8px; border-top: 1px solid rgba(255,255,255,0.055); color: inherit; text-decoration: none; border-radius: 12px; }
+.a-evdoc:first-child { border-top: 0; }
+a.a-evdoc:hover { background: rgba(255,255,255,0.035); }
+.a-evdoc-ic { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font: 700 10.5px 'Instrument Sans', system-ui, sans-serif; letter-spacing: 0.04em; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: rgba(235,240,255,0.7); }
+.a-evdoc-r { color: #FF8A8A; border-color: rgba(255,107,107,0.35); background: rgba(255,107,107,0.08); }
+.a-evdoc-b { color: #6FB4FF; border-color: rgba(10,132,255,0.35); background: rgba(10,132,255,0.08); }
+.a-evdoc-empty { opacity: 0.75; }
+html.alfie-light .a-evdoc { border-top-color: rgba(15,23,42,0.07); }
+html.alfie-light a.a-evdoc:hover { background: rgba(15,23,42,0.03); }
+html.alfie-light .a-evdoc-ic { border-color: rgba(15,23,42,0.1); background: #F6F8FB; color: #475569; }
+html.alfie-light .a-evdoc-r { color: #C8323A; border-color: rgba(229,72,77,0.3); background: rgba(229,72,77,0.06); }
+html.alfie-light .a-evdoc-b { color: #0A64D8; border-color: rgba(10,100,216,0.3); background: rgba(10,100,216,0.06); }
