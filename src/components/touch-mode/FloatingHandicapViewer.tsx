@@ -1,5 +1,6 @@
+import { AAvatar } from '../alfie/Kit';
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Award, ChevronLeft, RotateCcw, CreditCard as Edit3, Check, History, Zap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { X, Award, ChevronLeft, ChevronRight, RotateCcw, CreditCard as Edit3, Check, History, Zap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { Skipper, RaceResult } from '../../types';
 import { RaceEvent } from '../../types/race';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -351,40 +352,19 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
     return (
       <div
         key={ranking.skipperIndex}
-        className={`rounded-lg p-3 border transition-all ${
-          darkMode
-            ? 'bg-slate-900/30 border-slate-700/50 hover:bg-slate-900/50'
-            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-        }`}
+        className="a-ov-row"
+        style={{ padding: '9px 14px' }}
       >
         <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
-            pos === 1
-              ? 'bg-yellow-500 text-white'
-              : pos === 2
-                ? 'bg-slate-400 text-white'
-                : pos === 3
-                  ? 'bg-amber-700 text-white'
-                  : darkMode
-                    ? 'bg-slate-700 text-slate-300'
-                    : 'bg-slate-200 text-slate-700'
-          }`}>
+          <span className={`a-fo-pos ${pos === 1 ? 'p1' : pos === 2 ? 'p2' : pos === 3 ? 'p3' : ''}`} style={{ width: 28, height: 28, fontSize: 12.5 }}>
             {pos}
-          </div>
+          </span>
 
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-xs border-2 overflow-hidden flex-shrink-0 ${
-            darkMode ? 'bg-slate-700 text-slate-300 border-slate-600' : 'bg-slate-200 text-slate-600 border-slate-300'
-          }`}>
-            {ranking.avatarUrl ? (
-              <img src={ranking.avatarUrl} alt={ranking.skipperName} className="w-full h-full object-cover" />
-            ) : (
-              <span>{initials}</span>
-            )}
-          </div>
+          <AAvatar url={ranking.avatarUrl} first={initials.charAt(0)} last={initials.charAt(1)} size={34} />
 
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-sm">{ranking.skipperName}</div>
-            <div className={`text-xs flex items-center gap-1.5 flex-wrap ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            <div className="a-ink font-semibold text-[14px] truncate">{ranking.skipperName}</div>
+            <div className="a-dim text-[12px] mt-px flex items-center gap-1.5 flex-wrap">
               {currentEvent?.show_flag && effectiveSkippers[ranking.skipperIndex]?.country_code && (
                 <span className="text-base">{getCountryFlag(effectiveSkippers[ranking.skipperIndex].country_code!)}</span>
               )}
@@ -395,14 +375,14 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
             </div>
           </div>
 
-          <div className="w-16 text-center flex-shrink-0">
-            <div className={`text-sm font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+          <div className="w-9 text-center flex-shrink-0">
+            <div className="a-num a-dim text-[14px]">
               {ranking.totalPoints}
             </div>
           </div>
 
-          <div className="w-16 text-center flex-shrink-0">
-            <div className="text-sm font-bold text-blue-500">{ranking.netPoints}</div>
+          <div className="w-9 text-center flex-shrink-0">
+            <div className="a-num a-txt-a text-[15px] font-bold">{ranking.netPoints}</div>
           </div>
         </div>
       </div>
@@ -446,32 +426,27 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`fixed right-0 top-0 bottom-0 w-[480px] max-w-[95vw] shadow-2xl z-[9996] flex flex-col ${
-                darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'
-              }`}
+              className="a-sheet a-tray fixed right-3 top-3 bottom-3 w-[440px] max-w-[calc(100vw-24px)] z-[9996] flex flex-col overflow-hidden"
             >
-              <div className={`border-b ${
-                darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'
-              }`}>
-                <div className="px-4 py-4 flex items-center justify-between">
+              <div>
+                <div className="flex items-center justify-between gap-3" style={{ padding: '18px 16px 12px' }}>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setIsOpen(false)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
-                      }`}
+                      className="a-ib"
+                      aria-label="Close standings"
                     >
-                      <ChevronLeft size={20} />
+                      <ChevronRight size={20} />
                     </button>
                     <div>
-                      <h3 className="font-bold text-lg">
+                      <h3 className="a-display a-ink text-[19px] font-semibold">
                         {isScratchEvent || isShrs
-                          ? 'Current Rankings'
+                          ? 'Standings'
                           : viewMode === 'handicaps'
                             ? canEditHandicaps ? 'Set Starting Handicaps' : isOverrideMode ? 'Override Handicaps' : 'Current Handicaps'
-                            : 'Current Rankings'}
+                            : 'Standings'}
                       </h3>
-                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <p className="a-dim text-[12px] mt-0.5">
                         {isShrs
                           ? isInFinals
                             ? `Final ${currentRace - shrsQualifyingRounds} of Finals Series`
@@ -482,7 +457,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                               : 'Tap a handicap to edit or use scratch start'
                             : isOverrideMode
                               ? 'Tap a handicap to override for next race'
-                              : `As of Race ${currentRace}`}
+                              : `After race ${currentRace}`}
                       </p>
                     </div>
                   </div>
@@ -744,29 +719,10 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                   </>
                 ) : (
                   <>
-                    <div className={`flex items-center gap-3 px-3 py-2 mb-3 rounded-lg ${
-                      darkMode ? 'bg-slate-900/50' : 'bg-slate-100'
-                    }`}>
-                      <div className="w-8 text-center">
-                        <span className={`text-xs font-semibold uppercase tracking-wide ${
-                          darkMode ? 'text-slate-400' : 'text-slate-600'
-                        }`}>Pos</span>
-                      </div>
-                      <div className="flex-1">
-                        <span className={`text-xs font-semibold uppercase tracking-wide ${
-                          darkMode ? 'text-slate-400' : 'text-slate-600'
-                        }`}>Skipper</span>
-                      </div>
-                      <div className="w-16 text-center">
-                        <span className={`text-xs font-semibold uppercase tracking-wide ${
-                          darkMode ? 'text-slate-400' : 'text-slate-600'
-                        }`}>Total</span>
-                      </div>
-                      <div className="w-16 text-center">
-                        <span className={`text-xs font-semibold uppercase tracking-wide ${
-                          darkMode ? 'text-slate-400' : 'text-slate-600'
-                        }`}>Net</span>
-                      </div>
+                    <div className="a-dim flex items-center gap-3" style={{ padding: '0 14px 6px', font: "600 10.5px 'Instrument Sans', sans-serif", letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                      <span className="flex-1 pl-1">Skipper</span>
+                      <span className="w-9 text-center">Total</span>
+                      <span className="w-9 text-center a-txt-a">Net</span>
                     </div>
 
                     {fleetGroups ? (
@@ -781,14 +737,14 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                                 ({group.rankings.length} skippers)
                               </span>
                             </div>
-                            <div className="space-y-2">
+                            <div className="a-grp">
                               {group.rankings.map((ranking) => renderRankingRow(ranking, ranking.position))}
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="a-grp">
                         {rankings.map((ranking) => renderRankingRow(ranking))}
                       </div>
                     )}
@@ -810,9 +766,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
               )}
 
               {(viewMode === 'rankings' || isScratchEvent || isShrs) && (
-                <div className={`px-4 py-3 border-t text-xs ${
-                  darkMode ? 'bg-slate-900/50 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
-                }`}>
+                <div className="a-sheet-foot a-dim px-4 py-3 text-[12px]">
                   <div className="text-center">
                     {isShrs
                       ? isInFinals
