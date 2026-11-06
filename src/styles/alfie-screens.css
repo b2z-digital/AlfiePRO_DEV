@@ -805,3 +805,24 @@ html.alfie-theme .a-linkbox { display: flex; align-items: center; gap: 8px; padd
 html.alfie-light .a-ag + .a-ag, html.alfie-light .a-ag.a-ag-h { border-color: rgba(15,23,42,0.07); }
 html.alfie-light .a-ag-num { background: rgba(15,23,42,0.05); color: #0B1220; }
 html.alfie-light .a-linkbox { background: rgba(15,23,42,0.04); color: rgba(15,23,42,0.55); }
+
+/* ── My Stuff (boards MS_*) ─────────────────────────────────── */
+html.alfie-theme .a-av-spec { display: inline-flex; padding: 5px; border-radius: 999px; background: linear-gradient(135deg,#2E7BFF 0%,#8A4DFF 38%,#FF3E9A 70%,#FF8A2B 100%); }
+html.alfie-theme .a-av-spec .a-av { box-shadow: 0 0 0 2.5px #0D1424; }
+html.alfie-light .a-av-spec .a-av { box-shadow: 0 0 0 2.5px #fff; }
+html.alfie-theme .a-ring-box { padding: 10px 18px 10px 10px; border-radius: 20px; background: rgba(0,0,0,0.22); }
+html.alfie-light .a-ring-box { background: rgba(15,23,42,0.04); }
+html.alfie-theme .a-ring { position: absolute; inset: 0; border-radius: 999px; -webkit-mask: radial-gradient(circle, transparent 64%, #000 65%); mask: radial-gradient(circle, transparent 64%, #000 65%); }
+html.alfie-theme .a-tl { position: relative; height: 10px; margin-top: 10px; border-radius: 999px; background: rgba(0,0,0,0.3); }
+html.alfie-theme .a-tl-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg,#2E7BFF,#30D158); }
+html.alfie-theme .a-tl-dot { position: absolute; top: -4px; width: 18px; height: 18px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 4px rgba(48,209,88,0.3); }
+html.alfie-light .a-tl { background: rgba(15,23,42,0.07); }
+html.alfie-light .a-tl-dot { box-shadow: 0 0 0 4px rgba(48,209,88,0.3), 0 1px 3px rgba(15,23,42,0.25); }
+html.alfie-theme .a-rr { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+html.alfie-theme .a-rr + .a-rr { border-top: 1px solid rgba(255,255,255,0.06); }
+html.alfie-theme .a-rr:hover { background: rgba(255,255,255,0.025); }
+html.alfie-light .a-rr + .a-rr { border-top-color: rgba(15,23,42,0.07); }
+html.alfie-light .a-rr:hover { background: rgba(15,23,42,0.02); }
+html.alfie-theme .a-club-row + .a-club-row { border-top: 1px solid rgba(255,255,255,0.06); }
+html.alfie-light .a-club-row + .a-club-row { border-top-color: rgba(15,23,42,0.07); }
+html.alfie-theme .a-club-logo { width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px; object-fit: contain; background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }

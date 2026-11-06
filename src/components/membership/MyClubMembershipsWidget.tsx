@@ -235,216 +235,119 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
 
   return (
     <>
-      <div className="rounded-2xl bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 backdrop-blur-sm overflow-hidden">
-        <div className="p-5 border-b border-slate-700/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/20">
-                <Building2 className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-slate-200">My Club Memberships</h2>
-                <p className="text-xs text-slate-500">
-                  {memberships.length} {memberships.length === 1 ? 'club' : 'clubs'}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowJoinModal(true)}
-              className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Join Another Club</span>
-            </button>
+      <div className="a-card flex flex-col gap-3.5" style={{ padding: '18px 20px' }}>
+        <div className="flex items-center gap-3">
+          <span className="a-tile a-tile-sm"><Building2 size={16} /></span>
+          <div className="flex-1 min-w-0">
+            <h2 className="a-display a-ink m-0 text-[18px] font-semibold">My clubs</h2>
+            <p className="a-dim mt-0.5 text-[12.5px]">{memberships.length} {memberships.length === 1 ? 'club' : 'clubs'}</p>
           </div>
+          <button onClick={() => setShowJoinModal(true)} className="a-btn" style={{ height: 36 }}>
+            <Plus size={16} />
+            <span>Join another club</span>
+          </button>
         </div>
 
-        {totalFees.total > 0 && (
-          <div className="px-5 py-4 border-b border-slate-700/50 bg-slate-800/20">
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Total Annual Fees</p>
-                <p className="text-lg font-bold text-white">${totalFees.total.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Paid</p>
-                <p className="text-lg font-bold text-green-400">${totalFees.paid.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Pending</p>
-                <p className="text-lg font-bold text-orange-400">${totalFees.pending.toFixed(2)}</p>
-              </div>
-            </div>
+        {totalFees.total > 0 && memberships.length > 1 && (
+          <div className="grid grid-cols-3 gap-2">
+            <div className="a-grp" style={{ padding: '10px 12px' }}><p className="a-cap">Annual fees</p><p className="a-num a-ink text-[16px] font-semibold mt-1">${totalFees.total.toFixed(2)}</p></div>
+            <div className="a-grp" style={{ padding: '10px 12px' }}><p className="a-cap">Paid</p><p className="a-num a-txt-g text-[16px] font-semibold mt-1">${totalFees.paid.toFixed(2)}</p></div>
+            <div className="a-grp" style={{ padding: '10px 12px' }}><p className="a-cap">Pending</p><p className="a-num a-txt-a text-[16px] font-semibold mt-1">${totalFees.pending.toFixed(2)}</p></div>
           </div>
         )}
 
-        <div className="p-5 space-y-3">
-          {memberships.length === 0 ? (
-            <div className="text-center py-10">
-              <div className="w-14 h-14 rounded-2xl bg-slate-700/30 border border-slate-600/30 flex items-center justify-center mx-auto mb-4">
-                <Building2 className="w-7 h-7 text-slate-500" />
-              </div>
-              <p className="text-base font-medium text-slate-300 mb-1">
-                No Club Memberships
-              </p>
-              <p className="text-sm text-slate-500 mb-5">
-                Join a club to start racing and tracking your results
-              </p>
-              <button
-                onClick={() => setShowJoinModal(true)}
-                className="btn-primary-green inline-flex items-center gap-2 px-4 py-2 from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Join a Club</span>
-              </button>
-            </div>
-          ) : (
-            memberships.map((membership) => {
+        {memberships.length === 0 ? (
+          <div className="a-grp a-empty text-center" style={{ padding: 22 }}>
+            <p className="a-ink text-[14px] font-semibold mb-1">No club memberships</p>
+            <p className="a-dim text-[12.5px] mb-3">Join a club to start racing and tracking your results</p>
+            <button onClick={() => setShowJoinModal(true)} className="a-btn a-btn-p mx-auto" style={{ height: 36 }}>
+              <Plus size={16} />Join a club
+            </button>
+          </div>
+        ) : (
+          <div className="a-grp">
+            {memberships.map((membership) => {
               const isUnpaid = membership.payment_status === 'unpaid' || membership.payment_status === 'pending' || membership.payment_status === 'overdue';
               const isExpanded = expandedBankDetails === membership.club_id;
               const details = bankDetailsCache[membership.club_id];
+              const tone = membership.payment_status === 'paid' ? 'g' : membership.payment_status === 'unpaid' || membership.payment_status === 'overdue' ? 'r' : 'a';
+              const statusLabel = membership.payment_status === 'paid' ? 'Paid' : membership.payment_status === 'pending' ? 'Pending' : membership.payment_status === 'overdue' ? 'Overdue' : membership.payment_status === 'unpaid' ? 'Unpaid' : (membership.payment_status || '—');
+              const rel = membership.relationship_type;
+              const isDefault = defaultClubId === membership.club_id;
 
               return (
-                <div
-                  key={membership.id}
-                  className="rounded-xl bg-slate-800/40 border border-slate-700/40 hover:border-slate-600/60 transition-all duration-200 overflow-hidden"
-                >
+                <div key={membership.id} className="a-club-row">
                   <div
-                    className={`p-4 ${isUnpaid ? 'cursor-pointer' : ''}`}
+                    className={`a-ir ${isUnpaid ? 'cursor-pointer' : ''}`}
                     onClick={isUnpaid ? () => toggleBankDetails(membership.club_id) : undefined}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {membership.clubs.logo ? (
-                          <img
-                            src={membership.clubs.logo}
-                            alt={membership.clubs.name}
-                            className="w-11 h-11 rounded-xl object-cover ring-1 ring-slate-600/50 flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-11 h-11 rounded-xl bg-slate-700/50 border border-slate-600/30 flex items-center justify-center flex-shrink-0">
-                            <Building2 className="w-5 h-5 text-slate-400" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                            <h3 className="font-semibold text-white text-sm truncate">{membership.clubs.name}</h3>
-                            {getRelationshipBadge(membership.relationship_type)}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                              <span className="text-slate-400">
-                                Joined {new Date(membership.joined_date).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <CreditCard className="w-3.5 h-3.5 text-slate-500" />
-                              <span className="text-slate-300 font-medium">
-                                ${parseFloat(membership.annual_fee_amount || '0').toFixed(2)}/year
-                              </span>
-                            </div>
-                            {getPaymentStatusBadge(membership.payment_status)}
-                          </div>
-                          {!membership.pays_association_fees && membership.relationship_type === 'associate' && (
-                            <div className="mt-2 text-[11px] text-slate-500">
-                              <AlertCircle className="w-3 h-3 inline mr-1" />
-                              State & national fees covered by primary membership
-                            </div>
-                          )}
-                        </div>
+                    {membership.clubs.logo ? (
+                      <img src={membership.clubs.logo} alt="" className="a-club-logo" />
+                    ) : (
+                      <span className="a-tile" style={{ width: 42, height: 42, borderRadius: 12 }}><Building2 size={18} /></span>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="a-ink text-[15px] font-semibold truncate">{membership.clubs.name}</span>
+                        {rel === 'primary' && <span className="a-lb-fmt a-txt-a" style={{ height: 22, fontSize: 11.5 }}>★ Primary</span>}
+                        {rel && rel !== 'primary' && <span className="a-lb-fmt capitalize" style={{ height: 22, fontSize: 11.5 }}>{rel}</span>}
+                        {memberships.length > 1 && isDefault && <span className="a-lb-fmt" style={{ height: 22, fontSize: 11.5 }}><Star size={11} className="fill-current a-txt-a" />Default</span>}
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                        {memberships.length > 1 && (
-                          <>
-                            {defaultClubId === membership.club_id ? (
-                              <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-[10px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/20">
-                                <Star className="w-3.5 h-3.5 mr-1 fill-current" />
-                                Default
-                              </span>
-                            ) : (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleSetDefault(membership.club_id); }}
-                                disabled={settingDefault === membership.club_id}
-                                className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 border border-slate-700/50 hover:border-amber-500/20 transition-colors disabled:opacity-50"
-                              >
-                                {settingDefault === membership.club_id ? (
-                                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-current mr-1"></div>
-                                ) : (
-                                  <Star className="w-3.5 h-3.5 mr-1" />
-                                )}
-                                Set Default
-                              </button>
-                            )}
-                          </>
-                        )}
-                        {isUnpaid && (
-                          isExpanded
-                            ? <ChevronUp className="w-4 h-4 text-slate-400" />
-                            : <ChevronDown className="w-4 h-4 text-slate-400" />
-                        )}
+                      <div className="a-dim text-[12.5px] mt-[3px]">
+                        Joined {new Date(membership.joined_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })} · ${parseFloat(membership.annual_fee_amount || '0').toFixed(2)} / year
                       </div>
+                      {!membership.pays_association_fees && rel === 'associate' && (
+                        <div className="a-dim text-[11.5px] mt-1 flex items-center gap-1"><AlertCircle size={12} />State and national fees covered by primary membership</div>
+                      )}
                     </div>
+                    {memberships.length > 1 && !isDefault && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleSetDefault(membership.club_id); }}
+                        disabled={settingDefault === membership.club_id}
+                        className="a-btn a-btn-q disabled:opacity-50"
+                        style={{ height: 30, fontSize: 12, padding: '0 10px' }}
+                      >
+                        {settingDefault === membership.club_id ? <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-current" /> : <Star size={13} />}
+                        Set default
+                      </button>
+                    )}
+                    <span className="a-st text-[13px]"><span className={`a-light a-light-${tone}`} />{statusLabel}</span>
+                    {isUnpaid && (isExpanded ? <ChevronUp size={16} className="a-dim" /> : <ChevronDown size={16} className="a-dim" />)}
                   </div>
                   {isExpanded && details && (
-                    <div className="px-4 pb-4 border-t border-slate-700/30 pt-3">
-                      <div className="bg-slate-800/60 rounded-xl p-4 space-y-3 border border-slate-700/40">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Landmark className="w-4 h-4 text-blue-400" />
-                          <p className="text-sm font-medium text-slate-200">Bank Transfer Details</p>
-                        </div>
-                        {details.bank_name && (
-                          <div>
-                            <p className="text-[10px] text-slate-500 uppercase tracking-wider">Bank Name</p>
-                            <p className="text-sm text-white font-medium">{details.bank_name}</p>
-                          </div>
-                        )}
+                    <div style={{ padding: '0 16px 14px' }}>
+                      <div className="a-grp">
+                        {details.bank_name && <div className="a-ir"><span className="a-ir-l"><Landmark size={15} />Bank</span><span className="a-ir-v">{details.bank_name}</span></div>}
                         {details.bsb && (
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">BSB</p>
-                              <p className="text-sm text-white font-medium font-mono">{details.bsb}</p>
-                            </div>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleCopyBankField(details.bsb, `bsb-${membership.club_id}`); }}
-                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
-                            >
-                              {copiedField === `bsb-${membership.club_id}` ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                          <div className="a-ir">
+                            <span className="a-ir-l"><Landmark size={15} />BSB</span>
+                            <span className="a-ir-v a-mono">{details.bsb}</span>
+                            <button onClick={(e) => { e.stopPropagation(); handleCopyBankField(details.bsb, `bsb-${membership.club_id}`); }} className="a-ib" style={{ width: 30, height: 30 }} aria-label="Copy BSB">
+                              {copiedField === `bsb-${membership.club_id}` ? <Check size={14} className="a-txt-g" /> : <Copy size={14} />}
                             </button>
                           </div>
                         )}
                         {details.account_number && (
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Account Number</p>
-                              <p className="text-sm text-white font-medium font-mono">{details.account_number}</p>
-                            </div>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleCopyBankField(details.account_number, `acc-${membership.club_id}`); }}
-                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
-                            >
-                              {copiedField === `acc-${membership.club_id}` ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                          <div className="a-ir">
+                            <span className="a-ir-l"><Landmark size={15} />Account</span>
+                            <span className="a-ir-v a-mono">{details.account_number}</span>
+                            <button onClick={(e) => { e.stopPropagation(); handleCopyBankField(details.account_number, `acc-${membership.club_id}`); }} className="a-ib" style={{ width: 30, height: 30 }} aria-label="Copy account number">
+                              {copiedField === `acc-${membership.club_id}` ? <Check size={14} className="a-txt-g" /> : <Copy size={14} />}
                             </button>
                           </div>
                         )}
-                        <p className="text-[11px] text-slate-500 mt-2">
-                          Complete the bank transfer and notify your club administrator to confirm payment.
-                        </p>
                       </div>
+                      <p className="a-dim text-[11.5px] mt-2">Complete the bank transfer and let your club administrator know so they can confirm payment.</p>
                     </div>
                   )}
                   {isExpanded && !details && bankDetailsCache.hasOwnProperty(membership.club_id) && (
-                    <div className="px-4 pb-4 border-t border-slate-700/30 pt-3">
-                      <p className="text-xs text-slate-500 text-center py-2">
-                        No bank details configured for this club. Please contact the club administrator.
-                      </p>
-                    </div>
+                    <p className="a-dim text-[12px] text-center" style={{ padding: '0 16px 14px' }}>No bank details are set up for this club. Please contact the club administrator.</p>
                   )}
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
 
       {showJoinModal && (

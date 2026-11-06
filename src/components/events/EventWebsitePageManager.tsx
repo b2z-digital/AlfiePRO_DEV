@@ -63,7 +63,7 @@ const SortablePageItem: React.FC<SortablePageItemProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="a-dim text-[12.5px] hidden sm:inline">{page.is_published ? 'Published' : 'Draft'}</span>
+          <span className="a-dim text-[12.5px] max-sm:hidden">{page.is_published ? 'Published' : 'Draft'}</span>
           <button
             type="button"
             role="switch"

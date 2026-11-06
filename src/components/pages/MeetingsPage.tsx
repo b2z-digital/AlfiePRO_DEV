@@ -454,7 +454,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                             </div>
                           </div>
                           {att.length > 0 && (
-                            <div className="hidden md:flex items-center gap-2" title={`${att.length} attending`}>
+                            <div className="max-md:hidden flex items-center gap-2" title={`${att.length} attending`}>
                               <span className="inline-flex">
                                 {att.slice(0, 4).map((a, idx) => (
                                   <span key={idx} style={{ marginLeft: idx ? -8 : 0 }} className="a-av-ring inline-flex rounded-full">
