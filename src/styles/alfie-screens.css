@@ -1,0 +1,92 @@
+/*
+ * Alfie theme, phase 6: board pieces used by the screens rebuilt to their
+ * board layouts (Membership committee/positions, applications, renewals,
+ * remittances, member sheets, Finance, Tasks …). Dark is the default;
+ * html.alfie-light flips it. Builds on the a-* kit in alfie-ui.css.
+ */
+
+/* ── Form label + input ── */
+.a-flab { display: block; margin: 0 0 8px; font-size: 13px; font-weight: 600; color: rgba(235, 240, 255, 0.82); }
+.a-inp { width: 100%; box-sizing: border-box; height: 46px; padding: 0 14px; border: 0; border-radius: 13px; background: rgba(0, 0, 0, 0.26); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04); color: #fff; font: 400 15px 'Instrument Sans', system-ui, sans-serif; outline: none; }
+textarea.a-inp { height: auto; min-height: 92px; padding: 12px 14px; resize: vertical; line-height: 1.5; }
+select.a-inp { appearance: none; -webkit-appearance: none; padding-right: 36px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b8c2d6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 10l5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+select.a-inp option { background: #111A2C; color: #F1F4FA; }
+.a-inp::placeholder { color: rgba(235, 240, 255, 0.42); }
+.a-inp:focus, .a-inp:focus-visible { box-shadow: inset 0 0 0 1.5px #0A84FF; outline: none; }
+
+/* ── Toggle switch (real button, role=switch) ── */
+.a-sw { position: relative; width: 46px; height: 28px; flex-shrink: 0; padding: 0; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25); cursor: pointer; transition: background .15s ease; }
+.a-sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 999px; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); transition: left .15s ease; }
+.a-sw[aria-checked="true"] { background: #30D158; }
+.a-sw[aria-checked="true"]::after { left: 20px; }
+
+/* ── Access level label (signal bars) ── */
+.a-lvl { --lv: #9AA6BD; --lv-bd: rgba(154, 166, 189, 0.35); --lv-bg: rgba(154, 166, 189, 0.06); display: inline-flex; align-items: center; gap: 7px; height: 24px; padding: 0 10px 0 9px; box-sizing: border-box; border-radius: 7px; border: 1px solid var(--lv-bd); background: var(--lv-bg); font: 600 12px 'Instrument Sans', system-ui, sans-serif; color: var(--lv); white-space: nowrap; flex-shrink: 0; }
+.a-lvl-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
+.a-lvl-bars i { width: 3px; border-radius: 1px; background: var(--lv); opacity: 0.28; }
+.a-lvl-bars i.on { opacity: 1; }
+.a-lvl-admin { --lv: #FFC56B; --lv-bd: rgba(255, 179, 64, 0.35); --lv-bg: rgba(255, 179, 64, 0.06); }
+.a-lvl-editor { --lv: #6CB4FF; --lv-bd: rgba(10, 132, 255, 0.4); --lv-bg: rgba(10, 132, 255, 0.07); }
+.a-lvl-race_scorer { --lv: #6BE38C; --lv-bd: rgba(48, 209, 88, 0.35); --lv-bg: rgba(48, 209, 88, 0.06); }
+
+/* ── Person pill (assigned member) + dashed add pill ── */
+.a-pill { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 6px 0 4px; box-sizing: border-box; border-radius: 999px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 13.5px; font-weight: 500; color: #F1F4FA; max-width: 100%; }
+.a-pill > span:not(.a-av) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.a-pill .a-ib { width: 24px; height: 24px; border-radius: 999px; }
+.a-pill-add { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 10px; box-sizing: border-box; border-radius: 999px; border: 1px dashed rgba(255, 255, 255, 0.2); background: transparent; color: rgba(235, 240, 255, 0.7); font: 500 13px 'Instrument Sans', system-ui, sans-serif; cursor: pointer; }
+.a-pill-add:hover { color: #fff; border-color: rgba(255, 255, 255, 0.35); background: rgba(255, 255, 255, 0.03); }
+
+/* ── Selectable list row with Spectrum edge ── */
+.a-prow { display: flex; align-items: center; gap: 12px; padding: 12px 10px 12px 8px; border-radius: 14px; box-sizing: border-box; border-left: 3px solid transparent; cursor: pointer; color: inherit; }
+.a-prow:hover { background: rgba(255, 255, 255, 0.035); }
+.a-prow-on, .a-prow-on:hover { background: linear-gradient(#1B2232, #1B2232) padding-box, var(--alfie-spectrum-v) border-box; }
+
+/* ── Radio card ── */
+.a-acc { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.03); cursor: pointer; text-align: left; color: #fff; font: inherit; }
+.a-acc:hover { background: rgba(255, 255, 255, 0.055); }
+.a-acc-on, .a-acc-on:hover { border-color: transparent; background: linear-gradient(#141B2B, #141B2B) padding-box, var(--alfie-spectrum) border-box; }
+.a-radio { position: absolute; top: 14px; right: 14px; width: 18px; height: 18px; box-sizing: border-box; border-radius: 999px; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.25); }
+.a-acc-on .a-radio { background: #0A84FF; box-shadow: inset 0 0 0 5px #0A84FF, inset 0 0 0 9px #fff; }
+
+/* ── Inset well (toggle rows etc.) & side panel ── */
+.a-well { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); }
+.a-panel { background: rgba(22, 26, 36, 0.55); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 20px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+.a-panel-head { display: flex; align-items: center; gap: 14px; padding: 20px 22px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.a-panel-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+
+/* ── Dropdown card ── */
+.a-pop { background: rgba(20, 25, 38, 0.97); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 60px rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: blur(28px); backdrop-filter: blur(28px); overflow: hidden; }
+.a-pop-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: #F1F4FA; font: 500 13.5px 'Instrument Sans', system-ui, sans-serif; text-align: left; cursor: pointer; }
+.a-pop-item:hover { background: rgba(255, 255, 255, 0.06); }
+.a-pop-item-on { background: rgba(10, 132, 255, 0.14); }
+
+/* ═══════════════ Light ═══════════════ */
+html.alfie-light .a-flab { color: #334155; }
+html.alfie-light .a-inp { background: #fff; box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12); color: #0B1220; }
+html.alfie-light .a-inp::placeholder { color: #94A3B8; }
+html.alfie-light .a-inp:focus { box-shadow: inset 0 0 0 1.5px #0A84FF, 0 0 0 3px rgba(10, 132, 255, 0.15); }
+html.alfie-light select.a-inp { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 10l5 5 5-5'/%3E%3C/svg%3E"); }
+html.alfie-light select.a-inp option { background: #fff; color: #0B1220; }
+html.alfie-light .a-sw { background: rgba(15, 23, 42, 0.16); }
+html.alfie-light .a-sw[aria-checked="true"] { background: #30D158; }
+html.alfie-light .a-lvl { --lv: #64748B; --lv-bd: rgba(100, 116, 139, 0.35); --lv-bg: rgba(100, 116, 139, 0.06); }
+html.alfie-light .a-lvl-admin { --lv: #B25E00; --lv-bd: rgba(178, 94, 0, 0.3); --lv-bg: rgba(255, 159, 10, 0.08); }
+html.alfie-light .a-lvl-editor { --lv: #0A6FD6; --lv-bd: rgba(10, 111, 214, 0.3); --lv-bg: rgba(10, 132, 255, 0.07); }
+html.alfie-light .a-lvl-race_scorer { --lv: #167A3A; --lv-bd: rgba(22, 122, 58, 0.3); --lv-bg: rgba(48, 209, 88, 0.08); }
+html.alfie-light .a-pill { background: #fff; border-color: rgba(15, 23, 42, 0.1); color: #0B1220; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+html.alfie-light .a-pill-add { border-color: rgba(15, 23, 42, 0.22); color: #475569; }
+html.alfie-light .a-pill-add:hover { color: #0B1220; border-color: rgba(15, 23, 42, 0.4); background: rgba(15, 23, 42, 0.02); }
+html.alfie-light .a-prow:hover { background: rgba(15, 23, 42, 0.035); }
+html.alfie-light .a-prow-on, html.alfie-light .a-prow-on:hover { background: linear-gradient(#EEF4FF, #EEF4FF) padding-box, var(--alfie-spectrum-v) border-box; }
+html.alfie-light .a-acc { background: #fff; border-color: rgba(15, 23, 42, 0.1); color: #0B1220; }
+html.alfie-light .a-acc:hover { background: #F8FAFC; }
+html.alfie-light .a-acc-on, html.alfie-light .a-acc-on:hover { background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; border-color: transparent; }
+html.alfie-light .a-radio { box-shadow: inset 0 0 0 1.5px rgba(15, 23, 42, 0.25); }
+html.alfie-light .a-well { background: #F8FAFC; border-color: rgba(15, 23, 42, 0.08); }
+html.alfie-light .a-panel { background: #fff; border-color: rgba(15, 23, 42, 0.08); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06); }
+html.alfie-light .a-panel-head, html.alfie-light .a-panel-foot { border-color: rgba(15, 23, 42, 0.07); }
+html.alfie-light .a-pop { background: rgba(255, 255, 255, 0.98); border-color: rgba(15, 23, 42, 0.1); box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18); }
+html.alfie-light .a-pop-item { color: #0B1220; }
+html.alfie-light .a-pop-item:hover { background: rgba(15, 23, 42, 0.05); }
+html.alfie-light .a-pop-item-on { background: rgba(10, 132, 255, 0.1); }
+html.alfie-light .a-card-rule { border-color: rgba(15, 23, 42, 0.07) !important; }
