@@ -26,7 +26,7 @@ export const ThemedWidgetWrapper: React.FC<ThemedWidgetWrapperProps> = ({
 
   return (
     <div
-      className={`relative rounded-2xl p-6 w-full h-full flex flex-col border backdrop-blur-sm ${themeColors.background} ${
+      className={`a-widget relative rounded-2xl p-6 w-full h-full flex flex-col border backdrop-blur-sm ${themeColors.background} ${
         isEditMode ? 'animate-wiggle cursor-move' : ''
       } ${className}`}
     >
@@ -44,7 +44,7 @@ export const ThemedWidgetWrapper: React.FC<ThemedWidgetWrapperProps> = ({
         </button>
       )}
       {(title || Icon) && (
-        <div className="flex items-center gap-3 mb-4">
+        <div className="a-widget-head flex items-center gap-3 mb-4">
           {Icon && (
             <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30">
               <Icon className="w-5 h-5 text-blue-400" />
