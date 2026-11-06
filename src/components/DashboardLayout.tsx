@@ -1391,8 +1391,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
           {/* Club Switcher */}
           <div className={`px-3 py-3 border-t ${lightMode ? 'border-gray-200/50' : 'border-slate-700/50'} ${(collapsed && !isHoveringNav) ? 'flex flex-col items-center' : ''}`}>
-            {!collapsed && <p className={`text-xs mb-2 px-2 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>Current Club</p>}
             <ClubSwitcher
+              variant="sidebar"
               currentClubId={currentOrganization?.id || currentClub?.clubId || null}
               onClubChange={async (orgId) => {
                 try {
