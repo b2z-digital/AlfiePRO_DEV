@@ -73,7 +73,7 @@ html.alfie-theme :is(button, a).rounded-lg:is(.bg-blue-600, .bg-blue-500, .bg-cy
 
 /* Cards & rows */
 .a-card { background: rgba(255, 255, 255, 0.025); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 20px; }
-.a-card-hi { background: rgba(20, 28, 46, 0.66); border: 1px solid rgba(255, 255, 255, 0.075); border-radius: 20px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px rgba(0, 0, 0, 0.22); }
+.a-card-hi { background: rgba(255, 255, 255, 0.025); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 20px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px rgba(0, 0, 0, 0.22); }
 .a-row { display: flex; align-items: center; gap: 16px; padding: 14px 18px; }
 .a-row + .a-row { border-top: 1px solid rgba(255, 255, 255, 0.055); }
 .a-row-hover:hover { background: rgba(255, 255, 255, 0.025); }
@@ -569,3 +569,32 @@ html.alfie-theme .a-sb-pill {
 }
 html.alfie-theme .a-sb-pill .tabular-nums { font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-size: 22px; }
 html.alfie-light .a-sb-pill { background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box !important; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18) !important; }
+
+/* ═══════════════════ Membership dashboard (board MemDash) ═══════════════════ */
+.a-memdash .a-card { border-radius: 22px; }
+.a-trend { color: #fff; overflow: visible; }
+.a-trend-grid { stroke: rgba(255, 255, 255, 0.06); stroke-width: 1; }
+.a-trend-tick, .a-trend-x { fill: rgba(235, 240, 255, 0.45); font: 500 11px 'Instrument Sans', system-ui, sans-serif; }
+.a-trend-x { font-size: 12px; }
+.a-trend-x-on { fill: #fff; font-weight: 600; }
+.a-trend-dot { fill: #0B1222; stroke: #2F7BFF; stroke-width: 2; }
+.a-trend-dot-on { fill: #fff; stroke: #2F7BFF; stroke-width: 3; }
+.a-trend-pill { fill: rgba(255, 255, 255, 0.08); stroke: rgba(255, 255, 255, 0.14); }
+.a-trend-pill-t { fill: #fff; font: 700 12px 'Bricolage Grotesque', system-ui, sans-serif; }
+.a-memdash-cls { width: 118px; flex-shrink: 0; justify-content: flex-start; }
+.a-memdash-cls::before { content: ''; width: 9px; height: 11px; flex-shrink: 0; background: var(--a-cls, #9AA6BD); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12'%3E%3Cpath d='M1 .75v10.5' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M1.75 1.25h6.5L1.75 5.5z' fill='black'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12'%3E%3Cpath d='M1 .75v10.5' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M1.75 1.25h6.5L1.75 5.5z' fill='black'/%3E%3C/svg%3E") center / contain no-repeat; }
+.a-memdash-bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.a-memdash-bar > span { display: block; height: 100%; border-radius: 999px; }
+.a-memdash-well { padding: 14px 16px; border-radius: 16px; background: rgba(0, 0, 0, 0.26); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4); }
+.a-memdash-dots { display: flex; flex-wrap: wrap; gap: 4px; }
+.a-memdash-dots > span { width: 9px; height: 9px; border-radius: 3px; }
+.a-memdash-dots > .is-series { background: #FF8A2B; }
+.a-memdash-dots > .is-single { background: #2F7BFF; }
+html.alfie-light .a-trend-grid { stroke: rgba(15, 23, 42, 0.07); }
+html.alfie-light .a-trend-tick, html.alfie-light .a-trend-x { fill: #64748B; }
+html.alfie-light .a-trend-x-on, html.alfie-light .a-trend-pill-t { fill: #0B1220; }
+html.alfie-light .a-trend-dot { fill: #fff; }
+html.alfie-light .a-trend-pill { fill: #fff; stroke: rgba(15, 23, 42, 0.12); }
+html.alfie-light .a-memdash-bar { background: rgba(15, 23, 42, 0.06); }
+html.alfie-light .a-memdash-well { background: rgba(15, 23, 42, 0.04); box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06); }
+html.alfie-light .a-memdash .a-ink { color: #0B1220 !important; }
