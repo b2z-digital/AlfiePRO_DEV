@@ -4,7 +4,7 @@ import { supabase } from '../../utils/supabase';
 import { sanitizePassword } from '../../utils/password';
 import { Logo } from '../Logo';
 import { GoogleIcon } from './GoogleIcon';
-import { Smartphone, Monitor, ExternalLink } from 'lucide-react';
+import { Smartphone, Monitor, ExternalLink, Eye, EyeOff, ArrowRight } from 'lucide-react';
 
 const AppleIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg viewBox="0 0 384 512" fill="currentColor" className={className}>
@@ -42,6 +42,7 @@ export const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [appLinks, setAppLinks] = useState<{ ios: string; android: string }>({ ios: '', android: '' });
   const [showLogin, setShowLogin] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const isMobile = useIsMobilePhone();
 
@@ -219,127 +220,179 @@ export const Login: React.FC = () => {
     );
   }
 
+  const inputClass =
+    'w-full h-[52px] px-4 bg-white/[0.05] border border-white/[0.14] rounded-[14px] text-white text-base placeholder-white/50 focus:outline-none focus:border-[#6E8FFF] focus:ring-4 focus:ring-[#5E80FF]/25 focus:bg-white/[0.08] transition-colors';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-xl">
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl shadow-2xl border border-slate-700/50 overflow-hidden">
-          <div className="flex justify-end items-center px-6 py-4 border-b border-slate-700/30">
-            <div className="flex items-center gap-3">
-              <div className="px-5 py-1.5 bg-blue-600 rounded-full text-white text-sm font-semibold shadow-lg shadow-blue-500/15">
-                Sign In
-              </div>
-              <button
-                onClick={() => navigate('/register')}
-                className="px-5 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-full transition-all duration-200"
-              >
-                Create Account
-              </button>
-            </div>
+    <div className="min-h-screen bg-[#0B1328] text-white lg:flex">
+      {/* Photo panel: hero on small screens, full-height left half on desktop */}
+      <section className="relative overflow-hidden flex flex-col justify-between min-h-[46vh] lg:min-h-screen lg:flex-1 px-6 pt-8 pb-16 sm:px-10 lg:p-12">
+        <img
+          src="/login-yacht.jpg"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover object-[50%_30%]"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-b from-[#070D22]/60 via-transparent to-[#070D22]/85"
+        />
+
+        <div className="relative flex items-center gap-3">
+          <Logo size="medium" />
+          <div className="text-3xl text-white tracking-wide">
+            <span className="font-thin">Alfie</span><span className="font-bold">PRO</span>
           </div>
+        </div>
 
-          <div className="p-8">
-            <div className="flex flex-col items-center mb-8">
-              <div className="flex items-center gap-4 mb-3">
-                <Logo size="medium" />
-                <div className="text-3xl text-white">
-                  <span className="font-thin">Alfie</span><span className="font-bold">PRO</span>
-                </div>
+        <div className="relative max-w-xl mt-10">
+          <p className="flex max-sm:hidden items-center gap-2.5 mb-4 text-[13px] font-semibold tracking-[0.14em] uppercase text-[#A9C4FF]">
+            <span aria-hidden="true" className="inline-block w-7 h-0.5 bg-[#A9C4FF]" />
+            Welcome back
+          </p>
+          <h1 className="font-['Outfit',sans-serif] font-semibold text-[40px] sm:text-5xl xl:text-[72px] leading-[1.02] tracking-tight">
+            Good to have
+            <br />
+            you aboard.
+          </h1>
+          <p className="max-sm:hidden mt-4 max-w-md text-lg leading-relaxed text-white/85">
+            Sign in to pick up right where you left off.
+          </p>
+        </div>
+      </section>
+
+      {/* Form panel */}
+      <section
+        aria-labelledby="signin-title"
+        className="relative -mt-8 lg:mt-0 rounded-t-[28px] lg:rounded-none bg-[#0B1328] flex flex-col lg:flex-1 lg:max-w-[720px] px-6 pt-8 pb-8 sm:px-10 lg:px-16 lg:pt-9"
+      >
+        <p className="max-lg:hidden self-end text-[15px] text-white/80">
+          New to AlfiePRO?{' '}
+          <button
+            onClick={() => navigate('/register')}
+            className="font-semibold text-[#9DB8FF] hover:text-[#C9D7FF] transition-colors"
+          >
+            Create an account
+          </button>
+        </p>
+
+        <div className="flex-1 flex items-center justify-center lg:py-10">
+          <div className="w-full max-w-[400px]">
+            <h2
+              id="signin-title"
+              className="font-['Outfit',sans-serif] text-[34px] font-semibold tracking-tight mb-2"
+            >
+              Sign in
+            </h2>
+            <p className="text-white/70 mb-7">Use your Google account or email.</p>
+
+            {error && (
+              <div role="alert" className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl">
+                <p className="text-red-300 text-sm">{error}</p>
               </div>
+            )}
+
+            <button
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading}
+              className="w-full h-[52px] flex items-center justify-center gap-3 bg-white/[0.05] hover:bg-white/10 border border-white/[0.16] rounded-[14px] font-medium transition-colors disabled:opacity-60"
+            >
+              {googleLoading ? (
+                <div className="w-5 h-5 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <GoogleIcon />
+              )}
+              {googleLoading ? 'Redirecting...' : 'Continue with Google'}
+            </button>
+
+            <div className="flex items-center gap-3.5 my-6">
+              <span aria-hidden="true" className="flex-1 h-px bg-white/[0.12]" />
+              <span className="text-[13px] text-white/65">or with email</span>
+              <span aria-hidden="true" className="flex-1 h-px bg-white/[0.12]" />
             </div>
 
-            <div className="mx-auto">
-              {error && (
-                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl backdrop-blur-sm">
-                  <p className="text-red-400 text-sm">{error}</p>
-                </div>
-              )}
-
-              <button
-                onClick={handleGoogleSignIn}
-                disabled={googleLoading}
-                className="w-full flex items-center justify-center gap-3 py-3 bg-slate-700/60 hover:bg-slate-600/70 disabled:bg-slate-700/40 border border-slate-600/50 hover:border-slate-500/60 text-slate-200 font-medium rounded-xl transition-all duration-200 backdrop-blur-sm disabled:text-slate-500 mb-6"
-              >
-                {googleLoading ? (
-                  <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <GoogleIcon />
-                )}
-                {googleLoading ? 'Redirecting...' : 'Continue with Google'}
-              </button>
-
-              <div className="relative mb-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-600/50" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-3 bg-slate-800/50 text-slate-400">or sign in with email</span>
-                </div>
+            <form onSubmit={handleLogin} className="space-y-[18px]">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-white/85 mb-2">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className={inputClass}
+                  placeholder="you@example.com"
+                />
               </div>
 
-              <form onSubmit={handleLogin} className="space-y-5">
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
-                    Email
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label htmlFor="password" className="block text-sm font-medium text-white/85">
+                    Password
                   </label>
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                    placeholder="you@example.com"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => navigate('/forgot-password')}
+                    className="text-sm font-medium text-[#9DB8FF] hover:text-[#C9D7FF] transition-colors"
+                  >
+                    Forgot password?
+                  </button>
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label htmlFor="password" className="block text-sm font-medium text-slate-300">
-                      Password
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => navigate('/forgot-password')}
-                      className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
+                <div className="relative">
                   <input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    className={`${inputClass} pr-14`}
                     placeholder="••••••••"
                   />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/15 hover:shadow-xl hover:shadow-blue-500/25 disabled:shadow-none"
-                >
-                  {loading ? 'Signing in...' : 'Sign In'}
-                </button>
-              </form>
-
-              <div className="mt-6 text-center">
-                <p className="text-slate-400 text-sm">
-                  Don't have an account?{' '}
                   <button
-                    onClick={() => navigate('/register')}
-                    className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-1 top-1 w-11 h-11 flex items-center justify-center rounded-[10px] text-white/70 hover:text-white transition-colors"
                   >
-                    Sign up
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
-                </p>
+                </div>
               </div>
-            </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full h-[54px] mt-1 flex items-center justify-center gap-2.5 bg-[#3B63E0] hover:brightness-110 disabled:bg-slate-600 disabled:hover:brightness-100 text-white font-semibold rounded-[14px] transition-all shadow-[0_12px_30px_rgba(59,99,224,0.4)] disabled:shadow-none"
+              >
+                {loading ? 'Signing in...' : 'Sign in'}
+                {!loading && <ArrowRight size={18} />}
+              </button>
+            </form>
+
+            <p className="lg:hidden mt-6 text-center text-sm text-white/80">
+              New to AlfiePRO?{' '}
+              <button
+                onClick={() => navigate('/register')}
+                className="font-semibold text-[#9DB8FF] hover:text-[#C9D7FF] transition-colors"
+              >
+                Create an account
+              </button>
+            </p>
           </div>
         </div>
-      </div>
+
+        <footer className="mt-10 lg:mt-0 flex flex-wrap items-center justify-between gap-3 text-[13px] text-white/70">
+          <p>© {new Date().getFullYear()} AlfiePRO</p>
+          <nav aria-label="Legal" className="flex gap-5">
+            <a href="/privacy-policy" className="text-white/80 hover:text-white transition-colors">Privacy</a>
+            <a href="/terms-of-service" className="text-white/80 hover:text-white transition-colors">Terms</a>
+          </nav>
+        </footer>
+      </section>
     </div>
   );
 };
