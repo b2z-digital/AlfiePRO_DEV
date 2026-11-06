@@ -421,7 +421,7 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     return (
       <div className="fixed bottom-4 left-0 right-0 z-[100] flex justify-center pointer-events-none">
         <div
-          className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-2xl animate-slideUp ${
+          className={`a-sb-pill pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-2xl animate-slideUp ${
             darkMode
               ? 'bg-slate-900 border-slate-700/60'
               : 'bg-white border-slate-200'
