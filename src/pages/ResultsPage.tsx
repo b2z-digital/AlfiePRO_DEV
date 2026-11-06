@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CircleCheck as CheckCircle2, Clock, ChevronRight, X, Grid2x2 as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, Circle as XCircle, Send, SquarePen as Edit2, Globe, Map as MapIcon, ArrowUpDown, ListFilter as Filter, FlaskConical } from 'lucide-react';
+import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CircleCheck as CheckCircle2, Clock, ChevronRight, X, Grid2x2 as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, Circle as XCircle, Send, SquarePen as Edit2, Globe, Map as MapIcon, ArrowUpDown, ListFilter as Filter, FlaskConical, Sailboat } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Papa from 'papaparse';
@@ -13,6 +13,7 @@ import { mergeSeriesSkippersByName, findRoundSkipperIndex, MergedSeriesSkipper }
 import { getStoredRaceSeries, getStoredRaceEvents, getSimulatedRaceEvents, combineAllDayResults, storeRaceSeries } from '../utils/raceStorage';
 import { getPublicEvents, convertToRaceEvent } from '../utils/publicEventStorage';
 import { formatDate } from '../utils/date';
+import { getBoatClassBadge, getRaceFormatBadge } from '../constants/colors';
 import { getBoatClassImage } from '../utils/boatClassImages';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -383,7 +384,8 @@ export const ResultsPage: React.FC = () => {
   const [mainTab, setMainTab] = useState<MainTab>('events');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [expandedResultGroups, setExpandedResultGroups] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('date-desc');
@@ -1790,6 +1792,200 @@ export const ResultsPage: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const resultPodium = (item: RaceEvent | RoundResult) => {
+    if (!item.completed) return [] as { name: string; avatarUrl?: string; pos: number }[];
+    try {
+      const st = computeEventStandings(item as unknown as RaceEvent);
+      const rows = st.rows.filter(r => !r.isFleetSeparator).slice(0, 3);
+      return rows.map((r, i) => ({ name: r.skipper, avatarUrl: (item.skippers || []).find((s: any) => s.name === r.skipper)?.avatarUrl, pos: i + 1 }));
+    } catch {
+      return [];
+    }
+  };
+
+  const plInitials = (n: string) => n.split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase();
+
+  const renderResultsBoardList = (items: (RaceEvent | RoundResult)[]) => {
+    if (items.length === 0) return <div className="a-card a-empty a-dim text-center" style={{ padding: 48 }}>No events found</div>;
+    const open = (id: string) => navigate(`/results/${id}`);
+    const inProgress = items.filter(i => !i.completed && ((i.raceResults || []).length > 0 || (i.skippers || []).length > 0));
+    const groups: { key: string; series?: RaceSeries; name: string; items: (RaceEvent | RoundResult)[] }[] = [];
+    const standalone: (RaceEvent | RoundResult)[] = [];
+    items.forEach(i => {
+      if ('seriesId' in i && (i as RoundResult).seriesId) {
+        const r = i as RoundResult;
+        let g = groups.find(x => x.key === r.seriesId);
+        if (!g) { g = { key: r.seriesId, series: allSeries.find(s => s.id === r.seriesId), name: r.seriesName, items: [] }; groups.push(g); }
+        g.items.push(i);
+      } else standalone.push(i);
+    });
+    const dChip = (d: string) => {
+      const dt = new Date(d);
+      return <div className="a-dc a-dc-sm"><b>{dt.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</b><span>{dt.getDate()}</span></div>;
+    };
+    const status = (i: RaceEvent | RoundResult) => i.completed
+      ? <span className="a-st a-txt-g"><span className="a-light a-light-g" />Completed</span>
+      : <span className="a-st a-txt-a"><span className="a-light a-light-a" />In Progress</span>;
+    const row = (i: RaceEvent | RoundResult, inSeries: boolean) => {
+      const pod = resultPodium(i);
+      const n = (i.skippers || []).length;
+      const title = 'seriesId' in i ? (i as RoundResult).roundName : (i as RaceEvent).eventName;
+      return (
+        <div key={i.id} className="a-rrow" onClick={() => open(i.id)} role="button" tabIndex={0}>
+          {i.date ? dChip(i.date) : <span />}
+          <div className="min-w-0">
+            <p className="a-ink m-0 text-[14.5px] font-semibold truncate">{title}</p>
+            {inSeries ? (
+              i.date && <p className="a-dim m-0 mt-0.5 text-[12.5px]">{new Date(i.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</p>
+            ) : (
+              <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                {i.raceClass && <span className={getBoatClassBadge(i.raceClass, true).className}>{i.raceClass}</span>}
+                {i.raceFormat && <span className={getRaceFormatBadge(i.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', true).className}>{i.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}</span>}
+              </div>
+            )}
+          </div>
+          <span className="max-sm:hidden">{status(i)}</span>
+          <span className="a-rrow-pod max-md:hidden">
+            {pod.length > 0 ? pod.map(p => (
+              <span key={p.pos} className={`a-pl a-p${p.pos}`} style={{ width: 30, height: 30 }} title={`${p.pos}. ${p.name}`}>
+                <span className="a-pl-face">{p.avatarUrl ? <img src={p.avatarUrl} alt="" /> : plInitials(p.name)}</span>
+                <span className="a-pl-n">{p.pos}</span>
+              </span>
+            )) : <span className="a-dim text-[12.5px]">{!i.completed && n > 0 ? 'Scoring' : ''}</span>}
+          </span>
+          <span className="a-mute inline-flex items-center gap-1.5 text-[12.5px] max-lg:hidden"><Users size={14} />{n} competitors</span>
+          <ChevronRight size={16} className="a-dim" />
+        </div>
+      );
+    };
+    const seriesBar = (s: RaceSeries | undefined) => {
+      if (!s || !s.rounds?.length) return null;
+      const total = s.rounds.length;
+      const done = s.rounds.filter(r => r.completed).length;
+      return (
+        <>
+          <span className="a-segbar max-sm:hidden" aria-label={`${done} of ${total} rounds`}>
+            {s.rounds.map((r, k) => <i key={k} style={r.completed ? { background: `color-mix(in srgb, #2E7BFF ${100 - Math.round((k / Math.max(1, total - 1)) * 100)}%, #FF3E9A)` } : undefined} />)}
+          </span>
+          <span className="a-mute text-[12.5px] whitespace-nowrap">{done === total ? `${total} rounds` : `${done} of ${total}`}</span>
+        </>
+      );
+    };
+
+    const yearItems = items;
+    const months = (() => {
+      const m: Record<number, number> = {};
+      yearItems.forEach(i => { if (i.date) { const k = new Date(i.date).getMonth(); m[k] = (m[k] || 0) + 1; } });
+      const max = Math.max(1, ...Object.values(m));
+      return Object.entries(m).map(([k, v]) => ({ k: Number(k), v, w: (v / max) * 100 })).sort((a, b) => b.k - a.k);
+    })();
+    const monthName = (k: number) => new Date(2000, k, 1).toLocaleDateString('en-US', { month: 'short' });
+
+    return (
+      <div className="flex flex-wrap gap-6 items-start">
+        <div className="flex flex-col gap-[18px]" style={{ flex: '999 1 640px', minWidth: 0 }}>
+          {inProgress.length > 0 && statusFilter !== 'completed' && (
+            <section className="flex flex-col gap-2.5">
+              <div className="flex items-center gap-2.5 px-1"><span className="a-light a-light-a" /><p className="a-cap a-txt-a m-0">In progress · finish scoring</p></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {inProgress.slice(0, 4).map(i => (
+                  <div key={i.id} className="a-card flex items-center gap-3.5" style={{ padding: '14px 16px', borderColor: 'rgba(255,179,64,0.28)' }}>
+                    {i.date && dChip(i.date)}
+                    <div className="flex-1 min-w-0">
+                      <p className="a-ink m-0 text-[14.5px] font-semibold truncate">{'seriesId' in i ? `${(i as RoundResult).roundName} - ${(i as RoundResult).seriesName}` : (i as RaceEvent).eventName}</p>
+                      <p className="a-dim m-0 mt-0.5 text-[12.5px]">{(i.skippers || []).length} competitors</p>
+                    </div>
+                    <button onClick={() => open(i.id)} className="a-btn a-btn-p">Open</button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {groups.map(g => {
+            const expanded = expandedResultGroups.includes(g.key);
+            const shown = expanded ? g.items : g.items.slice(0, 4);
+            const hidden = g.items.length - shown.length;
+            const cls = g.series?.raceClass || g.items[0]?.raceClass;
+            const fmt = g.series?.raceFormat || g.items[0]?.raceFormat;
+            return (
+              <section key={g.key} className="a-card overflow-hidden">
+                <div className="a-grp-h">
+                  <span className="a-tile" style={{ width: 36, height: 36 }}><TrendingUp size={17} /></span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h2 className="a-display a-ink m-0 text-[17px] font-semibold">{g.name}</h2>
+                      {cls && <span className={getBoatClassBadge(cls, true).className}>{cls}</span>}
+                      {fmt && <span className={getRaceFormatBadge(fmt === 'handicap' ? 'Handicap' : 'Scratch', true).className}>{fmt === 'handicap' ? 'Handicap' : 'Scratch'}</span>}
+                    </div>
+                  </div>
+                  {seriesBar(g.series)}
+                  {g.series && <button onClick={() => open(g.series!.id)} className="a-link text-[13px] font-medium whitespace-nowrap">Leaderboard</button>}
+                </div>
+                {shown.map(i => row(i, true))}
+                {hidden > 0 && (
+                  <button onClick={() => setExpandedResultGroups(p => [...p, g.key])} className="a-grp-more">Show {hidden} earlier {hidden === 1 ? 'round' : 'rounds'}</button>
+                )}
+              </section>
+            );
+          })}
+
+          {standalone.length > 0 && (
+            <section className="a-card overflow-hidden">
+              <div className="a-grp-h">
+                <span className="a-tile" style={{ width: 36, height: 36 }}><Trophy size={17} /></span>
+                <div className="flex-1"><h2 className="a-display a-ink m-0 text-[17px] font-semibold">Standalone events</h2></div>
+                <span className="a-mute inline-flex items-center gap-2 text-[12.5px]"><span className="a-cnt">{standalone.length}</span>events</span>
+              </div>
+              {standalone.map(i => row(i, false))}
+            </section>
+          )}
+        </div>
+
+        <aside className="a-card flex flex-col gap-[18px]" style={{ flex: '1 1 280px', maxWidth: 340, padding: 20 }}>
+          <div>
+            <p className="a-cap m-0">{selectedYear} season</p>
+            <div className="grid grid-cols-3 gap-2.5 mt-3">
+              <div><p className="a-display a-ink m-0 text-[26px] font-semibold">{items.length}</p><p className="a-dim m-0 mt-0.5 text-[12px]">Events</p></div>
+              <div><p className="a-display a-ink m-0 text-[26px] font-semibold">{groups.length}</p><p className="a-dim m-0 mt-0.5 text-[12px]">Series</p></div>
+              <div><p className="a-display a-txt-a m-0 text-[26px] font-semibold">{items.filter(i => !i.completed).length}</p><p className="a-dim m-0 mt-0.5 text-[12px]">In progress</p></div>
+            </div>
+          </div>
+          {months.length > 0 && (
+            <>
+              <div className="a-month-rule" />
+              <div>
+                <p className="a-cap m-0 mb-2">By month</p>
+                {months.map(mo => (
+                  <div key={mo.k} className="a-mo"><span style={{ width: 34 }}>{monthName(mo.k)}</span><i><s style={{ width: `${mo.w}%` }} /></i><span className="a-cnt">{mo.v}</span></div>
+                ))}
+              </div>
+            </>
+          )}
+          {groups.length > 0 && (
+            <>
+              <div className="a-month-rule" />
+              <div className="flex flex-col gap-2.5">
+                <p className="a-cap m-0">Series</p>
+                {groups.map(g => {
+                  const total = g.series?.rounds?.length || g.items.length;
+                  const done = g.series?.rounds?.filter(r => r.completed).length ?? g.items.filter(i => i.completed).length;
+                  return (
+                    <button key={g.key} onClick={() => g.series && open(g.series.id)} className="flex items-center gap-2.5 text-[13px] text-left">
+                      <TrendingUp size={15} className="a-dim flex-shrink-0" />
+                      <span className="a-ink flex-1 truncate">{g.name.replace(/\s*(Club Championship )?Series\s*-?\s*\d{4}$/i, '').replace(/\s*-\s*\d{4}$/, '')}</span>
+                      <span className="a-dim whitespace-nowrap">{done === total ? `${total} rounds` : `${done} of ${total}`}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </aside>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     if (loading) {
       return (
@@ -2332,85 +2528,59 @@ export const ResultsPage: React.FC = () => {
     const eventsToShow = mainTab === 'events' ? filteredEvents : [];
     const seriesToShow = mainTab === 'leaderboards' ? filteredSeries : [];
 
+    const tabs: { key: MainTab; label: string; icon: React.ReactNode; count: number; show: boolean }[] = [
+      { key: 'events', label: 'Individual Events & Rounds', icon: <Trophy size={15} />, count: filteredEvents.length, show: true },
+      { key: 'leaderboards', label: 'Series Leaderboards', icon: <TrendingUp size={15} />, count: filteredSeries.length, show: true },
+      { key: 'state', label: 'State Events', icon: <MapIcon size={15} />, count: filteredStateEvents.length, show: externalStateEvents.length > 0 },
+      { key: 'national', label: 'National Events', icon: <Globe size={15} />, count: filteredNationalEvents.length, show: externalNationalEvents.length > 0 },
+      { key: 'world', label: 'World Events', icon: <Globe size={15} />, count: filteredWorldEvents.length, show: externalWorldEvents.length > 0 },
+      { key: 'simulated', label: 'Simulated Events', icon: <FlaskConical size={15} />, count: simulatedEvents.length, show: can('manage_races') && simulatedEvents.length > 0 },
+    ];
+    const statusCounts = {
+      all: filterItems([...allEvents, ...roundResults], searchTerm, 'all', selectedYear).length,
+      completed: filterItems([...allEvents, ...roundResults], searchTerm, 'completed', selectedYear).length,
+      'in-progress': filterItems([...allEvents, ...roundResults], searchTerm, 'in-progress', selectedYear).length,
+    };
+    const classCounts = (() => {
+      const base = [...allEvents, ...roundResults].filter(e => e.date && new Date(e.date).getFullYear() === selectedYear);
+      const m: Record<string, number> = {};
+      base.forEach(e => { if (e.raceClass) m[e.raceClass] = (m[e.raceClass] || 0) + 1; });
+      return Object.entries(m).sort((a, b) => b[1] - a[1]);
+    })();
+
     return (
-      <div className="space-y-6">
+      <div className="flex flex-col gap-[22px]">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br">
-              <Trophy className="text-white" size={24} />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">Results</h1>
-              <p className="text-sm text-slate-400">
-                {mainTab === 'events' ? eventsToShow.length : mainTab === 'leaderboards' ? seriesToShow.length : mainTab === 'simulated' ? simulatedEvents.length : mainTab === 'national' ? filteredNationalEvents.length : mainTab === 'state' ? filteredStateEvents.length : filteredWorldEvents.length} {mainTab === 'leaderboards' ? 'leaderboards' : 'events'}
-              </p>
-            </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><Trophy size={22} /></span>
+          <div className="flex-1" style={{ minWidth: 180 }}>
+            <h1 className="a-display a-ink m-0 text-[32px] font-semibold leading-[1.1]">Results</h1>
+            <p className="a-mute mt-0.5 text-[14px]">
+              {mainTab === 'events' ? eventsToShow.length : mainTab === 'leaderboards' ? seriesToShow.length : mainTab === 'simulated' ? simulatedEvents.length : mainTab === 'national' ? filteredNationalEvents.length : mainTab === 'state' ? filteredStateEvents.length : filteredWorldEvents.length} {mainTab === 'leaderboards' ? 'leaderboards' : 'events'}
+            </p>
           </div>
 
-          {/* Search, Sort, Filters, and View Toggle */}
-          <div className="flex items-center gap-2">
-            {showSearch ? (
-              <div className="relative flex-1 sm:w-64">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-9 py-2 rounded-lg bg-slate-700 text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-                  autoFocus
-                />
-                <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setShowSearch(false);
-                  }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowSearch(true)}
-                className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
-              >
-                <Search size={18} />
-              </button>
-            )}
+          <div className="a-tbar flex-wrap">
+            <div className="a-field a-field-sunk" style={{ height: 36, width: 240 }}>
+              <Search size={16} />
+              <input type="text" placeholder="Search results, skippers…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              {searchTerm && <button onClick={() => { setSearchTerm(''); setShowSearch(false); }} className="a-dim" aria-label="Clear search"><X size={14} /></button>}
+            </div>
 
-            {/* Sort Dropdown */}
             <div className="relative" ref={sortDropdownRef}>
-              <button
-                onClick={() => { setShowSortDropdown(!showSortDropdown); setShowFilterDropdown(false); }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200"
-              >
-                <ArrowUpDown size={16} />
-                Sort
-                <ChevronDown size={16} />
+              <button onClick={() => { setShowSortDropdown(!showSortDropdown); setShowFilterDropdown(false); }} className="a-tb-btn">
+                <ArrowUpDown size={15} />Sort<ChevronDown size={15} className="a-dim" />
               </button>
               {showSortDropdown && (
-                <div className="absolute right-0 mt-2 w-56 rounded-lg shadow-xl border py-2 z-50 bg-slate-800 border-slate-700">
+                <div className="a-pop absolute right-0 mt-2 w-56 z-50" style={{ padding: 6 }}>
                   {[
-                    { value: 'date-desc', label: 'Date (Newest First)' },
-                    { value: 'date-asc', label: 'Date (Oldest First)' },
-                    { value: 'name-asc', label: 'Name (A-Z)' },
-                    { value: 'name-desc', label: 'Name (Z-A)' },
+                    { value: 'date-desc', label: 'Date (newest first)' },
+                    { value: 'date-asc', label: 'Date (oldest first)' },
+                    { value: 'name-asc', label: 'Name (A–Z)' },
+                    { value: 'name-desc', label: 'Name (Z–A)' },
                     { value: 'status', label: 'Status' },
                   ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        setSortBy(option.value as SortOption);
-                        setShowSortDropdown(false);
-                      }}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                        sortBy === option.value
-                          ? 'bg-blue-600/20 text-blue-400'
-                          : 'text-slate-300 hover:bg-slate-700'
-                      }`}
-                    >
+                    <button key={option.value} onClick={() => { setSortBy(option.value as SortOption); setShowSortDropdown(false); }} className={`a-pop-item ${sortBy === option.value ? 'a-pop-item-on' : ''}`}>
                       {option.label}
                     </button>
                   ))}
@@ -2418,314 +2588,93 @@ export const ResultsPage: React.FC = () => {
               )}
             </div>
 
-            {/* Filters Dropdown */}
             <div className="relative" ref={filterDropdownRef}>
-              <button
-                onClick={() => { setShowFilterDropdown(!showFilterDropdown); setShowSortDropdown(false); }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${
-                  filterClass !== 'all' || filterFormat !== 'all' || filterEventType !== 'all'
-                    ? 'bg-blue-600/20 border-blue-500/50 text-blue-400'
-                    : 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200'
-                }`}
-              >
-                <Filter size={16} />
-                Filters
-                <ChevronDown size={16} />
+              <button onClick={() => { setShowFilterDropdown(!showFilterDropdown); setShowSortDropdown(false); }} className="a-tb-btn">
+                <Filter size={15} />Filters
+                {(filterClass !== 'all' || filterFormat !== 'all' || filterEventType !== 'all') && <span className="a-light a-light-b" />}
               </button>
               {showFilterDropdown && (
-                <div className="absolute right-0 mt-2 w-80 rounded-lg shadow-xl border py-3 z-50 bg-slate-800 border-slate-700">
-                  {/* Race Format Filter */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Race Type
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setFilterFormat(filterFormat === 'scratch' ? 'all' : 'scratch')}
-                        className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                          filterFormat === 'scratch'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                        }`}
-                      >
-                        Scratch
-                      </button>
-                      <button
-                        onClick={() => setFilterFormat(filterFormat === 'handicap' ? 'all' : 'handicap')}
-                        className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                          filterFormat === 'handicap'
-                            ? 'bg-green-600 text-white'
-                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                        }`}
-                      >
-                        Handicap
-                      </button>
+                <div className="a-pop absolute right-0 mt-2 w-80 z-50 flex flex-col gap-3" style={{ padding: 14 }}>
+                  <div>
+                    <p className="a-cap mb-2">Race type</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button onClick={() => setFilterFormat(filterFormat === 'scratch' ? 'all' : 'scratch')} className={`a-fchip ${filterFormat === 'scratch' ? 'a-fchip-on' : ''}`}>Scratch</button>
+                      <button onClick={() => setFilterFormat(filterFormat === 'handicap' ? 'all' : 'handicap')} className={`a-fchip ${filterFormat === 'handicap' ? 'a-fchip-on' : ''}`}>Handicap</button>
                     </div>
                   </div>
-
-                  <div className="border-t my-2 border-slate-700" />
-
-                  {/* Boat Class Filter */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Class
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {boatClasses.map(boatClass => {
-                        const typeColors = boatTypeColors[boatClass] || defaultColorScheme;
-                        return (
-                          <button
-                            key={boatClass}
-                            onClick={() => setFilterClass(filterClass === boatClass ? 'all' : boatClass)}
-                            className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                              filterClass === boatClass
-                                ? `${typeColors.bg} ${typeColors.text} ${typeColors.darkBg} ${typeColors.darkText}`
-                                : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                            }`}
-                          >
-                            {boatClass}
-                          </button>
-                        );
-                      })}
-                      {boatClasses.length === 0 && (
-                        <span className="text-xs text-slate-500">No classes available</span>
-                      )}
+                  <div className="a-pop-rule" style={{ margin: 0 }} />
+                  <div>
+                    <p className="a-cap mb-2">Class</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {boatClasses.map(boatClass => (
+                        <button key={boatClass} onClick={() => setFilterClass(filterClass === boatClass ? 'all' : boatClass)} className={`a-fchip ${filterClass === boatClass ? 'a-fchip-on' : ''}`}>{boatClass}</button>
+                      ))}
+                      {boatClasses.length === 0 && <span className="a-dim text-[12px]">No classes available</span>}
                     </div>
                   </div>
-
-                  <div className="border-t my-2 border-slate-700" />
-
-                  {/* Event Type Filter */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Event Type
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setFilterEventType(filterEventType === 'single' ? 'all' : 'single')}
-                        className={`px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 ${
-                          filterEventType === 'single'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                        }`}
-                      >
-                        <Trophy size={14} />
-                        Single Events
-                      </button>
-                      <button
-                        onClick={() => setFilterEventType(filterEventType === 'series' ? 'all' : 'series')}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors ${
-                          filterEventType === 'series'
-                            ? 'bg-green-600 text-white'
-                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                        }`}
-                      >
-                        <Calendar size={14} />
-                        Race Series
-                      </button>
+                  <div className="a-pop-rule" style={{ margin: 0 }} />
+                  <div>
+                    <p className="a-cap mb-2">Event type</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button onClick={() => setFilterEventType(filterEventType === 'single' ? 'all' : 'single')} className={`a-fchip ${filterEventType === 'single' ? 'a-fchip-on' : ''}`}><Trophy size={13} />Single events</button>
+                      <button onClick={() => setFilterEventType(filterEventType === 'series' ? 'all' : 'series')} className={`a-fchip ${filterEventType === 'series' ? 'a-fchip-on' : ''}`}><Calendar size={13} />Race series</button>
                     </div>
                   </div>
-
-                  {/* Clear Filters */}
                   {(filterClass !== 'all' || filterFormat !== 'all' || filterEventType !== 'all') && (
-                    <>
-                      <div className="border-t my-2 border-slate-700" />
-                      <div className="px-4 py-1">
-                        <button
-                          onClick={() => {
-                            setFilterClass('all');
-                            setFilterFormat('all');
-                            setFilterEventType('all');
-                          }}
-                          className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                        >
-                          Clear all filters
-                        </button>
-                      </div>
-                    </>
+                    <button onClick={() => { setFilterClass('all'); setFilterFormat('all'); setFilterEventType('all'); }} className="a-link text-[12.5px] text-left">Clear all filters</button>
                   )}
                 </div>
               )}
             </div>
-
-            {/* View Mode Toggle */}
-            <div className="flex items-center bg-slate-700 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded transition-colors ${
-                  viewMode === 'list' ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <ListIcon size={18} />
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded transition-colors ${
-                  viewMode === 'grid' ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <GridIcon size={18} />
-              </button>
+            <span className="a-tb-sep" />
+            <div className="a-seg" style={{ padding: 2, borderRadius: 10 }}>
+              <button onClick={() => setViewMode('list')} className={`a-seg-i ${viewMode === 'list' ? 'a-seg-on' : ''}`} style={{ width: 34, height: 30, padding: 0, justifyContent: 'center', borderRadius: 8 }} aria-label="List view" title="List view"><ListIcon size={16} /></button>
+              <button onClick={() => setViewMode('grid')} className={`a-seg-i ${viewMode === 'grid' ? 'a-seg-on' : ''}`} style={{ width: 34, height: 30, padding: 0, justifyContent: 'center', borderRadius: 8 }} aria-label="Grid view" title="Grid view"><GridIcon size={16} /></button>
             </div>
           </div>
         </div>
 
         {/* Main Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-700 flex-wrap">
-          <button
-            onClick={() => { setMainTab('events'); setSelectedExternalEvent(null); }}
-            className={`px-4 py-3 font-medium transition-colors relative ${
-              mainTab === 'events' ? 'text-green-400' : 'text-slate-400 hover:text-slate-300'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Trophy size={18} />
-              <span>Individual Events & Rounds</span>
-              <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredEvents.length}</span>
-            </div>
-            {mainTab === 'events' && <div className="absolute bottom-0 left-0 right-0 h-0.5" />}
-          </button>
-
-          <button
-            onClick={() => { setMainTab('leaderboards'); setSelectedExternalEvent(null); }}
-            className={`px-4 py-3 font-medium transition-colors relative ${
-              mainTab === 'leaderboards' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-300'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <TrendingUp size={18} />
-              <span>Series Leaderboards</span>
-              <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredSeries.length}</span>
-            </div>
-            {mainTab === 'leaderboards' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />}
-          </button>
-
-          {externalStateEvents.length > 0 && (
-            <button
-              onClick={() => { setMainTab('state'); setSelectedExternalEvent(null); }}
-              className={`px-4 py-3 font-medium transition-colors relative ${
-                mainTab === 'state' ? 'text-green-400' : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <MapIcon size={18} />
-                <span>State Events</span>
-                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredStateEvents.length}</span>
-              </div>
-              {mainTab === 'state' && <div className="absolute bottom-0 left-0 right-0 h-0.5" />}
-            </button>
-          )}
-
-          {externalNationalEvents.length > 0 && (
-            <button
-              onClick={() => { setMainTab('national'); setSelectedExternalEvent(null); }}
-              className={`px-4 py-3 font-medium transition-colors relative ${
-                mainTab === 'national' ? 'text-amber-400' : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Globe size={18} />
-                <span>National Events</span>
-                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredNationalEvents.length}</span>
-              </div>
-              {mainTab === 'national' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400" />}
-            </button>
-          )}
-
-          {externalWorldEvents.length > 0 && (
-            <button
-              onClick={() => { setMainTab('world'); setSelectedExternalEvent(null); }}
-              className={`px-4 py-3 font-medium transition-colors relative ${
-                mainTab === 'world' ? 'text-orange-400' : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Globe size={18} />
-                <span>World Events</span>
-                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredWorldEvents.length}</span>
-              </div>
-              {mainTab === 'world' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-400" />}
-            </button>
-          )}
-
-          {can('manage_races') && simulatedEvents.length > 0 && (
-            <button
-              onClick={() => { setMainTab('simulated'); setSelectedExternalEvent(null); }}
-              className={`px-4 py-3 font-medium transition-colors relative ${
-                mainTab === 'simulated' ? 'text-cyan-400' : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FlaskConical size={18} />
-                <span>Simulated Events</span>
-                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{simulatedEvents.length}</span>
-              </div>
-              {mainTab === 'simulated' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />}
-            </button>
-          )}
+        <div className="overflow-x-auto">
+          <div className="a-seg" role="tablist" aria-label="Result types" style={{ flexWrap: 'nowrap' }}>
+            {tabs.filter(t => t.show).map(t => (
+              <button key={t.key} role="tab" aria-selected={mainTab === t.key} onClick={() => { setMainTab(t.key); setSelectedExternalEvent(null); }} className={`a-seg-i ${mainTab === t.key ? 'a-seg-on' : ''}`}>
+                {t.icon}{t.label}<span className="a-cnt">{t.count}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Year Filter */}
-          <div className="relative">
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="px-4 py-2 rounded-lg font-medium text-sm transition-colors bg-slate-700 text-slate-200 border border-slate-600 hover:bg-slate-600 appearance-none pr-10"
-            >
-              {availableYears.map(year => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              size={16}
-              className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"
-            />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))} className="a-inp font-semibold" style={{ width: 'auto', height: 36, minWidth: 92 }} aria-label="Year">
+            {availableYears.map(year => <option key={year} value={year}>{year}</option>)}
+          </select>
+          <div className="a-seg" style={{ padding: 2, borderRadius: 11 }}>
+            {([['all', 'All'], ['completed', 'Completed'], ['in-progress', 'In Progress']] as [StatusFilter, string][]).map(([k, l]) => (
+              <button key={k} onClick={() => setStatusFilter(k)} className={`a-seg-i ${statusFilter === k ? 'a-seg-on' : ''}`} style={{ height: 32 }}>
+                {l}{mainTab === 'events' && <span className="a-cnt">{statusCounts[k]}</span>}
+              </button>
+            ))}
           </div>
-
-          {/* Status Filters */}
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-              statusFilter === 'all'
-                ? 'bg-green-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setStatusFilter('completed')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-              statusFilter === 'completed'
-                ? 'bg-green-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            Completed
-          </button>
-          <button
-            onClick={() => setStatusFilter('in-progress')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-              statusFilter === 'in-progress'
-                ? 'bg-green-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            In Progress
-          </button>
+          {mainTab === 'events' && classCounts.length > 1 && (
+            <>
+              <span className="a-tb-sep" style={{ margin: '0 4px' }} />
+              {classCounts.slice(0, 6).map(([cls, n]) => (
+                <button key={cls} onClick={() => setFilterClass(filterClass === cls ? 'all' : cls)} className={`a-fchip ${filterClass === cls ? 'a-fchip-on' : ''}`}>
+                  <Sailboat size={13} />{cls}<span className="a-cnt">{n}</span>
+                </button>
+              ))}
+            </>
+          )}
         </div>
 
         {/* Results Grid/List */}
-        {mainTab === 'events' && (
-          <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-3'}>
+        {mainTab === 'events' && viewMode === 'list' && renderResultsBoardList(eventsToShow)}
+        {mainTab === 'events' && viewMode === 'grid' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {eventsToShow.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-slate-400">
-                No events found
-              </div>
+              <div className="a-dim col-span-full text-center py-12">No events found</div>
             ) : (
               eventsToShow.map(item =>
                 'seriesId' in item
@@ -2901,7 +2850,7 @@ export const ResultsPage: React.FC = () => {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-4 sm:p-6 lg:p-16">
+      <div className="p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-16 lg:pl-9">
         {renderContent()}
       </div>
 
