@@ -826,3 +826,12 @@ html.alfie-light .a-rr:hover { background: rgba(15,23,42,0.02); }
 html.alfie-theme .a-club-row + .a-club-row { border-top: 1px solid rgba(255,255,255,0.06); }
 html.alfie-light .a-club-row + .a-club-row { border-top-color: rgba(15,23,42,0.07); }
 html.alfie-theme .a-club-logo { width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px; object-fit: contain; background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.1); }
+html.alfie-theme .a-med { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 999px; font: 700 13px 'Bricolage Grotesque', sans-serif; color: #0B1220; }
+html.alfie-theme .a-posc { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 9px; font: 700 12.5px 'Bricolage Grotesque', sans-serif; background: rgba(255,255,255,0.06); color: #fff; }
+html.alfie-theme .a-posc.a-posc-r { background: rgba(255,107,107,0.12); color: #FF8A8A; font-size: 10px; }
+html.alfie-theme .a-res-open { background: rgba(255,255,255,0.025); }
+html.alfie-light .a-posc { background: rgba(15,23,42,0.06); color: #0B1220; }
+html.alfie-light .a-posc.a-posc-r { background: rgba(217,45,32,0.08); color: #D92D20; }
+html.alfie-light .a-res-open { background: rgba(15,23,42,0.02); }
+html.alfie-theme .a-best-1 { color: #FFC56B; } html.alfie-theme .a-best-2 { color: #C9D1DE; } html.alfie-theme .a-best-3 { color: #E59A62; }
+html.alfie-light .a-best-1 { color: #B7791F; } html.alfie-light .a-best-2 { color: #64748B; } html.alfie-light .a-best-3 { color: #B4622A; }
