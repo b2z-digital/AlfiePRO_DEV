@@ -237,37 +237,55 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className={`
-        w-full max-w-4xl rounded-xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col
+        a-memsheet w-full max-w-4xl rounded-xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col
         ${darkMode ? 'bg-slate-800' : 'bg-white'}
       `}>
-        <div className="from-blue-600 to-blue-800 p-6">
+        <div className="a-sheet-head px-6 pt-6 pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {memberData?.avatar_url ? (
                 <img
                   src={memberData.avatar_url}
                   alt={`${memberData.first_name} ${memberData.last_name}`}
-                  className="w-16 h-16 rounded-full object-cover border-2 border-white/30"
+                  className="w-16 h-16 rounded-full object-cover ring-2 ring-white/10"
                 />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-blue-700 border-2 border-white/30 flex items-center justify-center text-white text-xl font-semibold">
+                <div className="a-display w-16 h-16 rounded-full bg-blue-700 ring-2 ring-white/10 flex items-center justify-center text-white text-xl font-semibold">
                   {memberData ? `${memberData.first_name[0]}${memberData.last_name[0]}` : ''}
                 </div>
               )}
-              <h2 className="text-2xl font-semibold text-white">
-                {memberData ? `${memberData.first_name} ${memberData.last_name}` : 'Member Details'}
-              </h2>
+              <div className="min-w-0">
+                <p className="a-cap">Member</p>
+                <h2 className="a-display text-2xl font-bold text-white truncate">
+                  {memberData ? `${memberData.first_name} ${memberData.last_name}` : 'Member Details'}
+                </h2>
+                {memberData && (
+                  <div className="flex items-center gap-4 mt-1.5 flex-wrap">
+                    <span className={`a-st ${(memberData as any).is_financial ? 'a-mute' : 'a-txt-r'}`}>
+                      <span className={`a-light ${(memberData as any).is_financial ? 'a-light-g' : 'a-light-r'}`}></span>
+                      {(memberData as any).is_financial ? 'Financial' : 'Unfinancial'}
+                    </span>
+                    {(memberData as any).membership_level && (
+                      <span className="a-st a-mute"><span className="a-light a-light-b"></span>{(memberData as any).membership_level}</span>
+                    )}
+                    {(memberData as any).user_id && (
+                      <span className="a-st a-mute"><span className="a-light a-light-t"></span>On the app</span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <button
               onClick={onClose}
-              className="rounded-full p-2 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="a-ib"
+              aria-label="Close"
             >
               <X size={20} />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="a-form flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>

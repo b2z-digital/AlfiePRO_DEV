@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, UserPlus, Shield, Trash2, SquarePen as Edit2, GripVertical, Plus, Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown, Globe, LayoutGrid, Check } from 'lucide-react';
+import { Users, UserPlus, Shield, Trash2, SquarePen as Edit2, GripVertical, Plus, Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown, Globe, LayoutGrid, Check, Minus } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
@@ -1070,32 +1070,37 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
             Position Priority
           </label>
-          <p className="text-xs text-slate-500 mb-3">
-            When a member holds multiple positions, the highest priority determines their dashboard (0–100)
-          </p>
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              value={formData.position_priority}
-              onChange={(e) => setFormData({ ...formData, position_priority: parseInt(e.target.value) })}
-              className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
-              style={{
-                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${formData.position_priority}%, #334155 ${formData.position_priority}%, #334155 100%)`
-              }}
-            />
-            <div className="w-14 px-2 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-center">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="a-seg" role="group" aria-label="Dashboard priority">
+              <button
+                type="button"
+                className="a-seg-i"
+                aria-label="Lower priority"
+                onClick={() => setFormData({ ...formData, position_priority: Math.max(0, (formData.position_priority ?? 0) - 5) })}
+              >
+                <Minus size={16} />
+              </button>
               <input
                 type="number"
                 min="0"
                 max="100"
+                aria-label="Priority (0 to 100)"
                 value={formData.position_priority}
                 onChange={(e) => setFormData({ ...formData, position_priority: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
-                className="w-full bg-transparent text-white text-sm text-center focus:outline-none"
+                className="a-num w-12 bg-transparent text-white text-base font-semibold text-center focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
+              <button
+                type="button"
+                className="a-seg-i"
+                aria-label="Higher priority"
+                onClick={() => setFormData({ ...formData, position_priority: Math.min(100, (formData.position_priority ?? 0) + 5) })}
+              >
+                <Plus size={16} />
+              </button>
             </div>
+            <p className="text-xs text-slate-500 flex-1 min-w-[180px]">
+              If a member holds two positions, the higher number picks their dashboard (0–100).
+            </p>
           </div>
         </div>
       </div>

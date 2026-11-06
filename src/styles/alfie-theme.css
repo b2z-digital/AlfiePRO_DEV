@@ -690,3 +690,30 @@ html.alfie-light .text-center > svg.mx-auto:is([width="40"], [width="48"], [widt
   color: #475569 !important;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
+
+/* ── Tab bars where only the active tab carries border-b-2 → segmented control ── */
+html.alfie-theme :is(div, nav).border-b:has(> button.border-b-2):has(> button + button):not(:has(> :not(button))):not(:has(> button.border-b-2 + button.border-b-2)) {
+  display: flex; flex-wrap: wrap; gap: 3px; width: fit-content; max-width: 100%;
+  padding: 4px; border-radius: 15px; border: 0 !important;
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+html.alfie-theme :is(div, nav).border-b:has(> button.border-b-2):has(> button + button):not(:has(> :not(button))):not(:has(> button.border-b-2 + button.border-b-2)) > button {
+  margin: 0 !important; border: 0 !important; border-radius: 11px; min-height: 38px;
+  background: transparent; color: rgba(235, 240, 255, 0.7); white-space: nowrap;
+}
+html.alfie-theme :is(div, nav).border-b:has(> button.border-b-2):has(> button + button):not(:has(> :not(button))):not(:has(> button.border-b-2 + button.border-b-2)) > button:hover { color: #fff; }
+html.alfie-theme :is(div, nav).border-b:has(> button.border-b-2):has(> button + button):not(:has(> :not(button))):not(:has(> button.border-b-2 + button.border-b-2)) > button.border-b-2 {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08)) !important;
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+html.alfie-light :is(div, nav).border-b:has(> button.border-b-2):has(> button + button):not(:has(> :not(button))):not(:has(> button.border-b-2 + button.border-b-2)) {
+  background: rgba(15, 23, 42, 0.06) !important; box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+html.alfie-light :is(div, nav).border-b:has(> button.border-b-2):has(> button + button):not(:has(> :not(button))):not(:has(> button.border-b-2 + button.border-b-2)) > button { color: #475569 !important; }
+html.alfie-light :is(div, nav).border-b:has(> button.border-b-2):has(> button + button):not(:has(> :not(button))):not(:has(> button.border-b-2 + button.border-b-2)) > button.border-b-2 {
+  background: #fff !important; color: #0B1220 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10), 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+html.alfie-theme :is(div, nav).border-b:has(> button.border-b-2):has(> button + button):not(:has(> :not(button))):not(:has(> button.border-b-2 + button.border-b-2)) > button * { color: inherit; }
