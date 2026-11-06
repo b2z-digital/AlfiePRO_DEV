@@ -891,7 +891,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                 e.stopPropagation();
                 onCompleteScoring();
               }}
-              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors font-semibold"
+              className="a-btn a-btn-g"
             >
               <Trophy size={18} />
               <span className="text-sm font-medium">
@@ -1169,7 +1169,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                                 e.stopPropagation();
                                 handleClearRaceClick(race);
                               }}
-                              className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
+                              className="a-clear px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
                             >
                               Clear
                             </button>
@@ -1206,6 +1206,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                         <div className="flex items-center justify-center">
                           <div className={`
                             ${isCompactView ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-base'} rounded-full flex items-center justify-center text-white font-bold
+                            a-posb ${position <= 2 ? `a-posb-${position + 1}` : ''}
                             ${position === 0 ? 'bg-yellow-500' :
                               position === 1 ? 'bg-gray-400' :
                               position === 2 ? 'bg-amber-600' :
@@ -1314,6 +1315,15 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                         // Include withdrawn skippers in completed races even without a result
                         const isCompleted = (hasResult || (skipperWithdrawn && raceHasResults)) && race <= lastCompletedRace && editingRace !== race;
                         const isHoveredColumn = activeRaceColumn === race;
+                        // Alfie score chip: medal tint for 1st-3rd, red for letter scores, neutral otherwise
+                        const roundedPos = result?.position ? Math.round(result.position) : null;
+                        const alfieScoreClass = result?.letterScore && result.letterScore !== 'WDN'
+                          ? 'a-sc a-sc-l'
+                          : !skipperWithdrawn && roundedPos !== null && roundedPos <= 3 && !result?.letterScore
+                            ? `a-sc a-sc-${roundedPos}`
+                            : roundedPos !== null || (skipperWithdrawn && raceHasResults) || result?.letterScore === 'WDN'
+                              ? 'a-sc a-sc-n'
+                              : 'a-sc a-sc-d';
                         const cellBgClass = isActiveRace
                           ? (darkMode ? 'bg-blue-900/30' : 'bg-blue-50')
                           : isHoveredColumn
@@ -1328,7 +1338,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                               onMouseEnter={() => setActiveRaceColumn(race)}
                               onMouseLeave={() => setActiveRaceColumn(null)}>
                               <div
-                                className={`${isFocusMode ? 'w-16 h-16 text-base' : 'w-10 h-10 text-xs'} flex items-center justify-center font-medium rounded mx-auto cursor-default`}
+                                className={`${isFocusMode ? 'w-16 h-16 text-base' : 'w-10 h-10 text-xs'} flex items-center justify-center font-medium rounded mx-auto cursor-default ${alfieScoreClass} ${isDropped ? 'a-sc-drop' : ''}`}
                                 title="Race completed (click Clear Race to edit)"
                               >
                                 {result?.letterScore && result?.letterScore !== 'WDN' ? (
