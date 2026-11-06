@@ -498,3 +498,39 @@ html.alfie-light .osw-crumbs button:hover, html.alfie-light .osw-crumb-cur { col
 html.alfie-light .osw-trigger { background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; color: #0B1220; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); }
 html.alfie-light .osw-trigger > svg, html.alfie-light .osw-trigger-sub { color: #64748B; }
 .osw-search input, html.alfie-theme .osw-search input { border: 0 !important; box-shadow: none !important; outline: none !important; background: transparent !important; padding: 0 !important; height: auto; }
+
+/* ═══════════════════ Member sheets (board MemEdit): grouped cells ═══════════════════ */
+html.alfie-theme .a-memsheet { border-radius: 28px !important; }
+html.alfie-dark .a-memsheet { background: rgba(17, 22, 34, 0.96) !important; border: 1px solid rgba(255, 255, 255, 0.10); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 30px 90px rgba(0, 0, 0, 0.55) !important; }
+html.alfie-theme .a-sheet-head { background: transparent !important; }
+html.alfie-theme .a-sheet-head .a-cap { margin-bottom: 2px; }
+html.alfie-theme .a-sheet-head .a-cam { border-color: #111622 !important; }
+html.alfie-light .a-sheet-head .a-cam { border-color: #fff !important; }
+html.alfie-theme .a-form h3 { font-family: 'Bricolage Grotesque', 'Instrument Sans', sans-serif; font-size: 15px !important; font-weight: 600; letter-spacing: -0.01em; gap: 10px !important; margin-bottom: 10px !important; margin-left: 4px; }
+html.alfie-theme .a-form h3 > svg:first-child {
+  width: 34px; height: 34px; padding: 8px; flex-shrink: 0; border-radius: 30%;
+  border: 1px solid rgba(255, 255, 255, 0.11); background: rgba(255, 255, 255, 0.03);
+}
+html.alfie-light .a-form h3 > svg:first-child { border-color: rgba(15, 23, 42, 0.10); background: #fff; }
+/* grouped list: 1px grid gap shows the container colour as hairlines */
+html.alfie-theme .a-form :is(.grid.gap-4, .grid.gap-3) {
+  gap: 1px !important; border-radius: 18px; overflow: hidden;
+  background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.07);
+}
+html.alfie-theme .a-form :is(.grid.gap-4, .grid.gap-3) + :is(.grid.gap-4, .grid.gap-3) { margin-top: 10px !important; }
+html.alfie-theme .a-form :is(.grid.gap-4, .grid.gap-3) > div { background: #151C2C; padding: 10px 16px 11px; min-width: 0; }
+html.alfie-theme .a-form :is(.grid.gap-4, .grid.gap-3) > div:focus-within { background: #18213A; box-shadow: inset 0 0 0 1.5px rgba(10, 132, 255, 0.55); }
+html.alfie-theme .a-form :is(.grid.gap-4, .grid.gap-3) > div > label { font-size: 12px !important; font-weight: 500; color: rgba(235, 240, 255, 0.5) !important; margin-bottom: 2px !important; }
+html.alfie-theme .a-form :is(.grid.gap-4, .grid.gap-3) > div :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]), select, textarea) {
+  background: transparent !important; border: 0 !important; box-shadow: none !important; --tw-ring-shadow: 0 0 #0000 !important;
+  padding-top: 2px !important; padding-bottom: 2px !important; padding-right: 0 !important; font-size: 15px; border-radius: 0 !important;
+}
+html.alfie-theme .a-form :is(.grid.gap-4, .grid.gap-3) > div :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]), select, textarea):not([class*="pl-"]) { padding-left: 0 !important; }
+html.alfie-theme .a-form :is(.grid.gap-4, .grid.gap-3) > div .absolute.left-3 { left: 0; }
+html.alfie-theme .a-form :is(.grid.gap-4, .grid.gap-3) > div input.pl-10 { padding-left: 28px !important; }
+html.alfie-light .a-form :is(.grid.gap-4, .grid.gap-3) { background: rgba(15, 23, 42, 0.08); border-color: rgba(15, 23, 42, 0.08); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+html.alfie-light .a-form :is(.grid.gap-4, .grid.gap-3) > div { background: #fff; }
+html.alfie-light .a-form :is(.grid.gap-4, .grid.gap-3) > div:focus-within { background: #F7FAFF; }
+html.alfie-light .a-form :is(.grid.gap-4, .grid.gap-3) > div > label { color: #64748B !important; }
+html.alfie-theme .a-form :is(.grid.gap-4, .grid.gap-3) > div.grid { padding: 0; border: 0; border-radius: 0; margin: 0 !important; background: rgba(255, 255, 255, 0.07); }
+html.alfie-light .a-form :is(.grid.gap-4, .grid.gap-3) > div.grid { background: rgba(15, 23, 42, 0.08); }
