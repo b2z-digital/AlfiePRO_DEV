@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, User, Mail, Phone, House, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CircleCheck as CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, CircleAlert as AlertCircle, Star, Users, Anchor, Hash, Trophy, ChevronDown, ChevronUp, Award, UserPlus, Archive } from 'lucide-react';
+import { X, User, Mail, Phone, House, Building, Sailboat, Plus, Trash2, DollarSign, CircleCheck as CheckCircle, Clock, Camera, Globe, Link, Unlink, Shield, CircleAlert as AlertCircle, Star, Trophy, ChevronDown, Award, Archive } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { BoatType, MembershipLevel } from '../../types/member';
-import { Avatar } from '../ui/Avatar';
+import { AAvatar, AStatus } from '../alfie/Kit';
 import { AvatarCropModal } from '../ui/AvatarCropModal';
 import imageCompression from 'browser-image-compression';
 import { SAILING_NATIONS, getCountryFlag } from '../../utils/countryFlags';
@@ -611,941 +611,416 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
 
   if (!isOpen) return null;
 
-  const inputClass = `w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-    darkMode ? 'bg-slate-700 text-slate-200 border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-400'
-  }`;
-  const labelClass = `block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`;
-  const sectionHeaderClass = `text-lg font-medium mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`;
+  const Sec: React.FC<{ icon: React.ReactNode; title: string; right?: React.ReactNode }> = ({ icon, title, right }) => (
+    <div className="a-sec">
+      <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}>{icon}</span>
+      <h3>{title}</h3>
+      <div className="flex-1" />
+      {right}
+    </div>
+  );
+  const Cell: React.FC<{ label: React.ReactNode; icon?: React.ReactNode; trail?: React.ReactNode; children: React.ReactNode }> = ({ label, icon, trail, children }) => (
+    <label className="a-cell">
+      {icon && <span className="a-dim flex">{icon}</span>}
+      <span className="flex-1 min-w-0"><span className="a-cell-l">{label}</span>{children}</span>
+      {trail && <span className="a-dim flex">{trail}</span>}
+    </label>
+  );
+  const Req = () => <span className="a-txt-r">*</span>;
+  const typeName = memberData?.membership_level || '';
+  const renewalDue = !!memberData?.is_financial && !!memberData?.renewal_date && new Date(memberData.renewal_date) < new Date();
+  const fmt = (d?: string) => (d ? new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not set');
+  const firstBoatIdx = (cls: string) => boats.findIndex(b => b.boat_type === cls);
+  const ClassFlag = () => (
+    <svg width="9" height="11" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path d="M1 .75v10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M1.75 1.25h6.5L1.75 5.5z" fill="currentColor" />
+    </svg>
+  );
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className={`w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] ${
-        darkMode ? 'bg-slate-800' : 'bg-white'
-      }`}>
-        {/* Header - matches Add Member gradient style */}
-        <div className="bg-gradient-to-br from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden flex-shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
-          <div className="flex items-center gap-4 relative z-10">
-            {memberData ? (
-              <div className="relative group cursor-pointer" onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}>
-                <Avatar
-                  name={`${memberData.first_name} ${memberData.last_name}`}
-                  imageUrl={memberData.avatar_url}
-                  size="xl"
-                />
-                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 group-hover:bg-black/40 transition-colors">
-                  {uploadingAvatar && (
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                  )}
-                </div>
-                <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white shadow-lg flex items-center justify-center border-2 border-cyan-700">
-                  <Camera size={13} className="text-slate-700" />
-                </div>
-                <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
-              </div>
-            ) : (
-              <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20">
-                <User className="text-white drop-shadow-lg" size={24} />
+      <section className="a-msheet" role="dialog" aria-modal="true" aria-label={memberData ? `Edit member — ${memberData.first_name} ${memberData.last_name}` : 'Edit member'}>
+        <div className="flex items-center gap-4 flex-shrink-0" style={{ padding: '22px 20px 18px 24px' }}>
+          <div className="relative flex-shrink-0">
+            <button type="button" className="a-msheet-av" onClick={() => !uploadingAvatar && avatarInputRef.current?.click()} aria-label="Change photo">
+              <AAvatar url={memberData?.avatar_url} first={memberData?.first_name} last={memberData?.last_name} size={64} />
+              {uploadingAvatar && <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40"><span className="animate-spin rounded-full h-6 w-6 border-2 border-white/30 border-t-white" /></span>}
+              <span className="a-msheet-cam" aria-hidden="true"><Camera size={14} /></span>
+            </button>
+            <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="a-cap">Edit member</p>
+            <h2 className="a-display a-ink truncate" style={{ margin: '3px 0 6px', fontSize: 25, fontWeight: 600 }}>
+              {memberData ? `${memberData.first_name} ${memberData.last_name}` : 'Loading…'}
+            </h2>
+            {memberData && (
+              <div className="flex flex-wrap gap-x-3.5 gap-y-1">
+                <AStatus tone={memberData.is_financial ? 'g' : 'a'} className="text-[12.5px]">{memberData.is_financial ? 'Financial' : 'Unfinancial'}</AStatus>
+                {typeName && <span className="a-st a-mute text-[12.5px]"><span className="a-light a-light-b" style={{ boxShadow: 'none' }} />{typeName}</span>}
+                <AStatus tone={memberData.user_id ? 'b' : 'n'} className="text-[12.5px]"><span className="a-mute">{memberData.user_id ? 'On the app' : 'Not on the app'}</span></AStatus>
               </div>
             )}
-            <div>
-              <h2 className="text-2xl font-bold text-white drop-shadow-lg">Edit Member</h2>
-              {memberData && (
-                <p className="text-cyan-100 text-sm mt-0.5">{memberData.first_name} {memberData.last_name}</p>
-              )}
-            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-white/80 hover:text-white rounded-xl p-2.5 hover:bg-white/10 transition-all hover:rotate-90 transform duration-300 relative z-10"
-          >
-            <X size={20} />
-          </button>
+          <button type="button" onClick={onClose} className="a-ib self-start" aria-label="Close"><X size={20} /></button>
         </div>
 
-        {/* Tab Navigation - matches Add Member underline style */}
-        <div className={`flex border-b flex-shrink-0 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-          {([
-            { key: 'details', icon: User, label: 'Details' },
-            { key: 'boats', icon: Sailboat, label: 'Boats' },
-            { key: 'membership', icon: DollarSign, label: 'Membership' },
-          ] as const).map(({ key, icon: Icon, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`flex-1 px-4 py-3 font-medium transition-colors ${
-                activeTab === key
-                  ? darkMode
-                    ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700/50'
-                    : 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                  : darkMode
-                  ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/30'
-                  : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Icon size={18} />
-                <span className="text-sm">{label}</span>
-              </div>
-            </button>
-          ))}
+        <div className="px-5 pb-4 flex-shrink-0">
+          <div className="a-seg flex w-full" role="tablist" aria-label="Member sections">
+            {([
+              { key: 'details', icon: User, label: 'Details' },
+              { key: 'boats', icon: Sailboat, label: 'Boats' },
+              { key: 'membership', icon: DollarSign, label: 'Membership' },
+            ] as const).map(({ key, icon: Icon, label }) => (
+              <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setActiveTab(key)} className={`a-seg-i flex-1 justify-center ${activeTab === key ? 'a-seg-on' : ''}`}>
+                <Icon size={16} />{label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mx-auto mb-3"></div>
-            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Loading member data...</p>
+            <div className="animate-spin rounded-full h-9 w-9 border-2 border-white/10 border-t-[#0A84FF] mx-auto mb-3"></div>
+            <p className="a-mute text-sm">Loading member data...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-            <div className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col">
+            <div className="flex-1 overflow-y-auto flex flex-col gap-[22px]" style={{ padding: '4px 20px 20px' }}>
             {activeTab === 'details' && memberData && (
-              <div className="space-y-6">
-                {/* Personal Information */}
+              <>
                 <div>
-                  <h3 className={sectionHeaderClass}>
-                    <User size={20} className="text-blue-400" />
-                    Personal Information
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className={labelClass}>First Name *</label>
-                      <input
-                        type="text"
-                        value={memberData.first_name}
-                        onChange={(e) => setMemberData({ ...memberData, first_name: e.target.value })}
-                        className={inputClass}
-                        placeholder="Enter first name"
-                        required
-                      />
+                  <Sec icon={<User size={15} />} title="Personal information" />
+                  <div className="a-grp">
+                    <div className="a-gr">
+                      <Cell label={<>First name <Req /></>}><input type="text" value={memberData.first_name} onChange={(e) => setMemberData({ ...memberData, first_name: e.target.value })} placeholder="First name" required /></Cell>
+                      <Cell label={<>Last name <Req /></>}><input type="text" value={memberData.last_name} onChange={(e) => setMemberData({ ...memberData, last_name: e.target.value })} placeholder="Last name" required /></Cell>
                     </div>
-                    <div>
-                      <label className={labelClass}>Last Name *</label>
-                      <input
-                        type="text"
-                        value={memberData.last_name}
-                        onChange={(e) => setMemberData({ ...memberData, last_name: e.target.value })}
-                        className={inputClass}
-                        placeholder="Enter last name"
-                        required
-                      />
+                    <div className="a-gr">
+                      <Cell label="Email" icon={<Mail size={16} />}><input type="email" value={memberData.email} onChange={(e) => setMemberData({ ...memberData, email: e.target.value })} placeholder="you@example.com" /></Cell>
+                      <Cell label="Phone" icon={<Phone size={16} />}><input type="tel" value={memberData.phone} onChange={(e) => setMemberData({ ...memberData, phone: e.target.value })} placeholder="Phone number" /></Cell>
                     </div>
-                    <div>
-                      <label className={labelClass}>Email Address</label>
-                      <div className="relative">
-                        <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="email"
-                          value={memberData.email}
-                          onChange={(e) => setMemberData({ ...memberData, email: e.target.value })}
-                          className={`${inputClass} pl-10`}
-                          placeholder="you@example.com"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelClass}>Phone Number</label>
-                      <div className="relative">
-                        <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="tel"
-                          value={memberData.phone}
-                          onChange={(e) => setMemberData({ ...memberData, phone: e.target.value })}
-                          className={`${inputClass} pl-10`}
-                          placeholder="Enter phone number"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <label className={labelClass}>Country <span className="text-red-400">*</span></label>
-                      <div className="relative">
-                        <Globe size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-                        <div className="absolute left-10 top-1/2 -translate-y-1/2 text-2xl z-10 pointer-events-none">
-                          {getCountryFlag(memberData.country_code || 'AU')}
-                        </div>
-                        <select
-                          value={memberData.country_code || 'AU'}
-                          onChange={(e) => {
-                            const country = SAILING_NATIONS.find(c => c.code === e.target.value);
-                            setMemberData({ ...memberData, country_code: e.target.value, country: country?.name || e.target.value });
-                          }}
-                          className={`${inputClass} pl-20`}
-                        >
-                          {SAILING_NATIONS.map((country) => (
-                            <option key={country.code} value={country.code}>{country.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelClass}>Category</label>
-                      <div className="relative">
-                        <Award size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <select
-                          value={memberData.category || ''}
-                          onChange={(e) => setMemberData({ ...memberData, category: e.target.value })}
-                          className={`${inputClass} pl-10`}
-                        >
-                          <option value="">Select Category</option>
+                    <div className="a-gr">
+                      <Cell label={<>Country <Req /></>} icon={<Globe size={16} />} trail={<ChevronDown size={15} />}>
+                        <span className="flex items-center gap-2">
+                          <span aria-hidden="true">{getCountryFlag(memberData.country_code || 'AU')}</span>
+                          <select
+                            value={memberData.country_code || 'AU'}
+                            onChange={(e) => {
+                              const country = SAILING_NATIONS.find(c => c.code === e.target.value);
+                              setMemberData({ ...memberData, country_code: e.target.value, country: country?.name || e.target.value });
+                            }}
+                          >
+                            {SAILING_NATIONS.map((country) => <option key={country.code} value={country.code}>{country.name}</option>)}
+                          </select>
+                        </span>
+                      </Cell>
+                      <Cell label="Category" icon={<Award size={16} />} trail={<ChevronDown size={15} />}>
+                        <select value={memberData.category || ''} onChange={(e) => setMemberData({ ...memberData, category: e.target.value })}>
+                          <option value="">Select category</option>
                           <option value="Junior">Junior</option>
                           <option value="Open">Open</option>
                           <option value="Master">Master</option>
                           <option value="Grand Master">Grand Master</option>
                           <option value="Legend">Legend</option>
                         </select>
-                      </div>
+                      </Cell>
                     </div>
                   </div>
                 </div>
 
-                {/* Address */}
                 <div>
-                  <h3 className={sectionHeaderClass}>
-                    <House size={20} className="text-blue-400" />
-                    Address
-                  </h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <label className={labelClass}>Street Address</label>
-                      <input
-                        type="text"
-                        value={memberData.street}
-                        onChange={(e) => setMemberData({ ...memberData, street: e.target.value })}
-                        className={inputClass}
-                        placeholder="Enter street address"
-                      />
+                  <Sec icon={<House size={15} />} title="Address" />
+                  <div className="a-grp">
+                    <div className="a-gr a-gr1">
+                      <Cell label="Street address"><input type="text" value={memberData.street} onChange={(e) => setMemberData({ ...memberData, street: e.target.value })} placeholder="Street address" /></Cell>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className={labelClass}>City/Suburb</label>
-                        <input
-                          type="text"
-                          value={memberData.city}
-                          onChange={(e) => setMemberData({ ...memberData, city: e.target.value })}
-                          className={inputClass}
-                          placeholder="Enter city"
-                        />
-                      </div>
-                      <div>
-                        <label className={labelClass}>State</label>
-                        <input
-                          type="text"
-                          value={memberData.state}
-                          onChange={(e) => setMemberData({ ...memberData, state: e.target.value })}
-                          className={inputClass}
-                          placeholder="Enter state"
-                        />
-                      </div>
-                      <div>
-                        <label className={labelClass}>Postcode</label>
-                        <input
-                          type="text"
-                          value={memberData.postcode}
-                          onChange={(e) => setMemberData({ ...memberData, postcode: e.target.value })}
-                          className={inputClass}
-                          placeholder="Enter postcode"
-                        />
-                      </div>
+                    <div className="a-gr a-gr3">
+                      <Cell label="Suburb"><input type="text" value={memberData.city} onChange={(e) => setMemberData({ ...memberData, city: e.target.value })} placeholder="Suburb" /></Cell>
+                      <Cell label="State"><input type="text" value={memberData.state} onChange={(e) => setMemberData({ ...memberData, state: e.target.value })} placeholder="State" /></Cell>
+                      <Cell label="Postcode"><input type="text" value={memberData.postcode} onChange={(e) => setMemberData({ ...memberData, postcode: e.target.value })} placeholder="Postcode" /></Cell>
                     </div>
                   </div>
                 </div>
 
-                {/* Emergency Contact */}
                 <div>
-                  <h3 className={sectionHeaderClass}>
-                    <Phone size={20} className="text-blue-400" />
-                    Emergency Contact
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className={labelClass}>Contact Name</label>
-                      <input
-                        type="text"
-                        value={memberData.emergency_contact_name}
-                        onChange={(e) => setMemberData({ ...memberData, emergency_contact_name: e.target.value })}
-                        className={inputClass}
-                        placeholder="Emergency contact name"
-                      />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Contact Phone</label>
-                      <input
-                        type="tel"
-                        value={memberData.emergency_contact_phone}
-                        onChange={(e) => setMemberData({ ...memberData, emergency_contact_phone: e.target.value })}
-                        className={inputClass}
-                        placeholder="Emergency contact phone"
-                      />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Relationship</label>
-                      <input
-                        type="text"
-                        value={memberData.emergency_contact_relationship}
-                        onChange={(e) => setMemberData({ ...memberData, emergency_contact_relationship: e.target.value })}
-                        className={inputClass}
-                        placeholder="e.g., Spouse, Parent"
-                      />
+                  <Sec icon={<Phone size={15} />} title="Emergency contact" />
+                  <div className="a-grp">
+                    <div className="a-gr a-gr3">
+                      <Cell label="Name"><input type="text" value={memberData.emergency_contact_name} onChange={(e) => setMemberData({ ...memberData, emergency_contact_name: e.target.value })} placeholder="Contact name" /></Cell>
+                      <Cell label="Phone"><input type="tel" value={memberData.emergency_contact_phone} onChange={(e) => setMemberData({ ...memberData, emergency_contact_phone: e.target.value })} placeholder="Contact phone" /></Cell>
+                      <Cell label="Relationship"><input type="text" value={memberData.emergency_contact_relationship} onChange={(e) => setMemberData({ ...memberData, emergency_contact_relationship: e.target.value })} placeholder="e.g. Spouse" /></Cell>
                     </div>
                   </div>
                 </div>
-              </div>
+              </>
             )}
 
             {activeTab === 'boats' && (() => {
               const classHandicaps: Record<string, number> = {};
               boats.forEach(b => {
-                if (b.boat_type && !classHandicaps.hasOwnProperty(b.boat_type)) {
+                if (b.boat_type && !Object.prototype.hasOwnProperty.call(classHandicaps, b.boat_type)) {
                   classHandicaps[b.boat_type] = b.handicap || 0;
                 }
               });
               const uniqueClasses = [...new Set(boats.filter(b => b.boat_type).map(b => b.boat_type))];
+              const setClassHandicap = (cls: string, val: number) => {
+                const idx = firstBoatIdx(cls);
+                if (idx >= 0) updateBoat(idx, 'handicap', Math.max(0, val));
+              };
 
               return (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        Fleet
-                      </h3>
-                      <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {boats.length} {boats.length === 1 ? 'boat' : 'boats'} registered
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addBoat}
-                      className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-500/10 text-blue-400 rounded-xl hover:bg-blue-500/20 transition-all text-sm font-medium border border-blue-500/20"
-                    >
-                      <Plus size={15} />
-                      Add Boat
-                    </button>
-                  </div>
-
+                <>
                   {uniqueClasses.length > 0 && (
-                    <div className={`rounded-xl p-3 ${darkMode ? 'bg-slate-800/60' : 'bg-slate-50'}`}>
-                      <p className={`text-[10px] uppercase tracking-wider font-semibold mb-2 ${
-                        darkMode ? 'text-slate-400' : 'text-slate-500'
-                      }`}>
-                        Class Handicaps
-                      </p>
-                      <div className="flex flex-wrap gap-2">
+                    <div>
+                      <Sec icon={<Trophy size={15} />} title="Class handicaps" />
+                      <div className="flex gap-2.5 flex-wrap">
                         {uniqueClasses.map(cls => (
-                          <div key={cls} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
-                            darkMode ? 'bg-slate-700/60' : 'bg-white border border-slate-200'
-                          }`}>
-                            <span className={`text-xs font-semibold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{cls}</span>
-                            <input
-                              type="number"
-                              value={classHandicaps[cls] || 0}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value) || 0;
-                                const firstIdx = boats.findIndex(b => b.boat_type === cls);
-                                if (firstIdx >= 0) updateBoat(firstIdx, 'handicap', val);
-                              }}
-                              min="0"
-                              step="1"
-                              className={`w-16 px-2 py-0.5 rounded-md text-center text-sm font-bold ${
-                                darkMode
-                                  ? 'bg-slate-600/60 text-white border-slate-500/50'
-                                  : 'bg-slate-50 text-slate-900 border-slate-200'
-                              } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50`}
-                            />
+                          <div key={cls} className="a-hcap">
+                            <span className="a-lb-cls"><ClassFlag />{cls}</span>
+                            <div className="a-stp">
+                              <button type="button" aria-label={`Lower ${cls} handicap`} onClick={() => setClassHandicap(cls, (classHandicaps[cls] || 0) - 1)}>−</button>
+                              <input
+                                type="number"
+                                aria-label={`${cls} handicap`}
+                                value={classHandicaps[cls] || 0}
+                                min={0}
+                                onChange={(e) => setClassHandicap(cls, parseInt(e.target.value) || 0)}
+                                className="a-num"
+                              />
+                              <button type="button" aria-label={`Raise ${cls} handicap`} onClick={() => setClassHandicap(cls, (classHandicaps[cls] || 0) + 1)}>+</button>
+                            </div>
                           </div>
                         ))}
                       </div>
-                      <p className={`text-[10px] mt-1.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                        Handicap is shared across all boats of the same class. Auto-updated after races.
-                      </p>
+                      <p className="a-dim text-[12.5px]" style={{ margin: '10px 4px 0' }}>Shared across every boat in the same class. Updated automatically after races.</p>
                     </div>
                   )}
 
-                  {boats.length === 0 && (
-                    <div className={`flex flex-col items-center justify-center py-12 rounded-2xl border-2 border-dashed ${
-                      darkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'
-                    }`}>
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
-                        darkMode ? 'bg-slate-700/50' : 'bg-slate-200'
-                      }`}>
-                        <Sailboat size={24} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                  <div>
+                    <Sec
+                      icon={<Sailboat size={15} />}
+                      title="Fleet"
+                      right={<>
+                        <span className="a-dim text-[13px] mr-2">{boats.length} {boats.length === 1 ? 'boat' : 'boats'}</span>
+                        <button type="button" onClick={addBoat} className="a-btn" style={{ height: 34, padding: '0 12px', borderRadius: 10 }}><Plus size={15} />Add boat</button>
+                      </>}
+                    />
+                    {boats.length === 0 ? (
+                      <div className="a-grp a-empty py-10">
+                        <span className="a-tile"><Sailboat size={19} /></span>
+                        <div className="a-ink text-sm font-semibold">No boats registered</div>
+                        <div className="a-dim text-[12.5px]">Add a boat to get started</div>
                       </div>
-                      <p className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>No boats registered</p>
-                      <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Add a boat to get started</p>
-                    </div>
-                  )}
-
-                  {boats.map((boat, index) => {
-                    const classColor = boat.boat_type === '10R' ? 'blue' :
-                      boat.boat_type === 'IOM' ? 'emerald' :
-                      boat.boat_type === 'DF65' ? 'amber' :
-                      boat.boat_type === 'DF95' ? 'orange' :
-                      boat.boat_type === 'Marblehead' ? 'cyan' :
-                      boat.boat_type === 'A Class' ? 'rose' :
-                      boat.boat_type === 'RC Laser' ? 'teal' : 'slate';
-
-                    const accentMap: Record<string, string> = {
-                      blue: 'from-blue-500/20 to-blue-600/5',
-                      emerald: 'from-emerald-500/20 to-emerald-600/5',
-                      amber: 'from-amber-500/20 to-amber-600/5',
-                      orange: 'from-orange-500/20 to-orange-600/5',
-                      cyan: 'from-cyan-500/20 to-cyan-600/5',
-                      rose: 'from-rose-500/20 to-rose-600/5',
-                      teal: 'from-teal-500/20 to-teal-600/5',
-                      slate: 'from-slate-500/20 to-slate-600/5',
-                    };
-                    const badgeMap: Record<string, string> = {
-                      blue: 'bg-blue-500/20 text-blue-300',
-                      emerald: 'bg-emerald-500/20 text-emerald-300',
-                      amber: 'bg-amber-500/20 text-amber-300',
-                      orange: 'bg-orange-500/20 text-orange-300',
-                      cyan: 'bg-cyan-500/20 text-cyan-300',
-                      rose: 'bg-rose-500/20 text-rose-300',
-                      teal: 'bg-teal-500/20 text-teal-300',
-                      slate: 'bg-slate-500/20 text-slate-300',
-                    };
-                    const iconMap: Record<string, string> = {
-                      blue: 'text-blue-400',
-                      emerald: 'text-emerald-400',
-                      amber: 'text-amber-400',
-                      orange: 'text-orange-400',
-                      cyan: 'text-cyan-400',
-                      rose: 'text-rose-400',
-                      teal: 'text-teal-400',
-                      slate: 'text-slate-400',
-                    };
-
-                    return (
-                      <div
-                        key={index}
-                        className={`relative rounded-2xl transition-all ${
-                          darkMode
-                            ? 'bg-slate-800/70 border border-slate-700/60 hover:border-slate-600/80'
-                            : 'bg-white border border-slate-200 shadow-sm hover:shadow-md'
-                        }`}
-                      >
-                        {darkMode && (
-                          <div className={`absolute inset-0 rounded-2xl overflow-hidden bg-gradient-to-br ${accentMap[classColor] || accentMap.slate} pointer-events-none`} />
-                        )}
-
-                        <div className="relative p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                                darkMode ? 'bg-slate-700/80' : 'bg-slate-100'
-                              }`}>
-                                <Sailboat size={18} className={darkMode ? (iconMap[classColor] || 'text-slate-400') : 'text-slate-500'} />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`font-semibold text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                    {boat.hull || boat.boat_type || `Boat ${index + 1}`}
-                                  </span>
-                                  {boat.boat_type && (
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
-                                      darkMode ? (badgeMap[classColor] || badgeMap.slate) : 'bg-slate-100 text-slate-600'
-                                    }`}>
-                                      {boat.boat_type}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className={`flex items-center gap-3 mt-0.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  {boat.sail_number && (
-                                    <span className="flex items-center gap-1">
-                                      <Hash size={10} />
-                                      {boat.sail_number}
-                                    </span>
-                                  )}
-                                  {boat.boat_type && (
-                                    <span className="flex items-center gap-1">
-                                      <Trophy size={10} />
-                                      Hcap: {boat.handicap || 0}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {boats.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeBoat(index)}
-                                className={`p-2 rounded-xl transition-all shrink-0 ${
-                                  darkMode
-                                    ? 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'
-                                    : 'text-slate-300 hover:text-red-500 hover:bg-red-50'
-                                }`}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                          </div>
-
-                          <div className={`grid grid-cols-3 gap-2 pt-3 border-t ${
-                            darkMode ? 'border-slate-700/40' : 'border-slate-100'
-                          }`}>
-                            <div data-class-dropdown>
-                              <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
-                                darkMode ? 'text-slate-400' : 'text-slate-500'
-                              }`}>
-                                Class
-                              </label>
-                              <button
-                                type="button"
-                                ref={(el) => { classButtonRefs.current[index] = el; }}
-                                onClick={() => openClassDropdownAt(index)}
-                                className={`w-full px-2.5 py-2 rounded-xl text-sm font-medium text-left relative ${
-                                  darkMode
-                                    ? 'bg-slate-700/60 text-slate-100 border-slate-600/50'
-                                    : 'bg-slate-50 text-slate-900 border-slate-200'
-                                } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all ${
-                                  boat.boat_type ? 'pl-9' : ''
-                                }`}
-                              >
-                                {(() => {
-                                  const selectedClass = allBoatClasses.find(bc => getBoatClassShortCode(bc.name) === boat.boat_type);
-                                  if (selectedClass?.class_image) {
-                                    return (
-                                      <div className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md overflow-hidden border border-slate-600/50">
-                                        <img src={selectedClass.class_image} alt="" className="w-full h-full object-cover" />
-                                      </div>
-                                    );
-                                  } else if (boat.boat_type) {
-                                    return (
-                                      <Sailboat size={14} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
-                                    );
-                                  }
-                                  return null;
-                                })()}
-                                <span className={boat.boat_type ? '' : (darkMode ? 'text-slate-500' : 'text-slate-400')}>
-                                  {boat.boat_type || 'Select'}
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        {boats.map((boat, index) => {
+                          const selectedClass = allBoatClasses.find(bc => getBoatClassShortCode(bc.name) === boat.boat_type);
+                          return (
+                            <div key={index} className="a-grp">
+                              <div className="flex items-center gap-3 a-grp-head" style={{ padding: '14px 12px 14px 16px' }}>
+                                <span className="a-tile">
+                                  {selectedClass?.class_image ? <img src={selectedClass.class_image} alt="" className="w-full h-full object-cover rounded-[30%]" /> : <Sailboat size={19} />}
                                 </span>
-                                <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
-                              </button>
-                              {openClassDropdown === index && dropdownPos && createPortal(
-                                <div
-                                  data-class-dropdown
-                                  className={`fixed z-[99999] w-56 max-h-60 overflow-y-auto rounded-xl shadow-2xl border ${
-                                    darkMode
-                                      ? 'bg-slate-800 border-slate-600/50'
-                                      : 'bg-white border-slate-200'
-                                  }`}
-                                  style={{ top: dropdownPos.top - 4, left: dropdownPos.left, transform: 'translateY(-100%)' }}
-                                >
+                                <div className="flex-1 min-w-0">
+                                  <div className="a-ink text-base font-semibold truncate">{boat.hull || boat.boat_type || `Boat ${index + 1}`}</div>
+                                  {boat.boat_type && (
+                                    <div className="flex items-center gap-2.5 mt-[5px]">
+                                      <span className="a-lb-cls"><ClassFlag />{boat.boat_type}{boat.sail_number && <span className="a-dim" style={{ fontWeight: 500, letterSpacing: 0 }}>{boat.sail_number}</span>}</span>
+                                      <span className="a-mute text-[12.5px]">Handicap <b className="a-num a-ink font-semibold">{boat.handicap || 0}</b></span>
+                                    </div>
+                                  )}
+                                </div>
+                                {boats.length > 1 && (
+                                  <button type="button" onClick={() => removeBoat(index)} className="a-ib a-ib-d" aria-label="Remove boat"><Trash2 size={16} /></button>
+                                )}
+                              </div>
+                              <div className="a-gr a-gr3">
+                                <div className="a-cell" data-class-dropdown>
                                   <button
                                     type="button"
-                                    onClick={() => { updateBoat(index, 'boat_type', ''); setOpenClassDropdown(null); setDropdownPos(null); }}
-                                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
-                                      darkMode ? 'text-slate-400 hover:bg-slate-700/60' : 'text-slate-500 hover:bg-slate-50'
-                                    }`}
+                                    ref={(el) => { classButtonRefs.current[index] = el; }}
+                                    onClick={() => openClassDropdownAt(index)}
+                                    className="flex items-center gap-2 w-full text-left bg-transparent border-0 p-0"
+                                    aria-haspopup="listbox"
+                                    aria-expanded={openClassDropdown === index}
                                   >
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                                      <Sailboat size={16} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
-                                    </div>
-                                    <span>None</span>
+                                    <span className="flex-1 min-w-0">
+                                      <span className="a-cell-l">Class</span>
+                                      <span className="a-cell-v flex items-center gap-[7px]">{boat.boat_type ? <><ClassFlag />{boat.boat_type}</> : <span className="a-dim">Select</span>}</span>
+                                    </span>
+                                    <ChevronDown size={15} className="a-dim" />
                                   </button>
-                                  {allBoatClasses.map(bc => {
-                                    const shortCode = getBoatClassShortCode(bc.name);
-                                    return (
-                                      <button
-                                        key={bc.id}
-                                        type="button"
-                                        onClick={() => { updateBoat(index, 'boat_type', shortCode); setOpenClassDropdown(null); setDropdownPos(null); }}
-                                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
-                                          boat.boat_type === shortCode
-                                            ? (darkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-700')
-                                            : (darkMode ? 'text-slate-200 hover:bg-slate-700/60' : 'text-slate-700 hover:bg-slate-50')
-                                        }`}
-                                      >
-                                        {bc.class_image ? (
-                                          <img src={bc.class_image} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-slate-600/50" />
-                                        ) : (
-                                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                                            <Sailboat size={16} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
-                                          </div>
-                                        )}
-                                        <span className="font-medium truncate">{bc.name}</span>
-                                      </button>
-                                    );
-                                  })}
-                                  {boat.boat_type && !allBoatClasses.some(bc => getBoatClassShortCode(bc.name) === boat.boat_type) && (
-                                    <button
-                                      type="button"
-                                      onClick={() => { setOpenClassDropdown(null); setDropdownPos(null); }}
-                                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
-                                        darkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-700'
-                                      }`}
+                                  {openClassDropdown === index && dropdownPos && createPortal(
+                                    <div
+                                      data-class-dropdown
+                                      role="listbox"
+                                      className="a-pop fixed z-[99999] w-60 max-h-64 overflow-y-auto p-1.5 flex flex-col gap-0.5"
+                                      style={{ top: dropdownPos.top - 4, left: dropdownPos.left, transform: 'translateY(-100%)' }}
                                     >
-                                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                                        <Sailboat size={16} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
-                                      </div>
-                                      <span className="font-medium">{boat.boat_type}</span>
-                                    </button>
+                                      <button type="button" role="option" aria-selected={!boat.boat_type} onClick={() => { updateBoat(index, 'boat_type', ''); setOpenClassDropdown(null); setDropdownPos(null); }} className="a-pop-item">
+                                        <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}><Sailboat size={14} /></span><span className="a-mute">None</span>
+                                      </button>
+                                      {allBoatClasses.map(bc => {
+                                        const shortCode = getBoatClassShortCode(bc.name);
+                                        return (
+                                          <button key={bc.id} type="button" role="option" aria-selected={boat.boat_type === shortCode} onClick={() => { updateBoat(index, 'boat_type', shortCode); setOpenClassDropdown(null); setDropdownPos(null); }} className={`a-pop-item ${boat.boat_type === shortCode ? 'a-pop-item-on' : ''}`}>
+                                            {bc.class_image
+                                              ? <img src={bc.class_image} alt="" className="w-[30px] h-[30px] rounded-[30%] object-cover flex-shrink-0" />
+                                              : <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}><Sailboat size={14} /></span>}
+                                            <span className="truncate">{bc.name}</span>
+                                          </button>
+                                        );
+                                      })}
+                                      {boat.boat_type && !allBoatClasses.some(bc => getBoatClassShortCode(bc.name) === boat.boat_type) && (
+                                        <button type="button" onClick={() => { setOpenClassDropdown(null); setDropdownPos(null); }} className="a-pop-item a-pop-item-on">
+                                          <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}><Sailboat size={14} /></span><span>{boat.boat_type}</span>
+                                        </button>
+                                      )}
+                                    </div>,
+                                    document.body
                                   )}
-                                </div>,
-                                document.body
-                              )}
+                                </div>
+                                <Cell label="Sail no."><input type="text" value={boat.sail_number} onChange={(e) => updateBoat(index, 'sail_number', e.target.value)} placeholder="58" /></Cell>
+                                <Cell label="Hull / design"><input type="text" value={boat.hull} onChange={(e) => updateBoat(index, 'hull', e.target.value)} placeholder="Trance" /></Cell>
+                              </div>
                             </div>
-                            <div>
-                              <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
-                                darkMode ? 'text-slate-400' : 'text-slate-500'
-                              }`}>
-                                Sail No.
-                              </label>
-                              <input
-                                type="text"
-                                value={boat.sail_number}
-                                onChange={(e) => updateBoat(index, 'sail_number', e.target.value)}
-                                placeholder="58"
-                                className={`w-full px-2.5 py-2 rounded-xl text-sm ${
-                                  darkMode
-                                    ? 'bg-slate-700/60 text-slate-100 border-slate-600/50 placeholder-slate-500'
-                                    : 'bg-slate-50 text-slate-900 border-slate-200 placeholder-slate-400'
-                                } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all`}
-                              />
-                            </div>
-                            <div>
-                              <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
-                                darkMode ? 'text-slate-400' : 'text-slate-500'
-                              }`}>
-                                Hull / Design
-                              </label>
-                              <input
-                                type="text"
-                                value={boat.hull}
-                                onChange={(e) => updateBoat(index, 'hull', e.target.value)}
-                                placeholder="Trance"
-                                className={`w-full px-2.5 py-2 rounded-xl text-sm ${
-                                  darkMode
-                                    ? 'bg-slate-700/60 text-slate-100 border-slate-600/50 placeholder-slate-500'
-                                    : 'bg-slate-50 text-slate-900 border-slate-200 placeholder-slate-400'
-                                } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all`}
-                              />
-                            </div>
-                          </div>
-                        </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
+                    )}
+                  </div>
+                </>
               );
             })()}
 
             {activeTab === 'membership' && memberData && (
-              <div className="space-y-6">
-                <div className={`p-6 rounded-lg ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-slate-50'}`}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Membership Type
-                      </label>
-                      <select
-                        value={memberData.membership_level || ''}
-                        onChange={(e) => setMemberData({ ...memberData, membership_level: e.target.value })}
-                        className={`w-full px-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                      >
-                        <option value="">Not set</option>
-                        {membershipTypes.map(type => (
-                          <option key={type.id} value={type.name}>
-                            {type.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Financial Status
-                      </label>
-                      <select
-                        value={memberData.is_financial ? 'financial' : 'unfinancial'}
-                        onChange={(e) => setMemberData({ ...memberData, is_financial: e.target.value === 'financial' })}
-                        className={`w-full px-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                      >
-                        <option value="financial">Financial</option>
-                        <option value="unfinancial">Unfinancial</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Date Joined
-                      </label>
-                      <div className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {memberData.date_joined ? new Date(memberData.date_joined).toLocaleDateString() : 'Not set'}
-                      </div>
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Renewal Date
-                      </label>
-                      <div className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {memberData.renewal_date ? new Date(memberData.renewal_date).toLocaleDateString() : 'Not set'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 mt-4">
-                  <div className="flex items-center gap-2">
-                    {memberData.is_financial && memberData.renewal_date && new Date(memberData.renewal_date) < new Date() ? (
-                      <>
-                        <span className="flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-sm font-medium border border-amber-500/30">
-                          <Clock size={16} />
-                          Renewal Due
+              <>
+                <div>
+                  <Sec icon={<DollarSign size={15} />} title="Membership" />
+                  <div className="a-grp">
+                    <div className="a-gr">
+                      <Cell label="Membership type" trail={<ChevronDown size={15} />}>
+                        <span className="flex items-center gap-2">
+                          <span className="a-light a-light-b" style={{ boxShadow: 'none' }} />
+                          <select value={memberData.membership_level || ''} onChange={(e) => setMemberData({ ...memberData, membership_level: e.target.value })}>
+                            <option value="">Not set</option>
+                            {membershipTypes.map(type => <option key={type.id} value={type.name}>{type.name}</option>)}
+                          </select>
                         </span>
-                        {onRenew && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onClose();
-                              onRenew(memberId);
-                            }}
-                            className="flex items-center gap-2 px-4 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium"
-                          >
-                            <DollarSign size={14} />
-                            Renew Membership
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={handleSendReminder}
-                          disabled={sendingReminder}
-                          className="flex items-center gap-2 px-4 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
-                        >
-                          <Mail size={14} />
-                          {sendingReminder ? 'Sending...' : 'Send Reminder'}
-                        </button>
-                      </>
-                    ) : memberData.is_financial ? (
-                      <span className="flex items-center gap-2 px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">
-                        <CheckCircle size={16} />
-                        Financial
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2 px-3 py-1 bg-orange-500/20 text-orange-400 rounded-full text-sm font-medium">
-                        <Clock size={16} />
-                        Unfinancial
-                      </span>
-                    )}
+                      </Cell>
+                      <Cell label="Financial status" trail={<ChevronDown size={15} />}>
+                        <span className="flex items-center gap-[9px]">
+                          <span className={`a-light ${memberData.is_financial ? 'a-light-g' : 'a-light-a'}`} />
+                          <select value={memberData.is_financial ? 'financial' : 'unfinancial'} onChange={(e) => setMemberData({ ...memberData, is_financial: e.target.value === 'financial' })}>
+                            <option value="financial">Financial</option>
+                            <option value="unfinancial">Unfinancial</option>
+                          </select>
+                        </span>
+                      </Cell>
+                    </div>
+                    <div className="a-gr">
+                      <div className="a-cell"><span><span className="a-cell-l">Date joined</span><span className="a-cell-v a-num" style={{ letterSpacing: 0 }}>{fmt(memberData.date_joined)}</span></span></div>
+                      <div className="a-cell"><span><span className="a-cell-l">Renews</span><span className={`a-cell-v a-num ${renewalDue ? 'a-txt-a' : ''}`} style={{ letterSpacing: 0 }}>{fmt(memberData.renewal_date)}</span></span></div>
+                    </div>
                   </div>
-                </div>
-
-                <div className={`border-t pt-6 mt-6 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                  <h3 className={`text-lg font-semibold mb-3 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    <Users size={20} className="text-blue-400" />
-                    Club Memberships
-                  </h3>
-                  {memberClubs.length > 0 && (
-                    <div className="space-y-2 mb-4">
-                      {memberClubs.map(mc => (
-                        <div
-                          key={mc.club_id}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg ${
-                            mc.club_id === clubId
-                              ? darkMode ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'
-                              : darkMode ? 'bg-slate-800/50 border border-slate-700/30' : 'bg-slate-50 border border-slate-200'
-                          }`}
-                        >
-                          <Building size={14} className={mc.club_id === clubId ? 'text-blue-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} />
-                          <span className={`text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                            {mc.club_name}
-                          </span>
-                          {mc.club_id === clubId && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">Current</span>
-                          )}
-                          {mc.club_id === defaultClubId && (
-                            <Star size={12} className="text-amber-400 fill-amber-400" />
-                          )}
-                        </div>
-                      ))}
+                  {renewalDue && (
+                    <div className="a-note mt-2.5">
+                      <span className="a-txt-a flex"><Clock size={17} /></span>
+                      <span className="flex-1 a-mute text-[13px]">Renewal is due.</span>
+                      {onRenew && <button type="button" onClick={() => { onClose(); onRenew(memberId); }} className="a-btn a-btn-a a-btn-sm"><DollarSign size={14} />Renew</button>}
+                      <button type="button" onClick={handleSendReminder} disabled={sendingReminder} className="a-btn a-btn-sm"><Mail size={14} />{sendingReminder ? 'Sending…' : 'Send reminder'}</button>
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      fetchAvailableClubs();
-                      setShowAddToClubModal(true);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus size={16} />
-                    Add to Another Club
-                  </button>
                 </div>
 
-                {memberData.user_id && memberClubs.length > 1 && (
-                  <div className={`border-t pt-6 mt-6 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                    <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      <Star size={20} className="text-amber-400" />
-                      Default Club
-                    </h3>
-                    <p className={`text-sm mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      This member belongs to {memberClubs.length} clubs. The default club loads automatically when they sign in.
-                    </p>
-                    {defaultClubId === clubId ? (
-                      <div className={`p-4 rounded-lg ${darkMode ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
-                        <div className="flex items-center gap-3">
-                          <Star size={18} className="text-amber-400 fill-amber-400" />
-                          <span className={`font-medium ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
-                            This is the member's default club
-                          </span>
-                        </div>
+                <div>
+                  <Sec icon={<Building size={15} />} title="Club memberships" />
+                  <div className="a-grp">
+                    {memberClubs.map(mc => (
+                      <div key={mc.club_id} className={`a-lnk ${mc.club_id === clubId ? 'a-lnk-on' : ''}`}>
+                        <span className={`a-tile a-tile-sm ${mc.club_id === clubId ? 'a-tile-rim' : ''}`}><Building size={15} /></span>
+                        <span className={`flex-1 text-[14.5px] a-ink ${mc.club_id === clubId ? 'font-semibold' : ''}`}>{mc.club_name}</span>
+                        {mc.club_id === defaultClubId && <span className="a-txt-a flex" title="Default club"><Star size={14} fill="currentColor" /></span>}
+                        {mc.club_id === clubId && <AStatus tone="b" className="text-[12.5px] a-txt-b">This club</AStatus>}
                       </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleSetDefaultClub}
-                        disabled={settingDefaultClub}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                          darkMode
-                            ? 'bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300'
-                        } disabled:opacity-50`}
-                      >
-                        {settingDefaultClub ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                        ) : (
-                          <Star size={16} />
-                        )}
-                        Set This Club as Default
-                      </button>
-                    )}
+                    ))}
+                    <button type="button" onClick={() => { fetchAvailableClubs(); setShowAddToClubModal(true); }} className="a-lnk a-lnk-add w-full">
+                      <span className="w-[34px] flex justify-center"><Plus size={16} /></span>Add to another club
+                    </button>
                   </div>
-                )}
-
-                <div className={`border-t pt-6 mt-6 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                  <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    <Shield size={20} className="text-blue-400" />
-                    Account Linking
-                  </h3>
-
-                  {memberData.user_id ? (
-                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-green-500/10 border border-green-500/20' : 'bg-green-50 border border-green-200'}`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                            <Link size={18} className="text-green-400" />
-                          </div>
-                          <div>
-                            <p className={`font-medium ${darkMode ? 'text-green-300' : 'text-green-800'}`}>
-                              Linked to Account
-                            </p>
-                            <p className={`text-sm ${darkMode ? 'text-green-400/70' : 'text-green-600'}`}>
-                              {linkedUserEmail || 'Loading...'}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleUnlinkAccount}
-                          disabled={linkingAccount}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors disabled:opacity-50"
-                        >
-                          {linkingAccount ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                          ) : (
-                            <Unlink size={14} />
-                          )}
-                          Unlink
+                  {memberData.user_id && memberClubs.length > 1 && (
+                    <div className="a-note mt-2.5">
+                      <span className="a-txt-a flex"><Star size={17} /></span>
+                      <span className="flex-1 a-mute text-[13px]">Belongs to {memberClubs.length} clubs. The default club opens when they sign in.</span>
+                      {defaultClubId === clubId ? (
+                        <AStatus tone="a" className="text-[12.5px]">Default</AStatus>
+                      ) : (
+                        <button type="button" onClick={handleSetDefaultClub} disabled={settingDefaultClub} className="a-btn" style={{ height: 34, padding: '0 12px', borderRadius: 10, fontSize: 13 }}>
+                          {settingDefaultClub && <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-current border-t-transparent" />}Set as default
                         </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Sec icon={<Shield size={15} />} title="App account" />
+                  {memberData.user_id ? (
+                    <div className="a-grp a-lnk" style={{ padding: 14 }}>
+                      <span className="a-tile"><Link size={18} /></span>
+                      <div className="flex-1 min-w-0">
+                        <div className="a-ink text-[14.5px] font-semibold">Linked to account</div>
+                        <div className="a-dim text-[12.5px] mt-0.5 truncate">{linkedUserEmail || 'Loading…'}</div>
                       </div>
+                      <button type="button" onClick={handleUnlinkAccount} disabled={linkingAccount} className="a-btn a-btn-q a-btn-reject" style={{ height: 34, padding: '0 12px' }}>
+                        {linkingAccount ? <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-current border-t-transparent" /> : <Unlink size={14} />}Unlink
+                      </button>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <div className={`p-4 rounded-lg ${darkMode ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
-                        <div className="flex items-start gap-3">
-                          <AlertCircle size={18} className="text-amber-400 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <p className={`text-sm ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
-                              This member is not linked to a login account. They cannot access the app until linked.
-                            </p>
-                            <p className={`text-xs mt-1 ${darkMode ? 'text-amber-400/60' : 'text-amber-600'}`}>
-                              Enter the email address the member registered with (or will register with). If they haven't registered yet, they can sign up and auto-linking will match by email.
-                            </p>
-                          </div>
+                    <div className="a-grp" style={{ padding: 14 }}>
+                      <div className="flex items-start gap-3">
+                        <span className="a-txt-a flex mt-0.5"><AlertCircle size={17} /></span>
+                        <div className="flex-1">
+                          <p className="a-ink text-[13.5px] m-0">Not linked to a login account, so they can't use the app yet.</p>
+                          <p className="a-dim text-[12.5px] mt-1 mb-0">Enter the email they registered with (or will register with). New sign-ups are matched by email automatically.</p>
                         </div>
                       </div>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="email"
-                          value={linkEmail}
-                          onChange={(e) => setLinkEmail(e.target.value)}
-                          placeholder="Enter member's account email..."
-                          className={`flex-1 px-4 py-2.5 rounded-lg ${
-                            darkMode ? 'bg-slate-700 text-slate-200 border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-400'
-                          } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleLinkAccount}
-                          disabled={linkingAccount || !linkEmail.trim()}
-                          className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 whitespace-nowrap"
-                        >
-                          {linkingAccount ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          ) : (
-                            <Link size={16} />
-                          )}
-                          Link Account
+                      <div className="flex gap-2 mt-3">
+                        <label className="a-field flex-1" style={{ height: 40 }}>
+                          <Mail size={16} />
+                          <span className="sr-only">Member's account email</span>
+                          <input type="email" value={linkEmail} onChange={(e) => setLinkEmail(e.target.value)} placeholder="Member's account email" />
+                        </label>
+                        <button type="button" onClick={handleLinkAccount} disabled={linkingAccount || !linkEmail.trim()} className="a-btn a-btn-p">
+                          {linkingAccount ? <span className="animate-spin rounded-full h-4 w-4 border-2 border-white/40 border-t-white" /> : <Link size={16} />}Link account
                         </button>
                       </div>
                     </div>
                   )}
                 </div>
 
-                <div className={`border-t pt-6 mt-6 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                  <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    <Archive size={20} className="text-red-400" />
-                    Archive Member
-                  </h3>
-                  <div className={`p-4 rounded-lg ${darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'}`}>
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                      <p className={`text-sm ${darkMode ? 'text-red-300' : 'text-red-800'}`}>
-                        Remove this member from the club's active roster. Their history is preserved and they can be reinstated later from the Cancelled tab.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowArchiveModal(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors whitespace-nowrap"
-                      >
-                        <Archive size={16} />
-                        Archive Member
-                      </button>
-                    </div>
+                <div className="a-danger">
+                  <span className="a-tile a-tile-danger"><Archive size={18} /></span>
+                  <div className="flex-1 min-w-0">
+                    <div className="a-ink text-[14.5px] font-semibold">Archive member</div>
+                    <div className="a-mute text-[12.5px] mt-0.5">Removes them from the active roster. History is kept and they can be reinstated from Cancelled.</div>
                   </div>
+                  <button type="button" onClick={() => setShowArchiveModal(true)} className="a-btn a-btn-d" style={{ height: 36 }}>Archive</button>
                 </div>
-              </div>
+              </>
             )}
-
             </div>
 
-            {/* Footer buttons - sticky at bottom */}
-            <div className={`flex justify-end gap-3 px-6 py-4 border-t flex-shrink-0 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
-              <button
-                type="button"
-                onClick={onClose}
-                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                  darkMode ? 'text-slate-300 hover:text-slate-100' : 'text-slate-700 hover:text-slate-900'
-                }`}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="btn-primary-green px-6 py-2 text-white rounded-lg font-semibold transition-all disabled:opacity-50"
-              >
-                {submitting ? 'Saving...' : 'Save Changes'}
+            <div className="a-panel-foot flex-shrink-0" style={{ padding: '16px 20px' }}>
+              <button type="button" onClick={onClose} className="a-btn" style={{ height: 44 }}>Cancel</button>
+              <button type="submit" disabled={submitting} className="a-btn a-btn-p" style={{ height: 44 }}>
+                <CheckCircle size={16} />{submitting ? 'Saving…' : 'Save changes'}
               </button>
             </div>
           </form>
         )}
-      </div>
+      </section>
 
       {selectedImageFile && (
         <AvatarCropModal
@@ -1593,7 +1068,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
 
       {showUpdateLoginEmailPrompt && memberData && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full shadow-2xl">
+          <div className="a-sheet max-w-md w-full">
             <div className="p-6 border-b border-slate-700">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center">

@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { BoatType } from '../../types/member';
 import { CodeOfConductModal } from '../CodeOfConductModal';
 import { Avatar } from '../ui/Avatar';
+import { MemberProfileSheet } from './MemberProfileSheet';
 
 interface MembershipFormModalProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ interface MembershipFormModalProps {
   darkMode?: boolean;
   onSuccess?: () => void;
   readOnly?: boolean;
+  /** Read-only profile: open the full member editor. */
+  onEdit?: () => void;
 }
 
 export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
@@ -25,7 +28,8 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
   existingMemberId,
   darkMode = true,
   onSuccess,
-  readOnly = false
+  readOnly = false,
+  onEdit
 }) => {
   const { user } = useAuth();
   
@@ -40,6 +44,7 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [showCodeOfConductModal, setShowCodeOfConductModal] = useState(false);
   const [memberAvatar, setMemberAvatar] = useState<string | null>(null);
+  const [viewMember, setViewMember] = useState<any>(null);
   const [showCodeOfConduct, setShowCodeOfConduct] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -137,6 +142,7 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
         if (memberError) throw memberError;
 
         if (memberData) {
+          setViewMember(memberData);
           // Ensure member's current type is in the list (even if marked inactive)
           if (isRenewal && memberData.membership_level) {
             const currentTypeInList = filteredTypes.find(t => t.name === memberData.membership_level);
@@ -480,6 +486,18 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  if (readOnly && existingMemberId) {
+    return (
+      <MemberProfileSheet
+        member={viewMember}
+        avatarUrl={memberAvatar}
+        loading={loading}
+        onClose={onClose}
+        onEdit={onEdit}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
