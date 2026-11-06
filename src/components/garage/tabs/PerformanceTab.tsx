@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Award, TrendingDown, Activity, Calendar, Target } from 'lucide-react';
 import { supabase } from '../../../utils/supabase';
-import { Line, Bar } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -177,48 +177,52 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({ boatId, sailNumb
 
   if (loading) {
     return (
-      <div className={`
-        rounded-2xl p-12 text-center
-        ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
-      `}>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto mb-4"></div>
-        <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Loading performance data...</p>
+      <div className="a-card text-center" style={{ padding: 48 }}>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-3"></div>
+        <p className="a-dim text-[13.5px]">Loading performance…</p>
       </div>
     );
   }
 
   if (raceResults.length === 0) {
     return (
-      <div className={`
-        rounded-2xl p-12 text-center
-        ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
-      `}>
-        <Activity className={`w-16 h-16 mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
-        <h3 className={`text-xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-          No Race Data Yet
-        </h3>
-        <p className={`${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          Start racing with this boat to see performance analytics
-        </p>
+      <div className="a-card a-empty text-center" style={{ padding: 48 }}>
+        <span className="a-tile mx-auto mb-3" style={{ width: 52, height: 52 }}><Activity size={22} /></span>
+        <h3 className="a-ink text-[16px] font-semibold mb-1">No race data yet</h3>
+        <p className="a-dim text-[13.5px]">Race with this boat to see performance here</p>
       </div>
     );
   }
 
+  const MEDAL: Record<number, string> = { 1: '#FFC56B', 2: '#C9D1DE', 3: '#E59A62' };
+  const ord = (n: number | null) => n ? `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}` : '–';
+  const line = darkMode ? '#4DA3FF' : '#0A64D8';
+  const grid = darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)';
+  const tick = darkMode ? 'rgba(235,240,255,0.45)' : 'rgba(15,23,42,0.5)';
+  const last = raceResults.slice(0, 15).reverse();
+
   const chartData = {
-    labels: raceResults.slice(0, 15).reverse().map(r =>
-      new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    ),
+    labels: last.map(r => new Date(r.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })),
     datasets: [
       {
         label: 'Position',
-        data: raceResults.slice(0, 15).reverse().map(r => r.position),
-        borderColor: darkMode ? 'rgb(34, 211, 238)' : 'rgb(8, 145, 178)',
-        backgroundColor: darkMode ? 'rgba(34, 211, 238, 0.1)' : 'rgba(8, 145, 178, 0.1)',
-        fill: true,
-        tension: 0.4,
-        pointRadius: 6,
-        pointHoverRadius: 8,
-        pointBackgroundColor: darkMode ? 'rgb(34, 211, 238)' : 'rgb(8, 145, 178)',
+        data: last.map(r => r.position),
+        borderColor: line,
+        backgroundColor: (ctx: any) => {
+          const c = ctx.chart.ctx; const h = ctx.chart.height || 260;
+          const g = c.createLinearGradient(0, 0, 0, h);
+          g.addColorStop(0, darkMode ? 'rgba(46,123,255,0.28)' : 'rgba(10,100,216,0.16)');
+          g.addColorStop(1, 'rgba(46,123,255,0)');
+          return g;
+        },
+        fill: 'start' as const,
+        tension: 0.35,
+        borderWidth: 2.5,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointBackgroundColor: last.map(r => MEDAL[r.position] || line),
+        pointBorderColor: darkMode ? '#0D1424' : '#fff',
+        pointBorderWidth: 2,
       }
     ]
   };
@@ -227,283 +231,102 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({ boatId, sailNumb
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        display: false
-      },
+      legend: { display: false },
       tooltip: {
-        backgroundColor: darkMode ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-        titleColor: darkMode ? '#fff' : '#000',
-        bodyColor: darkMode ? '#cbd5e1' : '#475569',
-        borderColor: darkMode ? '#475569' : '#cbd5e1',
-        borderWidth: 1
+        backgroundColor: darkMode ? 'rgba(17,22,34,0.96)' : 'rgba(255,255,255,0.98)',
+        titleColor: darkMode ? '#fff' : '#0B1220',
+        bodyColor: darkMode ? 'rgba(235,240,255,0.75)' : 'rgba(15,23,42,0.7)',
+        borderColor: darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.1)',
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 10,
       }
     },
     scales: {
-      y: {
-        reverse: true,
-        beginAtZero: false,
-        grid: {
-          color: darkMode ? 'rgba(71, 85, 105, 0.3)' : 'rgba(203, 213, 225, 0.5)'
-        },
-        ticks: {
-          color: darkMode ? '#94a3b8' : '#64748b',
-          stepSize: 1
-        },
-        title: {
-          display: true,
-          text: 'Position (Lower is Better)',
-          color: darkMode ? '#94a3b8' : '#64748b'
-        }
-      },
-      x: {
-        grid: {
-          color: darkMode ? 'rgba(71, 85, 105, 0.3)' : 'rgba(203, 213, 225, 0.5)'
-        },
-        ticks: {
-          color: darkMode ? '#94a3b8' : '#64748b'
-        }
-      }
+      y: { reverse: true, beginAtZero: false, grid: { color: grid }, border: { display: false }, ticks: { color: tick, stepSize: 1 } },
+      x: { grid: { display: false }, border: { display: false }, ticks: { color: tick } }
     }
   };
 
-  const positionDistributionData = {
-    labels: ['1st', '2nd', '3rd', '4-5th', '6-10th', '11+'],
-    datasets: [
-      {
-        label: 'Finishes',
-        data: [
-          raceResults.filter(r => r.position === 1).length,
-          raceResults.filter(r => r.position === 2).length,
-          raceResults.filter(r => r.position === 3).length,
-          raceResults.filter(r => r.position >= 4 && r.position <= 5).length,
-          raceResults.filter(r => r.position >= 6 && r.position <= 10).length,
-          raceResults.filter(r => r.position > 10).length,
-        ],
-        backgroundColor: [
-          'rgba(234, 179, 8, 0.8)',   // Gold
-          'rgba(168, 162, 158, 0.8)',  // Silver
-          'rgba(205, 127, 50, 0.8)',   // Bronze
-          'rgba(34, 211, 238, 0.8)',   // Cyan
-          'rgba(147, 51, 234, 0.8)',   // Purple
-          'rgba(100, 116, 139, 0.8)',  // Gray
-        ],
-        borderColor: darkMode ? 'rgba(30, 41, 59, 1)' : 'rgba(255, 255, 255, 1)',
-        borderWidth: 2
-      }
-    ]
-  };
-
-  const barOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false
-      },
-      tooltip: {
-        backgroundColor: darkMode ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-        titleColor: darkMode ? '#fff' : '#000',
-        bodyColor: darkMode ? '#cbd5e1' : '#475569',
-        borderColor: darkMode ? '#475569' : '#cbd5e1',
-        borderWidth: 1
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        grid: {
-          color: darkMode ? 'rgba(71, 85, 105, 0.3)' : 'rgba(203, 213, 225, 0.5)'
-        },
-        ticks: {
-          color: darkMode ? '#94a3b8' : '#64748b',
-          stepSize: 1
-        }
-      },
-      x: {
-        grid: {
-          display: false
-        },
-        ticks: {
-          color: darkMode ? '#94a3b8' : '#64748b'
-        }
-      }
-    }
-  };
+  const buckets = [
+    { label: '1st', n: raceResults.filter(r => r.position === 1).length, color: '#FFC56B', cls: 'a-best-1' },
+    { label: '2nd', n: raceResults.filter(r => r.position === 2).length, color: '#C9D1DE', cls: 'a-best-2' },
+    { label: '3rd', n: raceResults.filter(r => r.position === 3).length, color: '#E59A62', cls: 'a-best-3' },
+    { label: '4–5th', n: raceResults.filter(r => r.position >= 4 && r.position <= 5).length, color: '#40C8C0', cls: 'a-mute' },
+    { label: '6–10th', n: raceResults.filter(r => r.position >= 6 && r.position <= 10).length, color: '#8A4DFF', cls: 'a-mute' },
+    { label: '11+', n: raceResults.filter(r => r.position > 10).length, color: 'rgba(154,166,189,0.5)', cls: 'a-mute' },
+  ];
+  const maxB = Math.max(1, ...buckets.map(b => b.n));
+  const mini = (icon: React.ReactNode, label: string, value: React.ReactNode, cls = 'a-ink') => (
+    <div className="a-card" style={{ padding: '14px 16px' }}>
+      <div className="a-dim flex items-center gap-1.5 text-[12px]">{icon}{label}</div>
+      <div className={`a-display a-num text-[24px] font-semibold leading-none mt-2 ${cls}`}>{value}</div>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Performance Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className={`
-          rounded-xl p-4
-          ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
-        `}>
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar size={16} className={darkMode ? 'text-cyan-400' : 'text-cyan-600'} />
-            <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Total Races
-            </span>
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        {mini(<Calendar size={14} />, 'Races', stats.totalRaces)}
+        {mini(<Award size={14} />, 'Best', ord(stats.bestPosition), stats.bestPosition && stats.bestPosition <= 3 ? `a-best-${stats.bestPosition}` : 'a-ink')}
+        {mini(<Target size={14} />, 'Avg', stats.avgPosition || '–')}
+        {mini(<Award size={14} />, 'Podiums', stats.podiumFinishes)}
+        {mini(<Award size={14} />, 'Top 5', stats.top5Finishes)}
+        {mini(stats.recentTrend === 'improving' ? <TrendingUp size={14} /> : stats.recentTrend === 'declining' ? <TrendingDown size={14} /> : <Activity size={14} />, 'Trend',
+          stats.recentTrend === 'improving' ? 'Improving' : stats.recentTrend === 'declining' ? 'Declining' : 'Stable',
+          stats.recentTrend === 'improving' ? 'a-txt-g' : stats.recentTrend === 'declining' ? 'a-txt-r' : 'a-mute')}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
+        <div className="a-card flex flex-col gap-3" style={{ padding: 20 }}>
+          <div className="flex items-center gap-3">
+            <span className="a-tile a-tile-sm"><TrendingUp size={16} /></span>
+            <div className="flex-1 min-w-0">
+              <h2 className="a-display a-ink m-0 text-[18px] font-semibold">Last {last.length} races</h2>
+              <p className="a-dim mt-0.5 text-[12.5px]">Higher on the chart is better</p>
+            </div>
           </div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            {stats.totalRaces}
+          <div style={{ height: 260 }}>
+            <Line data={chartData} options={chartOptions as any} />
           </div>
         </div>
 
-        <div className={`
-          rounded-xl p-4
-          ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
-        `}>
-          <div className="flex items-center gap-2 mb-2">
-            <Award size={16} className="text-yellow-500" />
-            <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Best Finish
-            </span>
+        <div className="a-card flex flex-col gap-3" style={{ padding: 20 }}>
+          <div className="flex items-center gap-3">
+            <span className="a-tile a-tile-sm"><Award size={16} /></span>
+            <div className="flex-1 min-w-0">
+              <h2 className="a-display a-ink m-0 text-[18px] font-semibold">Where you finish</h2>
+              <p className="a-dim mt-0.5 text-[12.5px]">{raceResults.length} races</p>
+            </div>
           </div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            {stats.bestPosition ? `${stats.bestPosition}${['st', 'nd', 'rd'][stats.bestPosition - 1] || 'th'}` : '-'}
-          </div>
-        </div>
-
-        <div className={`
-          rounded-xl p-4
-          ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
-        `}>
-          <div className="flex items-center gap-2 mb-2">
-            <Target size={16} className={darkMode ? 'text-blue-400' : 'text-blue-600'} />
-            <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Avg Position
-            </span>
-          </div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            {stats.avgPosition || '-'}
-          </div>
-        </div>
-
-        <div className={`
-          rounded-xl p-4
-          ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
-        `}>
-          <div className="flex items-center gap-2 mb-2">
-            <Award size={16} className="text-orange-500" />
-            <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Podiums
-            </span>
-          </div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            {stats.podiumFinishes}
-          </div>
-        </div>
-
-        <div className={`
-          rounded-xl p-4
-          ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
-        `}>
-          <div className="flex items-center gap-2 mb-2">
-            <Award size={16} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
-            <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Top 5
-            </span>
-          </div>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            {stats.top5Finishes}
-          </div>
-        </div>
-
-        <div className={`
-          rounded-xl p-4
-          ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
-        `}>
-          <div className="flex items-center gap-2 mb-2">
-            {stats.recentTrend === 'improving' ? (
-              <TrendingUp size={16} className="text-green-500" />
-            ) : stats.recentTrend === 'declining' ? (
-              <TrendingDown size={16} className="text-red-500" />
-            ) : (
-              <Activity size={16} className={darkMode ? 'text-slate-400' : 'text-slate-600'} />
-            )}
-            <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Trend
-            </span>
-          </div>
-          <div className={`text-sm font-bold ${
-            stats.recentTrend === 'improving' ? 'text-green-500' :
-            stats.recentTrend === 'declining' ? 'text-red-500' :
-            darkMode ? 'text-slate-400' : 'text-slate-600'
-          }`}>
-            {stats.recentTrend === 'improving' ? 'Improving' :
-             stats.recentTrend === 'declining' ? 'Declining' : 'Stable'}
-          </div>
+          {buckets.map(b => (
+            <div key={b.label} className="grid items-center gap-3" style={{ gridTemplateColumns: '64px 1fr 40px', height: 34 }}>
+              <span className={`text-[13px] font-semibold ${b.cls}`}>{b.label}</span>
+              <div className="a-bar-track"><div style={{ width: `${(b.n / maxB) * 100}%`, minWidth: b.n ? 4 : 0, height: '100%', borderRadius: 999, background: b.color }} /></div>
+              <span className="a-num a-ink text-right text-[14px] font-semibold">{b.n}</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Position Trend */}
-        <div className={`
-          rounded-2xl p-6
-          ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
-        `}>
-          <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            Position Trend (Last 15 Races)
-          </h3>
-          <div style={{ height: '300px' }}>
-            <Line data={chartData} options={chartOptions} />
+      <div className="a-card overflow-hidden">
+        <div style={{ padding: '18px 18px 8px' }}>
+          <div className="flex items-center gap-3">
+            <span className="a-tile a-tile-sm"><Calendar size={16} /></span>
+            <h2 className="a-display a-ink flex-1 m-0 text-[18px] font-semibold">Recent results</h2>
           </div>
         </div>
-
-        {/* Position Distribution */}
-        <div className={`
-          rounded-2xl p-6
-          ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
-        `}>
-          <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            Position Distribution
-          </h3>
-          <div style={{ height: '300px' }}>
-            <Bar data={positionDistributionData} options={barOptions} />
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Results */}
-      <div className={`
-        rounded-2xl p-6
-        ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
-      `}>
-        <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-          Recent Results
-        </h3>
-        <div className="space-y-2">
+        <div style={{ paddingBottom: 6 }}>
           {raceResults.slice(0, 10).map((result, index) => (
-            <div
-              key={`${result.date}-${index}`}
-              className={`
-                flex items-center justify-between p-3 rounded-lg
-                ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}
-              `}
-            >
-              <div className="flex items-center gap-3 flex-1">
-                <div className={`
-                  w-10 h-10 rounded-lg flex items-center justify-center font-bold
-                  ${result.position === 1 ? 'bg-yellow-500 text-white' :
-                    result.position === 2 ? 'bg-gray-400 text-white' :
-                    result.position === 3 ? 'bg-orange-500 text-white' :
-                    darkMode ? 'bg-slate-600 text-white' : 'bg-slate-200 text-slate-900'}
-                `}>
-                  {result.position}
-                </div>
-                <div className="flex-1">
-                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    {result.title}
-                  </p>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    {result.totalCompetitors} competitors
-                  </p>
-                </div>
+            <div key={`${result.date}-${index}`} className="a-rr" style={{ padding: '12px 16px', cursor: 'default' }}>
+              {MEDAL[result.position]
+                ? <span className="a-med" style={{ width: 32, height: 32, background: MEDAL[result.position], boxShadow: `0 0 0 3px color-mix(in srgb, ${MEDAL[result.position]} 25%, transparent)` }}>{result.position}</span>
+                : <span className="a-med a-med-n" style={{ width: 32, height: 32 }}>{result.position}</span>}
+              <div className="flex-1 min-w-0">
+                <div className="a-ink text-[14.5px] font-semibold truncate">{result.title}</div>
+                <div className="a-dim text-[12.5px] mt-0.5">{result.totalCompetitors} competitors</div>
               </div>
-              <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                {new Date(result.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </div>
+              <span className="a-dim text-[12.5px] whitespace-nowrap">{new Date(result.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
             </div>
           ))}
         </div>

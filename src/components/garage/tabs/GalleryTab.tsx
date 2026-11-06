@@ -184,10 +184,10 @@ export const GalleryTab: React.FC<GalleryTabProps> = ({ boatId, darkMode }) => {
     return (
       <div className={`
         rounded-2xl p-12 text-center
-        ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
+        a-card
       `}>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto mb-4"></div>
-        <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Loading gallery...</p>
+        <p className="a-dim">Loading gallery...</p>
       </div>
     );
   }
@@ -227,17 +227,17 @@ export const GalleryTab: React.FC<GalleryTabProps> = ({ boatId, darkMode }) => {
             {uploading ? (
               <>
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500 mb-2"></div>
-                <p className={`text-xs font-medium text-center ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                <p className={`text-xs font-medium text-center a-ink`}>
                   Uploading...
                 </p>
               </>
             ) : (
               <>
-                <Upload className={`w-8 h-8 mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
-                <p className={`text-xs font-bold text-center mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                <Upload className={`w-8 h-8 mb-2 a-dim`} />
+                <p className={`text-xs font-bold text-center mb-1 a-ink`}>
                   Add Photos
                 </p>
-                <p className={`text-[10px] text-center ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
+                <p className={`text-[10px] text-center a-dim`}>
                   Click or drop
                 </p>
               </>
@@ -251,7 +251,7 @@ export const GalleryTab: React.FC<GalleryTabProps> = ({ boatId, darkMode }) => {
             key={image.id}
             className={`
               group relative aspect-square rounded-xl overflow-hidden
-              ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
+              a-card
             `}
           >
             <img
@@ -285,13 +285,13 @@ export const GalleryTab: React.FC<GalleryTabProps> = ({ boatId, darkMode }) => {
       {images.length === 0 && (
         <div className={`
           rounded-2xl p-8 text-center mt-6
-          ${darkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}
+          a-card a-empty
         `}>
-          <Camera className={`w-12 h-12 mx-auto mb-3 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
-          <h3 className={`text-lg font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          <Camera className={`w-12 h-12 mx-auto mb-3 a-dim`} />
+          <h3 className={`text-lg font-bold mb-1 a-ink`}>
             No photos yet
           </h3>
-          <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+          <p className="a-mute text-[13.5px]">
             Click the card above to upload photos of your boat
           </p>
         </div>
