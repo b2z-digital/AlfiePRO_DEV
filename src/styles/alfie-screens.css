@@ -848,3 +848,11 @@ html.alfie-light .a-bc:hover { background: linear-gradient(#fff,#fff) padding-bo
 html.alfie-light .a-bc.a-bc-add { background: transparent; box-shadow: none; border-color: rgba(15,23,42,0.18); color: rgba(15,23,42,0.6); }
 html.alfie-light .a-lb-late { color: #D92D20 !important; background: rgba(217,45,32,0.08) !important; }
 html.alfie-light .a-lb-soon { color: #B25E00 !important; background: rgba(255,159,10,0.1) !important; }
+html.alfie-theme .a-hullreg { font: 600 12.5px ui-monospace, Menlo, monospace; color: #8FD3FF; padding: 4px 8px; border-radius: 7px; background: rgba(46,123,255,0.1); }
+html.alfie-light .a-hullreg { color: #0A64D8; background: rgba(10,100,216,0.08); }
+html.alfie-theme .a-mini-stat { padding: 12px 14px; border-radius: 14px; background: rgba(0,0,0,0.22); }
+html.alfie-light .a-mini-stat { background: rgba(15,23,42,0.04); }
+html.alfie-theme .a-txt-v { color: #B794FF; }
+html.alfie-light .a-txt-v { color: #7C3AED; }
+html.alfie-theme .a-med.a-med-n { background: rgba(255,255,255,0.08); color: #fff; }
+html.alfie-light .a-med.a-med-n { background: rgba(15,23,42,0.07); color: #0B1220; }
