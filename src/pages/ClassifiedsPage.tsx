@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, ListFilter as Filter, Plus, Heart, MapPin, Calendar, Eye, Tag, X, SquarePen as Edit2, Trash2, Grid2x2 as Grid, List, ArrowUpDown, ShoppingBag } from 'lucide-react';
+import { Search, ListFilter as Filter, Plus, Heart, MapPin, Eye, Tag, X, SquarePen as Edit2, Trash2, Grid2x2 as Grid, List, ShoppingBag, Globe, ExternalLink } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getClassifieds, getUserClassifieds, getUserFavorites, toggleClassifiedFavorite, deleteClassified } from '../utils/classifiedStorage';
 import type { Classified } from '../types/classified';
@@ -236,508 +236,176 @@ export default function ClassifiedsPage() {
     setSelectedCategory('');
   };
 
+  const shortDate = (d: string) => { const x = new Date(d); return `${x.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][x.getMonth()]}`; };
+  const catOnly = (v: string) => CLASSIFIED_CATEGORIES.find(c => c.value === v)?.label || v;
+  const cover = (classified: Classified, h: number | string, iconSize = 52) => (
+    <>
+      {classified.images && classified.images.length > 0 ? (
+        <img
+          src={classified.images[0]}
+          alt={classified.title}
+          className="w-full h-full object-cover block"
+          style={{ height: h }}
+          onError={(e) => {
+            const target = e.currentTarget;
+            target.style.display = 'none';
+            const placeholder = target.parentElement?.querySelector('.no-img-placeholder') as HTMLElement | null;
+            if (placeholder) placeholder.style.display = 'flex';
+          }}
+        />
+      ) : null}
+      <div className="no-img-placeholder a-bc-ph absolute inset-0 items-center justify-center" style={{ display: classified.images && classified.images.length > 0 ? 'none' : 'flex' }}>
+        <img src="/alfie_app_logo.svg" alt="" style={{ width: iconSize, height: iconSize, opacity: 0.4 }} />
+      </div>
+    </>
+  );
+  const actions = (classified: Classified, size = 34) => (
+    <>
+      {canManageListing(classified) && (
+        <>
+          <button onClick={(e) => handleEdit(classified, e)} className="a-gb" style={{ width: size, height: size }} aria-label="Edit listing" title="Edit listing"><Edit2 size={15} /></button>
+          <button onClick={(e) => handleDeleteClick(classified, e)} className="a-gb a-gb-d" style={{ width: size, height: size }} aria-label="Delete listing" title="Delete listing"><Trash2 size={15} /></button>
+        </>
+      )}
+      <button onClick={(e) => handleToggleFavorite(classified.id, e)} className="a-gb" style={{ width: size, height: size, color: favorites.has(classified.id) ? '#FF3E9A' : undefined }} aria-label={favorites.has(classified.id) ? 'Remove from saved' : 'Save'} title={favorites.has(classified.id) ? 'Saved' : 'Save'}>
+        <Heart size={16} className={favorites.has(classified.id) ? 'fill-current' : ''} />
+      </button>
+    </>
+  );
+  const chips = (classified: Classified) => (
+    <>
+      {classified.condition && <span className="a-lb-fmt capitalize" style={{ height: 22, fontSize: 11.5 }}>{classified.condition}</span>}
+      {classified.is_public && <span className="a-lb-fmt" style={{ height: 22, fontSize: 11.5 }}><Globe size={11} />Public</span>}
+      {classified.is_external && <span className="a-lb-fmt" style={{ height: 22, fontSize: 11.5 }}><ExternalLink size={11} />External</span>}
+      {classified.featured && <span className="a-lb-fmt a-txt-a" style={{ height: 22, fontSize: 11.5 }}>★ Featured</span>}
+    </>
+  );
+  const meta = (classified: Classified) => (
+    <div className="a-dim flex items-center gap-3 flex-wrap text-[12.5px]">
+      {classified.location && <span className="inline-flex items-center gap-1"><MapPin size={13} />{classified.location}</span>}
+      <span>{shortDate(classified.created_at)}</span>
+      <span className="inline-flex items-center gap-1"><Eye size={13} />{classified.views_count || 0}</span>
+    </div>
+  );
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-16">
-        {/* Header */}
-        <div className="mb-8 flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
-            <ShoppingBag className="text-white" size={28} />
+      <div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        <div className="flex items-center gap-4">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><ShoppingBag size={24} /></span>
+          <div className="flex-1 min-w-0">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">Classifieds</h1>
+            <p className="a-mute mt-1 text-[14.5px]">Buy, sell and trade sailing gear with the community</p>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Classifieds</h1>
-            <p className="text-slate-400">Buy, sell, and trade sailing gear with your club community</p>
-          </div>
+          <button onClick={() => setShowCreateModal(true)} className="a-btn a-btn-p" style={{ height: 42, borderRadius: 13 }}>
+            <Plus size={17} />Sell something
+          </button>
         </div>
 
-        {/* View Mode Tabs with Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 mb-6">
-          <button
-            onClick={() => handleTabChange('all')}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-              viewMode === 'all'
-                ? 'bg-blue-500 text-white'
-                : 'bg-slate-700/50 text-white hover:bg-slate-700'
-            }`}
-          >
-            All Listings
-          </button>
-          <button
-            onClick={() => handleTabChange('my-listings')}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-              viewMode === 'my-listings'
-                ? 'bg-blue-500 text-white'
-                : 'bg-slate-700/50 text-white hover:bg-slate-700'
-            }`}
-          >
-            My Listings
-          </button>
-          <button
-            onClick={() => handleTabChange('favorites')}
-            className={`px-6 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-              viewMode === 'favorites'
-                ? 'bg-blue-500 text-white'
-                : 'bg-slate-700/50 text-white hover:bg-slate-700'
-            }`}
-          >
-            <Heart size={18} />
-            Favorites
-          </button>
-
-          {/* Icon Toolbar */}
-          <div className="flex items-center gap-3 ml-auto">
-            {/* Search Button */}
-            <button
-              onClick={() => setShowSearchBar(!showSearchBar)}
-              className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-              title="Search"
-            >
-              <Search size={20} className="text-slate-300" />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="a-seg" role="tablist">
+            <button onClick={() => handleTabChange('all')} className={`a-seg-i ${viewMode === 'all' ? 'a-seg-on' : ''}`} role="tab" aria-selected={viewMode === 'all'}>
+              All listings{viewMode === 'all' && <span className="a-cnt">{filteredClassifieds.length}</span>}
             </button>
-
-            {/* View Mode Toggle */}
-            <div className="flex items-center bg-slate-800 rounded-lg p-1">
-              <button
-                onClick={() => setDisplayMode('grid')}
-                className={`p-2 rounded transition-colors ${
-                  displayMode === 'grid'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Grid view"
-              >
-                <Grid size={18} />
-              </button>
-              <button
-                onClick={() => setDisplayMode('list')}
-                className={`p-2 rounded transition-colors ${
-                  displayMode === 'list'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="List view"
-              >
-                <List size={18} />
-              </button>
-            </div>
-
-            {/* Sort Button */}
-            <div className="relative sort-menu-container">
-              <button
-                onClick={() => setShowSortMenu(!showSortMenu)}
-                className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-                title="Sort"
-              >
-                <ArrowUpDown size={20} className="text-slate-300" />
-              </button>
-              {showSortMenu && (
-                <div className="absolute top-full mt-2 right-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[180px]">
-                  {[
-                    { value: 'newest' as SortOption, label: 'Newest First' },
-                    { value: 'oldest' as SortOption, label: 'Oldest First' },
-                    { value: 'price-low' as SortOption, label: 'Price: Low to High' },
-                    { value: 'price-high' as SortOption, label: 'Price: High to Low' },
-                    { value: 'title' as SortOption, label: 'Title (A-Z)' }
-                  ].map(option => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        setSortBy(option.value);
-                        setShowSortMenu(false);
-                      }}
-                      className={`w-full px-4 py-2.5 text-left hover:bg-slate-700 transition-colors first:rounded-t-lg last:rounded-b-lg ${
-                        sortBy === option.value ? 'text-blue-400 bg-slate-700/50' : 'text-slate-300'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Filter Button */}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-              title="Filters"
-            >
-              <Filter size={20} className="text-slate-300" />
-            </button>
-
-            {/* Create Listing Button */}
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn-primary-green px-6 py-2 text-white rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 flex items-center gap-2 animate-pulse"
-            >
-              <Plus size={18} />
-              Create Listing
-            </button>
+            <button onClick={() => handleTabChange('my-listings')} className={`a-seg-i ${viewMode === 'my-listings' ? 'a-seg-on' : ''}`} role="tab" aria-selected={viewMode === 'my-listings'}>My listings</button>
+            <button onClick={() => handleTabChange('favorites')} className={`a-seg-i ${viewMode === 'favorites' ? 'a-seg-on' : ''}`} role="tab" aria-selected={viewMode === 'favorites'}><Heart size={15} />Saved</button>
           </div>
-        </div>
-
-        {/* Expandable Search Bar */}
-        {showSearchBar && (
-          <div className="mb-6 relative animate-slideDown">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <label className="a-field flex-1 min-w-[200px]">
+            <Search size={16} />
             <input
               id="classifieds-search"
               type="text"
-              placeholder="Search classifieds..."
+              placeholder="Search IOM, sails, winches…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              autoFocus
-              className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {searchTerm && <button onClick={() => setSearchTerm('')} className="a-dim flex" aria-label="Clear search"><X size={14} /></button>}
+          </label>
+          <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="a-inp a-inp-sel" style={{ height: 42, width: 'auto', minWidth: 160 }} aria-label="Category">
+            <option value="">All categories</option>
+            {CLASSIFIED_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+          <div className="a-seg" role="radiogroup" aria-label="Layout">
+            <button onClick={() => setDisplayMode('grid')} className={`a-seg-i ${displayMode === 'grid' ? 'a-seg-on' : ''}`} style={{ padding: '0 10px' }} aria-label="Grid" title="Grid view"><Grid size={17} /></button>
+            <button onClick={() => setDisplayMode('list')} className={`a-seg-i ${displayMode === 'list' ? 'a-seg-on' : ''}`} style={{ padding: '0 10px' }} aria-label="List" title="List view"><List size={17} /></button>
           </div>
-        )}
-
-        {/* Filter Panel */}
-        {showFilters && (
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-4 mb-6 border border-slate-700/50 filter-menu-container">
-            {/* Visibility Filter */}
-            <div className="mb-4 pb-4 border-b border-slate-700">
-              <h4 className="text-sm font-medium text-slate-300 mb-2">Visibility</h4>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setVisibilityFilter('all')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    visibilityFilter === 'all'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-slate-700/50 text-white hover:bg-slate-700'
-                  }`}
-                >
-                  All Listings
-                </button>
-                <button
-                  onClick={() => setVisibilityFilter('club')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    visibilityFilter === 'club'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-slate-700/50 text-white hover:bg-slate-700'
-                  }`}
-                >
-                  Club Only
-                </button>
-                <button
-                  onClick={() => setVisibilityFilter('public')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    visibilityFilter === 'public'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-slate-700/50 text-white hover:bg-slate-700'
-                  }`}
-                >
-                  Public
-                </button>
-              </div>
-            </div>
-
-            {/* Category Filter */}
-            <div>
-              <h4 className="text-sm font-medium text-slate-300 mb-2">Category</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                <button
-                  onClick={() => setSelectedCategory('')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    selectedCategory === ''
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-slate-700/50 text-white hover:bg-slate-700'
-                  }`}
-                >
-                  All Categories
-                </button>
-                {CLASSIFIED_CATEGORIES.map(category => (
-                  <button
-                    key={category.value}
-                    onClick={() => setSelectedCategory(category.value)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      selectedCategory === category.value
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-slate-700/50 text-white hover:bg-slate-700'
-                    }`}
-                  >
-                    <span className="mr-1">{category.icon}</span>
-                    {category.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Results Count */}
-        <div className="mb-4 text-slate-400">
-          {filteredClassifieds.length} {filteredClassifieds.length === 1 ? 'listing' : 'listings'} found
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} className="a-inp a-inp-sel" style={{ height: 42, width: 'auto', minWidth: 140 }} aria-label="Sort">
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="price-low">Price: low to high</option>
+            <option value="price-high">Price: high to low</option>
+            <option value="title">Title A–Z</option>
+          </select>
+          <button onClick={() => setShowFilters(!showFilters)} className={`a-ib ${showFilters || visibilityFilter !== 'all' ? 'a-ib-on' : ''}`} style={{ width: 42, height: 42 }} aria-label="Visibility filter" title="Visibility">
+            <Filter size={17} />
+          </button>
         </div>
 
-        {/* Classifieds Grid */}
+        {showFilters && (
+          <div className="flex items-center gap-2.5 filter-menu-container">
+            <span className="a-cap">Visibility</span>
+            <div className="a-seg">
+              {(['all', 'club', 'public'] as const).map(v => (
+                <button key={v} onClick={() => setVisibilityFilter(v)} className={`a-seg-i ${visibilityFilter === v ? 'a-seg-on' : ''}`}>
+                  {v === 'all' ? 'All' : v === 'club' ? 'Club only' : 'Public'}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="a-dim text-[13px] -mt-2">{filteredClassifieds.length} {filteredClassifieds.length === 1 ? 'listing' : 'listings'}</div>
+
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-white text-xl">Loading classifieds...</div>
+          <div className="a-card text-center" style={{ padding: 48 }}>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3"></div>
+            <p className="a-dim text-[13.5px]">Loading classifieds…</p>
           </div>
         ) : filteredClassifieds.length === 0 ? (
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-12 text-center border border-slate-700/50">
-            <Tag size={48} className="mx-auto text-slate-500 mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">No listings found</h3>
-            <p className="text-slate-400 mb-6">
-              {viewMode === 'my-listings'
-                ? 'You haven\'t created any listings yet.'
-                : viewMode === 'favorites'
-                ? 'You haven\'t favorited any listings yet.'
-                : 'No listings match your search criteria.'}
+          <div className="a-card a-empty text-center" style={{ padding: 48 }}>
+            <span className="a-tile mx-auto mb-3" style={{ width: 52, height: 52 }}><Tag size={22} /></span>
+            <h3 className="a-ink text-[16px] font-semibold mb-1">No listings found</h3>
+            <p className="a-dim text-[13.5px] mb-5">
+              {viewMode === 'my-listings' ? 'You haven’t listed anything yet.' : viewMode === 'favorites' ? 'You haven’t saved any listings yet.' : 'No listings match your search.'}
             </p>
             {viewMode === 'my-listings' && (
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-              >
-                Create Your First Listing
-              </button>
+              <button onClick={() => setShowCreateModal(true)} className="a-btn a-btn-p mx-auto"><Plus size={16} />Create your first listing</button>
             )}
           </div>
-        ) : (
-          <div className={displayMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
-            {filteredClassifieds.map(classified => displayMode === 'grid' ? (
-              <div
-                key={classified.id}
-                onClick={() => setSelectedClassified(classified)}
-                className="bg-slate-800/50 backdrop-blur-sm rounded-xl overflow-hidden hover:bg-slate-800/70 transition-all cursor-pointer group border border-slate-700/50"
-              >
-                {/* Image */}
-                <div className="relative aspect-video overflow-hidden bg-slate-900">
-                  {classified.images && classified.images.length > 0 ? (
-                    <img
-                      src={classified.images[0]}
-                      alt={classified.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        target.style.display = 'none';
-                        const parent = target.parentElement;
-                        if (parent) {
-                          parent.classList.add('bg-gradient-to-br', 'from-slate-700', 'to-slate-800');
-                          const placeholder = parent.querySelector('.no-img-placeholder') as HTMLElement | null;
-                          if (placeholder) placeholder.style.display = 'flex';
-                        }
-                      }}
-                    />
-                  ) : null}
-                  {(!classified.images || classified.images.length === 0) && (
-                    <div className="no-img-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
-                      <img src="/alfie_app_logo.svg" alt="Alfie" className="w-16 h-16 opacity-40" />
-                    </div>
-                  )}
-                  {classified.images && classified.images.length > 0 && (
-                    <div className="no-img-placeholder w-full h-full items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800 absolute inset-0" style={{ display: 'none' }}>
-                      <img src="/alfie_app_logo.svg" alt="Alfie" className="w-16 h-16 opacity-40" />
-                    </div>
-                  )}
-
-                  {/* Category Badge */}
-                  <div className="absolute top-3 left-3 px-3 py-1 bg-blue-500 text-white text-sm font-medium rounded-full">
-                    {getCategoryLabel(classified.category)}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="absolute top-3 right-3 flex gap-2">
-                    {/* Edit/Delete buttons - only show for user's own listings */}
-                    {canManageListing(classified) && (
-                      <>
-                        <button
-                          onClick={(e) => handleEdit(classified, e)}
-                          className="w-10 h-10 rounded-full bg-slate-900/50 backdrop-blur-sm hover:bg-blue-500/70 transition-colors flex items-center justify-center"
-                        >
-                          <Edit2 size={18} className="text-white" />
-                        </button>
-                        <button
-                          onClick={(e) => handleDeleteClick(classified, e)}
-                          className="w-10 h-10 rounded-full bg-slate-900/50 backdrop-blur-sm hover:bg-red-500/70 transition-colors flex items-center justify-center"
-                        >
-                          <Trash2 size={18} className="text-white" />
-                        </button>
-                      </>
-                    )}
-
-                    {/* Favorite Button */}
-                    <button
-                      onClick={(e) => handleToggleFavorite(classified.id, e)}
-                      className="w-10 h-10 rounded-full bg-slate-900/50 backdrop-blur-sm hover:bg-slate-900/70 transition-colors flex items-center justify-center"
-                    >
-                      <Heart
-                        size={20}
-                        className={favorites.has(classified.id) ? 'fill-red-500 text-red-500' : 'text-white'}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Featured Badge */}
-                  {classified.featured && (
-                    <div className="absolute bottom-3 left-3 px-3 py-1 bg-yellow-500 text-white text-sm font-medium rounded-full">
-                      ⭐ Featured
-                    </div>
-                  )}
+        ) : displayMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredClassifieds.map(classified => (
+              <div key={classified.id} onClick={() => setSelectedClassified(classified)} className="a-bc group" role="button" tabIndex={0}>
+                <div className="relative overflow-hidden" style={{ height: 200 }}>
+                  {cover(classified, 200)}
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(6,11,22,0.25), rgba(6,11,22,0) 35%, rgba(6,11,22,0) 60%, rgba(6,11,22,0.75))' }} />
+                  <span className="a-glass absolute" style={{ left: 12, top: 12 }}><Tag size={12} />{catOnly(classified.category)}</span>
+                  <div className="absolute flex gap-1.5" style={{ right: 12, top: 12 }}>{actions(classified)}</div>
+                  <span className="a-display a-num absolute font-semibold" style={{ left: 14, bottom: 12, fontSize: 26, color: '#fff', textShadow: '0 2px 12px rgba(0,0,0,0.5)' }}>{formatPrice(classified.price, classified)}</span>
                 </div>
-
-                {/* Content */}
-                <div className="p-5">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-xl font-bold text-white group-hover:text-blue-300 transition-colors flex-1">
-                      {classified.title}
-                    </h3>
-                  </div>
-
-                  <div className="text-2xl font-bold text-blue-400 mb-3">
-                    {formatPrice(classified.price, classified)}
-                  </div>
-
-                  <p className="text-slate-300 text-sm mb-4 line-clamp-2">
-                    {classified.description}
-                  </p>
-
-                  {/* Meta Info */}
-                  <div className="space-y-2 text-sm text-slate-400">
-                    <div className="flex items-center gap-2">
-                      <MapPin size={16} />
-                      <span>{classified.location}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar size={16} />
-                      <span>Listed {formatDate(classified.created_at)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Eye size={16} />
-                      <span>{classified.views_count || 0} views</span>
-                    </div>
-                  </div>
-
-                  {/* Condition Badge */}
-                  <div className="mt-4 inline-block px-3 py-1 bg-slate-700/50 text-slate-300 text-xs font-medium rounded-full capitalize">
-                    {classified.condition}
-                  </div>
-
-                  {classified.is_public && (
-                    <div className="mt-2 inline-block ml-2 px-3 py-1 bg-green-500/20 text-green-300 text-xs font-medium rounded-full">
-                      Public Listing
-                    </div>
-                  )}
-                  {classified.is_external && (
-                    <div className="mt-2 inline-block ml-2 px-3 py-1 bg-amber-500/20 text-amber-300 text-xs font-medium rounded-full">
-                      External
-                    </div>
-                  )}
+                <div className="flex flex-col gap-2" style={{ padding: '14px 16px 16px' }}>
+                  <div className="a-ink text-[16px] font-semibold leading-[1.3] line-clamp-2">{classified.title}</div>
+                  {classified.description && <div className="a-mute text-[13px] leading-[1.45] line-clamp-2">{classified.description}</div>}
+                  <div className="mt-1">{meta(classified)}</div>
+                  <div className="flex gap-1.5 flex-wrap mt-1">{chips(classified)}</div>
                 </div>
               </div>
-            ) : (
-              // List View
-              <div
-                key={classified.id}
-                onClick={() => setSelectedClassified(classified)}
-                className="bg-slate-800/50 backdrop-blur-sm rounded-xl overflow-hidden hover:bg-slate-800/70 transition-all cursor-pointer border border-slate-700/50 p-4"
-              >
-                <div className="flex gap-4">
-                  {/* Thumbnail */}
-                  <div className="relative w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-slate-900">
-                    {classified.images && classified.images.length > 0 ? (
-                      <img
-                        src={classified.images[0]}
-                        alt={classified.title}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            parent.classList.add('bg-gradient-to-br', 'from-slate-700', 'to-slate-800');
-                            const placeholder = parent.querySelector('.no-img-placeholder') as HTMLElement | null;
-                            if (placeholder) placeholder.style.display = 'flex';
-                          }
-                        }}
-                      />
-                    ) : null}
-                    {(!classified.images || classified.images.length === 0) && (
-                      <div className="no-img-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
-                        <img src="/alfie_app_logo.svg" alt="Alfie" className="w-12 h-12 opacity-40" />
-                      </div>
-                    )}
-                    {classified.images && classified.images.length > 0 && (
-                      <div className="no-img-placeholder w-full h-full items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800 absolute inset-0" style={{ display: 'none' }}>
-                        <img src="/alfie_app_logo.svg" alt="Alfie" className="w-12 h-12 opacity-40" />
-                      </div>
-                    )}
+            ))}
+          </div>
+        ) : (
+          <div className="a-card overflow-hidden">
+            {filteredClassifieds.map(classified => (
+              <div key={classified.id} onClick={() => setSelectedClassified(classified)} className="a-rr" style={{ padding: '12px 16px' }} role="button" tabIndex={0}>
+                <div className="relative overflow-hidden flex-shrink-0" style={{ width: 112, height: 80, borderRadius: 12 }}>{cover(classified, 80, 32)}</div>
+                <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                  <div className="flex items-baseline gap-3">
+                    <span className="a-ink text-[15px] font-semibold truncate flex-1">{classified.title}</span>
+                    <span className="a-display a-num a-ink text-[18px] font-semibold whitespace-nowrap">{formatPrice(classified.price, classified)}</span>
                   </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4 mb-2">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-bold text-white mb-1">{classified.title}</h3>
-                        <p className="text-2xl font-bold text-green-400">{formatPrice(classified.price, classified)}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {canManageListing(classified) && (
-                          <>
-                            <button
-                              onClick={(e) => handleEdit(classified, e)}
-                              className="p-2 rounded-lg bg-slate-700 hover:bg-blue-500 transition-colors"
-                            >
-                              <Edit2 size={18} className="text-white" />
-                            </button>
-                            <button
-                              onClick={(e) => handleDeleteClick(classified, e)}
-                              className="p-2 rounded-lg bg-slate-700 hover:bg-red-500 transition-colors"
-                            >
-                              <Trash2 size={18} className="text-white" />
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={(e) => handleToggleFavorite(classified.id, e)}
-                          className="p-2 rounded-lg bg-slate-700 hover:bg-pink-500 transition-colors"
-                        >
-                          <Heart
-                            size={18}
-                            className={favorites.has(classified.id) ? 'fill-pink-500 text-pink-500' : 'text-white'}
-                          />
-                        </button>
-                      </div>
-                    </div>
-
-                    <p className="text-slate-300 text-sm line-clamp-2 mb-3">{classified.description}</p>
-
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
-                      <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs font-medium">
-                        {getCategoryLabel(classified.category)}
-                      </span>
-                      <span className="px-2 py-1 bg-slate-700 text-slate-300 rounded text-xs">
-                        {classified.condition}
-                      </span>
-                      {classified.location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin size={14} />
-                          {classified.location}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1">
-                        <Calendar size={14} />
-                        Listed {formatDate(classified.created_at)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Eye size={14} />
-                        {classified.views_count || 0} views
-                      </span>
-                      {classified.is_public && (
-                        <span className="px-2 py-1 bg-green-500/20 text-green-300 rounded text-xs">
-                          Public Listing
-                        </span>
-                      )}
-                      {classified.is_external && (
-                        <span className="px-2 py-1 bg-amber-500/20 text-amber-300 rounded text-xs">
-                          External
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  {meta(classified)}
+                  <div className="flex gap-1.5 flex-wrap"><span className="a-lb-fmt" style={{ height: 22, fontSize: 11.5 }}><Tag size={11} />{catOnly(classified.category)}</span>{chips(classified)}</div>
                 </div>
+                <div className="flex gap-1.5 a-list-actions">{actions(classified, 32)}</div>
               </div>
             ))}
           </div>
@@ -771,9 +439,9 @@ export default function ClassifiedsPage() {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && classifiedToDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl shadow-xl max-w-md w-full p-6 border border-slate-700">
-            <h3 className="text-xl font-semibold text-white mb-4">Delete Listing</h3>
-            <p className="text-slate-300 mb-6">
+          <div className="a-sheet max-w-md w-full" style={{ padding: 24 }}>
+            <h3 className="a-display a-ink text-[20px] font-semibold mb-2">Delete listing</h3>
+            <p className="a-mute text-[14px] mb-6">
               Are you sure you want to delete "{classifiedToDelete.title}"? This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
@@ -782,13 +450,13 @@ export default function ClassifiedsPage() {
                   setShowDeleteConfirm(false);
                   setClassifiedToDelete(null);
                 }}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                className="a-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
+                className="a-btn a-btn-d"
               >
                 Delete
               </button>

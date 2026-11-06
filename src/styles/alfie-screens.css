@@ -885,3 +885,5 @@ html.alfie-theme .a-rig-sub { font-size: 11px; color: rgba(235,240,255,0.55); mi
 html.alfie-light .a-rig-sub { color: rgba(15,23,42,0.5); }
 html.alfie-theme .a-bar-track { height: 12px; border-radius: 999px; background: rgba(0,0,0,0.3); overflow: hidden; }
 html.alfie-light .a-bar-track { background: rgba(15,23,42,0.06); }
+html.alfie-theme .a-list-actions .a-gb { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); }
+html.alfie-light .a-list-actions .a-gb { background: rgba(15,23,42,0.05); border-color: rgba(15,23,42,0.08); color: rgba(15,23,42,0.7); }
