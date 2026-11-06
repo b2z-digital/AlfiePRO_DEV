@@ -651,6 +651,13 @@ export const EventWebsitesPage: React.FC = () => {
                 </div>
               );
             })}
+          {!searchTerm && (
+            <button type="button" onClick={handleAddEventWebsite} className="a-addtile">
+              <span className="a-tile"><Plus size={19} /></span>
+              <span className="a-ink text-[14px] font-semibold">New event website</span>
+              <span className="a-dim text-[12.5px]">Start blank or from a template</span>
+            </button>
+          )}
         </div>
       )}
 
