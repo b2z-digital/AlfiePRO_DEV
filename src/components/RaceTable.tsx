@@ -918,7 +918,7 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                 e.stopPropagation();
                 onCompleteScoring();
               }}
-              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors font-semibold"
+              className="a-btn a-btn-g"
             >
               <Trophy size={18} />
               <span className="text-sm font-medium">

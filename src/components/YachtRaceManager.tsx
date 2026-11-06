@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
 import { useAlfieTheme } from '../hooks/useAlfieTheme';
-import { AlfieIconContext } from './brand/AlfieIcon';
+import { AlfieIcon, AlfieIconContext } from './brand/AlfieIcon';
 import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle, RotateCcw } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
@@ -3994,12 +3994,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   {scoringMode === 'pro' && (
                     <button
                       onClick={() => setShowStartBoxModal(true)}
-                      className={`
-                        flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-                        ${darkMode
-                          ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
-                          : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'}
-                      `}
+                      className="a-btn a-btn-sb"
                       title="Open StartBox"
                     >
                       <Timer size={18} />
@@ -4013,43 +4008,36 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   })()}
                 </div>
 
-                {/* Right side: mode switchers */}
+                {/* Right side: mode switcher (segmented) */}
                 <div className="flex items-center gap-2">
-                {(['pro', 'touch', 'spreadsheet'] as const).filter(m => m !== scoringMode).filter(m => !(raceType === 'handicap' && m === 'spreadsheet')).map(mode => (
+                <div className="a-seg" role="radiogroup" aria-label="Scoring mode">
+                {(['pro', 'touch', 'spreadsheet'] as const).filter(m => !(raceType === 'handicap' && m === 'spreadsheet')).map(mode => (
                   <button
                     key={mode}
+                    role="radio"
+                    aria-checked={mode === scoringMode}
                     onClick={async () => {
+                      if (mode === scoringMode) return;
                       setScoringMode(mode);
                       const { data: { user } } = await supabase.auth.getUser();
                       if (user) {
                         await supabase.from('profiles').update({ scoring_mode_preference: mode }).eq('id', user.id);
                       }
                     }}
-                    className={`
-                      flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-                      ${darkMode
-                        ? 'bg-slate-700 hover:bg-slate-600 text-slate-200'
-                        : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}
-                    `}
-                    title={`Switch to ${mode === 'pro' ? 'Pro' : mode === 'touch' ? 'Touch' : 'Spreadsheet'} Mode`}
+                    className={`a-seg-i ${mode === scoringMode ? 'a-seg-on' : ''}`}
+                    title={`${mode === 'pro' ? 'Pro' : mode === 'touch' ? 'Touch' : 'Spreadsheet'} Mode`}
                   >
-                    {mode === 'pro' ? <Table2 size={18} className="text-blue-400" />
-                      : mode === 'touch' ? <Hand size={18} className="text-blue-400" />
-                      : <Grid3X3 size={18} className="text-blue-400" />}
-                    <span className="text-sm font-medium">
-                      {mode === 'pro' ? 'Pro Mode' : mode === 'touch' ? 'Touch Mode' : 'Spreadsheet Mode'}
-                    </span>
+                    {mode === 'pro' ? <AlfieIcon glyph="table" size={17} />
+                      : mode === 'touch' ? <AlfieIcon glyph="hand" size={17} />
+                      : <AlfieIcon glyph="sheet" size={17} />}
+                    {mode === 'pro' ? 'Pro' : mode === 'touch' ? 'Touch' : 'Spreadsheet'}
                   </button>
                 ))}
+                </div>
                 {raceType === 'scratch' && (
                   <button
                     onClick={() => setShowOverallResults(true)}
-                    className={`
-                      flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-                      ${darkMode
-                        ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25'
-                        : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'}
-                    `}
+                    className="a-btn a-btn-gold"
                     title="View Overall Results"
                   >
                     <Trophy size={18} />

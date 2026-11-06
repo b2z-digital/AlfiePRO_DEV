@@ -139,7 +139,7 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
 
   return (
     <div className="relative">
-      <div className="bg-black rounded-2xl p-6 border border-slate-700/50 overflow-hidden">
+      <div className="alfie-startbox-face bg-black rounded-2xl p-6 border border-slate-700/50 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none rounded-2xl" />
 
         {/* Central dial */}
@@ -165,6 +165,14 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
               viewBox={`0 0 ${size} ${size}`}
               className="transform -rotate-90"
             >
+              <defs>
+                <linearGradient id="alfieStartRing" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stopColor="#2E7BFF" />
+                  <stop offset="0.38" stopColor="#8A4DFF" />
+                  <stop offset="0.7" stopColor="#FF3E9A" />
+                  <stop offset="1" stopColor="#FF8A2B" />
+                </linearGradient>
+              </defs>
               {/* Background track ring */}
               <circle
                 cx={size / 2}
@@ -184,7 +192,7 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
                 r={radius}
                 fill="none"
                 strokeWidth={strokeWidth}
-                stroke={colorHex}
+                stroke={colorHex === '#22d3ee' ? 'url(#alfieStartRing)' : colorHex}
                 strokeLinecap="round"
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeDashoffset}

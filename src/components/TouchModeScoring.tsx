@@ -1382,6 +1382,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                     onTouchEnd={handleLongPressEnd}
                     disabled={isFinished}
                     className={`
+                      a-tile2 ${isFinished ? 'a-t-done' : 'a-t-open'}
                       relative w-full aspect-square
                       flex items-center justify-center
                       transition-all duration-200 font-semibold text-2xl sm:text-3xl lg:text-4xl
