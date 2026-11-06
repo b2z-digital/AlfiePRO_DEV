@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, SquarePen as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Users, Repeat, Navigation, ExternalLink, Copy, Printer } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, ChevronLeft, SquarePen as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Repeat, Navigation, ExternalLink, Copy, Printer } from 'lucide-react';
+import { AAvatar } from '../alfie/Kit';
 import { Meeting, MeetingAgendaItem } from '../../types/meeting';
 import { getMeetingAgenda, lockMeetingMinutes } from '../../utils/meetingStorage';
 import { generateAgendaPdf } from '../../utils/agendaPdfExport';
@@ -7,7 +8,6 @@ import { formatDate } from '../../utils/date';
 import { useNavigate } from 'react-router-dom';
 import { MeetingInviteModal } from './MeetingInviteModal';
 import { ShareMinutesModal } from './ShareMinutesModal';
-import { Avatar } from '../ui/Avatar';
 import { supabase } from '../../utils/supabase';
 
 interface MeetingDetailsProps {
@@ -153,535 +153,291 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
     }
   };
 
+  const mType = (meeting as any).meeting_type as string | undefined;
+  const lat = (meeting as any).location_lat, lng = (meeting as any).location_lng, placeId = (meeting as any).location_place_id;
+  const directionsUrl = lat && lng ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}${placeId ? `&destination_place_id=${placeId}` : ''}` : null;
+  const attending = attendance.filter(a => a.status === 'attending' && a.member);
+  const conf = meeting.conferencing_url || '';
+  const confName = /teams\.(microsoft|live)\.com/i.test(conf) ? 'Microsoft Teams' : /zoom\.us/i.test(conf) ? 'Zoom' : /meet\.google\.com/i.test(conf) ? 'Google Meet' : 'Video conference';
+  const confShort = conf.replace(/^https?:\/\//, '').replace(/^www\./, '');
+  const typeDot = (t: string) => (t === 'for_noting' ? '#2E7BFF' : t === 'for_action' ? '#30D158' : t === 'for_discussion' ? '#8A4DFF' : '#9AA6BD');
+  const longDate = (() => { const d = new Date(meeting.date); return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); })();
+  const runAgendaPdf = async () => {
+    setGeneratingPdf(true);
+    try {
+      await generateAgendaPdf(meeting, agendaItems, associationId, associationType);
+    } catch (err) {
+      console.error('Error generating agenda PDF:', err);
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between mb-6">
-        <button
-          onClick={onClose}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105 text-slate-300 hover:text-white bg-slate-800/50 hover:bg-slate-700/70 border border-slate-700/50 hover:border-slate-600"
-        >
-          <ArrowLeft size={16} />
-          Back to Meetings
+    <div className="flex flex-col gap-[22px]">
+      <div className="flex items-center gap-2 text-[13.5px]">
+        <button onClick={onClose} className="a-txt-b inline-flex items-center gap-1 font-medium">
+          <ChevronLeft size={16} />Meetings
         </button>
+      </div>
+
+      <div className="flex flex-wrap items-start gap-4">
+        <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}>{meeting.meeting_category === 'committee' ? <Shield size={24} /> : <Calendar size={24} />}</span>
+        <div className="flex-1 min-w-[260px]">
+          <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">{meeting.name}</h1>
+          <div className="flex gap-2 flex-wrap mt-3">
+            <span className="a-chip"><Calendar size={15} />{longDate}</span>
+            {meeting.start_time && meeting.end_time && <span className="a-chip"><Clock size={15} />{formatTime(meeting.start_time)} – {formatTime(meeting.end_time)}</span>}
+            {mType && (
+              <span className={`a-chip ${mType === 'online' ? 'a-txt-b' : ''}`}>
+                {mType === 'online' ? <><Video size={15} />Online meeting</> : mType === 'hybrid' ? <><Video size={15} />Hybrid meeting</> : <><MapPin size={15} />In person</>}
+              </span>
+            )}
+            {meeting.meeting_category && (
+              <span className="a-chip"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: meeting.meeting_category === 'committee' ? '#FFB340' : '#2E7BFF' }} />{meeting.meeting_category === 'committee' ? 'Committee' : 'General'}</span>
+            )}
+            {meeting.recurrence_type && meeting.recurrence_type !== 'none' && (
+              <span className="a-chip"><Repeat size={15} />{meeting.recurrence_type === 'monthly_nth' ? 'Monthly' : meeting.recurrence_type.charAt(0).toUpperCase() + meeting.recurrence_type.slice(1)}</span>
+            )}
+            {meeting.status !== 'upcoming' && (
+              <span className={`a-chip ${meeting.status === 'completed' ? 'a-txt-g' : 'a-txt-r'}`}>
+                {meeting.status === 'completed' ? <Check size={15} /> : <X size={15} />}
+                {meeting.status === 'completed' ? 'Completed' : 'Cancelled'}
+              </span>
+            )}
+          </div>
+        </div>
 
         <div className="flex flex-wrap gap-2 justify-end">
           {onDuplicate && (
-            <button
-              onClick={onDuplicate}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:scale-105"
-            >
-              <Copy size={16} />
-              Duplicate
-            </button>
+            <button onClick={onDuplicate} className="a-btn"><Copy size={16} />Duplicate</button>
           )}
 
           {meeting.status === 'upcoming' && (
             <>
               {meeting.minutes_status !== 'in_progress' && (
-                <button
-                  onClick={onEdit}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:scale-105"
-                >
-                  <Edit2 size={16} />
-                  Edit
-                </button>
+                <button onClick={onEdit} className="a-btn"><Edit2 size={16} />Edit</button>
               )}
-
               {meeting.minutes_status !== 'in_progress' && (
-                <button
-                  onClick={() => setShowInviteModal(true)}
-                  className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
-                >
-                  <Mail size={16} />
-                  Send Invites
-                </button>
+                <button onClick={() => setShowInviteModal(true)} className="a-btn"><Mail size={16} />Send invites</button>
               )}
-
+              <button onClick={() => setShowStatusConfirm('cancel')} className="a-btn a-btn-danger-soft"><X size={16} />Cancel meeting</button>
               {meeting.minutes_status === 'in_progress' ? (
-                <button
-                  onClick={handleStartMeeting}
-                  className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
-                >
-                  <Edit2 size={16} />
-                  Continue Minutes
-                </button>
+                <button onClick={handleStartMeeting} className="a-btn a-btn-p" style={{ height: 42, borderRadius: 13 }}><Edit2 size={16} />Continue minutes</button>
               ) : (
-                <button
-                  onClick={handleStartMeeting}
-                  className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
-                >
-                  <Play size={16} />
-                  Start Meeting
-                </button>
+                <button onClick={handleStartMeeting} className="a-btn a-btn-p" style={{ height: 42, borderRadius: 13 }}><Play size={16} />Start meeting</button>
               )}
-
-              <button
-                onClick={() => setShowStatusConfirm('cancel')}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-red-500/20"
-              >
-                <X size={16} />
-                Cancel Meeting
-              </button>
             </>
           )}
 
           {meeting.status !== 'upcoming' && meeting.minutes_status === 'in_progress' && (
-            <button
-              onClick={handleStartMeeting}
-              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
-            >
-              <Edit2 size={16} />
-              Continue Minutes
-            </button>
+            <button onClick={handleStartMeeting} className="a-btn a-btn-p" style={{ height: 42, borderRadius: 13 }}><Edit2 size={16} />Continue minutes</button>
           )}
 
           {meeting.minutes_status === 'completed' && (
             <>
-              <button
-                onClick={handleStartMeeting}
-                className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
-              >
-                <FileText size={16} />
-                View Minutes
-              </button>
-
               {!meeting.minutes_locked && (
-                <button
-                  onClick={() => setShowLockConfirm(true)}
-                  className="btn-primary-green flex items-center gap-2 px-4 py-2 from-amber-600 to-amber-700 text-white rounded-lg hover:from-amber-700 hover:to-amber-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-amber-500/20"
-                >
-                  <Lock size={16} />
-                  Confirm & Lock
-                </button>
+                <button onClick={() => setShowLockConfirm(true)} className="a-btn"><Lock size={16} />Confirm &amp; lock</button>
               )}
-
-              <button
-                onClick={() => setShowShareModal(true)}
-                className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
-              >
-                <Share size={16} />
-                Share Minutes
-              </button>
+              <button onClick={() => setShowShareModal(true)} className="a-btn"><Share size={16} />Share minutes</button>
+              <button onClick={handleStartMeeting} className="a-btn a-btn-p" style={{ height: 42, borderRadius: 13 }}><FileText size={16} />View minutes</button>
             </>
           )}
         </div>
       </div>
 
       {error && (
-        <div className="p-4 rounded-lg bg-red-900/20 border border-red-900/30">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <AlertTriangle className="h-5 w-5 text-red-400" aria-hidden="true" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-300">{error}</p>
-            </div>
-          </div>
+        <div className="a-note a-note-r flex items-center gap-2.5">
+          <AlertTriangle size={17} />
+          <p className="m-0 text-[13.5px]">{error}</p>
         </div>
       )}
 
       {success && (
-        <div className="p-4 rounded-lg bg-green-900/20 border border-green-900/30">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <Check className="h-5 w-5 text-green-400" aria-hidden="true" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-green-300">{success}</p>
-            </div>
-          </div>
+        <div className="a-note flex items-center gap-2.5">
+          <Check size={17} className="a-txt-g" />
+          <p className="m-0 text-[13.5px]">{success}</p>
         </div>
       )}
 
-      <div className="bg-gradient-to-br from-slate-800/80 via-slate-800/60 to-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-700/50 overflow-hidden shadow-2xl">
-        <div className="relative p-8 from-blue-600/10 via-transparent to-emerald-600/10 border-b border-slate-700/50">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-emerald-500/5"></div>
-          <div className="relative">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <h1 className="text-3xl font-bold text-white mb-3 leading-tight">{meeting.name}</h1>
-
-                  {meeting.status !== 'upcoming' && (
-                    <div className={`
-                      inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium mb-3
-                      ${meeting.status === 'completed'
-                        ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                        : 'bg-red-500/20 text-red-300 border border-red-500/30'}
-                    `}>
-                      {meeting.status === 'completed' ? <Check size={14} /> : <X size={14} />}
-                      {meeting.status === 'completed' ? 'Completed' : 'Cancelled'}
-                    </div>
-                  )}
-                </div>
-
-                {meeting.status === 'upcoming' && (
-                  <div className="flex items-center gap-4">
-                    {/* Attendance Avatars */}
-                    {attendance.filter(a => a.status === 'attending' && a.member).length > 0 && (
-                      <div className="flex items-center gap-2">
-                        <div className="flex -space-x-2">
-                          {attendance
-                            .filter(a => a.status === 'attending' && a.member)
-                            .slice(0, 5)
-                            .map((att, idx) => (
-                              <div
-                                key={idx}
-                                className="relative w-9 h-9 rounded-full border-2 border-slate-800 bg-slate-700 overflow-hidden"
-                                title={`${att.member?.first_name || ''} ${att.member?.last_name || ''}`}
-                              >
-                                {att.member?.avatar_url ? (
-                                  <img
-                                    src={att.member.avatar_url}
-                                    alt={`${att.member.first_name} ${att.member.last_name}`}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-xs font-semibold text-slate-300">
-                                    {att.member?.first_name?.[0]}{att.member?.last_name?.[0]}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          {attendance.filter(a => a.status === 'attending' && a.member).length > 5 && (
-                            <div className="relative w-9 h-9 rounded-full border-2 border-slate-800 bg-slate-700 flex items-center justify-center text-xs font-semibold text-slate-300">
-                              +{attendance.filter(a => a.status === 'attending' && a.member).length - 5}
-                            </div>
-                          )}
-                        </div>
-                        <span className="text-sm text-slate-400 font-medium">
-                          {attendance.filter(a => a.status === 'attending' && a.member).length} attending
-                        </span>
-                      </div>
-                    )}
-
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-4 text-sm">
-                <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600/50">
-                  <Calendar size={16} className="text-blue-400" />
-                  <span className="text-slate-200 font-medium">{formatDate(meeting.date)}</span>
-                </div>
-
-                {meeting.start_time && meeting.end_time && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600/50">
-                    <Clock size={16} className="text-emerald-400" />
-                    <span className="text-slate-200 font-medium">{formatTime(meeting.start_time)} - {formatTime(meeting.end_time)}</span>
-                  </div>
-                )}
-
-                {(meeting as any).meeting_type && (
-                  <div className={`
-                    flex items-center gap-2 px-3 py-2 rounded-lg border font-medium
-                    ${(meeting as any).meeting_type === 'online' ? 'bg-blue-500/20 border-blue-400/50 text-blue-300' :
-                      (meeting as any).meeting_type === 'hybrid' ? 'bg-purple-500/20 border-purple-400/50 text-purple-300' :
-                      'bg-slate-700/50 border-slate-600/50 text-slate-200'}
-                  `}>
-                    {(meeting as any).meeting_type === 'online' ? (
-                      <>
-                        <Video size={16} />
-                        <span>Online Meeting</span>
-                      </>
-                    ) : (meeting as any).meeting_type === 'hybrid' ? (
-                      <>
-                        <MapPin size={14} />
-                        <Video size={14} />
-                        <span>Hybrid Meeting</span>
-                      </>
-                    ) : (
-                      <>
-                        <MapPin size={16} />
-                        <span>In Person</span>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {meeting.location && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600/50">
-                    <MapPin size={16} className="text-amber-400 flex-shrink-0" />
-                    <span className="text-slate-200 font-medium">{meeting.location}</span>
-                    {(meeting as any).location_lat && (meeting as any).location_lng && (
-                      <a
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${(meeting as any).location_lat},${(meeting as any).location_lng}${(meeting as any).location_place_id ? `&destination_place_id=${(meeting as any).location_place_id}` : ''}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 text-xs font-medium transition-colors flex-shrink-0"
-                      >
-                        <Navigation size={12} />
-                        Directions
-                      </a>
-                    )}
-                  </div>
-                )}
-
-                {meeting.meeting_category && (
-                  <div className={`
-                    flex items-center gap-2 px-3 py-2 rounded-lg border font-medium
-                    ${meeting.meeting_category === 'committee'
-                      ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
-                      : 'bg-blue-500/20 border-blue-400/50 text-blue-300'}
-                  `}>
-                    {meeting.meeting_category === 'committee' ? <Shield size={16} /> : <Users size={16} />}
-                    <span>{meeting.meeting_category === 'committee' ? 'Committee Meeting' : 'General Meeting'}</span>
-                  </div>
-                )}
-
-                {meeting.recurrence_type && meeting.recurrence_type !== 'none' && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/20 rounded-lg border border-teal-400/50 text-teal-300 font-medium">
-                    <Repeat size={16} />
-                    <span>{meeting.recurrence_type.charAt(0).toUpperCase() + meeting.recurrence_type.slice(1)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            {meeting.description && (
-              <div className="p-5 rounded-xl bg-gradient-to-br from-slate-700/40 to-slate-800/40 border border-slate-600/50 hover:border-slate-500/50 transition-all hover:shadow-lg col-span-full">
-                <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-blue-500/20">
-                    <FileText size={16} className="text-blue-400" />
-                  </div>
-                  Description
-                </h3>
-                <p className="text-slate-200 whitespace-pre-line leading-relaxed">{meeting.description}</p>
-              </div>
-            )}
-
-            {meeting.chairperson && (
-              <div className="p-5 rounded-xl bg-gradient-to-br from-slate-700/40 to-slate-800/40 border border-slate-600/50 hover:border-slate-500/50 transition-all hover:shadow-lg">
-                <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-emerald-500/20">
-                    <User size={16} className="text-emerald-400" />
-                  </div>
-                  Chairperson
-                </h3>
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    firstName={meeting.chairperson.first_name}
-                    lastName={meeting.chairperson.last_name}
-                    imageUrl={meeting.chairperson.avatar_url}
-                    size="lg"
-                  />
-                  <p className="text-white font-medium text-lg">
-                    {meeting.chairperson.first_name} {meeting.chairperson.last_name}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {meeting.minute_taker && (
-              <div className="p-5 rounded-xl bg-gradient-to-br from-slate-700/40 to-slate-800/40 border border-slate-600/50 hover:border-slate-500/50 transition-all hover:shadow-lg">
-                <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-amber-500/20">
-                    <User size={16} className="text-amber-400" />
-                  </div>
-                  Minute Taker
-                </h3>
-                <div className="flex items-center gap-3">
-                  <Avatar
-                    firstName={meeting.minute_taker.first_name}
-                    lastName={meeting.minute_taker.last_name}
-                    imageUrl={meeting.minute_taker.avatar_url}
-                    size="lg"
-                  />
-                  <p className="text-white font-medium text-lg">
-                    {meeting.minute_taker.first_name} {meeting.minute_taker.last_name}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {meeting.conferencing_url && (
-              <div className="p-5 rounded-xl bg-gradient-to-br from-slate-700/40 to-slate-800/40 border border-slate-600/50 hover:border-slate-500/50 transition-all hover:shadow-lg col-span-full">
-                <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-blue-500/20">
-                    <Video size={16} className="text-blue-400" />
-                  </div>
-                  Video Conference
-                </h3>
-                <a
-                  href={meeting.conferencing_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 hover:text-blue-200 font-medium transition-colors"
-                >
-                  <Video size={16} />
-                  Join Meeting
-                  <ExternalLink size={14} />
-                </a>
-                <p className="mt-2 text-xs text-slate-400 break-all">{meeting.conferencing_url}</p>
-              </div>
-            )}
-
-            {(meeting as any).location_lat && (meeting as any).location_lng && (
-              <div className="p-5 rounded-xl bg-gradient-to-br from-slate-700/40 to-slate-800/40 border border-slate-600/50 hover:border-slate-500/50 transition-all hover:shadow-lg col-span-full">
-                <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-emerald-500/20">
-                    <MapPin size={16} className="text-emerald-400" />
-                  </div>
-                  Venue Location
-                </h3>
-                <div className="rounded-lg overflow-hidden border border-slate-600/50 mb-3">
-                  <iframe
-                    src={`https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${(meeting as any).location_lat},${(meeting as any).location_lng}&zoom=15`}
-                    width="100%"
-                    height="250"
-                    style={{ border: 0 }}
-                    allowFullScreen
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                </div>
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${(meeting as any).location_lat},${(meeting as any).location_lng}${(meeting as any).location_place_id ? `&destination_place_id=${(meeting as any).location_place_id}` : ''}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/30 hover:text-emerald-200 font-medium transition-colors"
-                >
-                  <Navigation size={16} />
-                  Get Directions
-                  <ExternalLink size={14} />
-                </a>
-              </div>
-            )}
-          </div>
-          
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-white flex items-center gap-2">
-                <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-emerald-500 rounded-full"></div>
-                Agenda
-              </h3>
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-4 items-start">
+        <div className="flex flex-col gap-4 min-w-0">
+          <div className="a-card overflow-hidden">
+            <div className="flex items-center gap-3" style={{ padding: '18px 20px 12px' }}>
+              <span className="a-tile a-tile-sm"><FileText size={16} /></span>
+              <h2 className="a-display a-ink flex-1 m-0 text-[19px] font-semibold">Agenda</h2>
+              <span className="a-dim text-[12.5px] mr-2">{agendaItems.length} {agendaItems.length === 1 ? 'item' : 'items'}</span>
               {agendaItems.length > 0 && (
-                <button
-                  onClick={async () => {
-                    setGeneratingPdf(true);
-                    try {
-                      await generateAgendaPdf(meeting, agendaItems, associationId, associationType);
-                    } catch (err) {
-                      console.error('Error generating agenda PDF:', err);
-                    } finally {
-                      setGeneratingPdf(false);
-                    }
-                  }}
-                  disabled={generatingPdf}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Printer size={16} />
-                  {generatingPdf ? 'Generating...' : 'Print Agenda'}
+                <button onClick={runAgendaPdf} disabled={generatingPdf} className="a-btn disabled:opacity-50" style={{ height: 36, fontSize: 13 }}>
+                  <Printer size={15} />
+                  {generatingPdf ? 'Generating…' : 'Print agenda'}
                 </button>
               )}
             </div>
 
             {loading ? (
-              <div className="text-center py-12 bg-slate-700/20 rounded-xl border border-slate-600/30">
+              <div className="text-center py-10">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3"></div>
-                <p className="text-slate-400 font-medium">Loading agenda...</p>
+                <p className="a-dim text-[13.5px]">Loading agenda…</p>
               </div>
             ) : agendaItems.length === 0 ? (
-              <div className="text-center py-12 bg-slate-700/20 rounded-xl border border-slate-600/30">
-                <FileText size={48} className="mx-auto mb-4 text-slate-600" />
-                <p className="text-slate-400 font-medium">No agenda items added yet</p>
+              <div className="text-center py-10 border-t a-bd">
+                <span className="a-tile mx-auto mb-3" style={{ width: 48, height: 48 }}><FileText size={20} /></span>
+                <p className="a-dim text-[13.5px]">No agenda items added yet</p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-slate-600/50 shadow-lg">
-                <table className="w-full">
-                  <thead>
-                    <tr className="from-slate-700/80 to-slate-800/80 border-b border-slate-600/50">
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-300 uppercase tracking-wider w-20">No.</th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-300 uppercase tracking-wider">Item</th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-300 uppercase tracking-wider">Owner</th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-300 uppercase tracking-wider">Type</th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-slate-300 uppercase tracking-wider">Duration</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-slate-800/40 divide-y divide-slate-700/50">
-                    {agendaItems.map((item, index) => (
-                      <tr key={item.id} className="hover:bg-slate-700/30 transition-colors">
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-700/50 text-slate-200 font-semibold text-sm">
-                            {item.item_number}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-white font-medium">{item.item_name}</td>
-                        <td className="px-6 py-4">
-                          {item.owner ? (
-                            <div className="flex items-center gap-2">
-                              <Avatar
-                                firstName={item.owner.first_name}
-                                lastName={item.owner.last_name}
-                                imageUrl={item.owner.avatar_url}
-                                size="sm"
-                              />
-                              <span className="text-slate-300">
-                                {item.owner.first_name} {item.owner.last_name}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${getAgendaItemTypeClass(item.type)} border border-current/20`}>
-                            {getAgendaItemTypeLabel(item.type)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-slate-300 font-medium">
-                          {item.duration ? `${item.duration} min` : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="overflow-x-auto">
+                <div style={{ minWidth: 600 }}>
+                  <div className="a-ag a-ag-h">
+                    <p className="a-cap">#</p>
+                    <p className="a-cap">Item</p>
+                    <p className="a-cap">Type</p>
+                    <p className="a-cap">Owner</p>
+                    <p className="a-cap">Time</p>
+                  </div>
+                  {agendaItems.map((item) => (
+                    <div key={item.id} className="a-ag">
+                      <span className="a-ag-num">{item.item_number}</span>
+                      <span className={`text-[14.5px] truncate ${item.item_name ? 'a-ink font-semibold' : 'a-dim italic'}`}>{item.item_name || 'Untitled item'}</span>
+                      <span><span className="a-lb-fmt"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: typeDot(item.type) }} />{getAgendaItemTypeLabel(item.type).replace(/ (\w)/, (_, c) => ' ' + c.toLowerCase())}</span></span>
+                      {item.owner ? (
+                        <span className="flex items-center gap-2 min-w-0">
+                          <AAvatar url={item.owner.avatar_url} first={item.owner.first_name} last={item.owner.last_name} size={26} />
+                          <span className="a-ink text-[13px] truncate">{item.owner.first_name} {item.owner.last_name}</span>
+                        </span>
+                      ) : (
+                        <span className="a-dim text-[13px]">No owner</span>
+                      )}
+                      <span className="a-dim text-[13px]">{item.duration ? `${item.duration} min` : '—'}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-          
-          {meeting.minutes_status === 'completed' && (
-            <div className="mt-8">
-              <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                <div className="w-1 h-8 bg-gradient-to-b to-blue-500 rounded-full"></div>
-                Meeting Minutes
-              </h3>
 
-              <div className="p-6 rounded-xl bg-gradient-to-br from-emerald-900/20 to-blue-900/20 border border-emerald-500/30">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30">
-                    <FileText size={24} className="text-emerald-400" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-slate-200 font-medium mb-2">
-                      Minutes have been recorded for this meeting. Click the button above to view the full minutes.
-                    </p>
-                    {meeting.minutes_locked && (
-                      <div className="mt-3 flex items-center gap-2 text-amber-400 bg-amber-900/20 px-4 py-2 rounded-lg border border-amber-500/30">
-                        <Lock size={16} />
-                        <span className="font-medium">These minutes have been locked and can no longer be edited.</span>
-                      </div>
-                    )}
-                  </div>
+          {meeting.description && (
+            <div className="a-card" style={{ padding: '18px 20px' }}>
+              <div className="flex items-center gap-3 mb-2.5">
+                <span className="a-tile a-tile-sm"><FileText size={16} /></span>
+                <h2 className="a-display a-ink m-0 text-[17px] font-semibold">Description</h2>
+              </div>
+              <p className="a-mute m-0 text-[14px] leading-[1.65] whitespace-pre-line">{meeting.description}</p>
+            </div>
+          )}
+
+          {meeting.minutes_status === 'completed' && (
+            <div className="a-card" style={{ padding: '18px 20px' }}>
+              <div className="flex items-center gap-3 mb-2.5">
+                <span className="a-tile a-tile-sm"><FileText size={16} /></span>
+                <h2 className="a-display a-ink m-0 text-[17px] font-semibold">Minutes</h2>
+              </div>
+              <p className="a-mute m-0 text-[14px] leading-[1.65]">Minutes have been recorded for this meeting. Use View minutes above to read them in full.</p>
+              {meeting.minutes_locked && (
+                <div className="a-note mt-3 flex items-center gap-2 a-txt-a">
+                  <Lock size={16} />
+                  <span className="text-[13.5px] font-medium">These minutes are locked and can no longer be edited.</span>
                 </div>
+              )}
+            </div>
+          )}
+
+          {lat && lng && (
+            <div className="a-card" style={{ padding: '18px 20px' }}>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="a-tile a-tile-sm"><MapPin size={16} /></span>
+                <h2 className="a-display a-ink flex-1 m-0 text-[17px] font-semibold">Venue location</h2>
+                {directionsUrl && (
+                  <a href={directionsUrl} target="_blank" rel="noopener noreferrer" className="a-btn" style={{ height: 36, fontSize: 13 }}>
+                    <Navigation size={15} />Directions
+                  </a>
+                )}
+              </div>
+              <div className="overflow-hidden" style={{ borderRadius: 14 }}>
+                <iframe
+                  src={`https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${lat},${lng}&zoom=15`}
+                  width="100%"
+                  height="250"
+                  style={{ border: 0, display: 'block' }}
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
               </div>
             </div>
           )}
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {meeting.conferencing_url && (
+            <div className="a-card a-spec-card flex flex-col gap-3" style={{ padding: 18 }}>
+              <div className="flex items-center gap-3">
+                <span className="a-tile" style={{ width: 44, height: 44 }}><Video size={20} /></span>
+                <div className="flex-1 min-w-0">
+                  <div className="a-ink text-[15px] font-semibold">{confName}</div>
+                  <div className="a-dim text-[12.5px] mt-0.5">Video conference</div>
+                </div>
+              </div>
+              <a href={meeting.conferencing_url} target="_blank" rel="noopener noreferrer" className="a-btn a-btn-p justify-center" style={{ height: 46 }}>
+                <Video size={17} />Join meeting<ExternalLink size={15} />
+              </a>
+              <div className="a-linkbox">
+                <span className="flex-1 truncate">{confShort}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="a-card" style={{ padding: 8 }}>
+            <p className="a-cap" style={{ padding: '10px 12px 4px' }}>People</p>
+            {meeting.chairperson && (
+              <div className="flex items-center gap-3" style={{ padding: '10px 12px' }}>
+                <AAvatar url={meeting.chairperson.avatar_url} first={meeting.chairperson.first_name} last={meeting.chairperson.last_name} size={40} />
+                <div className="flex-1 min-w-0">
+                  <div className="a-ink text-[14.5px] font-semibold truncate">{meeting.chairperson.first_name} {meeting.chairperson.last_name}</div>
+                  <div className="a-dim text-[12px] mt-0.5">Chairperson</div>
+                </div>
+              </div>
+            )}
+            {meeting.minute_taker && (
+              <div className="flex items-center gap-3" style={{ padding: '10px 12px' }}>
+                <AAvatar url={meeting.minute_taker.avatar_url} first={meeting.minute_taker.first_name} last={meeting.minute_taker.last_name} size={40} />
+                <div className="flex-1 min-w-0">
+                  <div className="a-ink text-[14.5px] font-semibold truncate">{meeting.minute_taker.first_name} {meeting.minute_taker.last_name}</div>
+                  <div className="a-dim text-[12px] mt-0.5">Minute taker</div>
+                </div>
+              </div>
+            )}
+            {!meeting.chairperson && !meeting.minute_taker && (
+              <p className="a-dim text-[13px]" style={{ padding: '6px 12px 10px' }}>No chair or minute taker set</p>
+            )}
+            {meeting.status === 'upcoming' && attending.length > 0 && (
+              <div className="flex items-center gap-2.5 border-t a-bd" style={{ padding: '10px 12px' }}>
+                <span className="inline-flex">
+                  {attending.slice(0, 5).map((att, idx) => (
+                    <span key={idx} className="a-av-ring inline-flex rounded-full" style={{ marginLeft: idx ? -8 : 0 }} title={`${att.member?.first_name || ''} ${att.member?.last_name || ''}`}>
+                      <AAvatar url={att.member?.avatar_url} first={att.member?.first_name} last={att.member?.last_name} size={28} />
+                    </span>
+                  ))}
+                </span>
+                <span className="a-dim text-[12.5px]">{attending.length} attending</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2.5 flex-wrap border-t a-bd" style={{ padding: '10px 12px' }}>
+              <span className="a-st text-[12.5px]"><span className={`a-light ${mType === 'online' ? 'a-light-g' : mType === 'hybrid' ? 'a-light-b' : 'a-light-a'}`} />{mType === 'online' ? 'Online' : mType === 'hybrid' ? 'Hybrid' : 'In person'}</span>
+              <span className="a-dim text-[12.5px] min-w-0 truncate">· {meeting.location || (mType === 'online' ? 'No venue needed' : 'Venue not set')}</span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Status Change Confirmation Modal */}
       {showStatusConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-xl font-semibold text-white mb-4">
+          <div className="a-sheet max-w-md w-full" style={{ padding: 24 }}>
+            <h3 className="a-display a-ink text-[20px] font-semibold mb-2">
               {showStatusConfirm === 'complete' ? 'Mark as Completed' : 'Mark as Cancelled'}
             </h3>
-            <p className="text-slate-300 mb-6">
+            <p className="a-mute text-[14px] mb-6">
               {showStatusConfirm === 'complete'
                 ? 'Are you sure you want to mark this meeting as completed?'
                 : 'Are you sure you want to mark this meeting as cancelled?'}
@@ -689,15 +445,13 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowStatusConfirm(null)}
-                className="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
+                className="a-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmStatusChange}
-                className={`px-4 py-2 rounded-lg text-white transition-colors ${
-                  showStatusConfirm === 'complete' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
-                }`}
+                className={`a-btn ${showStatusConfirm === 'complete' ? 'a-btn-g' : 'a-btn-d'}`}
               >
                 Confirm
               </button>
@@ -709,23 +463,23 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
       {/* Lock Minutes Confirmation Modal */}
       {showLockConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-xl font-semibold text-white mb-4">
+          <div className="a-sheet max-w-md w-full" style={{ padding: 24 }}>
+            <h3 className="a-display a-ink text-[20px] font-semibold mb-2">
               Confirm & Lock Minutes
             </h3>
-            <p className="text-slate-300 mb-6">
+            <p className="a-mute text-[14px] mb-6">
               Are you sure you want to lock these minutes? Once locked, they can no longer be edited.
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowLockConfirm(false)}
-                className="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
+                className="a-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={handleLockMinutes}
-                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+                className="a-btn a-btn-a"
               >
                 Lock Minutes
               </button>
