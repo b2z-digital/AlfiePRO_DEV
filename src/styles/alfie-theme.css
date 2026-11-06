@@ -217,3 +217,191 @@ html.alfie-light ::-webkit-scrollbar-thumb {
   background-clip: padding-box;
 }
 html.alfie-light ::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+
+/* ═══════════════════ Phase 2: shared pattern layer ═══════════════════
+ * Restyles recurring markup patterns across the signed-in app without
+ * touching components. Each selector is narrow (structure + class) and
+ * scoped to html.alfie-theme, so anything that doesn't match keeps its
+ * current look.
+ */
+
+/* ── Underline tab bars → segmented control ──
+ * A tab bar is any element whose direct children include two adjacent
+ * <button class="border-b-2 …">. Spinners also use border-b-2 but are
+ * <div>s, so they never match. Active tab = the one without
+ * border-transparent. */
+html.alfie-theme :is(div, nav):has(> button.border-b-2 + button.border-b-2) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  border-radius: 15px;
+  border: 0 !important;
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+/* The divider line under the old tab bar */
+/* (:has() can't nest, so the parent is matched by a plain relative chain) */
+html.alfie-theme .border-b:has(> :is(div, nav) > button.border-b-2 + button.border-b-2) {
+  border-bottom-color: transparent !important;
+}
+html.alfie-theme :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2 {
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 11px;
+  min-height: 38px;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  color: rgba(235, 240, 255, 0.7);
+  transition: background-color .15s ease, color .15s ease;
+}
+html.alfie-theme :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2:hover {
+  color: #fff;
+}
+html.alfie-theme :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2:not(.border-transparent) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08));
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+html.alfie-theme :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2:not(.border-transparent) * {
+  color: inherit;
+}
+
+html.alfie-light :is(div, nav):has(> button.border-b-2 + button.border-b-2) {
+  background: rgba(15, 23, 42, 0.06) !important;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+html.alfie-light :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2 {
+  color: #475569 !important;
+}
+html.alfie-light :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2:not(.border-transparent) {
+  background: #ffffff !important;
+  color: #0B1220 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10), 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+/* ── Page header icon (gradient box holding just an icon) → Spectrum rim tile ── */
+html.alfie-theme :is(.rounded-xl, .rounded-2xl).bg-gradient-to-br:has(> svg:only-child) {
+  border: 1px solid transparent;
+  border-radius: 30% !important;
+  background:
+    linear-gradient(#141A28, #141A28) padding-box,
+    var(--alfie-spectrum) border-box !important;
+  box-shadow: none !important;
+}
+html.alfie-light :is(.rounded-xl, .rounded-2xl).bg-gradient-to-br:has(> svg:only-child) {
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    var(--alfie-spectrum) border-box !important;
+}
+html.alfie-light :is(.rounded-xl, .rounded-2xl).bg-gradient-to-br:has(> svg:only-child) > svg {
+  color: #0B1220 !important;
+}
+
+/* ── Dark glass cards: lift bordered translucent cards off the navy ── */
+html.alfie-dark :is(.rounded-xl, .rounded-2xl).border:is(.bg-slate-800\/30, .bg-slate-800\/40, .bg-slate-800\/50) {
+  background-color: rgba(20, 28, 46, 0.66);
+  border-color: rgba(255, 255, 255, 0.075);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+/* ── Tinted icon tiles (e.g. bg-blue-600/20 box holding just an icon) →
+ *    hairline tile; the icon keeps its colour as the accent ── */
+html.alfie-theme :is(.rounded-lg, .rounded-xl):not(button)[class*="bg-"]:is([class*="/10"], [class*="/15"], [class*="/20"], [class*="/25"]):has(> svg:only-child) {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.11) !important;
+  border-radius: 30% !important;
+}
+html.alfie-light :is(.rounded-lg, .rounded-xl):not(button)[class*="bg-"]:is([class*="/10"], [class*="/15"], [class*="/20"], [class*="/25"]):has(> svg:only-child) {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.10) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+/* Spectrum rim on the tile when its card is hovered */
+html.alfie-theme .rounded-xl:hover > * > :is(.rounded-lg, .rounded-xl):not(button)[class*="bg-"]:is([class*="/10"], [class*="/15"], [class*="/20"], [class*="/25"]):has(> svg:only-child),
+html.alfie-theme .rounded-xl:hover > :is(.rounded-lg, .rounded-xl):not(button)[class*="bg-"]:is([class*="/10"], [class*="/15"], [class*="/20"], [class*="/25"]):has(> svg:only-child) {
+  border-color: transparent !important;
+  background:
+    linear-gradient(#141A28, #141A28) padding-box,
+    var(--alfie-spectrum) border-box !important;
+}
+html.alfie-light .rounded-xl:hover > * > :is(.rounded-lg, .rounded-xl):not(button)[class*="bg-"]:is([class*="/10"], [class*="/15"], [class*="/20"], [class*="/25"]):has(> svg:only-child),
+html.alfie-light .rounded-xl:hover > :is(.rounded-lg, .rounded-xl):not(button)[class*="bg-"]:is([class*="/10"], [class*="/15"], [class*="/20"], [class*="/25"]):has(> svg:only-child) {
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    var(--alfie-spectrum) border-box !important;
+}
+
+/* ── Cards: softer Alfie radius ── */
+html.alfie-theme .rounded-xl:is([class*="bg-slate-800"], [class*="bg-slate-900"]) {
+  border-radius: 16px;
+}
+html.alfie-theme .rounded-2xl:is([class*="bg-slate-800"], [class*="bg-slate-900"]) {
+  border-radius: 22px;
+}
+
+/* ── Big stat numbers in the display face ── */
+html.alfie-theme :is(.text-2xl, .text-3xl, .text-4xl).font-bold {
+  font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ── Buttons & inputs: Alfie rounding ── */
+html.alfie-theme button.rounded-lg:is(.bg-blue-600, .bg-blue-500, .bg-green-600, .bg-emerald-600) {
+  border-radius: 12px;
+}
+html.alfie-theme :is(input, select, textarea).rounded-lg {
+  border-radius: 12px;
+}
+
+/* Tab bars whose tabs stretch (flex-1) stay full width; scrolling bars keep scrolling */
+html.alfie-theme :is(div, nav):has(> button.border-b-2.flex-1 + button.border-b-2) {
+  width: 100%;
+  flex-wrap: nowrap;
+}
+html.alfie-theme :is(div, nav).overflow-x-auto:has(> button.border-b-2 + button.border-b-2) {
+  flex-wrap: nowrap;
+}
+html.alfie-theme :is(div, nav):has(> button.border-b-2 + button.border-b-2) > button.border-b-2 {
+  white-space: nowrap;
+}
+
+/* ── Modals: frosted navy veil + rounder sheet ── */
+html.alfie-dark .fixed.inset-0:is(.bg-black\/50, .bg-black\/60, .bg-black\/70) {
+  background-color: rgba(3, 6, 14, 0.62);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+html.alfie-light .fixed.inset-0:is(.bg-black\/50, .bg-black\/60, .bg-black\/70) {
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+html.alfie-theme .fixed.inset-0:is(.bg-black\/50, .bg-black\/60, .bg-black\/70) > :is(.rounded-xl, .rounded-2xl, .rounded-lg):is([class*="bg-slate-8"], [class*="bg-slate-9"], [class*="bg-white"], [class*="from-slate-8"]) {
+  border-radius: 22px;
+}
+html.alfie-dark .fixed.inset-0:is(.bg-black\/50, .bg-black\/60, .bg-black\/70) > :is(.rounded-xl, .rounded-2xl, .rounded-lg):is(.bg-slate-800, .bg-slate-900) {
+  background-color: #111A2C;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+
+/* ── Form fields (dark): inset wells with a hairline edge ── */
+html.alfie-dark :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]), select, textarea):is(.bg-slate-700, .bg-slate-700\/50, .bg-slate-800, .bg-slate-800\/50, .bg-slate-900, .bg-slate-900\/50):is(.border, [class*="border-"]) {
+  background-color: rgba(0, 0, 0, 0.24);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+html.alfie-dark :is(input, select, textarea):is(.bg-slate-700, .bg-slate-700\/50, .bg-slate-800, .bg-slate-800\/50, .bg-slate-900, .bg-slate-900\/50):focus {
+  border-color: rgb(10 132 255 / 0.7);
+}
+html.alfie-dark select:is(.bg-slate-700, .bg-slate-700\/50, .bg-slate-800, .bg-slate-900, .bg-slate-900\/50) option {
+  background-color: #111A2C;
+}
+
+/* Full-bleed stretch tab bars (typically inside a modal) get breathing room */
+html.alfie-theme :is(div, nav).border-b:has(> button.border-b-2.flex-1 + button.border-b-2) {
+  width: auto;
+  margin: 0.75rem 1.25rem;
+}
