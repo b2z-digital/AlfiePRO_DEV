@@ -1030,34 +1030,30 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   );
 
   return (
-    <div className="flex flex-col h-full min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="flex flex-col gap-[22px] h-full p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-9 lg:pl-9">
       {/* Page Header */}
-      <div className="flex-shrink-0 px-6 py-5 border-b border-slate-700/50 bg-slate-900/60">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-600 shadow-lg shadow-blue-500/20">
-              <FolderOpen size={22} className="text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Documents</h1>
-              <p className="text-sm text-slate-400 mt-0.5">
-                {isClubContext ? 'Manage Club Documents & Access Shared Association Resources' : 'Manage and share resources with your members'}
-              </p>
-            </div>
+      <div className="flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><FolderOpen size={24} /></span>
+          <div className="flex-1 min-w-[220px]">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">Documents</h1>
+            <p className="a-mute mt-1 text-[14.5px]">
+              {isClubContext ? 'Manage club documents and access shared association resources' : 'Manage and share resources with your members'}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             {!isCloudSection && !isAllSection && !isSharedSection && (
               <button
                 onClick={() => { resetResourceForm(); setShowResourceModal(true); }}
-                className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium text-sm"
+                className="a-btn a-btn-p" style={{ height: 42, borderRadius: 13 }}
               >
-                <Plus size={15} />
-                Add Resource
+                <Plus size={17} />
+                Add resource
               </button>
             )}
             {isDriveSection && currentDriveFolderId && (
-              <label className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg font-medium text-sm cursor-pointer">
-                <Upload size={15} />
+              <label className="a-btn a-btn-p cursor-pointer" style={{ height: 42, borderRadius: 13 }}>
+                <Upload size={17} />
                 Upload
                 <input
                   type="file"
@@ -1074,8 +1070,8 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
               </label>
             )}
             {isDropboxSection && currentDropboxPath && (
-              <label className="flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium text-sm cursor-pointer">
-                <Upload size={15} />
+              <label className="a-btn a-btn-p cursor-pointer" style={{ height: 42, borderRadius: 13 }}>
+                <Upload size={17} />
                 Upload
                 <input
                   type="file"
@@ -1094,26 +1090,26 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
             {isDriveSection && currentDriveFolderId ? (
               <button
                 onClick={() => { setDriveNewFolderName(''); setShowDriveNewFolderModal(true); }}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-700/80 hover:bg-slate-700 border border-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-all text-sm"
+                className="a-btn"
               >
-                <FolderPlus size={15} />
-                New Folder
+                <FolderPlus size={16} />
+                New folder
               </button>
             ) : isDropboxSection && currentDropboxPath ? (
               <button
                 onClick={() => { setDriveNewFolderName(''); setShowDriveNewFolderModal(true); }}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-700/80 hover:bg-slate-700 border border-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-all text-sm"
+                className="a-btn"
               >
-                <FolderPlus size={15} />
-                New Folder
+                <FolderPlus size={16} />
+                New folder
               </button>
             ) : !isCloudSection && (
               <button
                 onClick={() => { resetCategoryForm(); setShowCategoryModal(true); }}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-700/80 hover:bg-slate-700 border border-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-all text-sm"
+                className="a-btn"
               >
-                <FolderPlus size={15} />
-                New Folder
+                <FolderPlus size={16} />
+                New folder
               </button>
             )}
           </div>
@@ -1121,19 +1117,21 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       </div>
 
       {/* Main layout */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 gap-4">
         {/* Sidebar */}
-        <div className="w-60 flex-shrink-0 border-r border-slate-700/50 bg-slate-900/40 flex flex-col overflow-y-auto">
-          <nav className="p-3 space-y-0.5 flex-1">
+        <aside className="a-card lg:w-[260px] flex-shrink-0 self-start flex flex-col overflow-y-auto lg:max-h-full" style={{ padding: 12 }}>
+          <nav className="flex flex-col gap-0.5 flex-1">
+            <p className="a-cap" style={{ padding: '6px 10px' }}>Library</p>
             {/* All Files */}
             <SidebarItem
               icon={Home}
-              label="All Files"
+              label="All files"
               count={resources.length}
               active={isAllSection}
               onClick={() => setActiveSection('all')}
             />
 
+            {(hasGoogleDrive || hasDropbox) && <p className="a-cap" style={{ padding: '14px 10px 6px' }}>Connected</p>}
             {/* Google Drive */}
             {hasGoogleDrive && (
               <SidebarItem
@@ -1160,7 +1158,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
             {isClubContext && sharedResources.length > 0 && (
               <SidebarItem
                 icon={Building2}
-                label="Shared with Club"
+                label="Shared with club"
                 count={sharedResources.length}
                 active={isSharedSection}
                 onClick={() => setActiveSection('shared')}
@@ -1169,16 +1167,14 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
             )}
 
             {categories.length > 0 && (
-              <div className="pt-3 pb-1">
-                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-3 mb-1">Folders</p>
-              </div>
+              <p className="a-cap" style={{ padding: '14px 10px 6px' }}>Folders</p>
             )}
 
             {categories.map(cat => (
               <div
                 key={cat.id}
-                className={`group flex items-center gap-0.5 rounded-lg transition-all ${
-                  dropTargetCatId === cat.id ? 'ring-2 ring-amber-400/60 bg-amber-500/10' : ''
+                className={`group relative flex items-center gap-0.5 rounded-[12px] transition-all ${
+                  dropTargetCatId === cat.id ? 'a-drop-target' : ''
                 }`}
                 onDragOver={e => { if (draggedResource || draggedCategory) { e.preventDefault(); setDropTargetCatId(cat.id); } }}
                 onDragLeave={() => setDropTargetCatId(null)}
@@ -1186,19 +1182,15 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
               >
                 <button
                   onClick={() => setActiveSection(cat.id)}
-                  className={`flex-1 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all min-w-0 ${
-                    activeSection === cat.id
-                      ? 'bg-slate-700/80 text-white border border-slate-600/60 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
-                  }`}
+                  className={`a-lib flex-1 min-w-0 ${activeSection === cat.id ? 'a-lib-on' : ''}`}
                 >
-                  <FolderOpen size={14} className={`flex-shrink-0 ${dropTargetCatId === cat.id ? 'text-amber-400' : activeSection === cat.id ? 'text-amber-400' : 'text-slate-500'}`} />
+                  <FolderOpen size={17} className="flex-shrink-0 a-txt-a" />
                   <span className="flex-1 truncate text-left">{cat.name}</span>
-                  <span className="text-xs text-slate-600 group-hover:invisible">
+                  <span className="a-cnt group-hover:invisible">
                     {resources.filter(r => r.category_id === cat.id).length}
                   </span>
                 </button>
-                <div className="flex items-center flex-shrink-0 invisible group-hover:visible">
+                <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center invisible group-hover:visible">
                   <button
                     onClick={e => {
                       e.stopPropagation();
@@ -1207,57 +1199,53 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                       setCategoryDescription(cat.description || '');
                       setShowCategoryModal(true);
                     }}
-                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-600 rounded transition-colors"
+                    className="a-ib" style={{ width: 28, height: 28 }}
                     title="Rename folder"
+                    aria-label="Rename folder"
                   >
-                    <Edit2 size={12} />
+                    <Edit2 size={13} />
                   </button>
                   <button
                     onClick={e => { e.stopPropagation(); handleDeleteCategory(cat.id); }}
-                    className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors"
+                    className="a-ib a-ib-d" style={{ width: 28, height: 28 }}
                     title="Delete folder"
+                    aria-label="Delete folder"
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               </div>
             ))}
           </nav>
-        </div>
+        </aside>
 
         {/* Content area */}
         <div
           ref={dropZoneRef}
-          className={`flex-1 flex flex-col min-h-0 transition-colors relative ${
-            isDragging ? 'bg-blue-900/10' : ''
-          }`}
+          className="flex-1 flex flex-col min-h-0 min-w-0 transition-colors relative gap-4"
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
           {/* Toolbar bar */}
-          <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3 border-b border-slate-700/40 bg-slate-800/30">
+          <div className="flex-shrink-0 flex flex-wrap items-center gap-2.5">
             {/* Breadcrumbs */}
-            <div className="flex items-center gap-1 flex-1 min-w-0 text-sm">
+            <div className="flex items-center gap-1.5 flex-1 min-w-[200px] text-[15px]">
               {isDriveSection ? (
                 <>
                   <button
                     onClick={() => navigateDriveTo(0)}
-                    className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors"
+                    className="flex items-center gap-1.5 a-mute"
                   >
-                    <HardDrive size={13} className="text-green-400" />
-                    <span className={driveBreadcrumbs.length === 0 ? 'text-white font-medium' : ''}>Google Drive</span>
+                    <HardDrive size={16} className="a-txt-g" />
+                    <span className={driveBreadcrumbs.length === 0 ? 'a-display a-ink text-[20px] font-semibold' : ''}>Google Drive</span>
                   </button>
                   {driveBreadcrumbs.map((crumb, i) => (
                     <React.Fragment key={crumb.id}>
-                      <ChevronRight size={13} className="text-slate-600 flex-shrink-0" />
+                      <ChevronRight size={15} className="a-dim flex-shrink-0" />
                       <button
                         onClick={() => navigateDriveTo(i + 1)}
-                        className={`truncate max-w-[140px] transition-colors ${
-                          i === driveBreadcrumbs.length - 1
-                            ? 'text-white font-medium'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
+                        className={`truncate max-w-[180px] ${i === driveBreadcrumbs.length - 1 ? 'a-display a-ink text-[20px] font-semibold' : 'a-mute'}`}
                       >
                         {crumb.name}
                       </button>
@@ -1268,21 +1256,17 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 <>
                   <button
                     onClick={() => navigateDropboxTo(0)}
-                    className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors"
+                    className="flex items-center gap-1.5 a-mute"
                   >
-                    <Cloud size={13} className="text-blue-400" />
-                    <span className={dropboxBreadcrumbs.length === 0 ? 'text-white font-medium' : ''}>Dropbox</span>
+                    <Cloud size={16} className="a-txt-b" />
+                    <span className={dropboxBreadcrumbs.length === 0 ? 'a-display a-ink text-[20px] font-semibold' : ''}>Dropbox</span>
                   </button>
                   {dropboxBreadcrumbs.map((crumb, i) => (
                     <React.Fragment key={crumb.id}>
-                      <ChevronRight size={13} className="text-slate-600 flex-shrink-0" />
+                      <ChevronRight size={15} className="a-dim flex-shrink-0" />
                       <button
                         onClick={() => navigateDropboxTo(i + 1)}
-                        className={`truncate max-w-[140px] transition-colors ${
-                          i === dropboxBreadcrumbs.length - 1
-                            ? 'text-white font-medium'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
+                        className={`truncate max-w-[180px] ${i === dropboxBreadcrumbs.length - 1 ? 'a-display a-ink text-[20px] font-semibold' : 'a-mute'}`}
                       >
                         {crumb.name}
                       </button>
@@ -1290,48 +1274,41 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                   ))}
                 </>
               ) : (
-                <span className="font-medium text-white">
-                  {isAllSection ? 'All Files' : isSharedSection ? 'Shared with Club' : (currentCategory?.name || 'Resources')}
+                <span className="a-display a-ink text-[20px] font-semibold">
+                  {isAllSection ? 'All files' : isSharedSection ? 'Shared with club' : (currentCategory?.name || 'Resources')}
                 </span>
               )}
               {!isCloudSection && (
-                <span className="text-xs text-slate-500 ml-2">
-                  {isSharedSection ? filteredSharedResources.length : filteredResources.length} items
+                <span className="a-cnt ml-1">
+                  {isSharedSection ? filteredSharedResources.length : filteredResources.length}
                 </span>
               )}
               {isDriveSection && !loadingDrive && (
-                <span className="text-xs text-slate-500 ml-2">{filteredDriveItems.length} items</span>
+                <span className="a-cnt ml-1">{filteredDriveItems.length}</span>
               )}
               {isDropboxSection && !loadingDropbox && (
-                <span className="text-xs text-slate-500 ml-2">{filteredDropboxItems.length} items</span>
+                <span className="a-cnt ml-1">{filteredDropboxItems.length}</span>
               )}
             </div>
 
             {/* Search */}
-            <div className="relative w-56">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <label className="a-field" style={{ width: 320, maxWidth: '100%' }}>
+              <Search size={16} />
               <input
                 type="text"
-                placeholder="Search files..."
+                placeholder="Search files"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-700/60 border border-slate-600/50 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
               />
-            </div>
+            </label>
 
             {/* View toggle */}
-            <div className="flex items-center bg-slate-700/50 rounded-lg p-0.5 border border-slate-600/30">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                <List size={13} />
+            <div className="a-seg" role="radiogroup" aria-label="Layout">
+              <button onClick={() => setViewMode('list')} className={`a-seg-i ${viewMode === 'list' ? 'a-seg-on' : ''}`} style={{ padding: '0 10px' }} aria-label="List view" title="List view">
+                <List size={17} />
               </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                <Grid size={13} />
+              <button onClick={() => setViewMode('grid')} className={`a-seg-i ${viewMode === 'grid' ? 'a-seg-on' : ''}`} style={{ padding: '0 10px' }} aria-label="Grid view" title="Grid view">
+                <Grid size={17} />
               </button>
             </div>
 
@@ -1339,20 +1316,22 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
               <button
                 onClick={() => currentDriveFolderId && browseDriveFolder(currentDriveFolderId)}
                 disabled={loadingDrive}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/50 transition-colors disabled:opacity-50"
+                className="a-ib disabled:opacity-50"
                 title="Refresh"
+                aria-label="Refresh"
               >
-                <RefreshCw size={13} className={loadingDrive ? 'animate-spin' : ''} />
+                <RefreshCw size={17} className={loadingDrive ? 'animate-spin' : ''} />
               </button>
             )}
             {isDropboxSection && (
               <button
                 onClick={() => currentDropboxPath && browseDropboxFolder(currentDropboxPath)}
                 disabled={loadingDropbox}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/50 transition-colors disabled:opacity-50"
+                className="a-ib disabled:opacity-50"
                 title="Refresh"
+                aria-label="Refresh"
               >
-                <RefreshCw size={13} className={loadingDropbox ? 'animate-spin' : ''} />
+                <RefreshCw size={17} className={loadingDropbox ? 'animate-spin' : ''} />
               </button>
             )}
           </div>
@@ -1360,11 +1339,11 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
           {/* Drag overlay */}
           {isDragging && (
             <div className="absolute inset-0 z-50 pointer-events-none flex items-center justify-center">
-              <div className="absolute inset-4 rounded-2xl border-2 border-dashed border-blue-400/60 bg-blue-900/20 flex items-center justify-center">
+              <div className="a-dropzone absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <UploadCloud size={48} className="mx-auto mb-3 text-blue-400" />
-                  <p className="text-blue-300 font-semibold text-lg">Drop files here to upload</p>
-                  <p className="text-blue-400/70 text-sm mt-1">
+                  <UploadCloud size={44} className="mx-auto mb-3 a-txt-b" />
+                  <p className="a-ink font-semibold text-[17px]">Drop files to upload</p>
+                  <p className="a-dim text-[13px] mt-1">
                     {activeSection === 'drive' ? 'Upload to Google Drive' : activeSection === 'dropbox' ? 'Upload to Dropbox' : 'Upload to folder'}
                   </p>
                 </div>
@@ -1374,19 +1353,19 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
 
           {/* Upload progress */}
           {uploading && (
-            <div className="flex-shrink-0 flex items-center gap-2.5 px-5 py-2.5 bg-blue-900/20 border-b border-blue-700/30">
-              <RefreshCw size={13} className="animate-spin text-blue-400" />
-              <span className="text-sm text-blue-300 font-medium">Uploading files...</span>
+            <div className="a-note flex-shrink-0 flex items-center gap-2.5">
+              <RefreshCw size={15} className="animate-spin a-txt-b" />
+              <span className="a-ink text-[13.5px] font-medium">Uploading files…</span>
             </div>
           )}
 
           {/* Main scroll area */}
-          <div className="flex-1 overflow-y-auto p-5">
+          <div className="flex-1 overflow-y-auto pb-4">
             {loading ? (
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3" />
-                  <p className="text-slate-400 text-sm">Loading resources...</p>
+                  <p className="a-dim text-[13.5px]">Loading documents…</p>
                 </div>
               </div>
             ) : isDriveSection ? (
@@ -1537,47 +1516,47 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       {/* Category modal */}
       {showCategoryModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white">
+          <div className="a-sheet w-full max-w-md">
+            <div className="flex items-center justify-between p-5 pb-3">
+              <h3 className="a-display a-ink text-[19px] font-semibold">
                 {editingCategory ? 'Rename Folder' : 'New Folder'}
               </h3>
-              <button onClick={() => { setShowCategoryModal(false); resetCategoryForm(); }} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors">
+              <button onClick={() => { setShowCategoryModal(false); resetCategoryForm(); }} className="a-ib" aria-label="Close">
                 <X size={16} />
               </button>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="text-sm font-medium text-slate-300 block mb-1.5">Folder Name</label>
+                <label className="a-flab">Folder Name</label>
                 <input
                   type="text"
                   value={categoryName}
                   onChange={e => setCategoryName(e.target.value)}
                   placeholder="e.g. Race Documents, Minutes..."
-                  className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
+                  className="a-inp w-full"
                   autoFocus
                   onKeyDown={e => e.key === 'Enter' && handleSaveCategory()}
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-300 block mb-1.5">Description <span className="text-slate-500 font-normal">(optional)</span></label>
+                <label className="a-flab">Description <span className="a-dim font-normal">(optional)</span></label>
                 <input
                   type="text"
                   value={categoryDescription}
                   onChange={e => setCategoryDescription(e.target.value)}
                   placeholder="Brief description"
-                  className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
+                  className="a-inp w-full"
                 />
               </div>
             </div>
             <div className="p-5 pt-0 flex justify-end gap-3">
-              <button onClick={() => { setShowCategoryModal(false); resetCategoryForm(); }} className="px-4 py-2 text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-xl transition-colors">
+              <button onClick={() => { setShowCategoryModal(false); resetCategoryForm(); }} className="a-btn">
                 Cancel
               </button>
               <button
                 onClick={handleSaveCategory}
                 disabled={categorySaving || !categoryName.trim()}
-                className="btn-primary-green px-4 py-2 text-sm from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
+                className="a-btn a-btn-p disabled:opacity-50"
               >
                 {categorySaving ? 'Saving...' : editingCategory ? 'Rename' : 'Create Folder'}
               </button>
@@ -1589,28 +1568,25 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       {/* Resource modal */}
       {showResourceModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-lg">
-            <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white">
+          <div className="a-sheet w-full max-w-lg">
+            <div className="flex items-center justify-between p-5 pb-3">
+              <h3 className="a-display a-ink text-[19px] font-semibold">
                 {editingResource ? 'Edit Resource' : 'Add Resource'}
               </h3>
-              <button onClick={() => { setShowResourceModal(false); resetResourceForm(); }} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors">
+              <button onClick={() => { setShowResourceModal(false); resetResourceForm(); }} className="a-ib" aria-label="Close">
                 <X size={16} />
               </button>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="text-sm font-medium text-slate-300 block mb-1.5">Type</label>
-                <div className="flex gap-2">
+                <label className="a-flab">Type</label>
+                <div className="a-seg" style={{ display: 'flex' }}>
                   {(['file', 'link', 'page'] as const).map(t => (
                     <button
                       key={t}
+                      type="button"
                       onClick={() => setResourceType(t)}
-                      className={`px-3 py-1.5 rounded-lg text-sm capitalize transition-colors font-medium ${
-                        resourceType === t
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700 hover:text-white'
-                      }`}
+                      className={`a-seg-i flex-1 justify-center capitalize ${resourceType === t ? 'a-seg-on' : ''}`}
                     >
                       {t}
                     </button>
@@ -1618,57 +1594,57 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-300 block mb-1.5">Title</label>
+                <label className="a-flab">Title</label>
                 <input
                   type="text"
                   value={resourceTitle}
                   onChange={e => setResourceTitle(e.target.value)}
                   placeholder="Resource title"
-                  className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
+                  className="a-inp w-full"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-300 block mb-1.5">Description <span className="text-slate-500 font-normal">(optional)</span></label>
+                <label className="a-flab">Description <span className="a-dim font-normal">(optional)</span></label>
                 <input
                   type="text"
                   value={resourceDescription}
                   onChange={e => setResourceDescription(e.target.value)}
                   placeholder="Brief description"
-                  className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
+                  className="a-inp w-full"
                 />
               </div>
               {resourceType === 'file' && (
                 <div>
-                  <label className="text-sm font-medium text-slate-300 block mb-1.5">File</label>
+                  <label className="a-flab">File</label>
                   <input
                     type="file"
                     onChange={e => setResourceFile(e.target.files?.[0] || null)}
-                    className="w-full text-sm text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-700 file:text-slate-300 hover:file:bg-slate-600 file:transition-colors file:text-sm"
+                    className="a-file w-full text-[13px]"
                   />
                 </div>
               )}
               {resourceType === 'link' && (
                 <div>
-                  <label className="text-sm font-medium text-slate-300 block mb-1.5">URL</label>
+                  <label className="a-flab">URL</label>
                   <input
                     type="url"
                     value={resourceUrl}
                     onChange={e => setResourceUrl(e.target.value)}
                     placeholder="https://"
-                    className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
+                    className="a-inp w-full"
                   />
                 </div>
               )}
               {resourceType === 'page' && (
                 <div>
-                  <label className="text-sm font-medium text-slate-300 block mb-1.5">Content</label>
+                  <label className="a-flab">Content</label>
                   <textarea
                     value={resourceContent}
                     onChange={e => setResourceContent(e.target.value)}
                     placeholder="Page content..."
                     rows={4}
-                    className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors resize-none"
+                    className="a-inp a-ta w-full"
                   />
                 </div>
               )}
@@ -1679,17 +1655,17 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                   onChange={e => setResourceIsPublic(e.target.checked)}
                   className="rounded accent-blue-500"
                 />
-                <span className="text-sm text-slate-300 group-hover:text-white transition-colors">Visible to all members</span>
+                <span className="a-ink text-[14px]">Visible to all members</span>
               </label>
             </div>
             <div className="p-5 pt-0 flex justify-end gap-3">
-              <button onClick={() => { setShowResourceModal(false); resetResourceForm(); }} className="px-4 py-2 text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-xl transition-colors">
+              <button onClick={() => { setShowResourceModal(false); resetResourceForm(); }} className="a-btn">
                 Cancel
               </button>
               <button
                 onClick={handleSaveResource}
                 disabled={resourceSaving || !resourceTitle.trim()}
-                className="btn-primary-green px-4 py-2 text-sm from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
+                className="a-btn a-btn-p disabled:opacity-50"
               >
                 {resourceSaving ? 'Saving...' : editingResource ? 'Update' : 'Add Resource'}
               </button>
@@ -1701,14 +1677,14 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       {/* In-app Confirm Dialog */}
       {confirmDialog && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-sm">
+          <div className="a-sheet w-full max-w-sm">
             <div className="p-6">
-              <p className="text-white text-sm font-medium leading-relaxed">{confirmDialog.message}</p>
+              <p className="a-ink text-[14px] font-medium leading-relaxed">{confirmDialog.message}</p>
             </div>
             <div className="px-6 pb-5 flex justify-end gap-3">
               <button
                 onClick={() => setConfirmDialog(null)}
-                className="px-4 py-2 text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-xl transition-colors"
+                className="a-btn"
               >
                 Cancel
               </button>
@@ -1717,7 +1693,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                   confirmDialog.onConfirm();
                   setConfirmDialog(null);
                 }}
-                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors font-medium"
+                className="a-btn a-btn-d"
               >
                 Delete
               </button>
@@ -1729,21 +1705,21 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       {/* Drive/Dropbox New Folder Modal */}
       {showDriveNewFolderModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-sm">
-            <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white">New Folder in {isDropboxSection ? 'Dropbox' : 'Google Drive'}</h3>
-              <button onClick={() => { setShowDriveNewFolderModal(false); setDriveNewFolderName(''); }} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors">
+          <div className="a-sheet w-full max-w-sm">
+            <div className="flex items-center justify-between p-5 pb-3">
+              <h3 className="a-display a-ink text-[19px] font-semibold">New Folder in {isDropboxSection ? 'Dropbox' : 'Google Drive'}</h3>
+              <button onClick={() => { setShowDriveNewFolderModal(false); setDriveNewFolderName(''); }} className="a-ib" aria-label="Close">
                 <X size={16} />
               </button>
             </div>
             <div className="p-5">
-              <label className="text-sm font-medium text-slate-300 block mb-1.5">Folder Name</label>
+              <label className="a-flab">Folder Name</label>
               <input
                 type="text"
                 value={driveNewFolderName}
                 onChange={e => setDriveNewFolderName(e.target.value)}
                 placeholder="e.g. Race Documents 2026"
-                className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
+                className="a-inp w-full"
                 autoFocus
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
@@ -1757,12 +1733,12 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                   }
                 }}
               />
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="a-dim mt-2 text-[12px]">
                 This folder will be created inside the current {isDropboxSection ? 'Dropbox' : 'Google Drive'} location.
               </p>
             </div>
             <div className="p-5 pt-0 flex justify-end gap-3">
-              <button onClick={() => { setShowDriveNewFolderModal(false); setDriveNewFolderName(''); }} className="px-4 py-2 text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-xl transition-colors">
+              <button onClick={() => { setShowDriveNewFolderModal(false); setDriveNewFolderName(''); }} className="a-btn">
                 Cancel
               </button>
               <button
@@ -1776,7 +1752,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                   }
                 }}
                 disabled={driveNewFolderCreating || !driveNewFolderName.trim()}
-                className={`px-4 py-2 text-sm ${isDropboxSection ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800' : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'} text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium`}
+                className="a-btn a-btn-p disabled:opacity-50"
               >
                 {driveNewFolderCreating ? 'Creating...' : 'Create Folder'}
               </button>
@@ -1788,20 +1764,20 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       {/* Drive Rename Modal */}
       {driveRenameItem && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-sm">
-            <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white">Rename</h3>
-              <button onClick={() => { setDriveRenameItem(null); setDriveRenameName(''); }} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors">
+          <div className="a-sheet w-full max-w-sm">
+            <div className="flex items-center justify-between p-5 pb-3">
+              <h3 className="a-display a-ink text-[19px] font-semibold">Rename</h3>
+              <button onClick={() => { setDriveRenameItem(null); setDriveRenameName(''); }} className="a-ib" aria-label="Close">
                 <X size={16} />
               </button>
             </div>
             <div className="p-5">
-              <label className="text-sm font-medium text-slate-300 block mb-1.5">New name</label>
+              <label className="a-flab">New name</label>
               <input
                 type="text"
                 value={driveRenameName}
                 onChange={e => setDriveRenameName(e.target.value)}
-                className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
+                className="a-inp w-full"
                 autoFocus
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
@@ -1820,7 +1796,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
               />
             </div>
             <div className="p-5 pt-0 flex justify-end gap-3">
-              <button onClick={() => { setDriveRenameItem(null); setDriveRenameName(''); }} className="px-4 py-2 text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-xl transition-colors">
+              <button onClick={() => { setDriveRenameItem(null); setDriveRenameName(''); }} className="a-btn">
                 Cancel
               </button>
               <button
@@ -1837,7 +1813,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                   }
                 }}
                 disabled={driveRenaming || !driveRenameName.trim()}
-                className="px-4 py-2 text-sm from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
+                className="a-btn a-btn-p disabled:opacity-50"
               >
                 {driveRenaming ? 'Renaming...' : 'Rename'}
               </button>
@@ -1858,25 +1834,14 @@ const SidebarItem: React.FC<{
   active: boolean;
   onClick: () => void;
   accent?: 'blue' | 'green';
-}> = ({ icon: Icon, label, count, active, onClick, accent }) => {
-  const accentColor = accent === 'green' ? 'text-green-400' : accent === 'blue' ? 'text-blue-400' : 'text-slate-400';
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
-        active
-          ? 'bg-slate-700/80 text-white border border-slate-600/60 shadow-sm'
-          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
-      }`}
-    >
-      <Icon size={14} className={active ? (accent ? accentColor : 'text-blue-400') : (accent ? accentColor : 'text-slate-500')} />
-      <span className="flex-1 text-left">{label}</span>
-      {count !== undefined && count > 0 && (
-        <span className="text-xs text-slate-500">{count}</span>
-      )}
-    </button>
-  );
-};
+}> = ({ icon: Icon, label, count, active, onClick, accent }) => (
+  <button onClick={onClick} className={`a-lib w-full ${active ? 'a-lib-on' : ''}`}>
+    <Icon size={17} className="flex-shrink-0" />
+    <span className="flex-1 text-left truncate">{label}</span>
+    {accent && count === undefined && <span className="a-light a-light-g" />}
+    {count !== undefined && count > 0 && <span className="a-cnt">{count}</span>}
+  </button>
+);
 
 // All Files overview
 const AllFilesView: React.FC<{
@@ -1908,146 +1873,79 @@ const AllFilesView: React.FC<{
   onDropOnCategory: (catId: string) => void;
   onDragOverCategory: (catId: string | null) => void;
 }> = ({ categories, resources, filteredResources, viewMode, hasGoogleDrive, hasDropbox, sharedCount, isClubContext, onSetSection, onOpenDrive, onOpenDropbox, onNewFolder, onEditCategory, onDeleteCategory, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, onEditResource, onDeleteResource, draggedResource, onDragStartResource, onDragEndResource, dropTargetCatId, onDropOnCategory, onDragOverCategory }) => {
+  const source = (icon: React.ReactNode, title: string, sub: string, onClick: () => void) => (
+    <button onClick={onClick} className="a-qa text-left">
+      <span className="a-tile" style={{ width: 44, height: 44 }}>{icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="a-ink text-[15px] font-semibold">{title}</div>
+        <span className="a-st text-[12.5px] mt-[3px]"><span className="a-light a-light-g" /><span className="a-mute">{sub}</span></span>
+      </div>
+      <ChevronRight size={16} className="a-dim" />
+    </button>
+  );
   return (
-    <div className="space-y-6">
-      {/* Storage sources */}
+    <div className="flex flex-col gap-5">
       {(hasGoogleDrive || hasDropbox || (isClubContext && sharedCount > 0)) && (
-        <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Connected Storage</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {hasGoogleDrive && (
-              <button
-                onClick={onOpenDrive}
-                className="flex items-center gap-3 p-4 bg-gradient-to-br from-slate-800/80 to-slate-700/40 border border-slate-700/50 hover:border-green-500/40 rounded-xl transition-all hover:shadow-lg hover:shadow-green-500/10 group text-left"
-              >
-                <div className="w-10 h-10 rounded-xl bg-green-500/15 flex items-center justify-center flex-shrink-0">
-                  <HardDrive size={20} className="text-green-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-200 group-hover:text-white">Google Drive</p>
-                  <p className="text-xs text-slate-500">Browse connected Drive</p>
-                </div>
-                <ChevronRight size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
-              </button>
-            )}
-            {hasDropbox && onOpenDropbox && (
-              <button
-                onClick={onOpenDropbox}
-                className="flex items-center gap-3 p-4 bg-gradient-to-br from-slate-800/80 to-slate-700/40 border border-slate-700/50 hover:border-blue-500/40 rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/10 group text-left"
-              >
-                <div className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center flex-shrink-0">
-                  <Cloud size={20} className="text-blue-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-200 group-hover:text-white">Dropbox</p>
-                  <p className="text-xs text-slate-500">Browse connected Dropbox</p>
-                </div>
-                <ChevronRight size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
-              </button>
-            )}
-            {isClubContext && sharedCount > 0 && (
-              <button
-                onClick={() => onSetSection('shared')}
-                className="flex items-center gap-3 p-4 bg-gradient-to-br from-slate-800/80 to-slate-700/40 border border-slate-700/50 hover:border-blue-500/40 rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/10 group text-left"
-              >
-                <div className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center flex-shrink-0">
-                  <Building2 size={20} className="text-blue-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-200 group-hover:text-white">Shared with Club</p>
-                  <p className="text-xs text-slate-500">{sharedCount} resources from association</p>
-                </div>
-                <ChevronRight size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
-              </button>
-            )}
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {hasGoogleDrive && source(<HardDrive size={20} />, 'Google Drive', 'Connected · browse files', onOpenDrive)}
+          {hasDropbox && onOpenDropbox && source(<Cloud size={20} />, 'Dropbox', 'Connected · browse files', onOpenDropbox)}
+          {isClubContext && sharedCount > 0 && source(<Building2 size={20} />, 'Shared with club', `${sharedCount} resources from your association`, () => onSetSection('shared'))}
         </div>
       )}
 
-      {/* Folders */}
       {categories.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Folders</p>
-          <div className={viewMode === 'grid'
-            ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3'
-            : 'space-y-1'
-          }>
+          <p className="a-cap mb-2.5">Folders</p>
+          <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3' : 'a-card overflow-hidden'}>
             {categories.map(cat => {
               const count = resources.filter(r => r.category_id === cat.id).length;
               const isTarget = dropTargetCatId === cat.id && !!draggedResource;
+              const dnd = {
+                onDragOver: (e: React.DragEvent) => { if (draggedResource) { e.preventDefault(); onDragOverCategory(cat.id); } },
+                onDragLeave: () => onDragOverCategory(null),
+                onDrop: (e: React.DragEvent) => { e.preventDefault(); onDropOnCategory(cat.id); },
+              };
               if (viewMode === 'grid') {
                 return (
-                  <button
-                    key={cat.id}
-                    draggable={false}
-                    onDragOver={e => { if (draggedResource) { e.preventDefault(); onDragOverCategory(cat.id); } }}
-                    onDragLeave={() => onDragOverCategory(null)}
-                    onDrop={e => { e.preventDefault(); onDropOnCategory(cat.id); }}
-                    onClick={() => onSetSection(cat.id)}
-                    className={`flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-slate-800/70 to-slate-700/40 border rounded-xl transition-all group ${
-                      isTarget ? 'border-amber-400/70 bg-amber-500/10 scale-105 shadow-lg shadow-amber-500/20' : 'border-slate-700/50 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/10'
-                    }`}
-                  >
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isTarget ? 'bg-amber-500/30' : 'bg-amber-500/15'}`}>
-                      <FolderOpen size={24} className="text-amber-400" />
+                  <div key={cat.id} {...dnd} onClick={() => onSetSection(cat.id)} className={`a-fold group relative ${isTarget ? 'a-drop-target' : ''}`} role="button" tabIndex={0}>
+                    <span className="a-tile" style={{ width: 44, height: 44 }}><FolderOpen size={20} className="a-txt-a" /></span>
+                    <div className="min-w-0">
+                      <div className="a-ink text-[15px] font-semibold truncate">{cat.name}</div>
+                      <div className="a-dim text-[12.5px] mt-0.5">{count} item{count !== 1 ? 's' : ''}</div>
                     </div>
-                    <p className="text-xs font-medium text-slate-300 group-hover:text-white text-center">{cat.name}</p>
-                    <p className="text-xs text-slate-600">{count} item{count !== 1 ? 's' : ''}</p>
-                  </button>
+                    <div className="absolute flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ top: 12, right: 12 }}>
+                      <button onClick={e => { e.stopPropagation(); onEditCategory(cat); }} className="a-ib" style={{ width: 28, height: 28 }} title="Rename folder" aria-label="Rename folder"><Edit2 size={13} /></button>
+                      <button onClick={e => { e.stopPropagation(); onDeleteCategory(cat.id); }} className="a-ib a-ib-d" style={{ width: 28, height: 28 }} title="Delete folder" aria-label="Delete folder"><Trash2 size={13} /></button>
+                    </div>
+                  </div>
                 );
               }
               return (
-                <div
-                  key={cat.id}
-                  onDragOver={e => { if (draggedResource) { e.preventDefault(); onDragOverCategory(cat.id); } }}
-                  onDragLeave={() => onDragOverCategory(null)}
-                  onDrop={e => { e.preventDefault(); onDropOnCategory(cat.id); }}
-                  className={`rounded-xl transition-all ${isTarget ? 'ring-2 ring-amber-400/60' : ''}`}
-                >
-                  <div
-                    className={`flex items-center gap-3 px-4 py-3 border rounded-xl transition-all group w-full ${
-                      isTarget ? 'bg-amber-500/10 border-amber-400/50' : 'bg-slate-800/40 border-slate-700/40 hover:border-slate-600/60 hover:bg-slate-700/30'
-                    }`}
-                  >
-                    <button
-                      onClick={() => onSetSection(cat.id)}
-                      className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                    >
-                      <FolderOpen size={18} className={`flex-shrink-0 ${isTarget ? 'text-amber-300' : 'text-amber-400'}`} />
-                      <span className="flex-1 text-sm text-slate-300 group-hover:text-white font-medium truncate">{cat.name}</span>
-                    </button>
-                    <span className="text-xs text-slate-500 group-hover:hidden">{count} item{count !== 1 ? 's' : ''}</span>
-                    <div className="hidden group-hover:flex items-center gap-1">
-                      <button
-                        onClick={e => { e.stopPropagation(); onEditCategory(cat); }}
-                        className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
-                        title="Rename folder"
-                      >
-                        <Edit2 size={13} />
-                      </button>
-                      <button
-                        onClick={e => { e.stopPropagation(); onDeleteCategory(cat.id); }}
-                        className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-red-900/20 transition-colors"
-                        title="Delete folder"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                    <button onClick={() => onSetSection(cat.id)} className="flex-shrink-0">
-                      <ChevronRight size={13} className="text-slate-600 group-hover:text-slate-400" />
-                    </button>
+                <div key={cat.id} {...dnd} onClick={() => onSetSection(cat.id)} className={`a-fr a-fr-row group ${isTarget ? 'a-drop-target' : ''}`} role="button" tabIndex={0}>
+                  <span className="a-tile" style={{ width: 40, height: 40 }}><FolderOpen size={18} className="a-txt-a" /></span>
+                  <span className="a-ink text-[14.5px] font-medium truncate">{cat.name}</span>
+                  <span className="a-lb-fmt justify-self-start">Folder</span>
+                  <span className="a-mute text-[13px]">{count} item{count !== 1 ? 's' : ''}</span>
+                  <div className="a-acts flex justify-end gap-0.5" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => onEditCategory(cat)} className="a-ib" title="Rename folder" aria-label="Rename folder"><Edit2 size={16} /></button>
+                    <button onClick={() => onDeleteCategory(cat.id)} className="a-ib a-ib-d" title="Delete folder" aria-label="Delete folder"><Trash2 size={16} /></button>
                   </div>
                 </div>
               );
             })}
+            {viewMode === 'grid' && (
+              <button onClick={onNewFolder} className="a-fold a-fold-add text-left">
+                <span className="a-tile" style={{ width: 44, height: 44 }}><FolderPlus size={20} /></span>
+                <div className="text-[14px] font-semibold">New folder</div>
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* All resources flat list when searching */}
       {filteredResources.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">All Files</p>
+          <p className="a-cap mb-2.5">Files</p>
           <ResourceTable
             resources={filteredResources}
             getFileIcon={getFileIcon}
@@ -2062,21 +1960,12 @@ const AllFilesView: React.FC<{
         </div>
       )}
 
-      {/* Empty */}
       {categories.length === 0 && !hasGoogleDrive && !hasDropbox && (
-        <div className="flex flex-col items-center justify-center h-64 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
-            <FolderOpen size={28} className="text-slate-600" />
-          </div>
-          <p className="text-slate-300 font-semibold mb-1">No resources yet</p>
-          <p className="text-slate-500 text-sm mb-5">Create a folder to start organising your resources</p>
-          <button
-            onClick={onNewFolder}
-            className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-medium transition-all hover:scale-105"
-          >
-            <FolderPlus size={14} />
-            New Folder
-          </button>
+        <div className="a-card a-empty flex flex-col items-center justify-center text-center" style={{ padding: 48 }}>
+          <span className="a-tile mb-3" style={{ width: 52, height: 52 }}><FolderOpen size={22} /></span>
+          <p className="a-ink font-semibold mb-1">No documents yet</p>
+          <p className="a-dim text-[13.5px] mb-5">Create a folder to start organising your documents</p>
+          <button onClick={onNewFolder} className="a-btn a-btn-p"><FolderPlus size={16} />New folder</button>
         </div>
       )}
     </div>
@@ -2100,51 +1989,38 @@ const FolderView: React.FC<{
 }> = ({ resources, viewMode, onAddResource, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, onEditResource, onDeleteResource, onDragStartResource, onDragEndResource }) => {
   if (resources.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
-          <File size={28} className="text-slate-600" />
-        </div>
-        <p className="text-slate-300 font-semibold mb-1">No resources yet</p>
-        <p className="text-slate-500 text-sm mb-5">Add files, links, or pages to this folder</p>
-        <button
-          onClick={onAddResource}
-          className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-medium transition-all hover:scale-105"
-        >
-          <Plus size={14} />
-          Add Resource
-        </button>
+      <div className="a-card a-empty flex flex-col items-center justify-center text-center" style={{ padding: 48 }}>
+        <span className="a-tile mb-3" style={{ width: 52, height: 52 }}><File size={22} /></span>
+        <p className="a-ink font-semibold mb-1">This folder is empty</p>
+        <p className="a-dim text-[13.5px] mb-5">Add files, links or pages to this folder</p>
+        <button onClick={onAddResource} className="a-btn a-btn-p"><Plus size={16} />Add resource</button>
       </div>
     );
   }
 
   if (viewMode === 'grid') {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
         {resources.map(r => {
           const Icon = getFileIcon(r.file_type || r.resource_type);
           const iconColor = getFileIconColor(r.file_type || r.resource_type);
-          const bgColor = getFileBgColor(r.file_type || r.resource_type);
           return (
             <div
               key={r.id}
               draggable
               onDragStart={() => onDragStartResource(r)}
               onDragEnd={onDragEndResource}
-              className="group relative flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-br from-slate-800/70 to-slate-700/40 border border-slate-700/50 hover:border-slate-600/70 hover:shadow-lg transition-all cursor-grab active:cursor-grabbing active:opacity-60 active:scale-95"
+              className="a-fold group relative cursor-grab active:cursor-grabbing active:opacity-60"
               onClick={() => r.external_url ? window.open(r.external_url, '_blank') : r.file_url ? window.open(r.file_url, '_blank') : undefined}
             >
-              <div className={`w-12 h-12 rounded-xl ${bgColor} flex items-center justify-center`}>
-                <Icon size={24} className={iconColor} />
+              <span className="a-tile" style={{ width: 44, height: 44 }}><Icon size={20} className={iconColor} /></span>
+              <div className="min-w-0">
+                <div className="a-ink text-[14px] font-semibold line-clamp-2">{r.title}</div>
+                {r.file_size && <div className="a-dim text-[12px] mt-0.5">{formatFileSize(r.file_size)}</div>}
               </div>
-              <p className="text-xs font-medium text-slate-300 group-hover:text-white text-center line-clamp-2 w-full">{r.title}</p>
-              {r.file_size && <p className="text-xs text-slate-600">{formatFileSize(r.file_size)}</p>}
-              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={e => { e.stopPropagation(); onEditResource(r); }} className="p-1 bg-slate-700/90 rounded hover:bg-slate-600 transition-colors">
-                  <Edit2 size={10} className="text-slate-300" />
-                </button>
-                <button onClick={e => { e.stopPropagation(); onDeleteResource(r); }} className="p-1 bg-slate-700/90 rounded hover:bg-red-600/80 transition-colors">
-                  <Trash2 size={10} className="text-slate-300" />
-                </button>
+              <div className="absolute flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ top: 12, right: 12 }}>
+                <button onClick={e => { e.stopPropagation(); onEditResource(r); }} className="a-ib" style={{ width: 28, height: 28 }} aria-label="Edit"><Edit2 size={13} /></button>
+                <button onClick={e => { e.stopPropagation(); onDeleteResource(r); }} className="a-ib a-ib-d" style={{ width: 28, height: 28 }} aria-label="Delete"><Trash2 size={13} /></button>
               </div>
             </div>
           );
@@ -2181,74 +2057,46 @@ const ResourceTable: React.FC<{
   onDragStartResource?: (r: ResourceStorage.AssociationResource) => void;
   onDragEndResource?: () => void;
 }> = ({ resources, getFileIcon, getFileIconColor, formatFileSize, formatDate, onEdit, onDelete, readOnly, onDragStartResource, onDragEndResource }) => (
-  <div className="bg-gradient-to-br from-slate-800/80 to-slate-800/40 rounded-xl border border-slate-700/50 overflow-hidden">
-    <table className="w-full">
-      <thead>
-        <tr className="border-b border-slate-700/50 bg-slate-900/30">
-          <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 w-8"></th>
-          <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Name</th>
-          <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 w-36 hidden sm:table-cell">Added</th>
-          <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 w-24 hidden md:table-cell">Size</th>
-          <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 w-24 hidden lg:table-cell">Type</th>
-          {!readOnly && <th className="w-20 px-4 py-3"></th>}
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-700/30">
-        {resources.map(r => {
-          const Icon = getFileIcon(r.file_type || r.resource_type);
-          const iconColor = getFileIconColor(r.file_type || r.resource_type);
-          const url = r.file_url || r.external_url;
-          return (
-            <tr
-              key={r.id}
-              draggable={!!onDragStartResource}
-              onDragStart={() => onDragStartResource?.(r)}
-              onDragEnd={onDragEndResource}
-              className="hover:bg-slate-700/20 group transition-colors cursor-grab active:cursor-grabbing active:opacity-60"
-              onClick={() => url && window.open(url, '_blank')}
-            >
-              <td className="px-4 py-3">
-                <Icon size={16} className={iconColor} />
-              </td>
-              <td className="px-4 py-3">
-                <div>
-                  <p className="text-sm text-slate-200 group-hover:text-white font-medium transition-colors">{r.title}</p>
-                  {r.description && <p className="text-xs text-slate-500 truncate max-w-xs mt-0.5">{r.description}</p>}
-                </div>
-              </td>
-              <td className="px-4 py-3 text-xs text-slate-500 hidden sm:table-cell">{formatDate(r.created_at)}</td>
-              <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{formatFileSize(r.file_size)}</td>
-              <td className="px-4 py-3 hidden lg:table-cell">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700/60 text-slate-400 capitalize">
-                  {r.resource_type === 'google_drive' ? 'Drive' : r.resource_type}
-                </span>
-              </td>
-              {!readOnly && (
-                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {url && (
-                      <button onClick={() => window.open(url, '_blank')} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Open">
-                        <Eye size={12} />
-                      </button>
-                    )}
-                    {onEdit && (
-                      <button onClick={() => onEdit(r)} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Edit">
-                        <Edit2 size={12} />
-                      </button>
-                    )}
-                    {onDelete && (
-                      <button onClick={() => onDelete(r)} className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-red-900/20 transition-colors" title="Delete">
-                        <Trash2 size={12} />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              )}
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+  <div className="a-card overflow-hidden">
+    <div className="a-fr a-fr-h">
+      <span />
+      <p className="a-cap">Name</p>
+      <p className="a-cap">Type</p>
+      <p className="a-cap">Added</p>
+      <span />
+    </div>
+    {resources.map(r => {
+      const Icon = getFileIcon(r.file_type || r.resource_type);
+      const iconColor = getFileIconColor(r.file_type || r.resource_type);
+      const url = r.file_url || r.external_url;
+      const ext = (r.title?.match(/\.([a-z0-9]{2,5})$/i)?.[1] || r.file_url?.split('?')[0].match(/\.([a-z0-9]{2,5})$/i)?.[1] || '').toUpperCase();
+      const typeLabel = r.resource_type === 'google_drive' ? 'Drive' : r.resource_type === 'file' ? (ext || (r.file_type?.includes('pdf') ? 'PDF' : 'File')) : r.resource_type;
+      return (
+        <div
+          key={r.id}
+          draggable={!!onDragStartResource}
+          onDragStart={() => onDragStartResource?.(r)}
+          onDragEnd={onDragEndResource}
+          className="a-fr a-fr-row group cursor-grab active:cursor-grabbing active:opacity-60"
+          onClick={() => url && window.open(url, '_blank')}
+          role="button"
+          tabIndex={0}
+        >
+          <span className="a-tile" style={{ width: 40, height: 40 }}><Icon size={18} className={iconColor} /></span>
+          <div className="min-w-0">
+            <div className="a-ink text-[14.5px] font-medium truncate">{r.title}</div>
+            {(r.description || r.file_size) && <div className="a-dim text-[12px] truncate mt-0.5">{[r.description, r.file_size ? formatFileSize(r.file_size) : null].filter(Boolean).join(' · ')}</div>}
+          </div>
+          <span className="a-lb-fmt justify-self-start capitalize">{typeLabel}</span>
+          <span className="a-mute text-[13px]">{formatDate(r.created_at)}</span>
+          <div className="a-acts flex justify-end gap-0.5" onClick={e => e.stopPropagation()}>
+            {url && <button onClick={() => window.open(url, '_blank')} className="a-ib" title="Open" aria-label="Open"><Eye size={16} /></button>}
+            {!readOnly && onEdit && <button onClick={() => onEdit(r)} className="a-ib" title="Edit" aria-label="Edit"><Edit2 size={16} /></button>}
+            {!readOnly && onDelete && <button onClick={() => onDelete(r)} className="a-ib a-ib-d" title="Delete" aria-label="Delete"><Trash2 size={16} /></button>}
+          </div>
+        </div>
+      );
+    })}
   </div>
 );
 
@@ -2264,12 +2112,10 @@ const SharedResourcesView: React.FC<{
 }> = ({ resources, viewMode, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate }) => {
   if (resources.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
-          <Users size={28} className="text-slate-600" />
-        </div>
-        <p className="text-slate-300 font-semibold mb-1">No shared resources</p>
-        <p className="text-slate-500 text-sm">Your association hasn't shared any resources yet</p>
+      <div className="a-card a-empty flex flex-col items-center justify-center text-center" style={{ padding: 48 }}>
+        <span className="a-tile mb-3" style={{ width: 52, height: 52 }}><Users size={22} /></span>
+        <p className="a-ink font-semibold mb-1">Nothing shared yet</p>
+        <p className="a-dim text-[13.5px]">Your association hasn’t shared any resources yet</p>
       </div>
     );
   }
@@ -2283,13 +2129,13 @@ const SharedResourcesView: React.FC<{
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-5">
       {Object.entries(grouped).map(([orgName, items]) => (
         <div key={orgName}>
-          <div className="flex items-center gap-2 mb-3">
-            <Building2 size={14} className="text-blue-400" />
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{orgName}</p>
-            <span className="text-xs text-slate-600">({items.length})</span>
+          <div className="flex items-center gap-2 mb-2.5">
+            <Building2 size={14} className="a-dim" />
+            <p className="a-cap">{orgName}</p>
+            <span className="a-cnt">{items.length}</span>
           </div>
           <ResourceTable
             resources={items}
@@ -2339,12 +2185,12 @@ const DriveView: React.FC<{
 
   if (!hasGoogleDrive) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
-          <ProviderIcon size={28} className="text-slate-600" />
+      <div className="a-card a-empty flex flex-col items-center justify-center text-center" style={{ padding: 48 }}>
+        <div className="a-tile mb-3" style={{ width: 52, height: 52 }}>
+          <ProviderIcon size={22} />
         </div>
-        <p className="text-slate-300 font-semibold mb-1">{label} not connected</p>
-        <p className="text-slate-500 text-sm">Connect {label} in Settings &rarr; Integrations</p>
+        <p className="a-ink font-semibold mb-1">{label} not connected</p>
+        <p className="a-dim text-[13.5px]">Connect {label} in Settings &rarr; Integrations</p>
       </div>
     );
   }
@@ -2354,7 +2200,7 @@ const DriveView: React.FC<{
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className={`animate-spin rounded-full h-8 w-8 ${accentBorder} mx-auto mb-3`} />
-          <p className="text-slate-400 text-sm">Loading {label}...</p>
+          <p className="a-dim text-[13.5px]">Loading {label}...</p>
         </div>
       </div>
     );
@@ -2362,12 +2208,12 @@ const DriveView: React.FC<{
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
-          <FolderOpen size={28} className="text-slate-600" />
+      <div className="a-card a-empty flex flex-col items-center justify-center text-center" style={{ padding: 48 }}>
+        <div className="a-tile mb-3" style={{ width: 52, height: 52 }}>
+          <FolderOpen size={22} />
         </div>
-        <p className="text-slate-300 font-semibold mb-1">This folder is empty</p>
-        <p className="text-slate-500 text-sm">Drag and drop files here to upload</p>
+        <p className="a-ink font-semibold mb-1">This folder is empty</p>
+        <p className="a-dim text-[13.5px]">Drag and drop files here to upload</p>
       </div>
     );
   }
@@ -2382,11 +2228,11 @@ const DriveView: React.FC<{
 
   if (viewMode === 'grid') {
     return (
-      <div className="space-y-6">
+      <div className="flex flex-col gap-5">
         {folders.length > 0 && (
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Folders</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <p className="a-cap mb-2.5">Folders</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
               {folders.map(item => (
                 <DriveGridCard
                   key={item.id}
@@ -2413,8 +2259,8 @@ const DriveView: React.FC<{
         )}
         {files.length > 0 && (
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Files</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <p className="a-cap mb-2.5">Files</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
               {files.map(item => (
                 <DriveGridCard
                   key={item.id}
@@ -2457,18 +2303,18 @@ const DriveView: React.FC<{
 
   return (
     <div>
-      <div className="bg-gradient-to-br from-slate-800/80 to-slate-800/40 rounded-xl border border-slate-700/50 overflow-hidden">
+      <div className="a-card overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-slate-700/50 bg-slate-900/30">
-              <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 w-8"></th>
-              <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Name</th>
-              <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 w-36 hidden sm:table-cell">Modified</th>
-              <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 w-24 hidden md:table-cell">Size</th>
+            <tr className="a-thead-row">
+              <th className="a-cap text-left px-4 py-3 w-8"></th>
+              <th className="a-cap text-left px-4 py-3">Name</th>
+              <th className="a-cap text-left px-4 py-3 w-36 hidden sm:table-cell">Modified</th>
+              <th className="a-cap text-left px-4 py-3 w-24 hidden md:table-cell">Size</th>
               <th className="w-24 px-4 py-3"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-700/30">
+          <tbody className="a-tbody">
             {[...folders, ...files].map(item => {
               const Icon = getFileIcon(item.mimeType, item.isFolder);
               const iconColor = getFileIconColor(item.mimeType, item.isFolder);
@@ -2483,7 +2329,7 @@ const DriveView: React.FC<{
                   onDragLeave={() => { if (item.isFolder) onDragOverDriveFolder(null); }}
                   onDrop={e => { e.preventDefault(); if (item.isFolder) onDropOnDriveFolder(item.id); }}
                   className={`group transition-colors cursor-grab active:cursor-grabbing active:opacity-60 ${
-                    isTarget ? 'bg-green-500/10 border-l-2 border-green-400' : 'hover:bg-slate-700/20'
+                    isTarget ? 'a-drop-target' : 'a-tr-hover'
                   }`}
                   onClick={() => onItemClick(item)}
                   onContextMenu={e => handleRightClick(e, item)}
@@ -2492,24 +2338,24 @@ const DriveView: React.FC<{
                     <Icon size={16} className={isTarget ? 'text-green-400' : iconColor} />
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-sm font-medium transition-colors ${isTarget ? 'text-green-300' : 'text-slate-200 group-hover:text-white'}`}>{item.name}</span>
+                    <span className={`text-sm font-medium transition-colors ${isTarget ? 'a-txt-g' : 'a-ink'}`}>{item.name}</span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-500 hidden sm:table-cell">{formatDate(item.modifiedTime)}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{formatFileSize(item.size)}</td>
+                  <td className="a-mute px-4 py-3 text-[13px] hidden sm:table-cell">{formatDate(item.modifiedTime)}</td>
+                  <td className="a-mute px-4 py-3 text-[13px] hidden md:table-cell">{formatFileSize(item.size)}</td>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {!item.isFolder && (
-                        <button onClick={() => onDownload(item)} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Download">
+                        <button onClick={() => onDownload(item)} className="a-ib" style={{ width: 32, height: 32 }} title="Download">
                           <Download size={12} />
                         </button>
                       )}
-                      <button onClick={() => onRename(item)} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Rename">
+                      <button onClick={() => onRename(item)} className="a-ib" style={{ width: 32, height: 32 }} title="Rename">
                         <Edit2 size={12} />
                       </button>
-                      <button onClick={() => window.open(item.webViewLink, '_blank')} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Open in Drive">
+                      <button onClick={() => window.open(item.webViewLink, '_blank')} className="a-ib" style={{ width: 32, height: 32 }} title="Open in Drive">
                         <ExternalLink size={12} />
                       </button>
-                      <button onClick={() => onDelete(item)} className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-red-900/20 transition-colors" title="Delete">
+                      <button onClick={() => onDelete(item)} className="a-ib a-ib-d" style={{ width: 32, height: 32 }} title="Delete">
                         <Trash2 size={12} />
                       </button>
                     </div>
@@ -2565,33 +2411,33 @@ const DriveGridCard: React.FC<{
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`group relative flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-br from-slate-800/70 to-slate-700/40 border transition-all cursor-grab active:cursor-grabbing active:opacity-60 active:scale-95 ${
+      className={`a-fold group relative cursor-grab active:cursor-grabbing active:opacity-60 ${
         isDragTarget
           ? 'border-green-400/70 bg-green-500/10 scale-105 shadow-lg shadow-green-500/20'
-          : 'border-slate-700/50 hover:border-slate-600/70 hover:shadow-lg'
+          : ''
       }`}
       onClick={() => onClick(item)}
       onContextMenu={e => onRightClick(e, item)}
     >
-      <div className={`w-12 h-12 rounded-xl ${isDragTarget ? 'bg-green-500/30' : bgColor} flex items-center justify-center`}>
-        <Icon size={24} className={isDragTarget ? 'text-green-400' : iconColor} />
+      <div className="a-tile" style={{ width: 44, height: 44 }}>
+        <Icon size={20} className={isDragTarget ? 'a-txt-g' : iconColor} />
       </div>
-      <p className={`text-xs font-medium text-center line-clamp-2 w-full ${isDragTarget ? 'text-green-300' : 'text-slate-300 group-hover:text-white'}`}>{item.name}</p>
-      {!item.isFolder && item.size && <p className="text-xs text-slate-600">{formatFileSize(item.size)}</p>}
+      <p className={`text-[14px] font-semibold line-clamp-2 w-full ${isDragTarget ? 'a-txt-g' : 'a-ink'}`}>{item.name}</p>
+      {!item.isFolder && item.size && <p className="a-dim text-[12px]">{formatFileSize(item.size)}</p>}
       <div className="absolute top-2 right-2 hidden group-hover:flex gap-1" onClick={e => e.stopPropagation()}>
         {!item.isFolder && (
-          <button onClick={() => onDownload(item)} className="p-1 bg-slate-700/90 rounded hover:bg-slate-600 transition-colors" title="Download">
-            <Download size={10} className="text-slate-300" />
+          <button onClick={() => onDownload(item)} className="a-ib" style={{ width: 28, height: 28 }} title="Download">
+            <Download size={10} />
           </button>
         )}
-        <button onClick={() => onRename(item)} className="p-1 bg-slate-700/90 rounded hover:bg-slate-600 transition-colors" title="Rename">
-          <Edit2 size={10} className="text-slate-300" />
+        <button onClick={() => onRename(item)} className="a-ib" style={{ width: 28, height: 28 }} title="Rename">
+          <Edit2 size={10} />
         </button>
-        <button onClick={() => window.open(item.webViewLink, '_blank')} className="p-1 bg-slate-700/90 rounded hover:bg-slate-600 transition-colors" title="Open in Drive">
-          <ExternalLink size={10} className="text-slate-300" />
+        <button onClick={() => window.open(item.webViewLink, '_blank')} className="a-ib" style={{ width: 28, height: 28 }} title="Open in Drive">
+          <ExternalLink size={10} />
         </button>
-        <button onClick={() => onDelete(item)} className="p-1 bg-slate-700/90 rounded hover:bg-red-600/80 transition-colors" title="Delete">
-          <Trash2 size={10} className="text-slate-300" />
+        <button onClick={() => onDelete(item)} className="a-ib a-ib-d" style={{ width: 28, height: 28 }} title="Delete">
+          <Trash2 size={10} />
         </button>
       </div>
     </div>
@@ -2610,12 +2456,12 @@ const DriveContextMenu: React.FC<{
 }> = ({ item, x, y, onOpen, onDownload, onDelete, onRename, onClose }) => {
   return (
     <div
-      className="fixed z-[9999] bg-slate-800 border border-slate-700/60 rounded-xl shadow-2xl py-1 min-w-[180px]"
+      className="a-pop fixed z-[9999] min-w-[190px]"
       style={{ left: x, top: y }}
       onClick={e => e.stopPropagation()}
     >
       <button
-        className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors"
+        className="a-pop-item w-full"
         onClick={() => { onOpen(item); onClose(); }}
       >
         {item.isFolder ? <FolderOpen size={14} /> : <Eye size={14} />}
@@ -2623,7 +2469,7 @@ const DriveContextMenu: React.FC<{
       </button>
       {!item.isFolder && (
         <button
-          className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors"
+          className="a-pop-item w-full"
           onClick={() => { onDownload(item); onClose(); }}
         >
           <Download size={14} />
@@ -2631,20 +2477,20 @@ const DriveContextMenu: React.FC<{
         </button>
       )}
       <button
-        className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors"
+        className="a-pop-item w-full"
         onClick={() => { onRename(item); onClose(); }}
       >
         <Edit2 size={14} />
         Rename
       </button>
       <button
-        className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors"
+        className="a-pop-item w-full"
         onClick={() => { window.open(item.webViewLink, '_blank'); onClose(); }}
       >
         <ExternalLink size={14} />
         Open in Google Drive
       </button>
-      <div className="border-t border-slate-700/50 my-1" />
+      <div className="a-pop-rule" />
       <button
         className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors"
         onClick={() => { onDelete(item); onClose(); }}
