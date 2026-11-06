@@ -10,6 +10,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import App from './App';
 import MobileStreamPage from './pages/MobileStreamPage';
 import { registerServiceWorker } from './utils/registerServiceWorker';
+import { installBrokenImageFallback } from './lib/brokenImages';
 
 import './index.css';
 import './styles/alfie-theme.css';
@@ -29,6 +30,9 @@ if (lastReload) {
   const timeSinceReload = Date.now() - new Date(lastReload).getTime();
   console.log('[Main] Time since last reload:', Math.round(timeSinceReload / 1000), 'seconds');
 }
+
+// Broken images: retry external ones without a referrer, then fall back to initials / hide
+installBrokenImageFallback();
 
 // Register service worker only in supported environments
 registerServiceWorker().catch(() => {
