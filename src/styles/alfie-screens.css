@@ -283,3 +283,8 @@ html.alfie-light .a-btable td { border-bottom-color: rgba(15, 23, 42, 0.05); }
 html.alfie-light .a-btable-sticky-l, html.alfie-light .a-btable-sticky-r { background: #fff; }
 html.alfie-light .a-btable-total td { background: #F8FAFC; color: #334155; }
 html.alfie-light .a-btable-total .a-btable-sticky-l, html.alfie-light .a-btable-total .a-btable-sticky-r { background: #F8FAFC; }
+.a-delta { display: inline-flex; align-items: center; gap: 3px; height: 24px; padding: 0 8px 0 6px; border-radius: 999px; font: 600 12.5px 'Instrument Sans', sans-serif; }
+.a-delta-g { color: #5BE07D; background: rgba(48, 209, 88, 0.12); }
+.a-delta-r { color: #FF8A8A; background: rgba(255, 107, 107, 0.12); }
+html.alfie-light .a-delta-g { color: #167A3A; background: rgba(48, 209, 88, 0.12); }
+html.alfie-light .a-delta-r { color: #C8323A; background: rgba(229, 72, 77, 0.1); }
