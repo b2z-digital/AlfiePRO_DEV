@@ -1295,49 +1295,30 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   };
 
   const renderMonthView = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={prevMonth}
-            className={`
-              p-2 rounded-lg transition-colors
-              ${darkMode
-                ? 'hover:bg-slate-700 text-slate-300'
-                : 'hover:bg-slate-100 text-slate-600'}
-            `}
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <h3 className={`text-lg font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-            {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-          </h3>
-          <button
-            onClick={nextMonth}
-            className={`
-              p-2 rounded-lg transition-colors
-              ${darkMode
-                ? 'hover:bg-slate-700 text-slate-300'
-                : 'hover:bg-slate-100 text-slate-600'}
-            `}
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <button onClick={prevMonth} className="a-ib" aria-label="Previous month">
+          <ChevronLeft size={20} />
+        </button>
+        <h3 className="a-display a-ink text-[22px] font-bold">
+          {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+        </h3>
+        <button onClick={nextMonth} className="a-ib" aria-label="Next month">
+          <ChevronRight size={20} />
+        </button>
+        <div className="flex-1" />
+        <span className="a-st a-dim text-[12.5px]"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: '#30D158' }} />Scratch</span>
+        <span className="a-st a-dim text-[12.5px]"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: 'linear-gradient(90deg,#B794FF 50%,transparent 50%)', boxShadow: 'inset 0 0 0 1.25px #B794FF' }} />Handicap</span>
+        <span className="a-st a-dim text-[12.5px]"><Users size={13} />Meeting</span>
       </div>
 
-      <div className="grid grid-cols-7 gap-px bg-slate-200 dark:bg-slate-700 rounded-lg overflow-hidden">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div
-            key={day}
-            className={`
-              p-2 text-center text-sm font-medium
-              ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-white text-slate-600'}
-            `}
-          >
-            {day}
-          </div>
-        ))}
+      <div className="a-card overflow-hidden">
+        <div className="grid grid-cols-7 a-bd border-b">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="a-cap" style={{ padding: '10px 8px' }}>{day}</div>
+          ))}
+        </div>
+        <div className="a-month grid grid-cols-7">
         {monthData.map((day, index) => {
           const dayItems = day ? getCalendarItemsForDate(day) : [];
           const isToday = day &&
@@ -1346,55 +1327,24 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             day === new Date().getDate();
 
           return (
-            <div
-              key={index}
-              className={`
-                min-h-[120px] p-2
-                ${darkMode ? 'bg-slate-800' : 'bg-white'}
-                ${isToday ? darkMode ? 'ring-2 ring-blue-500' : 'ring-2 ring-blue-500' : ''}
-              `}
-            >
+            <div key={index} className={`a-month-cell ${!day ? 'a-month-blank' : ''}`}>
               {day && (
                 <>
-                  <div className={`
-                    text-sm font-medium mb-2
-                    ${darkMode ? 'text-slate-400' : 'text-slate-600'}
-                  `}>
+                  <span className={`a-month-day ${isToday ? 'a-month-today' : ''}`}>
                     {day}
-                  </div>
-                  <div className="space-y-1">
-                    {dayItems.map((item, itemIndex) => {
+                  </span>
+                  {dayItems.map((item, itemIndex) => {
                       if (item.type === 'meeting') {
                         const meeting = item.data;
                         return (
                           <button
                             key={`m-${itemIndex}`}
                             onClick={() => setSelectedMeeting(meeting)}
-                            className={`
-                              w-full text-left p-1.5 rounded text-xs
-                              ${darkMode
-                                ? 'bg-teal-900/30 hover:bg-teal-900/50 border border-teal-500/20'
-                                : 'bg-teal-50 hover:bg-teal-100 border border-teal-200'}
-                            `}
+                            className="a-evp a-evp-meet"
+                            title={meeting.name}
                           >
-                            <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                              {meeting.name}
-                            </div>
-                            <div className="flex flex-wrap gap-1 mb-1">
-                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300">
-                                Meeting
-                              </div>
-                              {meeting.meeting_category === 'committee' && (
-                                <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
-                                  Committee
-                                </div>
-                              )}
-                            </div>
-                            {meeting.start_time && (
-                              <div className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                                {meeting.start_time.substring(0, 5)}
-                              </div>
-                            )}
+                            <Users size={12} className="flex-shrink-0" />
+                            <span className="truncate flex-1">{meeting.start_time ? `${meeting.start_time.substring(0, 5)} · ` : ''}{meeting.name}</span>
                           </button>
                         );
                       }
@@ -1404,58 +1354,27 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                       const displayTitle = event.isSeriesEvent
                         ? `${event.roundName} - ${seriesName}`
                         : event.eventName || event.clubName;
-                      const colors = event.raceClass ? boatTypeColors[event.raceClass] || defaultColorScheme : defaultColorScheme;
                       const isNextEvent = isNextUpcomingEvent(event, filteredEvents);
+                      const hc = event.raceFormat === 'handicap';
 
                       return (
                         <button
                           key={`e-${itemIndex}`}
                           onClick={() => handleEventClick(event)}
-                          className={`
-                            w-full text-left p-1.5 rounded text-xs
-                            ${darkMode
-                              ? `bg-slate-700 hover:bg-slate-600 ${isNextEvent ? 'ring-1 ring-green-500' : ''}`
-                              : `bg-slate-50 hover:bg-slate-100 ${isNextEvent ? 'ring-1 ring-green-500' : ''}`}
-                          `}
+                          className={`a-evp ${isNextEvent ? 'a-evp-next' : ''}`}
+                          title={`${displayTitle}${event.venue ? ` · ${event.venue}` : ''}`}
                         >
-                          <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                            {displayTitle}
-                          </div>
-
-                          <div className="flex flex-wrap gap-1 mb-1">
-                            <div className={`
-                              px-1.5 py-0.5 rounded text-[10px] font-medium
-                              ${event.raceFormat === 'handicap'
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'}
-                            `}>
-                              {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                            </div>
-                            <div className={`
-                              px-1.5 py-0.5 rounded text-[10px] font-medium
-                              ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}
-                            `}>
-                              {event.raceClass}
-                            </div>
-                            {isNextEvent && (
-                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
-                                Next
-                              </div>
-                            )}
-                          </div>
-
-                          <div className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                            {event.venue}
-                          </div>
+                          <span className="inline-block w-[7px] h-[7px] rounded-full flex-shrink-0" style={hc ? { background: 'linear-gradient(90deg,#B794FF 50%,transparent 50%)', boxShadow: 'inset 0 0 0 1.25px #B794FF' } : { background: '#30D158' }} />
+                          <span className="truncate flex-1">{displayTitle}</span>
                         </button>
                       );
-                    })}
-                  </div>
+                  })}
                 </>
               )}
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );
@@ -2319,6 +2238,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           `}>
             <button
               onClick={() => setView('list')}
+              aria-label="List view"
+              title="List view"
               className={`
                 p-2 transition-colors flex items-center justify-center gap-1
                 ${view === 'list'
@@ -2336,6 +2257,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             </button>
             <button
               onClick={() => setView('grid')}
+              aria-label="Grid view"
+              title="Grid view"
               className={`
                 p-2 transition-colors flex items-center justify-center gap-1
                 ${view === 'grid'
@@ -2353,6 +2276,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             </button>
             <button
               onClick={() => setView('month')}
+              aria-label="Month view"
+              title="Month view"
               className={`
                 p-2 transition-colors flex items-center justify-center gap-1
                 ${view === 'month'
@@ -2370,6 +2295,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             </button>
             <button
               onClick={() => setView('year')}
+              aria-label="Year view"
+              title="Year view"
               className={`
                 p-2 transition-colors flex items-center justify-center gap-1
                 ${view === 'year'

@@ -619,3 +619,25 @@ html.alfie-light .a-glass-g { background: rgba(255,255,255,0.85); color: #1E8E3E
 html.alfie-light .a-pro { background: rgba(255,179,64,0.1); color: #0B1220; }
 .a-txt-t { color: #7FE0D9; }
 html.alfie-light .a-txt-t { color: #0F766E; }
+/* Calendar month (board S_cal_month) */
+.a-month { gap: 1px; background: rgba(255,255,255,0.05); }
+.a-month-cell { min-height: 120px; padding: 8px; display: flex; flex-direction: column; gap: 4px; background: #0C1322; min-width: 0; }
+.a-month-blank { background: #0A101C; }
+.a-month-day { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 999px; font-size: 13px; color: rgba(235,240,255,0.75); }
+.a-month-today { background: #0A84FF; color: #fff; font-weight: 700; }
+.a-evp { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 7px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); font: 500 11.5px 'Instrument Sans', sans-serif; color: #fff; white-space: nowrap; overflow: hidden; text-align: left; cursor: pointer; }
+.a-evp:hover { background: rgba(255,255,255,0.08); }
+.a-evp-next { border-color: transparent; background: linear-gradient(#141B2B,#141B2B) padding-box, var(--alfie-spectrum) border-box; }
+.a-evp-meet { background: rgba(64,200,192,0.08); border-color: rgba(64,200,192,0.28); color: #7FE0D9; }
+html.alfie-light .a-month { background: rgba(15,23,42,0.07); }
+html.alfie-light .a-month-cell { background: #fff; }
+html.alfie-light .a-month-blank { background: #F7F9FC; }
+html.alfie-light .a-month-day { color: rgba(15,23,42,0.7); }
+html.alfie-light .a-month-today { color: #fff; }
+html.alfie-light .a-evp { background: rgba(15,23,42,0.035); border-color: rgba(15,23,42,0.08); color: #0B1220; }
+html.alfie-light .a-evp-next { background: linear-gradient(#fff,#fff) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-evp-meet { background: rgba(64,200,192,0.1); color: #0F766E; }
+.a-month { gap: 0; background: transparent; }
+.a-month-cell { box-shadow: inset -1px -1px 0 rgba(255,255,255,0.05); }
+html.alfie-light .a-month { background: transparent; }
+html.alfie-light .a-month-cell { box-shadow: inset -1px -1px 0 rgba(15,23,42,0.07); }
