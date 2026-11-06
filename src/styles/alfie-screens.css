@@ -567,3 +567,11 @@ html.alfie-light .a-reminder { background: rgba(15,23,42,0.025); border-color: r
 .a-drop { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 16px; border: 1.5px dashed rgba(255,255,255,0.16); background: rgba(255,255,255,0.02); cursor: pointer; text-align: left; }
 .a-drop:hover, .a-drop.border-blue-500 { border-color: rgba(10,132,255,0.6); background: rgba(10,132,255,0.04); }
 html.alfie-light .a-drop { border-color: rgba(15,23,42,0.18); background: rgba(15,23,42,0.015); }
+/* Rostering list (board S_roster_list) */
+.a-ros-row:hover { background: rgba(255,255,255,0.025); }
+html.alfie-light .a-ros-row:hover { background: rgba(15,23,42,0.02); }
+.a-av-ring { box-shadow: 0 0 0 2px #0E1526 !important; }
+html.alfie-light .a-av-ring { box-shadow: 0 0 0 2px #fff !important; }
+.a-av-more { width: 26px; height: 26px; font-size: 10px; background: #2A3245; box-shadow: 0 0 0 2px #0E1526; }
+html.alfie-light .a-av-more { background: #E3E8F0; color: #0B1220; box-shadow: 0 0 0 2px #fff; }
+select.a-pick.a-inp-sel { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239AA6BD' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; appearance: none; -webkit-appearance: none; }
