@@ -717,3 +717,21 @@ html.alfie-light :is(div, nav).border-b:has(> button.border-b-2):has(> button + 
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10), 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 html.alfie-theme :is(div, nav).border-b:has(> button.border-b-2):has(> button + button):not(:has(> :not(button))):not(:has(> button.border-b-2 + button.border-b-2)) > button * { color: inherit; }
+
+/* ── Tinted KPI cards (bg-*-500/[0.08] + corner blob) → neutral glass cards; colour stays in the icon and figures ── */
+html.alfie-dark .group.relative.overflow-hidden:is(.rounded-xl, .rounded-2xl)[class*="-500/[0.0"] {
+  background: rgba(20, 28, 46, 0.66) !important;
+  border-color: rgba(255, 255, 255, 0.075) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+html.alfie-dark .group.relative.overflow-hidden:is(.rounded-xl, .rounded-2xl)[class*="-500/[0.0"]:hover { border-color: rgba(255, 255, 255, 0.14) !important; }
+html.alfie-light .group.relative.overflow-hidden:is(.rounded-xl, .rounded-2xl)[class*="-500/[0.0"] {
+  background: #fff !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+html.alfie-theme .group.relative.overflow-hidden:is(.rounded-xl, .rounded-2xl)[class*="-500/[0.0"] > .absolute.top-0.right-0.rounded-full { display: none; }
+html.alfie-theme .group.relative.overflow-hidden:is(.rounded-xl, .rounded-2xl)[class*="-500/[0.0"] :is(.p-2\.5, .p-3).rounded-xl:has(> svg:only-child) {
+  border-radius: 30% !important; background: rgba(255, 255, 255, 0.03) !important; border: 1px solid rgba(255, 255, 255, 0.11);
+}
+html.alfie-light .group.relative.overflow-hidden:is(.rounded-xl, .rounded-2xl)[class*="-500/[0.0"] :is(.p-2\.5, .p-3).rounded-xl:has(> svg:only-child) { background: #fff !important; border-color: rgba(15, 23, 42, 0.10); }
