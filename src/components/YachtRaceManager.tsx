@@ -40,6 +40,7 @@ import { RaceSettingsModal } from './RaceSettingsModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
 import { StartBoxModal } from './start-box/StartBoxModal';
+import { ScoringTopBar } from './scoring/ScoringTopBar';
 import { LiveStatusControl } from './LiveStatusControl';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
@@ -162,6 +163,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [isDataFullyLoaded, setIsDataFullyLoaded] = useState(false);
   const [scoringMode, setScoringMode] = useState<'pro' | 'touch' | 'spreadsheet'>('pro');
   const [touchModeCurrentRace, setTouchModeCurrentRace] = useState<number>(1);
+  const [proFocusRace, setProFocusRace] = useState<number | null>(null);
   const [isFullscreenScoring, setIsFullscreenScoring] = useState(false);
   const [showOverallResults, setShowOverallResults] = useState(false);
   const [showShareScoringModal, setShowShareScoringModal] = useState(false);
@@ -3935,12 +3937,76 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     );
   }
 
+  // Alfie theme: single scoring top bar (board SC_pro) for every non-heat scoring view.
+  const useAlfieTopBar = !heatManagement?.configuration.enabled && !(scoringMode === 'spreadsheet' && raceType === 'scratch');
+  const stepperRace = scoringMode === 'pro' ? (proFocusRace ?? Math.min(lastCompletedRace + 1, currentNumRaces || 1)) : touchModeCurrentRace;
+  const stepRace = (d: number) => {
+    const next = Math.min(Math.max(stepperRace + d, 1), currentNumRaces || 1);
+    if (scoringMode === 'pro') {
+      setProFocusRace(next);
+      document.querySelector(`[data-race-col="${next}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    } else {
+      setTouchModeCurrentRace(next);
+    }
+  };
+
   return (
     <AlfieIconContext.Provider value={true}>
     <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50'}`}>
-      <div className={`w-full ${isFullscreenScoring ? 'px-0 py-0' : 'px-20 py-12'}`}>
-        <div className={`flex-1 flex flex-col justify-center ${isFullscreenScoring ? '' : 'min-h-[calc(100vh-24rem)]'}`}>
-          {getCurrentEvent() && !isFullscreenScoring && (
+      <div className={`w-full ${isFullscreenScoring ? 'px-0 py-0' : useAlfieTopBar ? 'px-5 pt-5 pb-6' : 'px-20 py-12'}`}>
+        <div className={`flex-1 flex flex-col ${useAlfieTopBar ? 'justify-start' : 'justify-center'} ${isFullscreenScoring ? '' : 'min-h-[calc(100vh-24rem)]'}`}>
+          {getCurrentEvent() && useAlfieTopBar && (
+            <div className={isFullscreenScoring ? 'px-3 pt-3' : 'mb-4'}>
+              <ScoringTopBar
+                event={getCurrentEvent()}
+                raceType={raceType}
+                mode={scoringMode}
+                modes={(['pro', 'touch', 'spreadsheet'] as const).filter(m => !(raceType === 'handicap' && m === 'spreadsheet'))}
+                onModeChange={async (mode) => {
+                  setScoringMode(mode);
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (user) {
+                    await supabase.from('profiles').update({ scoring_mode_preference: mode }).eq('id', user.id);
+                  }
+                }}
+                currentRace={stepperRace}
+                numRaces={currentNumRaces}
+                completedRaces={lastCompletedRace}
+                onPrevRace={scoringMode === 'touch' ? undefined : () => stepRace(-1)}
+                onNextRace={scoringMode === 'touch' ? undefined : () => stepRace(1)}
+                onBack={() => setShowExitConfirm(true)}
+                onStartBox={scoringMode === 'pro' ? () => setShowStartBoxModal(true) : undefined}
+                onOverallResults={raceType === 'scratch' ? () => setShowOverallResults(true) : undefined}
+                onCheckpoints={() => setShowCheckpointModal(true)}
+                onSettings={() => setShowRaceSettingsModal(true)}
+                fullscreen={isFullscreenScoring}
+                onToggleFullscreen={() => setIsFullscreenScoring(prev => !prev)}
+                completeLabel={lastCompletedRace >= 1
+                  ? (getCurrentEvent()?.multiDay && getCurrentEvent()?.numberOfDays && currentDay < (getCurrentEvent()?.numberOfDays || 0) ? `Complete day ${currentDay}` : 'Complete scoring')
+                  : null}
+                onComplete={() => setShowCompleteConfirm(true)}
+              />
+              {!isFullscreenScoring && (
+                <div className="a-dim flex flex-wrap items-center gap-3.5 text-[12.5px] mt-4 px-1.5">
+                  {scoringMode === 'pro' && (
+                    <>
+                      <span className="inline-flex items-center gap-1.5"><span className="a-sc-leg a-sc-leg-e" aria-hidden="true" />Tap to enter a finish</span>
+                      <span className="inline-flex items-center gap-1.5"><span className="a-sc-leg a-sc-leg-1" aria-hidden="true">1</span><span className="a-sc-leg a-sc-leg-2" aria-hidden="true">2</span><span className="a-sc-leg a-sc-leg-3" aria-hidden="true">3</span>Podium finishes</span>
+                    </>
+                  )}
+                  {scoringMode === 'pro' && (() => {
+                    const evt = getCurrentEvent();
+                    if (!evt?.id || (!evt.enableLiveTracking && !evt.enableLiveStream) || evt.completed) return null;
+                    return <LiveStatusControl eventId={evt.id} darkMode={darkMode} />;
+                  })()}
+                  <div className="flex-1" />
+                  <MemberCacheBanner darkMode={darkMode} />
+                  <SyncStatusIndicator darkMode={darkMode} compact />
+                </div>
+              )}
+            </div>
+          )}
+          {getCurrentEvent() && !useAlfieTopBar && !isFullscreenScoring && (
             <div className={`mb-4 ${(scoringMode === 'touch' || scoringMode === 'spreadsheet' || heatManagement?.configuration.enabled) ? 'pt-10' : ''}`}>
               <div className="flex items-center justify-between">
                 <div className="flex-1">
@@ -3987,7 +4053,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             )}
 
             {/* Scoring Mode Buttons - Only show for non-heat races, hide when scratch spreadsheet uses HMS component */}
-            {!heatManagement?.configuration.enabled && !(scoringMode === 'spreadsheet' && raceType === 'scratch') && (
+            {!useAlfieTopBar && !heatManagement?.configuration.enabled && !(scoringMode === 'spreadsheet' && raceType === 'scratch') && (
               <div className="flex justify-between items-center mb-4">
                 {/* Left side: StartBox + Race Status (Pro Mode only) */}
                 <div className="flex items-center gap-2">
@@ -4048,7 +4114,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               </div>
             )}
 
-            {(scoringMode === 'touch' || scoringMode === 'spreadsheet' || heatManagement?.configuration.enabled) && (
+            {!useAlfieTopBar && (scoringMode === 'touch' || scoringMode === 'spreadsheet' || heatManagement?.configuration.enabled) && (
               <div className={`fixed ${isFullscreenScoring ? 'top-2 right-4' : 'top-4 right-[5.9375rem]'} z-40 flex items-center gap-2`}>
                 <button
                   type="button"
@@ -4614,6 +4680,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 onRaceSettingsChange={handleRaceSettingsChange}
                 onOpenRaceSettings={() => setShowRaceSettingsModal(true)}
                 updateSkipper={updateSkipper}
+                hideCornerControls={useAlfieTopBar}
               />
             ) : (
               <ScratchRaceTable
@@ -4639,6 +4706,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 onOpenRaceSettings={() => setShowRaceSettingsModal(true)}
                 onNewSession={startNewSession}
                 updateSkipper={updateSkipper}
+                hideCornerControls={useAlfieTopBar}
               />
             )}
           </div>
