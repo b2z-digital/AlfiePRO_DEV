@@ -727,3 +727,14 @@ html.alfie-light .a-chat-call.a-chat-call-n { background: rgba(15,23,42,0.04); b
 html.alfie-light .a-composer { background: #F6F8FB; border-color: rgba(15,23,42,0.1); }
 html.alfie-light .a-composer textarea { color: #0F172A; }
 html.alfie-light .a-composer textarea::placeholder { color: rgba(15,23,42,0.4); }
+html.alfie-theme .a-pr { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 10px; border: 0; border-radius: 14px; background: transparent; cursor: pointer; text-align: left; }
+html.alfie-theme .a-pr:hover { background: rgba(255,255,255,0.04); }
+html.alfie-theme .a-pr.a-pr-on { background: rgba(10,132,255,0.08); }
+html.alfie-theme .a-rchip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px 0 3px; border-radius: 999px; background: rgba(10,132,255,0.14); border: 1px solid rgba(10,132,255,0.35); font-size: 13px; }
+html.alfie-theme .a-rchip.a-rchip-e { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.12); }
+html.alfie-theme textarea.a-inp.a-ta { height: auto; padding: 12px 14px; resize: none; line-height: 1.5; }
+html.alfie-light .a-pr:hover { background: rgba(15,23,42,0.04); }
+html.alfie-light .a-pr.a-pr-on { background: rgba(10,132,255,0.07); }
+html.alfie-light .a-rchip { background: rgba(10,132,255,0.08); border-color: rgba(10,132,255,0.3); }
+html.alfie-light .a-rchip.a-rchip-e { background: rgba(15,23,42,0.04); border-color: rgba(15,23,42,0.1); }
+html.alfie-theme .a-field input:focus, html.alfie-theme .a-field input:focus-visible { outline: none !important; box-shadow: none !important; border: 0 !important; }
