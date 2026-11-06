@@ -345,356 +345,179 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
 
   if (loading) {
     return (
-      <div className={`rounded-2xl p-12 text-center ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-white border border-slate-200'}`}>
-        <Settings className={`w-8 h-8 mx-auto mb-4 animate-spin ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
-        <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Loading rig settings...</p>
+      <div className="a-card text-center" style={{ padding: 48 }}>
+        <Settings className="w-8 h-8 mx-auto mb-3 animate-spin a-dim" />
+        <p className="a-dim text-[13.5px]">Loading rig settings…</p>
       </div>
     );
   }
 
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+  const WINDS = ['light', 'medium', 'strong'] as const;
+  const WATERS = ['flat', 'moderate', 'rough'] as const;
+  const hasSetup = (w: string, wa: string) => rigConditions.some(rc => rc.wind_condition === w && rc.water_condition === wa);
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4">
       {tuningGuideUrl && (
-        <a
-          href={tuningGuideUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`
-            block rounded-2xl p-6 border-2 transition-all group
-            ${darkMode
-              ? 'bg-blue-500/10 border-blue-500/30 hover:border-blue-500 hover:bg-blue-500/20'
-              : 'bg-blue-50 border-blue-200 hover:border-blue-400 hover:bg-blue-100'}
-          `}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-xl ${darkMode ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
-                <FileText className="text-blue-500" size={28} />
-              </div>
-              <div>
-                <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  Manufacturer Tuning Guide
-                </h3>
-                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {tuningGuideFileName || 'Tuning Guide'} -- Click to view PDF
-                </p>
-              </div>
-            </div>
-            <ExternalLink
-              className={`flex-shrink-0 ${darkMode ? 'text-slate-400' : 'text-slate-600'} group-hover:text-blue-500`}
-              size={20}
-            />
+        <a href={tuningGuideUrl} target="_blank" rel="noopener noreferrer" className="a-card flex items-center gap-3.5" style={{ padding: '14px 18px' }}>
+          <span className="a-tile" style={{ width: 44, height: 44 }}><FileText size={20} /></span>
+          <div className="flex-1 min-w-0">
+            <div className="a-ink text-[15px] font-semibold">Manufacturer tuning guide</div>
+            <div className="a-dim text-[12.5px] mt-0.5 truncate">{tuningGuideFileName || 'Tuning guide'} · PDF</div>
           </div>
+          <ExternalLink size={17} className="a-dim" />
         </a>
       )}
 
-      {/* Rig Selector - Always Visible */}
-      <div className={`rounded-2xl p-5 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            Your Rigs
-          </h3>
-          <button
-            onClick={() => {
-              setNewRigName('');
-              setShowNewRigModal(true);
-            }}
-            className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 text-sm flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            Add Rig
-          </button>
-        </div>
-
-        {rigs.length === 0 ? (
-          <div className={`text-center py-8 rounded-xl border-2 border-dashed ${darkMode ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
-            <Settings className="w-10 h-10 mx-auto mb-3 opacity-50" />
-            <p className="font-medium mb-1">No rigs yet</p>
-            <p className="text-sm">Click "Add Rig" to create your first rig configuration</p>
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="a-cap">Rig</span>
+        {rigs.length > 0 && (
+          <div className="a-seg" style={{ padding: 4 }} role="tablist">
+            {rigs.map(rig => {
+              const on = selectedRig?.id === rig.id;
+              const count = conditionCount(rig.id);
+              return (
+                <button key={rig.id} onClick={() => setSelectedRig(rig)} className={`a-seg-i a-rig-i ${on ? 'a-seg-on' : ''}`} role="tab" aria-selected={on}>
+                  <span className="a-rig-name">{rig.name}</span>
+                  <span className="a-rig-sub">{count !== null ? (count > 0 ? `${count} setup${count === 1 ? '' : 's'}` : 'Empty') : rig.is_default ? 'Default' : ' '}</span>
+                </button>
+              );
+            })}
           </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {rigs.map(rig => (
-              <div
-                key={rig.id}
-                className={`relative rounded-xl transition-all ${
-                  selectedRig?.id === rig.id
-                    ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg ring-2 ring-cyan-400/50'
-                    : darkMode
-                    ? 'bg-slate-700/80 text-slate-300 hover:bg-slate-600'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                {editingRigId === rig.id ? (
-                  <div className="p-3">
-                    <input
-                      type="text"
-                      value={editingRigName}
-                      onChange={e => setEditingRigName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') renameRig(rig.id);
-                        if (e.key === 'Escape') { setEditingRigId(null); setEditingRigName(''); }
-                      }}
-                      autoFocus
-                      className={`w-full px-2 py-1 rounded text-sm font-bold ${
-                        darkMode
-                          ? 'bg-slate-900 border-slate-600 text-white'
-                          : 'bg-white border-slate-300 text-slate-900'
-                      } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                    />
-                    <div className="flex gap-1 mt-2">
-                      <button
-                        onClick={() => renameRig(rig.id)}
-                        className="p-1 rounded bg-green-600 text-white hover:bg-green-700 transition-colors"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => { setEditingRigId(null); setEditingRigName(''); }}
-                        className={`p-1 rounded transition-colors ${darkMode ? 'bg-slate-600 text-white hover:bg-slate-500' : 'bg-slate-300 text-slate-700 hover:bg-slate-400'}`}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ) : deleteRigConfirm === rig.id ? (
-                  <div className="p-3">
-                    <p className={`text-xs font-medium mb-2 ${selectedRig?.id === rig.id ? 'text-white/90' : darkMode ? 'text-red-400' : 'text-red-600'}`}>
-                      Delete "{rig.name}" and all its settings?
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => deleteRig(rig.id)}
-                        className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg font-medium hover:bg-red-700 transition-colors"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => setDeleteRigConfirm(null)}
-                        className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
-                          selectedRig?.id === rig.id
-                            ? 'bg-white/20 text-white hover:bg-white/30'
-                            : darkMode
-                            ? 'bg-slate-600 text-white hover:bg-slate-500'
-                            : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                        }`}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <button
-                      onClick={() => setSelectedRig(rig)}
-                      className="w-full p-4 pb-2 text-left"
-                    >
-                      <div className="font-bold text-sm">{rig.name}</div>
-                      {rig.is_default && (
-                        <div className={`text-xs mt-0.5 ${selectedRig?.id === rig.id ? 'text-white/70' : 'opacity-60'}`}>Default</div>
-                      )}
-                      {conditionCount(rig.id) !== null && (
-                        <div className={`text-xs mt-0.5 ${selectedRig?.id === rig.id ? 'text-white/70' : 'opacity-60'}`}>
-                          {conditionCount(rig.id)} condition{conditionCount(rig.id) !== 1 ? 's' : ''} saved
-                        </div>
-                      )}
-                    </button>
-                    <div className="flex items-center gap-1 px-3 pb-3">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingRigId(rig.id);
-                          setEditingRigName(rig.name);
-                        }}
-                        title="Rename rig"
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          selectedRig?.id === rig.id
-                            ? 'hover:bg-white/20 text-white/70 hover:text-white'
-                            : darkMode
-                            ? 'hover:bg-slate-500 text-slate-400 hover:text-slate-200'
-                            : 'hover:bg-slate-300 text-slate-400 hover:text-slate-600'
-                        }`}
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteRigConfirm(rig.id);
-                        }}
-                        title="Delete rig"
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          selectedRig?.id === rig.id
-                            ? 'hover:bg-red-500/30 text-white/70 hover:text-red-200'
-                            : darkMode
-                            ? 'hover:bg-red-900/40 text-slate-400 hover:text-red-400'
-                            : 'hover:bg-red-100 text-slate-400 hover:text-red-500'
-                        }`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+        )}
+        <button onClick={() => { setNewRigName(''); setShowNewRigModal(true); }} className="a-btn a-btn-q a-txt-b" style={{ height: 38 }}>
+          <Plus size={16} />Add rig
+        </button>
+        <div className="flex-1" />
+        {selectedRig && editingRigId === selectedRig.id ? (
+          <div className="flex items-center gap-1.5">
+            <label className="a-field" style={{ height: 38, width: 200 }}>
+              <input
+                type="text"
+                value={editingRigName}
+                onChange={e => setEditingRigName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') renameRig(selectedRig.id);
+                  if (e.key === 'Escape') { setEditingRigId(null); setEditingRigName(''); }
+                }}
+                autoFocus
+                aria-label="Rig name"
+              />
+            </label>
+            <button onClick={() => renameRig(selectedRig.id)} className="a-ib a-txt-g" aria-label="Save name"><Check size={17} /></button>
+            <button onClick={() => { setEditingRigId(null); setEditingRigName(''); }} className="a-ib" aria-label="Cancel rename"><X size={17} /></button>
           </div>
+        ) : selectedRig && deleteRigConfirm === selectedRig.id ? (
+          <div className="flex items-center gap-2">
+            <span className="a-txt-r text-[13px] font-medium">Delete “{selectedRig.name}” and all its setups?</span>
+            <button onClick={() => setDeleteRigConfirm(null)} className="a-btn" style={{ height: 34, fontSize: 13 }}>Cancel</button>
+            <button onClick={() => deleteRig(selectedRig.id)} className="a-btn a-btn-d" style={{ height: 34, fontSize: 13 }}>Delete</button>
+          </div>
+        ) : selectedRig && (
+          <>
+            <button onClick={() => { setEditingRigId(selectedRig.id); setEditingRigName(selectedRig.name); }} className="a-ib" aria-label="Rename rig" title="Rename rig"><Pencil size={17} /></button>
+            <button onClick={() => setDeleteRigConfirm(selectedRig.id)} className="a-ib a-ib-d" aria-label="Delete rig" title="Delete rig"><Trash2 size={17} /></button>
+          </>
         )}
       </div>
 
-      {selectedRig && (
+      {rigs.length === 0 ? (
+        <div className="a-card a-empty text-center" style={{ padding: 40 }}>
+          <span className="a-tile mx-auto mb-3" style={{ width: 48, height: 48 }}><Settings size={20} /></span>
+          <p className="a-ink text-[15px] font-semibold mb-1">No rigs yet</p>
+          <p className="a-dim text-[13px]">Add a rig to start saving setups for each condition</p>
+        </div>
+      ) : selectedRig && (
         <>
-          {/* Sailing Conditions */}
-          <div className={`rounded-2xl p-6 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-            <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Sailing Conditions
-            </h3>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <Wind className="w-4 h-4 inline mr-2" />
-                  Wind Condition
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['light', 'medium', 'strong'] as const).map(condition => (
-                    <button
-                      key={condition}
-                      onClick={() => setWindCondition(condition)}
-                      className={`py-3 rounded-lg font-medium capitalize transition-all ${
-                        windCondition === condition
-                          ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
-                          : darkMode
-                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      {condition}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <Waves className="w-4 h-4 inline mr-2" />
-                  Water Condition
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['flat', 'moderate', 'rough'] as const).map(condition => (
-                    <button
-                      key={condition}
-                      onClick={() => setWaterCondition(condition)}
-                      className={`py-3 rounded-lg font-medium capitalize transition-all ${
-                        waterCondition === condition
-                          ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
-                          : darkMode
-                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      {condition}
-                    </button>
-                  ))}
-                </div>
+          <div className="a-card flex flex-col gap-3.5" style={{ padding: '18px 20px' }}>
+            <div className="flex items-center gap-3">
+              <span className="a-tile a-tile-sm"><Wind size={16} /></span>
+              <div className="flex-1 min-w-0">
+                <h2 className="a-display a-ink m-0 text-[18px] font-semibold">Conditions</h2>
+                <p className="a-dim mt-0.5 text-[12.5px]">{rigConditions.length} setup{rigConditions.length === 1 ? '' : 's'} saved for {selectedRig.name} · tap a cell to load it</p>
               </div>
             </div>
-
+            <div className="grid items-center gap-2" style={{ gridTemplateColumns: '100px repeat(3, 1fr)' }}>
+              <span />
+              {WATERS.map(wa => <div key={wa} className="a-dim flex items-center justify-center gap-1.5 text-[13px]"><Waves size={14} />{cap(wa)}</div>)}
+              {WINDS.map(w => (
+                <React.Fragment key={w}>
+                  <div className="a-dim flex items-center gap-1.5 text-[13px]"><Wind size={14} />{cap(w)}</div>
+                  {WATERS.map(wa => {
+                    const on = windCondition === w && waterCondition === wa;
+                    const saved = hasSetup(w, wa);
+                    return (
+                      <button
+                        key={wa}
+                        onClick={() => { setWindCondition(w); setWaterCondition(wa); }}
+                        className={`a-mc ${on ? 'a-mc-on' : saved ? 'a-mc-saved' : 'a-mc-empty'}`}
+                        aria-pressed={on}
+                        aria-label={`${cap(w)} wind, ${wa} water${saved ? ', saved' : ''}`}
+                      >
+                        {on ? (saved ? 'Editing' : 'New setup') : saved ? '● Saved' : '+ Add'}
+                      </button>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+            </div>
             {selectedCondition && (
-              <div className="mt-4 flex gap-3">
-                <button
-                  onClick={duplicateRigCondition}
-                  disabled={saving}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
-                    darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-200 text-slate-900 hover:bg-slate-300'
-                  }`}
-                >
-                  <Copy className="w-4 h-4 inline mr-2" />
-                  Duplicate to Another Condition
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={duplicateRigCondition} disabled={saving} className="a-btn disabled:opacity-50" style={{ height: 36, fontSize: 13 }}>
+                  <Copy size={15} />Copy to another condition
                 </button>
-                <button
-                  onClick={deleteRigCondition}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all text-sm"
-                >
-                  <Trash2 className="w-4 h-4 inline mr-2" />
-                  Delete Condition
+                <button onClick={deleteRigCondition} className="a-btn a-btn-q a-txt-r" style={{ height: 36, fontSize: 13 }}>
+                  <Trash2 size={15} />Delete this setup
                 </button>
               </div>
             )}
           </div>
 
-          {/* Rig Measurements */}
-          <div className={`rounded-2xl p-6 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-            <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Rig Measurements
-              <span className={`ml-2 text-sm font-normal ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                for {selectedRig.name} -- {windCondition.charAt(0).toUpperCase() + windCondition.slice(1)} Wind / {waterCondition.charAt(0).toUpperCase() + waterCondition.slice(1)} Water
-              </span>
-            </h3>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <MeasurementInput label="Static Rake" value={settings.staticRake} onChange={val => updateSetting('staticRake', val)} darkMode={darkMode} unit="mm" />
-              <MeasurementInput label="Rake Datum" value={settings.rakeDatum} onChange={val => updateSetting('rakeDatum', val)} darkMode={darkMode} unit="mm" />
-              <MeasurementInput label="Shroud Tension" value={settings.shroud} onChange={val => updateSetting('shroud', val)} darkMode={darkMode} unit="units" />
-              <MeasurementInput label="Ram Position" value={settings.ramPosition} onChange={val => updateSetting('ramPosition', val)} darkMode={darkMode} unit="mm" />
-              <MeasurementInput label="Vang" value={settings.vang} onChange={val => updateSetting('vang', val)} darkMode={darkMode} unit="units" />
-              <MeasurementInput label="Mains Outhaul" value={settings.mainsOuthaul} onChange={val => updateSetting('mainsOuthaul', val)} darkMode={darkMode} unit="mm" />
-              <MeasurementInput label="Mains Foot Depth" value={settings.mainsFootDepth} onChange={val => updateSetting('mainsFootDepth', val)} darkMode={darkMode} unit="mm" />
-              <MeasurementInput label="Mains Twist" value={settings.mainsTwist} onChange={val => updateSetting('mainsTwist', val)} darkMode={darkMode} unit="degrees" />
-              <MeasurementInput label="Jib Outhaul" value={settings.jibOuthaul} onChange={val => updateSetting('jibOuthaul', val)} darkMode={darkMode} unit="mm" />
-              <MeasurementInput label="Jib Foot Depth" value={settings.jibFootDepth} onChange={val => updateSetting('jibFootDepth', val)} darkMode={darkMode} unit="mm" />
-              <MeasurementInput label="Jib Twist" value={settings.jibTwist} onChange={val => updateSetting('jibTwist', val)} darkMode={darkMode} unit="degrees" />
-            </div>
-
-            <div className="mt-6">
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                <Star className="w-4 h-4 inline mr-2" />
-                Performance Rating
-              </label>
-              <div className="flex gap-2">
-                {[1, 2, 3, 4, 5].map(rating => (
-                  <button
-                    key={rating}
-                    onClick={() => setPerformanceRating(rating)}
-                    className={`p-3 rounded-lg transition-all ${
-                      performanceRating && performanceRating >= rating
-                        ? 'text-yellow-500'
-                        : darkMode
-                        ? 'text-slate-600 hover:text-slate-400'
-                        : 'text-slate-300 hover:text-slate-500'
-                    }`}
-                  >
-                    <Star className="w-6 h-6" fill={performanceRating && performanceRating >= rating ? 'currentColor' : 'none'} />
-                  </button>
-                ))}
+          <div className="a-card flex flex-col gap-4" style={{ padding: '18px 20px' }}>
+            <div className="flex items-center gap-3">
+              <span className="a-tile a-tile-sm"><Settings size={16} /></span>
+              <div className="flex-1 min-w-0">
+                <h2 className="a-display a-ink m-0 text-[18px] font-semibold">{selectedRig.name} · {cap(windCondition)} wind · {cap(waterCondition)} water</h2>
+                <p className="a-dim mt-0.5 text-[12.5px]">Rig measurements</p>
               </div>
             </div>
 
-            <div className="mt-6">
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Notes
-              </label>
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                rows={4}
-                placeholder="Add notes about this setup..."
-                className={`w-full px-4 py-3 rounded-lg ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500'
-                    : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
-                } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3.5">
+              <MeasurementInput label="Static rake" value={settings.staticRake} onChange={val => updateSetting('staticRake', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Rake datum" value={settings.rakeDatum} onChange={val => updateSetting('rakeDatum', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Shroud tension" value={settings.shroud} onChange={val => updateSetting('shroud', val)} darkMode={darkMode} unit="units" />
+              <MeasurementInput label="Ram position" value={settings.ramPosition} onChange={val => updateSetting('ramPosition', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Vang" value={settings.vang} onChange={val => updateSetting('vang', val)} darkMode={darkMode} unit="units" />
+              <MeasurementInput label="Mains outhaul" value={settings.mainsOuthaul} onChange={val => updateSetting('mainsOuthaul', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Mains foot depth" value={settings.mainsFootDepth} onChange={val => updateSetting('mainsFootDepth', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Mains twist" value={settings.mainsTwist} onChange={val => updateSetting('mainsTwist', val)} darkMode={darkMode} unit="°" />
+              <MeasurementInput label="Jib outhaul" value={settings.jibOuthaul} onChange={val => updateSetting('jibOuthaul', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Jib foot depth" value={settings.jibFootDepth} onChange={val => updateSetting('jibFootDepth', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Jib twist" value={settings.jibTwist} onChange={val => updateSetting('jibTwist', val)} darkMode={darkMode} unit="°" />
             </div>
 
-            <div className="mt-6">
-              <button
-                onClick={saveRigCondition}
-                disabled={saving}
-                className="btn-primary-green w-full px-6 py-4 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50"
-              >
-                <Save className="w-5 h-5 inline mr-2" />
-                {saving ? 'Saving...' : selectedCondition ? 'Update Settings' : 'Save Settings'}
+            <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-4 items-start">
+              <div>
+                <span className="a-flab">How it went</span>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map(rating => (
+                    <button key={rating} onClick={() => setPerformanceRating(rating)} className={`a-ib ${performanceRating && performanceRating >= rating ? 'a-txt-a' : ''}`} aria-label={`${rating} star${rating === 1 ? '' : 's'}`}>
+                      <Star size={20} fill={performanceRating && performanceRating >= rating ? 'currentColor' : 'none'} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="a-flab">Notes</span>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Add notes about this setup" className="a-inp a-ta w-full" />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button onClick={saveRigCondition} disabled={saving} className="a-btn a-btn-p disabled:opacity-50" style={{ height: 42 }}>
+                <Save size={17} />
+                {saving ? 'Saving…' : selectedCondition ? 'Update setup' : 'Save setup'}
               </button>
             </div>
           </div>
@@ -702,13 +525,13 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
       )}
 
       {showNewRigModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewRigModal(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowNewRigModal(false)}>
           <div
-            className={`rounded-2xl p-6 max-w-md w-full mx-4 ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-white border border-slate-200'}`}
+            className="a-sheet max-w-md w-full mx-4" style={{ padding: 24 }}
             onClick={e => e.stopPropagation()}
           >
-            <h3 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Create New Rig
+            <h3 className="a-display a-ink text-[20px] font-semibold mb-4">
+              New rig
             </h3>
             <input
               type="text"
@@ -717,25 +540,19 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
               onKeyDown={e => { if (e.key === 'Enter') createNewRig(); }}
               placeholder="e.g., A Rig, B Rig, Light Air Setup"
               autoFocus
-              className={`w-full px-4 py-3 rounded-lg mb-4 ${
-                darkMode
-                  ? 'bg-slate-900 border-slate-700 text-white'
-                  : 'bg-white border-slate-300 text-slate-900'
-              } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+              className="a-inp w-full mb-4"
             />
             <div className="flex gap-3">
               <button
                 onClick={() => setShowNewRigModal(false)}
-                className={`flex-1 px-4 py-3 rounded-lg font-medium ${
-                  darkMode ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-900'
-                }`}
+                className="a-btn flex-1 justify-center"
               >
                 Cancel
               </button>
               <button
                 onClick={createNewRig}
                 disabled={!newRigName.trim() || saving}
-                className="btn-primary-green flex-1 px-4 py-3 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50"
+                className="a-btn a-btn-p flex-1 justify-center disabled:opacity-50"
               >
                 Create
               </button>
@@ -755,30 +572,20 @@ interface MeasurementInputProps {
   unit?: string;
 }
 
-const MeasurementInput: React.FC<MeasurementInputProps> = ({ label, value, onChange, darkMode, unit }) => {
+const MeasurementInput: React.FC<MeasurementInputProps> = ({ label, value, onChange, unit }) => {
   return (
     <div>
-      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-        {label}
-      </label>
-      <div className="relative">
+      <span className="a-flab">{label}</span>
+      <div className="a-ms">
         <input
           type="number"
           value={value}
           onChange={e => onChange(parseFloat(e.target.value) || 0)}
-          className={`w-full px-4 py-3 rounded-lg pr-16 ${
-            darkMode
-              ? 'bg-slate-800 border-slate-600 text-white'
-              : 'bg-white border-slate-300 text-slate-900'
-          } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+          aria-label={label}
         />
-        {unit && (
-          <span className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-sm ${
-            darkMode ? 'text-slate-500' : 'text-slate-400'
-          }`}>
-            {unit}
-          </span>
-        )}
+        {unit && <span className="a-ms-u">{unit}</span>}
+        <button type="button" onClick={() => onChange((Number(value) || 0) - 1)} aria-label={`Decrease ${label}`}>−</button>
+        <button type="button" onClick={() => onChange((Number(value) || 0) + 1)} aria-label={`Increase ${label}`}>+</button>
       </div>
     </div>
   );
