@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Settings, Clock, TrendingUp, Wrench, Plus, Calendar, Wind, Droplets, Award, Share2, CreditCard as Edit2, Trash2, Upload, Image as ImageIcon, Activity, FileText, ExternalLink, ChevronRight } from 'lucide-react';
+import { ChevronLeft, Camera, Settings, TrendingUp, Wrench, Award, Share2, SquarePen as Edit2, Upload, Image as ImageIcon, Activity, FileText, ExternalLink, ChevronRight, Sailboat } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { MaintenanceTab } from './tabs/MaintenanceTab';
@@ -307,478 +307,182 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
     { id: 'overview' as Tab, label: 'Overview', icon: TrendingUp },
     { id: 'gallery' as Tab, label: 'Gallery', icon: Camera },
     { id: 'maintenance' as Tab, label: 'Maintenance', icon: Wrench },
-    { id: 'rig-tuning' as Tab, label: 'Rig Tuning', icon: Settings },
+    { id: 'rig-tuning' as Tab, label: 'Rig tuning', icon: Settings },
     { id: 'performance' as Tab, label: 'Performance', icon: Award }
   ];
 
+  const ord = (n: number | null) => n ? `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}` : '–';
+  const MEDAL: Record<number, string> = { 1: '#FFC56B', 2: '#C9D1DE', 3: '#E59A62' };
+  const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  const specRow = (label: string, value: React.ReactNode) => (
+    <div className="a-ir" key={label}>
+      <span className="a-ir-l">{label}</span>
+      <span className="a-ir-v text-right">{value}</span>
+    </div>
+  );
+  const hasReg = !!(boat.hull_registration_number || boat.registration_date || boat.certification_authority);
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-4 sm:p-6 lg:p-16">
-        {/* Back Button */}
-        <button
-          onClick={onClose}
-          className={`
-            flex items-center gap-2 mb-6 px-4 py-2 rounded-xl transition-colors
-            ${darkMode
-              ? 'text-slate-300 hover:bg-slate-800'
-              : 'text-slate-700 hover:bg-slate-100'}
-          `}
-        >
-          <ArrowLeft size={20} />
-          <span className="font-medium">Back to Garage</span>
-        </button>
+      <div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        <div className="flex items-center gap-2 text-[13.5px]">
+          <button onClick={onClose} className="a-txt-b inline-flex items-center gap-1 font-medium">
+            <ChevronLeft size={16} />Boat Shed
+          </button>
+        </div>
 
-        {/* Boat Header */}
-        <div className={`
-          rounded-2xl overflow-hidden mb-6
-          ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-white border border-slate-200'}
-        `}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
-            {/* Image Section */}
-            <div className="relative h-64 md:h-auto group">
-              {boat.image_url ? (
-                <img
-                  src={boat.image_url}
-                  alt={`${boat.boat_type} ${boat.sail_number}`}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className={`
-                  w-full h-full flex items-center justify-center
-                  ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}
-                `}>
-                  <Camera className={`w-16 h-16 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
+        <div className="a-card overflow-hidden grid grid-cols-1 md:grid-cols-[420px_1fr]">
+          <div className="relative group" style={{ minHeight: 250 }}>
+            {boat.image_url ? (
+              <img src={boat.image_url} alt={`${boat.boat_type} ${boat.sail_number}`} className="absolute inset-0 w-full h-full object-cover" />
+            ) : (
+              <div className="a-bc-ph absolute inset-0 flex items-center justify-center"><Camera size={52} className="a-dim" /></div>
+            )}
+            {boat.is_primary && <span className="a-glass absolute" style={{ left: 14, top: 14, color: '#FFC56B' }}>★ Primary</span>}
+            <label htmlFor="boat-detail-image" className="a-glass absolute cursor-pointer" style={{ left: 14, bottom: 14 }}>
+              {uploadingImage ? <><Upload size={14} className="animate-pulse" />Uploading…</> : <><ImageIcon size={14} />Change photo</>}
+            </label>
+            <input
+              id="boat-detail-image"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageUpload(file);
+              }}
+            />
+          </div>
+
+          <div className="flex flex-col gap-4" style={{ padding: '22px 24px' }}>
+            <div className="flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="a-cap">{[boat.boat_type, boat.design_name ? `${boat.design_name} design` : null].filter(Boolean).join(' · ')}</p>
+                <h1 className="a-display a-ink mt-1 mb-0 text-[32px] font-bold leading-[1.1]">{boat.boat_name || boat.boat_type}</h1>
+                <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                  <span className="a-lb-cls"><Sailboat size={11} />{boat.boat_type}{boat.sail_number && <span className="a-dim" style={{ fontWeight: 500, letterSpacing: 0 }}>{boat.sail_number}</span>}</span>
+                  {boat.hull_registration_number && <span className="a-hullreg">{boat.hull_registration_number}</span>}
+                  {boat.hull && <span className="a-lb-fmt">Hull {boat.hull}</span>}
+                  {!!boat.handicap && <span className="a-lb-fmt">Handicap {boat.handicap}</span>}
                 </div>
-              )}
-
-              {/* Upload Button Overlay */}
-              <label
-                htmlFor="boat-detail-image"
-                className={`
-                  absolute bottom-4 left-4 px-4 py-2 rounded-lg cursor-pointer transition-all flex items-center gap-2
-                  ${darkMode ? 'bg-slate-900/90 hover:bg-slate-900 text-white' : 'bg-white/90 hover:bg-white text-slate-900'}
-                  backdrop-blur-sm shadow-lg opacity-0 group-hover:opacity-100
-                `}
-              >
-                {uploadingImage ? (
-                  <>
-                    <div className="animate-spin">
-                      <Upload size={16} />
-                    </div>
-                    <span className="text-sm font-medium">Uploading...</span>
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon size={16} />
-                    <span className="text-sm font-medium">Change Photo</span>
-                  </>
-                )}
-              </label>
-              <input
-                id="boat-detail-image"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImageUpload(file);
-                }}
-              />
-
-              {boat.is_primary && (
-                <div className="absolute top-4 right-4 px-3 py-1.5 bg-yellow-500 text-white text-sm font-bold rounded-full flex items-center gap-1.5 shadow-lg">
-                  <Award size={14} />
-                  Primary
-                </div>
-              )}
+              </div>
+              <button onClick={() => setShowEditModal(true)} className="a-ib" aria-label="Edit boat" title="Edit boat"><Edit2 size={18} /></button>
+              <button className="a-ib" aria-label="Share" title="Share"><Share2 size={18} /></button>
             </div>
 
-            {/* Info Section */}
-            <div className="md:col-span-2 p-6 md:p-8">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    {boat.boat_type}
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-3 text-sm">
-                    <span className={`font-medium ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>
-                      Sail #{boat.sail_number}
-                    </span>
-                    {boat.hull && (
-                      <>
-                        <span className={darkMode ? 'text-slate-600' : 'text-slate-400'}>•</span>
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                          Hull: {boat.hull}
-                        </span>
-                      </>
-                    )}
-                    {boat.handicap && boat.handicap !== 0 && (
-                      <>
-                        <span className={darkMode ? 'text-slate-600' : 'text-slate-400'}>•</span>
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                          Handicap: {boat.handicap}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
+            {boat.description && <p className="a-mute m-0 text-[14px] leading-[1.55]">{boat.description}</p>}
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowEditModal(true)}
-                    className={`
-                      p-2 rounded-lg transition-colors
-                      ${darkMode
-                        ? 'hover:bg-slate-700 text-slate-400'
-                        : 'hover:bg-slate-100 text-slate-600'}
-                    `}
-                    title="Edit boat"
-                  >
-                    <Edit2 size={20} />
-                  </button>
-                  <button
-                    className={`
-                      p-2 rounded-lg transition-colors
-                      ${darkMode
-                        ? 'hover:bg-slate-700 text-slate-400'
-                        : 'hover:bg-slate-100 text-slate-600'}
-                    `}
-                    title="Share"
-                  >
-                    <Share2 size={20} />
-                  </button>
-                </div>
-              </div>
-
-              {boat.description && (
-                <p className={`mb-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {boat.description}
-                </p>
-              )}
-
-              {/* Quick Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className={`
-                  p-4 rounded-xl
-                  ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}
-                `}>
-                  <div className={`text-2xl font-bold ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>
-                    {stats.totalRaces}
-                  </div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Total Races
-                  </div>
-                </div>
-
-                <div className={`
-                  p-4 rounded-xl
-                  ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}
-                `}>
-                  <div className={`text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                    {stats.bestPosition || '-'}
-                  </div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Best Position
-                  </div>
-                </div>
-
-                <div className={`
-                  p-4 rounded-xl
-                  ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}
-                `}>
-                  <div className={`text-2xl font-bold ${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>
-                    {stats.upcomingReminders}
-                  </div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Due Soon
-                  </div>
-                </div>
-
-                <div className={`
-                  p-4 rounded-xl
-                  ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}
-                `}>
-                  <div className={`text-2xl font-bold ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>
-                    {stats.rigs}
-                  </div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Rig Setups
-                  </div>
-                </div>
-              </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+              <div className="a-mini-stat"><div className="a-dim text-[11.5px]">Total races</div><div className="a-display a-ink a-num text-[24px] font-semibold mt-1.5 leading-none">{stats.totalRaces}</div></div>
+              <div className="a-mini-stat"><div className="a-dim text-[11.5px]">Best finish</div><div className={`a-display a-num text-[24px] font-semibold mt-1.5 leading-none ${stats.bestPosition && stats.bestPosition <= 3 ? `a-best-${stats.bestPosition}` : 'a-ink'}`}>{ord(stats.bestPosition)}</div></div>
+              <div className="a-mini-stat"><div className="a-dim text-[11.5px]">Due soon</div><div className={`a-display a-num text-[24px] font-semibold mt-1.5 leading-none ${stats.upcomingReminders > 0 ? 'a-txt-r' : 'a-ink'}`}>{stats.upcomingReminders}</div></div>
+              <div className="a-mini-stat"><div className="a-dim text-[11.5px]">Rig setups</div><div className="a-display a-num text-[24px] font-semibold mt-1.5 leading-none a-txt-v">{stats.rigs}</div></div>
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className={`
-          flex items-center gap-2 mb-6 p-1 rounded-xl overflow-x-auto
-          ${darkMode ? 'bg-slate-800/50' : 'bg-slate-100'}
-        `}>
+        <nav className="a-seg a-seg-lg self-start max-w-full overflow-x-auto" role="tablist">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all whitespace-nowrap
-                  ${activeTab === tab.id
-                    ? darkMode
-                      ? 'bg-slate-700 text-white shadow-lg'
-                      : 'bg-white text-slate-900 shadow-lg'
-                    : darkMode
-                      ? 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-                  }
-                `}
-              >
-                <Icon size={18} />
-                <span>{tab.label}</span>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`a-seg-i whitespace-nowrap ${activeTab === tab.id ? 'a-seg-on' : ''}`} role="tab" aria-selected={activeTab === tab.id}>
+                <Icon size={17} />
+                {tab.label}
+                {tab.id === 'maintenance' && stats.upcomingReminders > 0 && <span className="a-cnt" style={{ background: '#FF6B6B', color: '#fff', boxShadow: 'none' }}>{stats.upcomingReminders}</span>}
               </button>
             );
           })}
-        </div>
+        </nav>
 
-        {/* Tab Content */}
         <div>
           {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Overview content - Summary of all sections */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className={`
-                  rounded-2xl p-6
-                  ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-white border border-slate-200'}
-                `}>
-                  <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    <Activity size={20} />
-                    Recent Activity
-                  </h3>
-                  {recentActivity.length === 0 ? (
-                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      No activity yet. Start racing or logging maintenance to see activity here.
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {recentActivity.slice(0, 5).map((activity, index) => (
-                        <div
-                          key={`${activity.type}-${activity.resultId}-${index}`}
-                          onClick={() => activity.type === 'race' && activity.resultId && navigate(`/results/${activity.resultId}`)}
-                          className={`
-                            p-3 rounded-xl border transition-colors
-                            ${activity.type === 'race' && activity.resultId
-                              ? darkMode
-                                ? 'bg-slate-700/50 border-slate-600 hover:bg-slate-700 cursor-pointer'
-                                : 'bg-slate-50 border-slate-200 hover:bg-slate-100 cursor-pointer'
-                              : darkMode
-                                ? 'bg-slate-700/50 border-slate-600'
-                                : 'bg-slate-50 border-slate-200'
-                            }
-                          `}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                {activity.type === 'race' ? (
-                                  <Award size={14} className={darkMode ? 'text-cyan-400' : 'text-cyan-600'} />
-                                ) : (
-                                  <Wrench size={14} className={darkMode ? 'text-orange-400' : 'text-orange-600'} />
-                                )}
-                                <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                  {activity.title}
-                                </p>
-                              </div>
-                              {activity.position != null && (
-                                <p className={`text-xs font-medium ${darkMode ? 'text-cyan-400' : 'text-cyan-700'}`}>
-                                  Finished {activity.position}{activity.position === 1 ? 'st' : activity.position === 2 ? 'nd' : activity.position === 3 ? 'rd' : 'th'}
-                                </p>
-                              )}
-                              {activity.description && (
-                                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'} line-clamp-1`}>
-                                  {activity.description}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-600'} whitespace-nowrap`}>
-                                {new Date(activity.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              </div>
-                              {activity.type === 'race' && activity.resultId && (
-                                <ChevronRight size={14} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className={`
-                  rounded-2xl p-6
-                  ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-white border border-slate-200'}
-                `}>
-                  <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Boat Specifications
-                  </h3>
-                  <div className="space-y-3 text-sm">
-                    {/* Basic Info - Always Show */}
-                    <div className="flex justify-between">
-                      <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Boat Type:</span>
-                      <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {boat.boat_type}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Sail Number:</span>
-                      <span className={darkMode ? 'text-white' : 'text-slate-900'}>
-                        #{boat.sail_number}
-                      </span>
-                    </div>
-                    {boat.hull_registration_number && (
-                      <div className="flex justify-between">
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Hull Reg #:</span>
-                        <span className={`font-mono font-semibold tracking-wide ${darkMode ? 'text-cyan-300' : 'text-cyan-700'}`}>
-                          {boat.hull_registration_number}
-                        </span>
-                      </div>
-                    )}
-                    {boat.hull && (
-                      <div className="flex justify-between">
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Hull:</span>
-                        <span className={darkMode ? 'text-white' : 'text-slate-900'}>
-                          {boat.hull}
-                        </span>
-                      </div>
-                    )}
-                    {boat.handicap && boat.handicap !== 0 && (
-                      <div className="flex justify-between">
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Handicap:</span>
-                        <span className={darkMode ? 'text-white' : 'text-slate-900'}>
-                          {boat.handicap}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Registration & Certification - Conditional */}
-                    {(boat.boat_name || boat.design_name || boat.designer_name || boat.hull_registration_number ||
-                      boat.registration_date || boat.certification_authority || boat.certification_file_url) && (
-                      <div className={`pt-3 mt-3 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                        <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Registration & Certification
-                        </h4>
-                      </div>
-                    )}
-
-                    {boat.boat_name && (
-                      <div className="flex justify-between">
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Boat Name:</span>
-                        <span className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                          {boat.boat_name}
-                        </span>
-                      </div>
-                    )}
-                    {boat.design_name && (
-                      <div className="flex justify-between">
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Design:</span>
-                        <span className={darkMode ? 'text-white' : 'text-slate-900'}>
-                          {boat.design_name}
-                        </span>
-                      </div>
-                    )}
-                    {boat.designer_name && (
-                      <div className="flex justify-between">
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Designer:</span>
-                        <span className={darkMode ? 'text-white' : 'text-slate-900'}>
-                          {boat.designer_name}
-                        </span>
-                      </div>
-                    )}
-                    {boat.hull_registration_number && (
-                      <div className="flex flex-col gap-1 py-2">
-                        <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Hull Registration Number:
-                        </span>
-                        <div className={`
-                          px-4 py-3 rounded-lg font-mono text-base font-bold tracking-wider text-center
-                          ${darkMode
-                            ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-300'
-                            : 'bg-cyan-50 border border-cyan-200 text-cyan-700'}
-                        `}>
-                          {boat.hull_registration_number}
-                        </div>
-                      </div>
-                    )}
-                    {boat.registration_date && (
-                      <div className="flex justify-between">
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Registered:</span>
-                        <span className={darkMode ? 'text-white' : 'text-slate-900'}>
-                          {new Date(boat.registration_date).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
-                    {boat.certification_authority && (
-                      <div className="flex justify-between">
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Authority:</span>
-                        <span className={`text-right ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                          {boat.certification_authority}
-                        </span>
-                      </div>
-                    )}
-                    {boat.certification_file_url && (
-                      <div className="pt-2">
-                        <a
-                          href={boat.certification_file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`
-                            flex items-center gap-3 p-4 rounded-xl border-2 transition-all group
-                            ${darkMode
-                              ? 'bg-green-500/10 border-green-500/30 hover:border-green-500 hover:bg-green-500/20'
-                              : 'bg-green-50 border-green-200 hover:border-green-400 hover:bg-green-100'}
-                          `}
-                        >
-                          <FileText className="text-green-500 flex-shrink-0" size={28} />
-                          <div className="flex-1 min-w-0">
-                            <p className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                              {boat.certification_file_name || 'Certificate'}
-                            </p>
-                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                              Click to view PDF
-                            </p>
-                          </div>
-                          <ExternalLink
-                            className={`flex-shrink-0 ${darkMode ? 'text-slate-400' : 'text-slate-600'} group-hover:text-green-500`}
-                            size={18}
-                          />
-                        </a>
-                      </div>
-                    )}
-                    {(boat.purchase_date || boat.purchase_value) && (
-                      <div className={`pt-3 mt-3 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                        <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Purchase Information
-                        </h4>
-                      </div>
-                    )}
-                    {boat.purchase_date && (
-                      <div className="flex justify-between">
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Purchased:</span>
-                        <span className={darkMode ? 'text-white' : 'text-slate-900'}>
-                          {new Date(boat.purchase_date).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
-                    {boat.purchase_value && (
-                      <div className="flex justify-between">
-                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Value:</span>
-                        <span className={darkMode ? 'text-white' : 'text-slate-900'}>
-                          ${boat.purchase_value.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+              <div className="a-card overflow-hidden">
+                <div style={{ padding: '18px 18px 8px' }}>
+                  <div className="flex items-center gap-3">
+                    <span className="a-tile a-tile-sm"><Activity size={16} /></span>
+                    <h2 className="a-display a-ink flex-1 m-0 text-[18px] font-semibold">Recent activity</h2>
                   </div>
                 </div>
+                {recentActivity.length === 0 ? (
+                  <p className="a-dim text-[13px]" style={{ padding: '6px 18px 18px' }}>No activity yet. Race or log maintenance to see it here.</p>
+                ) : (
+                  <div style={{ paddingBottom: 6 }}>
+                    {recentActivity.slice(0, 5).map((activity, index) => {
+                      const clickable = activity.type === 'race' && activity.resultId;
+                      const p = activity.position as number | null;
+                      return (
+                        <div
+                          key={`${activity.type}-${activity.resultId}-${index}`}
+                          onClick={() => clickable && navigate(`/results/${activity.resultId}`)}
+                          className="a-rr"
+                          style={{ padding: '12px 16px', cursor: clickable ? 'pointer' : 'default' }}
+                        >
+                          {activity.type === 'race' ? (
+                            p && MEDAL[p]
+                              ? <span className="a-med" style={{ width: 32, height: 32, background: MEDAL[p], boxShadow: `0 0 0 3px color-mix(in srgb, ${MEDAL[p]} 25%, transparent)` }}>{p}</span>
+                              : <span className="a-med a-med-n" style={{ width: 32, height: 32 }}>{p ?? '–'}</span>
+                          ) : (
+                            <span className="a-tile a-tile-sm a-txt-a"><Wrench size={15} /></span>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="a-ink text-[14.5px] font-semibold truncate">{activity.title}</div>
+                            <div className="a-dim text-[12.5px] mt-0.5 truncate">
+                              {activity.type === 'race' ? (p != null ? `Finished ${ord(p)}` : `${activity.raceCount} race${activity.raceCount === 1 ? '' : 's'}`) : (activity.description || 'Maintenance')}
+                            </div>
+                          </div>
+                          <span className="a-dim text-[12.5px] whitespace-nowrap">{new Date(activity.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span>
+                          {clickable && <ChevronRight size={15} className="a-dim" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="a-card flex flex-col gap-3.5" style={{ padding: '18px 20px' }}>
+                <div className="flex items-center gap-3">
+                  <span className="a-tile a-tile-sm"><FileText size={16} /></span>
+                  <h2 className="a-display a-ink flex-1 m-0 text-[18px] font-semibold">Specifications</h2>
+                </div>
+                <div className="a-grp">
+                  {boat.boat_name && specRow('Boat name', boat.boat_name)}
+                  {specRow('Class', <span className="a-lb-cls"><Sailboat size={11} />{boat.boat_type}</span>)}
+                  {specRow('Sail number', boat.sail_number || '–')}
+                  {boat.hull && specRow('Hull', boat.hull)}
+                  {!!boat.handicap && specRow('Handicap', boat.handicap)}
+                  {boat.design_name && specRow('Design', boat.design_name)}
+                  {boat.designer_name && specRow('Designer', boat.designer_name)}
+                </div>
+                {hasReg && (
+                  <>
+                    <p className="a-cap mt-1">Registration</p>
+                    <div className="a-grp">
+                      {boat.hull_registration_number && specRow('Hull reg.', <span className="a-hullreg" style={{ background: 'none', padding: 0 }}>{boat.hull_registration_number}</span>)}
+                      {boat.registration_date && specRow('Registered', fmtDate(boat.registration_date))}
+                      {boat.certification_authority && specRow('Authority', boat.certification_authority)}
+                    </div>
+                  </>
+                )}
+                {boat.certification_file_url && (
+                  <a href={boat.certification_file_url} target="_blank" rel="noopener noreferrer" className="a-grp flex items-center gap-3" style={{ padding: '12px 14px' }}>
+                    <span className="a-tile" style={{ width: 40, height: 40 }}><FileText size={18} /></span>
+                    <div className="flex-1 min-w-0">
+                      <div className="a-ink text-[14px] font-semibold truncate">{boat.certification_file_name || 'Certificate'}</div>
+                      <div className="a-dim text-[12px] mt-0.5">Measurement certificate</div>
+                    </div>
+                    <ExternalLink size={16} className="a-dim" />
+                  </a>
+                )}
+                {(boat.purchase_date || boat.purchase_value) && (
+                  <>
+                    <p className="a-cap mt-1">Purchase</p>
+                    <div className="a-grp">
+                      {boat.purchase_date && specRow('Purchased', fmtDate(boat.purchase_date))}
+                      {boat.purchase_value && specRow('Value', `$${boat.purchase_value.toFixed(2)}`)}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
