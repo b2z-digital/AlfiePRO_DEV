@@ -9,6 +9,16 @@ import { ConversationThread } from './ConversationThread';
 import { ComposeModal } from './ComposeModal';
 import { ChatView } from './ChatView';
 import { NewChatModal } from './NewChatModal';
+import { Inbox, MessageCircle, MessagesSquare, Plus } from 'lucide-react';
+
+const PaneEmpty = ({ title, sub, cta, onCta }: { title: string; sub: string; cta: string; onCta: () => void }) => (
+  <div className="h-full flex flex-col items-center justify-center text-center px-8">
+    <span className="a-tile a-tile-rim mb-4" style={{ width: 64, height: 64 }}><MessagesSquare size={28} /></span>
+    <h3 className="a-display a-ink text-[19px] font-semibold mb-1.5">{title}</h3>
+    <p className="a-mute text-[14px] max-w-sm">{sub}</p>
+    <button onClick={onCta} className="a-btn a-btn-p mt-5"><Plus size={16} />{cta}</button>
+  </div>
+);
 
 interface Notification {
   id: string;
@@ -888,26 +898,47 @@ export const Conversations: React.FC<ConversationsProps> = ({
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-3 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-          <p className="text-sm text-slate-500">Loading conversations...</p>
+          <div className="w-10 h-10 border-[3px] border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+          <p className="a-dim text-sm">Loading conversations…</p>
         </div>
       </div>
     );
   }
 
+  const switchTopLevel = (tab: TopLevelTab) => {
+    setTopLevelTab(tab);
+    setSelectedNotification(null);
+    setSelectedChat(null);
+    setDirectChatTarget(null);
+  };
+
   return (
-    <div className="h-screen flex overflow-hidden">
-      <div className="w-[320px] xl:w-[360px] flex-shrink-0 h-full overflow-hidden">
+    <div className="h-screen flex flex-col gap-[22px] overflow-hidden p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-9 lg:pl-9">
+      <div className="flex flex-wrap items-center gap-4 flex-shrink-0">
+        <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><MessagesSquare size={24} /></span>
+        <div className="flex-1 min-w-0">
+          <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">Conversations</h1>
+          <p className="a-mute mt-1 text-[14.5px]">Messages, notifications and chats</p>
+        </div>
+        <div className="a-seg a-seg-lg" role="tablist">
+          <button className={`a-seg-i ${topLevelTab === 'inbox' ? 'a-seg-on' : ''}`} onClick={() => switchTopLevel('inbox')} role="tab" aria-selected={topLevelTab === 'inbox'}>
+            <Inbox size={17} />Inbox{unreadCount > 0 && <span className="a-cnt">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+          </button>
+          <button className={`a-seg-i ${topLevelTab === 'chats' ? 'a-seg-on' : ''}`} onClick={() => switchTopLevel('chats')} role="tab" aria-selected={topLevelTab === 'chats'}>
+            <MessageCircle size={17} />Chats{unreadChatsCount > 0 && <span className="a-cnt">{unreadChatsCount > 99 ? '99+' : unreadChatsCount}</span>}
+          </button>
+        </div>
+        <button className="a-btn a-btn-p" style={{ height: 44, borderRadius: 14 }} onClick={() => (topLevelTab === 'chats' ? setShowNewChat(true) : setShowCompose(true))}>
+          <Plus size={18} />{topLevelTab === 'chats' ? 'New chat' : 'New message'}
+        </button>
+      </div>
+      <div className="a-pane flex-1 min-h-0">
+      <div className="w-[340px] xl:w-[400px] flex-shrink-0 h-full overflow-hidden">
         <ConversationsSidebar
           activeTab={activeTab}
           onTabChange={(tab) => { setActiveTab(tab); setSelectedNotification(null); }}
           topLevelTab={topLevelTab}
-          onTopLevelTabChange={(tab) => {
-            setTopLevelTab(tab);
-            setSelectedNotification(null);
-            setSelectedChat(null);
-            setDirectChatTarget(null);
-          }}
+          onTopLevelTabChange={switchTopLevel}
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           notifications={notifications}
@@ -945,27 +976,7 @@ export const Conversations: React.FC<ConversationsProps> = ({
             darkMode={darkMode}
           />
         ) : topLevelTab === 'chats' ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-8 bg-[#0f1729]">
-            <div className="w-20 h-20 rounded-3xl bg-slate-700/40 border border-slate-600/50 flex items-center justify-center mb-6">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-slate-300 mb-2">Select a chat</h3>
-            <p className="text-sm text-slate-500 max-w-sm">
-              Choose a chat from the sidebar, or start a new one.
-            </p>
-            <button
-              onClick={() => setShowNewChat(true)}
-              className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 text-sm font-medium"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              New Chat
-            </button>
-          </div>
+          <PaneEmpty title="Select a chat" sub="Choose a chat from the list, or start a new one." cta="New chat" onCta={() => setShowNewChat(true)} />
         ) : selectedNotification ? (
           <ConversationThread
             notification={selectedNotification}
@@ -979,28 +990,9 @@ export const Conversations: React.FC<ConversationsProps> = ({
             darkMode={darkMode}
           />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center px-8 bg-[#0f1729]">
-            <div className="w-20 h-20 rounded-3xl bg-slate-700/40 border border-slate-600/50 flex items-center justify-center mb-6">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-slate-300 mb-2">Select a conversation</h3>
-            <p className="text-sm text-slate-500 max-w-sm">
-              Choose a message from the sidebar, or start a new conversation.
-            </p>
-            <button
-              onClick={() => setShowCompose(true)}
-              className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 text-sm font-medium"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              New Conversation
-            </button>
-          </div>
+          <PaneEmpty title="Select a conversation" sub="Choose a message from the list, or start a new conversation." cta="New message" onCta={() => setShowCompose(true)} />
         )}
+      </div>
       </div>
 
       {showCompose && (
