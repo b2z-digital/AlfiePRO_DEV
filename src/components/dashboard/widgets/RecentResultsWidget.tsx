@@ -470,154 +470,102 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
           <p className="text-slate-400">No recent results</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {recentResults.map((race, raceIdx) => (
-            <div
-              key={race.id}
-              onClick={() => {
-                if (isEditMode) return;
-                if (race.isNationalEvent || race.isStateEvent) {
-                  navigate('/results', { state: { mainTab: race.isStateEvent ? 'state' : 'national', externalEventId: race.externalEventId } });
-                } else {
-                  navigate('/results', { state: { eventId: race.id, isSeriesEvent: race.isSeriesEvent, seriesId: race.seriesId, roundIndex: race.roundIndex } });
-                }
-              }}
-              className={`
-                a-ev ${raceIdx === 0 ? 'a-ev-hero a-ev-latest' : 'a-ev-row'}
-                group relative overflow-hidden rounded-xl border transition-all duration-300
-                ${isEditMode ? 'pointer-events-none' : 'hover:shadow-xl hover:scale-[1.02] cursor-pointer'}
-                bg-slate-800/50 border-slate-700/50 hover:border-slate-600
-              `}
-            >
-              <div className="flex h-32">
-                <div className="relative w-32 h-32 flex-shrink-0 overflow-hidden">
-                  {(race.isNationalEvent || race.isStateEvent) ? (
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        backgroundImage: race.boatClassImage ? `url(${race.boatClassImage})` : 'url(https://images.pexels.com/photos/163236/sailing-ship-vessel-boat-sea-163236.jpeg?auto=compress&cs=tinysrgb&w=400)',
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center'
-                      }}
-                    />
-                  ) : (
-                    <div
-                      className="absolute inset-0 bg-gradient-to-br"
-                      style={{
-                        backgroundImage: race.venueImage ? `url(${race.venueImage})` : 'url(https://images.pexels.com/photos/163236/sailing-ship-vessel-boat-sea-163236.jpeg?auto=compress&cs=tinysrgb&w=400)',
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center'
-                      }}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                    </div>
-                  )}
-                  <div className={`absolute top-0 right-0 bottom-0 w-0.5 bg-gradient-to-b ${race.isNationalEvent ? 'from-amber-400 via-amber-500 to-amber-400' : race.isStateEvent ? 'from-green-400 via-green-500 to-green-400' : 'from-green-400 via-green-500 to-green-400'}`} />
-                  {race.date && (
-                    <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1.5 shadow-lg">
-                      <div className="text-center">
-                        <div className="text-xs font-semibold text-slate-900">{new Date(race.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</div>
-                        <div className="text-lg font-bold text-slate-900 leading-none">{new Date(race.date).getDate()}</div>
+        <div className="flex flex-col gap-4">
+          {(() => {
+            const FALLBACK = 'https://images.pexels.com/photos/163236/sailing-ship-vessel-boat-sea-163236.jpeg?auto=compress&cs=tinysrgb&w=400';
+            const open = (race: RaceResult) => {
+              if (isEditMode) return;
+              if (race.isNationalEvent || race.isStateEvent) {
+                navigate('/results', { state: { mainTab: race.isStateEvent ? 'state' : 'national', externalEventId: race.externalEventId } });
+              } else {
+                navigate('/results', { state: { eventId: race.id, isSeriesEvent: race.isSeriesEvent, seriesId: race.seriesId, roundIndex: race.roundIndex } });
+              }
+            };
+            const initials = (n: string) => n.split(' ').filter(Boolean).map((p: string) => p.charAt(0).toUpperCase()).slice(0, 2).join('');
+            const shortName = (n: string) => { const p = n.split(' ').filter(Boolean); return p.length > 1 ? `${p[0]} ${p[p.length - 1].charAt(0)}.` : n; };
+            const face = (w: { name: string; avatarUrl?: string }) => (
+              <span className="a-pl-face">{w.avatarUrl ? <img src={w.avatarUrl} alt={w.name} /> : initials(w.name)}</span>
+            );
+            const labels = (race: RaceResult) => (
+              <>
+                {race.isNationalEvent && <span className="a-wlvl a-wlvl-n">National</span>}
+                {race.isStateEvent && <span className="a-wlvl">State{race.stateAssociationName ? ` · ${race.stateAssociationName}` : ''}</span>}
+                {!race.isNationalEvent && !race.isStateEvent && race.raceFormat && (
+                  <span className={getRaceFormatBadge(race.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
+                    {race.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+                  </span>
+                )}
+                {race.raceClass && <span className={getBoatClassBadge(race.raceClass, darkMode).className}>{race.raceClass}</span>}
+              </>
+            );
+            const hero = recentResults[0];
+            const img = (hero.isNationalEvent || hero.isStateEvent) ? (hero.boatClassImage || FALLBACK) : (hero.venueImage || FALLBACK);
+            const d = hero.date ? new Date(hero.date) : null;
+            const podium = [2, 1, 3].map(pos => hero.topThree?.find(w => w.position === pos)).filter(Boolean) as NonNullable<RaceResult['topThree']>;
+            return (
+              <>
+                <div onClick={() => open(hero)} className={`a-rh ${isEditMode ? 'pointer-events-none' : ''}`}>
+                  <div className="a-rh-img" style={{ backgroundImage: `url(${img})` }}>
+                    <span className="a-chrome-pill" style={{ left: 14, top: 14 }}>LATEST</span>
+                    {d && (
+                      <div className="a-sp-date" style={{ left: 14, bottom: 14, width: 52, height: 58 }}>
+                        <b>{d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</b><span>{d.getDate()}</span>
                       </div>
-                    </div>
-                  )}
-                  <div className="absolute top-2 left-2">
-                    {race.isNationalEvent ? (
-                      <Globe size={20} className="text-amber-400 drop-shadow-lg" />
-                    ) : race.isStateEvent ? (
-                      <Globe size={20} className="text-green-400 drop-shadow-lg" />
-                    ) : (
-                      <Trophy size={20} className="text-yellow-400 drop-shadow-lg" />
                     )}
                   </div>
-                </div>
-                <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
-                  <div>
-                    <h3 className="text-base font-semibold text-white mb-1 truncate">
-                      {race.eventName}
-                    </h3>
-                    <div className="flex items-center text-sm text-slate-400 mb-2">
-                      {race.isNationalEvent ? (
-                        <>
-                          <Globe size={14} className="mr-1 text-amber-400" />
-                          <span className="truncate text-amber-400/80">{race.venue || 'National Event'}</span>
-                        </>
-                      ) : race.isStateEvent ? (
-                        <>
-                          <Globe size={14} className="mr-1 text-green-400" />
-                          <span className="truncate text-green-400/80">{race.venue || 'State Event'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <MapPin size={14} className="mr-1" />
-                          <span className="truncate">{race.venue}</span>
-                        </>
-                      )}
-                    </div>
+                  <div className="a-rh-body flex-1 min-w-0 flex flex-col" style={{ padding: '18px 20px 0' }}>
+                    <div className="flex gap-1.5 flex-wrap">{labels(hero)}</div>
+                    <p className="a-display a-ink m-0 mt-2 text-[17px] font-semibold leading-[1.25] line-clamp-2">{hero.eventName}</p>
+                    {hero.venue && <p className="a-ws" style={{ marginTop: 4 }}><MapPin size={13} className="flex-shrink-0" /><span>{hero.venue}</span></p>}
+                    {podium.length > 0 ? (
+                      <div className="mt-auto flex items-end justify-center gap-2 pt-3">
+                        {podium.map(w => (
+                          <div key={w.position} className="a-wstep" title={`${w.position}. ${w.name}`}>
+                            <span className={`a-pl a-p${w.position}`} style={{ width: w.position === 1 ? 50 : 40, height: w.position === 1 ? 50 : 40 }}>{face(w)}</span>
+                            <p className={w.position === 1 ? 'a-ink font-semibold' : ''}>{shortName(w.name)}</p>
+                            <div className={`a-wblk a-wblk-${w.position}`}>{w.position}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <div className="mt-auto pb-5 a-dim text-[12.5px]">Results not yet available</div>}
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {race.isNationalEvent && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                          National
-                        </span>
-                      )}
-                      {race.isStateEvent && (
-                        <>
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">
-                            State
-                          </span>
-                          {race.stateAssociationName && (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/50 text-green-300 border border-green-500/20">
-                              {race.stateAssociationName}
-                            </span>
-                          )}
-                        </>
-                      )}
-                      {!race.isNationalEvent && !race.isStateEvent && race.raceFormat && (
-                        <span className={getRaceFormatBadge(race.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
-                          {race.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                        </span>
-                      )}
-                      {race.raceClass && (
-                        <span className={getBoatClassBadge(race.raceClass, darkMode).className}>
-                          {race.raceClass}
-                        </span>
-                      )}
-                      {race.topThree && race.topThree.length > 0 && (
-                        <div className="flex items-center gap-1">
-                          {race.topThree.map((winner, idx) => (
-                            <div
-                              key={idx}
-                              className="relative"
-                              title={`${winner.position}. ${winner.name}`}
-                            >
-                              <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center overflow-hidden ${getPodiumColor(winner.position)}`}>
-                                {winner.avatarUrl ? (
-                                  <img src={winner.avatarUrl} alt={winner.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full bg-slate-700 flex items-center justify-center">
-                                    <span className="text-xs font-bold text-slate-300">{winner.name.split(' ').filter(Boolean).map((p: string) => p.charAt(0).toUpperCase()).slice(0, 2).join('')}</span>
-                                  </div>
-                                )}
-                              </div>
-                              <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                                winner.position === 1 ? 'bg-yellow-400 text-slate-900' :
-                                winner.position === 2 ? 'bg-slate-300 text-slate-900' :
-                                'bg-orange-600 text-white'
-                              }`}>
-                                {winner.position}
-                              </div>
+                </div>
+                {recentResults.length > 1 && (
+                  <div className="flex flex-col">
+                    {recentResults.slice(1).map(race => {
+                      const rd = race.date ? new Date(race.date) : null;
+                      return (
+                        <div key={race.id} onClick={() => open(race)} className={`a-wag a-wag-nt ${isEditMode ? 'pointer-events-none' : ''}`}>
+                          {rd ? (
+                            <div className="a-wagd">
+                              <b>{rd.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</b>
+                              <span>{rd.getDate()}</span>
+                              <i>{rd.toLocaleDateString('en-US', { weekday: 'short' })}</i>
                             </div>
-                          ))}
+                          ) : <div />}
+                          <div className="a-wdot" />
+                          <div className="min-w-0">
+                            <p className="a-wt">{race.eventName}</p>
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                              {labels(race)}
+                              {(race.isNationalEvent || race.isStateEvent) && race.venue && <span className="a-txt-a text-[12px] ml-1 truncate">{race.venue}</span>}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {(race.topThree || []).map(w => (
+                              <span key={w.position} className={`a-pl a-p${w.position}`} style={{ width: 30, height: 30 }} title={`${w.position}. ${w.name}`}>
+                                {face(w)}<span className="a-pl-n">{w.position}</span>
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      )}
-                    </div>
+                      );
+                    })}
                   </div>
-                </div>
-              </div>
-            </div>
-          ))}
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

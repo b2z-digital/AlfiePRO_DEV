@@ -98,33 +98,24 @@ export const PendingInvoicesWidget: React.FC<PendingInvoicesWidgetProps> = ({
       <button
         onClick={handleClick}
         disabled={isEditMode}
-        className={`relative rounded-2xl p-4 w-full h-full flex items-center gap-3 border backdrop-blur-sm ${themeColors.background} ${isEditMode ? '' : 'cursor-pointer transform hover:scale-[1.02]'}`}
+        className={`a-wstat relative rounded-2xl w-full h-full flex items-center border backdrop-blur-sm ${themeColors.background} ${isEditMode ? '' : 'cursor-pointer'}`}
       >
-        <div className="flex-shrink-0">
-          <div className="p-3 rounded-xl bg-yellow-500/20">
-            <Receipt className="text-yellow-400" size={24} />
-          </div>
-        </div>
+        <span className="a-tile flex-shrink-0" style={{ width: 48, height: 48 }}><Receipt size={22} /></span>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-400 mb-0.5">Pending Invoices</p>
+          <p className="a-mute text-[12.5px]">Pending Invoices</p>
           {loading ? (
-            <p className="text-2xl font-bold text-white">...</p>
+            <p className="a-num a-ink text-[28px] font-semibold leading-[1.1]">...</p>
           ) : (
             <>
-              <p className="text-2xl font-bold text-white mb-0.5">
+              <p className="a-num a-ink text-[28px] font-semibold leading-[1.1]">
                 {pendingCount}
               </p>
-              <p className="text-xs text-slate-400">
+              <p className="a-mute text-[12.5px]">
                 {pendingCount === 1 ? 'Draft invoice' : 'Draft invoices'}
               </p>
             </>
           )}
         </div>
-        {awaitingPayment > 0 && (
-          <div className="flex-shrink-0">
-            <Clock className="text-yellow-400/40" size={32} />
-          </div>
-        )}
       </button>
     </div>
   );

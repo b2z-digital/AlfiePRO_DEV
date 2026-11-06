@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useAlfieLight, alfieChartScales, alfieTooltip, ALFIE_CHART_COLORS } from '../../alfie/Kit';
 import { supabase } from '../../../utils/supabase';
 import { ThemedWidgetWrapper } from './ThemedWidgetWrapper';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
@@ -90,48 +91,27 @@ export const MembersByClassWidget: React.FC<MembersByClassWidgetProps> = ({
     }
   };
 
+  const light = useAlfieLight();
+  const palette = ALFIE_CHART_COLORS;
+  const styledData = chartData && {
+    ...chartData,
+    datasets: chartData.datasets.map((ds: any) => ({
+      ...ds,
+      backgroundColor: ds.data.map((_: any, i: number) => palette[i % palette.length]),
+      borderWidth: 0,
+      borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 2, bottomRight: 2 },
+      borderSkipped: false,
+      categoryPercentage: 0.86,
+      barPercentage: 0.9,
+    })),
+  };
+
+  const scales = alfieChartScales(light);
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false
-      },
-      tooltip: {
-        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-        titleColor: 'rgb(226, 232, 240)',
-        bodyColor: 'rgb(203, 213, 225)',
-        borderColor: 'rgba(71, 85, 105, 0.5)',
-        borderWidth: 1,
-        padding: 12
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: {
-          color: 'rgb(148, 163, 184)',
-          font: {
-            size: 11
-          },
-          stepSize: 1
-        },
-        grid: {
-          color: 'rgba(71, 85, 105, 0.2)'
-        }
-      },
-      x: {
-        ticks: {
-          color: 'rgb(148, 163, 184)',
-          font: {
-            size: 11
-          }
-        },
-        grid: {
-          display: false
-        }
-      }
-    }
+    plugins: { legend: { display: false }, tooltip: alfieTooltip(light) },
+    scales: { y: { ...scales.y, ticks: { ...scales.y.ticks, precision: 0, maxTicksLimit: 5 } }, x: scales.x },
   };
 
   return (
@@ -147,11 +127,11 @@ export const MembersByClassWidget: React.FC<MembersByClassWidgetProps> = ({
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
         </div>
       ) : chartData ? (
-        <div className="h-64 p-4">
-          <Bar data={chartData} options={options} />
+        <div className="h-[230px]">
+          <Bar data={styledData} options={options as any} />
         </div>
       ) : (
-        <div className="flex items-center justify-center h-64 text-slate-400">
+        <div className="a-dim flex items-center justify-center h-[230px] text-[13.5px]">
           No boat class data available
         </div>
       )}

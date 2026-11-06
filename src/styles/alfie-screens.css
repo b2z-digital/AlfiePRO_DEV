@@ -965,3 +965,78 @@ html.alfie-theme .a-qt-ctl { position: absolute; top: 10px; right: 10px; display
 html.alfie-theme .a-qt:hover .a-qt-ctl, html.alfie-theme .a-qt:focus-within .a-qt-ctl { opacity: 1; }
 @media (hover: none) { html.alfie-theme .a-qt-ctl { opacity: 1; } }
 html.alfie-light .a-qt { background: rgba(15,23,42,0.05); }
+
+/* ---- Dashboard widgets: agenda rows, podium, charts, news (Main board) ---- */
+html.alfie-theme .a-wag { display: grid; grid-template-columns: 44px 14px 52px minmax(0,1fr) auto; align-items: center; gap: 14px; padding: 12px 6px; position: relative; cursor: pointer; border-radius: 14px; transition: background .12s ease; }
+html.alfie-theme .a-wag.a-wag-nt { grid-template-columns: 44px 14px minmax(0,1fr) auto; }
+html.alfie-theme .a-wag:hover { background: rgba(255,255,255,0.03); }
+html.alfie-theme .a-wagd { text-align: center; }
+html.alfie-theme .a-wagd b { display: block; font: 600 10.5px 'Instrument Sans', system-ui, sans-serif; letter-spacing: 0.08em; color: rgba(235,240,255,0.6); }
+html.alfie-theme .a-wagd span { display: block; font: 600 20px/1.1 'Bricolage Grotesque', system-ui, sans-serif; color: #fff; font-variant-numeric: tabular-nums; }
+html.alfie-theme .a-wagd i { display: block; font: 500 11px 'Instrument Sans', system-ui, sans-serif; font-style: normal; color: rgba(235,240,255,0.5); }
+html.alfie-theme .a-wdot { position: relative; width: 14px; height: 100%; display: flex; align-items: center; justify-content: center; }
+html.alfie-theme .a-wdot::before { content: ''; position: absolute; left: 6.5px; top: -12px; bottom: -12px; width: 1px; background: rgba(255,255,255,0.1); }
+html.alfie-theme .a-wag:first-child .a-wdot::before { top: 50%; }
+html.alfie-theme .a-wag:last-child .a-wdot::before { bottom: 50%; }
+html.alfie-theme .a-wdot::after { content: ''; position: relative; width: 9px; height: 9px; border-radius: 999px; background: #0B111E; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.3); }
+html.alfie-theme .a-wth { width: 52px; height: 52px; border-radius: 14px; object-fit: cover; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: rgba(255,255,255,0.05); }
+html.alfie-theme .a-wth-meet { background: rgba(64,200,192,0.1); color: #7FE0D9; }
+html.alfie-theme .a-wt { margin: 0; font-size: 14.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.alfie-theme .a-ws { margin: 3px 0 0; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: rgba(235,240,255,0.6); white-space: nowrap; overflow: hidden; }
+html.alfie-theme .a-ws > span { overflow: hidden; text-overflow: ellipsis; }
+html.alfie-theme .a-wlvl { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 7px; border: 1px solid rgba(255,179,64,0.35); background: rgba(255,179,64,0.06); font: 600 11px 'Instrument Sans', system-ui, sans-serif; color: #FFC56B; white-space: nowrap; }
+html.alfie-theme .a-wlvl-n { border-color: rgba(10,132,255,0.4); background: rgba(10,132,255,0.07); color: #6FB4FF; }
+html.alfie-theme .a-wmeet { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 7px; border: 1px solid rgba(64,200,192,0.35); background: rgba(64,200,192,0.07); font: 600 11px 'Instrument Sans', system-ui, sans-serif; color: #7FE0D9; white-space: nowrap; }
+html.alfie-theme .a-wmeet-c { border-color: rgba(255,179,64,0.35); background: rgba(255,179,64,0.06); color: #FFC56B; }
+html.alfie-theme .a-wreg { display: inline-flex; align-items: center; gap: 6px; color: #7ABEFF; font-size: 12px; }
+html.alfie-theme .a-wreg::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: #0A84FF; flex-shrink: 0; }
+html.alfie-light .a-wag:hover { background: rgba(15,23,42,0.03); }
+html.alfie-light .a-wagd b { color: rgba(15,23,42,0.55); }
+html.alfie-light .a-wagd span, html.alfie-light .a-wt { color: #0B1220; }
+html.alfie-light .a-wagd i, html.alfie-light .a-ws { color: rgba(15,23,42,0.55); }
+html.alfie-light .a-wdot::before { background: rgba(15,23,42,0.1); }
+html.alfie-light .a-wdot::after { background: #fff; box-shadow: inset 0 0 0 2px rgba(15,23,42,0.25); }
+html.alfie-light .a-wth { background: rgba(15,23,42,0.05); }
+html.alfie-light .a-wth-meet { background: rgba(64,200,192,0.12); color: #0F766E; }
+html.alfie-light .a-wlvl { color: #B45309; border-color: rgba(217,119,6,0.35); background: rgba(217,119,6,0.06); }
+html.alfie-light .a-wlvl-n { color: #0A64D8; border-color: rgba(10,100,216,0.3); background: rgba(10,100,216,0.06); }
+html.alfie-light .a-wmeet { color: #0F766E; }
+html.alfie-light .a-wmeet-c { color: #B45309; }
+html.alfie-light .a-wreg { color: #0A64D8; }
+@media (max-width: 640px) { html.alfie-theme .a-wag { grid-template-columns: 44px 14px minmax(0,1fr); } html.alfie-theme .a-wag > .a-wth { display: none; } html.alfie-theme .a-wag > :last-child:not(.a-wdot):not(div.min-w-0) { grid-column: 3; justify-self: start; } }
+
+/* podium avatars */
+html.alfie-theme .a-pl { position: relative; display: inline-flex; flex-shrink: 0; border-radius: 999px; }
+html.alfie-theme .a-pl-face { position: absolute; inset: 0; border-radius: 999px; overflow: hidden; background: #16203A; display: flex; align-items: center; justify-content: center; font: 600 11px 'Bricolage Grotesque', system-ui, sans-serif; color: #fff; box-shadow: 0 0 0 1.5px var(--m); }
+html.alfie-theme .a-pl-face img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
+html.alfie-theme .a-pl-n { position: absolute; right: -3px; bottom: -3px; width: 14px; height: 14px; border-radius: 999px; background: var(--m); box-shadow: 0 0 0 2px #0E1526; font: 700 8.5px/14px 'Instrument Sans', system-ui, sans-serif; text-align: center; color: #0B1220; }
+html.alfie-theme .a-p1 { --m: #FFC56B; } html.alfie-theme .a-p2 { --m: #C9D1DE; } html.alfie-theme .a-p3 { --m: #E59A62; }
+html.alfie-light .a-pl-n { box-shadow: 0 0 0 2px #fff; }
+html.alfie-theme .a-rh { height: 250px; border-radius: 18px; overflow: hidden; display: flex; border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.03); cursor: pointer; }
+html.alfie-theme .a-rh-img { position: relative; flex: 0 0 210px; background-size: cover; background-position: center; }
+html.alfie-theme .a-rh-img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(8,13,26,0.1) 40%, rgba(14,21,38,0.95) 100%); }
+html.alfie-theme .a-chrome-pill { position: absolute; z-index: 1; height: 28px; padding: 0 11px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #fff; background: rgba(10,16,30,0.6); border: 1px solid rgba(255,255,255,0.14); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+html.alfie-theme .a-sp-date { position: absolute; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 14px; background: linear-gradient(#0C1220,#0C1220) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-theme .a-sp-date b { font: 600 10.5px 'Instrument Sans', system-ui, sans-serif; letter-spacing: 0.08em; color: rgba(235,240,255,0.78); }
+html.alfie-theme .a-sp-date span { font: 600 22px/1 'Bricolage Grotesque', system-ui, sans-serif; color: #fff; margin-top: 2px; }
+html.alfie-theme .a-wstep { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 92px; }
+html.alfie-theme .a-wstep p { margin: 0; font-size: 12px; font-weight: 500; color: rgba(235,240,255,0.85); white-space: nowrap; max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
+html.alfie-theme .a-wblk { width: 100%; border-radius: 10px 10px 4px 4px; display: flex; align-items: flex-start; justify-content: center; padding-top: 6px; font: 600 15px 'Bricolage Grotesque', system-ui, sans-serif; }
+html.alfie-theme .a-wblk-1 { height: 46px; background: linear-gradient(180deg, rgba(255,197,107,0.34), rgba(255,197,107,0.06)); color: #FFD48A; }
+html.alfie-theme .a-wblk-2 { height: 30px; background: linear-gradient(180deg, rgba(201,209,222,0.28), rgba(201,209,222,0.06)); color: #E3E7EF; }
+html.alfie-theme .a-wblk-3 { height: 20px; padding-top: 1px; font-size: 13px; background: linear-gradient(180deg, rgba(229,154,98,0.3), rgba(229,154,98,0.06)); color: #F0B184; }
+html.alfie-light .a-rh { background: #fff; border-color: rgba(15,23,42,0.08); }
+html.alfie-light .a-rh-img::after { background: linear-gradient(90deg, rgba(255,255,255,0) 55%, rgba(255,255,255,0.9) 100%); }
+html.alfie-light .a-wstep p { color: rgba(15,23,42,0.75); }
+html.alfie-light .a-wblk-1 { color: #B7791F; background: linear-gradient(180deg, rgba(255,179,64,0.35), rgba(255,179,64,0.08)); }
+html.alfie-light .a-wblk-2 { color: #475569; background: linear-gradient(180deg, rgba(100,116,139,0.25), rgba(100,116,139,0.06)); }
+html.alfie-light .a-wblk-3 { color: #B4561F; background: linear-gradient(180deg, rgba(229,124,62,0.3), rgba(229,124,62,0.06)); }
+@media (max-width: 640px) { html.alfie-theme .a-rh { flex-direction: column; height: auto; } html.alfie-theme .a-rh-img { flex-basis: 140px; } html.alfie-theme .a-rh-body { padding-bottom: 0; } }
+html.alfie-theme .a-wstat { padding: 18px; gap: 14px; border-radius: 22px !important; }
+html.alfie-theme button.a-wstat:not(:disabled):hover { filter: brightness(1.08); }
+html.alfie-theme .a-news { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border-radius: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); transition: background .16s ease, border-color .16s ease; }
+html.alfie-theme .a-news:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.12); }
+html.alfie-theme .a-news-img { width: 52px; height: 52px; border-radius: 10px; overflow: hidden; flex-shrink: 0; background: rgba(255,255,255,0.05); }
+html.alfie-light .a-news { background: #fff; border-color: rgba(15,23,42,0.08); }
+html.alfie-light .a-news:hover { background: rgba(15,23,42,0.02); border-color: rgba(15,23,42,0.14); }
+html.alfie-light .a-news-img { background: rgba(15,23,42,0.05); }

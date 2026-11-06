@@ -807,6 +807,96 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
     </div>
   );
 
+  const event0 = (event: RaceEvent) => event.isMeeting ? renderMeetingCard(event, true) : renderEventCard(event, true);
+
+  const agendaDate = (d: Date) => (
+    <div className="a-wagd">
+      <b>{d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</b>
+      <span>{d.getDate()}</span>
+      <i>{d.toLocaleDateString('en-US', { weekday: 'short' })}</i>
+    </div>
+  );
+
+  const renderMeetingRow = (event: RaceEvent) => (
+    <div
+      key={event.id}
+      onClick={() => handleMeetingClick(event)}
+      className={`a-wag ${isEditMode ? 'pointer-events-none' : ''}`}
+    >
+      {agendaDate(new Date(event.date + 'T00:00:00'))}
+      <div className="a-wdot" />
+      <div className="a-wth a-wth-meet"><Users size={22} /></div>
+      <div className="min-w-0">
+        <p className="a-wt">{event.eventName}</p>
+        <p className="a-ws">
+          {event.meetingTime && <><Clock size={13} className="flex-shrink-0" /><span>{formatMeetingTime(event.meetingTime)}</span></>}
+          {event.meetingType === 'online' ? (
+            <span>Online meeting</span>
+          ) : event.venue ? (
+            <><MapPin size={13} className="flex-shrink-0" /><span>{event.venue}</span></>
+          ) : null}
+          {event.meetingAttendingCount !== undefined && event.meetingAttendingCount > 0 && (
+            <span>· {event.meetingAttendingCount} attending</span>
+          )}
+        </p>
+      </div>
+      <div className="flex gap-1.5">
+        {event.meetingCategory === 'committee' ? (
+          <span className="a-wmeet a-wmeet-c"><Shield size={12} />Committee</span>
+        ) : (
+          <span className="a-wmeet"><Users size={12} />Meeting</span>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderEventRow = (event: RaceEvent) => {
+    const place = event.venue || event.clubName;
+    const going = event.attendees?.length || 0;
+    return (
+      <div
+        key={event.id}
+        onClick={() => {
+          if (isEditMode) return;
+          if (event.isExternalEvent) {
+            const url = event.sourceUrl || event.registrationUrl;
+            if (url) window.open(url, '_blank', 'noopener,noreferrer');
+            return;
+          }
+          if (orgContext.type === 'state' || orgContext.type === 'national' || event.isPublicEvent) {
+            navigate('/calendar');
+          } else {
+            navigate('/race-management', { state: { eventId: event.id, isSeriesEvent: event.isSeriesEvent, seriesId: event.seriesId, roundName: event.roundName } });
+          }
+        }}
+        className={`a-wag ${isEditMode ? 'pointer-events-none' : ''}`}
+      >
+        {agendaDate(new Date(event.date))}
+        <div className="a-wdot" />
+        {event.venueImage ? <img className="a-wth" src={event.venueImage} alt="" /> : <div className="a-wth"><Calendar size={20} className="a-dim" /></div>}
+        <div className="min-w-0">
+          <p className="a-wt">{event.eventName}</p>
+          <p className="a-ws">
+            {place && <><MapPin size={13} className="flex-shrink-0" /><span>{place}</span></>}
+            {going > 0 ? (
+              <span className="a-wreg ml-1.5">{going} registered</span>
+            ) : event.registrationOpen ? (
+              <span className="a-wreg ml-1.5">Registration open</span>
+            ) : null}
+          </p>
+        </div>
+        <div className="flex gap-1.5 flex-wrap justify-end">
+          {event.raceClass && (
+            <span className={getBoatClassBadge(event.raceClass, darkMode).className}>{event.raceClass}</span>
+          )}
+          {event.eventLevel && (
+            <span className={`a-wlvl ${event.eventLevel === 'national' ? 'a-wlvl-n' : ''}`}>{event.eventLevel === 'national' ? 'National' : 'State'}</span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={`relative rounded-2xl p-6 w-full h-full border backdrop-blur-sm ${themeColors.background}`}>
       {isEditMode && onRemove && (
@@ -848,10 +938,15 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           <p className="text-slate-400">No upcoming events</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {upcomingEvents.map((event, i) => (
-            event.isMeeting ? renderMeetingCard(event, i === 0) : renderEventCard(event, i === 0)
-          ))}
+        <div className="flex flex-col gap-4">
+          {event0(upcomingEvents[0])}
+          {upcomingEvents.length > 1 && (
+            <div className="flex flex-col">
+              {upcomingEvents.slice(1).map((event) => (
+                event.isMeeting ? renderMeetingRow(event) : renderEventRow(event)
+              ))}
+            </div>
+          )}
         </div>
       )}
 

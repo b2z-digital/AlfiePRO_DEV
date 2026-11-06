@@ -60,24 +60,17 @@ export const TasksCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
       <button
         onClick={() => !isEditMode && navigate('/tasks')}
         disabled={isEditMode}
-        className={`relative rounded-2xl p-4 text-left transition-all w-full h-full flex items-center gap-3 border backdrop-blur-sm ${themeColors.background} ${isEditMode ? '' : 'cursor-pointer transform hover:scale-[1.02]'}`}
+        className={`a-wstat relative rounded-2xl text-left transition-all w-full h-full flex items-center border backdrop-blur-sm ${themeColors.background} ${isEditMode ? '' : 'cursor-pointer'}`}
       >
-        <div className="flex-shrink-0">
-          <div className="p-3 rounded-xl bg-blue-500/20">
-            <CheckSquare className="text-blue-400" size={24} />
-          </div>
-        </div>
+        <span className="a-tile flex-shrink-0" style={{ width: 48, height: 48 }}><CheckSquare size={22} /></span>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-400 mb-0.5">Club Tasks</p>
-          <p className="text-2xl font-bold text-white mb-0.5">
+          <p className="a-mute text-[12.5px]">Club Tasks</p>
+          <p className="a-num a-ink text-[28px] font-semibold leading-[1.1]">
             {loading ? '...' : activeTaskCount}
           </p>
-          <p className="text-xs text-slate-400">
+          <p className="a-mute text-[12.5px]">
             {activeTaskCount === 1 ? '1 active task' : activeTaskCount === 0 ? 'No active tasks' : `${activeTaskCount} active tasks`}
           </p>
-        </div>
-        <div className="flex-shrink-0">
-          <BarChart3 className="text-blue-400/40" size={32} />
         </div>
       </button>
     </div>
