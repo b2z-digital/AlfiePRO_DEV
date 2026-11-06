@@ -9,17 +9,15 @@ interface EventWebsiteManagementProps {
 export const EventWebsiteManagement: React.FC<EventWebsiteManagementProps> = ({ darkMode }) => {
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-16">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
-            <Globe className="text-white" size={24} />
-          </div>
+      <div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        <div className="flex items-center gap-4">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><Globe size={24} /></span>
           <div>
-            <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Event Website Management
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">
+              Event Websites
             </h1>
-            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Manage dedicated websites for your state and national events
+            <p className="a-mute mt-1 text-[14.5px]">
+              Dedicated websites for your state and national events
             </p>
           </div>
         </div>
