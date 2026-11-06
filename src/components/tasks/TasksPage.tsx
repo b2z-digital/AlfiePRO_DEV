@@ -530,15 +530,20 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
 
             {filteredTasks.length === 0 ? (
               <div className="a-empty py-16 px-6">
-                <span className="a-tile" style={{ width: 48, height: 48 }}><CheckSquare size={22} /></span>
-                <h3 className="a-ink text-[16px] font-semibold">
-                  No tasks found
+                <span className="a-tile" style={{ width: 60, height: 60 }}><CheckSquare size={26} /></span>
+                <h3 className="a-display a-ink text-[19px] font-semibold">
+                  {searchTerm ? 'No matching tasks' : 'Nothing on your plate'}
                 </h3>
-                <p className="a-dim text-[13.5px]">
+                <p className="a-mute text-[14px]">
                   {searchTerm
                     ? 'Try adjusting your search terms'
-                    : 'Create your first task to get started'}
+                    : `No ${getCategoryTitle().toLowerCase().replace(/ tasks$/, '')} tasks. Create one to get started.`.replace('No all tasks', 'No tasks').replace('No my tasks', 'No tasks assigned to you')}
                 </p>
+                {!searchTerm && can('tasks.create') && (
+                  <button type="button" className="a-btn mt-1.5" onClick={() => { setEditingTask(null); setShowTaskForm(true); }}>
+                    <Plus size={17} strokeWidth={2.2} />New task
+                  </button>
+                )}
               </div>
             ) : (
               grouped.map((g, gi) => (
