@@ -662,3 +662,12 @@ html.alfie-light .a-sheet-hero { background: #E9EEF5; }
 html.alfie-light .a-sheet-hero::after { background: linear-gradient(180deg, rgba(255,255,255,0), #fff 98%); }
 .a-ew-logo { height: 120px; background: #fff; display: flex; align-items: center; justify-content: center; }
 html.alfie-light .a-ew-logo { border-bottom: 1px solid rgba(15,23,42,0.07); }
+/* Event website dashboard (board S_ev_overview) */
+.a-ew-mark { width: 64px; height: 52px; border-radius: 14px; background: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(255,255,255,0.14); }
+html.alfie-light .a-ew-mark { box-shadow: 0 0 0 1px rgba(15,23,42,0.1); }
+.a-banner-a { display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 16px; border-radius: 16px; background: rgba(255,179,64,0.06); border: 1px solid rgba(255,179,64,0.3); }
+html.alfie-light .a-banner-a { background: rgba(255,179,64,0.08); border-color: rgba(200,130,20,0.3); }
+.a-pill-st { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 999px; background: rgba(255,255,255,0.05); font: 500 13px 'Instrument Sans', sans-serif; color: rgba(235,240,255,0.7); }
+.a-pill-st-g { background: rgba(48,209,88,0.1); color: #6BE38C; }
+html.alfie-light .a-pill-st { background: rgba(15,23,42,0.05); color: rgba(15,23,42,0.6); }
+html.alfie-light .a-pill-st-g { background: rgba(48,209,88,0.1); color: #1E8E3E; }
