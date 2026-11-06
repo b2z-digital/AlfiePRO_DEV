@@ -1187,7 +1187,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         className={`
           fixed left-0 z-40 transition-all duration-300 ease-in-out
           ${isImpersonating ? 'top-[44px]' : 'top-0'} bottom-0
-          ${(collapsed && !isHoveringNav) ? 'w-[70px]' : 'w-64'}
+          ${(collapsed && !isHoveringNav) ? 'w-[92px]' : 'w-64'}
           ${lightMode ? 'alfie-chrome bg-white/60' : darkMode ? 'alfie-chrome bg-slate-800/50 border-r border-slate-700/50' : 'bg-white/10 border-r border-slate-200/20'}
           backdrop-blur-xl
         `}
@@ -1841,7 +1841,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       )}
 
       {/* Main Content */}
-      <div className={`transition-all duration-300 ${isPageEditor ? '' : (collapsed ? 'ml-[70px]' : 'ml-64')} ${isImpersonating ? 'pt-[44px]' : ''}`}>
+      <div className={`transition-all duration-300 ${isPageEditor ? '' : (collapsed ? 'ml-[92px]' : 'ml-64')} ${isImpersonating ? 'pt-[44px]' : ''}`}>
         <div className="h-full">
           <div className={`h-full transition-opacity duration-150 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
             <Routes>
