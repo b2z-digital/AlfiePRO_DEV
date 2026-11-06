@@ -641,3 +641,14 @@ html.alfie-light .a-evp-meet { background: rgba(64,200,192,0.1); color: #0F766E;
 .a-month-cell { box-shadow: inset -1px -1px 0 rgba(255,255,255,0.05); }
 html.alfie-light .a-month { background: transparent; }
 html.alfie-light .a-month-cell { box-shadow: inset -1px -1px 0 rgba(15,23,42,0.07); }
+/* Yacht classes (board S_classes) */
+.a-cc { position: relative; display: flex; flex-direction: column; border-radius: 22px; overflow: hidden; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); cursor: pointer; color: inherit; padding: 0; }
+.a-cc:hover { border-color: transparent; background: linear-gradient(#111827,#111827) padding-box, var(--alfie-spectrum) border-box; }
+.a-cc-img { position: relative; height: 180px; overflow: hidden; background: #0A0F1A; }
+.a-cc-img img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s; }
+.a-cc:hover .a-cc-img img { transform: scale(1.04); }
+.a-cc-img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6,11,22,0) 45%, rgba(6,11,22,0.7)); pointer-events: none; }
+html.alfie-light .a-cc { background: #fff; border-color: rgba(15,23,42,0.08); }
+html.alfie-light .a-cc:hover { background: linear-gradient(#fff,#fff) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-cc-img { background: #E9EEF5; }
+html.alfie-light .a-cc-img::after { background: linear-gradient(180deg, rgba(255,255,255,0) 60%, rgba(15,23,42,0.18)); }
