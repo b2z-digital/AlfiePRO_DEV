@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wrench, Plus, TrendingUp, Bell, Award, Activity, ChevronRight, Zap, Image as ImageIcon, Anchor, Trophy, SquarePen as Edit2, Trash2 } from 'lucide-react';
+import { Wrench, Plus, TrendingUp, Bell, Award, Activity, ChevronRight, Zap, Image as ImageIcon, Anchor, Trophy, SquarePen as Edit2, Trash2, Sailboat } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
@@ -329,11 +329,11 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
   if (loading) {
     return (
       <div className="h-full overflow-y-auto">
-        <div className="p-4 sm:p-6 lg:p-16">
+        <div className="p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto mb-4"></div>
-              <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Loading your garage...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+              <p className="a-dim">Loading your boat shed…</p>
             </div>
           </div>
         </div>
@@ -354,446 +354,161 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
     );
   }
 
+  const totalRaces = Object.values(performanceStats).reduce((sum, stat) => sum + stat.total_races, 0);
+  const improving = Object.values(performanceStats).filter(st => st.recent_trend === 'improving').length;
+  const now = new Date();
+  const overdueCount = upcomingReminders.filter(r => new Date(r.due_date) < now).length;
+  const ord = (n: number | null) => n ? `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}` : '–';
+  const statCard = (icon: React.ReactNode, cap: string, value: React.ReactNode, sub?: string, tone?: string) => (
+    <div className="a-card flex items-center gap-3.5" style={{ padding: '16px 18px' }}>
+      <span className="a-tile" style={{ width: 44, height: 44 }}>{icon}</span>
+      <div>
+        <p className="a-cap">{cap}</p>
+        <div className={`a-display a-num text-[28px] font-semibold leading-none mt-1.5 ${tone || 'a-ink'}`}>{value}</div>
+        {sub && <div className="a-dim text-[12px] mt-1.5">{sub}</div>}
+      </div>
+    </div>
+  );
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-4 sm:p-6 lg:p-16">
-        {/* Hero Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-4">
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/20">
-                <Wrench className="text-white" size={32} />
-              </div>
-              <div>
-                <h1 className={`text-4xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  Boat Shed
-                </h1>
-                <p className={`text-lg ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Your fleet command center
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn-primary-green flex items-center gap-2 px-6 py-3 text-white rounded-xl font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 animate-pulse"
-            >
-              <Plus size={20} />
-              <span className="hidden sm:inline">Add Boat</span>
-            </button>
+      <div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        <div className="flex items-center gap-4">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><Wrench size={24} /></span>
+          <div className="flex-1 min-w-0">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">Boat Shed</h1>
+            <p className="a-mute mt-1 text-[14.5px]">Your fleet, maintenance and rig setups</p>
           </div>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className={`
-              p-4 rounded-xl flex items-start gap-4
-              ${darkMode
-                ? 'bg-slate-800/50 border border-slate-700/50'
-                : 'bg-white border border-slate-200'}
-            `}>
-              <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/20 flex-shrink-0">
-                <Anchor className="text-white" size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {boats.length}
-                </div>
-                <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Total Boats
-                </div>
-              </div>
-            </div>
-
-            <div className={`
-              p-4 rounded-xl flex items-start gap-4
-              ${darkMode
-                ? 'bg-slate-800/50 border border-slate-700/50'
-                : 'bg-white border border-slate-200'}
-            `}>
-              <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-lg shadow-orange-500/20 flex-shrink-0">
-                <Bell className="text-white" size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {upcomingReminders.length}
-                </div>
-                <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Due Soon
-                </div>
-              </div>
-            </div>
-
-            <div className={`
-              p-4 rounded-xl flex items-start gap-4
-              ${darkMode
-                ? 'bg-slate-800/50 border border-slate-700/50'
-                : 'bg-white border border-slate-200'}
-            `}>
-              <div className="p-3 rounded-xl bg-gradient-to-br shadow-lg flex-shrink-0">
-                <Trophy className="text-white" size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {Object.values(performanceStats).reduce((sum, stat) => sum + stat.total_races, 0)}
-                </div>
-                <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Total Races
-                </div>
-              </div>
-            </div>
-
-            <div className={`
-              p-4 rounded-xl flex items-start gap-4
-              ${darkMode
-                ? 'bg-slate-800/50 border border-slate-700/50'
-                : 'bg-white border border-slate-200'}
-            `}>
-              <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 shadow-lg shadow-purple-500/20 flex-shrink-0">
-                <TrendingUp className="text-white" size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {Object.values(performanceStats).filter(s => s.recent_trend === 'improving').length}
-                </div>
-                <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Improving
-                </div>
-              </div>
-            </div>
-          </div>
+          <button onClick={() => setShowAddModal(true)} className="a-btn a-btn-p" style={{ height: 42, borderRadius: 13 }}>
+            <Plus size={17} />
+            <span className="max-sm:hidden">Add boat</span>
+          </button>
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Boats Section - Takes 2 columns */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="mb-4">
-              <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                Your Fleet
-              </h2>
-            </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {statCard(<Anchor size={20} />, 'Boats', boats.length)}
+          {statCard(<Bell size={20} />, overdueCount > 0 ? 'Overdue' : 'Due soon', overdueCount > 0 ? overdueCount : upcomingReminders.length, overdueCount > 0 && upcomingReminders.length > overdueCount ? `${upcomingReminders.length} due in total` : undefined, overdueCount > 0 ? 'a-txt-r' : undefined)}
+          {statCard(<Trophy size={20} />, 'Total races', totalRaces)}
+          {statCard(<TrendingUp size={20} />, 'Improving', improving, improving === 0 ? 'No boat trending up' : `${improving === 1 ? 'boat' : 'boats'} trending up`)}
+        </div>
 
+        <div className="flex flex-col xl:flex-row gap-4 items-start">
+          <div className="flex-1 min-w-0 w-full">
             {boats.length === 0 ? (
-              <div className={`
-                text-center py-16 rounded-2xl border-2 border-dashed
-                ${darkMode
-                  ? 'bg-slate-800/50 border-slate-700'
-                  : 'bg-slate-50 border-slate-300'}
-              `}>
-                <Wrench className={`w-16 h-16 mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
-                <p className={`text-lg font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  No boats in your garage yet
-                </p>
-                <p className={`text-sm mb-4 ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
-                  Add your first boat to start tracking maintenance and performance
-                </p>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="btn-primary-green inline-flex items-center gap-2 px-6 py-3 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-200 font-medium animate-pulse"
-                >
-                  <Plus size={20} />
-                  <span>Add Your First Boat</span>
-                </button>
+              <div className="a-bc a-bc-add" style={{ minHeight: 280 }} onClick={() => setShowAddModal(true)} role="button" tabIndex={0}>
+                <span className="a-tile" style={{ width: 52, height: 52 }}><Plus size={22} /></span>
+                <div className="text-[15px] font-semibold">Add your first boat</div>
+                <div className="a-dim text-[13px] max-w-xs text-center">Track maintenance, rig setups and performance for every boat you sail.</div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {boats.map((boat) => {
                   const stats = performanceStats[boat.id];
                   return (
-                    <div
-                      key={boat.id}
-                      className={`
-                        group relative overflow-hidden rounded-2xl transition-all
-                        ${darkMode
-                          ? 'bg-slate-800/80 backdrop-blur-sm hover:bg-slate-800/90 border border-slate-700 hover:border-cyan-500/50'
-                          : 'bg-white hover:bg-slate-50 border border-slate-200 hover:border-cyan-500/50'}
-                        shadow-lg hover:shadow-xl hover:shadow-cyan-500/10
-                      `}
-                    >
-                      {/* Boat Image */}
-                      <div className="relative h-64 overflow-hidden cursor-pointer" onClick={() => setSelectedBoat(boat)}>
+                    <div key={boat.id} className="a-bc group" onClick={() => setSelectedBoat(boat)} role="button" tabIndex={0}>
+                      <div className="relative overflow-hidden" style={{ height: 190 }}>
                         {boat.image_url ? (
-                          <div className="w-full h-full overflow-hidden relative">
-                            <div
-                              className="absolute inset-0 flex items-center justify-center group-hover:scale-105 transition-transform duration-300"
-                              style={
-                                boat.image_position
-                                  ? {
-                                      transform: `translate(${boat.image_position.x || 0}px, ${boat.image_position.y || 0}px) scale(${boat.image_position.scale || 1})`,
-                                      transformOrigin: 'center'
-                                    }
-                                  : undefined
-                              }
-                            >
-                              <img
-                                src={boat.image_url}
-                                alt={`${boat.boat_type} ${boat.sail_number}`}
-                                className="max-w-none"
-                                style={{
-                                  width: 'auto',
-                                  height: '100%'
-                                }}
-                              />
-                            </div>
+                          <div className="absolute inset-0 flex items-center justify-center"
+                            style={(boat as any).image_position ? { transform: `translate(${(boat as any).image_position.x || 0}px, ${(boat as any).image_position.y || 0}px) scale(${(boat as any).image_position.scale || 1})`, transformOrigin: 'center' } : undefined}>
+                            <img src={boat.image_url} alt={`${boat.boat_type} ${boat.sail_number}`} className="max-w-none" style={{ width: 'auto', height: '100%', minWidth: '100%', objectFit: 'cover' }} />
                           </div>
                         ) : (
-                          <div className={`
-                            w-full h-full flex items-center justify-center
-                            ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}
-                          `}>
-                            <Wrench className={`w-16 h-16 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
-                          </div>
+                          <div className="a-bc-ph absolute inset-0 flex items-center justify-center"><Sailboat size={52} className="a-dim" /></div>
                         )}
-
-                        {/* Overlay Gradient */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-
-                        {/* Action Buttons */}
-                        <div className="absolute top-3 left-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setBoatForImageUpload(boat);
-                            }}
-                            className={`
-                              p-2 rounded-lg transition-all
-                              ${darkMode ? 'bg-slate-900/80 hover:bg-slate-900' : 'bg-white/80 hover:bg-white'}
-                              backdrop-blur-sm shadow-lg
-                            `}
-                            title="Upload image"
-                          >
-                            <ImageIcon size={16} className={darkMode ? 'text-cyan-400' : 'text-cyan-600'} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingBoat(boat);
-                            }}
-                            className={`
-                              p-2 rounded-lg transition-all
-                              ${darkMode ? 'bg-slate-900/80 hover:bg-slate-900' : 'bg-white/80 hover:bg-white'}
-                              backdrop-blur-sm shadow-lg
-                            `}
-                            title="Edit boat"
-                          >
-                            <Edit2 size={16} className={darkMode ? 'text-green-400' : 'text-green-600'} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteBoat(boat.id, `${boat.boat_type} ${boat.sail_number}`);
-                            }}
-                            className={`
-                              p-2 rounded-lg transition-all
-                              ${darkMode ? 'bg-slate-900/80 hover:bg-slate-900' : 'bg-white/80 hover:bg-white'}
-                              backdrop-blur-sm shadow-lg
-                            `}
-                            title="Delete boat"
-                          >
-                            <Trash2 size={16} className="text-red-400" />
-                          </button>
+                        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(6,11,22,0.1) 40%, rgba(6,11,22,0.85))' }} />
+                        <div className="absolute flex gap-1.5" style={{ left: 12, top: 12 }}>
+                          {boat.is_primary && <span className="a-glass" style={{ color: '#FFC56B' }}>★ Primary</span>}
+                          {(boat as any).members?.clubs?.name && <span className="a-glass">{(boat as any).members.clubs.name}</span>}
                         </div>
-
-                        {/* Badges */}
-                        <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
-                          {boat.is_primary && (
-                            <div className="px-3 py-1 bg-yellow-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
-                              <Award size={12} />
-                              Primary
-                            </div>
-                          )}
-                          {/* Club Badge */}
-                          {(boat as any).members?.clubs?.name && (
-                            <div className={`px-3 py-1 text-xs font-medium rounded-full backdrop-blur-sm ${
-                              darkMode
-                                ? 'bg-slate-900/80 text-cyan-400 border border-cyan-500/30'
-                                : 'bg-white/90 text-cyan-600 border border-cyan-500/30'
-                            }`}>
-                              {(boat as any).members.clubs.name}
-                            </div>
-                          )}
+                        <div className="absolute flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ right: 12, top: 12 }}>
+                          <button onClick={(e) => { e.stopPropagation(); setBoatForImageUpload(boat); }} className="a-gb" style={{ width: 32, height: 32 }} aria-label="Upload image" title="Upload image"><ImageIcon size={15} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); setEditingBoat(boat); }} className="a-gb" style={{ width: 32, height: 32 }} aria-label="Edit boat" title="Edit boat"><Edit2 size={15} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteBoat(boat.id, `${boat.boat_type} ${boat.sail_number}`); }} className="a-gb a-gb-d" style={{ width: 32, height: 32 }} aria-label="Delete boat" title="Delete boat"><Trash2 size={15} /></button>
                         </div>
-
-                        {/* Boat Type & Sail Number */}
-                        <div className="absolute bottom-3 left-3 right-3">
-                          <h3 className="text-xl font-bold text-white mb-1">
-                            {boat.boat_type}
-                          </h3>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {boat.hull_registration_number && (
-                              <>
-                                <span className="text-cyan-300/90 text-sm font-mono">{boat.hull_registration_number}</span>
-                                <span className="text-white/50">|</span>
-                              </>
-                            )}
-                            <span className="text-white/90 text-sm">Sail #{boat.sail_number}</span>
-                            {boat.hull && (
-                              <>
-                                <span className="text-white/50">•</span>
-                                <span className="text-white/90 text-sm">{boat.hull}</span>
-                              </>
-                            )}
+                        <div className="absolute" style={{ left: 16, bottom: 14, right: 16 }}>
+                          <div className="a-display text-[22px] font-bold" style={{ color: '#fff' }}>{boat.boat_name || boat.boat_type}</div>
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <span className="a-glass" style={{ height: 24, fontSize: 11 }}><Sailboat size={12} />{boat.boat_type}{boat.sail_number ? ` · ${boat.sail_number}` : ''}</span>
+                            {boat.hull && <span className="a-glass" style={{ height: 24, fontSize: 11 }}>{boat.hull}</span>}
+                            {boat.hull_registration_number && <span style={{ font: '600 12px ui-monospace, Menlo, monospace', color: '#8FD3FF' }}>{boat.hull_registration_number}</span>}
                           </div>
                         </div>
                       </div>
 
-                      {/* Stats Bar */}
-                      <div className="p-4">
-                        <div className="grid grid-cols-4 gap-3">
-                          {stats && stats.total_races > 0 ? (
-                            <>
-                              <div className="text-center">
-                                <div className={`text-lg font-bold ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>
-                                  {stats.total_races}
-                                </div>
-                                <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
-                                  Races
-                                </div>
-                              </div>
-                              <div className="text-center">
-                                <div className={`text-lg font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                                  {stats.best_position || '-'}
-                                </div>
-                                <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
-                                  Best
-                                </div>
-                              </div>
-                              <div className="text-center">
-                                <div className={`text-lg font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                                  {stats.avg_position || '-'}
-                                </div>
-                                <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
-                                  Avg
-                                </div>
-                              </div>
-                              <div className="text-center">
-                                {stats.recent_trend && (
-                                  <div className={`text-lg font-bold flex items-center justify-center gap-1 ${
-                                    stats.recent_trend === 'improving' ? (darkMode ? 'text-green-400' : 'text-green-600') :
-                                    stats.recent_trend === 'declining' ? (darkMode ? 'text-red-400' : 'text-red-600') :
-                                    (darkMode ? 'text-slate-400' : 'text-slate-600')
-                                  }`}>
-                                    {stats.recent_trend === 'improving' && <TrendingUp size={16} />}
-                                    {stats.recent_trend === 'declining' && <Activity size={16} className="transform rotate-180" />}
-                                    {stats.recent_trend === 'stable' && <Activity size={16} />}
-                                  </div>
-                                )}
-                                {!stats.recent_trend && (
-                                  <div className={`text-lg font-bold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                    -
-                                  </div>
-                                )}
-                                <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
-                                  Trend
-                                </div>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="col-span-4 text-center py-2">
-                              <Trophy className={`w-8 h-8 mx-auto mb-2 ${darkMode ? 'text-slate-700' : 'text-slate-300'}`} />
-                              <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
-                                No race data yet
-                              </p>
+                      {stats && stats.total_races > 0 ? (
+                        <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', padding: '14px 16px' }}>
+                          <div><div className="a-dim text-[11.5px]">Races</div><div className="a-display a-ink a-num text-[20px] font-semibold mt-1">{stats.total_races}</div></div>
+                          <div><div className="a-dim text-[11.5px]">Best</div><div className="a-display a-ink a-num text-[20px] font-semibold mt-1">{ord(stats.best_position)}</div></div>
+                          <div><div className="a-dim text-[11.5px]">Avg</div><div className="a-display a-ink a-num text-[20px] font-semibold mt-1">{stats.avg_position || '–'}</div></div>
+                          <div>
+                            <div className="a-dim text-[11.5px]">Trend</div>
+                            <div className={`flex items-center gap-1 mt-1.5 text-[13px] font-semibold ${stats.recent_trend === 'improving' ? 'a-txt-g' : stats.recent_trend === 'declining' ? 'a-txt-r' : 'a-dim'}`}>
+                              {stats.recent_trend === 'improving' && <TrendingUp size={16} />}
+                              {stats.recent_trend === 'declining' && <Activity size={16} className="rotate-180" />}
+                              {stats.recent_trend === 'stable' && <Activity size={16} />}
+                              {stats.recent_trend ? stats.recent_trend.charAt(0).toUpperCase() + stats.recent_trend.slice(1) : '–'}
                             </div>
-                          )}
+                          </div>
                         </div>
-
-                        {/* View Details Button */}
-                        <button
-                          onClick={() => setSelectedBoat(boat)}
-                          className={`
-                            w-full mt-4 pt-4 border-t flex items-center justify-between cursor-pointer
-                            ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-                          `}
-                        >
-                          <span className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            View Details
-                          </span>
-                          <ChevronRight size={20} className={`
-                            transition-transform group-hover:translate-x-1
-                            ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}
-                          `} />
-                        </button>
+                      ) : (
+                        <div className="a-dim flex items-center gap-2 text-[13px]" style={{ padding: '22px 16px' }}><Trophy size={15} />No races yet</div>
+                      )}
+                      <div className="a-ink flex items-center justify-between border-t a-bd text-[13.5px] font-semibold" style={{ padding: '12px 16px' }}>
+                        Open<ChevronRight size={16} className="a-dim" />
                       </div>
                     </div>
                   );
                 })}
+                <div className="a-bc a-bc-add" style={{ minHeight: 300 }} onClick={() => setShowAddModal(true)} role="button" tabIndex={0}>
+                  <span className="a-tile" style={{ width: 52, height: 52 }}><Plus size={22} /></span>
+                  <div className="text-[15px] font-semibold">Add a boat</div>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Sidebar - Reminders & Quick Actions */}
-          <div className="space-y-6">
-            {/* Upcoming Maintenance */}
-            <div className={`
-              rounded-2xl p-6
-              ${darkMode
-                ? 'bg-slate-800 border border-slate-700'
-                : 'bg-white border border-slate-200'}
-            `}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-orange-500/10">
-                  <Bell className="text-orange-500" size={20} />
+          <aside className="w-full xl:w-[380px] flex-shrink-0 flex flex-col gap-4">
+            <div className="a-card overflow-hidden">
+              <div style={{ padding: '18px 18px 10px' }}>
+                <div className="flex items-center gap-3">
+                  <span className="a-tile a-tile-sm"><Wrench size={16} /></span>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="a-display a-ink m-0 text-[18px] font-semibold">Maintenance</h2>
+                    <p className="a-dim mt-0.5 text-[12.5px]">{overdueCount > 0 ? `${overdueCount} overdue` : upcomingReminders.length > 0 ? `${upcomingReminders.length} due soon` : 'All caught up'}</p>
+                  </div>
                 </div>
-                <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  Due Soon
-                </h3>
               </div>
-
               {upcomingReminders.length === 0 ? (
-                <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-600'}`}>
-                  No upcoming maintenance
-                </p>
+                <p className="a-dim text-[13px]" style={{ padding: '4px 18px 18px' }}>No upcoming maintenance</p>
               ) : (
-                <div className="space-y-3">
-                  {upcomingReminders.map((reminder) => (
-                    <div
-                      key={reminder.id}
-                      className={`
-                        p-3 rounded-xl
-                        ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}
-                      `}
-                    >
-                      <div className="flex items-start justify-between gap-2">
+                <div style={{ paddingBottom: 6 }}>
+                  {upcomingReminders.map((reminder) => {
+                    const due = new Date(reminder.due_date);
+                    const late = due < now;
+                    const days = Math.abs(Math.round((due.getTime() - now.getTime()) / 86400000));
+                    return (
+                      <div key={reminder.id} className="a-rr" style={{ padding: '11px 14px', cursor: 'default' }}>
+                        <span className={`a-light ${late ? 'a-light-r' : 'a-light-a'}`} />
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            {reminder.title}
-                          </p>
-                          <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            {getBoatName(reminder.boat_id)}
-                          </p>
+                          <div className="a-ink text-[14px] font-semibold truncate">{reminder.title}</div>
+                          <div className="a-dim text-[12px] mt-0.5 truncate">{getBoatName(reminder.boat_id)} · due {due.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>
                         </div>
-                        <div className={`text-xs font-medium px-2 py-1 rounded ${
-                          new Date(reminder.due_date) < new Date()
-                            ? 'bg-red-500/20 text-red-400'
-                            : 'bg-orange-500/20 text-orange-400'
-                        }`}>
-                          {new Date(reminder.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </div>
+                        <span className={`a-lb-fmt ${late ? 'a-lb-late' : 'a-lb-soon'}`} style={{ height: 22, fontSize: 11 }}>{late ? `${days}d late` : days === 0 ? 'Today' : `in ${days}d`}</span>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            {/* Performance Tip */}
-            <div className={`
-              rounded-2xl p-6 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border
-              ${darkMode ? 'border-cyan-500/20' : 'border-cyan-500/30'}
-            `}>
-              <div className="flex items-start gap-3 mb-3">
-                <Zap className="text-cyan-500 flex-shrink-0" size={20} />
-                <div>
-                  <h4 className={`font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Pro Tip
-                  </h4>
-                  <p className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Log your rig settings after each race to track what works best in different conditions!
-                  </p>
-                </div>
+            <div className="a-card a-spec-card flex gap-3.5" style={{ padding: 18 }}>
+              <span className="a-tile" style={{ width: 40, height: 40 }}><Zap size={18} /></span>
+              <div>
+                <div className="a-ink text-[14.5px] font-semibold">Tip from Alfie</div>
+                <div className="a-mute text-[13px] mt-1 leading-[1.5]">Log your rig settings after each race to track what works best in different conditions.</div>
               </div>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
 

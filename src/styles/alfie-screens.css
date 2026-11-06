@@ -835,3 +835,16 @@ html.alfie-light .a-posc.a-posc-r { background: rgba(217,45,32,0.08); color: #D9
 html.alfie-light .a-res-open { background: rgba(15,23,42,0.02); }
 html.alfie-theme .a-best-1 { color: #FFC56B; } html.alfie-theme .a-best-2 { color: #C9D1DE; } html.alfie-theme .a-best-3 { color: #E59A62; }
 html.alfie-light .a-best-1 { color: #B7791F; } html.alfie-light .a-best-2 { color: #64748B; } html.alfie-light .a-best-3 { color: #B4622A; }
+html.alfie-theme .a-bc { display: flex; flex-direction: column; border-radius: 22px; overflow: hidden; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07); cursor: pointer; }
+html.alfie-theme .a-bc:hover { border-color: transparent; background: linear-gradient(#111827,#111827) padding-box, linear-gradient(135deg,#2E7BFF 0%,#8A4DFF 38%,#FF3E9A 70%,#FF8A2B 100%) border-box; }
+html.alfie-theme .a-bc.a-bc-add { border-style: dashed; align-items: center; justify-content: center; gap: 10px; color: rgba(235,240,255,0.6); }
+html.alfie-theme .a-bc.a-bc-add:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.2); }
+html.alfie-theme .a-bc-ph { background: radial-gradient(120% 120% at 20% 0%, rgba(46,123,255,0.25), rgba(10,16,30,0.9)); }
+html.alfie-theme .a-gb.a-gb-d { color: #FF8A8A; }
+html.alfie-theme .a-lb-late { color: #FF9A9A !important; background: rgba(255,107,107,0.1) !important; }
+html.alfie-theme .a-lb-soon { color: #FFC56B !important; background: rgba(255,179,64,0.1) !important; }
+html.alfie-light .a-bc { background: #fff; border-color: rgba(15,23,42,0.08); box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.06); }
+html.alfie-light .a-bc:hover { background: linear-gradient(#fff,#fff) padding-box, linear-gradient(135deg,#2E7BFF 0%,#8A4DFF 38%,#FF3E9A 70%,#FF8A2B 100%) border-box; }
+html.alfie-light .a-bc.a-bc-add { background: transparent; box-shadow: none; border-color: rgba(15,23,42,0.18); color: rgba(15,23,42,0.6); }
+html.alfie-light .a-lb-late { color: #D92D20 !important; background: rgba(217,45,32,0.08) !important; }
+html.alfie-light .a-lb-soon { color: #B25E00 !important; background: rgba(255,159,10,0.1) !important; }
