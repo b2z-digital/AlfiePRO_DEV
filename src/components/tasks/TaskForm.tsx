@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, User, Flag, Repeat, Bell, Upload, Trash2, Users, SquareCheck as CheckSquare, Plus } from 'lucide-react';
+import { X, Calendar, User, Flag, Upload, Trash2, Users, SquareCheck as CheckSquare, Plus, Check, ChevronDown, Mail, UserPlus, RotateCw, Download } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { Avatar } from '../ui/Avatar';
@@ -306,11 +306,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 
   return (
     <>
+    <div className="a-veil fixed inset-0 z-[9994] pointer-events-none" aria-hidden="true" />
     <section className="a-sheet a-tray fixed top-3 right-3 bottom-3 w-[calc(100%-24px)] sm:w-[500px] z-[9995] overflow-hidden" role="dialog" aria-modal="true" aria-label={isEditing ? 'Edit task' : 'New task'}>
       <div className="flex flex-col h-full">
         {/* Header */}
         <div className="a-sheet-head flex items-center gap-3 border-b a-bd" style={{ padding: '18px 18px 16px 22px' }}>
-          <span className="a-tile a-tile-rim"><CheckSquare size={19} /></span>
+          <span className="a-tile a-tile-rim">{isEditing ? <CheckSquare size={19} /> : <Plus size={18} strokeWidth={2.2} />}</span>
           <h2 className="a-display a-ink flex-1 text-[21px] font-semibold">
             {isEditing ? 'Edit task' : 'New task'}
           </h2>
@@ -364,14 +365,16 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 Due date
               </label>
               <div className="relative">
-                <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 a-dim pointer-events-none" />
+                <Calendar size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 a-dim pointer-events-none z-[1]" />
                 <input
                   type="date"
                   value={formData.due_date}
                   onChange={(e) => handleInputChange('due_date', e.target.value)}
-                  className="a-inp a-inp-date"
-                  style={{ paddingLeft: 38 }}
+                  className={`a-inp a-inp-date a-inp-pick a-date-pick${formData.due_date ? '' : ' is-empty'}`}
+                  style={{ paddingLeft: 40 }}
+                  aria-label="Due date"
                 />
+                <span className="a-date-ph a-dim" aria-hidden="true">Pick a date</span>
               </div>
             </div>
 
@@ -408,10 +411,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <User size={16} className="a-dim" />
+                      <Users size={17} className="a-dim" />
                       <span className="a-dim text-sm">Choose member</span>
                     </div>
                   )}
+                  <ChevronDown size={16} className="a-dim ml-auto flex-shrink-0" />
                 </button>
 
                 {showAssigneeDropdown && (
@@ -485,8 +489,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 onClick={() => setShowFollowerDropdown(!showFollowerDropdown)}
                 className="a-pick w-full" style={{ height: 46 }}
               >
-                <div className="flex items-center gap-2">
-                  <Users size={16} className="a-dim" />
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <UserPlus size={17} className="a-dim" />
                   {formData.followers.length > 0 ? (
                     <div className="flex items-center gap-2">
                       <div className="flex -space-x-2">
@@ -500,7 +504,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                               lastName={member.last_name}
                               imageUrl={member.avatar_url}
                               size="sm"
-                              className="ring-2 ring-[#111A2C]"
+                              className="ring-2 ring-[#111622]"
                             />
                           );
                         })}
@@ -513,6 +517,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     <span className="a-dim text-sm">Add helpers</span>
                   )}
                 </div>
+                <ChevronDown size={16} className="a-dim ml-auto flex-shrink-0" />
               </button>
 
               {showFollowerDropdown && (
@@ -604,11 +609,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 Repeat
               </label>
               <div className="relative">
-                <Repeat size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 a-dim pointer-events-none" />
+                <RotateCw size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 a-dim pointer-events-none" />
                 <select
                   value={formData.repeat_type}
                   onChange={(e) => handleInputChange('repeat_type', e.target.value)}
-                  className="a-inp a-inp-sel"
+                  className="a-inp a-inp-sel a-inp-pick"
                   style={{ paddingLeft: 38 }}
                 >
                   <option value="none">No repeat</option>
@@ -620,7 +625,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
               </div>
             </div>
             <label htmlFor="send_reminder" className="a-reminder">
-              <Bell size={16} className="a-dim" />
+              <Mail size={17} className="a-dim" />
               <span className="flex-1 text-[14px] a-ink">Send reminder</span>
               <input
                 type="checkbox"
@@ -662,7 +667,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 onChange={(e) => handleFileUpload(e.target.files)}
                 accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
               />
-              <span className="a-tile"><Upload size={18} /></span>
+              <span className="a-tile"><Download size={19} style={{ transform: 'rotate(180deg)' }} /></span>
               {uploadingFiles ? (
                 <span className="flex-1 text-[14px] a-txt-b font-semibold">Uploading…</span>
               ) : (
@@ -716,7 +721,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
             ) : (
               <>
-                <Plus size={17} /><span>{isEditing ? 'Update task' : 'Create task'}</span>
+                <Check size={17} strokeWidth={2.2} /><span>{isEditing ? 'Update task' : 'Create task'}</span>
               </>
             )}
           </button>

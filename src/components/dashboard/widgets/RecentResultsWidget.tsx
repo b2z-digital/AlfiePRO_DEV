@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, MapPin, X, Trophy, ChevronRight, Globe } from 'lucide-react';
+import { TrendingUp, X, Trophy, ChevronRight, Globe } from 'lucide-react';
+import { AlfieIcon } from '../../brand/AlfieIcon';
+
+/* Board venue glyph (sail on water) for event places */
+const MapPin = ({ size = 14, className }: { size?: number; className?: string }) => <AlfieIcon glyph="venue" size={size} strokeWidth={2} className={className} />;
+
+/* Board level label bars: state = two of three, national = all three */
+const LevelBars = ({ level }: { level: 'state' | 'national' }) => (
+  <svg width="11" height="10" viewBox="0 0 11 10" aria-hidden="true"><rect x="0" y="6" width="2.5" height="4" rx="1" fill="currentColor" /><rect x="4.25" y="3" width="2.5" height="7" rx="1" fill="currentColor" /><rect x="8.5" y="0" width="2.5" height="10" rx="1" fill="currentColor" opacity={level === 'national' ? 1 : 0.3} /></svg>
+);
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
@@ -446,7 +455,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
 
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
-          <span className="a-tile" style={{ width: 36, height: 36 }}><Trophy size={19} /></span>
+          <span className="a-tile" style={{ width: 36, height: 36 }}><AlfieIcon glyph="podium" size={19} /></span>
           <h2 className="a-display text-lg font-semibold text-white">Recent Results</h2>
         </div>
         {!isEditMode && (
@@ -488,8 +497,8 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
             );
             const labels = (race: RaceResult) => (
               <>
-                {race.isNationalEvent && <span className="a-wlvl a-wlvl-n">National</span>}
-                {race.isStateEvent && <span className="a-wlvl">State{race.stateAssociationName ? ` · ${race.stateAssociationName}` : ''}</span>}
+                {race.isNationalEvent && <span className="a-wlvl a-wlvl-lv"><LevelBars level="national" />National</span>}
+                {race.isStateEvent && <span className="a-wlvl a-wlvl-lv"><LevelBars level="state" />State{race.stateAssociationName ? ` · ${race.stateAssociationName}` : ''}</span>}
                 {!race.isNationalEvent && !race.isStateEvent && race.raceFormat && (
                   <span className={getRaceFormatBadge(race.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
                     {race.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
