@@ -1050,10 +1050,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
       ) : (
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-auto relative"
+        className={`flex-1 overflow-auto relative ${singleFleetMode ? 'a-ss' : ''}`}
       >
         <table
-          className="border-collapse text-xs bg-white"
+          className="a-ss-t border-collapse text-xs bg-white"
           style={{ tableLayout: 'fixed', minWidth: 140 + displayRaceCount * 240 }}
         >
           <colgroup>
@@ -1072,12 +1072,12 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             <tr>
               <th
                 rowSpan={2}
-                className="sticky left-0 z-30 px-1 py-0 border-b border-r border-slate-300 bg-black cursor-pointer"
+                className="a-ss-sb sticky left-0 z-30 px-1 py-0 border-b border-r border-slate-300 bg-black cursor-pointer"
                 onClick={onOpenStartBox}
                 title="Open StartBox"
               >
-                <div className="flex items-center justify-center gap-1.5">
-                  <Timer size={18} className="text-white" />
+                <div className="a-ss-sb-btn flex items-center justify-center gap-1.5">
+                  <Timer size={singleFleetMode ? 15 : 18} className="text-white" />
                   <span className="text-xs font-semibold text-white">StartBox</span>
                 </div>
               </th>
@@ -1089,12 +1089,13 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                   <th
                     key={race}
                     colSpan={4}
-                    className={`px-0.5 py-0 text-center border-b border-slate-300 ${raceSeparator}`}
+                    data-race-col={race}
+                    className={`a-ss-rh ${dropdownTarget?.race === race ? 'a-ss-rh-on' : ''} px-0.5 py-0 text-center border-b border-slate-300 ${raceSeparator}`}
                     style={{ backgroundColor: '#00FFFF' }}
                   >
-                    <div className="flex flex-col items-center gap-0.5">
+                    <div className={`flex ${singleFleetMode ? 'flex-row justify-center gap-2' : 'flex-col gap-0.5'} items-center`}>
                       <div className="flex items-center gap-1">
-                        <span className="text-[11px] font-extrabold text-black">
+                        <span className="a-ss-rt text-[11px] font-extrabold text-black">
                           Race {race}
                         </span>
                         {!singleFleetMode && isSeeding && (
@@ -1102,7 +1103,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                             Seeding
                           </span>
                         )}
-                        {isVerified && (
+                        {isVerified && !singleFleetMode && (
                           <CheckCircle2 size={10} className="text-emerald-600" />
                         )}
                         {!singleFleetMode && !isSeeding && (
@@ -1114,14 +1115,14 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleVerifyRace(race)}
-                          className="text-[8px] font-bold px-1.5 py-0 rounded border transition-colors border-black/20 text-black hover:opacity-80"
+                          className={`a-ss-chip ${isVerified ? 'a-ss-chip-g' : 'a-ss-chip-a'} text-[8px] font-bold px-1.5 py-0 rounded border transition-colors border-black/20 text-black hover:opacity-80`}
                           style={{ backgroundColor: '#FFFF00' }}
                         >
-                          Verify R{race.toString().padStart(2, '0')}
+                          {singleFleetMode && isVerified ? <><CheckCircle2 size={12} />Verified</> : <>Verify R{race.toString().padStart(2, '0')}</>}
                         </button>
                         <button
                           onClick={() => setResetConfirmRace(race)}
-                          className="text-[8px] font-bold px-1.5 py-0 rounded text-white transition-colors hover:opacity-80"
+                          className="a-ss-chip a-ss-chip-r text-[8px] font-bold px-1.5 py-0 rounded text-white transition-colors hover:opacity-80"
                           style={{ backgroundColor: '#FF0000' }}
                         >
                           Reset
@@ -1136,16 +1137,16 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
             <tr>
               {Array.from({ length: displayRaceCount }, (_, i) => i + 1).map(race => (
                 <React.Fragment key={race}>
-                  <th className={`px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 ${raceSeparator} text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
+                  <th className={`a-ss-sh ${dropdownTarget?.race === race ? 'a-ss-on' : ''} px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 ${raceSeparator} text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
                     Sail No
                   </th>
-                  <th className="px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className={`a-ss-sh ${dropdownTarget?.race === race ? 'a-ss-on' : ''} px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
                     Comments
                   </th>
-                  <th className="px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className={`a-ss-sh ${dropdownTarget?.race === race ? 'a-ss-on' : ''} px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
                     Points
                   </th>
-                  <th className="px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap" style={{ backgroundColor: '#00FFFF' }}>
+                  <th className={`a-ss-sh ${dropdownTarget?.race === race ? 'a-ss-on' : ''} px-1 py-0 text-center text-[10px] font-extrabold border-b border-slate-300 text-black whitespace-nowrap`} style={{ backgroundColor: '#00FFFF' }}>
                     Exp.
                   </th>
                 </React.Fragment>
@@ -1207,11 +1208,11 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                     return (
                       <tr
                         key={`${heat}-${position}`}
-                        className="hover:bg-slate-50"
+                        className="a-ss-row hover:bg-slate-50"
                         style={{ height: 16 }}
                       >
                         <td
-                          className="sticky left-0 z-10 px-1 py-0 text-[11px] font-extrabold border-r border-slate-300 whitespace-nowrap text-black text-center leading-none"
+                          className="a-ss-pl sticky left-0 z-10 px-1 py-0 text-[11px] font-extrabold border-r border-slate-300 whitespace-nowrap text-black text-center leading-none"
                           style={{ backgroundColor: '#FFFF00' }}
                         >
                           {getOrdinal(position)}
@@ -1233,14 +1234,14 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                           const promotionStyle = isPromotedSlot
                             ? { backgroundColor: '#00FF00' }
                             : undefined;
-                          const cellBorderClass = isPromotedSlot
+                          const cellBorderClass = (isPromotedSlot
                             ? ''
-                            : 'border-b border-r border-slate-300';
+                            : 'border-b border-r border-slate-300') + (dropdownTarget?.race === race ? ' a-ss-on' : '');
 
                           return (
                             <React.Fragment key={race}>
                               <td
-                                className={`px-0 py-0 ${cellBorderClass} ${raceSeparator} relative`}
+                                className={`a-ss-sail ${isDropdownOpen ? 'a-ss-ed' : ''} px-0 py-0 ${cellBorderClass} ${raceSeparator} relative`}
                                 style={promotionStyle}
                               >
                                 <input
@@ -1261,11 +1262,11 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                     setDropdownFilter('');
                                   }}
                                   onKeyDown={e => handleKeyDown(e, heat, position, race)}
-                                  className={`w-full px-0.5 py-0 text-[11px] text-center border-0 outline-none bg-transparent leading-none
+                                  className={`a-ss-in w-full px-0.5 py-0 text-[11px] text-center border-0 outline-none bg-transparent leading-none
                                     ${isInvalid
-                                      ? 'text-red-500 font-bold'
+                                      ? 'a-ss-bad text-red-500 font-bold'
                                       : isDup
-                                        ? 'text-amber-500 font-bold'
+                                        ? 'a-ss-dup text-amber-500 font-bold'
                                         : 'text-black font-medium'
                                     }
                                     focus:ring-1 focus:ring-inset focus:ring-blue-400/40
@@ -1275,10 +1276,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                 {isDropdownOpen && availableSkippersForDropdown.length > 0 && (
                                   <div
                                     ref={dropdownRef}
-                                    className="absolute top-full left-0 z-50 w-48 max-h-48 overflow-auto rounded-lg shadow-2xl border bg-white border-slate-200"
+                                    className="a-ss-dd absolute top-full left-0 z-50 w-48 max-h-48 overflow-auto rounded-lg shadow-2xl border bg-white border-slate-200"
                                     style={{ minWidth: 180 }}
                                   >
-                                    <div className="sticky top-0 p-1.5 border-b bg-white border-slate-100">
+                                    <div className="a-ss-dd-head sticky top-0 p-1.5 border-b bg-white border-slate-100">
                                       <div className="relative">
                                         <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
                                         <input
@@ -1286,7 +1287,7 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                           value={dropdownFilter}
                                           onChange={e => setDropdownFilter(e.target.value)}
                                           placeholder="Filter..."
-                                          className="w-full pl-6 pr-2 py-1 text-[10px] rounded border outline-none bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
+                                          className="a-ss-dd-in w-full pl-6 pr-2 py-1 text-[10px] rounded border outline-none bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
                                         />
                                       </div>
                                     </div>
@@ -1297,9 +1298,9 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                                           e.preventDefault();
                                           handleDropdownSelect(heat, position, race, skipper, index);
                                         }}
-                                        className="w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors hover:bg-slate-50 text-slate-700"
+                                        className="a-ss-dd-item w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors hover:bg-slate-50 text-slate-700"
                                       >
-                                        <span className="text-[12px] font-bold min-w-[28px] text-black">
+                                        <span className="a-ss-dd-sail text-[12px] font-bold min-w-[28px] text-black">
                                           {skipper.sailNumber || skipper.sailNo || skipper.boat_sail_number}
                                         </span>
                                         <span className="text-[11px] truncate">
@@ -1312,30 +1313,30 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                               </td>
 
                               <td
-                                className={`px-0 py-0 ${cellBorderClass} cursor-pointer`}
+                                className={`a-ss-c px-0 py-0 ${cellBorderClass} cursor-pointer`}
                                 style={promotionStyle}
                                 onClick={() => handleCommentClick(heat, position, race)}
                               >
                                 {isPromotedEntry ? (
-                                  <div className="px-1 py-0 text-[10px] text-center font-bold text-black leading-none">
+                                  <div className="a-ss-up px-1 py-0 text-[10px] text-center font-bold text-black leading-none">
                                     UP
                                   </div>
                                 ) : ls ? (
                                   <div className="px-1 py-0 text-[10px] text-center font-medium text-black leading-none">
-                                    {getLetterScoreDisplayCode(ls, cell?.customPoints)}
+                                    <span className="a-ss-tag a-ss-tag-r">{getLetterScoreDisplayCode(ls, cell?.customPoints)}</span>
                                   </div>
                                 ) : hasSail ? (
                                   <div className="px-1 py-0 text-[10px] text-center font-medium text-black leading-none">
-                                    OK
+                                    <span className="a-ss-tag a-ss-tag-g">OK</span>
                                   </div>
                                 ) : null}
                               </td>
 
                               <td
-                                className={`px-0 py-0 ${cellBorderClass}`}
+                                className={`a-ss-c px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
-                                <div className={`px-1 py-0 text-[10px] text-center font-medium tabular-nums leading-none ${
+                                <div className={`a-ss-pts px-1 py-0 text-[10px] text-center font-medium tabular-nums leading-none ${
                                   hasSail ? 'text-black' : ''
                                 }`}>
                                   {pts !== '' ? pts : ''}
@@ -1343,10 +1344,10 @@ export const HmsManualSpreadsheet: React.FC<HmsManualSpreadsheetProps> = ({
                               </td>
 
                               <td
-                                className={`px-0 py-0 ${cellBorderClass}`}
+                                className={`a-ss-c px-0 py-0 ${cellBorderClass}`}
                                 style={promotionStyle}
                               >
-                                <div className="px-1 py-0 text-[10px] text-center font-medium tabular-nums leading-none text-black">
+                                <div className="a-ss-exp px-1 py-0 text-[10px] text-center font-medium tabular-nums leading-none text-black">
                                   {exp !== '' ? exp : ''}
                                 </div>
                               </td>
