@@ -249,3 +249,5 @@ html.alfie-light select.a-bare option { background: #fff; color: #0B1220; }
 .a-ir:focus-within { background: rgba(10, 132, 255, 0.06); }
 .a-amt-inp { width: 180px; border: 0; background: transparent; outline: none; text-align: left; -moz-appearance: textfield; }
 .a-amt-inp::-webkit-inner-spin-button { -webkit-appearance: none; }
+.a-code { padding: 4px 8px; border-radius: 7px; background: rgba(255, 255, 255, 0.05); color: rgba(235, 240, 255, 0.8); white-space: nowrap; }
+html.alfie-light .a-code { background: rgba(15, 23, 42, 0.05); color: #334155; }
