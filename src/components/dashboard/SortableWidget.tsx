@@ -25,10 +25,10 @@ class WidgetErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="h-full flex items-center justify-center bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+        <div className="a-card h-full flex items-center justify-center p-4">
           <div className="text-center">
             <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto mb-2" />
-            <p className="text-xs text-slate-400">Widget failed to load</p>
+            <p className="a-dim text-[12px]">Widget failed to load</p>
           </div>
         </div>
       );
@@ -150,7 +150,7 @@ export const SortableWidget: React.FC<SortableWidgetProps> = ({
             {...listeners}
             onMouseEnter={() => setIsHoveringHandle(true)}
             onMouseLeave={() => setIsHoveringHandle(false)}
-            className="absolute -top-2 -left-2 z-[60] bg-slate-700/90 hover:bg-slate-600 text-slate-300 rounded-full p-1.5 shadow-lg transition-colors pointer-events-auto cursor-grab active:cursor-grabbing"
+            className="a-em-wb absolute -top-2 -left-2 z-[60] pointer-events-auto cursor-grab active:cursor-grabbing"
             title="Drag to reorder"
           >
             <GripVertical size={16} />
@@ -159,7 +159,7 @@ export const SortableWidget: React.FC<SortableWidgetProps> = ({
             <button
               ref={buttonRef}
               onClick={() => setShowThemePicker(!showThemePicker)}
-              className="bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-full p-1.5 shadow-lg transition-colors pointer-events-auto"
+              className="a-em-wb pointer-events-auto"
               title="Change widget color"
             >
               <Palette size={16} />
@@ -168,21 +168,21 @@ export const SortableWidget: React.FC<SortableWidgetProps> = ({
           {showThemePicker && createPortal(
             <div
               ref={dropdownRef}
-              className="fixed bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 min-w-[200px] z-[9999]"
-              style={{ top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}
+              className="a-pop fixed min-w-[220px] z-[9999]"
+              style={{ padding: 10, top: `${dropdownPosition.top}px`, left: `${dropdownPosition.left}px` }}
             >
-              <div className="text-xs text-slate-400 mb-2 font-semibold">Widget Color Theme</div>
+              <div className="a-cap mb-2 px-1">Widget colour</div>
               <div className="grid grid-cols-2 gap-2">
                 {WIDGET_THEME_OPTIONS.map((option) => (
                   <button
                     key={option.value}
                     onClick={() => handleThemeSelect(option.value)}
-                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-700 transition-colors text-left"
+                    className="a-pop-item flex items-center gap-2 p-2 rounded-lg text-left"
                   >
                     <div className={`w-6 h-6 rounded ${option.preview} flex-shrink-0`} />
-                    <span className="text-xs text-white flex-1">{option.label}</span>
+                    <span className="a-ink text-[12.5px] flex-1">{option.label}</span>
                     {currentTheme === option.value && (
-                      <Check size={14} className="text-green-400 flex-shrink-0" />
+                      <Check size={14} className="a-txt-g flex-shrink-0" />
                     )}
                   </button>
                 ))}
