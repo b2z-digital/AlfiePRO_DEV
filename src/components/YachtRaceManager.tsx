@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
 import { useAlfieTheme } from '../hooks/useAlfieTheme';
+import { AlfieIconContext } from './brand/AlfieIcon';
 import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Grid3x2 as Grid3X3, Maximize2, Minimize2, Timer, TriangleAlert as AlertTriangle, RotateCcw } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
@@ -3935,6 +3936,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   }
 
   return (
+    <AlfieIconContext.Provider value={true}>
     <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50'}`}>
       <div className={`w-full ${isFullscreenScoring ? 'px-0 py-0' : 'px-20 py-12'}`}>
         <div className={`flex-1 flex flex-col justify-center ${isFullscreenScoring ? '' : 'min-h-[calc(100vh-24rem)]'}`}>
@@ -5225,5 +5227,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       )}
 
     </div>
+    </AlfieIconContext.Provider>
   );
 };

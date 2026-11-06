@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 
 /**
  * Adds the Alfie theme classes to <html> while the signed-in app is mounted:
@@ -9,7 +9,7 @@ import { useEffect } from 'react';
  * wrapper div) means portalled modals and menus pick the theme up too.
  */
 export function useAlfieTheme(enabled: boolean, mode: 'dark' | 'light' = 'dark') {
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement;
     const clear = () => root.classList.remove('alfie-theme', 'alfie-dark', 'alfie-light');
     clear();
