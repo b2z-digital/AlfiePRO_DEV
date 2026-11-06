@@ -1624,7 +1624,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   `}
                   title={(collapsed && !isHoveringNav) ? "Quick Start Guide" : ""}
                 >
-                  <Rocket size={16} className={location.pathname === '/support' ? '!text-white' : ''} />
+                  <Rocket size={18} className={location.pathname === '/support' ? '!text-white' : ''} />
                   {(!collapsed || isHoveringNav) && <span className={`text-sm ${location.pathname === '/support' ? '!text-white' : ''}`}>Quick Start Guide</span>}
                 </button>
               )}
@@ -1644,7 +1644,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 `}
                 title={(collapsed && !isHoveringNav) ? "Settings" : ""}
               >
-                <Settings size={16} className={location.pathname === '/settings' ? '!text-white' : ''} />
+                <Settings size={18} className={location.pathname === '/settings' ? '!text-white' : ''} />
                 {(!collapsed || isHoveringNav) && <span className={`text-sm ${location.pathname === '/settings' ? '!text-white' : ''}`}>Settings</span>}
               </button>
               <button
@@ -1661,7 +1661,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 `}
                 title={(collapsed && !isHoveringNav) ? "Sign Out" : ""}
               >
-                <LogOut size={16} />
+                <LogOut size={18} />
                 {(!collapsed || isHoveringNav) && <span className="text-sm">Sign Out</span>}
               </button>
             </div>
