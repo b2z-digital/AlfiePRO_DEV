@@ -417,22 +417,17 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed right-0 top-[calc(50%-140px)] z-40 rounded-l-xl shadow-lg flex flex-col items-center gap-2 px-2 py-4 transition-all duration-200 ${
+        className={`a-edge-tab fixed right-0 top-1/2 -translate-y-1/2 z-40 transition-all duration-200 ${
           canEditHandicaps && allHandicapsZero && hasStoredHandicaps
-            ? 'bg-gradient-to-b from-green-500 to-emerald-600 text-white animate-pulse'
+            ? 'a-edge-tab-g animate-pulse'
             : canEditHandicaps && allHandicapsZero
-              ? 'bg-gradient-to-b from-amber-500 to-orange-600 text-white animate-pulse'
-              : 'bg-gradient-to-b from-slate-700 to-slate-800 text-slate-200 border border-slate-600/50 hover:from-slate-600 hover:to-slate-700'
+              ? 'a-edge-tab-a animate-pulse'
+              : ''
         }`}
+        aria-label={isOpen ? 'Hide standings' : isScratchEvent ? 'Show standings' : 'Show handicaps'}
       >
-        {isOpen ? <X size={18} /> : <Award size={18} />}
-        <div className="flex flex-col items-center">
-          {(isScratchEvent ? 'RANKINGS' : 'HANDICAPS').split('').map((letter, index) => (
-            <span key={index} className="text-[10px] font-semibold leading-tight">
-              {letter}
-            </span>
-          ))}
-        </div>
+        {isOpen ? <X size={16} /> : <Award size={16} />}
+        <span className="a-edge-tab-l">{isScratchEvent ? 'STANDINGS' : 'HANDICAPS'}</span>
       </motion.button>
 
       <AnimatePresence>

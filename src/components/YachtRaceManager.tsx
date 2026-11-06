@@ -3953,10 +3953,10 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   return (
     <AlfieIconContext.Provider value={true}>
     <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50'}`}>
-      <div className={`w-full ${isFullscreenScoring ? 'px-0 py-0' : useAlfieTopBar ? 'px-5 pt-5 pb-6' : 'px-20 py-12'}`}>
-        <div className={`flex-1 flex flex-col ${useAlfieTopBar ? 'justify-start' : 'justify-center'} ${isFullscreenScoring ? '' : 'min-h-[calc(100vh-24rem)]'}`}>
+      <div className={`w-full ${isFullscreenScoring ? (useAlfieTopBar ? 'a-scoring-fs' : 'px-0 py-0') : useAlfieTopBar ? 'px-5 pt-5 pb-6' : 'px-20 py-12'}`}>
+        <div className={`flex-1 flex flex-col ${useAlfieTopBar ? 'justify-start' : 'justify-center'} ${isFullscreenScoring ? (useAlfieTopBar ? 'min-h-0 gap-3' : '') : 'min-h-[calc(100vh-24rem)]'}`}>
           {getCurrentEvent() && useAlfieTopBar && (
-            <div className={isFullscreenScoring ? 'px-3 pt-3' : 'mb-4'}>
+            <div className={isFullscreenScoring ? 'flex-shrink-0' : 'mb-4'}>
               <ScoringTopBar
                 event={getCurrentEvent()}
                 raceType={raceType}
@@ -3972,8 +3972,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 currentRace={stepperRace}
                 numRaces={currentNumRaces}
                 completedRaces={lastCompletedRace}
-                onPrevRace={scoringMode === 'touch' ? undefined : () => stepRace(-1)}
-                onNextRace={scoringMode === 'touch' ? undefined : () => stepRace(1)}
+                onPrevRace={() => stepRace(-1)}
+                onNextRace={() => stepRace(1)}
+                compact={isFullscreenScoring}
                 onBack={() => setShowExitConfirm(true)}
                 onStartBox={scoringMode === 'pro' ? () => setShowStartBoxModal(true) : undefined}
                 onOverallResults={raceType === 'scratch' ? () => setShowOverallResults(true) : undefined}
@@ -3994,7 +3995,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                       <span className="inline-flex items-center gap-1.5"><span className="a-sc-leg a-sc-leg-1" aria-hidden="true">1</span><span className="a-sc-leg a-sc-leg-2" aria-hidden="true">2</span><span className="a-sc-leg a-sc-leg-3" aria-hidden="true">3</span>Podium finishes</span>
                     </>
                   )}
-                  {scoringMode === 'pro' && (() => {
+                  {(scoringMode === 'pro' || scoringMode === 'touch') && (() => {
                     const evt = getCurrentEvent();
                     if (!evt?.id || (!evt.enableLiveTracking && !evt.enableLiveStream) || evt.completed) return null;
                     return <LiveStatusControl eventId={evt.id} darkMode={darkMode} />;
@@ -4034,7 +4035,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             </div>
           )}
 
-          <div className="mt-6">
+          <div className={useAlfieTopBar && isFullscreenScoring ? 'flex-1 min-h-0 overflow-auto' : useAlfieTopBar ? '' : 'mt-6'}>
             {showHandicapOptions && (
               <div className="flex justify-center gap-4 mb-8">
                 <button
@@ -4559,6 +4560,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 darkMode={darkMode}
                 currentEvent={currentEvent}
                 isFullscreen={isFullscreenScoring}
+                alfieBar={useAlfieTopBar}
                 updateSkipper={updateSkipper}
                 setSkippers={setSkippers}
                 handicapReadOnly={activeRuleset?.config.persist_handicaps === false}
