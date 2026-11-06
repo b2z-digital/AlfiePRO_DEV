@@ -51,7 +51,7 @@ export const TaskCategorySidebar: React.FC<TaskCategorySidebarProps> = ({
     },
     {
       id: 'dueToday',
-      label: 'Due Today',
+      label: 'Due today',
       icon: Calendar,
       count: taskCounts.dueToday,
       color: 'from-orange-500 to-orange-600',
@@ -59,7 +59,7 @@ export const TaskCategorySidebar: React.FC<TaskCategorySidebarProps> = ({
     },
     {
       id: 'dueThisWeek',
-      label: 'This Week',
+      label: 'This week',
       icon: CalendarDays,
       count: taskCounts.dueThisWeek,
       color: 'from-purple-500 to-purple-600',
@@ -67,7 +67,7 @@ export const TaskCategorySidebar: React.FC<TaskCategorySidebarProps> = ({
     },
     {
       id: 'dueThisMonth',
-      label: 'This Month',
+      label: 'This month',
       icon: CalendarRange,
       count: taskCounts.dueThisMonth,
       color: 'from-indigo-500 to-indigo-600',
@@ -86,7 +86,7 @@ export const TaskCategorySidebar: React.FC<TaskCategorySidebarProps> = ({
   const quickFilters = [
     {
       id: 'all',
-      label: 'All Tasks',
+      label: 'All tasks',
       icon: List,
       count: taskCounts.all,
       color: 'from-slate-500 to-slate-600',
@@ -94,7 +94,7 @@ export const TaskCategorySidebar: React.FC<TaskCategorySidebarProps> = ({
     },
     {
       id: 'myTasks',
-      label: 'My Tasks',
+      label: 'My tasks',
       icon: User,
       count: taskCounts.myTasks,
       color: 'from-cyan-500 to-cyan-600',
@@ -102,116 +102,50 @@ export const TaskCategorySidebar: React.FC<TaskCategorySidebarProps> = ({
     }
   ];
 
-  const CategoryTile = ({ category, isSelected }: { category: any; isSelected: boolean }) => {
-    const Icon = category.icon;
-    
-    return (
-      <button
-        onClick={() => onCategorySelect(category.id)}
-        className={`
-          relative w-full h-24 rounded-xl transition-all duration-200 transform
-          bg-gradient-to-br ${category.color} ${category.hoverColor}
-          hover:scale-105 hover:shadow-lg active:scale-95
-          ${isSelected ? 'ring-2 ring-white ring-opacity-50 shadow-lg scale-105' : ''}
-          overflow-hidden group
-        `}
-      >
-        {/* Background pattern */}
-        <div className="absolute inset-0 bg-white bg-opacity-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-        
-        {/* Content */}
-        <div className="relative h-full flex flex-col items-center justify-center p-3 text-white">
-          {/* Icon */}
-          <div className="mb-2">
-            <Icon size={20} className="drop-shadow-sm" />
-          </div>
-          
-          {/* Label */}
-          <div className="text-sm font-medium text-center leading-tight mb-1">
-            {category.label}
-          </div>
-          
-          {/* Count */}
-          <div className="text-lg font-bold">
-            {category.count}
-          </div>
-        </div>
-      </button>
-    );
-  };
-
-  const QuickFilterTile = ({ filter, isSelected }: { filter: any; isSelected: boolean }) => {
-    const Icon = filter.icon;
-    
-    return (
-      <button
-        onClick={() => onCategorySelect(filter.id)}
-        className={`
-          relative w-full h-16 rounded-xl transition-all duration-200 transform
-          bg-gradient-to-br ${filter.color} ${filter.hoverColor}
-          hover:scale-105 hover:shadow-lg active:scale-95
-          ${isSelected ? 'ring-2 ring-white ring-opacity-50 shadow-lg scale-105' : ''}
-          overflow-hidden group
-        `}
-      >
-        {/* Background pattern */}
-        <div className="absolute inset-0 bg-white bg-opacity-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-        
-        {/* Content */}
-        <div className="relative h-full flex items-center justify-between p-4 text-white">
-          {/* Icon and Label */}
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-white bg-opacity-20">
-              <Icon size={16} className="drop-shadow-sm" />
-            </div>
-            <div className="text-sm font-medium">
-              {filter.label}
-            </div>
-          </div>
-          
-          {/* Count */}
-          <div className="text-lg font-bold">
-            {filter.count}
-          </div>
-        </div>
-      </button>
-    );
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Task Categories */}
-      <div>
-        <h2 className="text-xs font-semibold uppercase tracking-wider mb-4 text-slate-400">
-          Task Categories
-        </h2>
-        
-        <div className="grid grid-cols-2 gap-3">
-          {categories.map((category) => (
-            <CategoryTile
+    <div className="flex flex-col gap-3">
+      <p className="a-cap px-1">My lists</p>
+      <div className="grid grid-cols-2 gap-2">
+        {categories.map((category) => {
+          const Icon = category.icon;
+          const on = activeCategory === category.id;
+          return (
+            <button
               key={category.id}
-              category={category}
-              isSelected={activeCategory === category.id}
-            />
-          ))}
-        </div>
+              type="button"
+              onClick={() => onCategorySelect(category.id)}
+              className={`a-sl ${on ? 'a-sl-on' : ''}`}
+              aria-pressed={on}
+            >
+              <span className="flex items-center justify-between">
+                <span className={`a-tile a-tile-sm ${category.id === 'overdue' && category.count > 0 ? 'a-txt-r' : ''}`}><Icon size={16} /></span>
+                <span className="a-num a-ink text-[24px] font-semibold">{category.count}</span>
+              </span>
+              <span className="a-ink text-[13.5px] font-medium">{category.label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Quick Filters */}
-      <div>
-        <h2 className="text-xs font-semibold uppercase tracking-wider mb-4 text-slate-400">
-          Quick Filters
-        </h2>
-
-        <div className="space-y-3">
-          {quickFilters.map((filter) => (
-            <QuickFilterTile
+      <p className="a-cap px-1 pt-2">Everyone</p>
+      <div className="flex flex-col gap-0.5">
+        {quickFilters.map((filter) => {
+          const Icon = filter.icon;
+          const on = activeCategory === filter.id;
+          return (
+            <button
               key={filter.id}
-              filter={filter}
-              isSelected={activeCategory === filter.id}
-            />
-          ))}
-        </div>
+              type="button"
+              onClick={() => onCategorySelect(filter.id)}
+              className={`a-ql ${on ? 'a-ql-on' : ''}`}
+              aria-pressed={on}
+            >
+              <span className="a-tile a-tile-sm"><Icon size={16} /></span>
+              <span className="flex-1 text-left">{filter.label}</span>
+              <span className="a-num text-[15px] font-semibold">{filter.count}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
