@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { DollarSign, Plus, Pencil, Trash2, Save, X, Settings, Receipt, Tag, Percent, Users, CreditCard, CircleAlert as AlertCircle, CircleCheck as CheckCircle2 } from 'lucide-react';
+import { DollarSign, Plus, Pencil, Trash2, Save, X, Settings, Receipt, Tag, Percent, Users, CreditCard, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { CircularCheckbox } from '../ui/CircularCheckbox';
@@ -1742,100 +1742,51 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
     );
   };
 
-  const renderCategoriesTab = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-white">Financial Categories</h3>
-          <p className="text-slate-400 text-sm">
-            Categories allow your organization to categorise line items or transactions.
-          </p>
-          <p className="text-slate-400 text-xs italic mt-1">
-            Tip: You can create as many categories as you like but we would suggest you keep them fairly broad so they're easy to follow.
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            setCategoryForm({ name: '', type: 'expense', description: '', tax_rate_id: '' });
-            setEditingCategory(null);
-            setShowCategoryModal(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-200"
-        >
-          <Plus size={16} />
-          New Category
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        {categories.map((category) => (
-          <div
-            key={category.id}
-            className={`
-              flex items-center justify-between p-4 rounded-lg border
-              ${darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-white border-slate-200'}
-            `}
-          >
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <span className="text-white font-medium">{category.name}</span>
-                <span className={`
-                  px-2 py-1 text-xs rounded-full
-                  ${category.type === 'income'
-                    ? 'bg-green-600/20 text-green-400'
-                    : 'bg-red-600/20 text-red-400'}
-                `}>
-                  {category.type}
-                </span>
-                {category.is_system && (
-                  <span className="px-2 py-1 text-xs rounded-full bg-blue-600/20 text-blue-400 border border-blue-500/30">
-                    System Category
-                  </span>
-                )}
+  const renderCategoriesTab = () => {
+    const CCOLS = '36px minmax(0,1fr) auto 150px 84px';
+    const group = (type: 'income' | 'expense') => categories.filter((c) => c.type === type);
+    const Section = ({ type }: { type: 'income' | 'expense' }) => {
+      const list = group(type);
+      return (
+        <div className="a-card overflow-hidden">
+          <div className="a-mhead">
+            <span className="a-light" style={{ background: type === 'income' ? '#30D158' : '#FF6B6B', boxShadow: 'none' }} />
+            <span className="a-display a-ink text-[15px] font-semibold">{type === 'income' ? 'Income' : 'Expense'}</span>
+            <span className="a-cnt">{list.length}</span>
+          </div>
+          {list.length === 0 && <div className="a-mute text-sm" style={{ padding: '8px 18px 16px' }}>No {type} categories yet.</div>}
+          {list.map((category) => (
+            <div key={category.id} className="a-tx" style={{ gridTemplateColumns: CCOLS, cursor: 'default' }}>
+              <span className="a-tile a-tile-sm"><Tag size={16} /></span>
+              <div className="min-w-0">
+                <div className="a-ink text-[14.5px] font-semibold truncate">{category.name}</div>
+                {category.description && <div className="a-dim text-[12.5px] mt-[3px] truncate">{category.description}</div>}
               </div>
-              {category.description && (
-                <p className="text-slate-400 text-sm mt-1">{category.description}</p>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <span className="text-slate-400 text-sm">Tax:</span>
+              {category.is_system ? <span className="a-st a-dim text-xs" style={{ gap: 5 }}><Lock size={12} />System</span> : <span />}
+              <label className="relative justify-self-end">
+                <span className="a-dim text-[13px] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">Tax</span>
                 <select
                   value={category.tax_rate_id || ''}
                   onChange={(e) => handleUpdateCategoryTaxRate(category.id, e.target.value)}
-                  className={`
-                    ml-2 px-2 py-1 rounded border text-sm
-                    ${darkMode 
-                      ? 'bg-slate-700 border-slate-600 text-white' 
-                      : 'bg-white border-slate-300 text-slate-900'}
-                  `}
+                  className="a-pick"
+                  style={{ height: 34, borderRadius: 10, fontSize: 13, paddingLeft: 38, maxWidth: 150 }}
+                  aria-label={`Tax rate for ${category.name}`}
                 >
                   <option value="">None</option>
-                  {taxRates.map(rate => (
-                    <option key={rate.id} value={rate.id}>{rate.name}</option>
-                  ))}
+                  {taxRates.map(rate => <option key={rate.id} value={rate.id}>{rate.name}</option>)}
                 </select>
-              </div>
-
-              <div className="flex gap-2">
+              </label>
+              <div className="flex justify-end gap-0.5">
                 <button
                   onClick={() => {
-                    setCategoryForm({
-                      name: category.name,
-                      type: category.type,
-                      description: category.description || '',
-                      tax_rate_id: category.tax_rate_id || ''
-                    });
+                    setCategoryForm({ name: category.name, type: category.type, description: category.description || '', tax_rate_id: category.tax_rate_id || '' });
                     setEditingCategory(category);
                     setShowCategoryModal(true);
                   }}
                   disabled={category.is_system}
-                  className={`p-2 transition-colors ${
-                    category.is_system
-                      ? 'text-slate-600 cursor-not-allowed'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
+                  className="a-ib"
+                  style={category.is_system ? { opacity: 0.3 } : undefined}
+                  aria-label={`Edit ${category.name}`}
                   title={category.is_system ? 'System categories cannot be edited' : 'Edit category'}
                 >
                   <Pencil size={16} />
@@ -1843,30 +1794,50 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
                 <button
                   onClick={() => handleDeleteCategory(category.id)}
                   disabled={category.is_system}
-                  className={`p-2 transition-colors ${
-                    category.is_system
-                      ? 'text-slate-600 cursor-not-allowed'
-                      : 'text-red-400 hover:text-red-300'
-                  }`}
+                  className="a-ib a-ib-d"
+                  style={category.is_system ? { opacity: 0.3 } : undefined}
+                  aria-label={`Delete ${category.name}`}
                   title={category.is_system ? 'System categories cannot be deleted' : 'Delete category'}
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+      );
+    };
 
-        {categories.length === 0 && (
-          <div className="text-center py-8 text-slate-400">
-            <Tag size={48} className="mx-auto mb-4 opacity-50" />
-            <p>No categories created yet</p>
-            <p className="text-sm">Create your first category to get started</p>
+    return (
+      <div className="flex flex-col gap-[22px]">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="a-display a-ink m-0 text-[22px] font-semibold">Categories</h2>
+            <p className="a-mute mt-1 mb-0 text-sm">Group line items and transactions. Keep them fairly broad so they're easy to follow.</p>
+          </div>
+          <button
+            onClick={() => { setCategoryForm({ name: '', type: 'expense', description: '', tax_rate_id: '' }); setEditingCategory(null); setShowCategoryModal(true); }}
+            className="a-btn a-btn-p"
+            style={{ height: 42, borderRadius: 13 }}
+          >
+            <Plus size={16} />New category
+          </button>
+        </div>
+        {categories.length === 0 ? (
+          <div className="a-card a-empty py-12 px-6">
+            <span className="a-tile" style={{ width: 56, height: 56 }}><Tag size={24} /></span>
+            <div className="a-display a-ink text-lg font-semibold">No categories yet</div>
+            <p className="a-mute m-0 text-sm">Create your first category to get started.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            <Section type="income" />
+            <Section type="expense" />
           </div>
         )}
       </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -1880,7 +1851,7 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
   const showNavigation = initialTab === 'taxes' && !initialTab;
 
   return (
-    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
+    <div className={initialTab === 'categories' ? '' : 'bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6'}>
       <div className="space-y-6">
           {!initialTab && (
             <div className="flex items-center gap-3 mb-6">
