@@ -296,12 +296,9 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
   return (
     <div className="space-y-6">
       {/* Live Preview */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
+      <div className="a-card" style={{ padding: 18 }}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Eye size={16} className="text-blue-400" />
-            Live Preview
-          </h3>
+          <span className="a-st text-[12.5px]"><span className="a-light a-light-g" />Live preview</span>
         </div>
 
         {/* Preview Container */}
@@ -439,44 +436,32 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
       </div>
 
       {/* Settings Tabs */}
-      <div className="flex gap-2">
+      <div className="a-seg self-start" style={{ display: 'inline-flex' }}>
         <button
           onClick={() => setActiveSection('appearance')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-            activeSection === 'appearance'
-              ? 'bg-blue-600 text-white'
-              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-          }`}
+          className={`a-seg-i ${activeSection === 'appearance' ? 'a-seg-on' : ''}`}
         >
           <Palette size={16} />
           Appearance
         </button>
         <button
           onClick={() => setActiveSection('navigation')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-            activeSection === 'navigation'
-              ? 'bg-blue-600 text-white'
-              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-          }`}
+          className={`a-seg-i ${activeSection === 'navigation' ? 'a-seg-on' : ''}`}
         >
           <MenuIcon size={16} />
           Navigation
         </button>
         <button
           onClick={() => setActiveSection('cta')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-            activeSection === 'cta'
-              ? 'bg-blue-600 text-white'
-              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-          }`}
+          className={`a-seg-i ${activeSection === 'cta' ? 'a-seg-on' : ''}`}
         >
           <Plus size={16} />
-          CTA Buttons
+          CTA buttons
         </button>
       </div>
 
       {/* Settings Content */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
+      <div className="a-card" style={{ padding: 22 }}>
         {activeSection === 'appearance' && (
           <div className="space-y-6">
             {/* Logo Section */}

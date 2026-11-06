@@ -164,39 +164,38 @@ export const EventWebsiteSponsorManager: React.FC<EventWebsiteSponsorManagerProp
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-white">
+          <h2 className="a-display a-ink m-0 text-[22px] font-semibold">
             Sponsors
-          </h3>
-          <p className="text-sm text-slate-400 mt-1">Showcase your event partners in style</p>
+          </h2>
+          <p className="a-mute mt-1 text-[14px]">Showcase your event partners in style</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="btn-primary-green flex items-center gap-2 px-6 py-3 text-white rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+          className="a-btn a-btn-p"
+          style={{ height: 42, borderRadius: 13 }}
         >
-          <Plus size={20} />
-          <span className="font-semibold">Add Sponsor</span>
+          <Plus size={17} />
+          Add sponsor
         </button>
       </div>
 
       {sponsors.length === 0 ? (
-        <div className="relative overflow-hidden bg-slate-800/50 backdrop-blur-sm rounded-2xl p-16 border border-slate-700/50">
+        <div className="a-card a-empty p-14">
           <div className="relative text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-cyan-500/10 mb-6">
-              <Trophy className="w-10 h-10 text-cyan-400" />
-            </div>
-            <h4 className="text-2xl font-bold text-white mb-3">No Sponsors Yet</h4>
-            <p className="text-slate-400 mb-8 max-w-md mx-auto">
+            <span className="a-tile mx-auto mb-3" style={{ width: 52, height: 52 }}><Trophy size={22} /></span>
+            <h4 className="a-ink text-[17px] font-semibold mb-1">No sponsors yet</h4>
+            <p className="a-dim text-[13.5px] mb-5 max-w-md mx-auto">
               Start building credibility by showcasing the brands and organizations supporting your event
             </p>
             <button
               onClick={() => setShowModal(true)}
-              className="btn-primary-green inline-flex items-center gap-2 px-8 py-4 text-white rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold"
+              className="a-btn a-btn-p"
             >
-              <Sparkles size={20} />
-              Add Your First Sponsor
+              <Plus size={16} />
+              Add your first sponsor
             </button>
           </div>
         </div>
@@ -207,7 +206,8 @@ export const EventWebsiteSponsorManager: React.FC<EventWebsiteSponsorManagerProp
             return (
               <div
                 key={sponsor.id}
-                className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl border border-slate-700/50 hover:border-slate-600 transition-all transform hover:scale-105"
+                className="a-cc group relative"
+                style={{ cursor: 'default' }}
               >
                 {/* Tier badge */}
                 <div className="absolute top-4 left-4 z-10">

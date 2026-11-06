@@ -149,34 +149,26 @@ export const EventWebsiteGlobalSectionsManager: React.FC<Props> = ({ websiteId, 
     <div className="h-full flex flex-col">
       {/* Compact Tab Switcher */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+        <div className="a-seg">
           <button
             onClick={() => setActiveTab('header_nav')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all text-sm ${
-              activeTab === 'header_nav'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
+            className={`a-seg-i ${activeTab === 'header_nav' ? 'a-seg-on' : ''}`}
           >
             <Layout size={16} />
-            Header & Navigation
+            Header & navigation
             {(sections.header?.enabled || sections.menu?.enabled) && (
-              <div className="w-1.5 h-1.5 rounded-full"></div>
+              <span className="a-light a-light-g" style={{ width: 6, height: 6 }} />
             )}
           </button>
 
           <button
             onClick={() => setActiveTab('footer')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all text-sm ${
-              activeTab === 'footer'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
+            className={`a-seg-i ${activeTab === 'footer' ? 'a-seg-on' : ''}`}
           >
             <PanelBottom size={16} />
             Footer
             {sections.footer?.enabled && (
-              <div className="w-1.5 h-1.5 rounded-full"></div>
+              <span className="a-light a-light-g" style={{ width: 6, height: 6 }} />
             )}
           </button>
         </div>
@@ -212,7 +204,7 @@ export const EventWebsiteGlobalSectionsManager: React.FC<Props> = ({ websiteId, 
               <button
                 onClick={() => handleSaveHeaderNavigation(localHeaderConfig, localMenuConfig)}
                 disabled={saving}
-                className="btn-primary-green flex items-center gap-2 px-6 py-2.5 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-lg"
+                className="a-btn a-btn-p disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? (
                   <>
@@ -222,7 +214,7 @@ export const EventWebsiteGlobalSectionsManager: React.FC<Props> = ({ websiteId, 
                 ) : (
                   <>
                     <Save size={18} />
-                    <span>Save Header & Navigation</span>
+                    <span>Save header</span>
                   </>
                 )}
               </button>
