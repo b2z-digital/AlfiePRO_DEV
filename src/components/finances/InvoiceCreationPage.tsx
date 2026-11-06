@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Paperclip, Send, Download } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Paperclip, Send, Download, FileText, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { InvoiceEmailModal } from './InvoiceEmailModal';
@@ -855,370 +855,177 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
     );
   }
 
+  const LCOLS = taxEnabled ? 'minmax(0,1fr) 190px 150px 130px 40px' : 'minmax(0,1fr) 210px 130px 40px';
+  const statusLight = status === 'paid' ? 'a-light-g' : status === 'overdue' ? 'a-light-r' : status === 'sent' ? 'a-light-b' : '';
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
-        >
-          <ArrowLeft size={20} />
-          Back to Finances
-        </button>
-      </div>
-
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
-        <h1 className="text-2xl font-bold text-white mb-6">{editingInvoice ? 'Edit Invoice' : 'Create Invoice'}</h1>
-
-        {error && (
-          <div className="mb-6 p-4 rounded-lg bg-red-900/20 border border-red-900/30">
-            <p className="text-red-400 text-sm">{error}</p>
+    <div className="flex justify-center">
+      <form onSubmit={handleSubmit} className="a-msheet a-msheet-page" style={{ width: 760 }} aria-label={editingInvoice ? 'Edit invoice' : 'Create invoice'}>
+        <div className="flex items-center gap-3 a-grp-head" style={{ padding: '20px 18px 16px 22px' }}>
+          <button type="button" onClick={onBack} className="a-ib" aria-label="Back to finances" title="Back to finances"><ArrowLeft size={20} /></button>
+          <span className="a-tile a-tile-rim"><FileText size={19} /></span>
+          <div className="flex-1 min-w-0">
+            <p className="a-cap">{editingInvoice ? 'Edit invoice' : 'New invoice'}</p>
+            <div className="a-display a-ink text-[21px] font-semibold mt-0.5 truncate">{invoiceNumber || 'Invoice'}</div>
           </div>
-        )}
-
-        {success && (
-          <div className="mb-6 p-4 rounded-lg bg-green-900/20 border border-green-900/30">
-            <p className="text-green-400 text-sm">{success}</p>
+          <div className="relative inline-flex">
+            <span className={`a-light ${statusLight} absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none`} />
+            <label className="sr-only" htmlFor="inv-status">Status</label>
+            <select id="inv-status" value={status} onChange={(e) => setStatus(e.target.value as 'draft' | 'sent' | 'paid' | 'overdue')} className="a-pick" style={{ height: 36, borderRadius: 11, paddingLeft: 30 }}>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+            </select>
           </div>
-        )}
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Header Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Customer Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                placeholder="Enter customer name"
-              />
-            </div>
+        <div className="flex flex-col gap-5" style={{ padding: '20px 22px' }}>
+          {error && <div className="a-note"><span className="a-txt-r text-sm">{error}</span></div>}
+          {success && <div className="a-note"><span className="a-txt-g text-sm">{success}</span></div>}
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Date *
-              </label>
-              <input
-                type="date"
-                required
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Invoice Number
-              </label>
-              <input
-                type="text"
-                value={invoiceNumber}
-                onChange={(e) => setInvoiceNumber(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-                placeholder="INV-001"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as 'draft' | 'sent' | 'paid' | 'overdue')}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-              >
-                <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
-                <option value="paid">Paid</option>
-                <option value="overdue">Overdue</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Reference
+          <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1fr] gap-3">
+            <label>
+              <span className="a-flab">Customer <span className="a-txt-r">*</span></span>
+              <input type="text" required value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="a-inp" placeholder="Who is this invoice for?" />
             </label>
-            <input
-              type="text"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-              placeholder="Optional reference"
-            />
+            <label>
+              <span className="a-flab">Date <span className="a-txt-r">*</span></span>
+              <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="a-inp a-inp-date" />
+            </label>
+            <label>
+              <span className="a-flab">Invoice number</span>
+              <input type="text" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} className="a-inp" placeholder="INV-001" />
+            </label>
           </div>
 
-          {/* Line Items */}
+          <label>
+            <span className="a-flab">Reference <span className="a-dim font-normal">· optional</span></span>
+            <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} className="a-inp" placeholder="PO number or note" />
+          </label>
+
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Line Items</h3>
-
-            <div className="space-y-4">
-              <div className={`grid gap-4 text-sm font-medium text-slate-400 ${taxEnabled ? 'grid-cols-12' : 'grid-cols-9'}`}>
-                <div className="col-span-3">Description</div>
-                <div className="col-span-2">Amount</div>
-                <div className="col-span-3">Category</div>
-                {taxEnabled && <div className="col-span-3">Tax</div>}
-                <div className="col-span-1">Actions</div>
-              </div>
-
-              {lineItems.map((item, index) => (
-                <div key={item.id} className={`grid gap-4 items-start ${taxEnabled ? 'grid-cols-12' : 'grid-cols-9'}`}>
-                  <div className="col-span-3">
-                    <input
-                      type="text"
-                      value={item.description}
-                      onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
-                      placeholder="Description"
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
-                      <input
-                        type="text"
-                        value={item.line_total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9.]/g, '');
-                          updateLineItem(item.id, 'line_total', parseFloat(value) || 0);
-                        }}
-                        className="w-full pl-7 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="col-span-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="a-flab" style={{ margin: 0 }}>Line items</span>
+              <button type="button" onClick={addLineItem} className="a-btn a-btn-q a-txt-b" style={{ height: 30, padding: '0 8px', fontSize: 13 }}><Plus size={15} />Add line</button>
+            </div>
+            <div className="a-grp">
+              {lineItems.map((item, i) => (
+                <div key={item.id} className={`grid items-center ${i > 0 ? 'a-grp-rule' : ''}`} style={{ gridTemplateColumns: LCOLS }}>
+                  <label className="a-cell" style={{ display: 'block' }}>
+                    <span className="a-cell-l">Description</span>
+                    <input type="text" value={item.description} onChange={(e) => updateLineItem(item.id, 'description', e.target.value)} placeholder="What is this for?" />
+                  </label>
+                  <div className="pr-2">
+                    <label className="sr-only" htmlFor={`cat-${item.id}`}>Category</label>
                     <select
+                      id={`cat-${item.id}`}
                       value={item.category}
                       onChange={(e) => {
-                        if (e.target.value === '__add_new__') {
-                          e.target.value = item.category;
-                          setShowAddCategory(true);
-                          return;
-                        }
+                        if (e.target.value === '__add_new__') { e.target.value = item.category; setShowAddCategory(true); return; }
                         updateLineItem(item.id, 'category', e.target.value);
                       }}
-                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                      className="a-pick a-pick-soft w-full"
+                      style={{ height: 38 }}
                     >
                       <option value="">Select category</option>
-                      {categories.map(category => (
-                        <option key={category.id} value={category.name}>
-                          {category.name}
-                        </option>
-                      ))}
-                      <option value="__add_new__">+ Add a Category...</option>
+                      {categories.map(category => <option key={category.id} value={category.name}>{category.name}</option>)}
+                      <option value="__add_new__">+ Add a category…</option>
                     </select>
                   </div>
-
                   {taxEnabled && (
-                    <div className="col-span-3">
-                      <select
-                        value={item.tax_type}
-                        onChange={(e) => updateLineItem(item.id, 'tax_type', e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
-                      >
-                        <option value="none">No Tax</option>
+                    <div className="pr-2">
+                      <label className="sr-only" htmlFor={`tax-${item.id}`}>Tax</label>
+                      <select id={`tax-${item.id}`} value={item.tax_type} onChange={(e) => updateLineItem(item.id, 'tax_type', e.target.value)} className="a-pick a-pick-soft w-full" style={{ height: 38 }}>
+                        <option value="none">No tax</option>
                         {taxRates.map(rate => (
                           <optgroup key={rate.id} label={rate.name}>
-                            <option value="included">
-                              Tax Included
-                            </option>
-                            <option value="excluded">
-                              Tax Excluded
-                            </option>
+                            <option value="included">Tax included</option>
+                            <option value="excluded">Tax excluded</option>
                           </optgroup>
                         ))}
                       </select>
                     </div>
                   )}
-
-                  <div className="col-span-1">
+                  <label className="text-right" style={{ padding: '0 14px' }}>
+                    <span className="a-dim text-xs block">AUD</span>
+                    <span className="inline-flex items-baseline justify-end">
+                      <span className={`a-num text-base font-semibold ${item.line_total ? 'a-ink' : 'a-dim'}`}>$</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        aria-label="Amount"
+                        value={item.line_total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        onChange={(e) => updateLineItem(item.id, 'line_total', parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0)}
+                        className={`a-num a-bare text-right text-base font-semibold ${item.line_total ? 'a-ink' : 'a-dim'}`}
+                        style={{ width: 90 }}
+                      />
+                    </span>
+                  </label>
+                  <span className="flex justify-center">
                     {lineItems.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeLineItem(item.id)}
-                        className="p-2 text-red-400 hover:text-red-300 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <button type="button" onClick={() => removeLineItem(item.id)} className="a-ib a-ib-d" style={{ width: 32, height: 32 }} aria-label="Remove line"><Trash2 size={15} /></button>
                     )}
-                  </div>
+                  </span>
                 </div>
               ))}
             </div>
-
-            <button
-              type="button"
-              onClick={addLineItem}
-              className="mt-4 flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              <Plus size={16} />
-              Add Line Item
-            </button>
           </div>
 
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Notes
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3.5 items-stretch">
+            <label>
+              <span className="a-flab">Notes</span>
+              <textarea rows={3} className="a-inp" placeholder="Add any notes for the customer" style={{ resize: 'none', minHeight: 82 }} />
             </label>
-            <textarea
-              rows={4}
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white resize-none"
-              placeholder="Add any additional notes..."
-            />
-          </div>
-
-          {/* Add Attachment Button */}
-          <div>
-            <button
-              type="button"
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
-            >
-              <Paperclip size={16} />
-              Add Attachment
-            </button>
-          </div>
-
-          {/* Totals */}
-          <div className="flex justify-end">
-            <div className="w-80 space-y-2">
-              {taxEnabled && (
-                <>
-                  <div className="flex justify-between text-slate-300">
-                    <span>Sub Total</span>
-                    <span>${subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-300">
-                    <span>Tax</span>
-                    <span>${taxAmount.toFixed(2)}</span>
-                  </div>
-                </>
-              )}
-              <div className={`flex justify-between text-xl font-bold text-white ${taxEnabled ? 'border-t border-slate-600 pt-2' : ''}`}>
-                <span>TOTAL</span>
-                <span>${total.toFixed(2)} AUD</span>
-              </div>
+            <div className="flex flex-col justify-end gap-2.5">
+              <button type="button" className="a-btn"><Paperclip size={16} />Attach file</button>
             </div>
           </div>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex justify-between items-center">
-            <div className="flex gap-3">
-              {editingInvoice && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setShowEmailModal(true)}
-                    className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg transition-colors"
-                  >
-                    <Send className="w-4 h-4" />
-                    Send Email
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportPDF}
-                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export PDF
-                  </button>
-                </>
-              )}
-            </div>
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={onBack}
-                className="px-6 py-2 text-slate-300 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn-primary-green px-6 py-2 text-white rounded-lg transition-colors disabled:opacity-50"
-              >
-                {loading ? 'Saving...' : (editingInvoice ? 'Update Invoice' : 'Save Invoice')}
-              </button>
-            </div>
+        <div className="a-panel-foot flex-wrap items-center" style={{ padding: '16px 22px' }}>
+          <div className="flex-1 min-w-[180px]">
+            <p className="a-cap">Total</p>
+            <div className="a-big a-ink mt-1" style={{ fontSize: 30 }}>${total.toFixed(2)} <span className="a-dim text-sm" style={{ fontFamily: 'Instrument Sans, sans-serif', letterSpacing: 0 }}>AUD</span></div>
+            {taxEnabled && <div className="a-dim text-xs mt-1">Sub total ${subtotal.toFixed(2)} · Tax ${taxAmount.toFixed(2)}</div>}
           </div>
-        </form>
-      </div>
+          {editingInvoice && (
+            <>
+              <button type="button" onClick={() => setShowEmailModal(true)} className="a-btn" style={{ height: 46 }}><Send size={16} />Send email</button>
+              <button type="button" onClick={handleExportPDF} className="a-btn" style={{ height: 46 }}><Download size={16} />Export PDF</button>
+            </>
+          )}
+          <button type="button" onClick={onBack} className="a-btn" style={{ height: 46 }}>Cancel</button>
+          <button type="submit" disabled={loading} className="a-btn a-btn-p" style={{ height: 46 }}><Check size={16} />{loading ? 'Saving…' : editingInvoice ? 'Update invoice' : 'Save invoice'}</button>
+        </div>
+      </form>
 
-      {/* Email Modal */}
       {editingInvoice && (
-        <InvoiceEmailModal
-          invoice={editingInvoice}
-          isOpen={showEmailModal}
-          onClose={() => setShowEmailModal(false)}
-          darkMode={darkMode}
-        />
+        <InvoiceEmailModal invoice={editingInvoice} isOpen={showEmailModal} onClose={() => setShowEmailModal(false)} darkMode={darkMode} />
       )}
 
       {showAddCategory && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 w-full max-w-md shadow-2xl">
-            <h3 className="text-lg font-semibold text-white mb-4">Add Category</h3>
-            <input
-              type="text"
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleQuickAddCategory()}
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm mb-4"
-              placeholder="Category name"
-              autoFocus
-            />
-            <div className="mb-4">
-              <label className="block text-sm text-slate-400 mb-2">Category Type</label>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setNewCategoryType('income')}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    newCategoryType === 'income'
-                      ? 'bg-green-600/20 text-green-400 border border-green-500/50'
-                      : 'bg-slate-700 text-slate-400 border border-slate-600 hover:border-slate-500'
-                  }`}
-                >
-                  Income
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNewCategoryType('expense')}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    newCategoryType === 'expense'
-                      ? 'bg-red-600/20 text-red-400 border border-red-500/50'
-                      : 'bg-slate-700 text-slate-400 border border-slate-600 hover:border-slate-500'
-                  }`}
-                >
-                  Expense
-                </button>
+          <div className="a-msheet" style={{ width: 420 }} role="dialog" aria-modal="true" aria-label="Add category">
+            <div className="flex items-center gap-3" style={{ padding: '20px 18px 12px 22px' }}>
+              <span className="a-tile a-tile-rim"><Plus size={18} /></span>
+              <h3 className="a-display a-ink flex-1 m-0 text-xl font-semibold">New category</h3>
+            </div>
+            <div className="flex flex-col gap-4" style={{ padding: '4px 22px 20px' }}>
+              <label><span className="a-flab">Name</span>
+                <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleQuickAddCategory()} className="a-inp" placeholder="Category name" autoFocus />
+              </label>
+              <div>
+                <span className="a-flab">Type</span>
+                <div className="a-seg flex w-full">
+                  <button type="button" onClick={() => setNewCategoryType('income')} className={`a-seg-i flex-1 justify-center ${newCategoryType === 'income' ? 'a-seg-on' : ''}`}><span className="a-light" style={{ background: '#30D158', boxShadow: 'none' }} />Income</button>
+                  <button type="button" onClick={() => setNewCategoryType('expense')} className={`a-seg-i flex-1 justify-center ${newCategoryType === 'expense' ? 'a-seg-on' : ''}`}><span className="a-light" style={{ background: '#FF6B6B', boxShadow: 'none' }} />Expense</button>
+                </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }}
-                className="px-4 py-2 text-slate-300 hover:text-white transition-colors text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleQuickAddCategory}
-                disabled={savingCategory || !newCategoryName.trim()}
-                className="btn-primary-green px-4 py-2 text-white rounded-lg text-sm disabled:opacity-50"
-              >
-                {savingCategory ? 'Adding...' : 'Add Category'}
-              </button>
+            <div className="a-panel-foot" style={{ padding: '14px 22px' }}>
+              <button onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }} className="a-btn">Cancel</button>
+              <button onClick={handleQuickAddCategory} disabled={savingCategory || !newCategoryName.trim()} className="a-btn a-btn-p">{savingCategory ? 'Adding…' : 'Add category'}</button>
             </div>
           </div>
         </div>
