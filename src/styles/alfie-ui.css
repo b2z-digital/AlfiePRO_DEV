@@ -207,3 +207,63 @@ html.alfie-light .a-sheet { background: #fff; border-color: rgba(15, 23, 42, 0.0
 .a-chip-rim { border-color: transparent; background: linear-gradient(#0E1424, #0E1424) padding-box, var(--alfie-spectrum) border-box; }
 html.alfie-light .a-chip { background: #fff; border-color: rgba(15, 23, 42, 0.08); color: #0B1220; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
 html.alfie-light .a-chip-rim { border-color: transparent; background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; }
+
+/* ═══════════════════ Settings (board layout) ═══════════════════ */
+[data-alfie-hide] { display: none !important; }
+.a-settings-profile { padding: 18px 20px; border: 1px solid transparent; background: linear-gradient(#0D1424, #0D1424) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-settings-profile { background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; border-color: transparent; }
+.a-settings-avatar { flex-shrink: 0; width: 66px; height: 66px; padding: 3px; border-radius: 999px; background: var(--alfie-spectrum); display: inline-flex; }
+.a-settings-avatar > * { width: 100%; height: 100%; border-radius: 999px; object-fit: cover; box-shadow: 0 0 0 3px #0D1424; background: #2F6FDE; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 600; }
+html.alfie-light .a-settings-avatar > * { box-shadow: 0 0 0 3px #fff; }
+.a-settings-org { display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; border-radius: 16px; background: rgba(255, 255, 255, 0.04); max-width: 260px; }
+html.alfie-light .a-settings-org { background: rgba(15, 23, 42, 0.04); }
+.a-settings-org-logo { width: 40px; height: 40px; flex-shrink: 0; border-radius: 11px; background: #fff; color: #0066b4; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.a-settings-org-logo img { width: 100%; height: 100%; object-fit: contain; }
+.a-settings-search { height: 50px; font-size: 15px; }
+
+html.alfie-theme .alfie-settings { column-count: 2; column-gap: 18px; }
+@media (max-width: 1180px) { html.alfie-theme .alfie-settings { column-count: 1; } }
+html.alfie-theme .alfie-settings > * + * { margin-top: 0 !important; }
+html.alfie-theme .alfie-settings > div {
+  display: block; width: 100%; break-inside: avoid; margin: 0 0 18px;
+  border-radius: 20px; background: rgba(255, 255, 255, 0.025); border: 1px solid rgba(255, 255, 255, 0.07); overflow: hidden;
+}
+html.alfie-theme .alfie-settings > div > button:first-child {
+  margin: 0 !important; padding: 14px 16px 8px !important; border: 0 !important; border-radius: 0 !important;
+  background: transparent !important; box-shadow: none !important;
+}
+html.alfie-theme .alfie-settings > div > button:first-child h2 { font-family: 'Bricolage Grotesque', 'Instrument Sans', sans-serif; font-size: 16px; letter-spacing: -0.01em; }
+html.alfie-theme .alfie-settings > div > div.grid { display: flex !important; flex-direction: column; gap: 0 !important; }
+html.alfie-theme .alfie-settings-searching > div > div.grid { max-height: none !important; opacity: 1 !important; }
+html.alfie-theme .alfie-settings > div > div.grid > button {
+  position: relative; display: flex; align-items: center; gap: 14px;
+  padding: 11px 40px 11px 16px !important; border: 0 !important; border-radius: 0 !important;
+  background: transparent !important; box-shadow: none !important;
+}
+html.alfie-theme .alfie-settings > div > div.grid > button + button { border-top: 1px solid rgba(255, 255, 255, 0.055) !important; }
+html.alfie-theme .alfie-settings > div > div.grid > button:hover { background: rgba(255, 255, 255, 0.035) !important; }
+html.alfie-theme .alfie-settings > div > div.grid > button::after {
+  content: ''; position: absolute; right: 16px; top: 50%; width: 16px; height: 16px; margin-top: -8px; opacity: 0.45;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 7l5 5-5 5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 7l5 5-5 5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+html.alfie-theme .alfie-settings > div > div.grid > button > .flex { align-items: center; gap: 14px; flex: 1; min-width: 0; }
+html.alfie-theme .alfie-settings > div > div.grid > button .p-3.rounded-lg {
+  width: 34px; height: 34px; padding: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  border-radius: 30% !important; background: rgba(255, 255, 255, 0.03) !important; border: 1px solid rgba(255, 255, 255, 0.11) !important;
+}
+html.alfie-theme .alfie-settings > div > div.grid > button:hover .p-3.rounded-lg {
+  border-color: transparent !important;
+  background: linear-gradient(#141A28, #141A28) padding-box, var(--alfie-spectrum) border-box !important;
+}
+html.alfie-theme .alfie-settings > div > div.grid > button .p-3.rounded-lg svg { width: 17px; height: 17px; }
+html.alfie-theme .alfie-settings > div > div.grid > button h3 { margin: 0; font-size: 14.5px; }
+html.alfie-theme .alfie-settings > div > div.grid > button p { margin-top: 2px; font-size: 12.5px; line-height: 1.4; opacity: 0.85; }
+
+html.alfie-light .alfie-settings > div { background: #fff; border-color: rgba(15, 23, 42, 0.08); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06); }
+html.alfie-light .alfie-settings > div > div.grid > button + button { border-top-color: rgba(15, 23, 42, 0.07) !important; }
+html.alfie-light .alfie-settings > div > div.grid > button:hover { background: rgba(15, 23, 42, 0.025) !important; }
+html.alfie-light .alfie-settings > div > div.grid > button .p-3.rounded-lg { background: #fff !important; border-color: rgba(15, 23, 42, 0.10) !important; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); }
+html.alfie-light .alfie-settings > div > div.grid > button:hover .p-3.rounded-lg { background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box !important; border-color: transparent !important; }
+html.alfie-theme .alfie-settings > div:has(> div.grid.max-h-0) > button:first-child { padding-bottom: 14px !important; }
