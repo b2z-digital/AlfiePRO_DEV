@@ -119,6 +119,7 @@ import { usePlatformTracking } from '../hooks/usePlatformTracking';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useAlfieTheme } from '../hooks/useAlfieTheme';
+import { AlfieIconContext } from './brand/AlfieIcon';
 
 type DashboardSection = 'home' | 'race-management' | 'club-management' | 'race-calendar' | 'team-management' | 'results' | 'yacht-classes';
 
@@ -1163,6 +1164,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         })).filter(section => section.items.length > 0);
 
   return (
+    <AlfieIconContext.Provider value={true}>
     <div className={`min-h-screen ${lightMode ? 'alfie-app-bg bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200' : 'alfie-app-bg bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]'}`}>
       <ImpersonationBanner />
       {/* Loading overlay when switching organizations or clubs */}
@@ -2213,5 +2215,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         <AskAlfieOrb darkMode={darkMode} />
       )}
     </div>
+    </AlfieIconContext.Provider>
   );
 };
