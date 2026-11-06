@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, MapPin, Calendar, Eye, Heart, MessageCircle, DollarSign, CreditCard as Edit, Trash2, Check, ChevronLeft, ChevronRight, ZoomIn, Share2, Mail, Users, ChevronDown, Phone, ExternalLink } from 'lucide-react';
+import { X, MapPin, Calendar, Eye, Heart, MessageCircle, DollarSign, SquarePen as Edit, Trash2, Check, ChevronLeft, ChevronRight, Share2, Mail, Users, ChevronDown, Phone, ExternalLink, Tag } from 'lucide-react';
+import { AAvatar } from '../alfie/Kit';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import { useAuth } from '../../contexts/AuthContext';
@@ -184,501 +185,181 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
     setCurrentImageIndex((prev) => (prev - 1 + (classified.images?.length || 1)) % (classified.images?.length || 1));
   };
 
+  const imgs = classified.images || [];
+  const seller = classified.is_external
+    ? (classified.matched_member
+        ? { first: classified.matched_member.first_name, last: classified.matched_member.last_name, url: classified.matched_member.avatar_url, name: `${classified.matched_member.first_name} ${classified.matched_member.last_name}`, sub: classified.matched_member.club_name ? `Member · ${classified.matched_member.club_name}` : 'Member', email: classified.matched_member.email, phone: classified.external_contact_phone }
+        : { first: classified.external_contact_name || '?', last: '', url: null, name: classified.external_contact_name || 'Private seller', sub: 'Not a member · from an external listing', email: classified.external_contact_email, phone: classified.external_contact_phone })
+    : { first: classified.user?.first_name, last: classified.user?.last_name, url: classified.user?.avatar_url, name: `${classified.user?.first_name || ''} ${classified.user?.last_name || ''}`.trim() || 'Seller', sub: classified.club?.name || 'Member', email: classified.contact_email, phone: classified.contact_phone };
+
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-slate-800 rounded-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden border border-slate-700">
-          {/* Header */}
-          <div className="from-blue-600 to-blue-800 p-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-white">Listing Details</h2>
-            <button
-              onClick={onClose}
-              className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
-            >
-              <X size={24} />
-            </button>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <section className="a-sheet w-full max-w-[1240px] max-h-[90vh] overflow-hidden flex flex-col lg:flex-row" role="dialog" aria-label="Listing details" onClick={(e) => e.stopPropagation()}>
+          <div className="relative lg:basis-[52%] flex-shrink-0 a-listing-media" style={{ minHeight: 320 }}>
+            {imgs.length > 0 ? (
+              <img
+                src={imgs[currentImageIndex]}
+                alt={classified.title}
+                className="absolute inset-0 w-full h-full object-cover cursor-zoom-in"
+                onClick={() => { setLightboxIndex(currentImageIndex); setLightboxOpen(true); }}
+              />
+            ) : (
+              <div className="a-bc-ph absolute inset-0 flex flex-col items-center justify-center gap-2">
+                <img src="/alfie_app_logo.svg" alt="" style={{ width: 64, height: 64, opacity: 0.4 }} />
+                <span className="a-dim text-[13px]">No photos</span>
+              </div>
+            )}
+            {imgs.length > 1 && (
+              <>
+                <button onClick={prevImage} className="a-gb absolute" style={{ left: 14, top: '50%', transform: 'translateY(-50%)' }} aria-label="Previous photo"><ChevronLeft size={18} /></button>
+                <button onClick={nextImage} className="a-gb absolute" style={{ right: 14, top: '50%', transform: 'translateY(-50%)' }} aria-label="Next photo"><ChevronRight size={18} /></button>
+                <span className="a-glass absolute" style={{ right: 14, bottom: 102 }}>{currentImageIndex + 1} / {imgs.length}</span>
+                <div className="absolute left-0 right-0 bottom-0 flex gap-2 overflow-x-auto" style={{ padding: '12px 14px', background: 'linear-gradient(0deg, rgba(10,15,26,0.95), rgba(10,15,26,0))' }}>
+                  {imgs.map((img, idx) => (
+                    <button key={idx} onClick={() => setCurrentImageIndex(idx)} className="flex-shrink-0" aria-label={`Photo ${idx + 1}`}>
+                      <img src={img} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 12, boxShadow: idx === currentImageIndex ? '0 0 0 2px #0A84FF' : 'none', opacity: idx === currentImageIndex ? 1 : 0.6 }} />
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
-          <div className="overflow-y-auto max-h-[calc(90vh-88px)]">
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 p-6">
-              {/* Left Column - Details (2/5 width) */}
-              <div className="lg:col-span-2 space-y-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-white mb-2">{classified.title}</h1>
-                  <div className="text-4xl font-bold text-blue-400 mb-4">
-                    {formatPrice(classified.price)}
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <span className="px-3 py-1 bg-blue-500/20 text-blue-300 text-sm font-medium rounded-full capitalize">
-                      {classified.category}
-                    </span>
-                    <span className="px-3 py-1 bg-green-500/20 text-green-300 text-sm font-medium rounded-full capitalize">
-                      {classified.condition}
-                    </span>
-                    {classified.is_public && (
-                      <span className="px-3 py-1 bg-teal-500/20 text-teal-300 text-sm font-medium rounded-full">
-                        Public Listing
-                      </span>
-                    )}
-                    {classified.is_external && (
-                      <span className="px-3 py-1 bg-amber-500/20 text-amber-300 text-sm font-medium rounded-full flex items-center gap-1">
-                        <ExternalLink size={14} />
-                        External Listing
-                      </span>
-                    )}
-                  </div>
-
-                  {classified.is_scraped && classified.source_url && (
-                    <a
-                      href={classified.source_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors mb-2"
-                    >
-                      <ExternalLink size={14} />
-                      View Original Listing
-                    </a>
-                  )}
-
-                  <div className="space-y-3 text-blue-100 mb-6">
-                    <div className="flex items-center gap-2">
-                      <MapPin size={18} className="text-blue-400" />
-                      <span>{classified.location}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar size={18} className="text-blue-400" />
-                      <span>Listed on {formatDate(classified.created_at)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Eye size={18} className="text-blue-400" />
-                      <span>{classified.views_count || 0} views</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-800/50 rounded-xl p-4 mb-4">
-                    <h3 className="text-lg font-semibold text-white mb-2">Description</h3>
-                    <p className="text-blue-100 whitespace-pre-wrap">{classified.description}</p>
-                  </div>
-                </div>
-
-                {classified.is_external ? (
-                  <div className="bg-slate-800/50 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <h3 className="text-lg font-semibold text-white">Seller Information</h3>
-                      {classified.matched_member ? (
-                        <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs font-medium rounded-full flex items-center gap-1">
-                          <Users size={12} />
-                          Member
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs font-medium rounded-full flex items-center gap-1">
-                          <ExternalLink size={12} />
-                          External
-                        </span>
-                      )}
-                    </div>
-                    {classified.matched_member ? (
-                      <>
-                        <div className="flex items-center gap-3 mb-3">
-                          {classified.matched_member.avatar_url ? (
-                            <img
-                              src={classified.matched_member.avatar_url}
-                              alt={`${classified.matched_member.first_name} ${classified.matched_member.last_name}`}
-                              className="w-12 h-12 rounded-full object-cover bg-slate-700"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                              {classified.matched_member.first_name?.[0]?.toUpperCase()}
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-semibold text-white">
-                              {classified.matched_member.first_name} {classified.matched_member.last_name}
-                            </div>
-                            {classified.matched_member.club_name && (
-                              <div className="text-xs text-green-300">{classified.matched_member.club_name}</div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="space-y-2 text-sm">
-                          {classified.matched_member.email && (
-                            <a
-                              href={`mailto:${classified.matched_member.email}`}
-                              className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
-                            >
-                              <Mail size={16} />
-                              {classified.matched_member.email}
-                            </a>
-                          )}
-                          {classified.external_contact_phone && (
-                            <a
-                              href={`tel:${classified.external_contact_phone}`}
-                              className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
-                            >
-                              <Phone size={16} />
-                              {classified.external_contact_phone}
-                            </a>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-300 font-bold text-lg">
-                            {classified.external_contact_name?.[0]?.toUpperCase() || '?'}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-white">
-                              {classified.external_contact_name || 'Unknown seller'}
-                            </div>
-                            <div className="text-xs text-slate-400">Non-member seller</div>
-                          </div>
-                        </div>
-                        <div className="space-y-2 text-sm">
-                          {classified.external_contact_email && (
-                            <a
-                              href={`mailto:${classified.external_contact_email}`}
-                              className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
-                            >
-                              <Mail size={16} />
-                              {classified.external_contact_email}
-                            </a>
-                          )}
-                          {classified.external_contact_phone && (
-                            <a
-                              href={`tel:${classified.external_contact_phone}`}
-                              className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
-                            >
-                              <Phone size={16} />
-                              {classified.external_contact_phone}
-                            </a>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="bg-slate-800/50 rounded-xl p-4">
-                    <h3 className="text-lg font-semibold text-white mb-3">Seller Information</h3>
-                    <div className="flex items-center gap-3 mb-3">
-                      {classified.user?.avatar_url ? (
-                        <img
-                          src={classified.user.avatar_url}
-                          alt={`${classified.user.first_name} ${classified.user.last_name}`}
-                          className="w-12 h-12 rounded-full object-cover bg-slate-700"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                            if (fallback) fallback.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <div
-                        className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg"
-                        style={{ display: classified.user?.avatar_url ? 'none' : 'flex' }}
-                      >
-                        {classified.user?.first_name?.[0]}{classified.user?.last_name?.[0]}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-white">
-                          {classified.user?.first_name} {classified.user?.last_name}
-                        </div>
-                        {classified.club && (
-                          <div className="text-sm text-blue-300">{classified.club.name}</div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="space-y-2 text-sm text-blue-100">
-                      <div>Email: {classified.contact_email}</div>
-                      {classified.contact_phone && (
-                        <div>Phone: {classified.contact_phone}</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="space-y-3">
-                  {!canManage && !classified.is_external && (
-                    <>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => {
-                            setInquiryType('question');
-                            setShowInquiryForm(true);
-                          }}
-                          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          <MessageCircle size={16} />
-                          Ask Question
-                        </button>
-                        <button
-                          onClick={() => {
-                            setInquiryType('offer');
-                            setShowInquiryForm(true);
-                          }}
-                          className="btn-primary-green px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          <DollarSign size={16} />
-                          Make Offer
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={handleToggleFavorite}
-                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Heart size={16} className={isFavorited ? 'fill-red-500 text-red-500' : ''} />
-                          {isFavorited ? 'Unfavorite' : 'Favorite'}
-                        </button>
-                        <button
-                          onClick={() => setShowShareModal(true)}
-                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Share2 size={16} />
-                          Share
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  {!canManage && classified.is_external && (
-                    <>
-                      <div className="grid grid-cols-2 gap-2">
-                        {classified.external_contact_email && (
-                          <a
-                            href={`mailto:${classified.external_contact_email}?subject=Enquiry: ${encodeURIComponent(classified.title)}`}
-                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                          >
-                            <Mail size={16} />
-                            Email Seller
-                          </a>
-                        )}
-                        {classified.external_contact_phone && (
-                          <a
-                            href={`tel:${classified.external_contact_phone}`}
-                            className="px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                          >
-                            <Phone size={16} />
-                            Call Seller
-                          </a>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={handleToggleFavorite}
-                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Heart size={16} className={isFavorited ? 'fill-red-500 text-red-500' : ''} />
-                          {isFavorited ? 'Unfavorite' : 'Favorite'}
-                        </button>
-                        <button
-                          onClick={() => setShowShareModal(true)}
-                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Share2 size={16} />
-                          Share
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  {canManage && (
-                    <>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => setShowEditModal(true)}
-                          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Edit size={16} />
-                          Edit
-                        </button>
-                        <button
-                          onClick={handleMarkAsSold}
-                          className="btn-primary-green px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Check size={16} />
-                          Mark Sold
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={handleDelete}
-                          className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Trash2 size={16} />
-                          Delete
-                        </button>
-                        <button
-                          onClick={() => setShowShareModal(true)}
-                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Share2 size={16} />
-                          Share
-                        </button>
-                      </div>
-
-                      {inquiries.length > 0 && (
-                        <div className="mt-4">
-                          <button
-                            onClick={() => setShowEnquiries(!showEnquiries)}
-                            className="w-full flex items-center justify-between px-4 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-white transition-colors"
-                          >
-                            <span className="flex items-center gap-2">
-                              <MessageCircle size={18} className="text-blue-400" />
-                              <span className="font-medium">Enquiries ({inquiries.length})</span>
-                            </span>
-                            <span className={`transform transition-transform ${showEnquiries ? 'rotate-180' : ''}`}>
-                              ▼
-                            </span>
-                          </button>
-
-                          {showEnquiries && (
-                            <div className="mt-2 bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
-                            <div className="max-h-96 overflow-y-auto custom-scrollbar">
-                              {inquiries.map((inquiry, idx) => (
-                                <div
-                                  key={inquiry.id}
-                                  className={`p-4 hover:bg-slate-700/30 transition-colors ${
-                                    idx !== inquiries.length - 1 ? 'border-b border-slate-700' : ''
-                                  }`}
-                                >
-                                  <div className="flex items-start gap-3">
-                                    {inquiry.sender?.avatar_url ? (
-                                      <img
-                                        src={inquiry.sender.avatar_url}
-                                        alt=""
-                                        className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                                      />
-                                    ) : (
-                                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium flex-shrink-0">
-                                        {inquiry.sender?.first_name?.[0]}
-                                      </div>
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center justify-between gap-2 mb-1">
-                                        <span className="text-white font-medium">
-                                          {inquiry.sender?.first_name} {inquiry.sender?.last_name}
-                                        </span>
-                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
-                                          inquiry.inquiry_type === 'offer'
-                                            ? 'bg-green-500/20 text-green-300'
-                                            : inquiry.inquiry_type === 'question'
-                                            ? 'bg-blue-500/20 text-blue-300'
-                                            : 'bg-slate-500/20 text-slate-300'
-                                        }`}>
-                                          {inquiry.inquiry_type}
-                                        </span>
-                                      </div>
-                                      {inquiry.offer_amount && (
-                                        <div className="mb-2 text-lg font-bold text-green-400">
-                                          Offer: {formatPrice(inquiry.offer_amount)}
-                                        </div>
-                                      )}
-                                      <p className="text-slate-300 text-sm leading-relaxed break-words">
-                                        {inquiry.message}
-                                      </p>
-                                      <div className="text-xs text-slate-400 mt-2">
-                                        {formatDate(inquiry.created_at)}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Column - Images (3/5 width) */}
-              <div className="lg:col-span-3">
-                {classified.images && classified.images.length > 0 ? (
-                  <div className="relative">
-                    <div className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-800 cursor-pointer group" onClick={() => {
-                      setLightboxIndex(currentImageIndex);
-                      setLightboxOpen(true);
-                    }}>
-                      <img
-                        src={classified.images[currentImageIndex]}
-                        alt={classified.title}
-                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full p-3">
-                          <ZoomIn size={32} className="text-slate-800" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {classified.images.length > 1 && (
-                      <>
-                        <button
-                          onClick={prevImage}
-                          className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
-                        >
-                          <ChevronLeft size={20} />
-                        </button>
-                        <button
-                          onClick={nextImage}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
-                        >
-                          <ChevronRight size={20} />
-                        </button>
-                        <div className="absolute bottom-2 right-2 px-3 py-1 bg-black/50 text-white text-sm rounded-full">
-                          {currentImageIndex + 1} / {classified.images.length}
-                        </div>
-                      </>
-                    )}
-
-                    {/* Thumbnail Grid */}
-                    {classified.images.length > 1 && (
-                      <div className="grid grid-cols-5 gap-2 mt-3">
-                        {classified.images.map((img, idx) => (
-                          <button
-                            key={idx}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setLightboxIndex(idx);
-                              setLightboxOpen(true);
-                            }}
-                            className={`aspect-square rounded-lg overflow-hidden border-2 transition-all hover:border-blue-400 ${
-                              idx === currentImageIndex ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-slate-600'
-                            }`}
-                          >
-                            <img src={img} alt="" className="w-full h-full object-cover" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="aspect-[4/3] rounded-xl bg-slate-800 flex items-center justify-center">
-                    <span className="text-slate-500 text-xl">No images</span>
-                  </div>
-                )}
-              </div>
+          <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-y-auto" style={{ padding: '22px 24px' }}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="a-lb-cls capitalize"><Tag size={11} />{classified.category}</span>
+              {classified.condition && <span className="a-lb-fmt capitalize">{classified.condition}</span>}
+              {classified.is_public && <span className="a-lb-fmt">Public</span>}
+              {classified.is_external && <span className="a-lb-fmt"><ExternalLink size={12} />External listing</span>}
+              <div className="flex-1" />
+              <button onClick={handleToggleFavorite} className={`a-ib ${isFavorited ? 'a-txt-pink' : ''}`} aria-label={isFavorited ? 'Remove from saved' : 'Save'} title={isFavorited ? 'Saved' : 'Save'}>
+                <Heart size={18} className={isFavorited ? 'fill-current' : ''} />
+              </button>
+              <button onClick={onClose} className="a-ib" aria-label="Close"><X size={18} /></button>
             </div>
+
+            <div>
+              <h2 className="a-display a-ink m-0 text-[28px] font-bold leading-[1.15]">{classified.title}</h2>
+              <div className="a-display a-num a-txt-b text-[36px] font-semibold mt-2 leading-none">{formatPrice(classified.price)}</div>
+            </div>
+
+            <div className="a-dim flex flex-wrap gap-3.5 text-[13px]">
+              {classified.location && <span className="inline-flex items-center gap-1.5"><MapPin size={14} />{classified.location}</span>}
+              <span className="inline-flex items-center gap-1.5"><Calendar size={14} />Listed {new Date(classified.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              <span className="inline-flex items-center gap-1.5"><Eye size={14} />{classified.views_count || 0} views</span>
+            </div>
+
+            {classified.description && <p className="a-mute m-0 text-[14.5px] leading-[1.6] whitespace-pre-wrap">{classified.description}</p>}
+
+            <div className="a-grp">
+              <div className="a-ir">
+                <AAvatar url={seller.url} first={seller.first} last={seller.last} size={40} />
+                <div className="flex-1 min-w-0">
+                  <div className="a-ink text-[14.5px] font-semibold truncate">{seller.name}</div>
+                  <div className="a-dim text-[12px] mt-0.5 truncate">{seller.sub}</div>
+                </div>
+                {classified.is_scraped && classified.source_url && (
+                  <a href={classified.source_url} target="_blank" rel="noopener noreferrer" className="a-txt-b inline-flex items-center gap-1 text-[13px]">Original<ExternalLink size={13} /></a>
+                )}
+              </div>
+              {seller.email && (
+                <div className="a-ir">
+                  <span className="a-ir-l"><Mail size={15} />Email</span>
+                  <a href={`mailto:${seller.email}`} className="a-ir-v a-txt-b truncate">{seller.email}</a>
+                </div>
+              )}
+              {seller.phone && (
+                <div className="a-ir">
+                  <span className="a-ir-l"><Phone size={15} />Phone</span>
+                  <a href={`tel:${seller.phone}`} className="a-ir-v">{seller.phone}</a>
+                </div>
+              )}
+            </div>
+
+            {!canManage && !classified.is_external && (
+              <div className="flex gap-2.5 flex-wrap">
+                <button onClick={() => { setInquiryType('question'); setShowInquiryForm(true); }} className="a-btn a-btn-p flex-1 justify-center" style={{ height: 46 }}>
+                  <MessageCircle size={17} />Ask a question
+                </button>
+                <button onClick={() => { setInquiryType('offer'); setShowInquiryForm(true); }} className="a-btn" style={{ height: 46 }}>
+                  <DollarSign size={17} />Make offer
+                </button>
+                <button onClick={() => setShowShareModal(true)} className="a-btn" style={{ height: 46 }}>
+                  <Share2 size={17} />Share
+                </button>
+              </div>
+            )}
+
+            {!canManage && classified.is_external && (
+              <div className="flex gap-2.5 flex-wrap">
+                {classified.external_contact_email && (
+                  <a href={`mailto:${classified.external_contact_email}?subject=Enquiry: ${encodeURIComponent(classified.title)}`} className="a-btn a-btn-p flex-1 justify-center" style={{ height: 46 }}>
+                    <Mail size={17} />Contact seller
+                  </a>
+                )}
+                {classified.external_contact_phone && (
+                  <a href={`tel:${classified.external_contact_phone}`} className="a-btn" style={{ height: 46 }}>
+                    <Phone size={17} />Call
+                  </a>
+                )}
+                <button onClick={() => setShowShareModal(true)} className="a-btn" style={{ height: 46 }}>
+                  <Share2 size={17} />Share
+                </button>
+              </div>
+            )}
+
+            {canManage && (
+              <>
+                {inquiries.length > 0 && (
+                  <div className="a-grp">
+                    <button onClick={() => setShowEnquiries(!showEnquiries)} className="a-ir w-full text-left">
+                      <MessageCircle size={17} className="a-txt-b" />
+                      <span className="a-ink flex-1 text-[14px] font-semibold">Enquiries</span>
+                      <span className="a-cnt">{inquiries.length}</span>
+                      <ChevronDown size={16} className={`a-dim transition-transform ${showEnquiries ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showEnquiries && inquiries.map((inquiry) => (
+                      <div key={inquiry.id} className="a-ir" style={{ alignItems: 'flex-start' }}>
+                        <AAvatar url={inquiry.sender?.avatar_url} first={inquiry.sender?.first_name} last={inquiry.sender?.last_name} size={34} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="a-ink flex-1 text-[14px] font-semibold truncate">{inquiry.sender?.first_name} {inquiry.sender?.last_name}</span>
+                            <span className="a-lb-fmt capitalize" style={{ height: 22, fontSize: 11 }}>{inquiry.inquiry_type}</span>
+                          </div>
+                          {inquiry.offer_amount && <div className="a-txt-g text-[15px] font-semibold mt-1">Offer {formatPrice(inquiry.offer_amount)}</div>}
+                          <p className="a-mute text-[13.5px] mt-1 break-words">{inquiry.message}</p>
+                          <div className="a-dim text-[11.5px] mt-1">{formatDate(inquiry.created_at)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-auto pt-3.5 border-t a-bd flex items-center gap-2 flex-wrap">
+                  <span className="a-cap flex-1">Your listing</span>
+                  <button onClick={() => setShowShareModal(true)} className="a-btn" style={{ height: 36, fontSize: 13 }}><Share2 size={15} />Share</button>
+                  <button onClick={handleMarkAsSold} className="a-btn a-btn-g" style={{ height: 36, fontSize: 13 }}><Check size={15} />Mark sold</button>
+                  <button onClick={() => setShowEditModal(true)} className="a-btn" style={{ height: 36, fontSize: 13 }}><Edit size={15} />Edit</button>
+                  <button onClick={handleDelete} className="a-ib a-ib-d a-ib-box" aria-label="Delete listing" title="Delete listing"><Trash2 size={17} /></button>
+                </div>
+              </>
+            )}
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Inquiry Form Modal */}
       {showInquiryForm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-slate-800 rounded-2xl max-w-md w-full p-6 border border-slate-700">
+          <div className="a-sheet max-w-md w-full" style={{ padding: 24 }}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-white">
+              <h3 className="a-display a-ink text-[20px] font-semibold m-0">
                 {inquiryType === 'offer' ? 'Make an Offer' : 'Ask a Question'}
               </h3>
               <button
                 onClick={() => setShowInquiryForm(false)}
-                className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
+                className="a-ib"
+                aria-label="Close"
               >
                 <X size={20} />
               </button>
@@ -687,7 +368,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
             <form onSubmit={handleSendInquiry} className="space-y-4">
               {inquiryType === 'offer' && (
                 <div>
-                  <label className="block text-sm font-medium text-blue-200 mb-2">
+                  <label className="a-flab">
                     Offer Amount
                   </label>
                   <input
@@ -696,13 +377,13 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                     onChange={(e) => setOfferAmount(e.target.value)}
                     placeholder="0.00"
                     required
-                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="a-inp w-full"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-blue-200 mb-2">
+                <label className="a-flab">
                   Message
                 </label>
                 <textarea
@@ -711,7 +392,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                   placeholder="Write your message here..."
                   rows={4}
                   required
-                  className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="a-inp a-ta w-full"
                 />
               </div>
 
@@ -719,13 +400,13 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                 <button
                   type="button"
                   onClick={() => setShowInquiryForm(false)}
-                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                  className="a-btn flex-1 justify-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+                  className="a-btn a-btn-p flex-1 justify-center"
                 >
                   Send
                 </button>
@@ -868,22 +549,22 @@ function ClassifiedShareModal({ classified, onClose }: ShareModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-      <div className="bg-slate-800 rounded-2xl max-w-md w-full p-6 border border-slate-700">
+      <div className="a-sheet max-w-md w-full" style={{ padding: 24 }}>
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+          <h3 className="a-display a-ink text-[20px] font-semibold flex items-center gap-2 m-0">
             <Share2 size={24} />
             Share Listing
           </h3>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors"
+            className="a-ib" aria-label="Close"
           >
             <X size={24} />
           </button>
         </div>
 
         {/* Listing Preview */}
-        <div className="bg-slate-700/50 rounded-lg p-4 mb-6">
+        <div className="a-grp mb-5" style={{ padding: 12 }}>
           <div className="flex gap-3">
             {classified.images && classified.images.length > 0 && (
               <img
@@ -893,8 +574,8 @@ function ClassifiedShareModal({ classified, onClose }: ShareModalProps) {
               />
             )}
             <div className="flex-1 min-w-0">
-              <h4 className="text-white font-semibold truncate">{classified.title}</h4>
-              <p className="text-green-400 font-bold">
+              <h4 className="a-ink font-semibold truncate">{classified.title}</h4>
+              <p className="a-txt-b font-semibold">
                 ${classified.price.toLocaleString()}
               </p>
             </div>
@@ -902,25 +583,17 @@ function ClassifiedShareModal({ classified, onClose }: ShareModalProps) {
         </div>
 
         {/* Share Method Tabs */}
-        <div className="flex gap-2 mb-4">
+        <div className="a-seg mb-4" style={{ display: 'flex' }}>
           <button
             onClick={() => setShareMethod('member')}
-            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-              shareMethod === 'member'
-                ? 'bg-blue-500 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
+            className={`a-seg-i flex-1 justify-center ${shareMethod === 'member' ? 'a-seg-on' : ''}`}
           >
             <Users size={18} />
             Share with Member
           </button>
           <button
             onClick={() => setShareMethod('email')}
-            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-              shareMethod === 'email'
-                ? 'bg-blue-500 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
+            className={`a-seg-i flex-1 justify-center ${shareMethod === 'email' ? 'a-seg-on' : ''}`}
           >
             <Mail size={18} />
             Send by Email
@@ -931,17 +604,17 @@ function ClassifiedShareModal({ classified, onClose }: ShareModalProps) {
         <div className="space-y-4">
           {shareMethod === 'member' && (
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="a-flab">
                 Select Member
               </label>
               {loadingMembers ? (
-                <div className="text-slate-400 text-sm">Loading members...</div>
+                <div className="a-dim text-[13px]">Loading members…</div>
               ) : (
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setShowMemberDropdown(!showMemberDropdown)}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between"
+                    className="a-inp w-full flex items-center justify-between text-left"
                   >
                     {selectedMemberId ? (
                       <div className="flex items-center gap-3">
@@ -956,13 +629,13 @@ function ClassifiedShareModal({ classified, onClose }: ShareModalProps) {
                         </span>
                       </div>
                     ) : (
-                      <span className="text-slate-400">Select a member...</span>
+                      <span className="a-dim">Select a member…</span>
                     )}
                     <ChevronDown size={20} />
                   </button>
 
                   {showMemberDropdown && (
-                    <div className="absolute z-10 w-full mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    <div className="a-pop absolute z-10 w-full mt-2 max-h-60 overflow-y-auto">
                       {members.map(member => (
                         <button
                           key={member.id}
@@ -971,7 +644,7 @@ function ClassifiedShareModal({ classified, onClose }: ShareModalProps) {
                             setSelectedMemberId(member.id);
                             setShowMemberDropdown(false);
                           }}
-                          className="w-full px-4 py-3 text-left text-white hover:bg-slate-700 flex items-center gap-3 transition-colors"
+                          className="a-pop-item w-full"
                         >
                           <img
                             src={member.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.first_name + ' ' + member.last_name)}&background=3b82f6&color=fff`}
@@ -990,7 +663,7 @@ function ClassifiedShareModal({ classified, onClose }: ShareModalProps) {
 
           {shareMethod === 'email' && (
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="a-flab">
                 Recipient Email
               </label>
               <input
@@ -998,13 +671,13 @@ function ClassifiedShareModal({ classified, onClose }: ShareModalProps) {
                 value={recipientEmail}
                 onChange={(e) => setRecipientEmail(e.target.value)}
                 placeholder="friend@example.com"
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="a-inp w-full"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="a-flab">
               Personal Message (Optional)
             </label>
             <textarea
@@ -1012,21 +685,21 @@ function ClassifiedShareModal({ classified, onClose }: ShareModalProps) {
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Add a personal note..."
               rows={3}
-              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="a-inp a-ta w-full"
             />
           </div>
 
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+              className="a-btn flex-1 justify-center"
             >
               Cancel
             </button>
             <button
               onClick={handleShare}
               disabled={sending}
-              className="flex-1 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="a-btn a-btn-p flex-1 justify-center disabled:opacity-50"
             >
               {sending ? 'Sending...' : 'Share'}
             </button>
