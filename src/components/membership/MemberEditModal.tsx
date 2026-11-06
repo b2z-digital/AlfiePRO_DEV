@@ -395,13 +395,13 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
       });
       if (error) throw error;
       if (data?.email_sent === false && data?.notification_sent === false) {
-        addNotification('Reminder created but email could not be sent (no email on file)', 'warning');
+        addNotification('warning', 'Reminder created but email could not be sent (no email on file)');
       } else {
-        addNotification('Renewal reminder sent successfully', 'success');
+        addNotification('success', 'Renewal reminder sent successfully');
       }
     } catch (err) {
       console.error('Error sending reminder:', err);
-      addNotification('Failed to send renewal reminder', 'error');
+      addNotification('error', 'Failed to send renewal reminder');
     } finally {
       setSendingReminder(false);
     }
@@ -1056,10 +1056,10 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
           if (!memberData) return;
           const result = await archiveMember(memberData.id, removeAuthAccess, reason);
           if (!result.success) {
-            addNotification(result.error || 'Failed to archive member', 'error');
+            addNotification('error', result.error || 'Failed to archive member');
             return;
           }
-          addNotification(`${memberData.first_name} ${memberData.last_name} archived successfully`, 'success');
+          addNotification('success', `${memberData.first_name} ${memberData.last_name} archived successfully`);
           setShowArchiveModal(false);
           onSuccess?.();
           onClose();

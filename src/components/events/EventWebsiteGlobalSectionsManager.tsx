@@ -69,7 +69,7 @@ export const EventWebsiteGlobalSectionsManager: React.FC<Props> = ({ websiteId, 
         ...prev,
         [sectionType]: prev[sectionType] ? { ...prev[sectionType]!, enabled: newEnabled } : null
       }));
-      addNotification(`${sectionType.charAt(0).toUpperCase() + sectionType.slice(1)} ${newEnabled ? 'enabled' : 'disabled'}`, 'success');
+      addNotification('success', `${sectionType.charAt(0).toUpperCase() + sectionType.slice(1)} ${newEnabled ? 'enabled' : 'disabled'}`);
     }
   };
 
@@ -97,9 +97,9 @@ export const EventWebsiteGlobalSectionsManager: React.FC<Props> = ({ websiteId, 
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2000);
         await loadSections();
-        addNotification('Header & Navigation saved successfully!', 'success');
+        addNotification('success', 'Header & Navigation saved successfully!');
       } else {
-        addNotification('Failed to save. Please try again.', 'error');
+        addNotification('error', 'Failed to save. Please try again.');
       }
     } catch (error) {
       console.error('Error saving header/navigation:', error);
@@ -125,13 +125,13 @@ export const EventWebsiteGlobalSectionsManager: React.FC<Props> = ({ websiteId, 
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2000);
         await loadSections();
-        addNotification('Footer saved successfully!', 'success');
+        addNotification('success', 'Footer saved successfully!');
       } else {
-        addNotification('Failed to save footer. Please try again.', 'error');
+        addNotification('error', 'Failed to save footer. Please try again.');
       }
     } catch (error) {
       console.error('Error saving footer:', error);
-      addNotification(`Failed to save footer: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      addNotification('error', `Failed to save footer: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }

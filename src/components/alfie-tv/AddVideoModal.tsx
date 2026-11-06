@@ -59,13 +59,13 @@ export default function AddVideoModal({ isOpen, onClose, onSuccess, darkMode = f
 
   const handleSave = async () => {
     if (!youtubeUrl.trim() || !title.trim()) {
-      addNotification('Please fill in YouTube URL and title', 'error');
+      addNotification('error', 'Please fill in YouTube URL and title');
       return;
     }
 
     const videoId = extractYouTubeId(youtubeUrl);
     if (!videoId) {
-      addNotification('Invalid YouTube URL', 'error');
+      addNotification('error', 'Invalid YouTube URL');
       return;
     }
 
@@ -83,12 +83,12 @@ export default function AddVideoModal({ isOpen, onClose, onSuccess, darkMode = f
         skill_level: 'beginner'
       });
 
-      addNotification('Video added successfully', 'success');
+      addNotification('success', 'Video added successfully');
       onSuccess();
       handleClose();
     } catch (error: any) {
       console.error('Error adding video:', error);
-      addNotification(error.message || 'Failed to add video', 'error');
+      addNotification('error', error.message || 'Failed to add video');
     } finally {
       setSaving(false);
     }

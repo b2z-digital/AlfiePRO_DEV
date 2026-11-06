@@ -110,17 +110,17 @@ export default function AiInstructionsTab({ darkMode }: AiInstructionsTabProps) 
       if (editingInstruction) {
         const updated = await updateAiInstruction(editingInstruction.id, formData, user.id);
         setInstructions(prev => prev.map(i => i.id === updated.id ? updated : i));
-        addNotification({ type: 'success', title: 'Instruction Updated', message: 'AI instruction has been updated.' });
+        addNotification('success', 'AI instruction has been updated.');
       } else {
         const created = await createAiInstruction(formData, user.id);
         setInstructions(prev => [created, ...prev]);
-        addNotification({ type: 'success', title: 'Instruction Created', message: 'New AI instruction has been added.' });
+        addNotification('success', 'New AI instruction has been added.');
       }
       setShowFormModal(false);
       setEditingInstruction(null);
       setFormData(emptyForm);
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Save Failed', message: err.message });
+      addNotification('error', err.message);
     } finally {
       setSaving(false);
     }
@@ -131,7 +131,7 @@ export default function AiInstructionsTab({ darkMode }: AiInstructionsTabProps) 
       const updated = await updateAiInstruction(instruction.id, { is_active: !instruction.is_active }, user?.id);
       setInstructions(prev => prev.map(i => i.id === updated.id ? updated : i));
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Update Failed', message: err.message });
+      addNotification('error', err.message);
     }
   };
 
@@ -140,9 +140,9 @@ export default function AiInstructionsTab({ darkMode }: AiInstructionsTabProps) 
     try {
       await deleteAiInstruction(instructionToDelete);
       setInstructions(prev => prev.filter(i => i.id !== instructionToDelete));
-      addNotification({ type: 'success', title: 'Instruction Deleted', message: 'AI instruction has been removed.' });
+      addNotification('success', 'AI instruction has been removed.');
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Delete Failed', message: err.message });
+      addNotification('error', err.message);
     } finally {
       setDeleteConfirmOpen(false);
       setInstructionToDelete(null);

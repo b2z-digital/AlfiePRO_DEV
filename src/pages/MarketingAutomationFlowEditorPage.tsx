@@ -131,10 +131,10 @@ export default function MarketingAutomationFlowEditorPage({ darkMode = true }: F
 
       setSteps([...steps, newStep]);
       setShowAddStepModal(false);
-      addNotification('Step added successfully', 'success');
+      addNotification('success', 'Step added successfully');
     } catch (error) {
       console.error('Error adding step:', error);
-      addNotification('Failed to add step', 'error');
+      addNotification('error', 'Failed to add step');
     }
   }
 
@@ -574,10 +574,10 @@ export default function MarketingAutomationFlowEditorPage({ darkMode = true }: F
       }
       setShowDeleteStepModal(false);
       setStepToDelete(null);
-      addNotification('Step deleted successfully', 'success');
+      addNotification('success', 'Step deleted successfully');
     } catch (error) {
       console.error('Error deleting step:', error);
-      addNotification('Failed to delete step', 'error');
+      addNotification('error', 'Failed to delete step');
     }
   }
 
@@ -590,7 +590,7 @@ export default function MarketingAutomationFlowEditorPage({ darkMode = true }: F
       }
     } catch (error) {
       console.error('Error updating step:', error);
-      addNotification('Failed to update step', 'error');
+      addNotification('error', 'Failed to update step');
     }
   }
 
@@ -602,7 +602,7 @@ export default function MarketingAutomationFlowEditorPage({ darkMode = true }: F
       setFlow(updatedFlow);
     } catch (error) {
       console.error('Error updating flow:', error);
-      addNotification('Failed to update flow', 'error');
+      addNotification('error', 'Failed to update flow');
     }
   }
 
@@ -630,7 +630,7 @@ export default function MarketingAutomationFlowEditorPage({ darkMode = true }: F
     });
 
     setShowTemplateSelector(false);
-    addNotification('Template applied successfully', 'success');
+    addNotification('success', 'Template applied successfully');
   }
 
   function handleDeleteEmailContent() {
@@ -646,7 +646,7 @@ export default function MarketingAutomationFlowEditorPage({ darkMode = true }: F
     });
 
     setShowDeleteEmailModal(false);
-    addNotification('Email content deleted', 'success');
+    addNotification('success', 'Email content deleted');
   }
 
   function handlePreviewEmail() {
@@ -798,10 +798,10 @@ export default function MarketingAutomationFlowEditorPage({ darkMode = true }: F
 
     try {
       await updateMarketingAutomationFlow(flow.id, { updated_at: new Date().toISOString() });
-      addNotification('Flow saved successfully', 'success');
+      addNotification('success', 'Flow saved successfully');
     } catch (error) {
       console.error('Error saving flow:', error);
-      addNotification('Failed to save flow', 'error');
+      addNotification('error', 'Failed to save flow');
     }
   }
 
@@ -815,10 +815,10 @@ export default function MarketingAutomationFlowEditorPage({ darkMode = true }: F
       };
       const updatedFlow = await updateMarketingAutomationFlow(flow.id, updates);
       setFlow(updatedFlow);
-      addNotification('Flow published and activated successfully', 'success');
+      addNotification('success', 'Flow published and activated successfully');
     } catch (error) {
       console.error('Error publishing flow:', error);
-      addNotification('Failed to publish flow', 'error');
+      addNotification('error', 'Failed to publish flow');
     }
   }
 
@@ -828,10 +828,10 @@ export default function MarketingAutomationFlowEditorPage({ darkMode = true }: F
     try {
       const updatedFlow = await updateMarketingAutomationFlow(flow.id, { status: 'paused' });
       setFlow(updatedFlow);
-      addNotification('Flow unpublished successfully', 'success');
+      addNotification('success', 'Flow unpublished successfully');
     } catch (error) {
       console.error('Error unpublishing flow:', error);
-      addNotification('Failed to unpublish flow', 'error');
+      addNotification('error', 'Failed to unpublish flow');
     }
   }
 
@@ -2290,7 +2290,7 @@ export default function MarketingAutomationFlowEditorPage({ darkMode = true }: F
               <button
                 onClick={() => {
                   setShowTriggerSettings(false);
-                  addNotification('Trigger settings saved', 'success');
+                  addNotification('success', 'Trigger settings saved');
                 }}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >

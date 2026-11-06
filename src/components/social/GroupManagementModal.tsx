@@ -97,19 +97,19 @@ export default function GroupManagementModal({ isOpen, onClose, clubId, darkMode
     if (!groupToDelete) return;
     try {
       await socialStorage.deleteGroup(groupToDelete.id);
-      addNotification('Group deleted', 'success');
+      addNotification('success', 'Group deleted');
       setShowDeleteConfirm(false);
       setGroupToDelete(null);
       loadGroups();
       onGroupsChanged?.();
     } catch (error) {
-      addNotification('Failed to delete group', 'error');
+      addNotification('error', 'Failed to delete group');
     }
   };
 
   const handleSave = async () => {
     if (!formName.trim()) {
-      addNotification('Group name is required', 'error');
+      addNotification('error', 'Group name is required');
       return;
     }
 
@@ -123,7 +123,7 @@ export default function GroupManagementModal({ isOpen, onClose, clubId, darkMode
           require_approval: formRequireApproval,
           allow_member_posts: formAllowMemberPosts,
         });
-        addNotification('Group updated', 'success');
+        addNotification('success', 'Group updated');
       } else {
         await socialStorage.createGroup({
           name: formName.trim(),
@@ -135,14 +135,14 @@ export default function GroupManagementModal({ isOpen, onClose, clubId, darkMode
           allow_member_posts: formAllowMemberPosts,
           moderate_posts: false,
         });
-        addNotification('Group created', 'success');
+        addNotification('success', 'Group created');
       }
       resetForm();
       setView('list');
       loadGroups();
       onGroupsChanged?.();
     } catch (error: any) {
-      addNotification(error?.message || 'Failed to save group', 'error');
+      addNotification('error', error?.message || 'Failed to save group');
     } finally {
       setSaving(false);
     }
@@ -202,10 +202,10 @@ export default function GroupManagementModal({ isOpen, onClose, clubId, darkMode
   const handleReviewReport = async (reportId: string, action: 'dismissed' | 'actioned', actionTaken?: string) => {
     try {
       await socialStorage.reviewReport(reportId, action, actionTaken);
-      addNotification(`Report ${action}`, 'success');
+      addNotification('success', `Report ${action}`);
       loadReports();
     } catch (error) {
-      addNotification('Failed to update report', 'error');
+      addNotification('error', 'Failed to update report');
     }
   };
 
@@ -213,10 +213,10 @@ export default function GroupManagementModal({ isOpen, onClose, clubId, darkMode
     try {
       await socialStorage.deletePostAsAdmin(postId);
       await socialStorage.reviewReport(reportId, 'actioned', 'Post deleted by admin');
-      addNotification('Post deleted and report resolved', 'success');
+      addNotification('success', 'Post deleted and report resolved');
       loadReports();
     } catch (error) {
-      addNotification('Failed to delete post', 'error');
+      addNotification('error', 'Failed to delete post');
     }
   };
 
@@ -225,16 +225,16 @@ export default function GroupManagementModal({ isOpen, onClose, clubId, darkMode
     try {
       const member = clubMembers.find(m => m.id === selectedMemberId);
       if (!member?.user_id) {
-        addNotification('This member does not have a linked user account', 'error');
+        addNotification('error', 'This member does not have a linked user account');
         return;
       }
       await socialStorage.addGroupModerator(selectedGroupForMod.id, member.user_id);
-      addNotification('Moderator added', 'success');
+      addNotification('success', 'Moderator added');
       setShowAddModerator(false);
       setSelectedMemberId('');
       loadModerators(selectedGroupForMod.id);
     } catch (error: any) {
-      addNotification(error?.message || 'Failed to add moderator', 'error');
+      addNotification('error', error?.message || 'Failed to add moderator');
     }
   };
 
@@ -242,10 +242,10 @@ export default function GroupManagementModal({ isOpen, onClose, clubId, darkMode
     if (!selectedGroupForMod) return;
     try {
       await socialStorage.removeGroupModerator(selectedGroupForMod.id, userId);
-      addNotification('Moderator removed', 'success');
+      addNotification('success', 'Moderator removed');
       loadModerators(selectedGroupForMod.id);
     } catch (error) {
-      addNotification('Failed to remove moderator', 'error');
+      addNotification('error', 'Failed to remove moderator');
     }
   };
 
@@ -254,28 +254,28 @@ export default function GroupManagementModal({ isOpen, onClose, clubId, darkMode
     try {
       const member = clubMembers.find(m => m.id === selectedMemberId);
       if (!member?.user_id) {
-        addNotification('This member does not have a linked user account', 'error');
+        addNotification('error', 'This member does not have a linked user account');
         return;
       }
       await socialStorage.blockUser(member.user_id, blockType, blockReason, undefined, clubId);
-      addNotification(`User ${blockType === 'muted' ? 'muted' : 'banned'}`, 'success');
+      addNotification('success', `User ${blockType === 'muted' ? 'muted' : 'banned'}`);
       setShowBlockUser(false);
       setSelectedMemberId('');
       setBlockReason('');
       setBlockType('muted');
       loadBlockedUsers();
     } catch (error: any) {
-      addNotification(error?.message || 'Failed to block user', 'error');
+      addNotification('error', error?.message || 'Failed to block user');
     }
   };
 
   const handleUnblockUser = async (blockId: string) => {
     try {
       await socialStorage.unblockUser(blockId);
-      addNotification('User unblocked', 'success');
+      addNotification('success', 'User unblocked');
       loadBlockedUsers();
     } catch (error) {
-      addNotification('Failed to unblock user', 'error');
+      addNotification('error', 'Failed to unblock user');
     }
   };
 

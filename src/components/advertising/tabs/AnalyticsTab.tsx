@@ -61,7 +61,7 @@ export const AnalyticsTab: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading campaigns:', error);
-      addNotification('Failed to load campaigns', 'error');
+      addNotification('error', 'Failed to load campaigns');
     }
   };
 
@@ -76,7 +76,7 @@ export const AnalyticsTab: React.FC = () => {
       setAnalytics(data);
     } catch (error) {
       console.error('Error loading analytics:', error);
-      addNotification('Failed to load analytics', 'error');
+      addNotification('error', 'Failed to load analytics');
     } finally {
       setLoading(false);
     }
@@ -113,7 +113,7 @@ export const AnalyticsTab: React.FC = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    addNotification('Report exported successfully', 'success');
+    addNotification('success', 'Report exported successfully');
   };
 
   if (campaigns.length === 0) {

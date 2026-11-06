@@ -254,8 +254,8 @@ export default function MarketingCampaignEditorPage({ darkMode = true }: Marketi
   const [testSent, setTestSent] = useState(false);
 
   const showNotification = (message: string, type: 'success' | 'error') => {
-    if (notification?.showNotification) {
-      notification.showNotification(message, type);
+    if (notification?.addNotification) {
+      notification.addNotification(type, message);
     } else {
       console.log(`[${type.toUpperCase()}] ${message}`);
       if (type === 'success') {

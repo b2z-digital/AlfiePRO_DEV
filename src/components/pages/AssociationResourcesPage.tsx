@@ -109,10 +109,10 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     if (draggedResource && draggedResource.category_id !== targetCatId) {
       try {
         await ResourceStorage.updateResource(draggedResource.id, { category_id: targetCatId });
-        addNotification(`"${draggedResource.title}" moved`, 'success');
+        addNotification('success', `"${draggedResource.title}" moved`);
         loadAll();
       } catch {
-        addNotification('Failed to move resource', 'error');
+        addNotification('error', 'Failed to move resource');
       }
     }
     setDraggedResource(null);
@@ -135,10 +135,10 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         targetFolderId,
         currentParentId: currentDriveFolderId,
       });
-      addNotification(`"${draggedDriveItem.name}" moved`, 'success');
+      addNotification('success', `"${draggedDriveItem.name}" moved`);
       if (currentDriveFolderId) browseDriveFolder(currentDriveFolderId);
     } catch (err: any) {
-      addNotification(err.message || 'Failed to move file', 'error');
+      addNotification('error', err.message || 'Failed to move file');
     }
     setDraggedDriveItem(null);
     setDropTargetDriveFolderId(null);
@@ -402,7 +402,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         setDropboxBreadcrumbs(prev => [...prev, { id: folderPath, name: folderName }]);
       }
     } catch (err: any) {
-      addNotification(err.message || 'Failed to load Dropbox folder', 'error');
+      addNotification('error', err.message || 'Failed to load Dropbox folder');
     } finally {
       setLoadingDropbox(false);
     }
@@ -449,7 +449,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         });
         if (data.link) window.open(data.link, '_blank');
       } catch (err: any) {
-        addNotification(err.message || 'Failed to open file', 'error');
+        addNotification('error', err.message || 'Failed to open file');
       }
     }
   };
@@ -464,7 +464,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       });
       if (data.link) window.open(data.link, '_blank');
     } catch (err: any) {
-      addNotification(err.message || 'Failed to download file', 'error');
+      addNotification('error', err.message || 'Failed to download file');
     }
   };
 
@@ -480,10 +480,10 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
             filePath: item.id,
             folderPath: item.isFolder ? item.id : undefined,
           });
-          addNotification(`"${item.name}" deleted`, 'success');
+          addNotification('success', `"${item.name}" deleted`);
           if (currentDropboxPath) browseDropboxFolder(currentDropboxPath);
         } catch (err: any) {
-          addNotification(err.message || 'Failed to delete file', 'error');
+          addNotification('error', err.message || 'Failed to delete file');
         }
       }
     );
@@ -498,10 +498,10 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         filePath: item.id,
         newName: newName.trim(),
       });
-      addNotification(`Renamed to "${newName.trim()}"`, 'success');
+      addNotification('success', `Renamed to "${newName.trim()}"`);
       if (currentDropboxPath) browseDropboxFolder(currentDropboxPath);
     } catch (err: any) {
-      addNotification(err.message || 'Failed to rename', 'error');
+      addNotification('error', err.message || 'Failed to rename');
     }
   };
 
@@ -514,10 +514,10 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         filePath: item.id,
         targetFolderPath,
       });
-      addNotification(`"${item.name}" moved`, 'success');
+      addNotification('success', `"${item.name}" moved`);
       if (currentDropboxPath) browseDropboxFolder(currentDropboxPath);
     } catch (err: any) {
-      addNotification(err.message || 'Failed to move file', 'error');
+      addNotification('error', err.message || 'Failed to move file');
     }
   };
 
@@ -531,10 +531,10 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         folderName: folderName.trim(),
         parentPath: currentDropboxPath,
       });
-      addNotification(`Folder "${folderName.trim()}" created in Dropbox`, 'success');
+      addNotification('success', `Folder "${folderName.trim()}" created in Dropbox`);
       browseDropboxFolder(currentDropboxPath);
     } catch (err: any) {
-      addNotification(err.message || 'Failed to create folder', 'error');
+      addNotification('error', err.message || 'Failed to create folder');
     }
   };
 
@@ -559,12 +559,12 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         });
         uploaded++;
       } catch (err: any) {
-        addNotification(`Failed to upload ${file.name}: ${err.message}`, 'error');
+        addNotification('error', `Failed to upload ${file.name}: ${err.message}`);
       }
     }
     setUploading(false);
     if (uploaded > 0) {
-      addNotification(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''} to Dropbox`, 'success');
+      addNotification('success', `Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''} to Dropbox`);
       browseDropboxFolder(folderPath);
     }
   };
@@ -601,7 +601,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         setDriveBreadcrumbs(prev => [...prev, { id: folderId, name: folderName }]);
       }
     } catch (err: any) {
-      addNotification(err.message || 'Failed to load Drive folder', 'error');
+      addNotification('error', err.message || 'Failed to load Drive folder');
     } finally {
       setLoadingDrive(false);
     }
@@ -660,10 +660,10 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
             organizationType: driveOrgType || organizationType,
             fileId: item.id,
           });
-          addNotification(`"${item.name}" deleted`, 'success');
+          addNotification('success', `"${item.name}" deleted`);
           if (currentDriveFolderId) browseDriveFolder(currentDriveFolderId);
         } catch (err: any) {
-          addNotification(err.message || 'Failed to delete file', 'error');
+          addNotification('error', err.message || 'Failed to delete file');
         }
       }
     );
@@ -680,12 +680,12 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         fileId: driveRenameItem.id,
         newName: driveRenameName.trim(),
       });
-      addNotification(`Renamed to "${driveRenameName.trim()}"`, 'success');
+      addNotification('success', `Renamed to "${driveRenameName.trim()}"`);
       setDriveRenameItem(null);
       setDriveRenameName('');
       if (currentDriveFolderId) browseDriveFolder(currentDriveFolderId);
     } catch (err: any) {
-      addNotification(err.message || 'Failed to rename', 'error');
+      addNotification('error', err.message || 'Failed to rename');
     } finally {
       setDriveRenaming(false);
     }
@@ -707,12 +707,12 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         folderName: driveNewFolderName.trim(),
         parentFolderId: currentDriveFolderId,
       });
-      addNotification(`Folder "${driveNewFolderName.trim()}" created in Google Drive`, 'success');
+      addNotification('success', `Folder "${driveNewFolderName.trim()}" created in Google Drive`);
       setShowDriveNewFolderModal(false);
       setDriveNewFolderName('');
       browseDriveFolder(currentDriveFolderId);
     } catch (err: any) {
-      addNotification(err.message || 'Failed to create folder', 'error');
+      addNotification('error', err.message || 'Failed to create folder');
     } finally {
       setDriveNewFolderCreating(false);
     }
@@ -746,7 +746,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     } else if (activeSection !== 'drive' && activeSection !== 'dropbox' && activeSection !== 'all' && activeSection !== 'shared') {
       await uploadFilesToCategory(files, activeSection);
     } else {
-      addNotification('Select a folder to upload files into', 'info');
+      addNotification('info', 'Select a folder to upload files into');
     }
   }, [activeSection, hasGoogleDrive, currentDriveFolderId]);
 
@@ -772,12 +772,12 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         });
         uploaded++;
       } catch (err: any) {
-        addNotification(`Failed to upload ${file.name}: ${err.message}`, 'error');
+        addNotification('error', `Failed to upload ${file.name}: ${err.message}`);
       }
     }
     setUploading(false);
     if (uploaded > 0) {
-      addNotification(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''} to Google Drive`, 'success');
+      addNotification('success', `Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''} to Google Drive`);
       browseDriveFolder(folderId);
     }
   };
@@ -805,12 +805,12 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         });
         uploaded++;
       } catch {
-        addNotification(`Failed to upload ${file.name}`, 'error');
+        addNotification('error', `Failed to upload ${file.name}`);
       }
     }
     setUploading(false);
     if (uploaded > 0) {
-      addNotification(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''}`, 'success');
+      addNotification('success', `Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''}`);
       await loadAll();
     }
   };
@@ -824,7 +824,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
           name: categoryName,
           description: categoryDescription,
         });
-        addNotification('Folder updated', 'success');
+        addNotification('success', 'Folder updated');
       } else {
         const newCat = await ResourceStorage.createResourceCategory({
           organization_id: organizationId,
@@ -835,13 +835,13 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
           display_order: categories.length,
         });
         setActiveSection(newCat.id);
-        addNotification('Folder created', 'success');
+        addNotification('success', 'Folder created');
       }
       setShowCategoryModal(false);
       resetCategoryForm();
       await loadAll();
     } catch {
-      addNotification('Failed to save folder', 'error');
+      addNotification('error', 'Failed to save folder');
     } finally {
       setCategorySaving(false);
     }
@@ -865,10 +865,10 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
           }
           await ResourceStorage.deleteResourceCategory(catId);
           if (activeSection === catId) setActiveSection('all');
-          addNotification('Folder deleted', 'success');
+          addNotification('success', 'Folder deleted');
           await loadAll();
         } catch {
-          addNotification('Failed to delete folder', 'error');
+          addNotification('error', 'Failed to delete folder');
         }
       }
     );
@@ -905,16 +905,16 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       };
       if (editingResource) {
         await ResourceStorage.updateResource(editingResource.id, payload);
-        addNotification('Resource updated', 'success');
+        addNotification('success', 'Resource updated');
       } else {
         await ResourceStorage.createResource(payload);
-        addNotification('Resource added', 'success');
+        addNotification('success', 'Resource added');
       }
       setShowResourceModal(false);
       resetResourceForm();
       await loadAll();
     } catch {
-      addNotification('Failed to save resource', 'error');
+      addNotification('error', 'Failed to save resource');
     } finally {
       setResourceSaving(false);
     }
@@ -938,10 +938,10 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         try {
           if (resource.file_url) await ResourceStorage.deleteResourceFile(resource.file_url);
           await ResourceStorage.deleteResource(resource.id);
-          addNotification('Resource deleted', 'success');
+          addNotification('success', 'Resource deleted');
           await loadAll();
         } catch {
-          addNotification('Failed to delete resource', 'error');
+          addNotification('error', 'Failed to delete resource');
         }
       }
     );

@@ -58,7 +58,7 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({
       setDependencies(depsMap);
     } catch (error) {
       console.error('Error loading timeline data:', error);
-      addNotification('Failed to load timeline', 'error');
+      addNotification('error', 'Failed to load timeline');
     } finally {
       setLoading(false);
     }

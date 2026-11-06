@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, SquarePen as Edit2, Trash2, Image as ImageIcon, Eye, EyeOff, ChevronLeft, ChevronRight, House as Home, GalleryHorizontal, LayoutGrid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { ASwitch } from '../alfie/Kit';
+import { ASwitch, useAlfieLight } from '../alfie/Kit';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -30,7 +30,8 @@ interface HomepageTile {
 }
 
 export const WebsiteHomepageManager: React.FC = () => {
-  const { currentClub, darkMode } = useAuth();
+  const { currentClub } = useAuth();
+  const darkMode = !useAlfieLight();
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const [slides, setSlides] = useState<HomepageSlide[]>([]);

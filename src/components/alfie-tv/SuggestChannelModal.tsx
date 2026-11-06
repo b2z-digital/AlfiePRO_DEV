@@ -30,7 +30,7 @@ export const SuggestChannelModal: React.FC<SuggestChannelModalProps> = ({
     e.preventDefault();
 
     if (!channelName.trim() || !channelUrl.trim()) {
-      addNotification('Please provide both channel name and URL', 'error');
+      addNotification('error', 'Please provide both channel name and URL');
       return;
     }
 
@@ -60,7 +60,7 @@ export const SuggestChannelModal: React.FC<SuggestChannelModalProps> = ({
         }
       });
 
-      addNotification('Thank you for your suggestion! We\'ll review it shortly.', 'success');
+      addNotification('success', 'Thank you for your suggestion! We\'ll review it shortly.');
 
       // Reset form and close
       setChannelName('');
@@ -74,7 +74,7 @@ export const SuggestChannelModal: React.FC<SuggestChannelModalProps> = ({
       }
     } catch (error) {
       console.error('Error submitting suggestion:', error);
-      addNotification('Failed to submit suggestion. Please try again.', 'error');
+      addNotification('error', 'Failed to submit suggestion. Please try again.');
     } finally {
       setSubmitting(false);
     }

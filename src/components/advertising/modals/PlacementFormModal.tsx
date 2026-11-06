@@ -105,7 +105,7 @@ export const PlacementFormModal: React.FC<PlacementFormModalProps> = ({ placemen
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) {
-      addNotification('Please enter a placement name', 'error');
+      addNotification('error', 'Please enter a placement name');
       return;
     }
 
@@ -113,15 +113,15 @@ export const PlacementFormModal: React.FC<PlacementFormModalProps> = ({ placemen
       setLoading(true);
       if (placement) {
         await advertisingStorage.updatePlacement(placement.id, formData);
-        addNotification('Placement updated successfully', 'success');
+        addNotification('success', 'Placement updated successfully');
       } else {
         await advertisingStorage.createPlacement(formData);
-        addNotification('Placement created successfully', 'success');
+        addNotification('success', 'Placement created successfully');
       }
       onClose(true);
     } catch (error) {
       console.error('Error saving placement:', error);
-      addNotification('Failed to save placement', 'error');
+      addNotification('error', 'Failed to save placement');
     } finally {
       setLoading(false);
     }

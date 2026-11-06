@@ -572,7 +572,9 @@ body.light-mode [class*="rounded-2xl"][class*="border"][class*="backdrop-blur"] 
     }
   }
   
-  .hidden {
+  /* Force plain `hidden`, but let responsive variants (`hidden sm:inline`,
+     `hidden md:flex`, ...) take over at their breakpoint as Tailwind intends. */
+  .hidden:not([class*="sm:"]):not([class*="md:"]):not([class*="lg:"]):not([class*="xl:"]) {
     display: none !important;
   }
 }

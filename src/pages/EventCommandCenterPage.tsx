@@ -37,13 +37,13 @@ export const EventCommandCenterPage: React.FC = () => {
 
       if (error) {
         console.error('Error loading event:', error);
-        addNotification('Failed to load event', 'error');
+        addNotification('error', 'Failed to load event');
         navigate(-1);
         return;
       }
 
       if (!data) {
-        addNotification('Event not found', 'error');
+        addNotification('error', 'Event not found');
         navigate(-1);
         return;
       }
@@ -54,7 +54,7 @@ export const EventCommandCenterPage: React.FC = () => {
       });
     } catch (error) {
       console.error('Error loading event:', error);
-      addNotification('Failed to load event', 'error');
+      addNotification('error', 'Failed to load event');
       navigate(-1);
     } finally {
       setLoading(false);

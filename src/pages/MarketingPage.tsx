@@ -81,13 +81,13 @@ export default function MarketingPage({ darkMode = true }: MarketingPageProps) {
       setCampaignName('');
       setCampaignSubject('');
 
-      addNotification('Campaign created successfully', 'success');
+      addNotification('success', 'Campaign created successfully');
 
       // Navigate to campaigns page
       navigate('/marketing/campaigns');
     } catch (error) {
       console.error('Error creating campaign:', error);
-      addNotification('Failed to create campaign. Please try again.', 'error');
+      addNotification('error', 'Failed to create campaign. Please try again.');
     }
   }
 

@@ -63,7 +63,7 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
       setChannels(data);
     } catch (error) {
       console.error('Error loading channels:', error);
-      addNotification('Failed to load channels', 'error');
+      addNotification('error', 'Failed to load channels');
     } finally {
       setLoading(false);
     }
@@ -71,19 +71,19 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
 
   const handleAddChannel = async () => {
     if (!channelUrl.trim() || !channelName.trim()) {
-      addNotification('Please fill in all fields', 'error');
+      addNotification('error', 'Please fill in all fields');
       return;
     }
 
     // If creating global channel, require SuperAdmin or Association Admin
     if (isGlobal && !canCreateGlobalChannels) {
-      addNotification('Only SuperAdmins and Association Admins can create global channels', 'error');
+      addNotification('error', 'Only SuperAdmins and Association Admins can create global channels');
       return;
     }
 
     // If not global, require organization context
     if (!isGlobal && !organizationId) {
-      addNotification('Please select an organization to add a channel', 'error');
+      addNotification('error', 'Please select an organization to add a channel');
       return;
     }
 
@@ -113,10 +113,10 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
       const newChannel = await alfieTVStorage.createChannel(channelData);
 
       addNotification(
+        'success',
         isGlobal
           ? 'Global channel added successfully - visible to all users!'
-          : 'Channel added successfully',
-        'success'
+          : 'Channel added successfully'
       );
       setShowAddModal(false);
       setChannelUrl('');
@@ -127,12 +127,12 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
 
       // Auto-sync videos for the new channel
       if (newChannel?.id) {
-        addNotification('Starting automatic video sync...', 'info');
+        addNotification('info', 'Starting automatic video sync...');
         await handleSyncChannel(newChannel.id);
       }
     } catch (error) {
       console.error('Error adding channel:', error);
-      addNotification('Failed to add channel', 'error');
+      addNotification('error', 'Failed to add channel');
     }
   };
 
@@ -160,7 +160,7 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
 
       await alfieTVStorage.updateChannel(editingChannel.id, updateData);
 
-      addNotification('Channel updated successfully', 'success');
+      addNotification('success', 'Channel updated successfully');
       setEditingChannel(null);
       setChannelUrl('');
       setChannelName('');
@@ -168,7 +168,7 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
       loadChannels();
     } catch (error) {
       console.error('Error updating channel:', error);
-      addNotification('Failed to update channel', 'error');
+      addNotification('error', 'Failed to update channel');
     }
   };
 
@@ -182,13 +182,13 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
 
     try {
       await alfieTVStorage.deleteChannel(channelToDelete);
-      addNotification('Channel deleted successfully', 'success');
+      addNotification('success', 'Channel deleted successfully');
       setDeleteConfirmOpen(false);
       setChannelToDelete(null);
       loadChannels();
     } catch (error) {
       console.error('Error deleting channel:', error);
-      addNotification('Failed to delete channel', 'error');
+      addNotification('error', 'Failed to delete channel');
       setDeleteConfirmOpen(false);
       setChannelToDelete(null);
     }
@@ -211,8 +211,8 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
     try {
       await alfieTVStorage.toggleChannelVisibility(channelId, !currentVisibility);
       addNotification(
-        !currentVisibility ? 'Channel is now visible' : 'Channel is now hidden',
-        'success'
+        'success',
+        !currentVisibility ? 'Channel is now visible' : 'Channel is now hidden'
       );
     } catch (error) {
       // Revert on error
@@ -220,7 +220,7 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
         ch.id === channelId ? { ...ch, is_visible: currentVisibility } : ch
       ));
       console.error('Error toggling visibility:', error);
-      addNotification('Failed to update channel visibility', 'error');
+      addNotification('error', 'Failed to update channel visibility');
     }
   };
 
@@ -248,14 +248,14 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
       }
 
       addNotification(
-        `Successfully imported ${data.videosImported} videos from ${data.channelName}`,
-        'success'
+        'success',
+        `Successfully imported ${data.videosImported} videos from ${data.channelName}`
       );
       await loadChannels();
     } catch (error) {
       console.error('Error syncing channel:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to sync channel';
-      addNotification(errorMessage, 'error');
+      addNotification('error', errorMessage);
 
       // Show detailed error in console for debugging
       if (error instanceof Error && error.message.includes('YouTube API key')) {
@@ -297,14 +297,14 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
     try {
       await alfieTVStorage.togglePlaylistFeatured(playlistId, !currentFeatured);
       addNotification(
-        !currentFeatured ? 'Playlist marked as featured' : 'Playlist unfeatured',
-        'success'
+        'success',
+        !currentFeatured ? 'Playlist marked as featured' : 'Playlist unfeatured'
       );
     } catch (error) {
       setPlaylists(prev => prev.map(p =>
         p.id === playlistId ? { ...p, is_featured: currentFeatured } : p
       ));
-      addNotification('Failed to update playlist', 'error');
+      addNotification('error', 'Failed to update playlist');
     }
   };
 
@@ -315,14 +315,14 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
     try {
       await alfieTVStorage.togglePlaylistVisibility(playlistId, !currentVisibility);
       addNotification(
-        !currentVisibility ? 'Playlist is now visible' : 'Playlist is now hidden',
-        'success'
+        'success',
+        !currentVisibility ? 'Playlist is now visible' : 'Playlist is now hidden'
       );
     } catch (error) {
       setPlaylists(prev => prev.map(p =>
         p.id === playlistId ? { ...p, is_visible: currentVisibility } : p
       ));
-      addNotification('Failed to update playlist visibility', 'error');
+      addNotification('error', 'Failed to update playlist visibility');
     }
   };
 
@@ -332,9 +332,9 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
     ));
     try {
       await alfieTVStorage.updateYouTubePlaylist(playlistId, { playlist_category: category as any });
-      addNotification('Playlist category updated', 'success');
+      addNotification('success', 'Playlist category updated');
     } catch (error) {
-      addNotification('Failed to update category', 'error');
+      addNotification('error', 'Failed to update category');
       await loadPlaylists();
     }
   };
@@ -731,7 +731,7 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
           isOpen={showAddVideoModal}
           onClose={() => setShowAddVideoModal(false)}
           onSuccess={() => {
-            addNotification('Video added successfully', 'success');
+            addNotification('success', 'Video added successfully');
             loadChannels();
           }}
           darkMode={darkMode}

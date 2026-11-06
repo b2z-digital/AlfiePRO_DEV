@@ -109,17 +109,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           paymentDirection
         );
 
-        addNotification({
-          type: 'success',
-          message: `Payment recorded and ${reconciledCount} remittances marked as paid`,
-          duration: 5000
-        });
+        addNotification('success', `Payment recorded and ${reconciledCount} remittances marked as paid`);
       } else {
-        addNotification({
-          type: 'success',
-          message: 'Payment recorded successfully',
-          duration: 3000
-        });
+        addNotification('success', 'Payment recorded successfully');
       }
 
       if (onPaymentRecorded) {
@@ -129,11 +121,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       onClose();
     } catch (error) {
       console.error('Error recording payment:', error);
-      addNotification({
-        type: 'error',
-        message: 'Failed to record payment. Please try again.',
-        duration: 5000
-      });
+      addNotification('error', 'Failed to record payment. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -610,7 +610,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
       const validation = validatePersonalTab();
       if (!validation.isValid) {
         setFieldErrors(validation.errors);
-        addNotification('Please complete all required fields', 'error');
+        addNotification('error', 'Please complete all required fields');
         return;
       }
       setFieldErrors({});
@@ -619,7 +619,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
       const validation = validateBoatTab();
       if (!validation.isValid) {
         setFieldErrors(validation.errors);
-        addNotification('Please complete all required fields', 'error');
+        addNotification('error', 'Please complete all required fields');
         return;
       }
       setFieldErrors({});
@@ -760,12 +760,12 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
         return;
       }
 
-      addNotification('Registration successful!', 'success');
+      addNotification('success', 'Registration successful!');
       onSuccess();
       onClose();
     } catch (err: any) {
       console.error('Registration error:', err);
-      addNotification(err.message || 'Failed to register for event', 'error');
+      addNotification('error', err.message || 'Failed to register for event');
     } finally {
       setLoading(false);
     }

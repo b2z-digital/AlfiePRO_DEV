@@ -40,7 +40,7 @@ export const EventTemplateModal: React.FC<EventTemplateModalProps> = ({
       setTemplates(templatesData);
     } catch (error) {
       console.error('Error loading templates:', error);
-      addNotification('Failed to load templates', 'error');
+      addNotification('error', 'Failed to load templates');
     } finally {
       setLoading(false);
     }
@@ -52,12 +52,12 @@ export const EventTemplateModal: React.FC<EventTemplateModalProps> = ({
     try {
       setApplying(true);
       await EventCommandCenterStorage.applyTemplate(selectedTemplate.id, eventId, eventDate);
-      addNotification('Template applied successfully!', 'success');
+      addNotification('success', 'Template applied successfully!');
       onTemplateApplied();
       onClose();
     } catch (error) {
       console.error('Error applying template:', error);
-      addNotification('Failed to apply template', 'error');
+      addNotification('error', 'Failed to apply template');
     } finally {
       setApplying(false);
     }

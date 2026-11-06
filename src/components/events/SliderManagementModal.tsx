@@ -363,10 +363,10 @@ export const SliderManagementModal: React.FC<Props> = ({ isOpen, onClose, websit
         if (error) throw error;
       }
 
-      addNotification('Slide order saved successfully!', 'success');
+      addNotification('success', 'Slide order saved successfully!');
     } catch (error) {
       console.error('Error saving order:', error);
-      addNotification('Failed to save slide order', 'error');
+      addNotification('error', 'Failed to save slide order');
     } finally {
       setIsSaving(false);
     }
@@ -536,10 +536,10 @@ export const SliderManagementModal: React.FC<Props> = ({ isOpen, onClose, websit
       setEditingSlide(null);
       setSlideButtons([]);
       loadSlides();
-      addNotification('Slide saved successfully!', 'success');
+      addNotification('success', 'Slide saved successfully!');
     } catch (error) {
       console.error('Error saving slide:', error);
-      addNotification('Failed to save slide', 'error');
+      addNotification('error', 'Failed to save slide');
     } finally {
       setIsSaving(false);
     }
@@ -739,10 +739,10 @@ export const SliderManagementModal: React.FC<Props> = ({ isOpen, onClose, websit
                                 .from('media')
                                 .getPublicUrl(`event-media/${fileName}`);
                               setFormData({ ...formData, logo_url: publicUrl });
-                              addNotification('Logo uploaded successfully!', 'success');
+                              addNotification('success', 'Logo uploaded successfully!');
                             } catch (error) {
                               console.error('Error uploading logo:', error);
-                              addNotification('Failed to upload logo', 'error');
+                              addNotification('error', 'Failed to upload logo');
                             } finally {
                               setIsUploading(false);
                             }

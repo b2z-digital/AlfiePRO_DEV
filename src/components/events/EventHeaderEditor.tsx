@@ -121,10 +121,10 @@ export const EventHeaderEditor: React.FC<Props> = ({ websiteId, config, onSave, 
         .getPublicUrl(filePath);
 
       handleChange('logo_url', publicUrl);
-      addNotification('Logo uploaded successfully!', 'success');
+      addNotification('success', 'Logo uploaded successfully!');
     } catch (error) {
       console.error('Error uploading logo:', error);
-      addNotification(`Failed to upload logo: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      addNotification('error', `Failed to upload logo: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
     }

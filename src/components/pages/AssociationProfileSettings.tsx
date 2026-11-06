@@ -172,7 +172,7 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
 
       if (updateError) throw updateError;
 
-      addNotification(`${associationType} Association profile updated successfully!`, 'success');
+      addNotification('success', `${associationType} Association profile updated successfully!`);
       setLogoFile(null);
       setCoverImageFile(null);
     } catch (err: any) {

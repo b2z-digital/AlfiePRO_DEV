@@ -52,8 +52,8 @@ export function EventLivestreamModal({
 
   const handleWizardComplete = (newSession: LivestreamSession) => {
     addNotification(
-      'Live stream configured! Opening the Broadcast Studio.',
-      'success'
+      'success',
+      'Live stream configured! Opening the Broadcast Studio.'
     );
     onClose();
     navigate(`/livestream?sessionId=${newSession.id}`);

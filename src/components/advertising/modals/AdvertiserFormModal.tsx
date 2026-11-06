@@ -50,12 +50,12 @@ export const AdvertiserFormModal: React.FC<AdvertiserFormModalProps> = ({
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      addNotification('Please upload an image file', 'error');
+      addNotification('error', 'Please upload an image file');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      addNotification('Image size should be less than 5MB', 'error');
+      addNotification('error', 'Image size should be less than 5MB');
       return;
     }
 
@@ -94,7 +94,7 @@ export const AdvertiserFormModal: React.FC<AdvertiserFormModalProps> = ({
       return publicUrl;
     } catch (err) {
       console.error('Error uploading logo:', err);
-      addNotification('Failed to upload logo', 'error');
+      addNotification('error', 'Failed to upload logo');
       return null;
     } finally {
       setIsUploadingLogo(false);
@@ -124,7 +124,7 @@ export const AdvertiserFormModal: React.FC<AdvertiserFormModalProps> = ({
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      addNotification('Please enter an advertiser name', 'error');
+      addNotification('error', 'Please enter an advertiser name');
       return;
     }
 
@@ -151,16 +151,16 @@ export const AdvertiserFormModal: React.FC<AdvertiserFormModalProps> = ({
 
       if (advertiser) {
         await advertisingStorage.updateAdvertiser(advertiser.id, dataToSave);
-        addNotification('Advertiser updated successfully', 'success');
+        addNotification('success', 'Advertiser updated successfully');
       } else {
         await advertisingStorage.createAdvertiser(dataToSave);
-        addNotification('Advertiser created successfully', 'success');
+        addNotification('success', 'Advertiser created successfully');
       }
 
       onClose(true);
     } catch (error) {
       console.error('Error saving advertiser:', error);
-      addNotification('Failed to save advertiser', 'error');
+      addNotification('error', 'Failed to save advertiser');
     } finally {
       setLoading(false);
     }

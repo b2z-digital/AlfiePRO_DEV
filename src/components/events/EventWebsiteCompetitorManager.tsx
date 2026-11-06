@@ -58,7 +58,7 @@ export const EventWebsiteCompetitorManager: React.FC<EventWebsiteCompetitorManag
   eventId
 }) => {
   const { currentClub } = useAuth();
-  const { showNotification } = useNotification();
+  const { addNotification } = useNotification();
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -337,13 +337,13 @@ export const EventWebsiteCompetitorManager: React.FC<EventWebsiteCompetitorManag
       }
 
       // Show success notification
-      showNotification('success', `${competitorToDelete.skipper_name} has been removed from the event`);
+      addNotification('success', `${competitorToDelete.skipper_name} has been removed from the event`);
 
       // Refresh the competitors list
       await fetchCompetitors();
     } catch (error: any) {
       console.error('Error deleting competitor:', error);
-      showNotification('error', error.message || 'Failed to remove competitor. Please try again.');
+      addNotification('error', error.message || 'Failed to remove competitor. Please try again.');
     } finally {
       setDeletingId(null);
       setCompetitorToDelete(null);

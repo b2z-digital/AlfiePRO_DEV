@@ -52,7 +52,7 @@ export const NationalAssociationFeeSettings: React.FC<NationalAssociationFeeSett
       setFeeStructures(data || []);
     } catch (error) {
       console.error('Error loading fee structures:', error);
-      addNotification('error', 'Failed to Load', 'Could not load fee structures.');
+      addNotification('error', 'Could not load fee structures.');
     } finally {
       setLoading(false);
     }
@@ -88,14 +88,14 @@ export const NationalAssociationFeeSettings: React.FC<NationalAssociationFeeSett
         if (error) throw error;
       }
 
-      addNotification('success', 'Success', editingId ? 'Fee structure updated' : 'Fee structure created');
+      addNotification('success', editingId ? 'Fee structure updated' : 'Fee structure created');
       setShowAddForm(false);
       setEditingId(null);
       resetForm();
       loadFeeStructures();
     } catch (error) {
       console.error('Error saving fee structure:', error);
-      addNotification('error', 'Failed to Save', 'Could not save fee structure.');
+      addNotification('error', 'Could not save fee structure.');
     }
   };
 

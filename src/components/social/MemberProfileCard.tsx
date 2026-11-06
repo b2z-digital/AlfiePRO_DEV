@@ -141,12 +141,12 @@ export default function MemberProfileCard({
     try {
       await socialStorage.sendConnectionRequest(userId);
       setConnectionStatus('pending_sent');
-      addNotification('Connection request sent!', 'success');
+      addNotification('success', 'Connection request sent!');
     } catch (error: any) {
       if (error.message?.includes('duplicate') || error.code === '23505') {
-        addNotification('Connection request already exists', 'info');
+        addNotification('info', 'Connection request already exists');
       } else {
-        addNotification('Failed to send connection request', 'error');
+        addNotification('error', 'Failed to send connection request');
       }
     } finally {
       setIsSendingRequest(false);

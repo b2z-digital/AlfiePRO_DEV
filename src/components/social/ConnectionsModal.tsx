@@ -96,9 +96,9 @@ export default function ConnectionsModal({ isOpen, onClose, darkMode = false }: 
     try {
       await socialStorage.sendConnectionRequest(userId, 'friend');
       setPendingSentIds(prev => new Set([...prev, userId]));
-      addNotification('Connection request sent', 'success');
+      addNotification('success', 'Connection request sent');
     } catch (error: any) {
-      addNotification(error?.message || 'Failed to send connection request', 'error');
+      addNotification('error', error?.message || 'Failed to send connection request');
     }
   };
 
@@ -107,10 +107,10 @@ export default function ConnectionsModal({ isOpen, onClose, darkMode = false }: 
       await socialStorage.acceptConnectionRequest(connectionId);
       setPendingReceived(prev => prev.filter(r => r.id !== connectionId));
       setConnectedIds(prev => new Set([...prev, requesterId]));
-      addNotification('Connection accepted', 'success');
+      addNotification('success', 'Connection accepted');
       loadData();
     } catch (error) {
-      addNotification('Failed to accept request', 'error');
+      addNotification('error', 'Failed to accept request');
     }
   };
 
@@ -118,9 +118,9 @@ export default function ConnectionsModal({ isOpen, onClose, darkMode = false }: 
     try {
       await socialStorage.rejectConnectionRequest(connectionId);
       setPendingReceived(prev => prev.filter(r => r.id !== connectionId));
-      addNotification('Connection request declined', 'success');
+      addNotification('success', 'Connection request declined');
     } catch (error) {
-      addNotification('Failed to decline request', 'error');
+      addNotification('error', 'Failed to decline request');
     }
   };
 
@@ -149,12 +149,12 @@ export default function ConnectionsModal({ isOpen, onClose, darkMode = false }: 
         setMyConnections(prev => prev.filter(c =>
           c.connected_user_id !== userToDisconnect && c.user_id !== userToDisconnect
         ));
-        addNotification('Connection removed', 'success');
+        addNotification('success', 'Connection removed');
       }
       setShowDeleteConfirmation(false);
       setUserToDisconnect(null);
     } catch (error) {
-      addNotification('Failed to remove connection', 'error');
+      addNotification('error', 'Failed to remove connection');
     }
   };
 

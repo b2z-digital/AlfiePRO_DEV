@@ -53,7 +53,7 @@ export function ScheduleStreamModal({
 
   const handleSave = async () => {
     if (!date || !time) {
-      addNotification('Please select both date and time', 'warning');
+      addNotification('warning', 'Please select both date and time');
       return;
     }
 
@@ -63,7 +63,7 @@ export function ScheduleStreamModal({
 
       // Check if date is in the future
       if (scheduledDateTime <= new Date()) {
-        addNotification('Scheduled time must be in the future', 'warning');
+        addNotification('warning', 'Scheduled time must be in the future');
         setSaving(false);
         return;
       }
@@ -161,7 +161,7 @@ export function ScheduleStreamModal({
           }
         } catch (youtubeError) {
           console.error('Error creating YouTube broadcast:', youtubeError);
-          addNotification('Stream scheduled locally, but YouTube broadcast creation failed', 'warning');
+          addNotification('warning', 'Stream scheduled locally, but YouTube broadcast creation failed');
         }
       }
 
@@ -171,12 +171,12 @@ export function ScheduleStreamModal({
       };
 
       await livestreamStorage.updateSession(sessionId, updates);
-      addNotification('Stream scheduled successfully!', 'success');
+      addNotification('success', 'Stream scheduled successfully!');
       onSchedule(scheduledDateTime.toISOString());
       onClose();
     } catch (error) {
       console.error('Error scheduling stream:', error);
-      addNotification('Failed to schedule stream', 'error');
+      addNotification('error', 'Failed to schedule stream');
     } finally {
       setSaving(false);
     }
@@ -191,12 +191,12 @@ export function ScheduleStreamModal({
       };
 
       await livestreamStorage.updateSession(sessionId, updates);
-      addNotification('Schedule cleared successfully', 'success');
+      addNotification('success', 'Schedule cleared successfully');
       onSchedule('');
       onClose();
     } catch (error) {
       console.error('Error clearing schedule:', error);
-      addNotification('Failed to clear schedule', 'error');
+      addNotification('error', 'Failed to clear schedule');
     } finally {
       setSaving(false);
     }

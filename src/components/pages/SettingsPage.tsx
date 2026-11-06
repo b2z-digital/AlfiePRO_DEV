@@ -400,14 +400,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
       const { outcome } = await deferredPrompt.userChoice;
 
       if (outcome === 'accepted') {
-        addNotification('App installed successfully!', 'success');
+        addNotification('success', 'App installed successfully!');
         setIsInstalled(true);
       }
 
       setDeferredPrompt(null);
     } catch (error) {
       console.error('Error installing PWA:', error);
-      addNotification('Failed to install app', 'error');
+      addNotification('error', 'Failed to install app');
     }
   };
 

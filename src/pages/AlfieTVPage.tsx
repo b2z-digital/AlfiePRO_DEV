@@ -1149,7 +1149,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       });
     } catch (error) {
       console.error('Error loading content:', error);
-      addNotification('Failed to load content', 'error');
+      addNotification('error', 'Failed to load content');
     } finally {
       setLoading(false);
     }
@@ -1169,7 +1169,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       await alfieTVStorage.saveSearchHistory(user.id, query, results.length);
     } catch (error) {
       console.error('Error searching:', error);
-      addNotification('Search failed', 'error');
+      addNotification('error', 'Search failed');
     }
   };
 
@@ -1203,15 +1203,15 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       if (inWatchlist) {
         await alfieTVStorage.removeFromWatchlist(user.id, video.id);
         setWatchlist(prev => prev.filter(v => v.id !== video.id));
-        addNotification('Removed from My List', 'success');
+        addNotification('success', 'Removed from My List');
       } else {
         await alfieTVStorage.addToWatchlist(user.id, video.id);
         setWatchlist(prev => [video, ...prev]);
-        addNotification('Added to My List', 'success');
+        addNotification('success', 'Added to My List');
       }
     } catch (error) {
       console.error('Error updating watchlist:', error);
-      addNotification('Failed to update My List', 'error');
+      addNotification('error', 'Failed to update My List');
     }
   };
 

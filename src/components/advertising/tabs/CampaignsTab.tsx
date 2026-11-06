@@ -25,7 +25,7 @@ export const CampaignsTab: React.FC = () => {
       setCampaigns(data);
     } catch (error) {
       console.error('Error loading campaigns:', error);
-      addNotification('Failed to load campaigns', 'error');
+      addNotification('error', 'Failed to load campaigns');
     } finally {
       setLoading(false);
     }
@@ -43,11 +43,11 @@ export const CampaignsTab: React.FC = () => {
 
     try {
       await advertisingStorage.deleteCampaign(id);
-      addNotification('Campaign deleted successfully', 'success');
+      addNotification('success', 'Campaign deleted successfully');
       loadCampaigns();
     } catch (error) {
       console.error('Error deleting campaign:', error);
-      addNotification('Failed to delete campaign', 'error');
+      addNotification('error', 'Failed to delete campaign');
     }
   };
 
@@ -56,11 +56,11 @@ export const CampaignsTab: React.FC = () => {
       await advertisingStorage.updateCampaign(campaign.id, {
         is_active: !campaign.is_active,
       });
-      addNotification('Campaign status updated', 'success');
+      addNotification('success', 'Campaign status updated');
       loadCampaigns();
     } catch (error) {
       console.error('Error updating campaign:', error);
-      addNotification('Failed to update campaign', 'error');
+      addNotification('error', 'Failed to update campaign');
     }
   };
 
