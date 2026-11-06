@@ -5,6 +5,7 @@ import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase } from '../utils/supabase';
 import type { Organization } from '../types/club';
 import { Logo } from './Logo';
+import { OrgSwitcherPalette, OrgLogo, formatOrgRole } from './OrgSwitcherPalette';
 
 interface ClubSwitcherProps {
   currentClubId: string | null;
@@ -12,6 +13,8 @@ interface ClubSwitcherProps {
   className?: string;
   isCollapsed?: boolean;
   darkMode?: boolean;
+  /** 'sidebar' = the main navigation switcher (Alfie palette design); default = plain dropdown picker */
+  variant?: 'sidebar' | 'default';
 }
 
 const formatRoleDisplay = (role: string): string => {
@@ -52,8 +55,10 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
   onClubChange,
   className = '',
   isCollapsed = false,
-  darkMode = true
+  darkMode = true,
+  variant = 'default'
 }) => {
+  const [parentOf, setParentOf] = useState<Record<string, string>>({});
   const { userClubs, currentClub, isSuperAdmin } = useAuth();
   const { isImpersonating, session: impersonationSession } = useImpersonation();
   const [isOpen, setIsOpen] = useState(false);
@@ -81,11 +86,13 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
   useEffect(() => {
     const fetchOrganizations = async () => {
       const allOrgs: Organization[] = [];
+      const parents: Record<string, string> = {};
 
       if (userClubs && userClubs.length > 0) {
         userClubs.forEach(uc => {
           if (uc.club) {
             if (!isSuperAdmin && (uc.club as any).is_test) return;
+            if ((uc.club as any).state_association_id) parents[uc.clubId] = (uc.club as any).state_association_id;
             allOrgs.push({
               id: uc.clubId,
               name: uc.club.abbreviation || uc.club.name,
@@ -107,12 +114,13 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
       if (userId) {
         const { data: stateAssocs } = await supabase
           .from('user_state_associations')
-          .select('state_association_id, role, state_associations(id, name, short_name, logo_url)')
+          .select('state_association_id, role, state_associations(id, name, short_name, logo_url, national_association_id)')
           .eq('user_id', userId);
 
         if (stateAssocs) {
           stateAssocs.forEach((sa: any) => {
             if (sa.state_associations) {
+              if (sa.state_associations.national_association_id) parents[sa.state_associations.id] = sa.state_associations.national_association_id;
               allOrgs.push({
                 id: sa.state_associations.id,
                 name: sa.state_associations.short_name || sa.state_associations.name,
@@ -136,6 +144,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
               const existingClubIds = new Set(allOrgs.filter(o => o.type === 'club').map(o => o.id));
 
               assocClubs.forEach((club: any) => {
+                parents[club.id] = sa.state_association_id;
                 if (!existingClubIds.has(club.id)) {
                   allOrgs.push({
                     id: club.id,
@@ -179,6 +188,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
               const existingStateIds = new Set(allOrgs.filter(o => o.type === 'state').map(o => o.id));
 
               allStateAssocs.forEach((sa: any) => {
+                parents[sa.id] = na.national_association_id;
                 if (!existingStateIds.has(sa.id)) {
                   allOrgs.push({
                     id: sa.id,
@@ -202,6 +212,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
                   const existingClubIds = new Set(allOrgs.filter(o => o.type === 'club').map(o => o.id));
 
                   stateClubs.forEach((club: any) => {
+                    parents[club.id] = sa.id;
                     if (!existingClubIds.has(club.id)) {
                       allOrgs.push({
                         id: club.id,
@@ -220,6 +231,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
       }
 
       setOrganizations(allOrgs);
+      setParentOf(parents);
 
       const current = allOrgs.find(o => o.id === currentClubId);
       setCurrentOrg(current || null);
@@ -265,6 +277,21 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
     });
   }, [currentClubId]);
 
+  const [paletteLeft, setPaletteLeft] = useState(76);
+  const openPalette = () => {
+    if (typeof window !== 'undefined') {
+      const rail = document.querySelector('.alfie-chrome.fixed') as HTMLElement | null;
+      const right = rail ? rail.getBoundingClientRect().right : 70;
+      setPaletteLeft(window.innerWidth < 640 ? 12 : Math.round(right + 6));
+    }
+    setShowSlideout(true);
+  };
+
+  const savePinned = (ids: string[]) => {
+    setPinnedIds(ids);
+    try { localStorage.setItem('alfie.switcher.pinned', JSON.stringify(ids)); } catch { /* ignore */ }
+  };
+
   const togglePinned = (id: string) => {
     setPinnedIds((prev) => {
       const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id].slice(-6);
@@ -273,7 +300,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
     });
   };
 
-  const isSlideoutHost = isCollapsed || className.includes('w-10 h-10');
+  const isSlideoutHost = variant === 'sidebar' || isCollapsed || className.includes('w-10 h-10');
   useEffect(() => {
     if (!isSlideoutHost) return;
     const onKey = (e: KeyboardEvent) => {
@@ -285,8 +312,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
         if (previous) onClubChange(previous);
         return;
       }
-      setShowSlideout(true);
-      setTimeout(() => searchInputRef.current?.focus(), 50);
+      openPalette();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -318,7 +344,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
     if (!org) {
       return (
         <div className={`${className} rounded-lg overflow-hidden flex items-center justify-center bg-white ${hasMultipleOrgs ? 'cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all' : ''}`}
-          onClick={() => hasMultipleOrgs && setShowSlideout(true)}
+          onClick={() => hasMultipleOrgs && openPalette()}
         >
           <div className="w-full h-full bg-white flex items-center justify-center">
             <Logo size="small" />
@@ -379,7 +405,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
         <div className={`alfie-switch ${hasMultipleOrgs ? 'alfie-switch-multi' : ''}`}>
         <div
           className={`${className} alfie-switch-tile rounded-lg overflow-hidden flex items-center justify-center bg-slate-700 ${hasMultipleOrgs ? 'cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all' : ''}`}
-          onClick={() => hasMultipleOrgs && setShowSlideout(true)}
+          onClick={() => hasMultipleOrgs && openPalette()}
           title={hasMultipleOrgs ? "Switch club or association (⌘O)" : undefined}
         >
           {org.logo ? (
@@ -399,298 +425,21 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
         )}
         </div>
 
-        {/* Slide-out panel for multiple organizations */}
-        {hasMultipleOrgs && showSlideout && (
-          <>
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]"
-              onClick={() => setShowSlideout(false)}
-            />
-
-            {/* Slide-out panel */}
-            <div
-              ref={slideoutRef}
-              className="alfie-switch-panel fixed left-[70px] top-0 bottom-0 w-80 bg-slate-800 border-r border-slate-700 shadow-2xl z-[70] animate-slide-in-left flex flex-col"
-            >
-              <div className="p-4 border-b border-slate-700">
-                <h3 className="text-white font-semibold text-sm">Switch View</h3>
-                <p className="text-slate-400 text-xs mt-1">Select an organization to manage <span className="alfie-kbd">⌘O</span></p>
-
-                {/* Search Box */}
-                {organizations.length > 5 && (
-                  <div className="mt-3 relative">
-                    <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                    <input
-                      ref={searchInputRef}
-                      type="text"
-                      placeholder="Search organizations..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && searchQuery) {
-                          const o = firstMatch();
-                          if (o) selectOrg(o.id);
-                        } else if (e.key === 'Escape') {
-                          setShowSlideout(false);
-                        }
-                      }}
-                      className="w-full pl-9 pr-9 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="overflow-y-auto flex-1 min-h-0">
-                {/* Pinned + recent places */}
-                {!searchQuery && pinnedOrgs.length > 0 && (
-                  <>
-                    <div className="alfie-switch-sec px-4 pt-3 pb-1 flex items-center gap-2">
-                      <Star size={13} className="text-amber-400" />
-                      <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Pinned</h4>
-                    </div>
-                    {pinnedOrgs.map(quickRow)}
-                  </>
-                )}
-                {!searchQuery && recentOrgs.length > 0 && (
-                  <>
-                    <div className="alfie-switch-sec px-4 pt-3 pb-1 flex items-center gap-2">
-                      <Clock size={13} className="text-slate-400" />
-                      <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Recent</h4>
-                      <span className="ml-auto text-[11px] text-slate-500"><span className="alfie-kbd">⌘⇧O</span> jump back</span>
-                    </div>
-                    {recentOrgs.map(quickRow)}
-                  </>
-                )}
-                {/* AlfiePRO Management - Super Admin Only */}
-                {isSuperAdmin && (
-                  <>
-                    <button
-                      onClick={() => toggleSection('platform')}
-                      className="w-full px-4 py-2 bg-slate-900/50 flex items-center justify-between hover:bg-slate-900/70 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        {expandedSections.has('platform') ? (
-                          <ChevronDown size={14} className="text-sky-400" />
-                        ) : (
-                          <ChevronRight size={14} className="text-sky-400" />
-                        )}
-                        <h4 className="text-sky-400 text-xs font-semibold uppercase tracking-wider">Platform</h4>
-                      </div>
-                    </button>
-                    {expandedSections.has('platform') && (
-                      <button
-                        onClick={() => {
-                          onClubChange('super-admin-dashboard');
-                          setShowSlideout(false);
-                        }}
-                        className={`
-                          w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700/50
-                          ${currentClubId === 'super-admin-dashboard' ? 'bg-slate-700' : ''}
-                        `}
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
-                          <Shield size={20} className="text-white" />
-                        </div>
-                        <div className="flex-1 text-left">
-                          <div className="text-white font-medium text-sm">AlfiePRO Management</div>
-                          <div className="text-sky-400 text-xs">Platform Administration</div>
-                        </div>
-                        {currentClubId === 'super-admin-dashboard' && (
-                          <Check size={16} className="text-sky-400 flex-shrink-0" />
-                        )}
-                      </button>
-                    )}
-                  </>
-                )}
-
-                {/* National Associations */}
-                {nationalAssocs.length > 0 && (
-                  <>
-                    <button
-                      onClick={() => toggleSection('national')}
-                      className="w-full px-4 py-2 bg-slate-900/50 flex items-center justify-between hover:bg-slate-900/70 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        {expandedSections.has('national') ? (
-                          <ChevronDown size={14} className="text-slate-400" />
-                        ) : (
-                          <ChevronRight size={14} className="text-slate-400" />
-                        )}
-                        <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">National</h4>
-                      </div>
-                      <span className="text-slate-500 text-xs">{nationalAssocs.length}</span>
-                    </button>
-                    {expandedSections.has('national') && nationalAssocs.map((org) => {
-                      const Icon = getOrgIcon(org.type);
-                      return (
-                        <button
-                          key={org.id}
-                          onClick={() => {
-                            onClubChange(org.id);
-                            setShowSlideout(false);
-                          }}
-                          className={`
-                            w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700/50
-                            ${org.id === currentClubId ? 'bg-slate-700' : ''}
-                          `}
-                        >
-                          {org.logo ? (
-                            <img
-                              src={org.logo}
-                              alt={org.name}
-                              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0">
-                              <Icon size={20} className="text-white" />
-                            </div>
-                          )}
-                          <div className="flex-1 text-left">
-                            <div className="text-white font-medium text-sm">{org.name}</div>
-                            <div className="text-slate-400 text-xs">{formatRoleDisplay(org.role || 'member')}</div>
-                          </div>
-                          {pinStar(org.id)}
-                          {org.id === currentClubId && (
-                            <Check size={16} className="text-blue-400 flex-shrink-0" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </>
-                )}
-
-                {/* State Associations */}
-                {stateAssocs.length > 0 && (
-                  <>
-                    <button
-                      onClick={() => toggleSection('state')}
-                      className="w-full px-4 py-2 bg-slate-900/50 flex items-center justify-between hover:bg-slate-900/70 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        {expandedSections.has('state') ? (
-                          <ChevronDown size={14} className="text-slate-400" />
-                        ) : (
-                          <ChevronRight size={14} className="text-slate-400" />
-                        )}
-                        <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">State</h4>
-                      </div>
-                      <span className="text-slate-500 text-xs">{stateAssocs.length}</span>
-                    </button>
-                    {expandedSections.has('state') && stateAssocs.map((org) => {
-                      const Icon = getOrgIcon(org.type);
-                      return (
-                        <button
-                          key={org.id}
-                          onClick={() => {
-                            onClubChange(org.id);
-                            setShowSlideout(false);
-                          }}
-                          className={`
-                            w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700/50
-                            ${org.id === currentClubId ? 'bg-slate-700' : ''}
-                          `}
-                        >
-                          {org.logo ? (
-                            <img
-                              src={org.logo}
-                              alt={org.name}
-                              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-purple-600 flex items-center justify-center flex-shrink-0">
-                              <Icon size={20} className="text-white" />
-                            </div>
-                          )}
-                          <div className="flex-1 text-left">
-                            <div className="text-white font-medium text-sm">{org.name}</div>
-                            <div className="text-slate-400 text-xs">{formatRoleDisplay(org.role || 'member')}</div>
-                          </div>
-                          {pinStar(org.id)}
-                          {org.id === currentClubId && (
-                            <Check size={16} className="text-blue-400 flex-shrink-0" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </>
-                )}
-
-                {/* Clubs */}
-                {clubs.length > 0 && (
-                  <>
-                    <button
-                      onClick={() => toggleSection('clubs')}
-                      className="w-full px-4 py-2 bg-slate-900/50 flex items-center justify-between hover:bg-slate-900/70 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        {expandedSections.has('clubs') ? (
-                          <ChevronDown size={14} className="text-slate-400" />
-                        ) : (
-                          <ChevronRight size={14} className="text-slate-400" />
-                        )}
-                        <h4 className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Clubs</h4>
-                      </div>
-                      <span className="text-slate-500 text-xs">{clubs.length}</span>
-                    </button>
-                    {expandedSections.has('clubs') && clubs.map((org) => {
-                      const Icon = getOrgIcon(org.type);
-                      return (
-                        <button
-                          key={org.id}
-                          onClick={() => {
-                            onClubChange(org.id);
-                            setShowSlideout(false);
-                          }}
-                          className={`
-                            w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700/50
-                            ${org.id === currentClubId ? 'bg-slate-700' : ''}
-                          `}
-                        >
-                          {org.logo ? (
-                            <img
-                              src={org.logo}
-                              alt={org.name}
-                              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 p-1.5">
-                              <Logo size="small" />
-                            </div>
-                          )}
-                          <div className="flex-1 text-left">
-                            <div className="text-white font-medium text-sm">{org.name}</div>
-                            <div className="text-slate-400 text-xs">{formatRoleDisplay(org.role || 'member')}</div>
-                          </div>
-                          {pinStar(org.id)}
-                          {org.id === currentClubId && (
-                            <Check size={16} className="text-blue-400 flex-shrink-0" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </>
-                )}
-
-                {/* No Results Message */}
-                {searchQuery && filteredOrgs.length === 0 && (
-                  <div className="p-8 text-center">
-                    <Search size={48} className="mx-auto text-slate-600 mb-3" />
-                    <p className="text-slate-400 text-sm">No organizations found</p>
-                    <p className="text-slate-500 text-xs mt-1">Try a different search term</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
+        {/* Alfie switcher palette */}
+        {showSlideout && hasMultipleOrgs && (
+          <OrgSwitcherPalette
+            organizations={organizations as any}
+            parentOf={parentOf}
+            currentId={currentClubId}
+            isSuperAdmin={!!isSuperAdmin}
+            pinnedIds={pinnedIds}
+            onPinnedChange={savePinned}
+            recentIds={recentIds}
+            onSelect={(id) => { onClubChange(id); setSearchQuery(''); }}
+            onClose={() => setShowSlideout(false)}
+            left={paletteLeft}
+            panelRef={slideoutRef}
+          />
         )}
       </>
     );
@@ -731,6 +480,68 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
           <div className="text-white font-medium">{org.name}</div>
           <div className="text-slate-400 text-xs">{formatRoleDisplay(org.role || 'member')}</div>
         </div>
+      </div>
+    );
+  }
+
+  if (variant === 'sidebar') {
+    const platformOrg = { id: 'super-admin-dashboard', name: 'AlfiePRO Management', type: 'platform', role: 'super_admin', logo: null } as any;
+    const cur: any = organizations.find((o) => o.id === currentClubId) || (currentClubId === 'super-admin-dashboard' ? platformOrg : currentOrg);
+    const crumbs: Organization[] = [];
+    let up = currentClubId ? parentOf[currentClubId] : undefined;
+    let guard = 0;
+    while (up && guard++ < 4) {
+      const o = organizations.find((x) => x.id === up);
+      if (o) crumbs.unshift(o);
+      up = parentOf[up];
+    }
+    return (
+      <div className={`osw-host ${className}`}>
+        {crumbs.length > 0 && cur && (
+          <div className="osw-crumbs" aria-label="Where you are">
+            {crumbs.map((c) => (
+              <React.Fragment key={c.id}>
+                <button type="button" onClick={() => onClubChange(c.id)} title={`Go to ${c.name}`}>{c.name}</button>
+                <span aria-hidden="true">›</span>
+              </React.Fragment>
+            ))}
+            <span className="osw-crumb-cur">{cur.name}</span>
+          </div>
+        )}
+        <button
+          type="button"
+          className="osw-trigger"
+          aria-haspopup="dialog"
+          aria-expanded={showSlideout}
+          onClick={() => (showSlideout ? setShowSlideout(false) : openPalette())}
+          title="Switch club or association (⌘O)"
+        >
+          {cur ? (
+            <OrgLogo org={cur} size={40} radius={11} />
+          ) : (
+            <span className="osw-logo" style={{ width: 40, height: 40, borderRadius: 11, background: '#fff' }}><Logo size="small" /></span>
+          )}
+          <span className="flex-1 min-w-0 text-left">
+            <span className="osw-trigger-name">{cur?.name || 'Select organisation'}</span>
+            <span className="osw-trigger-sub">{formatOrgRole(cur?.role)}</span>
+          </span>
+          <ChevronsUpDown size={16} />
+        </button>
+        {showSlideout && (
+          <OrgSwitcherPalette
+            organizations={organizations as any}
+            parentOf={parentOf}
+            currentId={currentClubId}
+            isSuperAdmin={!!isSuperAdmin}
+            pinnedIds={pinnedIds}
+            onPinnedChange={savePinned}
+            recentIds={recentIds}
+            onSelect={(id) => onClubChange(id)}
+            onClose={() => setShowSlideout(false)}
+            left={paletteLeft}
+            panelRef={slideoutRef}
+          />
+        )}
       </div>
     );
   }
