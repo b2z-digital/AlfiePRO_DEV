@@ -251,3 +251,8 @@ html.alfie-light select.a-bare option { background: #fff; color: #0B1220; }
 .a-amt-inp::-webkit-inner-spin-button { -webkit-appearance: none; }
 .a-code { padding: 4px 8px; border-radius: 7px; background: rgba(255, 255, 255, 0.05); color: rgba(235, 240, 255, 0.8); white-space: nowrap; }
 html.alfie-light .a-code { background: rgba(15, 23, 42, 0.05); color: #334155; }
+.a-msheet-page { max-height: none; }
+.a-grp-rule { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+html.alfie-light .a-grp-rule { border-top-color: rgba(15, 23, 42, 0.07); }
+.a-pick-soft { border: 0 !important; background-color: rgba(255, 255, 255, 0.04) !important; font-size: 13.5px; }
+html.alfie-light .a-pick-soft { background-color: rgba(15, 23, 42, 0.04) !important; }
