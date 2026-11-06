@@ -90,6 +90,7 @@ export const ScoringTopBar: React.FC<{
             ))}
           </div>
         )}
+        <div id="alfie-startbox-slot" className="contents" />
         {(onStartBox || onOverallResults) && <span className="a-vd" />}
         {onStartBox && <button type="button" className="a-btn a-btn-sb" style={{ height: 40 }} onClick={onStartBox}><Timer size={17} />StartBox</button>}
         {onOverallResults && <button type="button" className="a-btn a-btn-gold" style={{ height: 40 }} onClick={onOverallResults}><Trophy size={17} />Overall results</button>}
