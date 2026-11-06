@@ -12,8 +12,6 @@ interface ClubSwitcherProps {
   className?: string;
   isCollapsed?: boolean;
   darkMode?: boolean;
-  /** 'sidebar' = the main navigation switcher (Alfie palette design); default = plain dropdown picker */
-  variant?: 'sidebar' | 'default';
 }
 
 export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
@@ -37,7 +35,6 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
         userClubs.forEach(uc => {
           if (uc.club) {
             if (!isSuperAdmin && (uc.club as any).is_test) return;
-            if ((uc.club as any).state_association_id) parents[uc.clubId] = (uc.club as any).state_association_id;
             allOrgs.push({
               id: uc.clubId,
               name: uc.club.abbreviation || uc.club.name,
@@ -65,7 +62,6 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
         if (stateAssocs) {
           stateAssocs.forEach((sa: any) => {
             if (sa.state_associations) {
-              if (sa.state_associations.national_association_id) parents[sa.state_associations.id] = sa.state_associations.national_association_id;
               allOrgs.push({
                 id: sa.state_associations.id,
                 name: sa.state_associations.short_name || sa.state_associations.name,
@@ -183,7 +179,6 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
       }
 
       setOrganizations(allOrgs);
-      setParentOf(parents);
 
       const current = allOrgs.find(o => o.id === currentClubId);
       setCurrentOrg(current || null);
@@ -213,21 +208,6 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
       return next;
     });
   }, [currentClubId]);
-
-  const [paletteLeft, setPaletteLeft] = useState(76);
-  const openPalette = () => {
-    if (typeof window !== 'undefined') {
-      const rail = document.querySelector('.alfie-chrome.fixed') as HTMLElement | null;
-      const right = rail ? rail.getBoundingClientRect().right : 70;
-      setPaletteLeft(window.innerWidth < 640 ? 12 : Math.round(right + 6));
-    }
-    setShowSlideout(true);
-  };
-
-  const savePinned = (ids: string[]) => {
-    setPinnedIds(ids);
-    try { localStorage.setItem('alfie.switcher.pinned', JSON.stringify(ids)); } catch { /* ignore */ }
-  };
 
   const togglePinned = (id: string) => {
     setPinnedIds((prev) => {
