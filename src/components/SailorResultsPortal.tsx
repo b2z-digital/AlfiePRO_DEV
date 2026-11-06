@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trophy, TrendingUp, Calendar, ListFilter as Filter, ChartBar as BarChart3, ChevronDown, ChevronUp, Award, Target, Medal, Sailboat } from 'lucide-react';
+import { Trophy, TrendingUp, ChevronDown, ChevronUp, Award, Target, Medal, Sailboat } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
@@ -305,7 +305,7 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
   if (loading) {
     return (
       <div className="h-full overflow-y-auto">
-        <div className="p-4 sm:p-6 lg:p-16">
+        <div className="p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
           <div className="flex items-center justify-center py-20">
             <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full" />
           </div>
@@ -314,223 +314,141 @@ export const SailorResultsPortal: React.FC<SailorResultsPortalProps> = ({
     );
   }
 
+  const MEDAL: Record<number, string> = { 1: '#FFC56B', 2: '#C9D1DE', 3: '#E59A62' };
+  const ord = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`;
+  const pos = (r: SailorResult | null, size: number, best?: number | null) => {
+    const p = r ? r.position : best;
+    const letter = r?.letter_score;
+    if (letter) return <span className="a-posc a-posc-r" style={{ width: size, height: size }}>{letter.slice(0, 3)}</span>;
+    if (p && MEDAL[p]) return <span className="a-med" style={{ width: size, height: size, background: MEDAL[p], boxShadow: `0 0 0 3px color-mix(in srgb, ${MEDAL[p]} 25%, transparent)` }}>{p}</span>;
+    return <span className="a-posc" style={{ width: size, height: size }}>{p || '–'}</span>;
+  };
+  const statCard = (icon: React.ReactNode, cap: string, value: React.ReactNode, sub: string) => (
+    <div className="a-card flex items-center gap-3.5" style={{ padding: '16px 18px' }}>
+      <span className="a-tile" style={{ width: 44, height: 44 }}>{icon}</span>
+      <div>
+        <p className="a-cap">{cap}</p>
+        <div className="a-display a-ink a-num text-[28px] font-semibold leading-none mt-1.5">{value}</div>
+        <div className="a-dim text-[12px] mt-1.5">{sub}</div>
+      </div>
+    </div>
+  );
+  const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const groups = Object.entries(eventGroups);
+  const yearCounts = groups.reduce<Record<string, number>>((acc, [, rs]) => { const y = rs[0].event_date?.slice(0, 4) || '—'; acc[y] = (acc[y] || 0) + 1; return acc; }, {});
+  let lastYear = '';
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-4 sm:p-6 lg:p-16">
-        {/* Hero Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/20">
-              <Trophy className="text-white" size={32} />
-            </div>
-            <div>
-              <h1 className={`text-4xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                My Results
-              </h1>
-              <p className={`text-lg ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                {userName ? `${userName}'s race history` : 'Your personal race history'}
-                {userSailNumber ? ` - Sail #${userSailNumber}` : ''}
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className={`p-4 rounded-xl flex items-start gap-4 ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-white border border-slate-200'}`}>
-              <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/20 flex-shrink-0">
-                <Medal className="text-white" size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {stats.winCount}
-                </div>
-                <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Wins
-                </div>
-              </div>
-            </div>
-
-            <div className={`p-4 rounded-xl flex items-start gap-4 ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-white border border-slate-200'}`}>
-              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/20 flex-shrink-0">
-                <Award className="text-white" size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {stats.podiumCount}
-                </div>
-                <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Podiums
-                </div>
-              </div>
-            </div>
-
-            <div className={`p-4 rounded-xl flex items-start gap-4 ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-white border border-slate-200'}`}>
-              <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/20 flex-shrink-0">
-                <Target className="text-white" size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {stats.averagePosition || '-'}
-                </div>
-                <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Avg Position
-                </div>
-              </div>
-            </div>
-
-            <div className={`p-4 rounded-xl flex items-start gap-4 ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-white border border-slate-200'}`}>
-              <div className="p-3 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 shadow-lg shadow-teal-500/20 flex-shrink-0">
-                <TrendingUp className="text-white" size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {stats.completionRate}%
-                </div>
-                <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Completion
-                </div>
-              </div>
-            </div>
+      <div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        <div className="flex items-center gap-4">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><Trophy size={24} /></span>
+          <div className="flex-1 min-w-0">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">My results</h1>
+            <p className="a-mute mt-1 text-[14.5px]">
+              {userName ? `${userName}'s race history` : 'Your personal race history'}
+              {userSailNumber ? ` · Sail #${userSailNumber}` : ''}
+            </p>
           </div>
         </div>
 
-        {/* Filters */}
-        {(years.length > 1 || classes.length > 1) && (
-          <div className={`flex items-center gap-3 flex-wrap mb-6 p-4 rounded-xl ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-white border border-slate-200'}`}>
-            <Filter className={`w-4 h-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {statCard(<Medal size={20} />, 'Wins', stats.winCount, 'Race wins')}
+          {statCard(<Award size={20} />, 'Podiums', stats.podiumCount, 'Top three finishes')}
+          {statCard(<Target size={20} />, 'Avg position', stats.averagePosition || '–', 'Across all races')}
+          {statCard(<TrendingUp size={20} />, 'Completion', `${stats.completionRate}%`, 'Races finished')}
+        </div>
+
+        {(years.length > 1 || classes.length > 1 || results.length > 0) && (
+          <div className="flex items-center gap-2.5 flex-wrap">
             {years.length > 1 && (
-              <select
-                value={filterYear}
-                onChange={(e) => setFilterYear(e.target.value)}
-                className={`px-3 py-2 text-sm rounded-lg border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-              >
-                <option value="all">All Years</option>
-                {years.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
+              <div className="a-seg" role="tablist">
+                <button onClick={() => setFilterYear('all')} className={`a-seg-i ${filterYear === 'all' ? 'a-seg-on' : ''}`}>All years</button>
+                {years.map(y => (
+                  <button key={y} onClick={() => setFilterYear(y!)} className={`a-seg-i ${filterYear === y ? 'a-seg-on' : ''}`}>{y}</button>
+                ))}
+              </div>
             )}
             {classes.length > 1 && (
-              <select
-                value={filterClass}
-                onChange={(e) => setFilterClass(e.target.value)}
-                className={`px-3 py-2 text-sm rounded-lg border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-              >
-                <option value="all">All Classes</option>
+              <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="a-inp a-inp-sel" style={{ height: 40, width: 'auto', minWidth: 150 }} aria-label="Class">
+                <option value="all">All classes</option>
                 {classes.map(c => <option key={c} value={c!}>{c}</option>)}
               </select>
             )}
-            <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              {stats.totalRaces} races across {stats.totalEvents} events
-            </span>
+            <div className="flex-1" />
+            <span className="a-dim text-[13px]"><b className="a-num a-ink">{stats.totalRaces}</b> races across <b className="a-num a-ink">{stats.totalEvents}</b> events</span>
           </div>
         )}
 
-        {/* Results List */}
-        {Object.keys(eventGroups).length === 0 ? (
-          <div className={`rounded-xl p-12 text-center ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-white border border-slate-200'}`}>
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-500/10 to-slate-600/10 inline-block mb-4">
-              <Sailboat className={`w-12 h-12 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
-            </div>
-            <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              No results yet
-            </h3>
-            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'} max-w-sm mx-auto`}>
-              Your race results will appear here once you compete in events at this club.
-            </p>
+        {groups.length === 0 ? (
+          <div className="a-card a-empty text-center" style={{ padding: 48 }}>
+            <span className="a-tile mx-auto mb-3" style={{ width: 52, height: 52 }}><Sailboat size={22} /></span>
+            <h3 className="a-ink text-[16px] font-semibold mb-1">No results yet</h3>
+            <p className="a-dim text-[13.5px] max-w-sm mx-auto">Your race results will appear here once you compete in events at this club.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {Object.entries(eventGroups).map(([eventId, eventResults]) => {
+          <div className="a-card overflow-hidden">
+            {groups.map(([eventId, eventResults]) => {
               const firstResult = eventResults[0];
               const expanded = expandedEvent === eventId;
               const positions = eventResults.filter(r => r.position && !r.letter_score).map(r => r.position!);
-              const avgPos = positions.length > 0
-                ? Math.round((positions.reduce((a, b) => a + b, 0) / positions.length) * 10) / 10
-                : null;
+              const avgPos = positions.length > 0 ? Math.round((positions.reduce((a, b) => a + b, 0) / positions.length) * 10) / 10 : null;
               const bestPos = positions.length > 0 ? Math.min(...positions) : null;
+              const d = firstResult.event_date ? new Date(firstResult.event_date + 'T00:00:00') : null;
+              const y = firstResult.event_date?.slice(0, 4) || '—';
+              const showYear = y !== lastYear;
+              lastYear = y;
 
               return (
-                <div
-                  key={eventId}
-                  className={`rounded-xl overflow-hidden transition-all ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-white border border-slate-200'}`}
-                >
-                  <button
-                    onClick={() => setExpandedEvent(expanded ? null : eventId)}
-                    className={`w-full flex items-center gap-4 p-4 text-left transition-colors ${darkMode ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'}`}
-                  >
-                    <div className={`p-2.5 rounded-xl flex-shrink-0 ${
-                      bestPos === 1
-                        ? 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/20'
-                        : bestPos && bestPos <= 3
-                          ? 'bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/20'
-                          : darkMode ? 'bg-slate-700' : 'bg-slate-100'
-                    }`}>
-                      <Trophy className={`w-5 h-5 ${bestPos && bestPos <= 3 ? 'text-white' : darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-slate-900'} truncate`}>
-                          {firstResult.event_name}
-                        </span>
-                        {firstResult.boat_class && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                            {firstResult.boat_class}
-                          </span>
-                        )}
-                      </div>
-                      <div className={`flex items-center gap-4 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {firstResult.event_date ? new Date(firstResult.event_date + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'No date'}
-                        </span>
-                        <span>{eventResults.length} race{eventResults.length !== 1 ? 's' : ''}</span>
-                        {bestPos && (
-                          <span className={bestPos === 1 ? 'text-amber-500 font-medium' : ''}>
-                            Best: {bestPos}{bestPos === 1 ? 'st' : bestPos === 2 ? 'nd' : bestPos === 3 ? 'rd' : 'th'}
-                          </span>
-                        )}
-                        {avgPos && <span>Avg: {avgPos}</span>}
-                      </div>
-                    </div>
-                    <div className={`flex-shrink-0 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                    </div>
-                  </button>
-
-                  {expanded && (
-                    <div className={`border-t px-4 pb-4 pt-3 ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
-                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-                        {eventResults.map((r) => (
-                          <div
-                            key={`${r.event_id}-${r.race_number}`}
-                            className={`text-center p-2.5 rounded-lg transition-all ${
-                              r.letter_score
-                                ? darkMode ? 'bg-red-900/20 border border-red-800/50' : 'bg-red-50 border border-red-200'
-                                : r.position === 1
-                                  ? darkMode ? 'bg-amber-900/20 border border-amber-700/50' : 'bg-amber-50 border border-amber-200'
-                                  : r.position && r.position <= 3
-                                    ? darkMode ? 'bg-blue-900/20 border border-blue-800/50' : 'bg-blue-50 border border-blue-200'
-                                    : darkMode ? 'bg-slate-700/50 border border-slate-600/50' : 'bg-slate-50 border border-slate-200'
-                            }`}
-                          >
-                            <p className={`text-[10px] font-medium uppercase ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>R{r.race_number}</p>
-                            <p className={`text-base font-bold mt-0.5 ${
-                              r.letter_score
-                                ? 'text-red-500'
-                                : r.position === 1
-                                  ? 'text-amber-500'
-                                  : r.position && r.position <= 3
-                                    ? darkMode ? 'text-blue-400' : 'text-blue-600'
-                                    : darkMode ? 'text-white' : 'text-slate-900'
-                            }`}>
-                              {r.letter_score || r.position || '-'}
-                            </p>
-                            <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>/{r.total_entries}</p>
-                          </div>
-                        ))}
-                      </div>
+                <React.Fragment key={eventId}>
+                  {showYear && (
+                    <div className="flex items-baseline gap-2" style={{ padding: '16px 16px 6px' }}>
+                      <span className="a-display a-ink text-[16px] font-semibold">{y}</span>
+                      <span className="a-cnt">{yearCounts[y]}</span>
                     </div>
                   )}
-                </div>
+                  <div className={expanded ? 'a-res-open' : ''}>
+                    <button onClick={() => setExpandedEvent(expanded ? null : eventId)} className="a-rr w-full text-left" style={{ padding: '12px 16px' }} aria-expanded={expanded}>
+                      <div className="text-center flex-shrink-0" style={{ width: 50 }}>
+                        <div className="a-cap" style={{ fontSize: 10 }}>{d ? MON[d.getMonth()] : ''}</div>
+                        <div className="a-display a-ink a-num text-[22px] font-semibold leading-none mt-[3px]">{d ? d.getDate() : '–'}</div>
+                      </div>
+                      {pos(null, 34, bestPos)}
+                      <div className="flex-1 min-w-0">
+                        <div className="a-ink text-[15px] font-semibold truncate">{firstResult.event_name}</div>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          {firstResult.boat_class && <span className="a-lb-cls"><Sailboat size={11} />{firstResult.boat_class}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right max-md:hidden" style={{ width: 90 }}>
+                        <div className="a-dim text-[11.5px]">Best</div>
+                        <div className={`text-[14px] font-semibold ${bestPos && bestPos <= 3 ? `a-best-${bestPos}` : 'a-ink'}`}>{bestPos ? ord(bestPos) : '–'}</div>
+                      </div>
+                      <div className="text-right max-md:hidden" style={{ width: 80 }}>
+                        <div className="a-dim text-[11.5px]">Avg</div>
+                        <div className="a-num a-ink text-[14px] font-semibold">{avgPos ?? '–'}</div>
+                      </div>
+                      <div className="text-right" style={{ width: 70 }}>
+                        <div className="a-dim text-[11.5px]">Races</div>
+                        <div className="a-num a-ink text-[14px] font-semibold">{eventResults.length}</div>
+                      </div>
+                      {expanded ? <ChevronUp size={18} className="a-dim" /> : <ChevronDown size={18} className="a-dim" />}
+                    </button>
+
+                    {expanded && (
+                      <div className="flex items-center gap-3.5 flex-wrap" style={{ padding: '4px 16px 16px 92px' }}>
+                        <div className="flex gap-2.5 flex-wrap">
+                          {eventResults.map((r) => (
+                            <div key={`${r.event_id}-${r.race_number}`} className="flex flex-col items-center gap-1" title={`Race ${r.race_number}: ${r.letter_score || r.position || '–'} of ${r.total_entries}`}>
+                              <span className="a-dim text-[10.5px]">R{r.race_number}</span>
+                              {pos(r, 28)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </React.Fragment>
               );
             })}
           </div>

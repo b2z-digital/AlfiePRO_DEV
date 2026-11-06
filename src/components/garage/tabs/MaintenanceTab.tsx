@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wrench, Plus, Calendar, DollarSign, Clock, Bell, CircleCheck as CheckCircle, CircleAlert as AlertCircle, CreditCard as Edit, Trash2, FileText, Repeat as RepeatIcon, User } from 'lucide-react';
+import { Wrench, Plus, Calendar, DollarSign, Clock, Bell, CircleCheck as CheckCircle, CircleAlert as AlertCircle, SquarePen as Edit, Trash2, FileText, Repeat as RepeatIcon, User } from 'lucide-react';
 import { supabase } from '../../../utils/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNotifications } from '../../../contexts/NotificationContext';
@@ -251,311 +251,146 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({ boatId, darkMode
 
   if (loading) {
     return (
-      <div className={`rounded-2xl p-12 text-center ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-white border border-slate-200'}`}>
-        <Wrench className={`w-8 h-8 mx-auto mb-4 animate-spin ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
-        <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Loading maintenance data...</p>
+      <div className="a-card text-center" style={{ padding: 48 }}>
+        <Wrench className="w-8 h-8 mx-auto mb-3 animate-spin a-dim" />
+        <p className="a-dim text-[13.5px]">Loading maintenance…</p>
       </div>
     );
   }
 
   const upcomingReminders = reminders.filter(r => !r.is_completed && r.due_date);
   const overdueReminders = upcomingReminders.filter(r => getDaysUntilDue(r.due_date!) < 0);
+  const TYPE_DOT: Record<string, string> = { repair: '#FF6B6B', upgrade: '#2E7BFF', inspection: '#FFB340', cleaning: '#30D158', other: '#9AA6BD' };
+  const fmt = (d?: string) => d ? new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  const firstOverdue = overdueReminders[0];
+  const statCard = (icon: React.ReactNode, cap: string, value: React.ReactNode, tone?: string) => (
+    <div className="a-card flex items-center gap-3.5" style={{ padding: '16px 18px' }}>
+      <span className="a-tile" style={{ width: 44, height: 44 }}>{icon}</span>
+      <div>
+        <p className="a-cap">{cap}</p>
+        <div className={`a-display a-num text-[28px] font-semibold leading-none mt-1.5 ${tone || 'a-ink'}`}>{value}</div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className={`rounded-xl p-4 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            {logs.length}
+    <div className="flex flex-col gap-4">
+      {firstOverdue && (
+        <div className="a-overdue flex flex-wrap items-center gap-3">
+          <AlertCircle size={18} className="a-txt-r flex-shrink-0" />
+          <div className="flex-1 min-w-[200px]">
+            <span className="a-txt-r text-[14px] font-semibold">{firstOverdue.title}</span>
+            <span className="a-mute text-[13px]"> · was due {new Date(firstOverdue.due_date!).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}, {Math.abs(getDaysUntilDue(firstOverdue.due_date!))} days ago</span>
           </div>
-          <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-            Total Logs
-          </div>
-        </div>
-        <div className={`rounded-xl p-4 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            {upcomingReminders.length}
-          </div>
-          <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-            Active Reminders
-          </div>
-        </div>
-        <div className={`rounded-xl p-4 ${darkMode ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'}`}>
-          <div className="text-2xl font-bold text-orange-500">
-            {overdueReminders.length}
-          </div>
-          <div className={`text-sm ${darkMode ? 'text-orange-400' : 'text-orange-600'}`}>
-            Overdue
-          </div>
-        </div>
-        <div className={`rounded-xl p-4 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            ${logs.reduce((sum, log) => sum + (log.cost || 0), 0).toFixed(0)}
-          </div>
-          <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-            Total Cost
-          </div>
-        </div>
-      </div>
-
-      {/* Tab Selector */}
-      <div className={`rounded-2xl p-2 flex gap-2 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-        <button
-          onClick={() => setActiveTab('logs')}
-          className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all ${
-            activeTab === 'logs'
-              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
-              : darkMode
-              ? 'text-slate-400 hover:text-white'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <FileText className="w-4 h-4 inline mr-2" />
-          Maintenance Logs
-        </button>
-        <button
-          onClick={() => setActiveTab('reminders')}
-          className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all ${
-            activeTab === 'reminders'
-              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
-              : darkMode
-              ? 'text-slate-400 hover:text-white'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Bell className="w-4 h-4 inline mr-2" />
-          Reminders
-          {overdueReminders.length > 0 && (
-            <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
-              {overdueReminders.length}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* Content Area */}
-      {activeTab === 'logs' ? (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Maintenance History
-            </h3>
-            <button
-              onClick={() => {
-                setEditingLog(null);
-                setShowLogModal(true);
-              }}
-              className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200"
-            >
-              <Plus className="w-4 h-4 inline mr-2" />
-              Add Log
-            </button>
-          </div>
-
-          {logs.length === 0 ? (
-            <div className={`rounded-2xl p-12 text-center ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-              <Wrench className={`w-16 h-16 mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
-              <h3 className={`text-xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                No Maintenance Logs
-              </h3>
-              <p className={`mb-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Start tracking your boat maintenance activities
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {logs.map(log => {
-                const typeInfo = maintenanceTypes.find(t => t.value === log.maintenance_type);
-                return (
-                  <div
-                    key={log.id}
-                    className={`rounded-xl p-4 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'} hover:shadow-lg transition-all`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r ${typeInfo?.color} text-white`}>
-                            {typeInfo?.label}
-                          </span>
-                          <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            {new Date(log.performed_date).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <h4 className={`text-lg font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                          {log.title}
-                        </h4>
-                        {log.description && (
-                          <p className={`text-sm mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            {log.description}
-                          </p>
-                        )}
-                        <div className="flex flex-wrap gap-4 text-sm">
-                          {log.cost && (
-                            <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                              <DollarSign className="w-4 h-4 inline mr-1" />
-                              ${log.cost.toFixed(2)}
-                            </span>
-                          )}
-                          {log.performed_by && (
-                            <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                              <User className="w-4 h-4 inline mr-1" />
-                              {log.performed_by}
-                            </span>
-                          )}
-                          {log.next_service_date && (
-                            <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                              <Calendar className="w-4 h-4 inline mr-1" />
-                              Next: {new Date(log.next_service_date).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                        {log.notes && (
-                          <p className={`text-sm mt-2 italic ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                            {log.notes}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex gap-2 ml-4">
-                        <button
-                          onClick={() => {
-                            setEditingLog(log);
-                            setShowLogModal(true);
-                          }}
-                          className={`p-2 rounded-lg ${darkMode ? 'hover:bg-slate-700 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'}`}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteLog(log.id)}
-                          className="p-2 rounded-lg hover:bg-red-500/10 text-red-500"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Maintenance Reminders
-            </h3>
-            <button
-              onClick={() => {
-                setEditingReminder(null);
-                setShowReminderModal(true);
-              }}
-              className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200"
-            >
-              <Plus className="w-4 h-4 inline mr-2" />
-              Add Reminder
-            </button>
-          </div>
-
-          {reminders.length === 0 ? (
-            <div className={`rounded-2xl p-12 text-center ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-              <Bell className={`w-16 h-16 mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
-              <h3 className={`text-xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                No Reminders Set
-              </h3>
-              <p className={`mb-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Create reminders for upcoming maintenance tasks
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {reminders.map(reminder => {
-                const dueStatus = reminder.due_date ? getDueStatus(reminder.due_date) : null;
-                return (
-                  <div
-                    key={reminder.id}
-                    className={`rounded-xl p-4 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'} hover:shadow-lg transition-all`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3 flex-1">
-                        <button
-                          onClick={() => toggleReminderComplete(reminder)}
-                          className={`mt-1 ${
-                            reminder.is_completed
-                              ? 'text-green-500'
-                              : darkMode
-                              ? 'text-slate-600 hover:text-slate-400'
-                              : 'text-slate-300 hover:text-slate-500'
-                          }`}
-                        >
-                          <CheckCircle className="w-5 h-5" fill={reminder.is_completed ? 'currentColor' : 'none'} />
-                        </button>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            {dueStatus && (
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${dueStatus.bgColor} ${dueStatus.color}`}>
-                                {dueStatus.label}
-                              </span>
-                            )}
-                            {reminder.recurrence !== 'once' && (
-                              <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                <RepeatIcon className="w-3 h-3 inline mr-1" />
-                                {recurrenceOptions.find(r => r.value === reminder.recurrence)?.label}
-                              </span>
-                            )}
-                          </div>
-                          <h4 className={`text-lg font-bold mb-1 ${
-                            reminder.is_completed
-                              ? darkMode ? 'text-slate-500 line-through' : 'text-slate-400 line-through'
-                              : darkMode ? 'text-white' : 'text-slate-900'
-                          }`}>
-                            {reminder.title}
-                          </h4>
-                          {reminder.description && (
-                            <p className={`text-sm mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                              {reminder.description}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap gap-4 text-sm">
-                            {reminder.due_date && (
-                              <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                                <Calendar className="w-4 h-4 inline mr-1" />
-                                Due: {new Date(reminder.due_date).toLocaleDateString()}
-                              </span>
-                            )}
-                            <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                              <Bell className="w-4 h-4 inline mr-1" />
-                              {reminder.notification_days_before} days before
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 ml-4">
-                        <button
-                          onClick={() => {
-                            setEditingReminder(reminder);
-                            setShowReminderModal(true);
-                          }}
-                          className={`p-2 rounded-lg ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteReminder(reminder.id)}
-                          className="p-2 rounded-lg hover:bg-red-500/10 text-red-500"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <button onClick={() => toggleReminderComplete(firstOverdue)} className="a-btn a-btn-p" style={{ height: 36 }}>
+            <CheckCircle size={16} />Mark done
+          </button>
         </div>
       )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {statCard(<FileText size={20} />, 'Logs', logs.length)}
+        {statCard(<Bell size={20} />, 'Active reminders', upcomingReminders.length)}
+        {statCard(<AlertCircle size={20} />, 'Overdue', overdueReminders.length, overdueReminders.length > 0 ? 'a-txt-r' : undefined)}
+        {statCard(<DollarSign size={20} />, 'Total cost', `$${logs.reduce((sum, log) => sum + (log.cost || 0), 0).toFixed(0)}`)}
+      </div>
+
+      <div className="a-card flex flex-col gap-4" style={{ padding: '18px 20px' }}>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="a-seg" role="tablist">
+            <button onClick={() => setActiveTab('logs')} className={`a-seg-i ${activeTab === 'logs' ? 'a-seg-on' : ''}`} role="tab" aria-selected={activeTab === 'logs'}>
+              <FileText size={16} />Logs{logs.length > 0 && <span className="a-cnt">{logs.length}</span>}
+            </button>
+            <button onClick={() => setActiveTab('reminders')} className={`a-seg-i ${activeTab === 'reminders' ? 'a-seg-on' : ''}`} role="tab" aria-selected={activeTab === 'reminders'}>
+              <Bell size={16} />Reminders{overdueReminders.length > 0 && <span className="a-cnt" style={{ background: '#FF6B6B', color: '#fff', boxShadow: 'none' }}>{overdueReminders.length}</span>}
+            </button>
+          </div>
+          <div className="flex-1" />
+          {activeTab === 'logs' ? (
+            <button onClick={() => { setEditingLog(null); setShowLogModal(true); }} className="a-btn a-btn-p" style={{ height: 40 }}>
+              <Plus size={16} />Add log
+            </button>
+          ) : (
+            <button onClick={() => { setEditingReminder(null); setShowReminderModal(true); }} className="a-btn a-btn-p" style={{ height: 40 }}>
+              <Plus size={16} />Add reminder
+            </button>
+          )}
+        </div>
+
+        {activeTab === 'logs' ? (
+          logs.length === 0 ? (
+            <div className="a-grp a-empty text-center" style={{ padding: 32 }}>
+              <span className="a-tile mx-auto mb-3" style={{ width: 48, height: 48 }}><Wrench size={20} /></span>
+              <p className="a-ink text-[15px] font-semibold mb-1">No maintenance logs</p>
+              <p className="a-dim text-[13px]">Start tracking your boat's maintenance</p>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {logs.map((log, i) => {
+                const typeInfo = maintenanceTypes.find(t => t.value === log.maintenance_type);
+                const dot = TYPE_DOT[log.maintenance_type] || '#9AA6BD';
+                return (
+                  <div key={log.id} className="flex gap-4 relative" style={{ paddingBottom: i < logs.length - 1 ? 20 : 0 }}>
+                    {i < logs.length - 1 && <span className="a-tl-line" />}
+                    <span className="a-tile flex-shrink-0" style={{ width: 40, height: 40, color: dot }}><Wrench size={17} /></span>
+                    <div className="a-grp flex-1 min-w-0" style={{ padding: '14px 16px' }}>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="a-lb-fmt" style={{ height: 22, fontSize: 11.5 }}><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: dot }} />{typeInfo?.label || 'Other'}</span>
+                        <span className="a-dim text-[12.5px]">{fmt(log.performed_date)}{log.performed_by ? ` · by ${log.performed_by}` : ''}</span>
+                        <div className="flex-1" />
+                        <button onClick={() => { setEditingLog(log); setShowLogModal(true); }} className="a-ib" style={{ width: 30, height: 30 }} aria-label="Edit log"><Edit size={15} /></button>
+                        <button onClick={() => deleteLog(log.id)} className="a-ib a-ib-d" style={{ width: 30, height: 30 }} aria-label="Delete log"><Trash2 size={15} /></button>
+                      </div>
+                      <div className="a-ink text-[15.5px] font-semibold mt-2">{log.title}</div>
+                      {log.description && <div className="a-mute text-[13.5px] mt-1 leading-[1.5]">{log.description}</div>}
+                      {(log.cost || log.next_service_date) && (
+                        <div className="a-dim flex flex-wrap gap-4 text-[12.5px] mt-2">
+                          {!!log.cost && <span className="inline-flex items-center gap-1"><DollarSign size={13} />${log.cost.toFixed(2)}</span>}
+                          {log.next_service_date && <span className="inline-flex items-center gap-1"><Calendar size={13} />Next service {fmt(log.next_service_date)}</span>}
+                        </div>
+                      )}
+                      {log.notes && <div className="a-dim text-[13px] mt-2 italic">{log.notes}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : reminders.length === 0 ? (
+          <div className="a-grp a-empty text-center" style={{ padding: 32 }}>
+            <span className="a-tile mx-auto mb-3" style={{ width: 48, height: 48 }}><Bell size={20} /></span>
+            <p className="a-ink text-[15px] font-semibold mb-1">No reminders set</p>
+            <p className="a-dim text-[13px]">Create reminders for upcoming maintenance</p>
+          </div>
+        ) : (
+          <div className="a-grp">
+            {reminders.map(reminder => {
+              const days = reminder.due_date ? getDaysUntilDue(reminder.due_date) : null;
+              const tone = reminder.is_completed ? 'g' : days === null ? 'n' : days < 0 ? 'r' : days <= 7 ? 'a' : 'g';
+              const label = reminder.is_completed ? 'Done' : days === null ? '' : days < 0 ? `${Math.abs(days)}d late` : days === 0 ? 'Due today' : `in ${days}d`;
+              return (
+                <div key={reminder.id} className="a-ir" style={{ alignItems: 'flex-start' }}>
+                  <button onClick={() => toggleReminderComplete(reminder)} className={`a-chk mt-0.5 ${reminder.is_completed ? 'a-chk-on' : ''}`} style={{ borderRadius: 999 }} aria-label={reminder.is_completed ? 'Mark not done' : 'Mark done'}>
+                    {reminder.is_completed && <CheckCircle size={13} />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-[14.5px] font-semibold ${reminder.is_completed ? 'a-dim line-through' : 'a-ink'}`}>{reminder.title}</div>
+                    {reminder.description && <div className="a-mute text-[13px] mt-0.5">{reminder.description}</div>}
+                    <div className="a-dim flex flex-wrap gap-3.5 text-[12.5px] mt-1.5">
+                      {reminder.due_date && <span className="inline-flex items-center gap-1"><Calendar size={13} />Due {fmt(reminder.due_date)}</span>}
+                      <span className="inline-flex items-center gap-1"><Bell size={13} />{reminder.notification_days_before} days before</span>
+                      {reminder.recurrence !== 'once' && <span className="inline-flex items-center gap-1"><RepeatIcon size={13} />{recurrenceOptions.find(r => r.value === reminder.recurrence)?.label}</span>}
+                    </div>
+                  </div>
+                  {label && <span className={`a-lb-fmt ${tone === 'r' ? 'a-lb-late' : tone === 'a' ? 'a-lb-soon' : ''}`} style={{ height: 22, fontSize: 11 }}>{label}</span>}
+                  <button onClick={() => { setEditingReminder(reminder); setShowReminderModal(true); }} className="a-ib" style={{ width: 30, height: 30 }} aria-label="Edit reminder"><Edit size={15} /></button>
+                  <button onClick={() => deleteReminder(reminder.id)} className="a-ib a-ib-d" style={{ width: 30, height: 30 }} aria-label="Delete reminder"><Trash2 size={15} /></button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Modals */}
       {showLogModal && (
@@ -675,18 +510,18 @@ const MaintenanceLogModal: React.FC<MaintenanceLogModalProps> = ({ boatId, log, 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className={`rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-white border border-slate-200'}`}
+        className="a-sheet max-w-2xl w-full max-h-[90vh] overflow-y-auto" style={{ padding: 24 }}
         onClick={e => e.stopPropagation()}
       >
-        <h3 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+        <h3 className="a-display a-ink text-[22px] font-semibold mb-5">
           {log ? 'Edit' : 'Add'} Maintenance Log
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            <label className="a-flab">
               Title *
             </label>
             <input
@@ -694,30 +529,21 @@ const MaintenanceLogModal: React.FC<MaintenanceLogModalProps> = ({ boatId, log, 
               value={formData.title}
               onChange={e => setFormData({ ...formData, title: e.target.value })}
               placeholder="e.g., Hull Cleaning, Rigging Repair"
-              className={`w-full px-4 py-3 rounded-lg ${
-                darkMode
-                  ? 'bg-slate-800 border-slate-600 text-white'
-                  : 'bg-white border-slate-300 text-slate-900'
-              } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+              className="a-inp w-full"
             />
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            <label className="a-flab">
               Type
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="a-seg" style={{ display: 'flex' }}>
               {maintenanceTypes.map(type => (
                 <button
                   key={type.value}
+                  type="button"
                   onClick={() => setFormData({ ...formData, maintenance_type: type.value as any })}
-                  className={`py-3 rounded-lg font-medium transition-all ${
-                    formData.maintenance_type === type.value
-                      ? `bg-gradient-to-r ${type.color} text-white shadow-lg`
-                      : darkMode
-                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
+                  className={`a-seg-i flex-1 justify-center ${formData.maintenance_type === type.value ? 'a-seg-on' : ''}`}
                 >
                   {type.label}
                 </button>
@@ -726,7 +552,7 @@ const MaintenanceLogModal: React.FC<MaintenanceLogModalProps> = ({ boatId, log, 
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            <label className="a-flab">
               Description
             </label>
             <textarea
@@ -734,77 +560,61 @@ const MaintenanceLogModal: React.FC<MaintenanceLogModalProps> = ({ boatId, log, 
               onChange={e => setFormData({ ...formData, description: e.target.value })}
               rows={3}
               placeholder="Describe what was done..."
-              className={`w-full px-4 py-3 rounded-lg ${
-                darkMode
-                  ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500'
-                  : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
-              } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+              className="a-inp w-full"
             />
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              <label className="a-flab">
                 Date Performed *
               </label>
               <input
                 type="date"
                 value={formData.performed_date}
                 onChange={e => setFormData({ ...formData, performed_date: e.target.value })}
-                className={`w-full px-4 py-3 rounded-lg ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-600 text-white'
-                    : 'bg-white border-slate-300 text-slate-900'
-                } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className="a-inp w-full"
               />
             </div>
 
             <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              <label className="a-flab">
                 Next Service Date
               </label>
               <input
                 type="date"
                 value={formData.next_service_date}
                 onChange={e => setFormData({ ...formData, next_service_date: e.target.value })}
-                className={`w-full px-4 py-3 rounded-lg ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-600 text-white'
-                    : 'bg-white border-slate-300 text-slate-900'
-                } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className="a-inp w-full"
               />
             </div>
           </div>
 
           {formData.next_service_date && (
-            <div className={`rounded-lg p-4 ${darkMode ? 'bg-slate-700/50 border border-slate-600' : 'bg-blue-50 border border-blue-200'}`}>
+            <div className="a-grp" style={{ padding: 14 }}>
               <label className="flex items-center cursor-pointer group">
                 <input
                   type="checkbox"
                   checked={createReminder}
                   onChange={(e) => setCreateReminder(e.target.checked)}
-                  className="w-5 h-5 rounded border-2 border-cyan-500 text-cyan-500 focus:ring-2 focus:ring-cyan-500 cursor-pointer"
+                  className="w-5 h-5 rounded accent-blue-500 cursor-pointer"
                 />
-                <span className={`ml-3 font-medium ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                <span className="a-ink ml-3 font-medium text-[14px]">
                   Create automatic reminder for next service
                 </span>
               </label>
               {createReminder && (
                 <div className="mt-3 ml-8">
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <label className="a-flab">
                     Notify me (days before)
                   </label>
                   <input
                     type="number"
                     value={reminderDaysBefore}
                     onChange={(e) => setReminderDaysBefore(e.target.value)}
-                    className={`w-32 px-3 py-2 rounded-lg ${
-                      darkMode
-                        ? 'bg-slate-800 border-slate-600 text-white'
-                        : 'bg-white border-slate-300 text-slate-900'
-                    } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                    className="a-inp" style={{ width: 128 }}
                   />
-                  <p className={`mt-2 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <p className="a-dim mt-2 text-[12.5px]">
                     You'll be reminded on {new Date(new Date(formData.next_service_date).getTime() - (parseInt(reminderDaysBefore) || 7) * 24 * 60 * 60 * 1000).toLocaleDateString()}
                   </p>
                 </div>
@@ -814,11 +624,11 @@ const MaintenanceLogModal: React.FC<MaintenanceLogModalProps> = ({ boatId, log, 
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              <label className="a-flab">
                 Cost
               </label>
               <div className="relative">
-                <span className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                <span className="a-dim absolute left-3 top-1/2 -translate-y-1/2">
                   $
                 </span>
                 <input
@@ -827,17 +637,13 @@ const MaintenanceLogModal: React.FC<MaintenanceLogModalProps> = ({ boatId, log, 
                   value={formData.cost}
                   onChange={e => setFormData({ ...formData, cost: e.target.value })}
                   placeholder="0.00"
-                  className={`w-full pl-8 pr-4 py-3 rounded-lg ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                  className="a-inp w-full" style={{ paddingLeft: 30 }}
                 />
               </div>
             </div>
 
             <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              <label className="a-flab">
                 Performed By
               </label>
               <input
@@ -845,17 +651,13 @@ const MaintenanceLogModal: React.FC<MaintenanceLogModalProps> = ({ boatId, log, 
                 value={formData.performed_by}
                 onChange={e => setFormData({ ...formData, performed_by: e.target.value })}
                 placeholder="e.g., Self, Marine Shop"
-                className={`w-full px-4 py-3 rounded-lg ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-600 text-white'
-                    : 'bg-white border-slate-300 text-slate-900'
-                } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className="a-inp w-full"
               />
             </div>
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            <label className="a-flab">
               Notes
             </label>
             <textarea
@@ -863,11 +665,7 @@ const MaintenanceLogModal: React.FC<MaintenanceLogModalProps> = ({ boatId, log, 
               onChange={e => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
               placeholder="Additional notes..."
-              className={`w-full px-4 py-3 rounded-lg ${
-                darkMode
-                  ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500'
-                  : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
-              } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+              className="a-inp w-full"
             />
           </div>
         </div>
@@ -875,16 +673,14 @@ const MaintenanceLogModal: React.FC<MaintenanceLogModalProps> = ({ boatId, log, 
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className={`flex-1 px-4 py-3 rounded-lg font-medium ${
-              darkMode ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-900'
-            }`}
+            className="a-btn flex-1 justify-center"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="btn-primary-green flex-1 px-4 py-3 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50"
+            className="a-btn a-btn-p flex-1 justify-center disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Log'}
           </button>
@@ -961,18 +757,18 @@ const MaintenanceReminderModal: React.FC<MaintenanceReminderModalProps> = ({ boa
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className={`rounded-2xl p-6 max-w-2xl w-full ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-white border border-slate-200'}`}
+        className="a-sheet max-w-2xl w-full" style={{ padding: 24 }}
         onClick={e => e.stopPropagation()}
       >
-        <h3 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+        <h3 className="a-display a-ink text-[22px] font-semibold mb-5">
           {reminder ? 'Edit' : 'Add'} Reminder
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            <label className="a-flab">
               Title *
             </label>
             <input
@@ -980,16 +776,12 @@ const MaintenanceReminderModal: React.FC<MaintenanceReminderModalProps> = ({ boa
               value={formData.title}
               onChange={e => setFormData({ ...formData, title: e.target.value })}
               placeholder="e.g., Check Rigging, Replace Sails"
-              className={`w-full px-4 py-3 rounded-lg ${
-                darkMode
-                  ? 'bg-slate-800 border-slate-600 text-white'
-                  : 'bg-white border-slate-300 text-slate-900'
-              } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+              className="a-inp w-full"
             />
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            <label className="a-flab">
               Description
             </label>
             <textarea
@@ -997,64 +789,47 @@ const MaintenanceReminderModal: React.FC<MaintenanceReminderModalProps> = ({ boa
               onChange={e => setFormData({ ...formData, description: e.target.value })}
               rows={3}
               placeholder="What needs to be done..."
-              className={`w-full px-4 py-3 rounded-lg ${
-                darkMode
-                  ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500'
-                  : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
-              } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+              className="a-inp w-full"
             />
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              <label className="a-flab">
                 Due Date
               </label>
               <input
                 type="date"
                 value={formData.due_date}
                 onChange={e => setFormData({ ...formData, due_date: e.target.value })}
-                className={`w-full px-4 py-3 rounded-lg ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-600 text-white'
-                    : 'bg-white border-slate-300 text-slate-900'
-                } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className="a-inp w-full"
               />
             </div>
 
             <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              <label className="a-flab">
                 Notify Me (days before)
               </label>
               <input
                 type="number"
                 value={formData.notification_days_before}
                 onChange={e => setFormData({ ...formData, notification_days_before: e.target.value })}
-                className={`w-full px-4 py-3 rounded-lg ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-600 text-white'
-                    : 'bg-white border-slate-300 text-slate-900'
-                } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className="a-inp w-full"
               />
             </div>
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            <label className="a-flab">
               Recurrence
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="a-seg" style={{ display: 'flex' }}>
               {recurrenceOptions.map(option => (
                 <button
                   key={option.value}
+                  type="button"
                   onClick={() => setFormData({ ...formData, recurrence: option.value as any })}
-                  className={`py-3 rounded-lg font-medium transition-all ${
-                    formData.recurrence === option.value
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
-                      : darkMode
-                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
+                  className={`a-seg-i flex-1 justify-center ${formData.recurrence === option.value ? 'a-seg-on' : ''}`}
                 >
                   {option.label}
                 </button>
@@ -1066,16 +841,14 @@ const MaintenanceReminderModal: React.FC<MaintenanceReminderModalProps> = ({ boa
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className={`flex-1 px-4 py-3 rounded-lg font-medium ${
-              darkMode ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-900'
-            }`}
+            className="a-btn flex-1 justify-center"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="btn-primary-green flex-1 px-4 py-3 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50"
+            className="a-btn a-btn-p flex-1 justify-center disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Reminder'}
           </button>

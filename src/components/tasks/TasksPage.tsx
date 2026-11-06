@@ -418,210 +418,153 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
     );
   }
 
+  const now0 = new Date();
+  const today0 = new Date(now0.getFullYear(), now0.getMonth(), now0.getDate());
+  const groupOf = (t: typeof filteredTasks[number]) => {
+    if (t.status === 'completed') return 'completed';
+    if (!t.due_date) return 'nodate';
+    const d = new Date(t.due_date + (t.due_date.length <= 10 ? 'T00:00:00' : ''));
+    if (d < today0) return 'overdue';
+    if (d.toDateString() === today0.toDateString()) return 'today';
+    return 'upcoming';
+  };
+  const GROUPS: { id: string; label: string; light: string }[] = [
+    { id: 'overdue', label: 'Overdue', light: 'a-light-r' },
+    { id: 'today', label: 'Due today', light: 'a-light-a' },
+    { id: 'upcoming', label: 'Upcoming', light: 'a-light-b' },
+    { id: 'nodate', label: 'No due date', light: 'a-light-n' },
+    { id: 'completed', label: 'Completed', light: 'a-light-g' },
+  ];
+  const grouped = GROUPS.map(g => ({ ...g, tasks: filteredTasks.filter(t => groupOf(t) === g.id) })).filter(g => g.tasks.length > 0);
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-16">
+      <div className="flex flex-col gap-[22px]" style={{ padding: '36px 48px 96px 36px' }}>
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
-              <CheckSquare className="text-white" size={28} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2">{getCategoryTitle()}</h1>
-              <p className="text-slate-400">
-                {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}
-              </p>
-            </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><CheckSquare size={24} /></span>
+          <div className="flex-1 min-w-[180px]">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">{getCategoryTitle().replace(/ Tasks$/, ' tasks')}</h1>
+            <p className="a-mute mt-1 text-[14.5px]">
+              {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}
+            </p>
           </div>
-
-          <div className="flex items-center gap-3">
-            {/* Expandable Search */}
-            {showSearch ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search tasks..."
-                  className="w-64 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all"
-                  autoFocus
-                />
-                <button
-                  onClick={() => {
-                    setShowSearch(false);
-                    setSearchTerm('');
-                  }}
-                  className="p-2 text-slate-400 hover:text-white transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowSearch(true)}
-                className="p-2 text-slate-400 hover:text-white transition-colors"
-                title="Search tasks"
-              >
-                <Search size={20} />
-              </button>
+          <label className="a-field" style={{ width: 320, maxWidth: '100%' }}>
+            <Search size={17} />
+            <span className="sr-only">Search tasks</span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search tasks"
+            />
+            {searchTerm && (
+              <button type="button" onClick={() => setSearchTerm('')} className="a-dim flex" aria-label="Clear search"><X size={15} /></button>
             )}
-
-            {/* Sort Menu */}
+          </label>
+          <div className="relative">
             <button
               onClick={() => setShowSortMenu(!showSortMenu)}
-              className="p-2 text-slate-400 hover:text-white transition-colors"
+              className="a-ib a-ib-box"
+              style={{ width: 42, height: 42 }}
               title="Sort tasks"
+              aria-label="Sort tasks"
             >
-              <SortAsc size={20} />
+              <SortAsc size={18} />
             </button>
-
             {showSortMenu && (
-              <div className="fixed inset-0 z-50" onClick={() => setShowSortMenu(false)}>
-                <div className="absolute right-16 top-32 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => {
-                      setSortBy('due_date');
-                      setShowSortMenu(false);
-                    }}
-                    className={`w-full px-4 py-2.5 text-left hover:bg-slate-700 transition-colors first:rounded-t-lg ${
-                      sortBy === 'due_date' ? 'text-blue-400 bg-slate-700/50' : 'text-slate-300'
-                    }`}
-                  >
-                    Sort by Due Date
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSortBy('priority');
-                      setShowSortMenu(false);
-                    }}
-                    className={`w-full px-4 py-2.5 text-left hover:bg-slate-700 transition-colors ${
-                      sortBy === 'priority' ? 'text-blue-400 bg-slate-700/50' : 'text-slate-300'
-                    }`}
-                  >
-                    Sort by Priority
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSortBy('title');
-                      setShowSortMenu(false);
-                    }}
-                    className={`w-full px-4 py-2.5 text-left hover:bg-slate-700 transition-colors last:rounded-b-lg ${
-                      sortBy === 'title' ? 'text-blue-400 bg-slate-700/50' : 'text-slate-300'
-                    }`}
-                  >
-                    Sort by Title
-                  </button>
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowSortMenu(false)} />
+                <div className="a-pop absolute right-0 top-[48px] z-50 w-52">
+                  {([['due_date', 'Sort by due date'], ['priority', 'Sort by priority'], ['title', 'Sort by title']] as const).map(([k, l]) => (
+                    <button
+                      key={k}
+                      onClick={() => {
+                        setSortBy(k);
+                        setShowSortMenu(false);
+                      }}
+                      className={`a-pop-item w-full ${sortBy === k ? 'a-pop-item-on' : ''}`}
+                    >
+                      {l}
+                    </button>
+                  ))}
                 </div>
+              </>
+            )}
+          </div>
+          {can('tasks.create') && (
+            <button
+              onClick={() => {
+                setEditingTask(null);
+                setShowTaskForm(true);
+              }}
+              className="a-btn a-btn-p"
+              style={{ height: 42, borderRadius: 13 }}
+            >
+              <Plus size={17} />
+              New task
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-4 items-start">
+          <aside className="a-card w-full lg:w-[300px] lg:flex-none lg:sticky lg:top-6" style={{ padding: 16 }} aria-label="Task lists">
+            <TaskCategorySidebar
+              activeCategory={activeCategory}
+              onCategorySelect={(category) => {
+                setActiveCategory(category);
+                setShowCategorySidebar(false);
+              }}
+              taskCounts={taskCounts}
+              darkMode={darkMode}
+            />
+          </aside>
+
+          {/* Task List */}
+          <div className="a-card flex-1 min-w-0 w-full overflow-hidden">
+            {error && (
+              <div className="a-note a-note-r m-4 text-[13.5px]">
+                <p>{error}</p>
               </div>
             )}
 
-            {can('tasks.create') && (
-              <button
-                onClick={() => {
-                  setEditingTask(null);
-                  setShowTaskForm(true);
-                }}
-                className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 animate-pulse"
-              >
-                <Plus size={18} />
-                New Task
-              </button>
+            {filteredTasks.length === 0 ? (
+              <div className="a-empty py-16 px-6">
+                <span className="a-tile" style={{ width: 48, height: 48 }}><CheckSquare size={22} /></span>
+                <h3 className="a-ink text-[16px] font-semibold">
+                  No tasks found
+                </h3>
+                <p className="a-dim text-[13.5px]">
+                  {searchTerm
+                    ? 'Try adjusting your search terms'
+                    : 'Create your first task to get started'}
+                </p>
+              </div>
+            ) : (
+              grouped.map((g, gi) => (
+                <React.Fragment key={g.id}>
+                  {gi > 0 && <div className="a-hr" style={{ height: 1, marginTop: 6 }} />}
+                  <div className="flex items-center gap-2.5" style={{ padding: '14px 18px 10px' }}>
+                    <span className={`a-light ${g.light}`} />
+                    <span className="a-display a-ink text-[15px] font-semibold">{g.label}</span>
+                    <span className="a-cnt">{g.tasks.length}</span>
+                  </div>
+                  {g.tasks.map((task) => (
+                    <TaskListItem
+                      key={task.id}
+                      task={task}
+                      onToggleComplete={handleToggleComplete}
+                      onEdit={handleEditTask}
+                      onDelete={() => handleDeleteClick(task)}
+                      onClick={handleTaskClick}
+                      darkMode={darkMode}
+                    />
+                  ))}
+                </React.Fragment>
+              ))
             )}
           </div>
         </div>
-
-        {/* Task List */}
-        <div className="space-y-3">
-          {error && (
-            <div className="mb-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
-              <p className="text-red-300">{error}</p>
-            </div>
-          )}
-
-          {filteredTasks.length === 0 ? (
-            <div className="text-center py-12 bg-slate-800/50 rounded-xl border border-slate-700/50">
-              <CheckSquare size={48} className="mx-auto mb-4 text-slate-500" />
-              <h3 className="text-lg font-medium mb-2 text-slate-300">
-                No tasks found
-              </h3>
-              <p className="text-slate-400">
-                {searchTerm
-                  ? 'Try adjusting your search terms'
-                  : 'Create your first task to get started'}
-              </p>
-            </div>
-          ) : (
-            filteredTasks.map((task) => (
-              <TaskListItem
-                key={task.id}
-                task={task}
-                onToggleComplete={handleToggleComplete}
-                onEdit={handleEditTask}
-                onDelete={() => handleDeleteClick(task)}
-                onClick={handleTaskClick}
-                darkMode={darkMode}
-              />
-            ))
-          )}
-        </div>
-
-        {/* Filter Button - Fixed Right Side Tab */}
-        <button
-          onClick={() => setShowCategorySidebar(!showCategorySidebar)}
-          className="fixed right-0 top-1/2 -translate-y-1/2 bg-gradient-to-l from-blue-600 to-purple-600 text-white px-3 py-6 rounded-l-xl shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200 z-40 flex flex-col items-center gap-2"
-          title="Filter Tasks"
-        >
-          <Filter size={20} />
-          <div className="flex flex-col items-center">
-            {['F', 'I', 'L', 'T', 'E', 'R', 'S'].map((letter, index) => (
-              <span key={index} className="text-xs font-medium leading-tight">
-                {letter}
-              </span>
-            ))}
-          </div>
-        </button>
-
-        {/* Collapsible Sidebar Panel */}
-        <div
-          className={`fixed right-0 top-0 h-full w-80 bg-slate-800/95 backdrop-blur-sm border-l border-slate-700 shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
-            showCategorySidebar ? 'translate-x-0' : 'translate-x-full'
-          }`}
-        >
-          <div className="flex flex-col h-full">
-            {/* Sidebar Header */}
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Task Filters</h3>
-              <button
-                onClick={() => setShowCategorySidebar(false)}
-                className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-400 hover:text-white"
-              >
-                <ChevronLeft size={20} />
-              </button>
-            </div>
-
-            {/* Sidebar Content */}
-            <div className="flex-1 overflow-y-auto p-4">
-              <TaskCategorySidebar
-                activeCategory={activeCategory}
-                onCategorySelect={(category) => {
-                  setActiveCategory(category);
-                  setShowCategorySidebar(false);
-                }}
-                taskCounts={taskCounts}
-                darkMode={darkMode}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Overlay when sidebar is open */}
-        {showCategorySidebar && (
-          <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
-            onClick={() => setShowCategorySidebar(false)}
-          />
-        )}
       </div>
 
       {/* Task Form Modal */}

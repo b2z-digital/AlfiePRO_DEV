@@ -24,9 +24,9 @@ export const QuickEventSetupWidget: React.FC<WidgetProps> = ({ widgetId, isEditM
         </button>
       )}
 
-      <div className="flex items-center gap-2 mb-4">
-        <Calendar className="text-purple-400" size={20} />
-        <h2 className="text-lg font-semibold text-white">Quick Event Setup</h2>
+      <div className="flex items-center gap-3 mb-4">
+        <span className="a-tile flex-shrink-0" style={{ width: 36, height: 36 }}><Calendar size={19} /></span>
+        <h2 className="a-display a-ink text-[18px] font-semibold">Quick Event Setup</h2>
       </div>
 
       <div className="flex-1 flex flex-col gap-3">

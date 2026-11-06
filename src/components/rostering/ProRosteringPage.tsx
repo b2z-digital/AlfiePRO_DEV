@@ -10,6 +10,7 @@ import { getBoatClassImage } from '../../utils/boatClassImages';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { RosterBuilder } from './RosterBuilder';
+import { AAvatar } from '../alfie/Kit';
 import { RosterGridView } from './RosterGridView';
 import { RosterListView } from './RosterListView';
 import { RosterCalendarView } from './RosterCalendarView';
@@ -307,23 +308,36 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
 
   if (selectedRoster && (view === 'grid' || view === 'list')) {
     return (
-      <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-16 space-y-4">
-        <div className="flex items-center gap-3 mb-4">
-          <button onClick={() => { setSelectedRoster(null); setView('dashboard'); }} className="text-slate-400 hover:text-white transition-colors">Rosters</button>
-          <ChevronRight size={16} className="text-slate-600" />
-          <span className="text-white font-medium">{selectedRoster.name}</span>
-          <div className={`ml-2 px-2 py-0.5 text-xs rounded-full border ${getStatusColor(selectedRoster.status)}`}>{selectedRoster.status}</div>
-          <div className="flex-1" />
+      <div className="h-full overflow-y-auto"><div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        <div className="flex items-center text-[13.5px]">
+          <button onClick={() => { setSelectedRoster(null); setView('dashboard'); }} className="a-link inline-flex items-center gap-1"><ChevronRight size={15} className="rotate-180" />Rosters</button>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><ClipboardList size={24} /></span>
+          <div className="flex-1 min-w-[220px]">
+            <h1 className="a-display a-ink m-0 text-[28px] font-bold">{selectedRoster.name}</h1>
+            <div className="a-mute flex flex-wrap items-center gap-2 mt-1.5 text-[13.5px]">
+              <span className="a-st text-[13px]"><span className={`a-light ${selectedRoster.status === 'active' ? 'a-light-g' : selectedRoster.status === 'draft' ? 'a-light-a' : selectedRoster.status === 'completed' ? 'a-light-b' : 'a-light-n'}`} />{selectedRoster.status.charAt(0).toUpperCase() + selectedRoster.status.slice(1)}</span>
+              <span className="a-dim">·</span>
+              <span className="a-lb-cls"><svg width="9" height="11" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M1 .75v10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M1.75 1.25h6.5L1.75 5.5z" fill="currentColor" /></svg>{selectedRoster.boat_class}</span>
+              <span className="a-dim">·</span>
+              <span>{selectedRoster.rounds.length} sailing day{selectedRoster.rounds.length !== 1 ? 's' : ''}</span>
+              <span className="a-dim">·</span>
+              <span className={selectedRoster.assignments.length > 0 && selectedRoster.assignments.every(a => a.status === 'confirmed') ? 'a-txt-g' : ''}>{selectedRoster.assignments.filter(a => a.status === 'confirmed').length}/{selectedRoster.assignments.length} confirmed</span>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setView('grid')} className={`px-3 py-1.5 rounded-lg text-sm transition-all ${view === 'grid' ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
-              <Calendar size={14} className="inline mr-1" /> Grid
-            </button>
-            <button onClick={() => setView('list')} className={`px-3 py-1.5 rounded-lg text-sm transition-all ${view === 'list' ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
-              <ClipboardList size={14} className="inline mr-1" /> List
-            </button>
+            <div className="a-seg" role="radiogroup" aria-label="View">
+              <button onClick={() => setView('grid')} className={`a-seg-i ${view === 'grid' ? 'a-seg-on' : ''}`} style={{ padding: '0 10px' }} aria-label="Grid" title="Grid">
+                <Grid3X3 size={16} />
+              </button>
+              <button onClick={() => setView('list')} className={`a-seg-i ${view === 'list' ? 'a-seg-on' : ''}`} style={{ padding: '0 10px' }} aria-label="List" title="List">
+                <List size={16} />
+              </button>
+            </div>
             {selectedRoster.status === 'draft' && (
-              <button onClick={() => handleActivateRoster(selectedRoster.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-500 transition-all">
-                <Play size={14} /> Activate
+              <button onClick={() => handleActivateRoster(selectedRoster.id)} className="a-btn a-btn-g">
+                <Play size={15} /> Activate
               </button>
             )}
             {selectedRoster.status === 'active' && user?.id && (
@@ -335,10 +349,10 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
                     else { addNotification('info', 'All assignments already have tasks'); }
                   } catch { addNotification('error', 'Failed to sync tasks'); }
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600 transition-all"
+                className="a-btn"
                 title="Create missing tasks for assignments that don't have them"
               >
-                <ListChecks size={14} /> Sync Tasks
+                <ListChecks size={16} /> Sync tasks
               </button>
             )}
           </div>
@@ -356,63 +370,55 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
   const draftCount = rosters.filter(r => r.status === 'draft').length;
 
   return (
-    <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-16 space-y-6">
+    <div className="h-full overflow-y-auto"><div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl">
-              <ClipboardList size={24} className="text-white" />
-            </div>
-            PRO Rostering
-          </h1>
-          <p className="text-slate-400 mt-1">Manage Principal Race Officer duty rosters for your club's sailing days</p>
+      <div className="flex flex-wrap items-center gap-4">
+        <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><ClipboardList size={24} /></span>
+        <div className="flex-1 min-w-[220px]">
+          <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">PRO Rostering</h1>
+          <p className="a-mute mt-1 text-[14.5px]">Manage Principal Race Officer duty rosters for your club's sailing days</p>
         </div>
-        <div className="flex items-center gap-2">
-          {filteredRosters.length > 0 && (
-            <button onClick={handleExportAllPDF} className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-slate-300 rounded-xl font-medium hover:bg-slate-600 transition-all border border-slate-600/50">
-              <Download size={16} /> Export All PDF
-            </button>
-          )}
-          <button onClick={() => setShowBuilder(true)} className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-xl font-medium hover:from-cyan-500 hover:to-blue-500 transition-all hover:scale-105 shadow-lg shadow-cyan-500/20">
-            <Plus size={18} /> New Roster
+        {filteredRosters.length > 0 && (
+          <button onClick={handleExportAllPDF} className="a-btn">
+            <Download size={16} /> Export all PDF
           </button>
-        </div>
+        )}
+        <button onClick={() => setShowBuilder(true)} className="a-btn a-btn-p" style={{ height: 42, borderRadius: 13 }}>
+          <Plus size={17} /> New roster
+        </button>
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total Rosters" value={rosters.length} icon={<ClipboardList size={14} />} color="text-slate-400" />
-        <StatCard label="Active" value={activeCount} icon={<Play size={14} />} color="text-emerald-400" />
-        <StatCard label="Draft" value={draftCount} icon={<Clock size={14} />} color="text-yellow-400" />
-        <StatCard label="Members Rostered" value={new Set(Array.from(summaries.values()).flatMap(s => s.member_ids)).size} icon={<Users size={14} />} color="text-cyan-400" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Total rosters" value={rosters.length} icon={<ClipboardList size={18} />} color="" />
+        <StatCard label="Active" value={activeCount} icon={<Play size={18} />} color="" />
+        <StatCard label="Draft" value={draftCount} icon={<Clock size={18} />} color="" />
+        <StatCard label="Members rostered" value={new Set(Array.from(summaries.values()).flatMap(s => s.member_ids)).size} icon={<Users size={18} />} color="" />
       </div>
 
       {/* View Toggle & Filters */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="flex items-center bg-slate-800/60 border border-slate-700/50 rounded-lg p-0.5">
-          <button onClick={() => setDashboardTab('cards')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all ${dashboardTab === 'cards' ? 'bg-cyan-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
-            <Grid3X3 size={14} /> Cards
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="a-seg" role="radiogroup" aria-label="View">
+          <button onClick={() => setDashboardTab('cards')} className={`a-seg-i ${dashboardTab === 'cards' ? 'a-seg-on' : ''}`} style={{ padding: '0 10px' }} aria-label="Cards" title="Cards">
+            <Grid3X3 size={16} />
           </button>
-          <button onClick={() => setDashboardTab('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all ${dashboardTab === 'list' ? 'bg-cyan-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
-            <List size={14} /> List
+          <button onClick={() => setDashboardTab('list')} className={`a-seg-i ${dashboardTab === 'list' ? 'a-seg-on' : ''}`} style={{ padding: '0 10px' }} aria-label="List" title="List">
+            <List size={16} />
           </button>
-          <button onClick={() => setDashboardTab('calendar')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all ${dashboardTab === 'calendar' ? 'bg-cyan-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>
-            <CalendarDays size={14} /> Calendar
+          <button onClick={() => setDashboardTab('calendar')} className={`a-seg-i ${dashboardTab === 'calendar' ? 'a-seg-on' : ''}`} style={{ padding: '0 10px' }} aria-label="Calendar" title="Calendar">
+            <CalendarDays size={16} />
           </button>
         </div>
 
-        <div className="relative flex-1 max-w-xs">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input type="text" placeholder="Search rosters..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-slate-800/60 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50" />
-        </div>
+        <label className="a-field flex-1 min-w-[200px]">
+          <Search size={17} />
+          <input type="text" placeholder="Search rosters" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+        </label>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Filter size={14} className="text-slate-500" />
+        <div className="a-seg" role="radiogroup" aria-label="Status">
           {['all', 'active', 'draft', 'completed', 'archived'].map(status => (
             <button key={status} onClick={() => setFilterStatus(status)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterStatus === status ? 'bg-cyan-600 text-white' : 'bg-slate-800/60 text-slate-400 hover:bg-slate-700/60 border border-slate-700/50'}`}>
+              className={`a-seg-i ${filterStatus === status ? 'a-seg-on' : ''}`}>
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </button>
           ))}
@@ -420,8 +426,8 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
 
         {boatClasses.length > 1 && (
           <select value={filterBoatClass} onChange={e => setFilterBoatClass(e.target.value)}
-            className="px-3 py-1.5 bg-slate-800/60 border border-slate-700/50 rounded-lg text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-cyan-500/50">
-            <option value="all">All Classes</option>
+            className="a-pick a-inp-sel" style={{ paddingRight: 36 }}>
+            <option value="all">All classes</option>
             {boatClasses.map(bc => <option key={bc} value={bc}>{bc}</option>)}
           </select>
         )}
@@ -432,15 +438,15 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
           <div className="animate-spin w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full" />
         </div>
       ) : filteredRosters.length === 0 ? (
-        <div className="text-center py-20 bg-slate-800/30 border border-slate-700/50 rounded-xl">
-          <ClipboardList size={48} className="mx-auto text-slate-600 mb-4" />
-          <h3 className="text-lg font-medium text-slate-300 mb-2">{rosters.length === 0 ? 'No Rosters Yet' : 'No Matching Rosters'}</h3>
-          <p className="text-slate-500 mb-6 max-w-md mx-auto">
+        <div className="a-card a-empty text-center py-20">
+          <span className="a-tile mx-auto mb-2" style={{ width: 48, height: 48 }}><ClipboardList size={22} /></span>
+          <h3 className="a-ink text-[16px] font-semibold mb-1">{rosters.length === 0 ? 'No Rosters Yet' : 'No Matching Rosters'}</h3>
+          <p className="a-dim text-[13.5px] mb-5 max-w-md mx-auto">
             {rosters.length === 0 ? 'Create your first PRO roster to automatically assign race officers to your sailing days.' : 'Try adjusting your search or filters to find what you\'re looking for.'}
           </p>
           {rosters.length === 0 && (
-            <button onClick={() => setShowBuilder(true)} className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-xl font-medium hover:from-cyan-500 hover:to-blue-500 transition-all">
-              <Plus size={16} className="inline mr-2" /> Create First Roster
+            <button onClick={() => setShowBuilder(true)} className="a-btn a-btn-p">
+              <Plus size={16} /> Create first roster
             </button>
           )}
         </div>
@@ -554,11 +560,14 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
   );
 };
 
-function StatCard({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) {
+function StatCard({ label, value, icon }: { label: string; value: number; icon: React.ReactNode; color: string }) {
   return (
-    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
-      <div className={`flex items-center gap-2 ${color} text-sm mb-1`}>{icon}{label}</div>
-      <div className="text-2xl font-bold text-white">{value}</div>
+    <div className="a-card flex items-center gap-3.5" style={{ padding: '16px 18px' }}>
+      <span className="a-tile">{icon}</span>
+      <div>
+        <p className="a-cap">{label}</p>
+        <div className="a-num a-ink text-[28px] font-semibold leading-[1.1] mt-1">{value}</div>
+      </div>
     </div>
   );
 }
@@ -690,113 +699,104 @@ function RosterListDashboard({
   onActivate: (id: string) => void;
 }) {
   const sorted = [...rosters].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+  const cols = 'minmax(0,1.7fr) 110px minmax(0,1.15fr) 150px 170px 90px';
+  const STATUS_GROUPS: { id: string; label: string; light: string }[] = [
+    { id: 'active', label: 'Active', light: 'a-light-g' },
+    { id: 'draft', label: 'Draft', light: 'a-light-a' },
+    { id: 'completed', label: 'Completed', light: 'a-light-b' },
+    { id: 'archived', label: 'Archived', light: 'a-light-n' },
+  ];
+  const known = new Set(STATUS_GROUPS.map(g => g.id));
+  const groups = [...STATUS_GROUPS, { id: '__other', label: 'Other', light: 'a-light-n' }]
+    .map(g => ({ ...g, rosters: sorted.filter(r => g.id === '__other' ? !known.has(r.status) : r.status === g.id) }))
+    .filter(g => g.rosters.length > 0);
+  const fmt = (d: string, y?: boolean) => new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', ...(y ? { year: 'numeric' } : {}) });
 
   return (
-    <div className="bg-slate-800/30 border border-slate-700/40 rounded-xl overflow-hidden">
+    <div className="a-card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-slate-700/50">
-              <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-4 py-3">Roster</th>
-              <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-4 py-3">Class</th>
-              <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-4 py-3">Dates</th>
-              <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-4 py-3">Status</th>
-              <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-4 py-3">Members</th>
-              <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-4 py-3">Progress</th>
-              <th className="text-right text-xs font-medium text-slate-500 uppercase tracking-wider px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map(roster => {
-              const summary = summaries.get(roster.id);
-              const classImg = getBoatClassImage(roster.boat_class);
-              const startDate = new Date(roster.start_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
-              const endDate = new Date(roster.end_date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
-              const maxAvatars = 4;
-              const avatars = summary ? summary.member_avatars.slice(0, maxAvatars) : [];
-              const names = summary ? summary.member_names.slice(0, maxAvatars) : [];
-              const extra = summary ? Math.max(0, summary.member_ids.length - maxAvatars) : 0;
-              const pct = summary && summary.total_rounds > 0 ? Math.round((summary.assigned_count / summary.total_rounds) * 100) : 0;
-
-              return (
-                <tr key={roster.id} onClick={() => onSelect(roster)}
-                  className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors cursor-pointer group">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      {classImg ? (
-                        <img src={classImg} alt="" className="w-10 h-7 rounded object-cover flex-shrink-0" />
-                      ) : (
-                        <div className="w-10 h-7 rounded bg-slate-700 flex items-center justify-center flex-shrink-0">
-                          <Anchor size={14} className="text-slate-500" />
-                        </div>
-                      )}
+        <div style={{ minWidth: 860 }}>
+          <div className="grid gap-4 a-bd border-b" style={{ gridTemplateColumns: cols, padding: '12px 18px' }}>
+            <p className="a-cap">Roster</p><p className="a-cap">Class</p><p className="a-cap">Dates</p><p className="a-cap">Members</p><p className="a-cap">Rostered</p><span />
+          </div>
+          {groups.map(g => (
+            <React.Fragment key={g.id}>
+              <div className="flex items-center gap-2.5" style={{ padding: '12px 18px 4px' }}>
+                <span className={`a-light ${g.light}`} />
+                <span className="a-display a-ink text-[14px] font-semibold">{g.label}</span>
+                <span className="a-cnt">{g.rosters.length}</span>
+              </div>
+              {g.rosters.map(roster => {
+                const summary = summaries.get(roster.id);
+                const maxAvatars = 4;
+                const avatars = summary ? summary.member_avatars.slice(0, maxAvatars) : [];
+                const names = summary ? summary.member_names.slice(0, maxAvatars) : [];
+                const extra = summary ? Math.max(0, summary.member_ids.length - maxAvatars) : 0;
+                const pct = summary && summary.total_rounds > 0 ? Math.round((summary.assigned_count / summary.total_rounds) * 100) : 0;
+                const segs = summary ? Math.min(summary.total_rounds, 12) : 0;
+                const filled = summary && summary.total_rounds > 0 ? Math.round((summary.assigned_count / summary.total_rounds) * segs) : 0;
+                const sameDay = roster.start_date === roster.end_date;
+                return (
+                  <div key={roster.id} onClick={() => onSelect(roster)} className="a-ros-row group grid gap-4 items-center cursor-pointer" style={{ gridTemplateColumns: cols, padding: '11px 18px' }}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="a-tile">{roster.series_id || (summary && summary.total_rounds > 1) ? <Layers size={17} /> : <CalendarDays size={17} />}</span>
                       <div className="min-w-0">
-                        <div className="font-medium text-sm text-white truncate group-hover:text-cyan-400 transition-colors">{roster.name}</div>
-                        {roster.series_id && <div className="text-[10px] text-slate-500">Series</div>}
+                        <div className="a-ink text-[14.5px] font-semibold truncate">{roster.name}</div>
+                        <div className="a-dim text-[12px] mt-0.5">{roster.series_id || (summary && summary.total_rounds > 1) ? 'Series' : 'One-off'}{summary ? ` · ${summary.total_rounds} round${summary.total_rounds !== 1 ? 's' : ''}` : ''}</div>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-300">{roster.boat_class}</td>
-                  <td className="px-4 py-3">
-                    <div className="text-sm text-slate-300">{startDate} - {endDate}</div>
-                    {summary && <div className="text-[10px] text-slate-500">{summary.total_rounds} rounds</div>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border ${getStatusColor(roster.status)}`}>
-                      {roster.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {summary && summary.member_ids.length > 0 ? (
-                      <div className="flex items-center gap-2">
-                        <div className="flex -space-x-1.5">
+                    <span><span className="a-lb-cls"><svg width="9" height="11" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M1 .75v10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M1.75 1.25h6.5L1.75 5.5z" fill="currentColor" /></svg>{roster.boat_class}</span></span>
+                    <span className="a-mute a-num text-[13px]" style={{ letterSpacing: 0 }}>{sameDay ? fmt(roster.start_date, true) : `${fmt(roster.start_date, new Date(roster.start_date).getFullYear() !== new Date(roster.end_date).getFullYear())} – ${fmt(roster.end_date, true)}`}</span>
+                    <div>
+                      {summary && summary.member_ids.length > 0 ? (
+                        <span className="inline-flex items-center">
                           {avatars.map((avatar, i) => (
-                            <div key={i} className="w-6 h-6 rounded-full border-2 border-slate-800 bg-slate-700 flex items-center justify-center text-[8px] font-medium text-white overflow-hidden flex-shrink-0" title={names[i]}>
-                              {avatar ? <img src={avatar} alt="" className="w-full h-full object-cover" /> : names[i]?.split(' ').map(n => n[0]).join('')}
-                            </div>
+                            <span key={i} className="inline-flex" style={{ marginLeft: i ? -7 : 0 }} title={names[i]}>
+                              <AAvatar url={avatar} first={names[i]?.split(' ')[0]} last={names[i]?.split(' ').slice(-1)[0]} size={26} className="a-av-ring" />
+                            </span>
                           ))}
-                          {extra > 0 && (
-                            <div className="w-6 h-6 rounded-full border-2 border-slate-800 bg-slate-600 flex items-center justify-center text-[8px] font-medium text-white flex-shrink-0">+{extra}</div>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-500">{summary.member_ids.length}</span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-600">--</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {summary && summary.total_rounds > 0 ? (
-                      <div className="flex items-center gap-2 min-w-[100px]">
-                        <div className="flex-1 h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" style={{ width: `${pct}%` }} />
-                        </div>
-                        <span className="text-[10px] text-slate-500 w-8 text-right">{pct}%</span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-600">--</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {extra > 0 && <span className="a-av a-av-more" style={{ marginLeft: -7 }}>+{extra}</span>}
+                        </span>
+                      ) : (
+                        <span className="a-dim text-[12.5px]">No one yet</span>
+                      )}
+                    </div>
+                    <div>
+                      {summary && summary.total_rounds > 0 ? (
+                        <>
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: segs }, (_, i) => (
+                              <span key={i} className="flex-1 h-2 rounded-[2px]" style={{ background: i < filled ? (pct >= 100 ? '#30D158' : '#0A84FF') : 'var(--a-ring-track, rgba(255,255,255,0.08))' }} />
+                            ))}
+                          </div>
+                          <div className="flex justify-between mt-[5px] text-[11.5px]">
+                            <span className={pct >= 100 ? 'a-txt-g' : pct > 0 ? 'a-txt-b' : 'a-dim'}>{pct >= 100 ? 'Fully rostered' : pct > 0 ? `${summary.total_rounds - summary.assigned_count} to fill` : 'Not started'}</span>
+                            <span className="a-num a-mute">{pct}%</span>
+                          </div>
+                        </>
+                      ) : (
+                        <span className="a-dim text-[12.5px]">No rounds</span>
+                      )}
+                    </div>
+                    <div className="flex justify-end gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                       {roster.status === 'draft' && (
-                        <button onClick={e => { e.stopPropagation(); onActivate(roster.id); }} className="p-1.5 rounded-md text-emerald-400 hover:bg-emerald-500/10 transition-all" title="Activate">
-                          <Play size={13} />
+                        <button onClick={() => onActivate(roster.id)} className="a-ib a-txt-g" title="Activate" aria-label="Activate">
+                          <Play size={16} />
                         </button>
                       )}
-                      <button onClick={e => { e.stopPropagation(); onEdit(roster); }} className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-all" title="Edit">
-                        <Pencil size={13} />
+                      <button onClick={() => onEdit(roster)} className="a-ib" title="Edit" aria-label="Edit">
+                        <Pencil size={16} />
                       </button>
-                      <button onClick={e => { e.stopPropagation(); onDelete(roster.id); }} className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Delete">
-                        <Trash2 size={13} />
+                      <button onClick={() => onDelete(roster.id)} className="a-ib a-ib-d" title="Delete" aria-label="Delete">
+                        <Trash2 size={16} />
                       </button>
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
       </div>
       {sorted.length === 0 && (
         <div className="text-center py-10 text-slate-500 text-sm">No rosters match your filters</div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Send, Phone, Video, PhoneOff, Users } from 'lucide-react';
+import { ArrowLeft, Send, Phone, Video, PhoneOff, UserPlus } from 'lucide-react';
+import { AAvatar } from '../alfie/Kit';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
@@ -342,109 +343,73 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
     return acc;
   }, []);
 
+  const [rFirst, ...rRest] = (recipientName || '?').split(' ');
+  const rLast = rRest.join(' ');
+  const dot = (size: number) => (
+    <span className="a-pres" style={{ width: size, height: size, background: recipientOnline ? '#30D158' : '#6B7488' }} />
+  );
+
   return (
-    <div className={`flex flex-col h-full ${darkMode ? 'bg-slate-900' : 'bg-gray-50'}`}>
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b ${darkMode ? 'bg-slate-800/80 border-slate-700/50' : 'bg-white border-gray-200'}`}>
-        <button
-          onClick={onBack}
-          className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-gray-100 text-gray-600'}`}
-        >
-          <ArrowLeft size={20} />
+    <div className="flex flex-col h-full">
+      <div className="flex-shrink-0 flex items-center gap-3 border-b a-bd" style={{ padding: '14px 18px' }}>
+        <button onClick={onBack} className="a-ib lg:hidden" aria-label="Back to chats">
+          <ArrowLeft size={18} />
         </button>
-        <div className="relative flex-shrink-0">
-          {recipientAvatar ? (
-            <img src={recipientAvatar} alt={recipientName} className="w-10 h-10 rounded-full object-cover" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">
-              {recipientName?.charAt(0) || '?'}
-            </div>
-          )}
-          <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${darkMode ? 'border-slate-800' : 'border-white'} ${recipientOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
-        </div>
+        <span className="relative inline-flex flex-shrink-0">
+          <AAvatar url={recipientAvatar} first={rFirst} last={rLast} size={42} />
+          {dot(12)}
+        </span>
         <div className="flex-1 min-w-0">
-          <div className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>{recipientName}</div>
-          <div className={`text-xs ${recipientOnline ? 'text-green-500' : darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{recipientOnline ? 'Online' : 'Offline'}</div>
+          <div className="a-ink text-[16px] font-semibold truncate">{recipientName}</div>
+          <div className={`text-[12.5px] mt-0.5 ${recipientOnline ? 'a-txt-g' : 'a-dim'}`}>{recipientOnline ? 'Online' : 'Offline'}</div>
         </div>
         <button
           onClick={() => startCall(recipientId, recipientName, recipientAvatar, conversationId || undefined, undefined, false)}
           disabled={!!callState}
-          className={`p-2 rounded-lg transition-colors ${
-            callState
-              ? 'opacity-40 cursor-not-allowed'
-              : recipientOnline
-                ? 'text-green-500 hover:bg-green-500/10 hover:text-green-400'
-                : darkMode
-                  ? 'text-slate-500 hover:bg-slate-700 hover:text-slate-300'
-                  : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
-          }`}
+          className="a-ib a-ib-call-g disabled:opacity-40"
+          style={{ width: 40, height: 40 }}
+          aria-label="Voice call"
           title="Voice call"
         >
-          <Phone size={20} />
+          <Phone size={18} />
         </button>
         <button
           onClick={() => startCall(recipientId, recipientName, recipientAvatar, conversationId || undefined, undefined, true)}
           disabled={!!callState}
-          className={`p-2 rounded-lg transition-colors ${
-            callState
-              ? 'opacity-40 cursor-not-allowed'
-              : recipientOnline
-                ? 'text-blue-500 hover:bg-blue-500/10 hover:text-blue-400'
-                : darkMode
-                  ? 'text-slate-500 hover:bg-slate-700 hover:text-slate-300'
-                  : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
-          }`}
+          className="a-ib a-ib-call-b disabled:opacity-40"
+          style={{ width: 40, height: 40 }}
+          aria-label="Video call"
           title="Video call"
         >
-          <Video size={20} />
+          <Video size={18} />
         </button>
         <button
           onClick={() => setShowGroupCallPicker(true)}
           disabled={!!callState}
-          className={`p-2 rounded-lg transition-colors ${
-            callState
-              ? 'opacity-40 cursor-not-allowed'
-              : darkMode
-                ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
-                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
-          }`}
+          className="a-ib disabled:opacity-40"
+          aria-label="Add people"
           title="Group call"
         >
-          <Users size={20} />
+          <UserPlus size={18} />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto" style={{ padding: '18px 24px' }}>
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-8">
-            <div className="relative mb-4">
-              {recipientAvatar ? (
-                <img src={recipientAvatar} alt={recipientName} className="w-20 h-20 rounded-full object-cover" />
-              ) : (
-                <div className="w-20 h-20 rounded-full bg-blue-500 flex items-center justify-center text-white text-2xl font-bold">
-                  {recipientName?.charAt(0) || '?'}
-                </div>
-              )}
-            </div>
-            <p className={`font-semibold mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{recipientName}</p>
-            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-              Start a conversation with {recipientName}
-            </p>
+            <span className="mb-4"><AAvatar url={recipientAvatar} first={rFirst} last={rLast} size={80} /></span>
+            <p className="a-display a-ink text-[19px] font-semibold mb-1">{recipientName}</p>
+            <p className="a-mute text-[14px]">Start a conversation with {recipientName}</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="flex flex-col gap-2">
             {groupedMessages.map((group) => (
-              <div key={group.date}>
-                <div className="flex items-center gap-3 my-4">
-                  <div className={`flex-1 h-px ${darkMode ? 'bg-slate-700/50' : 'bg-gray-200'}`} />
-                  <span className={`text-xs font-medium px-2 ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
-                    {formatDateSeparator(group.msgs[0].created_at)}
-                  </span>
-                  <div className={`flex-1 h-px ${darkMode ? 'bg-slate-700/50' : 'bg-gray-200'}`} />
-                </div>
+              <React.Fragment key={group.date}>
+                <div className="a-chat-sep">{formatDateSeparator(group.msgs[0].created_at)}</div>
                 {group.msgs.map((msg) => {
                   const isOwn = msg.sender_id === currentUserId;
                   const isOptimistic = msg.id.startsWith('temp-');
@@ -453,91 +418,71 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
                   if (isCallEvent) {
                     const isMissed = msg.message_type === 'missed_call';
                     const isDeclined = msg.message_type === 'declined_call';
-                    const isCompleted = msg.message_type === 'completed_call';
                     return (
-                      <div key={msg.id} className="flex justify-center mb-3">
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium ${
-                          isMissed || isDeclined
-                            ? darkMode ? 'bg-red-900/20 text-red-400' : 'bg-red-50 text-red-600'
-                            : darkMode ? 'bg-slate-700/50 text-slate-300' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {isMissed || isDeclined ? (
-                            <PhoneOff size={14} />
-                          ) : (
-                            <Phone size={14} />
-                          )}
-                          <span>{msg.content}</span>
-                          <span className={`${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
-                            {formatMessageTime(msg.created_at)}
-                          </span>
+                      <div key={msg.id} className={`a-chat-call ${isMissed || isDeclined ? '' : 'a-chat-call-n'}`}>
+                        {isMissed || isDeclined ? <PhoneOff size={14} /> : <Phone size={14} />}
+                        <span>{msg.content} · {formatMessageTime(msg.created_at)}</span>
+                      </div>
+                    );
+                  }
+
+                  if (isOwn) {
+                    return (
+                      <div key={msg.id} className="flex flex-col items-end">
+                        <div className={`a-bub a-bout ${isOptimistic ? 'opacity-70' : ''}`}>
+                          <p className="whitespace-pre-wrap break-words m-0">{msg.content}</p>
                         </div>
+                        <span className="a-chat-tm">{isOptimistic ? 'Sending…' : formatMessageTime(msg.created_at)}</span>
                       </div>
                     );
                   }
 
                   return (
-                    <div key={msg.id} className={`flex mb-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[75%] ${isOwn ? 'order-2' : ''}`}>
-                        <div className={`px-4 py-2.5 rounded-2xl ${
-                          isOwn
-                            ? `bg-blue-500 text-white rounded-br-md ${isOptimistic ? 'opacity-70' : ''}`
-                            : darkMode
-                              ? 'bg-slate-700/80 text-slate-200 rounded-bl-md'
-                              : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
-                        }`}>
-                          <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                    <div key={msg.id} className="flex items-end gap-2">
+                      <AAvatar url={recipientAvatar} first={rFirst} last={rLast} size={28} />
+                      <div className="flex flex-col" style={{ maxWidth: '62%' }}>
+                        <div className="a-bub a-bin" style={{ maxWidth: 'none' }}>
+                          <p className="whitespace-pre-wrap break-words m-0">{msg.content}</p>
                         </div>
-                        <p className={`text-[10px] mt-1 ${isOwn ? 'text-right' : ''} ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
-                          {isOptimistic ? 'Sending...' : formatMessageTime(msg.created_at)}
-                        </p>
+                        <span className="a-chat-tm">{formatMessageTime(msg.created_at)}</span>
                       </div>
                     </div>
                   );
                 })}
-              </div>
+              </React.Fragment>
             ))}
             <div ref={messagesEndRef} />
           </div>
         )}
       </div>
 
-      <div className={`flex-shrink-0 p-3 border-t ${darkMode ? 'bg-slate-800/60 border-slate-700/50' : 'bg-white border-gray-200'}`}>
+      <div className="flex-shrink-0" style={{ margin: '0 16px 16px' }}>
         {sendError && (
-          <div className="mb-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-between">
-            <p className="text-xs text-red-400">{sendError}</p>
-            <button onClick={() => setSendError(null)} className="text-red-400 hover:text-red-300 ml-2 text-xs font-medium">Dismiss</button>
+          <div className="a-note a-note-r mb-2 flex items-center justify-between">
+            <p className="text-[12.5px] m-0">{sendError}</p>
+            <button onClick={() => setSendError(null)} className="a-txt-r ml-2 text-[12px] font-semibold">Dismiss</button>
           </div>
         )}
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <textarea
-              ref={inputRef}
-              value={newMessage}
-              onChange={(e) => { setNewMessage(e.target.value); if (sendError) setSendError(null); }}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message..."
-              rows={1}
-              className={`w-full px-4 py-2.5 rounded-2xl resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all ${
-                darkMode
-                  ? 'bg-slate-700/60 border border-slate-600/50 text-white placeholder-slate-500'
-                  : 'bg-gray-100 border border-gray-200 text-gray-900 placeholder-gray-400'
-              }`}
-              style={{ maxHeight: 120 }}
-              onInput={(e) => {
-                const t = e.target as HTMLTextAreaElement;
-                t.style.height = 'auto';
-                t.style.height = Math.min(t.scrollHeight, 120) + 'px';
-              }}
-            />
-          </div>
+        <div className="a-composer">
+          <textarea
+            ref={inputRef}
+            value={newMessage}
+            onChange={(e) => { setNewMessage(e.target.value); if (sendError) setSendError(null); }}
+            onKeyDown={handleKeyDown}
+            placeholder={`Message ${rFirst}…`}
+            rows={1}
+            style={{ maxHeight: 120 }}
+            onInput={(e) => {
+              const t = e.target as HTMLTextAreaElement;
+              t.style.height = 'auto';
+              t.style.height = Math.min(t.scrollHeight, 120) + 'px';
+            }}
+          />
           <button
             onClick={handleSend}
             disabled={!newMessage.trim() || sending}
-            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-              newMessage.trim()
-                ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/20'
-                : darkMode ? 'bg-slate-700/60 text-slate-500' : 'bg-gray-200 text-gray-400'
-            }`}
+            className="a-send"
+            aria-label="Send"
           >
             <Send size={18} />
           </button>

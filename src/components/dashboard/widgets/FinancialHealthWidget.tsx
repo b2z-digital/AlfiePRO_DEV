@@ -184,9 +184,9 @@ export const FinancialHealthWidget: React.FC<WidgetProps> = ({ widgetId, isEditM
       )}
 
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <DollarSign className={darkMode ? "text-green-400" : "text-green-500"} size={18} />
-          <h2 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-700'}`}>Financial Health</h2>
+        <div className="flex items-center gap-3">
+          <span className="a-tile flex-shrink-0" style={{ width: 32, height: 32 }}><DollarSign size={16} /></span>
+          <h2 className="a-display a-ink text-[16px] font-semibold">Financial Health</h2>
         </div>
         {!isEditMode && <ChevronRight size={14} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />}
       </div>

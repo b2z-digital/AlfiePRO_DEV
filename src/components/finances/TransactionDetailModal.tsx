@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, DollarSign, FileText, User, CreditCard, Tag, MessageSquare, Users, Receipt } from 'lucide-react';
+import { X, Calendar, FileText, User, CreditCard, Tag, MessageSquare, Users, Receipt, SquarePen as Edit2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -226,418 +226,178 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     }).format(Math.abs(amount));
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-AU', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
-  };
 
   if (!isOpen) return null;
 
+  const inc = initialTransaction.type === 'deposit' || initialTransaction.type === 'income';
+  const paid = formData.payment_status === 'paid' || formData.payment_status === 'completed';
+  const Row = ({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) => (
+    <div className="a-ir"><span className="a-ir-l">{icon}{label}</span><span className="a-ir-v">{children}</span></div>
+  );
+
   const modalContent = (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-      <div className={`
-        rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto
-        ${darkMode ? 'bg-slate-800' : 'bg-white'}
-      `}>
-        {/* Header */}
-        <div className="bg-gradient-to-br from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
-          <div className="flex items-center gap-3 relative z-10">
-            <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20">
-              <Receipt className="text-white drop-shadow-lg" size={24} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-white drop-shadow-lg">
-                Transaction Details
-              </h2>
-              <p className="text-cyan-100 text-sm mt-0.5">
-                {isEditing ? 'Edit transaction information' : 'View transaction details'}
-              </p>
-            </div>
+      <section className="a-msheet" style={{ width: 600 }} role="dialog" aria-modal="true" aria-label="Transaction details">
+        <div className="flex items-center gap-3 flex-shrink-0" style={{ padding: '18px 18px 0 22px' }}>
+          <span className="a-tile"><Receipt size={19} /></span>
+          <div className="flex-1 min-w-0">
+            <p className="a-cap">{isEditing ? 'Edit transaction' : 'Transaction'}</p>
+            <div className="a-ink text-[15px] font-semibold mt-[3px] truncate">{formData.description}</div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-white/80 hover:text-white rounded-xl p-2.5 hover:bg-white/10 transition-all hover:rotate-90 transform duration-300 relative z-10"
-          >
-            <X size={20} />
-          </button>
+          <button onClick={onClose} className="a-ib" aria-label="Close"><X size={20} /></button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* Type and Status Row */}
-          <div className="flex items-center gap-4">
-            <span className={`
-              px-3 py-1.5 rounded-full text-sm font-medium
-              ${(initialTransaction.type === 'deposit' || initialTransaction.type === 'income')
-                ? 'bg-green-900/30 text-green-400'
-                : 'bg-red-900/30 text-red-400'}
-            `}>
-              {(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? 'Income' : 'Expense'}
-            </span>
-
+        <div className="flex-1 overflow-y-auto">
+          <div className="a-amt-hero" style={{ margin: '18px 22px 0', ['--amt-glow' as any]: inc ? 'rgba(48,209,88,0.16)' : 'rgba(255,107,107,0.16)' }}>
+            <div className="flex justify-center gap-2.5">
+              <span className="a-lb-fmt"><span className="a-light" style={{ background: inc ? '#30D158' : '#FF6B6B', boxShadow: 'none' }} />{inc ? 'Income' : 'Expense'}</span>
+            </div>
+            {isEditing ? (
+              <label className="inline-flex items-center gap-1 mt-3.5">
+                <span className={`a-big ${inc ? 'a-txt-g' : 'a-txt-r'}`} style={{ fontSize: 40 }}>{inc ? '+' : '−'}$</span>
+                <span className="sr-only">Amount</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.amount}
+                  onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) }))}
+                  className={`a-big a-amt-inp ${inc ? 'a-txt-g' : 'a-txt-r'}`}
+                  style={{ fontSize: 40 }}
+                />
+              </label>
+            ) : (
+              <div className={`a-big mt-3.5 ${inc ? 'a-txt-g' : 'a-txt-r'}`} style={{ fontSize: 54 }}>{inc ? '+' : '−'}{formatCurrency(formData.amount)}</div>
+            )}
             {!isEditing && (
-              <div className="flex items-center gap-2">
-                <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Status:</span>
+              <div className="inline-flex mt-4 relative">
+                <span className={`a-light ${paid ? 'a-light-g' : 'a-light-a'} absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none`} />
+                <label className="sr-only" htmlFor="tx-status">Status</label>
                 <select
+                  id="tx-status"
                   value={formData.payment_status}
                   onChange={(e) => handleQuickStatusUpdate(e.target.value)}
                   disabled={loading}
-                  className={`
-                    px-3 py-1.5 rounded-full text-sm font-medium cursor-pointer
-                    ${(formData.payment_status === 'paid' || formData.payment_status === 'completed')
-                      ? 'bg-green-900/30 text-green-400'
-                      : 'bg-amber-900/30 text-amber-400'}
-                    ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-300'}
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                  `}
+                  className="a-pick"
+                  style={{ height: 36, borderRadius: 11, paddingLeft: 30 }}
                 >
                   {isAssociation ? (
-                    <>
-                      <option value="pending">Pending</option>
-                      <option value="completed">Completed</option>
-                    </>
+                    <><option value="pending">Pending</option><option value="completed">Completed</option></>
                   ) : (
-                    <>
-                      <option value="awaiting_payment">Awaiting Payment</option>
-                      <option value="paid">Paid</option>
-                    </>
+                    <><option value="awaiting_payment">Awaiting payment</option><option value="paid">Paid</option></>
                   )}
                 </select>
               </div>
             )}
           </div>
 
-          {/* Amount */}
-          <div className={`
-            p-4 rounded-lg border
-            ${darkMode ? 'bg-slate-700/30 border-slate-700' : 'bg-slate-50 border-slate-200'}
-          `}>
-            <div className="flex items-center gap-3">
-              <DollarSign className={darkMode ? 'text-slate-400' : 'text-slate-600'} size={20} />
-              <div>
-                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Amount</p>
+          <div style={{ padding: '18px 22px 22px' }} className="flex flex-col gap-3">
+            <div className="a-grp">
+              {isEditing && (
+                <Row icon={<FileText size={15} />} label="Description">
+                  <input className="a-bare" type="text" value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} aria-label="Description" />
+                </Row>
+              )}
+              <Row icon={<Calendar size={15} />} label="Date">
+                {isEditing
+                  ? <input className="a-bare a-inp-date" type="date" value={formData.date} onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))} aria-label="Date" />
+                  : new Date(formData.date).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </Row>
+              <Row icon={<Tag size={15} />} label="Category">
+                {isEditing ? (
+                  <select className="a-bare" value={formData.category_id} onChange={(e) => setFormData(prev => ({ ...prev, category_id: e.target.value }))} aria-label="Category">
+                    <option value="">Select category</option>
+                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                  </select>
+                ) : (initialTransaction.category_name || <span className="a-dim">None</span>)}
+              </Row>
+              <Row icon={<User size={15} />} label={inc ? 'Payer' : 'Payee'}>
                 {isEditing ? (
                   <input
-                    type="number"
-                    step="0.01"
-                    value={formData.amount}
-                    onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) }))}
-                    className={`
-                      text-2xl font-bold mt-1 px-2 py-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
-                      ${(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? 'text-green-400' : 'text-red-400'}
-                      ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-300'}
-                      border
-                    `}
+                    className="a-bare"
+                    type="text"
+                    aria-label={inc ? 'Payer' : 'Payee'}
+                    value={inc ? formData.payer : formData.payee}
+                    onChange={(e) => setFormData(prev => ({ ...prev, [inc ? 'payer' : 'payee']: e.target.value }))}
                   />
-                ) : (
-                  <p className={`text-2xl font-bold ${(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? 'text-green-400' : 'text-red-400'}`}>
-                    {(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? '+' : '-'}{formatCurrency(formData.amount)}
-                  </p>
-                )}
-              </div>
+                ) : ((inc ? formData.payer : formData.payee) || <span className="a-dim">—</span>)}
+              </Row>
+              <Row icon={<CreditCard size={15} />} label="Payment">
+                {isEditing ? (
+                  <select className="a-bare" value={formData.payment_method} onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value }))} aria-label="Payment method">
+                    <option value="cash">Cash</option>
+                    <option value="stripe">Stripe</option>
+                    <option value="bank_transfer">Bank transfer</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="credit_card">Credit card</option>
+                    <option value="debit_card">Debit card</option>
+                    <option value="other">Other</option>
+                  </select>
+                ) : <span className="capitalize">{formData.payment_method.replace('_', ' ')}</span>}
+              </Row>
+              {formData.reference && (
+                <Row icon={<Receipt size={15} />} label="Reference"><span className="a-mono a-mute">{formData.reference}</span></Row>
+              )}
+              <Row icon={<MessageSquare size={15} />} label="Notes">
+                {isEditing
+                  ? <textarea className="a-bare" rows={3} value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} aria-label="Notes" />
+                  : <span className="a-mute">{formData.notes || 'No notes'}</span>}
+              </Row>
             </div>
-          </div>
 
-          {/* Description */}
-          <div>
-            <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              <FileText size={16} />
-              Description
-            </label>
-            {isEditing ? (
-              <input
-                type="text"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                className={`
-                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
-                `}
-              />
-            ) : (
-              <p className={`${darkMode ? 'text-white' : 'text-slate-900'}`}>{formData.description}</p>
-            )}
-          </div>
-
-          {/* Date */}
-          <div>
-            <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              <Calendar size={16} />
-              Date
-            </label>
-            {isEditing ? (
-              <input
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                className={`
-                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200 [color-scheme:dark]' : 'bg-white border-slate-300 text-slate-900'}
-                `}
-              />
-            ) : (
-              <p className={`${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatDate(formData.date)}</p>
-            )}
-          </div>
-
-          {/* Category */}
-          <div>
-            <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              <Tag size={16} />
-              Category
-            </label>
-            {isEditing ? (
-              <select
-                value={formData.category_id}
-                onChange={(e) => setFormData(prev => ({ ...prev, category_id: e.target.value }))}
-                className={`
-                  w-full px-3 py-2.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-no-repeat bg-[length:16px_16px] bg-[position:right_12px_center] cursor-pointer
-                  ${darkMode
-                    ? 'bg-slate-700 border-slate-600 text-slate-200 bg-[image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2716%27%20height%3D%2716%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%2394a3b8%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27m6%209%206%206%206-6%27/%3E%3C/svg%3E")]'
-                    : 'bg-white border-slate-300 text-slate-900 bg-[image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2716%27%20height%3D%2716%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%2364748b%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27m6%209%206%206%206-6%27/%3E%3C/svg%3E")]'}
-                  pr-10
-                `}
-              >
-                <option value="">Select category</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
-            ) : (
-              <p className={`${darkMode ? 'text-white' : 'text-slate-900'}`}>{initialTransaction.category_name || 'N/A'}</p>
-            )}
-          </div>
-
-          {/* Payer/Payee */}
-          <div>
-            <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              <User size={16} />
-              {initialTransaction.type === 'deposit' || initialTransaction.type === 'income' ? 'Payer' : 'Payee'}
-            </label>
-            {isEditing ? (
-              <input
-                type="text"
-                value={(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? formData.payer : formData.payee}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  [(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? 'payer' : 'payee']: e.target.value
-                }))}
-                className={`
-                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
-                `}
-              />
-            ) : (
-              <p className={`${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                {(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? (formData.payer || 'N/A') : (formData.payee || 'N/A')}
-              </p>
-            )}
-          </div>
-
-          {/* Payment Method */}
-          <div>
-            <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              <CreditCard size={16} />
-              Payment Method
-            </label>
-            {isEditing ? (
-              <select
-                value={formData.payment_method}
-                onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value }))}
-                className={`
-                  w-full px-3 py-2.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-no-repeat bg-[length:16px_16px] bg-[position:right_12px_center] cursor-pointer
-                  ${darkMode
-                    ? 'bg-slate-700 border-slate-600 text-slate-200 bg-[image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2716%27%20height%3D%2716%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%2394a3b8%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27m6%209%206%206%206-6%27/%3E%3C/svg%3E")]'
-                    : 'bg-white border-slate-300 text-slate-900 bg-[image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2716%27%20height%3D%2716%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%2364748b%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27m6%209%206%206%206-6%27/%3E%3C/svg%3E")]'}
-                  pr-10
-                `}
-              >
-                <option value="cash">Cash</option>
-                <option value="stripe">Stripe</option>
-                <option value="bank_transfer">Bank Transfer</option>
-                <option value="cheque">Cheque</option>
-                <option value="credit_card">Credit Card</option>
-                <option value="debit_card">Debit Card</option>
-                <option value="other">Other</option>
-              </select>
-            ) : (
-              <p className={`${darkMode ? 'text-white' : 'text-slate-900'} capitalize`}>{formData.payment_method.replace('_', ' ')}</p>
-            )}
-          </div>
-
-          {/* Reference */}
-          {formData.reference && (
-            <div>
-              <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Reference
-              </label>
-              <p className={`font-mono text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{formData.reference}</p>
-            </div>
-          )}
-
-          {/* Notes */}
-          <div>
-            <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              <MessageSquare size={16} />
-              Notes
-            </label>
-            {isEditing ? (
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                rows={3}
-                className={`
-                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
-                `}
-              />
-            ) : (
-              <p className={`${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{formData.notes || 'No notes'}</p>
-            )}
-          </div>
-
-          {/* Linked Members for Bulk Remittance */}
-          {isAssociation && initialTransaction.linked_entity_type === 'club' && formData.description.includes('members') && (
-            <div>
-              <button
-                onClick={() => {
-                  if (!showMembers) {
-                    loadRemittanceMembers();
-                  }
-                  setShowMembers(!showMembers);
-                }}
-                className={`
-                  w-full flex items-center justify-between p-3 rounded-lg border transition-colors
-                  ${darkMode ? 'bg-slate-700/30 border-slate-700 hover:bg-slate-700/50' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}
-                `}
-              >
-                <div className="flex items-center gap-2">
-                  <Users size={16} className={darkMode ? 'text-slate-400' : 'text-slate-600'} />
-                  <span className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    View Member List
-                  </span>
-                </div>
-                <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {showMembers ? 'Hide' : 'Show'}
-                </span>
-              </button>
-
-              {showMembers && (
-                <div className={`
-                  mt-2 p-4 rounded-lg border max-h-60 overflow-y-auto
-                  ${darkMode ? 'bg-slate-700/30 border-slate-700' : 'bg-slate-50 border-slate-200'}
-                `}>
-                  {loadingMembers ? (
-                    <div className="flex items-center justify-center py-4">
-                      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      <span className={`ml-2 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Loading members...
-                      </span>
-                    </div>
+            {isAssociation && initialTransaction.linked_entity_type === 'club' && formData.description.includes('members') && (
+              <div className="a-grp">
+                <button
+                  onClick={() => { if (!showMembers) loadRemittanceMembers(); setShowMembers(!showMembers); }}
+                  className="a-lnk w-full bg-transparent border-0 text-left cursor-pointer"
+                  aria-expanded={showMembers}
+                >
+                  <span className="a-tile a-tile-sm"><Users size={15} /></span>
+                  <span className="flex-1 a-ink text-sm font-medium">Member list</span>
+                  <span className="a-dim text-xs">{showMembers ? 'Hide' : 'Show'}</span>
+                </button>
+                {showMembers && (
+                  loadingMembers ? (
+                    <div className="a-lnk justify-center"><span className="w-5 h-5 border-2 border-white/10 border-t-[#0A84FF] rounded-full animate-spin" /><span className="a-mute text-sm">Loading members…</span></div>
                   ) : members.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="max-h-60 overflow-y-auto">
                       {members.map((remittance: any) => (
-                        <div
-                          key={remittance.id}
-                          className={`
-                            p-2 rounded border
-                            ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}
-                          `}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                {remittance.members?.first_name} {remittance.members?.last_name}
-                              </p>
-                              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                {remittance.members?.email}
-                              </p>
-                            </div>
-                            <span className={`text-sm font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                              ${remittance.state_contribution_amount.toFixed(2)}
-                            </span>
+                        <div key={remittance.id} className="a-lnk">
+                          <div className="flex-1 min-w-0">
+                            <div className="a-ink text-sm font-medium truncate">{remittance.members?.first_name} {remittance.members?.last_name}</div>
+                            <div className="a-dim text-xs truncate">{remittance.members?.email}</div>
                           </div>
+                          <span className="a-num a-txt-g text-sm font-semibold">${remittance.state_contribution_amount.toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <p className={`text-sm text-center ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      No members found
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+                  ) : <div className="a-lnk a-mute text-sm">No members found</div>
+                )}
+              </div>
+            )}
 
-          {/* Linked Entity Info */}
-          {initialTransaction.linked_entity_type === 'event_registration' && (
-            <div className={`
-              p-3 rounded-lg border-l-4
-              ${darkMode ? 'bg-blue-900/20 border-blue-500' : 'bg-blue-50 border-blue-400'}
-            `}>
-              <p className={`text-sm font-medium ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-                Linked to Event Registration
-              </p>
-              <p className={`text-xs mt-1 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                This transaction was automatically created from an event registration
-              </p>
-            </div>
-          )}
+            {initialTransaction.linked_entity_type === 'event_registration' && (
+              <div className="a-note">
+                <span className="a-txt-b flex"><Calendar size={17} /></span>
+                <span className="flex-1"><span className="block a-ink text-[13.5px] font-medium">Linked to an event registration</span><span className="block a-dim text-xs mt-0.5">Created automatically from an event registration.</span></span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className={`
-          sticky bottom-0 p-6 border-t flex items-center justify-end gap-3
-          ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-        `}>
+        <div className="flex gap-2.5 flex-shrink-0 a-panel-foot" style={{ padding: '16px 22px', justifyContent: 'stretch' }}>
           {isEditing ? (
             <>
-              <button
-                onClick={() => setIsEditing(false)}
-                disabled={loading}
-                className={`
-                  px-4 py-2 rounded-lg font-medium transition-colors
-                  ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                `}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={loading}
-                className="btn-primary-green px-6 py-2 text-white rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Saving...' : 'Save Changes'}
-              </button>
+              <button onClick={() => setIsEditing(false)} disabled={loading} className="a-btn flex-1" style={{ height: 46 }}>Cancel</button>
+              <button onClick={handleSave} disabled={loading} className="a-btn a-btn-p" style={{ height: 46, flex: 1.4 }}>{loading ? 'Saving…' : 'Save changes'}</button>
             </>
           ) : (
             <>
-              <button
-                onClick={onClose}
-                className={`
-                  px-4 py-2 rounded-lg font-medium transition-colors
-                  ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}
-                `}
-              >
-                Close
-              </button>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="btn-primary-green px-6 py-2 text-white rounded-lg transition-all font-semibold"
-              >
-                Edit Transaction
-              </button>
+              <button onClick={onClose} className="a-btn flex-1" style={{ height: 46 }}>Close</button>
+              <button onClick={() => setIsEditing(true)} className="a-btn a-btn-p" style={{ height: 46, flex: 1.4 }}><Edit2 size={16} />Edit transaction</button>
             </>
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 

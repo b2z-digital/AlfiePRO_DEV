@@ -27,9 +27,9 @@ export const ActivityFeedWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode
           <X size={16} />
         </button>
       )}
-      <div className="flex items-center gap-2 mb-4">
-        <Bell className="text-blue-400" size={20} />
-        <h2 className="text-lg font-semibold text-white">Recent Activity</h2>
+      <div className="flex items-center gap-3 mb-4">
+        <span className="a-tile flex-shrink-0" style={{ width: 36, height: 36 }}><Bell size={19} /></span>
+        <h2 className="a-display a-ink text-[18px] font-semibold">Recent Activity</h2>
       </div>
       <p className="text-sm text-slate-400">Activity feed placeholder</p>
     </div>

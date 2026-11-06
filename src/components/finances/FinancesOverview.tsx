@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect, useRef } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Receipt, Plus, ArrowUpRight, ArrowDownRight, ChevronDown, FileText, Minus, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -17,6 +18,7 @@ interface Transaction {
     name: string;
     type: 'income' | 'expense';
   };
+  payment_status?: string;
 }
 
 interface Invoice {
@@ -69,6 +71,8 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => { setHeaderSlot(document.getElementById('alfie-page-actions')); }, []);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [period, setPeriod] = useState<PeriodType>('30d');
   const [clubTaxSettings, setClubTaxSettings] = useState<{ enabled: boolean; rate: number; name: string }>({
@@ -554,25 +558,13 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
     }
   };
 
-  const getChangeColor = (change: number) => {
-    if (change > 0) return 'text-green-400';
-    if (change < 0) return 'text-red-400';
-    return 'text-slate-400';
-  };
-
-  const getChangeIcon = (change: number) => {
-    if (change > 0) return <TrendingUp size={14} />;
-    if (change < 0) return <TrendingDown size={14} />;
-    return null;
-  };
-
   console.log('FinancesOverview render - loading:', loading, 'error:', error, 'summary:', summary);
 
   if (loading) {
     console.log('FinancesOverview: Showing loading spinner');
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/10 border-t-[#0A84FF]"></div>
       </div>
     );
   }
@@ -591,196 +583,70 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
     );
   }
 
+  const isIncome = (t: any) => t.type === 'deposit' || t.type === 'income';
+  const newTxButton = (
+    <div className="relative inline-flex" ref={dropdownRef}>
+      <button onClick={onNewTransaction} className="a-btn a-btn-p" style={{ height: 42, borderRadius: '13px 0 0 13px', paddingRight: 14 }}>
+        <Plus size={16} />New transaction
+      </button>
+      <button
+        onClick={() => setShowDropdown(!showDropdown)}
+        className="a-btn a-btn-p"
+        aria-label="More transaction types"
+        aria-haspopup="menu"
+        aria-expanded={showDropdown}
+        style={{ height: 42, borderRadius: '0 13px 13px 0', padding: '0 10px', borderLeft: '1px solid rgba(255,255,255,0.25)' }}
+      >
+        <ChevronDown size={16} />
+      </button>
+      {showDropdown && (
+        <div className="a-pop absolute right-0 top-full mt-2 w-72 z-50 p-1.5 flex flex-col gap-0.5" role="menu">
+          {([
+            ['invoice', <FileText size={16} />, 'New invoice', 'Create an invoice for services or products'],
+            ['deposit', <Plus size={16} />, 'New deposit', 'Record incoming money or payments'],
+            ['expense', <Minus size={16} />, 'New expense', 'Record money spent or outgoing payments'],
+          ] as const).map(([k, icon, title, desc]) => (
+            <button key={k} role="menuitem" onClick={() => handleTransactionTypeClick(k)} className="a-pop-item" style={{ alignItems: 'flex-start', padding: '10px' }}>
+              <span className="a-tile a-tile-sm" style={{ width: 32, height: 32 }}>{icon}</span>
+              <span className="flex-1 min-w-0"><span className="block a-ink font-semibold text-[13.5px]">{title}</span><span className="block a-dim text-xs mt-0.5">{desc}</span></span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+  const Stat = ({ label, icon, value, sub }: { label: string; icon: React.ReactNode; value: React.ReactNode; sub: React.ReactNode }) => (
+    <div className="a-card flex flex-col gap-3.5" style={{ padding: '18px 20px' }}>
+      <div className="flex items-center justify-between"><p className="a-cap">{label}</p><span className="a-tile a-tile-sm">{icon}</span></div>
+      <div><div className="a-big a-ink" style={{ fontSize: 30 }}>{value}</div><div className="a-mute mt-[7px] text-[12.5px]">{sub}</div></div>
+    </div>
+  );
+  const changeLine = (n: number) => (
+    <span>{formatPercentage(n)} vs previous {getPeriodLabel()}</span>
+  );
+
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Financial Overview</h2>
-        <div className="relative" ref={dropdownRef}>
-          <div className="flex rounded-lg overflow-hidden shadow-md cursor-pointer" style={{ background: 'linear-gradient(to right, #16a34a, #059669)' }}>
-            <button
-              onClick={onNewTransaction}
-              className="flex items-center gap-2 px-4 py-2 text-white text-sm font-medium whitespace-nowrap hover:brightness-110 transition-all"
-            >
-              <Plus size={16} />
-              New Transaction
-            </button>
-            <div className="w-px bg-white/20 self-stretch my-1" />
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="px-2.5 py-2 text-white hover:brightness-110 transition-all"
-            >
-              <ChevronDown size={16} />
-            </button>
-          </div>
+    <div className="flex flex-col gap-[22px]">
+      {headerSlot ? createPortal(newTxButton, headerSlot) : <div className="flex justify-end">{newTxButton}</div>}
 
-          {showDropdown && (
-            <div className={`absolute right-0 mt-2 w-64 rounded-lg shadow-xl border py-2 z-50 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <button
-                onClick={() => handleTransactionTypeClick('invoice')}
-                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
-              >
-                <div className="p-2 rounded-lg bg-blue-500/15">
-                  <FileText className="text-blue-500" size={18} />
-                </div>
-                <div>
-                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Invoice</div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Create an invoice for services or products</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleTransactionTypeClick('deposit')}
-                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
-              >
-                <div className="p-2 rounded-lg bg-green-500/15">
-                  <Plus className="text-green-500" size={18} />
-                </div>
-                <div>
-                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Deposit</div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Record incoming money or payments</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleTransactionTypeClick('expense')}
-                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
-              >
-                <div className="p-2 rounded-lg bg-red-500/15">
-                  <Minus className="text-red-500" size={18} />
-                </div>
-                <div>
-                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Expense</div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Record money spent or outgoing payments</div>
-                </div>
-              </button>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.25fr_1fr_1fr] xl:grid-rows-[auto_auto] gap-4">
+        <div className="a-card a-hero a-hero-spec xl:row-span-2 flex flex-col justify-between gap-[18px] relative overflow-hidden" style={{ padding: 24 }}>
+          <div className="flex items-center justify-between"><p className="a-cap">Account balance</p><span className="a-tile a-tile-sm"><DollarSign size={17} /></span></div>
+          <div>
+            <div className={`a-big ${summary.currentBalance < 0 ? 'a-txt-r' : 'a-ink'}`} style={{ fontSize: 52 }}>{formatCurrency(summary.currentBalance)}</div>
+            <div className="flex gap-[22px] mt-4">
+              <div><p className="a-cap" style={{ fontSize: 10 }}>Opening</p><div className="a-num a-ink text-[15px] font-semibold mt-1">{formatCurrency(summary.openingBalance)}</div></div>
+              <div className="a-vrule" />
+              <div><p className="a-cap" style={{ fontSize: 10 }}>Period net</p><div className="a-num a-ink text-[15px] font-semibold mt-1">{formatCurrency(clubTaxSettings.enabled ? summary.netIncomeAfterTax : summary.netIncome)}</div></div>
             </div>
-          )}
+          </div>
         </div>
+        <Stat label={clubTaxSettings.enabled ? 'Gross income' : 'Total income'} icon={<TrendingUp size={17} />} value={formatCurrency(summary.totalIncome)} sub={changeLine(summary.incomeChange)} />
+        <Stat label="Total expenses" icon={<TrendingDown size={17} />} value={formatCurrency(summary.totalExpenses)} sub={changeLine(summary.expensesChange)} />
+        <Stat label="Membership income" icon={<Users size={17} />} value={formatCurrency(summary.membershipIncome)} sub={summary.pendingMembershipPayments > 0 ? <span className="a-txt-a">{summary.pendingMembershipPayments} pending</span> : 'All payments current'} />
+        <Stat label="Pending invoices" icon={<Receipt size={17} />} value={formatCurrency(summary.pendingInvoicesAmount)} sub="Awaiting payment" />
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
-        {/* Gross Income */}
-        <div className={`
-          p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
-        `}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{clubTaxSettings.enabled ? 'Gross Income' : 'Total Income'}</p>
-              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                {formatCurrency(summary.totalIncome)}
-              </p>
-            </div>
-            <div className="p-3 rounded-lg bg-green-500/15">
-              <TrendingUp className="text-green-500" size={24} />
-            </div>
-          </div>
-          <div className={`flex items-center gap-1 text-sm ${getChangeColor(summary.incomeChange)}`}>
-            {getChangeIcon(summary.incomeChange)}
-            <span>{formatPercentage(summary.incomeChange)} from previous {getPeriodLabel()}</span>
-          </div>
-        </div>
-
-        {/* Current Account Balance */}
-        <div className={`
-          p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
-        `}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Account Balance
-              </p>
-              <p className={`text-2xl font-bold ${summary.currentBalance >= 0 ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-red-500'}`}>
-                {formatCurrency(summary.currentBalance)}
-              </p>
-            </div>
-            <div className="p-3 rounded-lg bg-blue-500/15">
-              <DollarSign className="text-blue-500" size={24} />
-            </div>
-          </div>
-          <div className={`flex items-center gap-1 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            <span>Opening: {formatCurrency(summary.openingBalance)}</span>
-            <span className="mx-1">|</span>
-            <span>Period Net: {formatCurrency(clubTaxSettings.enabled ? summary.netIncomeAfterTax : summary.netIncome)}</span>
-          </div>
-        </div>
-
-        {/* Total Expenses */}
-        <div className={`
-          p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
-        `}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Expenses</p>
-              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                {formatCurrency(summary.totalExpenses)}
-              </p>
-            </div>
-            <div className="p-3 rounded-lg bg-red-500/15">
-              <TrendingDown className="text-red-500" size={24} />
-            </div>
-          </div>
-          <div className={`flex items-center gap-1 text-sm ${getChangeColor(summary.expensesChange)}`}>
-            {getChangeIcon(summary.expensesChange)}
-            <span>{formatPercentage(summary.expensesChange)} from previous {getPeriodLabel()}</span>
-          </div>
-        </div>
-
-        {/* Membership Income */}
-        <div className={`
-          p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
-        `}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Membership Income</p>
-              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                {formatCurrency(summary.membershipIncome)}
-              </p>
-            </div>
-            <div className="p-3 rounded-lg bg-cyan-500/15">
-              <Users className="text-cyan-500" size={24} />
-            </div>
-          </div>
-          <div className={`flex items-center gap-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            {summary.pendingMembershipPayments > 0 ? (
-              <>
-                <span className="text-orange-500">{summary.pendingMembershipPayments} pending</span>
-              </>
-            ) : (
-              <span>All payments current</span>
-            )}
-          </div>
-        </div>
-
-        {/* Pending Invoices */}
-        <div className={`
-          p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
-        `}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pending Invoices</p>
-              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                {formatCurrency(summary.pendingInvoicesAmount)}
-              </p>
-            </div>
-            <div className="p-3 rounded-lg bg-yellow-500/15">
-              <Receipt className="text-yellow-500" size={24} />
-            </div>
-          </div>
-          <div className="flex items-center gap-1 text-sm text-yellow-500">
-            <Receipt size={14} />
-            <span>Awaiting payment</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Financial Chart */}
       <FinancialChart
         darkMode={darkMode}
         period={period}
@@ -789,69 +655,40 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
         associationType={associationType}
       />
 
-      {/* Recent Transactions */}
-      <div className={`
-        rounded-xl border backdrop-blur-sm p-6
-        ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}
-      `}>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Recent Transactions</h3>
-          <button
-            onClick={() => onTabChange('transactions')}
-            className="text-blue-500 hover:text-blue-400 text-sm transition-colors"
-          >
-            View all
-          </button>
+      <div className="a-card overflow-hidden">
+        <div style={{ padding: '20px 22px 8px' }}>
+          <div className="flex items-center gap-3">
+            <span className="a-tile a-tile-sm"><Receipt size={17} /></span>
+            <h2 className="a-display a-ink m-0 flex-1 text-lg font-semibold">Recent transactions</h2>
+            <button onClick={() => onTabChange('transactions')} className="a-link text-[13px] font-medium">View all</button>
+          </div>
         </div>
-
         {recentTransactions.length === 0 ? (
-          <div className="text-center py-8">
-            <DollarSign size={48} className="mx-auto mb-4 text-slate-400 opacity-50" />
-            <p className={`mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>No recent transactions</p>
-            <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Transactions will appear here once you add them</p>
+          <div className="a-empty py-10 px-6">
+            <span className="a-tile" style={{ width: 56, height: 56 }}><DollarSign size={24} /></span>
+            <div className="a-display a-ink text-lg font-semibold">No recent transactions</div>
+            <p className="a-mute m-0 text-sm">Transactions will appear here once you add them.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {recentTransactions.map((transaction) => (
-              <div
-                key={transaction.id}
-                className={`
-                  flex items-center justify-between p-4 rounded-lg border
-                  ${darkMode ? 'bg-slate-700/30 border-slate-600/50' : 'bg-slate-50 border-slate-100'}
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`
-                    p-2 rounded-lg
-                    ${transaction.type === 'deposit' || transaction.type === 'income'
-                      ? 'bg-green-500/15'
-                      : 'bg-red-500/15'}
-                  `}>
-                    {transaction.type === 'deposit' || transaction.type === 'income' ? (
-                      <ArrowUpRight className="text-green-500" size={16} />
-                    ) : (
-                      <ArrowDownRight className="text-red-500" size={16} />
-                    )}
-                  </div>
-                  <div>
-                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{transaction.description}</p>
-                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {new Date(transaction.date).toLocaleDateString('en-AU')}
-                      {transaction.budget_categories && (
-                        <> - {transaction.budget_categories.name}</>
-                      )}
-                    </p>
-                  </div>
+          <div className="pb-2">
+            {recentTransactions.map((t) => {
+              const d = new Date(t.date);
+              const inc = isIncome(t);
+              return (
+                <div key={t.id} className="a-tx" style={{ gridTemplateColumns: '44px 36px minmax(0,1fr) minmax(0,210px) 90px 120px' }}>
+                  <div className="a-chip-d"><b>{d.getDate()}</b><i>{d.toLocaleDateString('en-AU', { weekday: 'short' })}</i></div>
+                  <span className={`a-tile a-tile-sm ${inc ? 'a-txt-g' : 'a-txt-r'}`}>{inc ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}</span>
+                  <div className="a-ink min-w-0 text-[14.5px] font-medium truncate">{t.description}</div>
+                  {t.budget_categories ? (
+                    <span className="a-lb-fmt justify-self-start max-w-full"><span className="a-light" style={{ background: inc ? '#30D158' : '#FF6B6B', boxShadow: 'none' }} /><span className="truncate">{t.budget_categories.name}</span></span>
+                  ) : <span />}
+                  {t.payment_status
+                    ? <span className={`a-st text-[12.5px]`}><span className={`a-light ${t.payment_status === 'paid' || t.payment_status === 'completed' ? 'a-light-g' : 'a-light-a'}`} />{t.payment_status.charAt(0).toUpperCase() + t.payment_status.slice(1)}</span>
+                    : <span />}
+                  <span className={`a-num text-right text-[15.5px] font-semibold ${inc ? 'a-txt-g' : 'a-txt-r'}`}>{inc ? '+' : '−'}{formatCurrency(Math.abs(t.amount))}</span>
                 </div>
-                <div className="text-right">
-                  <p className={`font-semibold ${
-                    transaction.type === 'deposit' || transaction.type === 'income' ? 'text-green-500' : 'text-red-500'
-                  }`}>
-                    {transaction.type === 'deposit' || transaction.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

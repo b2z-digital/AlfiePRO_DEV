@@ -103,116 +103,45 @@ export const CategoryCreationModal: React.FC<CategoryCreationModalProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-      <div className={`w-full max-w-md mx-4 rounded-xl shadow-xl border ${darkMode ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-gray-900 border-slate-200'}`}>
-        <div className="p-6 border-b border-slate-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                <Tag className="text-blue-600 dark:text-blue-400" size={20} />
-              </div>
-              <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                Add New Category
-              </h2>
-            </div>
-            <button
-              onClick={onClose}
-              className={`rounded-full p-2 transition-colors ${darkMode ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
-            >
-              <X size={20} />
-            </button>
-          </div>
+      <form onSubmit={handleSubmit} className="a-msheet" style={{ width: 460 }} role="dialog" aria-modal="true" aria-label="New category">
+        <div className="flex items-center gap-3" style={{ padding: '20px 18px 16px 22px' }}>
+          <span className="a-tile a-tile-rim"><Tag size={19} /></span>
+          <h2 className="a-display a-ink flex-1 m-0 text-[21px] font-semibold">New category</h2>
+          <button type="button" onClick={onClose} className="a-ib" aria-label="Close"><X size={20} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+        <div className="flex flex-col gap-[18px]" style={{ padding: '4px 22px 22px' }}>
+          {error && <div className="a-note"><span className="a-txt-r text-sm">{error}</span></div>}
+          <label>
+            <span className="a-flab">Name</span>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="a-inp" placeholder="e.g. Equipment, Events" required />
+          </label>
+          {!type && (
+            <div>
+              <span className="a-flab">Type</span>
+              <div className="a-seg flex w-full" role="radiogroup" aria-label="Category type">
+                <button type="button" role="radio" aria-checked={categoryType === 'income'} onClick={() => setCategoryType('income')} className={`a-seg-i flex-1 justify-center ${categoryType === 'income' ? 'a-seg-on' : ''}`}>
+                  <span className="a-light" style={{ background: '#30D158', boxShadow: 'none' }} />Income
+                </button>
+                <button type="button" role="radio" aria-checked={categoryType === 'expense'} onClick={() => setCategoryType('expense')} className={`a-seg-i flex-1 justify-center ${categoryType === 'expense' ? 'a-seg-on' : ''}`}>
+                  <span className="a-light" style={{ background: '#FF6B6B', boxShadow: 'none' }} />Expense
+                </button>
+              </div>
             </div>
           )}
+          <label>
+            <span className="a-flab">Description <span className="a-dim font-normal">· optional</span></span>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="a-inp" placeholder="What goes in this category?" rows={3} style={{ resize: 'none' }} />
+          </label>
+        </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Category Name *
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'}`}
-                placeholder="Enter category name"
-                required
-              />
-            </div>
-
-            {!type && (
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Category Type *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setCategoryType('income')}
-                    className={`
-                      px-4 py-3 rounded-lg border-2 transition-all
-                      ${categoryType === 'income'
-                        ? 'border-green-500 bg-green-500/20 text-green-400'
-                        : darkMode ? 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}
-                    `}
-                  >
-                    <div className="text-sm font-medium">Income</div>
-                    <div className="text-xs opacity-75 mt-1">Money coming in</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCategoryType('expense')}
-                    className={`
-                      px-4 py-3 rounded-lg border-2 transition-all
-                      ${categoryType === 'expense'
-                        ? 'border-red-500 bg-red-500/20 text-red-400'
-                        : darkMode ? 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}
-                    `}
-                  >
-                    <div className="text-sm font-medium">Expense</div>
-                    <div className="text-xs opacity-75 mt-1">Money going out</div>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Description
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'}`}
-                placeholder="Enter category description"
-                rows={3}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${darkMode ? 'text-slate-300 hover:text-slate-100 hover:bg-slate-700' : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'}`}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !name.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Creating...' : 'Create Category'}
-            </button>
-          </div>
-        </form>
-      </div>
+        <div className="a-panel-foot" style={{ padding: '16px 22px' }}>
+          <button type="button" onClick={onClose} className="a-btn flex-1" style={{ height: 46 }}>Cancel</button>
+          <button type="submit" disabled={loading || !name.trim()} className="a-btn a-btn-p" style={{ height: 46, flex: 1.4 }}>
+            {loading ? 'Saving…' : 'Save category'}
+          </button>
+        </div>
+      </form>
     </div>,
     document.body
   );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, User, Flag, Repeat, Bell, Upload, Trash2, Users } from 'lucide-react';
+import { X, Calendar, User, Flag, Repeat, Bell, Upload, Trash2, Users, SquareCheck as CheckSquare, Plus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { Avatar } from '../ui/Avatar';
@@ -305,79 +305,85 @@ export const TaskForm: React.FC<TaskFormProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-slate-800 border-l border-slate-700 shadow-xl z-[9995] transform transition-transform duration-300 ease-in-out">
+    <>
+    <section className="a-sheet a-tray fixed top-3 right-3 bottom-3 w-[calc(100%-24px)] sm:w-[500px] z-[9995] overflow-hidden" role="dialog" aria-modal="true" aria-label={isEditing ? 'Edit task' : 'New task'}>
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
-          <button
-            onClick={onClose}
-            className="flex items-center gap-2 text-slate-400 hover:text-slate-300 transition-colors"
-          >
-            <X size={16} />
-            <span className="text-sm">Back to Tasks</span>
-          </button>
-          <h2 className="text-lg font-semibold text-white">
-            {isEditing ? 'Edit Task' : 'New Task'}
+        <div className="a-sheet-head flex items-center gap-3 border-b a-bd" style={{ padding: '18px 18px 16px 22px' }}>
+          <span className="a-tile a-tile-rim"><CheckSquare size={19} /></span>
+          <h2 className="a-display a-ink flex-1 text-[21px] font-semibold">
+            {isEditing ? 'Edit task' : 'New task'}
           </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="a-ib"
+            aria-label="Back to tasks"
+            title="Back to tasks"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col gap-[18px]" style={{ padding: '20px 22px' }}>
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Title <span className="text-red-400">*</span>
+            <label className="a-flab">
+              Title <span className="a-txt-r">*</span>
             </label>
             <input
               type="text"
               required
               value={formData.title}
               onChange={(e) => handleInputChange('title', e.target.value)}
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter task title"
+              className="a-inp"
+              placeholder="What needs doing?"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="a-flab">
               Description
             </label>
             <textarea
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder="Enter task description"
+              className="a-inp"
+              style={{ height: 88, padding: '12px 14px', resize: 'none' }}
+              placeholder="Add details"
             />
           </div>
 
           {/* Due Date and Assignee */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Due Date
+              <label className="a-flab">
+                Due date
               </label>
               <div className="relative">
-                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 a-dim pointer-events-none" />
                 <input
                   type="date"
                   value={formData.due_date}
                   onChange={(e) => handleInputChange('due_date', e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="a-inp a-inp-date"
+                  style={{ paddingLeft: 38 }}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="a-flab">
                 Assignee
               </label>
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-blue-500 relative"
+                  className="a-pick w-full" style={{ height: 46 }}
                 >
                   {formData.assignee_id ? (
                     <div className="flex items-center gap-2">
@@ -391,19 +397,19 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                               imageUrl={assignee.avatar_url}
                               size="sm"
                             />
-                            <span className="text-white text-sm">
+                            <span className="a-ink text-sm">
                               {assignee.first_name} {assignee.last_name}
                             </span>
                           </>
                         ) : (
-                          <span className="text-slate-400 text-sm">Unassigned</span>
+                          <span className="a-dim text-sm">Unassigned</span>
                         );
                       })()}
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <User size={16} className="text-slate-400" />
-                      <span className="text-slate-400 text-sm">Select assignee</span>
+                      <User size={16} className="a-dim" />
+                      <span className="a-dim text-sm">Choose member</span>
                     </div>
                   )}
                 </button>
@@ -414,17 +420,17 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                       className="fixed inset-0 z-10"
                       onClick={() => setShowAssigneeDropdown(false)}
                     />
-                    <div className="absolute z-20 w-full mt-2 bg-slate-700 border border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <div className="a-pop absolute z-20 w-full mt-2 max-h-60 overflow-y-auto">
                       <button
                         type="button"
                         onClick={() => {
                           handleInputChange('assignee_id', '');
                           setShowAssigneeDropdown(false);
                         }}
-                        className="w-full px-3 py-2 flex items-center gap-3 hover:bg-slate-600 transition-colors text-left"
+                        className="a-pop-item w-full"
                       >
-                        <User size={16} className="text-slate-400" />
-                        <span className="text-slate-400 text-sm">Unassigned</span>
+                        <User size={16} className="a-dim" />
+                        <span className="a-dim text-sm">Unassigned</span>
                       </button>
                       {clubMembers.length > 0 ? (
                         clubMembers.map((member) => (
@@ -436,8 +442,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                               setShowAssigneeDropdown(false);
                             }}
                             className={`
-                              w-full px-3 py-2 flex items-center gap-3 hover:bg-slate-600 transition-colors text-left
-                              ${formData.assignee_id === member.id ? 'bg-slate-600' : ''}
+                              a-pop-item w-full
+                              ${formData.assignee_id === member.id ? 'a-pop-item-on' : ''}
                               ${!member.user_id ? 'opacity-50 cursor-not-allowed' : ''}
                             `}
                           >
@@ -447,9 +453,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                               imageUrl={member.avatar_url}
                               size="sm"
                             />
-                            <span className="text-white text-sm">
+                            <span className="a-ink text-sm">
                               {member.first_name} {member.last_name}
-                              {!member.user_id && <span className="text-xs text-slate-400 ml-2">(No account)</span>}
+                              {!member.user_id && <span className="text-xs a-dim ml-2">(No account)</span>}
                             </span>
                             {formData.assignee_id === member.id && (
                               <span className="ml-auto text-blue-400">✓</span>
@@ -457,7 +463,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                           </button>
                         ))
                       ) : (
-                        <div className="px-4 py-3 text-sm text-slate-400 text-center">
+                        <div className="px-4 py-3 text-sm a-dim text-center">
                           Loading members...
                         </div>
                       )}
@@ -470,17 +476,17 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 
           {/* Supporting Members */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Supporting Members (Optional)
+            <label className="a-flab">
+              Supporting members <span className="a-dim font-normal">· optional</span>
             </label>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowFollowerDropdown(!showFollowerDropdown)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-blue-500 relative"
+                className="a-pick w-full" style={{ height: 46 }}
               >
                 <div className="flex items-center gap-2">
-                  <Users size={16} className="text-slate-400" />
+                  <Users size={16} className="a-dim" />
                   {formData.followers.length > 0 ? (
                     <div className="flex items-center gap-2">
                       <div className="flex -space-x-2">
@@ -494,17 +500,17 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                               lastName={member.last_name}
                               imageUrl={member.avatar_url}
                               size="sm"
-                              className="ring-2 ring-slate-700"
+                              className="ring-2 ring-[#111A2C]"
                             />
                           );
                         })}
                       </div>
-                      <span className="text-white text-sm">
+                      <span className="a-ink text-sm">
                         {formData.followers.length} {formData.followers.length === 1 ? 'member' : 'members'}
                       </span>
                     </div>
                   ) : (
-                    <span className="text-slate-400 text-sm">Select supporting members</span>
+                    <span className="a-dim text-sm">Add helpers</span>
                   )}
                 </div>
               </button>
@@ -515,7 +521,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     className="fixed inset-0 z-10"
                     onClick={() => setShowFollowerDropdown(false)}
                   />
-                  <div className="absolute z-20 w-full mt-2 bg-slate-700 border border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  <div className="a-pop absolute z-20 w-full mt-2 max-h-60 overflow-y-auto">
                     {clubMembers.length > 0 ? (
                       clubMembers.map((member) => {
                         const isSelected = member.user_id && formData.followers.includes(member.user_id);
@@ -539,8 +545,8 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                             }}
                             disabled={isAssignee || hasNoAccount}
                             className={`
-                              w-full px-3 py-2 flex items-center gap-3 hover:bg-slate-600 transition-colors text-left
-                              ${isSelected ? 'bg-slate-600' : ''}
+                              a-pop-item w-full
+                              ${isSelected ? 'a-pop-item-on' : ''}
                               ${isAssignee || hasNoAccount ? 'opacity-50 cursor-not-allowed' : ''}
                             `}
                           >
@@ -550,9 +556,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                               imageUrl={member.avatar_url}
                               size="sm"
                             />
-                            <span className="text-white text-sm">
+                            <span className="a-ink text-sm">
                               {member.first_name} {member.last_name}
-                              {isAssignee && <span className="text-slate-400 ml-2">(Assignee)</span>}
+                              {isAssignee && <span className="a-dim ml-2">(Assignee)</span>}
                             </span>
                             {isSelected && !isAssignee && (
                               <span className="ml-auto text-blue-400">✓</span>
@@ -561,7 +567,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                         );
                       })
                     ) : (
-                      <div className="px-4 py-3 text-sm text-slate-400 text-center">
+                      <div className="px-4 py-3 text-sm a-dim text-center">
                         Loading members...
                       </div>
                     )}
@@ -571,37 +577,39 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             </div>
           </div>
 
-          {/* Priority and Repeat */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Priority
-              </label>
-              <div className="relative">
-                <Flag size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <select
-                  value={formData.priority}
-                  onChange={(e) => handleInputChange('priority', e.target.value)}
-                  className="w-full pl-10 pr-8 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+          {/* Priority */}
+          <div>
+            <span className="a-flab">Priority</span>
+            <div className="a-seg" style={{ display: 'flex' }} role="radiogroup" aria-label="Priority">
+              {([['low', 'Low', '#9AA6BD'], ['medium', 'Medium', '#FFB340'], ['high', 'High', '#FF8A2B'], ['urgent', 'Urgent', '#FF6B6B']] as const).map(([v, l, c]) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={formData.priority === v}
+                  onClick={() => handleInputChange('priority', v)}
+                  className={`a-seg-i flex-1 justify-center ${formData.priority === v ? 'a-seg-on' : ''}`}
+                  style={{ padding: '0 6px' }}
                 >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
+                  <span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: c }} />{l}
+                </button>
+              ))}
             </div>
+          </div>
 
+          {/* Repeat + reminder */}
+          <div className="grid grid-cols-2 gap-3 items-end">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="a-flab">
                 Repeat
               </label>
               <div className="relative">
-                <Repeat size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Repeat size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 a-dim pointer-events-none" />
                 <select
                   value={formData.repeat_type}
                   onChange={(e) => handleInputChange('repeat_type', e.target.value)}
-                  className="w-full pl-10 pr-8 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                  className="a-inp a-inp-sel"
+                  style={{ paddingLeft: 38 }}
                 >
                   <option value="none">No repeat</option>
                   <option value="daily">Daily</option>
@@ -611,29 +619,27 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 </select>
               </div>
             </div>
-          </div>
-
-          {/* Send Reminder */}
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="send_reminder"
-              checked={formData.send_reminder}
-              onChange={(e) => handleInputChange('send_reminder', e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-slate-700 border-slate-600 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="send_reminder" className="text-sm text-slate-300">
-              Send reminder
+            <label htmlFor="send_reminder" className="a-reminder">
+              <Bell size={16} className="a-dim" />
+              <span className="flex-1 text-[14px] a-ink">Send reminder</span>
+              <input
+                type="checkbox"
+                id="send_reminder"
+                checked={formData.send_reminder}
+                onChange={(e) => handleInputChange('send_reminder', e.target.checked)}
+                className="sr-only"
+              />
+              <span className="a-sw" aria-hidden="true" data-on={formData.send_reminder ? 'true' : 'false'} />
             </label>
           </div>
 
           {/* Attachments */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="a-flab">
               Attachments
             </label>
             <div
-              className="border-2 border-dashed border-slate-600 rounded-lg p-6 text-center cursor-pointer hover:border-slate-500 transition-colors"
+              className="a-drop"
               onDragOver={(e) => {
                 e.preventDefault();
                 e.currentTarget.classList.add('border-blue-500');
@@ -656,14 +662,14 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 onChange={(e) => handleFileUpload(e.target.files)}
                 accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
               />
-              <Upload size={24} className="mx-auto mb-2 text-slate-400" />
+              <span className="a-tile"><Upload size={18} /></span>
               {uploadingFiles ? (
-                <p className="text-sm text-blue-400 mb-1">Uploading...</p>
+                <span className="flex-1 text-[14px] a-txt-b font-semibold">Uploading…</span>
               ) : (
-                <>
-                  <p className="text-sm text-blue-400 mb-1">Upload a file or drag and drop</p>
-                  <p className="text-xs text-slate-500">PNG, JPG, GIF, PDF up to 10MB</p>
-                </>
+                <span className="flex-1 min-w-0">
+                  <span className="block a-ink text-[14px] font-semibold">Drop files or <span className="a-txt-b">browse</span></span>
+                  <span className="block a-dim text-[12.5px] mt-0.5">PNG, JPG, GIF or PDF · up to 10MB</span>
+                </span>
               )}
             </div>
 
@@ -673,13 +679,13 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                 {formData.attachments.map((url, index) => {
                   const fileName = url.split('/').pop() || 'attachment';
                   return (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-slate-700 rounded-lg">
-                      <Upload size={16} className="text-slate-400" />
-                      <span className="text-sm text-slate-300 flex-1 truncate">{fileName}</span>
+                    <div key={index} className="a-grp a-ir" style={{ padding: '8px 10px 8px 14px' }}>
+                      <Upload size={16} className="a-dim" />
+                      <span className="text-sm a-mute flex-1 truncate">{fileName}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveAttachment(index)}
-                        className="text-red-400 hover:text-red-300"
+                        className="a-ib a-ib-d"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -692,29 +698,31 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         </form>
 
         {/* Footer */}
-        <div className="flex gap-3 p-4 border-t border-slate-700">
+        <div className="a-sheet-foot flex gap-2.5" style={{ padding: '16px 22px' }}>
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 text-slate-300 hover:text-white transition-colors"
+            className="a-btn flex-1"
+            style={{ height: 46 }}
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading || !formData.title.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="a-btn a-btn-p disabled:opacity-45 disabled:cursor-not-allowed" style={{ flex: 1.4, height: 46 }}
           >
             {loading ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
             ) : (
               <>
-                <span>{isEditing ? 'Update Task' : 'Create Task'}</span>
+                <Plus size={17} /><span>{isEditing ? 'Update task' : 'Create task'}</span>
               </>
             )}
           </button>
         </div>
       </div>
-    </div>
+    </section>
+    </>
   );
 };

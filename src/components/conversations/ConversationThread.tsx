@@ -1,7 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Star, Archive, Trash2, Reply, Forward, ChevronRight, MoveHorizontal as MoreHorizontal, Bell, Paperclip, Download, ExternalLink } from 'lucide-react';
+import { X, Star, Archive, Trash2, Reply, Forward, ChevronRight, Bell, ExternalLink, Trophy } from 'lucide-react';
 import { sanitizeHtml } from '../../utils/sanitize';
+import { AAvatar } from '../alfie/Kit';
 
 interface Notification {
   id: string;
@@ -45,48 +46,27 @@ interface ConversationThreadProps {
 }
 
 const UserAvatar = ({ name, avatarUrl, size = 48 }: { name: string; avatarUrl?: string; size?: number }) => {
-  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  const colors = [
-    'from-blue-500 to-cyan-500',
-    'from-emerald-500 to-teal-500',
-    'from-amber-500 to-orange-500',
-    'from-rose-500 to-pink-500',
-    'from-sky-500 to-blue-500',
-    'from-green-500 to-emerald-500',
-  ];
-  const colorIdx = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % colors.length;
-
-  if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={name}
-        className="rounded-full object-cover ring-2 ring-white/10"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-
-  return (
-    <div
-      className={`rounded-full flex items-center justify-center text-white font-semibold bg-gradient-to-br ${colors[colorIdx]} ring-2 ring-white/10`}
-      style={{ width: size, height: size, fontSize: size * 0.38 }}
-    >
-      {initials || '?'}
-    </div>
-  );
+  const [first, ...rest] = (name || '?').split(' ');
+  return <AAvatar url={avatarUrl} first={first} last={rest.join(' ')} size={size} />;
 };
 
 const getTypeConfig = (type: string) => {
   switch (type) {
-    case 'race_results': return { label: 'Results', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
-    case 'club_news': return { label: 'News', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' };
-    case 'membership': return { label: 'Membership', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
-    case 'alert': return { label: 'Alert', color: 'bg-red-500/10 text-red-400 border-red-500/20' };
-    case 'meeting_invitation': return { label: 'Meeting', color: 'bg-sky-500/10 text-sky-400 border-sky-500/20' };
+    case 'race_results': case 'results': return { label: 'Results', dot: '#30D158' };
+    case 'club_news': return { label: 'News', dot: '#2E7BFF' };
+    case 'membership': return { label: 'Membership', dot: '#FF9F0A' };
+    case 'alert': return { label: 'Alert', dot: '#FF453A' };
+    case 'meeting_invitation': case 'meeting': return { label: 'Meeting', dot: '#40C8C0' };
     default: return null;
   }
 };
+
+const Chip = ({ dot, children }: { dot: string; children: React.ReactNode }) => (
+  <span className="a-lb-fmt" style={{ height: 22, fontSize: 11.5 }}>
+    <span className="inline-block w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ background: dot }} />
+    <span className="truncate max-w-[260px]">{children}</span>
+  </span>
+);
 
 export const ConversationThread: React.FC<ConversationThreadProps> = ({
   notification,
@@ -122,161 +102,94 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
     });
   };
 
-  return (
-    <div className="flex flex-col h-full bg-[#0f1729] overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 from-blue-600/10 via-transparent to-emerald-600/10">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex -space-x-2">
-            <UserAvatar
-              name={senderName}
-              avatarUrl={notification.sender_avatar_url}
-              size={36}
-            />
-            {isSent && notification.recipient_name && (
-              <UserAvatar
-                name={notification.recipient_name}
-                avatarUrl={notification.recipient_avatar_url}
-                size={36}
-              />
-            )}
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-white truncate">
-              {isSent ? (notification.recipient_name || 'Unknown') : senderName}
-            </h2>
-            <p className="text-xs text-slate-500 truncate">
-              {notification.subject}
-            </p>
-          </div>
-        </div>
+  const headName = isSent ? (notification.recipient_name || 'Unknown') : senderName;
+  const headAvatar = isSent ? notification.recipient_avatar_url : notification.sender_avatar_url;
+  const isSystem = !isSent && !notification.sender_name;
+  const isResults = typeConfig?.label === 'Results';
+  const openLink = () => {
+    if (!notification.link_url) return;
+    if (notification.link_url.startsWith('http')) {
+      window.open(notification.link_url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    let url = notification.link_url;
+    if (url.startsWith('/community/chat')) {
+      const convId = new URLSearchParams(url.split('?')[1] || '').get('id');
+      url = convId ? `/comms?tab=chats&conversationId=${convId}` : '/comms?tab=chats';
+    }
+    navigate(url);
+  };
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => onStar(notification)}
-            className={`p-2 rounded-lg transition-all ${
-              notification.is_starred
-                ? 'text-amber-400 hover:bg-amber-400/10'
-                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/40'
-            }`}
-            title={notification.is_starred ? 'Remove star' : 'Star'}
-          >
-            <Star size={16} className={notification.is_starred ? 'fill-amber-400' : ''} />
-          </button>
-          <button
-            onClick={() => onArchive(notification)}
-            className="p-2 text-slate-500 hover:text-slate-300 hover:bg-slate-700/40 rounded-lg transition-all"
-            title="Archive"
-          >
-            <Archive size={16} />
-          </button>
-          <button
-            onClick={() => onDelete(notification.id, isSent)}
-            className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
-            title="Delete"
-          >
-            <Trash2 size={16} />
-          </button>
-          <div className="w-px h-5 bg-slate-700/50 mx-1" />
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-500 hover:text-white hover:bg-slate-700/40 rounded-lg transition-all"
-          >
-            <X size={16} />
-          </button>
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex items-center gap-3 border-b a-bd" style={{ padding: '16px 20px' }}>
+        {isSystem ? (
+          <span className="a-sys" style={{ width: 44, height: 44 }}><Bell size={20} /></span>
+        ) : (
+          <UserAvatar name={headName} avatarUrl={headAvatar} size={44} />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="a-ink text-[16px] font-semibold truncate">{isSystem ? 'AlfiePRO' : headName}</span>
+            {notification.club_name && <Chip dot="#2E7BFF">{notification.club_name}</Chip>}
+            {typeConfig && <Chip dot={typeConfig.dot}>{typeConfig.label}</Chip>}
+          </div>
+          <div className="a-dim text-[12.5px] mt-[3px]">{formatFullDate(notification.sent_at)}</div>
         </div>
+        <button
+          onClick={() => onStar(notification)}
+          className={`a-ib ${notification.is_starred ? 'a-txt-a' : ''}`}
+          aria-label={notification.is_starred ? 'Remove star' : 'Star'}
+          title={notification.is_starred ? 'Remove star' : 'Star'}
+        >
+          <Star size={18} className={notification.is_starred ? 'fill-current' : ''} />
+        </button>
+        <button onClick={() => onArchive(notification)} className="a-ib" aria-label="Archive" title="Archive">
+          <Archive size={18} />
+        </button>
+        <button onClick={() => onDelete(notification.id, isSent)} className="a-ib a-ib-d" aria-label="Delete" title="Delete">
+          <Trash2 size={18} />
+        </button>
+        <button onClick={onClose} className="a-ib lg:hidden" aria-label="Close" title="Close">
+          <X size={18} />
+        </button>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto py-8 px-6 space-y-6">
-          <div className="flex items-start gap-4">
-            <UserAvatar
-              name={senderName}
-              avatarUrl={notification.sender_avatar_url}
-              size={48}
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-base font-semibold text-white">{senderName}</span>
-                {notification.club_name && (
-                  <span className="inline-flex items-center px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded-md text-[11px] text-cyan-400 font-medium">
-                    {notification.club_name}
-                  </span>
-                )}
-                {typeConfig && (
-                  <span className={`inline-flex items-center px-2 py-0.5 border rounded-md text-[11px] font-medium ${typeConfig.color}`}>
-                    {typeConfig.label}
-                  </span>
-                )}
+        <div className="flex flex-col gap-5" style={{ padding: '32px 40px' }}>
+          <h2 className="a-display a-ink m-0 text-[26px] font-bold leading-[1.15]">{notification.subject}</h2>
+          <div
+            className="a-msg-body a-mute text-[15px] leading-[1.6]"
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(notification.body) }}
+          />
+          {notification.link_url && (
+            <div className="a-card flex items-center gap-4" style={{ padding: 16, maxWidth: 520 }}>
+              <span className="a-tile" style={{ width: 48, height: 48 }}>{isResults ? <Trophy size={22} /> : <ExternalLink size={20} />}</span>
+              <div className="flex-1 min-w-0">
+                <div className="a-ink text-[15px] font-semibold truncate">{notification.subject.replace(/^Results posted:\s*/i, '')}</div>
+                {notification.club_name && <div className="a-dim text-[12.5px] mt-[3px] truncate">{notification.club_name}</div>}
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {formatFullDate(notification.sent_at)}
-              </p>
+              <button onClick={openLink} className="a-btn a-btn-p">
+                {notification.link_url.startsWith('http') ? <ExternalLink size={16} /> : <ChevronRight size={16} />}
+                {isResults ? 'View results' : 'View item'}
+              </button>
             </div>
-          </div>
-
-          <div className="ml-16">
-            <div className="bg-gradient-to-br from-slate-700/40 to-slate-800/40 rounded-2xl rounded-tl-md p-5 border border-slate-600/50">
-              <h3 className="text-lg font-semibold text-white mb-4">{notification.subject}</h3>
-              <div
-                className="prose prose-invert prose-sm max-w-none text-slate-300 leading-relaxed [&_p]:mb-3 [&_a]:text-blue-400 [&_a]:no-underline hover:[&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(notification.body) }}
-              />
-
-              {notification.link_url && (
-                <div className="mt-5 pt-4 border-t border-slate-700/50">
-                  {notification.link_url.startsWith('http') ? (
-                    <a
-                      href={notification.link_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 text-sm font-medium"
-                    >
-                      <ExternalLink size={16} />
-                      View Item
-                    </a>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        let url = notification.link_url!;
-                        if (url.startsWith('/community/chat')) {
-                          const convId = new URLSearchParams(url.split('?')[1] || '').get('id');
-                          url = convId ? `/comms?tab=chats&conversationId=${convId}` : '/comms?tab=chats';
-                        }
-                        navigate(url);
-                      }}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 text-sm font-medium"
-                    >
-                      <ChevronRight size={16} />
-                      View Item
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
       {activeTab === 'inbox' && (
-        <div className="px-6 py-4 border-t border-slate-700/50 from-blue-600/10 via-transparent to-emerald-600/10">
-          <div className="flex items-center gap-2">
-            {notification.sender_id && (
-              <button
-                onClick={() => onReply(notification)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 text-sm font-medium"
-              >
-                <Reply size={15} />
-                Reply
-              </button>
-            )}
-            <button
-              onClick={() => onForward(notification)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition-all text-sm font-medium border border-slate-700/50"
-            >
-              <Forward size={15} />
-              Forward
+        <div className="flex gap-2.5 border-t a-bd" style={{ padding: '14px 20px' }}>
+          {notification.sender_id && (
+            <button onClick={() => onReply(notification)} className="a-btn a-btn-p">
+              <Reply size={16} />
+              Reply
             </button>
-          </div>
+          )}
+          <button onClick={() => onForward(notification)} className="a-btn">
+            <Forward size={16} />
+            Forward
+          </button>
         </div>
       )}
     </div>

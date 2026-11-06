@@ -132,7 +132,7 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
   };
 
   return (
-    <div className={`relative rounded-2xl p-6 w-full h-full flex flex-col border backdrop-blur-sm ${themeColors.background} ${isEditMode ? 'animate-wiggle cursor-move' : ''}`}>
+    <div className={`a-widget relative rounded-2xl p-6 w-full h-full flex flex-col border backdrop-blur-sm ${themeColors.background} ${isEditMode ? 'animate-wiggle cursor-move' : ''}`}>
       {isEditMode && onRemove && (
         <button
           onClick={(e) => {
@@ -146,35 +146,37 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
         </button>
       )}
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Newspaper className="text-amber-400" size={20} />
-          <h2 className="text-lg font-semibold text-white">
+      <div className="a-widget-head flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="a-tile flex-shrink-0" style={{ width: 36, height: 36 }}><Newspaper size={19} /></span>
+          <h3 className="a-display a-ink text-[19px] font-semibold truncate">
             {currentOrganization?.type === 'state' || currentOrganization?.type === 'national' ? 'Association News' : 'Latest News'}
-          </h2>
+          </h3>
         </div>
         <button
           onClick={handleCreateArticle}
           disabled={isEditMode}
-          className={`p-2 bg-slate-700/30 hover:bg-slate-700/50 rounded-lg transition-colors ${isEditMode ? 'pointer-events-none' : ''}`}
+          className={`a-ib flex-shrink-0 ${isEditMode ? 'pointer-events-none' : ''}`}
+          style={{ width: 36, height: 36, borderRadius: 12 }}
           title="Create new article"
+          aria-label="Add news"
         >
-          <Plus size={16} className="text-amber-400" />
+          <Plus size={17} />
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto space-y-2">
+      <div className="flex-1 overflow-auto flex flex-col gap-2.5">
         {loading ? (
-          <div className="text-center py-8 text-slate-400">Loading...</div>
+          <div className="a-dim text-center py-8 text-[13.5px]">Loading…</div>
         ) : articles.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-slate-400 mb-4">No articles yet</p>
+          <div className="flex flex-col items-center text-center py-8">
+            <p className="a-dim text-[13.5px] mb-4">No articles yet</p>
             <button
               onClick={handleCreateArticle}
               disabled={isEditMode}
-              className={`px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors ${isEditMode ? 'pointer-events-none' : ''}`}
+              className={`a-btn a-btn-p ${isEditMode ? 'pointer-events-none' : ''}`}
             >
-              Create First Article
+              <Plus size={16} />Write the first article
             </button>
           </div>
         ) : (
@@ -182,41 +184,33 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
             <div
               key={article.id}
               onClick={() => handleViewArticle(article.id)}
-              className={`p-3 bg-slate-700/30 hover:bg-slate-700/50 border border-slate-700/50 rounded-xl transition-all group ${isEditMode ? 'pointer-events-none' : 'cursor-pointer'}`}
+              className={`a-news group ${isEditMode ? 'pointer-events-none' : 'cursor-pointer'}`}
             >
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-slate-700">
-                  <img
-                    src={article.cover_image || '/alfie_app_logo.svg'}
-                    alt=""
-                    className={`w-full h-full ${article.cover_image ? 'object-cover' : 'object-contain p-2'}`}
-                    onError={(e) => {
-                      const img = e.currentTarget as HTMLImageElement;
-                      img.src = '/alfie_app_logo.svg';
-                      img.className = 'w-full h-full object-contain p-2';
-                    }}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="font-medium text-white text-sm leading-snug line-clamp-2 group-hover:text-amber-400 transition-colors">
-                      {article.title}
-                    </div>
-                    <ExternalLink size={14} className="text-slate-400 group-hover:text-amber-400 transition-colors flex-shrink-0 mt-0.5" />
-                  </div>
-                  <div className="text-xs text-slate-400 flex items-center gap-3 mt-1">
-                    <span className="flex items-center gap-1">
-                      <Clock size={11} />
-                      {formatDate(article.published_at || article.created_at)}
-                    </span>
-                    {article.status === 'published' ? (
-                      <span className="text-green-400">Published</span>
-                    ) : (
-                      <span className="text-yellow-400">Draft</span>
-                    )}
-                  </div>
-                </div>
+              <div className="a-news-img">
+                <img
+                  src={article.cover_image || '/alfie_app_logo.svg'}
+                  alt=""
+                  className={`w-full h-full ${article.cover_image ? 'object-cover' : 'object-contain p-2'}`}
+                  onError={(e) => {
+                    const img = e.currentTarget as HTMLImageElement;
+                    img.src = '/alfie_app_logo.svg';
+                    img.className = 'w-full h-full object-contain p-2';
+                  }}
+                />
               </div>
+              <div className="flex-1 min-w-0">
+                <p className="a-ink m-0 text-[14px] font-semibold leading-[1.35] line-clamp-2">{article.title}</p>
+                <p className="a-dim m-0 mt-[5px] flex items-center gap-1.5 text-[12.5px]">
+                  <Clock size={12} />
+                  {formatDate(article.published_at || article.created_at)}
+                  {article.status === 'published' ? (
+                    <span className="a-txt-g ml-1.5">Published</span>
+                  ) : (
+                    <span className="a-txt-a ml-1.5">Draft</span>
+                  )}
+                </p>
+              </div>
+              <ExternalLink size={15} className="a-dim flex-shrink-0 mt-0.5" />
             </div>
           ))
         )}

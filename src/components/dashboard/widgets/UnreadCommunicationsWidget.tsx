@@ -68,26 +68,19 @@ export const UnreadCommunicationsWidget: React.FC<WidgetProps> = ({ widgetId, is
       <button
         onClick={handleClick}
         disabled={isEditMode}
-        className={`relative rounded-2xl p-4 text-left transition-all w-full h-full flex items-center gap-3 border backdrop-blur-sm ${themeColors.background} ${isEditMode ? '' : 'cursor-pointer transform hover:scale-[1.02]'}`}
+        className={`a-wstat relative rounded-2xl text-left transition-all w-full h-full flex items-center border backdrop-blur-sm ${themeColors.background} ${isEditMode ? '' : 'cursor-pointer'}`}
       >
-        <div className="flex-shrink-0">
-          <div className="p-3 rounded-xl bg-blue-500/20">
-            <MessageSquare className="text-blue-400" size={24} />
-          </div>
-        </div>
+        <span className="a-tile flex-shrink-0" style={{ width: 48, height: 48 }}><MessageSquare size={22} /></span>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-400 mb-0.5">Unread Messages</p>
-          <p className="text-2xl font-bold text-white mb-0.5">
+          <p className="a-mute text-[12.5px]">Unread Messages</p>
+          <p className="a-num a-ink text-[28px] font-semibold leading-[1.1]">
             {loading ? '...' : unreadCount}
           </p>
-          <p className="text-xs text-slate-400">
+          <p className="a-mute text-[12.5px]">
             {unreadCount > 0
               ? `${unreadCount === 1 ? '1 message' : `${unreadCount} messages`} unread`
               : 'All caught up!'}
           </p>
-        </div>
-        <div className="flex-shrink-0">
-          <Activity className="text-blue-400/40" size={32} />
         </div>
       </button>
     </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ArrowLeft, MapPin } from 'lucide-react';
+import { X, ArrowLeft, MapPin , Info, Wind } from 'lucide-react';
 import { getStoredVenues } from '../utils/venueStorage';
 import { Venue } from '../types/venue';
 import { loadGoogleMaps } from '../utils/googleMaps';
@@ -102,111 +102,61 @@ export const VenueDetails: React.FC<VenueDetailsProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`
-        w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]
-        ${darkMode ? 'bg-slate-800' : 'bg-white'}
-      `}>
+      <section className="a-sheet w-full max-w-[640px] overflow-hidden flex flex-col max-h-[90vh]" role="dialog" aria-modal="true" aria-label={venue.name}>
         {/* Header with venue image */}
-        <div
-          className="relative w-full h-64 bg-cover bg-center"
-          style={{
-            backgroundImage: venue.image
-              ? `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.7)), url(${venue.image})`
-              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-          }}
-        >
-          <div className="absolute top-4 left-4">
-            <button
-              onClick={onClose}
-              className="p-2 rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors"
-            >
-              <ArrowLeft size={20} />
-            </button>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-full bg-black/30 text-white hover:bg-black/50 transition-colors"
-          >
-            <X size={20} />
+        <div className="a-sheet-hero relative w-full flex-shrink-0" style={{ height: 200 }}>
+          {venue.image ? (
+            <img src={venue.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center"><MapPin size={44} className="a-dim" /></div>
+          )}
+          <button onClick={onClose} className="a-gb absolute top-3.5 left-3.5 z-[2]" style={{ width: 38, height: 38 }} aria-label="Back">
+            <ArrowLeft size={18} />
           </button>
-
-          <div className="absolute bottom-4 left-6">
-            <h2 className="text-2xl font-bold text-white drop-shadow-md">
+          <button onClick={onClose} className="a-gb absolute top-3.5 right-3.5 z-[2]" style={{ width: 38, height: 38 }} aria-label="Close">
+            <X size={18} />
+          </button>
+          <div className="absolute left-6 right-6 bottom-4 z-[1] pointer-events-none">
+            {((venue as any).is_default || (venue as any).isDefault) && <span className="a-glass" style={{ color: '#FFC56B' }}>★ Main venue</span>}
+            <h2 className="a-display a-ink text-[28px] font-bold mt-2.5">
               {venue.name}
             </h2>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className={`flex border-b ${darkMode ? 'border-slate-700' : 'border-gray-200'}`}>
-          <button
-            onClick={() => setActiveTab('details')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
-              activeTab === 'details'
-                ? darkMode
-                  ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-800/50'
-                  : 'text-blue-600 border-b-2 border-blue-600 bg-gray-50'
-                : darkMode
-                ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            Details
-          </button>
-          <button
-            onClick={() => setActiveTab('weather')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
-              activeTab === 'weather'
-                ? darkMode
-                  ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-800/50'
-                  : 'text-blue-600 border-b-2 border-blue-600 bg-gray-50'
-                : darkMode
-                ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            Weather
-          </button>
+        <div className="flex-shrink-0" style={{ padding: '4px 24px 0' }}>
+          <div className="a-seg" style={{ display: 'flex' }} role="tablist">
+            <button role="tab" aria-selected={activeTab === 'details'} onClick={() => setActiveTab('details')} className={`a-seg-i flex-1 justify-center ${activeTab === 'details' ? 'a-seg-on' : ''}`}>
+              <Info size={15} />Details
+            </button>
+            <button role="tab" aria-selected={activeTab === 'weather'} onClick={() => setActiveTab('weather')} className={`a-seg-i flex-1 justify-center ${activeTab === 'weather' ? 'a-seg-on' : ''}`}>
+              <Wind size={15} />Weather
+            </button>
+          </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto" style={{ padding: '18px 24px 24px' }}>
           {activeTab === 'details' && (
-            <div className="space-y-6">
+            <div className="flex flex-col gap-4">
               {/* About section */}
               {venue.description && (
-                <div>
-                  <h3 className={`text-lg font-medium mb-3 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                    About This Venue
-                  </h3>
-                  <p className={`${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                    {venue.description}
-                  </p>
-                </div>
+                <p className="a-mute m-0 text-[14px] leading-[1.6]">
+                  {venue.description}
+                </p>
               )}
 
               {/* Location section with address */}
-              <div>
-                <h3 className={`text-lg font-medium mb-3 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                  Location
-                </h3>
-                <div className="flex items-start gap-3 mb-4">
-                  <div className={`
-                    p-2 rounded-lg
-                    ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}
-                  `}>
-                    <MapPin size={20} className={darkMode ? 'text-blue-400' : 'text-blue-600'} />
-                  </div>
-                  <div>
-                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                      {venue.address}
-                    </p>
+              <div className="a-grp">
+                <div className="a-ir">
+                  <span className="a-tile a-tile-sm"><MapPin size={16} /></span>
+                  <div className="flex-1 min-w-0">
+                    <div className="a-ink text-[14.5px] font-semibold">{venue.address}</div>
                   </div>
                 </div>
-
                 {/* Embedded Map */}
-                <div className="w-full h-80 rounded-lg overflow-hidden border border-slate-300 dark:border-slate-600">
+                <div className="w-full h-72">
                   <div ref={mapRef} className="w-full h-full" />
                 </div>
               </div>
@@ -228,7 +178,7 @@ export const VenueDetails: React.FC<VenueDetailsProps> = ({
             </div>
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 };

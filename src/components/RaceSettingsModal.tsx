@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen as Edit2, Check, TriangleAlert as AlertTriangle, Sailboat, Eye, Grid3x2 as Grid3X3, ClipboardCheck, Table2, Hand, Share2, QrCode } from 'lucide-react';
+import { ASwitch } from './alfie/Kit';
+import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen as Edit2, Check, TriangleAlert as AlertTriangle, Sailboat, Eye, Grid3x2 as Grid3X3, ClipboardCheck, Table2, Hand, Share2, QrCode, Trash2 } from 'lucide-react';
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
 import { seedInitialHeats, validateHeatConfig, validateHeatAssignments, HMSConfig, calculateOptimalHeats, calculateHMSHeatSizes } from '../utils/hmsHeatSystem';
@@ -1112,11 +1113,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       {/* Slide-out Tray */}
       <div
         className={`
-          fixed top-0 right-0 h-full w-full sm:w-[500px] z-50
-          ${darkMode ? 'bg-slate-800' : 'bg-white'}
-          shadow-2xl flex flex-col
+          fixed top-3 right-3 bottom-3 w-[calc(100%-24px)] sm:w-[460px] z-50
+          a-sheet a-tray flex flex-col overflow-hidden
           transform transition-all duration-300 ease-in-out
-          ${isOpen ? 'translate-x-0' : 'translate-x-full'}
+          ${isOpen ? 'translate-x-0' : 'translate-x-[calc(100%+24px)]'}
         `}
         style={{
           transitionTimingFunction: isOpen
@@ -1125,38 +1125,29 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         }}
       >
         {/* Header */}
-        <div className={`
-          flex items-center justify-between p-4 border-b flex-shrink-0
-          ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-        `}>
-          <div className="flex items-center gap-3">
-            <Settings className="text-blue-400" size={20} />
-            <h2 className={`text-lg font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
-              Race Settings
-            </h2>
-          </div>
+        <div className="flex items-center gap-3 flex-shrink-0" style={{ padding: '20px 18px 16px 22px' }}>
+          <span className="a-tile a-tile-rim"><Settings size={19} /></span>
+          <h2 className="a-display a-ink flex-1 text-[20px] font-semibold">
+            Race settings
+          </h2>
           <button
             type="button"
             onClick={onClose}
-            className={`
-              rounded-full p-2 transition-colors
-              ${darkMode
-                ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700'
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
-            `}
+            className="a-ib"
+            aria-label="Close"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Scrollable Content */}
-        <div className="p-6 space-y-8 overflow-y-auto flex-1">
+        <div className="a-tray-body overflow-y-auto flex-1 flex flex-col gap-5" style={{ padding: '0 20px 20px' }}>
           {/* Appearance Settings */}
           {onToggleDarkMode && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                {darkMode ? <Moon className="text-blue-400" size={20} /> : <Sun className="text-blue-400" size={20} />}
-                <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center gap-2.5">
+                <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}>{darkMode ? <Moon size={15} /> : <Sun size={15} />}</span>
+                <h3 className="a-display a-ink text-[15px] font-semibold">
                   Appearance
                 </h3>
               </div>
@@ -1168,91 +1159,52 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   e.stopPropagation();
                   onToggleDarkMode();
                 }}
-                className={`
-                  w-full flex items-center justify-between p-4 rounded-lg transition-all border-2
-                  ${darkMode
-                    ? 'bg-slate-700 border-slate-600 hover:bg-slate-600'
-                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}
-                `}
+                className="a-grp a-ir w-full text-left"
+                role="switch"
+                aria-checked={darkMode}
               >
-                <div className="flex items-center gap-3">
-                  {darkMode ? <Moon size={20} className="text-blue-400" /> : <Sun size={20} className="text-amber-500" />}
-                  <div className="text-left">
-                    <div className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      {darkMode ? 'Dark Mode' : 'Light Mode'}
-                    </div>
-                    <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {darkMode ? 'Switch to light theme' : 'Switch to dark theme'}
-                    </div>
-                  </div>
-                </div>
-                <div className="relative inline-flex items-center">
-                  <div className={`w-14 h-7 rounded-full transition ${
-                    darkMode ? 'bg-blue-600' : 'bg-slate-300'
-                  }`}>
-                    <div className={`w-6 h-6 rounded-full bg-white shadow transform transition-transform top-0.5 absolute ${
-                      darkMode ? 'translate-x-7' : 'translate-x-0.5'
-                    }`} />
-                  </div>
-                </div>
+                <span className="a-dim flex">{darkMode ? <Moon size={17} /> : <Sun size={17} />}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="a-ink block text-[14px] font-semibold">Dark mode</span>
+                  <span className="a-dim block text-[12px] mt-0.5">{darkMode ? 'Switch to light theme' : 'Switch to dark theme'}</span>
+                </span>
+                <span className="a-sw" aria-hidden="true" data-on={darkMode ? 'true' : 'false'} />
               </button>
             </div>
           )}
 
           {/* Scoring Interface */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Sailboat className="text-blue-400" size={20} />
-              <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}><Sailboat size={15} /></span>
+              <h3 className="a-display a-ink text-[15px] font-semibold">
                 Scoring Interface
               </h3>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {([
-                { mode: 'pro' as const, label: 'Pro Mode', desc: 'Desktop', Icon: Table2 },
-                { mode: 'touch' as const, label: 'Touch Mode', desc: 'Tablet', Icon: Hand },
+                { mode: 'pro' as const, label: 'Pro', desc: 'Desktop', Icon: Table2 },
+                { mode: 'touch' as const, label: 'Touch', desc: 'Tablet', Icon: Hand },
                 { mode: 'spreadsheet' as const, label: 'Spreadsheet', desc: 'Traditional', Icon: Grid3X3 },
               ]).map(({ mode, label, desc, Icon }) => (
                 <button
                   key={mode}
                   type="button"
                   onClick={() => handleScoringModeChange(mode)}
-                  className={`
-                    relative flex flex-col items-center gap-2 p-4 rounded-xl transition-all border-2 text-center
-                    ${scoringMode === mode
-                      ? darkMode
-                        ? 'bg-blue-900/30 border-blue-500 ring-1 ring-blue-500/30'
-                        : 'bg-blue-50 border-blue-500 ring-1 ring-blue-200'
-                      : darkMode
-                        ? 'bg-slate-700/60 border-slate-600 hover:bg-slate-600/80 hover:border-slate-500'
-                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300'}
-                  `}
+                  className={`a-opt ${scoringMode === mode ? 'a-opt-on' : ''}`}
+                  style={{ flexDirection: 'column', gap: 8, padding: '14px 8px', textAlign: 'center' }}
+                  aria-pressed={scoringMode === mode}
                 >
-                  {scoringMode === mode && (
-                    <div className="absolute top-2 right-2">
-                      <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
-                        <Check size={12} className="text-white" />
-                      </div>
-                    </div>
-                  )}
-                  <div className={`p-2.5 rounded-lg ${
-                    scoringMode === mode
-                      ? 'bg-blue-600/20 text-blue-400'
-                      : darkMode
-                        ? 'bg-slate-600/50 text-slate-400'
-                        : 'bg-slate-200/80 text-slate-500'
-                  }`}>
-                    <Icon size={24} />
-                  </div>
-                  <div>
-                    <div className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  <span className="a-tile a-tile-sm"><Icon size={16} /></span>
+                  <span>
+                    <span className="a-ink block text-[13.5px] font-semibold">
                       {label}
-                    </div>
-                    <div className={`text-[11px] mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    </span>
+                    <span className="a-dim block text-[11.5px]">
                       {desc}
-                    </div>
-                  </div>
+                    </span>
+                  </span>
                 </button>
               ))}
             </div>
@@ -1260,10 +1212,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
           {/* Handicap Ruleset Selector - only for handicap events */}
           {currentEvent?.raceFormat === 'handicap' && availableRulesets.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Trophy className="text-amber-400" size={20} />
-                <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center gap-2.5">
+                <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}><Trophy size={15} /></span>
+                <h3 className="a-display a-ink text-[15px] font-semibold">
                   Handicap Scoring System
                 </h3>
               </div>
@@ -1316,53 +1268,40 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
           {/* Skipper Management */}
           {onManageSkippers && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Users className="text-blue-400" size={20} />
-                <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center gap-2.5">
+                <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}><Users size={15} /></span>
+                <h3 className="a-display a-ink text-[15px] font-semibold">
                   Skipper Management
                 </h3>
               </div>
 
-              <div className={`p-4 rounded-lg ${
-                darkMode ? 'bg-slate-700/50' : 'bg-blue-50'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className={`text-sm font-medium mb-1 ${
-                      darkMode ? 'text-slate-200' : 'text-slate-800'
-                    }`}>
-                      Current Skippers: {skippers.length}
+              <div className="a-grp a-ir">
+                  <div className="flex-1 min-w-0">
+                    <div className="a-ink text-[14px] font-semibold">
+                      {skippers.length} skipper{skippers.length !== 1 ? 's' : ''}
                     </div>
-                    <div className={`text-xs ${
-                      darkMode ? 'text-slate-400' : 'text-slate-600'
-                    }`}>
-                      Add, remove, or edit skippers participating in this event
+                    <div className="a-dim text-[12px] mt-0.5">
+                      Add, remove or edit who's racing
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={onManageSkippers}
-                    className={`
-                      px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${darkMode
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }
-                    `}
+                    className="a-btn"
+                    style={{ height: 36 }}
                   >
-                    Manage Skippers
+                    Manage
                   </button>
-                </div>
               </div>
             </div>
           )}
 
           {/* General Race Settings */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Trophy className="text-blue-400" size={20} />
-              <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}><Trophy size={15} /></span>
+              <h3 className="a-display a-ink text-[15px] font-semibold">
                 General Race Settings
               </h3>
             </div>
@@ -1370,51 +1309,43 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
             {/* Scoring System - Only show when heat racing is disabled */}
             {!isHeatRacingEnabled && (
-              <div className="space-y-3">
-                <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Award size={16} />
-                    Scoring System
-                  </div>
-                </label>
-                <div className="space-y-2">
+              <div className="flex flex-col gap-2">
+                <p className="a-cap">Scoring system</p>
+                <div className="a-grp">
                   {DROP_RULE_OPTIONS
                     .filter(option => !option.forHeatRacing)
-                    .map((option, index) => (
+                    .map((option, index) => {
+                      const on = (Array.isArray(option.value) && JSON.stringify(option.value) === JSON.stringify(currentDropRules)) ||
+                        (typeof option.value === 'string' && option.value !== 'custom' && option.value === currentDropRules) ||
+                        (option.value === 'custom' && isCustomDropRules);
+                      const m = /^(.*?)\s*\((.*)\)\s*$/.exec(option.label);
+                      return (
                       <button
                         key={index}
                         type="button"
                         onClick={() => handleDropRuleChange(option.value)}
-                        className={`
-                          w-full text-left px-4 py-3 rounded-lg text-sm transition-all
-                          ${(Array.isArray(option.value) && JSON.stringify(option.value) === JSON.stringify(currentDropRules)) ||
-                            (typeof option.value === 'string' && option.value !== 'custom' && option.value === currentDropRules) ||
-                            (option.value === 'custom' && isCustomDropRules)
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : darkMode
-                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }
-                        `}
+                        className="a-ir a-hov-row w-full text-left"
+                        role="radio"
+                        aria-checked={on}
                       >
-                        {option.label}
+                        <span className={`a-rad ${on ? 'a-rad-on' : ''}`} />
+                        <span className="flex-1 min-w-0">
+                          <span className={`a-ink block text-[14px] ${on ? 'font-semibold' : 'font-medium'}`}>{m ? m[1].replace(/ Scoring System$/, '').replace(/^RRS - /, 'RRS ') : option.label}</span>
+                          {m && <span className="a-dim block text-[12px] mt-0.5">{m[2].replace(/ and then /, ', then ').replace(/ races after$/, '')}</span>}
+                        </span>
                       </button>
-                    ))}
+                      );
+                    })}
                   {isCustomDropRules && (
-                    <div className="mt-2">
+                    <div className="a-ir flex-col items-stretch" style={{ gap: 6 }}>
                       <input
                         type="text"
                         value={customDropRules}
                         onChange={(e) => handleCustomDropRulesChange(e.target.value)}
                         placeholder="e.g., 4, 8, 12"
-                        className={`
-                          w-full px-3 py-2 rounded-lg text-sm border
-                          ${darkMode
-                            ? 'bg-slate-700 border-slate-600 text-white placeholder:text-slate-500'
-                            : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400'}
-                        `}
+                        className="a-inp"
                       />
-                      <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <p className="a-dim text-[12px]">
                         Enter race numbers separated by commas (e.g., 4, 8, 12)
                       </p>
                     </div>
@@ -1428,9 +1359,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           <div id="heat-racing-section" className="space-y-6">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="text-purple-400" size={20} />
-                  <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                <div className="flex items-center gap-2.5">
+                  <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}><Users size={15} /></span>
+                  <h3 className="a-display a-ink text-[15px] font-semibold">
                     Heat Racing
                   </h3>
                 </div>
@@ -1448,13 +1379,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   }`}
                   title={hasHeatScores ? 'Cannot disable heat racing after scoring has begun' : ''}
                 >
-                  <div className={`w-11 h-6 rounded-full transition ${
-                    isHeatRacingEnabled ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-200'
-                  }`}>
-                    <div className={`w-5 h-5 rounded-full bg-white shadow transform transition-transform ${
-                      isHeatRacingEnabled ? 'translate-x-6' : 'translate-x-1'
-                    } mt-0.5`} />
-                  </div>
+                  <span className="a-sw" aria-hidden="true" data-on={isHeatRacingEnabled ? 'true' : 'false'} />
                 </button>
               </div>
 
@@ -2412,62 +2337,21 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             )}
 
             {/* Display Settings */}
-            <div className="space-y-4 pt-4 border-t border-slate-700">
-              <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <Sailboat size={16} />
-                  Display Settings
+            <div className="flex flex-col gap-2.5">
+              <p className="a-cap">Display</p>
+
+              <div className="a-grp">
+                <div className="a-ir">
+                  <span className="a-ink flex-1 text-[14px]">Show country flags</span>
+                  <ASwitch checked={showFlag} onChange={() => setShowFlag(!showFlag)} label="Show country flags" />
                 </div>
-              </label>
 
-              <div className="space-y-3">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className={`text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                      Show Country Flags
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowFlag(!showFlag)}
-                    className={`
-                      relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                      ${showFlag ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'}
-                    `}
-                  >
-                    <span
-                      className={`
-                        inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                        ${showFlag ? 'translate-x-6' : 'translate-x-1'}
-                      `}
-                    />
-                  </button>
-                </label>
+                <div className="a-ir">
+                  <span className="a-ink flex-1 text-[14px]">Show country codes</span>
+                  <ASwitch checked={showCountry} onChange={() => setShowCountry(!showCountry)} label="Show country codes" />
+                </div>
 
-                <label className="flex items-center justify-between cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className={`text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                      Show Country Codes
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowCountry(!showCountry)}
-                    className={`
-                      relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                      ${showCountry ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'}
-                    `}
-                  >
-                    <span
-                      className={`
-                        inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                        ${showCountry ? 'translate-x-6' : 'translate-x-1'}
-                      `}
-                    />
-                  </button>
-                </label>
-
-                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                <p className="a-ir a-dim text-[12px]">
                   Control display of country flags and 3-letter codes (e.g., AUS) in scoring tables and touch mode.
                 </p>
               </div>
@@ -2475,33 +2359,24 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
             {/* Collaborative Scoring */}
             {onShareScoring && (
-              <div className={`p-4 rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${darkMode ? 'bg-cyan-500/10' : 'bg-blue-50'}`}>
-                      <Share2 className={`w-4.5 h-4.5 ${darkMode ? 'text-cyan-400' : 'text-blue-600'}`} />
-                    </div>
-                    <div>
-                      <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        Collaborative Scoring
+              <div className="a-grp a-ir" style={{ padding: 14 }}>
+                    <span className="a-tile"><Share2 size={18} /></span>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="a-ink text-[14px] font-semibold">
+                        Collaborative scoring
                       </h4>
-                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Invite others to help score via QR code or PIN
+                      <p className="a-dim text-[12px] mt-0.5">
+                        Invite others to help via QR code or PIN
                       </p>
                     </div>
-                  </div>
                   <button
                     onClick={onShareScoring}
-                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      darkMode
-                        ? 'bg-cyan-600 text-white hover:bg-cyan-500'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
+                    className="a-btn"
+                    style={{ height: 36 }}
                   >
-                    <QrCode className="w-4 h-4" />
+                    <QrCode size={16} />
                     Share
                   </button>
-                </div>
               </div>
             )}
 
@@ -2509,49 +2384,35 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         </div>
 
         {/* Footer with buttons */}
-        <div className={`
-          flex justify-end gap-3 p-4 border-t flex-shrink-0
-          ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-        `}>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className={`
-                px-4 py-2 rounded-lg font-medium transition-colors
-                ${darkMode
-                  ? 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
-                  : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'}
-              `}
-            >
-              Cancel
-            </button>
+        <div className="a-sheet-foot flex items-center gap-2.5 flex-shrink-0" style={{ padding: '14px 18px' }}>
             {hasAnyScores && onClearAllRaceResults && (
               <button
                 type="button"
                 onClick={() => setShowHeatClearConfirmation(true)}
-                className={`
-                  px-4 py-2 rounded-lg font-medium transition-colors
-                  bg-red-600 text-white hover:bg-red-700
-                `}
+                className="a-btn a-btn-q a-txt-r"
+                style={{ padding: '0 10px' }}
                 title="Clear all heat results and reset to Round 1"
               >
-                Clear All Results
+                <Trash2 size={16} />
+                Clear all results
               </button>
             )}
-          </div>
+          <div className="flex-1" />
+            <button
+              type="button"
+              onClick={onClose}
+              className="a-btn"
+            >
+              Cancel
+            </button>
           <button
             type="button"
             onClick={handleSave}
             disabled={isHeatRacingEnabled && !configValidation.isValid}
-            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-              isHeatRacingEnabled && !configValidation.isValid
-                ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
+            className={`a-btn a-btn-p ${isHeatRacingEnabled && !configValidation.isValid ? 'opacity-50 cursor-not-allowed' : ''}`}
             title={isHeatRacingEnabled && !configValidation.isValid ? 'Fix configuration issues before saving' : ''}
           >
-            Save Settings
+            Save
           </button>
         </div>
       </div>

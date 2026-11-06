@@ -10,6 +10,7 @@ import { formatDate } from '../../utils/date';
 import { MyClubMembershipsWidget } from '../membership/MyClubMembershipsWidget';
 import { MemberEditModal } from '../membership/MemberEditModal';
 import { Avatar } from '../ui/Avatar';
+import { AAvatar } from '../alfie/Kit';
 
 interface MemberData {
   id: string;
@@ -547,596 +548,259 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
     }
   ];
 
+  const fmtLong = (d?: string) => d ? new Date(d).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
+  const fmtShort = (d?: string) => d ? new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
+  const statusTone = membershipStatus.color === 'green' ? 'g' : membershipStatus.color === 'yellow' ? 'a' : 'r';
+  const ringColor = statusTone === 'g' ? '#30D158' : statusTone === 'a' ? '#FFB340' : '#FF6B6B';
+  const ringDeg = Math.round(Math.max(0, Math.min(1, membershipStatus.daysLeft / 365)) * 360);
+  const pctThrough = Math.round(Math.max(0, Math.min(100, ((365 - membershipStatus.daysLeft) / 365) * 100)));
+  const durationLong = memberDuration ? memberDuration.replace(/(\d+)y/, (_, y) => `${y} year${y === '1' ? '' : 's'}`).replace(/(\d+)m/, (_, m) => `${m} month${m === '1' ? '' : 's'}`) : null;
+  const section = (icon: React.ReactNode, title: string, sub?: string, action?: React.ReactNode) => (
+    <div className="flex items-center gap-3">
+      <span className="a-tile a-tile-sm">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <h2 className="a-display a-ink m-0 text-[18px] font-semibold">{title}</h2>
+        {sub && <p className="a-dim mt-0.5 text-[12.5px]">{sub}</p>}
+      </div>
+      {action}
+    </div>
+  );
+  const editBtn = (label: string) => (
+    <button onClick={() => setShowEditModal(true)} className="a-ib" aria-label={`Edit ${label}`} title={`Edit ${label}`}><Edit2 size={17} /></button>
+  );
+  const infoRow = (icon: React.ReactNode, label: string, value?: string) => (
+    <div className="a-ir" key={label}>
+      <span className="a-ir-l">{icon}{label}</span>
+      <span className={`a-ir-v ${value ? '' : 'a-dim'}`}>{value || 'Not provided'}</span>
+    </div>
+  );
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-4 sm:p-6 lg:p-16">
-        <div className="space-y-6">
+      <div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        <div className="flex items-center gap-4">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><Users size={24} /></span>
+          <div className="flex-1 min-w-0">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">My membership</h1>
+            <p className="a-mute mt-1 text-[14.5px]">Your membership, details and boats</p>
+          </div>
+          <button onClick={() => setShowEditModal(true)} className="a-btn">
+            <Edit2 size={16} />
+            <span className="max-sm:hidden">Edit details</span>
+          </button>
+        </div>
 
-          {/* Page Header */}
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="flex items-center justify-between gap-4 mb-2"
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/20">
-                <Users className="text-white" size={32} />
-              </div>
-              <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white">My Membership</h1>
-                <p className="text-lg text-slate-400">Manage your membership, details, and boats</p>
-              </div>
+        <div className="a-card a-spec-card flex flex-wrap items-center gap-[22px]" style={{ padding: '22px 24px' }}>
+          <div className="relative flex-shrink-0 cursor-pointer" onClick={() => setShowEditModal(true)}>
+            <span className="a-av-spec">
+              <AAvatar url={memberData.avatar_url} first={memberData.first_name} last={memberData.last_name} size={84} />
+            </span>
+            <button className="a-gb absolute" style={{ right: -2, bottom: -2, width: 30, height: 30 }} aria-label="Change photo"><Camera size={14} /></button>
+          </div>
+          <div className="flex-1 min-w-[220px]">
+            <div className="a-display a-ink text-[26px] font-bold">{memberData.first_name} {memberData.last_name}</div>
+            <div className="flex gap-2 mt-2.5 flex-wrap">
+              <span className="a-lb-fmt"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: '#2E7BFF' }} />{memberData.membership_level_custom || memberData.membership_level || 'Member'}</span>
+              {memberData.category && <span className="a-lb-fmt">{memberData.category}</span>}
+              {durationLong && <span className="a-lb-fmt"><Clock size={12} />{durationLong}</span>}
             </div>
-            <button
-              onClick={() => setShowEditModal(true)}
-              className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
-            >
-              <Edit2 size={16} />
-              <span className="hidden sm:inline">Edit Details</span>
-            </button>
-          </motion.div>
-
-          {/* Member Profile Hero */}
-          <motion.div
-            custom={1}
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            className="rounded-2xl bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-slate-700/50 backdrop-blur-sm overflow-hidden"
-          >
-            <div className="p-6">
-              <div className="flex flex-col sm:flex-row items-start gap-5">
-                <div className="relative flex-shrink-0 group cursor-pointer" onClick={() => setShowEditModal(true)}>
-                  <Avatar
-                    src={memberData.avatar_url}
-                    name={`${memberData.first_name} ${memberData.last_name}`}
-                    size="lg"
-                    className="w-20 h-20 rounded-2xl ring-2 ring-slate-600/50"
-                  />
-                  <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-slate-700 border-2 border-slate-800 flex items-center justify-center shadow-lg group-hover:bg-slate-600 transition-colors">
-                    <Camera size={13} className="text-slate-300" />
-                  </div>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                    <div>
-                      <h2 className="text-2xl font-bold text-white">
-                        {memberData.first_name} {memberData.last_name}
-                      </h2>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400 border border-blue-500/20">
-                          <Award size={12} />
-                          {memberData.membership_level_custom || memberData.membership_level || 'Member'}
-                        </span>
-                        {memberData.category && (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-700/50 text-slate-300 border border-slate-600/30">
-                            {memberData.category}
-                          </span>
-                        )}
-                        {memberDuration && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-teal-500/15 text-teal-400 border border-teal-500/20">
-                            <Clock size={12} />
-                            {memberDuration}
-                          </span>
-                        )}
-                      </div>
-                      {memberData.date_joined && (
-                        <p className="text-slate-500 text-xs mt-2">
-                          Member since {formatDate(memberData.date_joined)}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                      {memberData.renewal_date && membershipStatus.status !== 'expired' && (
-                        <RenewalRing daysLeft={membershipStatus.daysLeft} totalDays={365} />
-                      )}
-                      <div className={`px-4 py-2 rounded-xl flex items-center gap-2 flex-shrink-0 ${
-                        membershipStatus.color === 'green'
-                          ? 'bg-green-500/15 text-green-400 border border-green-500/20'
-                          : membershipStatus.color === 'yellow'
-                          ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20'
-                          : 'bg-red-500/15 text-red-400 border border-red-500/20'
-                      }`}>
-                        {membershipStatus.status === 'active' && <CheckCircle size={16} />}
-                        {membershipStatus.status === 'pending_payment' && <Clock size={16} />}
-                        {(membershipStatus.status === 'expiring' || membershipStatus.status === 'expired') && <AlertCircle size={16} />}
-                        <span className="text-sm font-semibold">{membershipStatus.text}</span>
-                      </div>
-                    </div>
-                  </div>
+            {memberData.date_joined && <div className="a-dim text-[12.5px] mt-2">Member since {fmtLong(memberData.date_joined)}</div>}
+          </div>
+          <div className="a-ring-box flex items-center gap-[18px]">
+            {memberData.renewal_date && membershipStatus.status !== 'expired' && !membershipStatus.pendingPayment ? (
+              <div className="relative flex-shrink-0" style={{ width: 92, height: 92 }}>
+                <div className="a-ring" style={{ background: `conic-gradient(${ringColor} 0deg ${ringDeg}deg, var(--a-ring-track) ${ringDeg}deg 360deg)` }} />
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="a-display a-ink text-[24px] font-bold leading-none">{Math.max(0, membershipStatus.daysLeft)}</span>
+                  <span className="a-dim text-[10.5px] mt-0.5">days left</span>
                 </div>
               </div>
-
-              {membershipStatus.pendingPayment && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  transition={{ delay: 0.5 }}
-                  className="mt-5 rounded-xl bg-yellow-500/10 border border-yellow-500/20 overflow-hidden"
-                >
-                  <div className="p-4 flex items-center gap-3">
-                    <Clock size={20} className="text-yellow-400 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="font-medium text-sm text-yellow-400">Renewal Submitted - Awaiting Payment</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Your renewal has been submitted. Please complete the bank transfer below and notify your club administrator.
-                      </p>
-                    </div>
-                  </div>
-                  {bankDetails && (
-                    <div className="px-4 pb-4">
-                      <div className="bg-slate-800/60 rounded-xl p-4 space-y-3 border border-slate-700/40">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Landmark size={16} className="text-blue-400" />
-                          <p className="text-sm font-medium text-slate-200">Bank Transfer Details</p>
-                        </div>
-                        {bankDetails.bank_name && (
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Bank Name</p>
-                              <p className="text-sm text-white font-medium">{bankDetails.bank_name}</p>
-                            </div>
-                          </div>
-                        )}
-                        {bankDetails.bsb && (
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">BSB</p>
-                              <p className="text-sm text-white font-medium font-mono">{bankDetails.bsb}</p>
-                            </div>
-                            <button
-                              onClick={() => handleCopyBankField(bankDetails.bsb, 'bsb-banner')}
-                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
-                            >
-                              {copiedField === 'bsb-banner' ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="text-slate-400" />}
-                            </button>
-                          </div>
-                        )}
-                        {bankDetails.account_number && (
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Account Number</p>
-                              <p className="text-sm text-white font-medium font-mono">{bankDetails.account_number}</p>
-                            </div>
-                            <button
-                              onClick={() => handleCopyBankField(bankDetails.account_number, 'acc-banner')}
-                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
-                            >
-                              {copiedField === 'acc-banner' ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="text-slate-400" />}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {clubHasStripe && (
-                    <div className="px-4 pb-4">
-                      <div className="bg-blue-500/10 rounded-xl p-4 border border-blue-500/20">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <CreditCard size={18} className="text-blue-400 flex-shrink-0" />
-                            <div>
-                              <p className="text-sm font-medium text-blue-300">Prefer to pay online?</p>
-                              <p className="text-xs text-slate-400 mt-0.5">Pay instantly with credit or debit card via Stripe</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={handleSwitchToOnlinePayment}
-                            disabled={switchingToOnline}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-all hover:shadow-lg hover:shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                          >
-                            {switchingToOnline ? (
-                              <>
-                                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
-                                Processing...
-                              </>
-                            ) : (
-                              <>
-                                <CreditCard size={14} />
-                                Pay Online
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-
+            ) : (
+              <span className="a-tile" style={{ width: 64, height: 64, borderRadius: 999 }}>
+                {membershipStatus.pendingPayment ? <Clock size={26} /> : <AlertCircle size={26} />}
+              </span>
+            )}
+            <div>
+              <span className={`a-st a-txt-${statusTone} text-[14px] font-semibold`}><span className={`a-light a-light-${statusTone}`} />{membershipStatus.text}</span>
+              {memberData.renewal_date && <div className="a-mute text-[13px] mt-1.5">{membershipStatus.status === 'expired' ? 'Expired' : 'Renews'} {fmtLong(memberData.renewal_date)}</div>}
               {membershipStatus.needsRenewal && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  transition={{ delay: 0.5 }}
-                  className={`mt-5 p-4 rounded-xl flex items-center justify-between ${
-                    membershipStatus.color === 'yellow'
-                      ? 'bg-yellow-500/10 border border-yellow-500/20'
-                      : 'bg-red-500/10 border border-red-500/20'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <AlertCircle size={20} className={membershipStatus.color === 'yellow' ? 'text-yellow-400' : 'text-red-400'} />
-                    <div>
-                      <p className={`font-medium text-sm ${membershipStatus.color === 'yellow' ? 'text-yellow-400' : 'text-red-400'}`}>
-                        {membershipStatus.status === 'expiring' ? 'Membership Expiring Soon' : 'Membership Expired'}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {membershipStatus.status === 'expiring' ? 'Renew now to maintain your benefits.' : 'Renew now to continue enjoying club benefits.'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowRenewalModal(true)}
-                    className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all flex-shrink-0"
-                  >
-                    <CreditCard size={14} />
-                    Renew Now
-                  </button>
-                </motion.div>
+                <button onClick={() => setShowRenewalModal(true)} className="a-btn a-btn-p mt-2.5" style={{ height: 34, fontSize: 13 }}>
+                  <CreditCard size={15} />Renew now
+                </button>
               )}
             </div>
-          </motion.div>
+          </div>
+        </div>
 
-          {/* Multi-Club Memberships */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.4 }}
-          >
+        {membershipStatus.pendingPayment && (
+          <div className="a-card flex flex-col gap-3" style={{ padding: '16px 20px' }}>
+            <div className="flex items-center gap-3">
+              <span className="a-tile a-tile-sm a-txt-a"><Clock size={16} /></span>
+              <div className="flex-1">
+                <p className="a-txt-a m-0 font-semibold text-[14px]">Renewal submitted · awaiting payment</p>
+                <p className="a-dim m-0 text-[12.5px] mt-0.5">Complete the bank transfer below and let your club administrator know.</p>
+              </div>
+            </div>
+            {bankDetails && (
+              <div className="a-grp">
+                {bankDetails.bank_name && (
+                  <div className="a-ir"><span className="a-ir-l"><Landmark size={15} />Bank</span><span className="a-ir-v">{bankDetails.bank_name}</span></div>
+                )}
+                {bankDetails.bsb && (
+                  <div className="a-ir">
+                    <span className="a-ir-l"><Landmark size={15} />BSB</span>
+                    <span className="a-ir-v a-mono">{bankDetails.bsb}</span>
+                    <button onClick={() => handleCopyBankField(bankDetails.bsb, 'bsb-banner')} className="a-ib" style={{ width: 30, height: 30 }} aria-label="Copy BSB">
+                      {copiedField === 'bsb-banner' ? <Check size={14} className="a-txt-g" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                )}
+                {bankDetails.account_number && (
+                  <div className="a-ir">
+                    <span className="a-ir-l"><Landmark size={15} />Account</span>
+                    <span className="a-ir-v a-mono">{bankDetails.account_number}</span>
+                    <button onClick={() => handleCopyBankField(bankDetails.account_number, 'acc-banner')} className="a-ib" style={{ width: 30, height: 30 }} aria-label="Copy account number">
+                      {copiedField === 'acc-banner' ? <Check size={14} className="a-txt-g" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            {clubHasStripe && (
+              <div className="a-note flex items-center gap-3">
+                <CreditCard size={18} className="a-txt-b flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="a-ink m-0 text-[13.5px] font-semibold">Prefer to pay online?</p>
+                  <p className="a-dim m-0 text-[12.5px] mt-0.5">Pay instantly by card via Stripe</p>
+                </div>
+                <button onClick={handleSwitchToOnlinePayment} disabled={switchingToOnline} className="a-btn a-btn-p disabled:opacity-50" style={{ height: 36, fontSize: 13 }}>
+                  {switchingToOnline ? <><div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />Processing…</> : <><CreditCard size={15} />Pay online</>}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {membershipStatus.needsRenewal && (
+          <div className={`a-note ${statusTone === 'r' ? 'a-note-r' : ''} flex items-center gap-3`}>
+            <AlertCircle size={18} className={statusTone === 'r' ? '' : 'a-txt-a'} />
+            <div className="flex-1">
+              <p className="m-0 font-semibold text-[13.5px]">{membershipStatus.status === 'expiring' ? 'Membership expiring soon' : 'Membership expired'}</p>
+              <p className="a-dim m-0 text-[12.5px] mt-0.5">{membershipStatus.status === 'expiring' ? 'Renew now to keep your benefits.' : 'Renew now to keep enjoying club benefits.'}</p>
+            </div>
+            <button onClick={() => setShowRenewalModal(true)} className="a-btn a-btn-p" style={{ height: 36, fontSize: 13 }}>
+              <CreditCard size={15} />Renew now
+            </button>
+          </div>
+        )}
+
+        {memberData.date_joined && memberData.renewal_date && (
+          <div className="a-card" style={{ padding: '16px 20px' }}>
+            <div className="a-dim flex justify-between gap-3 text-[12.5px]">
+              <span>Joined {fmtShort(memberData.date_joined)}</span>
+              <span className="a-ink font-semibold max-sm:hidden">Today · {pctThrough}% through this membership</span>
+              <span>Renewal {fmtShort(memberData.renewal_date)}</span>
+            </div>
+            <div className="a-tl">
+              <div className="a-tl-fill" style={{ width: `${pctThrough}%` }} />
+              <span className="a-tl-dot" style={{ left: `calc(${pctThrough}% - 9px)` }} />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          <div className="lg:col-span-1">
             <MyClubMembershipsWidget darkMode={darkMode} />
-          </motion.div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {statCards.map((stat, i) => {
-              const Icon = stat.icon;
-              return (
-                <motion.div
-                  key={stat.label}
-                  custom={i + 2}
-                  variants={cardVariants}
-                  initial="hidden"
-                  animate="visible"
-                  className={`rounded-2xl bg-gradient-to-br ${stat.bg} border backdrop-blur-sm p-4 hover:scale-[1.02] transition-transform duration-200`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg flex-shrink-0`}>
-                      <Icon className="text-white" size={18} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs text-slate-400 uppercase tracking-wider">{stat.label}</p>
-                      <p className="text-base font-bold text-white mt-0.5 truncate">{stat.value}</p>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
           </div>
 
-          {/* Membership Timeline */}
-          {memberData.date_joined && memberData.renewal_date && (
-            <motion.div
-              custom={6}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              className="rounded-2xl bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 backdrop-blur-sm p-5"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Activity size={16} className="text-blue-400" />
-                <h3 className="text-sm font-semibold text-slate-300">Membership Timeline</h3>
-              </div>
-              <div className="relative">
-                <div className="h-2 rounded-full bg-slate-700/50 overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full from-blue-500 via-cyan-500"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.max(5, Math.min(100, ((365 - membershipStatus.daysLeft) / 365) * 100))}%` }}
-                    transition={{ duration: 1, ease: 'easeOut', delay: 0.5 }}
-                  />
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-slate-500">Joined {formatDate(memberData.date_joined)}</span>
-                  <span className="text-xs text-slate-500">Renewal {formatDate(memberData.renewal_date)}</span>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Info Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Contact Details */}
-            <motion.div
-              custom={7}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              onClick={() => setShowEditModal(true)}
-              className="rounded-2xl bg-gradient-to-br from-blue-600/15 to-blue-800/15 border border-blue-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-blue-400/40 transition-colors group/card"
-            >
-              <div className="flex items-center gap-3 mb-5">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/20">
-                  <User size={16} className="text-white" />
-                </div>
-                <h3 className="text-base font-semibold text-slate-200">Contact Details</h3>
-                <Edit2 size={14} className="text-slate-600 group-hover/card:text-blue-400 transition-colors ml-auto" />
-              </div>
-              <div className="space-y-4">
-                {[
-                  { icon: Mail, label: 'Email', value: memberData.email },
-                  { icon: Phone, label: 'Phone', value: memberData.phone },
-                  { icon: MapPin, label: 'Address', value: fullAddress }
-                ].map((item) => {
-                  const ItemIcon = item.icon;
-                  return (
-                    <div key={item.label} className="flex items-start gap-3 group">
-                      <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/15 flex-shrink-0 mt-0.5">
-                        <ItemIcon size={14} className="text-blue-400" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">{item.label}</p>
-                        <p className="text-sm text-white mt-0.5">{item.value || 'Not provided'}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-
-            {/* Membership Details */}
-            <motion.div
-              custom={8}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              onClick={() => setShowEditModal(true)}
-              className="rounded-2xl bg-gradient-to-br from-green-600/15 to-green-800/15 border border-green-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-green-400/40 transition-colors group/card"
-            >
-              <div className="flex items-center gap-3 mb-5">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br shadow-lg">
-                  <Shield size={16} className="text-white" />
-                </div>
-                <h3 className="text-base font-semibold text-slate-200">Membership Details</h3>
-                <Edit2 size={14} className="text-slate-600 group-hover/card:text-green-400 transition-colors ml-auto" />
-              </div>
-              <div className="space-y-4">
-                {[
-                  { icon: FileText, label: 'Membership Type', value: memberData.membership_level_custom || memberData.membership_level || 'Standard' },
-                  { icon: Calendar, label: 'Renewal Date', value: memberData.renewal_date ? formatDate(memberData.renewal_date) : 'N/A' },
-                  { icon: Clock, label: 'Member Since', value: memberData.date_joined ? formatDate(memberData.date_joined) : 'N/A' }
-                ].map((item) => {
-                  const ItemIcon = item.icon;
-                  return (
-                    <div key={item.label} className="flex items-start gap-3 group">
-                      <div className="p-1.5 rounded-lg bg-green-500/10 border border-green-500/15 flex-shrink-0 mt-0.5">
-                        <ItemIcon size={14} className="text-green-400" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">{item.label}</p>
-                        <p className="text-sm text-white mt-0.5">{item.value}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-
-            {/* Emergency Contact */}
-            <motion.div
-              custom={9}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              onClick={() => setShowEditModal(true)}
-              className="rounded-2xl bg-gradient-to-br from-rose-600/15 to-rose-800/15 border border-rose-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-rose-400/40 transition-colors group/card"
-            >
-              <div className="flex items-center gap-3 mb-5">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 shadow-lg shadow-rose-500/20">
-                  <Heart size={16} className="text-white" />
-                </div>
-                <h3 className="text-base font-semibold text-slate-200">Emergency Contact</h3>
-                <Edit2 size={14} className="text-slate-600 group-hover/card:text-rose-400 transition-colors ml-auto" />
-              </div>
-              {memberData.emergency_contact_name ? (
-                <div className="space-y-4">
-                  {[
-                    { icon: User, label: 'Name', value: memberData.emergency_contact_name },
-                    ...(memberData.emergency_contact_phone ? [{ icon: Phone, label: 'Phone', value: memberData.emergency_contact_phone }] : []),
-                    ...(memberData.emergency_contact_relationship ? [{ icon: Shield, label: 'Relationship', value: memberData.emergency_contact_relationship }] : [])
-                  ].map((item) => {
-                    const ItemIcon = item.icon;
-                    return (
-                      <div key={item.label} className="flex items-start gap-3">
-                        <div className="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/15 flex-shrink-0 mt-0.5">
-                          <ItemIcon size={14} className="text-rose-400" />
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">{item.label}</p>
-                          <p className="text-sm text-white mt-0.5">{item.value}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/15 flex items-center justify-center mx-auto mb-3">
-                    <Heart size={20} className="text-rose-400/50" />
-                  </div>
-                  <p className="text-sm text-slate-500 mb-2">No emergency contact on file</p>
-                  <button
-                    onClick={() => setShowEditModal(true)}
-                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium"
-                  >
-                    Add emergency contact
-                  </button>
-                </div>
-              )}
-            </motion.div>
-
-            {/* My Boats */}
-            <motion.div
-              custom={10}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              onClick={() => setShowEditModal(true)}
-              className="rounded-2xl bg-gradient-to-br from-cyan-600/15 to-cyan-800/15 border border-cyan-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-cyan-400/40 transition-colors group/card"
-            >
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 shadow-lg shadow-cyan-500/20">
-                    <Anchor size={16} className="text-white" />
-                  </div>
-                  <h3 className="text-base font-semibold text-slate-200">My Boats</h3>
-                </div>
-                <button
-                  onClick={() => setShowEditModal(true)}
-                  className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-medium px-3 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/15"
-                >
-                  Manage
-                </button>
-              </div>
-              {boats.length > 0 ? (
-                <div className="space-y-3">
-                  {boats.map((boat, idx) => (
-                    <motion.div
-                      key={boat.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.6 + idx * 0.1 }}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 hover:border-cyan-500/30 transition-colors group"
-                    >
-                      <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/15 group-hover:bg-cyan-500/20 transition-colors">
-                        <Sailboat size={16} className="text-cyan-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">
-                          {boat.boat_type}
-                          {boat.boat_name && <span className="text-slate-400 ml-1.5">- {boat.boat_name}</span>}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          Sail: {boat.sail_number || 'N/A'}
-                          {boat.hull_number && ` | Hull: ${boat.hull_number}`}
-                          {boat.handicap !== undefined && boat.handicap !== null && ` | HC: ${boat.handicap}`}
-                        </p>
-                      </div>
-                      <ChevronRight size={14} className="text-slate-600 group-hover:text-cyan-400 transition-colors" />
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/15 flex items-center justify-center mx-auto mb-3">
-                    <Sailboat size={20} className="text-cyan-400/50" />
-                  </div>
-                  <p className="text-sm text-slate-500 mb-2">No boats registered</p>
-                  <button
-                    onClick={() => setShowEditModal(true)}
-                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium"
-                  >
-                    Add a boat
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </div>
-
-          {/* Payment History */}
-          <motion.div
-            custom={11}
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            className="rounded-2xl bg-gradient-to-br from-amber-600/15 to-amber-800/15 border border-amber-500/25 backdrop-blur-sm p-6"
-          >
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/20">
-                  <FileText size={16} className="text-white" />
-                </div>
-                <h3 className="text-base font-semibold text-slate-200">Payment History</h3>
-              </div>
-              {!membershipStatus.needsRenewal && (
-                <button className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors font-medium px-3 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15">
-                  <Download size={14} />
-                  Download Invoice
-                </button>
-              )}
+          <div className="a-card flex flex-col gap-3.5" style={{ padding: '18px 20px' }}>
+            {section(<Shield size={16} />, 'Membership', undefined, editBtn('membership'))}
+            <div className="a-grp">
+              {infoRow(<FileText size={15} />, 'Type', memberData.membership_level_custom || memberData.membership_level || 'Standard')}
+              {infoRow(<Calendar size={15} />, 'Renews', memberData.renewal_date ? fmtLong(memberData.renewal_date) : 'N/A')}
+              {infoRow(<Clock size={15} />, 'Member since', memberData.date_joined ? fmtLong(memberData.date_joined) : 'N/A')}
             </div>
+          </div>
 
-            {payments.length > 0 ? (
-              <div className="space-y-3">
-                {payments.map((payment, idx) => (
-                  <motion.div
-                    key={payment.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.7 + idx * 0.08 }}
-                    className="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-800/40 border border-slate-700/40"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`p-2 rounded-lg ${
-                        payment.status === 'paid' || payment.status === 'completed'
-                          ? 'bg-green-500/10 border border-green-500/15'
-                          : 'bg-yellow-500/10 border border-yellow-500/15'
-                      }`}>
-                        {payment.status === 'paid' || payment.status === 'completed'
-                          ? <CheckCircle size={14} className="text-green-400" />
-                          : <Clock size={14} className="text-yellow-400" />
-                        }
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-white truncate">
-                          {payment.description || 'Membership Payment'}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {formatDate(payment.payment_date)} · {payment.payment_method?.replace('_', ' ') || 'N/A'}
-                        </p>
+          <div className="a-card flex flex-col gap-3.5" style={{ padding: '18px 20px' }}>
+            {section(<User size={16} />, 'Contact details', undefined, editBtn('contact details'))}
+            <div className="a-grp">
+              {infoRow(<Mail size={15} />, 'Email', memberData.email)}
+              {infoRow(<Phone size={15} />, 'Phone', memberData.phone)}
+              {infoRow(<MapPin size={15} />, 'Address', fullAddress)}
+            </div>
+          </div>
+
+          <div className="a-card flex flex-col gap-3.5" style={{ padding: '18px 20px' }}>
+            {section(<Heart size={16} />, 'Emergency contact', undefined, editBtn('emergency contact'))}
+            {memberData.emergency_contact_name ? (
+              <div className="a-grp">
+                {infoRow(<User size={15} />, 'Name', memberData.emergency_contact_name)}
+                {infoRow(<Phone size={15} />, 'Phone', memberData.emergency_contact_phone)}
+                {infoRow(<Shield size={15} />, 'Relationship', memberData.emergency_contact_relationship)}
+              </div>
+            ) : (
+              <div className="a-grp a-empty text-center" style={{ padding: 18 }}>
+                <p className="a-dim text-[13px] mb-2">No emergency contact on file</p>
+                <button onClick={() => setShowEditModal(true)} className="a-btn a-btn-q a-txt-b" style={{ height: 32, fontSize: 13 }}>Add emergency contact</button>
+              </div>
+            )}
+          </div>
+
+          <div className="a-card flex flex-col gap-2.5" style={{ padding: '18px 20px' }}>
+            {section(<Anchor size={16} />, 'My boats', `${boats.length} ${boats.length === 1 ? 'boat' : 'boats'}`,
+              <button onClick={() => setShowEditModal(true)} className="a-btn a-btn-q a-txt-b" style={{ height: 32, fontSize: 13 }}>Manage</button>)}
+            {boats.length > 0 ? (
+              <div className="a-grp">
+                {boats.map((boat) => (
+                  <div key={boat.id} className="a-rr" style={{ padding: '10px 12px' }} onClick={() => setShowEditModal(true)} role="button" tabIndex={0}>
+                    <span className="a-tile" style={{ width: 44, height: 44 }}><Sailboat size={19} /></span>
+                    <div className="flex-1 min-w-0">
+                      <div className="a-ink text-[14.5px] font-semibold truncate">{boat.boat_name || boat.boat_type}</div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="a-lb-cls"><Sailboat size={11} />{boat.boat_type}{boat.sail_number && <span className="a-dim" style={{ fontWeight: 500, letterSpacing: 0 }}>{boat.sail_number}</span>}</span>
+                        {boat.hull_number && <span className="a-dim text-[12px]">Hull {boat.hull_number}</span>}
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold text-white">${payment.amount?.toFixed(2)}</p>
-                      <span className={`text-[10px] font-medium uppercase tracking-wider ${
-                        payment.status === 'paid' || payment.status === 'completed' ? 'text-green-400' : 'text-yellow-400'
-                      }`}>
-                        {payment.status || 'N/A'}
-                      </span>
-                    </div>
-                  </motion.div>
+                    {boat.handicap !== undefined && boat.handicap !== null && (
+                      <span className="a-dim text-[12.5px]">Handicap <b className="a-num a-ink">{boat.handicap}</b></span>
+                    )}
+                    <ChevronRight size={16} className="a-dim" />
+                  </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/15 flex items-center justify-center mx-auto mb-3">
-                  <FileText size={20} className="text-amber-400/50" />
-                </div>
-                <p className="text-sm text-slate-500">No payment history available</p>
+              <div className="a-grp a-empty text-center" style={{ padding: 18 }}>
+                <p className="a-dim text-[13px] mb-2">No boats registered</p>
+                <button onClick={() => setShowEditModal(true)} className="a-btn a-btn-q a-txt-b" style={{ height: 32, fontSize: 13 }}>Add a boat</button>
               </div>
             )}
-          </motion.div>
+          </div>
 
-          {/* Renewal CTA */}
-          {membershipStatus.needsRenewal && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.9 }}
-              className="flex justify-center"
-            >
-              <button
-                onClick={() => setShowRenewalModal(true)}
-                className="btn-primary-green flex items-center gap-2 px-8 py-3 from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-xl hover:shadow-blue-500/25 hover:scale-105 transition-all duration-200"
-              >
-                <CreditCard size={18} />
-                Renew Membership
-              </button>
-            </motion.div>
-          )}
+          <div className="a-card flex flex-col gap-3.5" style={{ padding: '18px 20px' }}>
+            {section(<FileText size={16} />, 'Payment history', `${payments.length} ${payments.length === 1 ? 'payment' : 'payments'}`)}
+            {payments.length > 0 ? (
+              <div className="a-grp">
+                {payments.map((payment) => {
+                  const paid = payment.status === 'paid' || payment.status === 'completed';
+                  return (
+                    <div key={payment.id} className="a-ir">
+                      <span className={`a-tile a-tile-sm ${paid ? 'a-txt-g' : 'a-txt-a'}`}>{paid ? <CheckCircle size={15} /> : <Clock size={15} />}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="a-ink text-[14.5px] font-semibold truncate">{payment.description || 'Membership payment'}</div>
+                        <div className="a-dim text-[12.5px] mt-0.5">{fmtShort(payment.payment_date)} · {payment.payment_method?.replace('_', ' ') || 'N/A'} · <span className={paid ? 'a-txt-g' : 'a-txt-a'}>{paid ? 'Paid' : (payment.status || 'Pending')}</span></div>
+                      </div>
+                      <span className="a-num a-ink text-[15px] font-semibold">${payment.amount?.toFixed(2)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="a-grp a-empty text-center" style={{ padding: 18 }}>
+                <p className="a-dim text-[13px]">No payment history yet</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

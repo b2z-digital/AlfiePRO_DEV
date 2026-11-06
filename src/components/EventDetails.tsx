@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, Circle as HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader as Loader2, CircleCheck as CheckCircle, Radio, Upload, TriangleAlert, ClipboardList, Gavel, Pencil, UserPlus, ChevronDown } from 'lucide-react';
 import { RaceEvent } from '../types/race';
+import { getBoatClassBadge, getRaceFormatBadge } from '../constants/colors';
+import { ASwitch } from './alfie/Kit';
 import { formatDate } from '../utils/date';
 import { setCurrentEvent } from '../utils/raceStorage';
 import EventResultsDisplay from './EventResultsDisplay';
@@ -1961,21 +1963,17 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   );
 
   const renderDetailsTab = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* LEFT COLUMN - Event Information */}
-        <div className={`p-4 rounded-xl border shadow-sm ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}>
-          <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-            Event Information
-          </h3>
-          <div className="space-y-3">
-            <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-              <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-blue-500/20' : 'bg-blue-50'}`}>
-                <Calendar className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={16} />
-              </div>
+        <section className="flex flex-col gap-3">
+          <p className="a-cap m-0 pl-1">Event information</p>
+          <div className="a-grp a-evgrp">
+            <div className="a-evrow">
+              <span className="a-tile flex-shrink-0" style={{ width: 38, height: 38 }}><Calendar size={17} /></span>
               <div className="flex-1">
-                <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Date</p>
-                <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                <p className="a-evk">Date</p>
+                <p className="a-evv">
                   {new Date(event.date).toLocaleDateString('en-GB')}
                   {event.multiDay && event.endDate && event.date !== event.endDate && (
                     <> - {new Date(event.endDate).toLocaleDateString('en-GB')}</>
@@ -1984,38 +1982,34 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               </div>
             </div>
 
-            <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-              <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-emerald-500/20' : 'bg-emerald-50'}`}>
-                <MapPin className={darkMode ? 'text-emerald-400' : 'text-emerald-600'} size={16} />
-              </div>
+            <div className="a-evrow">
+              <span className="a-tile flex-shrink-0" style={{ width: 38, height: 38 }}><MapPin size={17} /></span>
               <div className="flex-1">
-                <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Venue</p>
+                <p className="a-evk">Venue</p>
                 <button
                   onClick={() => onViewVenue && onViewVenue(event.venue)}
-                  className={`text-sm font-medium ${darkMode ? 'text-white hover:text-blue-400' : 'text-slate-900 hover:text-blue-600'} transition-colors text-left`}
+                  className="a-evv hover:underline text-left"
                 >
                   {event.venue}
                 </button>
               </div>
             </div>
 
-            <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-              <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-amber-500/20' : 'bg-amber-50'}`}>
-                <Trophy className={darkMode ? 'text-amber-400' : 'text-amber-600'} size={16} />
-              </div>
+            <div className="a-evrow">
+              <span className="a-tile flex-shrink-0" style={{ width: 38, height: 38 }}><Trophy size={17} /></span>
               <div className="flex-1">
-                <p className={`text-[10px] font-medium uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Race Format</p>
-                <div className="flex flex-wrap gap-1.5">
+                <p className="a-evk">Race Format</p>
+                <div className="flex flex-wrap gap-2 mt-1.5">
                   {!event.isExternalEvent && (
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${event.raceFormat === 'handicap' ? 'bg-purple-600 text-white' : 'bg-blue-600 text-white'}`}>
+                    <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', true).className}>
                       {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
                     </span>
                   )}
-                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-rose-600 text-white">{event.raceClass}</span>
-                  {event.isInterclub && <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">Interclub</span>}
-                  {event.multiDay && <span className="px-2 py-0.5 rounded text-xs font-medium text-white">{event.numberOfDays} Days</span>}
+                  {event.raceClass && <span className={getBoatClassBadge(event.raceClass, true).className}>{event.raceClass}</span>}
+                  {event.isInterclub && <span className="a-wlvl">Interclub</span>}
+                  {event.multiDay && <span className="a-wlvl a-wlvl-n">{event.numberOfDays} Days</span>}
                   {event.multiDay && event.dayResults && (
-                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-cyan-600 text-white">
+                    <span className="a-wlvl a-wlvl-n">
                       {Object.keys(event.dayResults).filter(day => {
                         const dayData = event.dayResults[day];
                         return dayData && dayData.lastCompletedRace > 0;
@@ -2027,59 +2021,55 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             </div>
 
             {event.isPaid && (
-              <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-green-500/20' : 'bg-green-50'}`}>
-                  <DollarSign className={darkMode ? 'text-green-400' : 'text-green-600'} size={16} />
-                </div>
+              <div className="a-evrow">
+                <span className="a-tile flex-shrink-0" style={{ width: 38, height: 38 }}><DollarSign size={17} /></span>
                 <div className="flex-1">
-                  <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Entry Fee</p>
-                  <p className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>${event.entryFee?.toFixed(2)} AUD</p>
+                  <p className="a-evk">Entry Fee</p>
+                  <p className="a-evv">${event.entryFee?.toFixed(2)} AUD</p>
                 </div>
               </div>
             )}
 
             {/* PRO Assignment Section */}
             {!event.isSeriesEvent && (
-              <div className={`p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="a-evrow-wrap">
                 <div className="flex items-center gap-3">
-                  <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-amber-500/20' : 'bg-amber-50'}`}>
-                    <ClipboardList className={darkMode ? 'text-amber-400' : 'text-amber-600'} size={16} />
-                  </div>
+                  <span className="a-tile flex-shrink-0" style={{ width: 38, height: 38 }}><ClipboardList size={17} /></span>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Principal Race Officer</p>
+                    <p className="a-evk">Principal Race Officer</p>
                     {(event.proMemberName || rosteredProName) ? (
                       <div className="flex items-center gap-2">
-                        <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.proMemberName || rosteredProName}</p>
+                        <p className="a-evv truncate">{event.proMemberName || rosteredProName}</p>
                         {(isAdmin || isEditor) && event.proMemberName && (
                           <button
                             onClick={handleRemovePro}
                             disabled={assigningPro}
-                            className={`text-xs px-1.5 py-0.5 rounded ${darkMode ? 'text-red-400 hover:bg-red-500/20' : 'text-red-500 hover:bg-red-50'} transition-colors`}
+                            className="a-txt-r text-[12px] px-1.5 py-0.5 rounded hover:underline"
                           >
                             Remove
                           </button>
                         )}
                       </div>
                     ) : rosteredProName ? (
-                      <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{rosteredProName}</p>
+                      <p className="a-evv">{rosteredProName}</p>
                     ) : (isAdmin || isEditor) ? (
                       <button
                         onClick={() => setShowProDropdown(!showProDropdown)}
                         disabled={assigningPro}
-                        className={`flex items-center gap-1 text-sm font-medium ${darkMode ? 'text-amber-400 hover:text-amber-300' : 'text-amber-600 hover:text-amber-700'} transition-colors`}
+                        className="a-link inline-flex items-center gap-1 text-[14.5px] font-medium mt-0.5"
                       >
                         <UserPlus size={14} />
                         <span>Assign PRO</span>
                         <ChevronDown size={12} className={`transition-transform ${showProDropdown ? 'rotate-180' : ''}`} />
                       </button>
                     ) : (
-                      <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Not assigned</p>
+                      <p className="a-evv a-evv-dim">Not assigned</p>
                     )}
                   </div>
                 </div>
 
                 {showProDropdown && (
-                  <div className={`mt-2 rounded-lg border shadow-lg max-h-48 overflow-auto ${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+                  <div className="a-pop mt-2 max-h-56 overflow-auto">
                     <div className="p-2">
                       <input
                         type="text"
@@ -2087,7 +2077,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                         onChange={(e) => setProSearchTerm(e.target.value)}
                         placeholder="Search members..."
                         autoFocus
-                        className={`w-full px-2.5 py-1.5 text-sm rounded border ${darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'} focus:outline-none focus:ring-1 focus:ring-amber-500`}
+                        className="a-inp w-full" style={{ height: 36 }}
                       />
                     </div>
                     {clubMembers
@@ -2096,13 +2086,13 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                         <button
                           key={member.id}
                           onClick={() => handleAssignPro(member.id, member.name)}
-                          className={`w-full text-left px-3 py-2 text-sm ${darkMode ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'} transition-colors`}
+                          className="a-pop-item"
                         >
                           {member.name}
                         </button>
                       ))}
                     {clubMembers.filter(m => m.name.toLowerCase().includes(proSearchTerm.toLowerCase())).length === 0 && (
-                      <p className={`px-3 py-2 text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>No members found</p>
+                      <p className="a-dim px-3 py-2 text-[13px]">No members found</p>
                     )}
                   </div>
                 )}
@@ -2110,101 +2100,88 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             )}
 
             {event.isSeriesEvent && (
-              <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-amber-500/20' : 'bg-amber-50'}`}>
-                  <ClipboardList className={darkMode ? 'text-amber-400' : 'text-amber-600'} size={16} />
-                </div>
+              <div className="a-evrow">
+                <span className="a-tile flex-shrink-0" style={{ width: 38, height: 38 }}><ClipboardList size={17} /></span>
                 <div className="flex-1">
-                  <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Principal Race Officer</p>
+                  <p className="a-evk">Principal Race Officer</p>
                   {(event.proMemberName || rosteredProName) ? (
-                    <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{event.proMemberName || rosteredProName}</p>
+                    <p className="a-evv">{event.proMemberName || rosteredProName}</p>
                   ) : (
-                    <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Not assigned</p>
+                    <p className="a-evv a-evv-dim">Not assigned</p>
                   )}
                 </div>
               </div>
             )}
           </div>
-        </div>
+        </section>
 
         {/* RIGHT COLUMN - Registration/Attendance OR Competing Skippers */}
-        <div className={`p-4 rounded-xl border shadow-sm ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}>
+        <section className="flex flex-col gap-3">
           {/* External Event Registration */}
           {event.isExternalEvent && event.registrationUrl && (
             <>
-              <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                Registration
-              </h3>
-              <p className={`text-sm mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                This event is managed externally.
-              </p>
+              <p className="a-cap m-0 pl-1">Registration</p>
+              <div className="a-grp flex items-center gap-3 flex-wrap" style={{ padding: 16 }}>
+              <p className="a-mute m-0 flex-1 text-[14px]">This event is managed externally.</p>
               <a
                 href={event.registrationUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+                className="a-btn a-btn-p"
               >
                 <ExternalLink size={16} />
                 Register for Event
               </a>
+              </div>
             </>
           )}
 
           {/* Competing Skippers (when skippers have been added) */}
           {skippersAdded && event.skippers && event.skippers.length > 0 && (
             <>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                  Competing Skippers
-                </h3>
-                <div className={`px-3 py-1 rounded-lg font-semibold text-xs ${darkMode ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white' : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'}`}>
-                  {event.skippers.length} competitor{event.skippers.length === 1 ? '' : 's'}
-                </div>
+              <div className="flex items-center justify-between px-1">
+                <p className="a-cap m-0">Competing skippers</p>
+                <span className="a-mute inline-flex items-center gap-2 text-[13px]"><span className="a-cnt" style={{ background: '#0A84FF', color: '#fff', boxShadow: 'none' }}>{event.skippers.length}</span>competitor{event.skippers.length === 1 ? '' : 's'}</span>
               </div>
-              <div className="flex items-center -space-x-2.5 flex-wrap gap-y-2">
+              <div className="a-grp grid grid-cols-3 sm:grid-cols-4" style={{ padding: 18, gap: '18px 12px' }}>
                 {event.skippers.slice(0, Math.min(12, event.skippers.length)).map((skipper, index) => {
-                  const nameParts = skipper.name.split(' ');
-                  const initials = nameParts.map(part => part[0]).join('');
+                  const nameParts = skipper.name.split(' ').filter(Boolean);
+                  const initials = nameParts.map(part => part[0]).join('').slice(0, 2).toUpperCase();
+                  const short = nameParts.length > 1 ? `${nameParts[0]} ${nameParts[nameParts.length - 1][0]}.` : skipper.name;
                   const avatarUrl = skipperAvatars[skipper.name];
                   return (
-                    <div
-                      key={index}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden ring-2 transform hover:scale-110 hover:z-10 transition-all cursor-pointer ${darkMode ? 'bg-gradient-to-br from-slate-700 to-slate-600 ring-slate-800' : 'bg-gradient-to-br from-slate-200 to-slate-100 ring-white'}`}
-                      title={skipper.name}
-                    >
-                      {avatarUrl ? (
-                        <img src={avatarUrl} alt={skipper.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className={`text-xs font-bold ${darkMode ? 'text-white' : 'text-slate-700'}`}>{initials}</span>
-                      )}
+                    <div key={index} className="a-evsk" title={skipper.name}>
+                      <span className="a-evskf">{avatarUrl ? <img src={avatarUrl} alt="" /> : initials}</span>
+                      <span className="truncate max-w-full">{short}</span>
                     </div>
                   );
                 })}
                 {event.skippers.length > 12 && (
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ring-2 ${darkMode ? 'bg-slate-600 ring-slate-800 text-slate-300' : 'bg-slate-200 ring-white text-slate-600'}`}>
-                    <span className="text-[10px] font-bold">+{event.skippers.length - 12}</span>
-                  </div>
+                  <button onClick={() => setShowAllSkippers(!showAllSkippers)} className="a-evsk">
+                    <span className="a-evskf a-evskf-more">+{event.skippers.length - 12}</span>
+                    <span>{showAllSkippers ? 'Show less' : 'Show all'}</span>
+                  </button>
                 )}
               </div>
               {showAllSkippers && event.skippers.length > 12 && (
-                <div className="mt-3 pt-3 border-t border-slate-600/30">
+                <div className="a-grp" style={{ padding: 12 }}>
                   <div className="grid grid-cols-2 gap-1.5">
                     {event.skippers.map((skipper, index) => {
                       const nameParts = skipper.name.split(' ');
                       const initials = nameParts.map(part => part[0]).join('');
                       const avatarUrl = skipperAvatars[skipper.name];
                       return (
-                        <div key={index} className={`flex items-center gap-2 p-1.5 rounded-lg ${darkMode ? 'bg-slate-700/50 hover:bg-slate-700' : 'bg-white hover:bg-slate-50'} transition-colors`}>
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${darkMode ? 'bg-slate-600' : 'bg-slate-200'}`}>
+                        <div key={index} className="flex items-center gap-2 p-1.5 rounded-lg">
+                          <div className="a-evskf flex-shrink-0" style={{ width: 28, height: 28, fontSize: 10 }}>
                             {avatarUrl ? (
                               <img src={avatarUrl} alt={skipper.name} className="w-full h-full object-cover" />
                             ) : (
-                              <span className={`text-[10px] font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{initials}</span>
+                              <>{initials}</>
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className={`text-xs font-medium truncate ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>{skipper.name}</div>
-                            <div className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>#{skipper.sailNo}</div>
+                            <div className="a-ink text-[12.5px] font-medium truncate">{skipper.name}</div>
+                            <div className="a-dim text-[11px]">#{skipper.sailNo}</div>
                           </div>
                         </div>
                       );
@@ -2212,9 +2189,9 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   </div>
                   <button
                     onClick={() => setShowAllSkippers(false)}
-                    className={`mt-2 w-full py-1.5 text-xs font-medium rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                    className="a-btn a-btn-sm w-full justify-center mt-2"
                   >
-                    Show Less
+                    Show less
                   </button>
                 </div>
               )}
@@ -2224,35 +2201,34 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
           {/* Event Registration (before skippers are added, non-external) */}
           {!skippersAdded && !event.isExternalEvent && (
             <>
-              <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                Registration
-              </h3>
+              <p className="a-cap m-0 pl-1">Registration</p>
 
-              <div className={`flex items-center justify-between gap-3 p-2.5 rounded-lg border mb-3 ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>Will you attend?</span>
-                <div className="flex gap-1.5">
+              <div className="a-grp">
+              <div className="flex items-center justify-between gap-3 flex-wrap" style={{ padding: 16 }}>
+                <span className="a-ink text-[15px] font-medium">Will you attend?</span>
+                <div className="a-seg" role="radiogroup" aria-label="Will you attend?" style={{ padding: 3, borderRadius: 12 }}>
                   <button
                     onClick={() => updateAttendance('yes')}
                     disabled={updatingAttendance}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all font-medium text-xs ${attendanceStatus === 'yes' ? 'bg-green-600 text-white shadow-lg shadow-green-600/30' : darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    role="radio" aria-checked={attendanceStatus === 'yes'} className={`a-seg-i a-att-yes ${attendanceStatus === 'yes' ? 'a-seg-on' : ''} ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ height: 34, padding: '0 12px', borderRadius: 9 }}
                   >
-                    <ThumbsUp size={13} />
+                    <ThumbsUp size={15} />
                     <span>Yes</span>
                   </button>
                   <button
                     onClick={() => updateAttendance('maybe')}
                     disabled={updatingAttendance}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all font-medium text-xs ${attendanceStatus === 'maybe' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30' : darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    role="radio" aria-checked={attendanceStatus === 'maybe'} className={`a-seg-i a-att-maybe ${attendanceStatus === 'maybe' ? 'a-seg-on' : ''} ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ height: 34, padding: '0 12px', borderRadius: 9 }}
                   >
-                    <HelpCircle size={13} />
+                    <HelpCircle size={15} />
                     <span>Maybe</span>
                   </button>
                   <button
                     onClick={() => updateAttendance('no')}
                     disabled={updatingAttendance}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all font-medium text-xs ${attendanceStatus === 'no' ? 'bg-red-600 text-white shadow-lg shadow-red-600/30' : darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    role="radio" aria-checked={attendanceStatus === 'no'} className={`a-seg-i a-att-no ${attendanceStatus === 'no' ? 'a-seg-on' : ''} ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ height: 34, padding: '0 12px', borderRadius: 9 }}
                   >
-                    <ThumbsDown size={13} />
+                    <ThumbsDown size={15} />
                     <span>No</span>
                   </button>
                 </div>
@@ -2296,11 +2272,11 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 </div>
               )}
 
-              <div className={`p-3 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="a-evatt">
                 <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Who's attending?</span>
-                  <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {attendees.filter(a => a.status === 'yes').length} confirmed
+                  <span className="a-ink text-[14px] font-medium">Who's attending?</span>
+                  <span className="a-mute inline-flex items-center gap-2 text-[13px]">
+                    <span className="a-cnt">{attendees.filter(a => a.status === 'yes').length}</span>confirmed
                   </span>
                 </div>
 
@@ -2308,7 +2284,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   <div className="space-y-3">
                     {attendees.filter(a => a.status === 'yes').length > 0 && (
                       <div>
-                        <h5 className={`text-[10px] font-medium uppercase tracking-wider mb-1.5 ${darkMode ? 'text-green-400' : 'text-green-600'}`}>Attending</h5>
+                        <h5 className="a-cap mb-2 a-txt-g">Attending</h5>
                         {renderAttendeeAvatars(
                           attendees.filter(a => a.status === 'yes'),
                           { bg: darkMode ? 'bg-green-900/30' : 'bg-green-100', text: darkMode ? 'text-green-400' : 'text-green-700' }
@@ -2317,7 +2293,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                     )}
                     {attendees.filter(a => a.status === 'maybe').length > 0 && (
                       <div>
-                        <h5 className={`text-[10px] font-medium uppercase tracking-wider mb-1.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>Maybe</h5>
+                        <h5 className="a-cap mb-2 a-txt-a">Maybe</h5>
                         {renderAttendeeAvatars(
                           attendees.filter(a => a.status === 'maybe'),
                           { bg: darkMode ? 'bg-amber-900/30' : 'bg-amber-100', text: darkMode ? 'text-amber-400' : 'text-amber-700' }
@@ -2326,7 +2302,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                     )}
                     {attendees.filter(a => a.status === 'no').length > 0 && (
                       <div>
-                        <h5 className={`text-[10px] font-medium uppercase tracking-wider mb-1.5 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>Not Attending</h5>
+                        <h5 className="a-cap mb-2 a-txt-r">Not Attending</h5>
                         {renderAttendeeAvatars(
                           attendees.filter(a => a.status === 'no'),
                           { bg: darkMode ? 'bg-red-900/30' : 'bg-red-100', text: darkMode ? 'text-red-400' : 'text-red-700' }
@@ -2335,14 +2311,16 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div className={`text-center py-3 text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    No responses yet
+                  <div className="flex flex-col items-center justify-center gap-3" style={{ height: 180 }}>
+                    <span className="a-tile" style={{ width: 52, height: 52 }}><Users size={22} /></span>
+                    <p className="a-dim m-0 text-[14px]">No responses yet</p>
                   </div>
                 )}
               </div>
+              </div>
 
               {smsEnabled && can('manage', 'events') && (
-                <div className={`mt-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="a-grp" style={{ padding: '12px 14px' }}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <MessageSquare size={14} className={darkMode ? 'text-teal-400' : 'text-teal-600'} />
@@ -2362,7 +2340,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                       <button
                         onClick={handleSendSms}
                         disabled={smsSending}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-500 text-white rounded-lg text-xs font-medium hover:bg-teal-600 transition-colors disabled:opacity-50"
+                        className="a-btn a-btn-sm disabled:opacity-50"
                       >
                         {smsSending ? <><Loader2 size={12} className="animate-spin" /> Sending...</> : <><MessageSquare size={12} /> Notify</>}
                       </button>
@@ -2375,31 +2353,27 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
 
           {/* Empty state when no registration and no skippers */}
           {!skippersAdded && event.isExternalEvent && !event.registrationUrl && (
-            <div className={`text-center py-6 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+            <div className="a-grp a-dim text-center" style={{ padding: 24 }}>
               <Users size={24} className="mx-auto mb-2 opacity-50" />
               <p className="text-sm">No registration details available</p>
             </div>
           )}
-        </div>
+        </section>
       </div>
       
       {onStartScoring && event.completed && !event.cancelled && can('races.score') && (
         <div className="flex flex-col gap-3">
-          <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <div className="flex items-center justify-between">
+          <div className="a-grp" style={{ padding: 16 }}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
                 <CheckCircle size={18} className="text-green-500" />
-                <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                <span className="a-ink text-[14.5px] font-medium">
                   Results Published
                 </span>
               </div>
               <button
                 onClick={() => setShowEditResultsConfirm(true)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  darkMode
-                    ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                    : 'bg-amber-500 hover:bg-amber-600 text-white'
-                }`}
+                className="a-btn a-btn-a"
               >
                 <Pencil size={16} />
                 Edit Results
@@ -2408,24 +2382,20 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
           </div>
 
           {showEditResultsConfirm && (
-            <div className={`p-4 rounded-lg border-2 ${
-              darkMode ? 'bg-amber-900/30 border-amber-600/50' : 'bg-amber-50 border-amber-300'
-            }`}>
-              <p className={`text-sm mb-3 ${darkMode ? 'text-amber-200' : 'text-amber-800'}`}>
+            <div className="a-grp" style={{ padding: 16, borderColor: 'rgba(255,179,64,0.4)' }}>
+              <p className="a-txt-a text-[13.5px] mb-3">
                 This will reopen the scoring screen so you can make changes to the results. You will need to publish the results again when you are done editing.
               </p>
               <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={() => setShowEditResultsConfirm(false)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                  }`}
+                  className="a-btn a-btn-sm"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleEditResults}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+                  className="a-btn a-btn-sm a-btn-a"
                 >
                   Reopen for Editing
                 </button>
@@ -2438,12 +2408,12 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
       {onStartScoring && !event.completed && !event.cancelled && can('races.score') && (
         <div className="flex flex-col gap-3">
           {event.multiDay && event.dayResults && event.numberOfDays && (
-            <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <div className="a-grp" style={{ padding: 16 }}>
               <div className="flex items-center justify-between gap-4 mb-3">
-                <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                <h4 className="a-ink text-[14px] font-medium">
                   Day Progress
                 </h4>
-                <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                <span className="a-dim text-[12.5px]">
                   {Array.from({ length: event.numberOfDays }, (_, i) => i + 1).filter(day => {
                     const dayData = event.dayResults?.[day];
                     return dayData?.dayCompleted === true;
@@ -2459,13 +2429,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   return (
                     <div
                       key={day}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm ${
-                        isCompleted
-                          ? 'bg-green-600 text-white'
-                          : hasProgress
-                          ? 'bg-blue-600 text-white'
-                          : darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-600'
-                      }`}
+                      className={`a-st text-[13px] ${isCompleted ? 'a-txt-g' : hasProgress ? 'a-txt-b' : 'a-dim'}`}
                     >
                       Day {day}: {isCompleted ? 'Completed' : hasProgress ? 'In Progress' : 'Not Started'}
                     </div>
@@ -2475,19 +2439,13 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             </div>
           )}
           {/* Action Buttons */}
-          <div className="flex items-start justify-between gap-3 mt-6">
+          <div className="a-evfoot">
             {/* Cancel Round - Left Side (series events only) */}
             {event.isSeriesEvent && (isAdmin || isEditor) ? (
               <div className="flex flex-col gap-2">
-                <label className={`flex items-center gap-2 cursor-pointer select-none ${event.cancelled ? 'text-amber-500' : darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <input
-                    type="checkbox"
-                    checked={!!event.cancelled}
-                    onChange={(e) => handleToggleCancelled(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-500 text-amber-500 focus:ring-amber-500"
-                  />
-                  <TriangleAlert size={16} className={event.cancelled ? 'text-amber-500' : 'opacity-50'} />
-                  <span className="text-sm font-medium">Mark as cancelled</span>
+                <label className={`flex items-center gap-3 cursor-pointer select-none text-[14px] ${event.cancelled ? 'a-txt-a' : 'a-mute'}`}>
+                  <ASwitch checked={!!event.cancelled} onChange={(v) => handleToggleCancelled(v)} label="Mark as cancelled" />
+                  Mark as cancelled
                 </label>
                 {event.cancelled && (
                   <input
@@ -2495,7 +2453,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                     placeholder="Reason (optional)"
                     value={event.cancellationReason || ''}
                     onChange={(e) => handleCancellationReasonChange(e.target.value)}
-                    className={`text-sm px-3 py-1.5 rounded-lg border ${darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'}`}
+                    className="a-inp" style={{ height: 36 }}
                   />
                 )}
               </div>
@@ -2523,20 +2481,20 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                     setShowEventWebsiteModal(true);
                   }
                 }}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 transition-all duration-200"
+                className="a-btn"
                 title={hasEventWebsite ? 'Manage Event Website' : 'Create Event Website'}
               >
-                <Globe size={18} />
+                <Globe size={16} />
                 {hasEventWebsite ? 'Event Website' : 'Create Website'}
               </button>
             )}
             {event.enableLiveTracking && (event.clubId || event.eventLevel === 'state' || event.eventLevel === 'national') && (isAdmin || isEditor) && (
               <button
                 onClick={() => setShowLiveTrackingQR(true)}
-                className="btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-all duration-200"
+                className="a-btn"
                 title="Live Skipper Tracking QR Code"
               >
-                <QrCode size={18} />
+                <QrCode size={16} />
                 Live Tracking QR
               </button>
             )}
@@ -2544,7 +2502,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               <button
                 onClick={handleJoinLiveTracking}
                 disabled={loadingSkipperTracking}
-                className="btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="a-btn disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Join Live Tracking"
               >
                 {loadingSkipperTracking ? <Loader2 size={18} className="animate-spin" /> : <Radio size={18} />}
@@ -2563,17 +2521,10 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   });
                   setShowLivestreamModal(true);
                 }}
-                className={`
-                  flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
-                  transition-all duration-200
-                  ${hasLivestreamSession
-                    ? 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600'
-                    : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600'
-                  }
-                `}
+                className={`a-btn ${hasLivestreamSession ? 'a-btn-d' : ''}`}
                 title={hasLivestreamSession ? "Manage YouTube Live Stream" : "Configure YouTube Live Stream"}
               >
-                <Video size={18} />
+                <Video size={16} />
                 {hasLivestreamSession ? 'Go Live - Stream' : 'Configure Stream'}
               </button>
             )}
@@ -2597,16 +2548,16 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                       }
                       setShowImportResults(true);
                     }}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all duration-200"
+                    className="a-btn"
                   >
-                    <Upload size={18} />
+                    <Upload size={16} />
                     Import Results
                   </button>
                 )}
                 <button
                   onClick={handleStartScoring}
                   disabled={startingScoring}
-                  className={`btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg transition-all duration-200 ${startingScoring ? 'opacity-75 cursor-wait' : 'animate-pulse'}`}
+                  className={`a-btn a-btn-p ${startingScoring ? 'opacity-75 cursor-wait' : ''}`}
                 >
                   {startingScoring ? (
                     <>
@@ -2626,12 +2577,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
         <div className="flex justify-end">
           <button
             onClick={onEdit}
-            className={`
-              px-4 py-2 rounded-lg font-medium transition-colors
-              ${darkMode
-                ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}
-            `}
+            className="a-btn"
           >
             Edit Event
           </button>
@@ -3689,219 +3635,64 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-        <div className={`
-          w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border animate-slideUp
-          ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-        `}>
-          {/* Modern Gradient Header */}
-          <div
-            className="relative w-full h-64 bg-cover bg-center overflow-hidden"
-            style={{
-              backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.8)), url(${venueImage || (event.media && event.media[0]?.url)})`
-            }}
-          >
-            {/* Decorative overlay gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-transparent to-cyan-600/20"></div>
-
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 p-2.5 rounded-xl bg-black/30 text-white hover:bg-black/50 transition-all hover:rotate-90 transform duration-300 backdrop-blur-sm z-10"
-            >
-              <X size={20} />
+      <div className="fixed inset-0 bg-[rgba(2,5,12,0.55)] backdrop-blur-[6px] flex items-center justify-center z-50 p-4 animate-fadeIn">
+        <div className="a-evm w-full max-w-[1120px] overflow-hidden flex flex-col max-h-[92vh] animate-slideUp" role="dialog" aria-label={event.eventName || event.clubName}>
+          {/* Hero */}
+          <div className="a-evm-hero">
+            {(venueImage || (event.media && event.media[0]?.url)) && <img src={venueImage || (event.media && event.media[0]?.url)} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />}
+            <div aria-hidden="true" className="a-evm-ov" />
+            <button onClick={onClose} className="a-gb absolute z-10" style={{ top: 18, right: 18, width: 40, height: 40 }} aria-label="Close">
+              <X size={19} />
             </button>
-
-            <div className="absolute bottom-6 left-6 right-6 z-10">
-              <div className="flex items-end justify-between">
-                <div>
-                  <h2 className="text-3xl font-bold text-white drop-shadow-2xl mb-2">
-                    {event.eventName || event.clubName}
-                  </h2>
-                  <p className="text-white/90 text-lg drop-shadow-lg">
-                    {event.venue}
-                  </p>
+            <div className="absolute z-10 flex items-end gap-[18px]" style={{ left: 36, right: 36, bottom: 26 }}>
+              {event.date && (
+                <div className="a-sp-date flex-shrink-0" style={{ position: 'relative', width: 60, height: 66, borderRadius: 16 }}>
+                  <b>{new Date(event.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</b>
+                  <span style={{ fontSize: 26 }}>{new Date(event.date).getDate()}</span>
                 </div>
+              )}
+              <div className="min-w-0">
+                <div className="flex flex-wrap gap-2 mb-2.5">
+                  {event.raceClass && <span className={getBoatClassBadge(event.raceClass, true).className}>{event.raceClass}</span>}
+                  {!event.isExternalEvent && (
+                    <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', true).className}>{event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}</span>
+                  )}
+                  <span className={`a-wlvl ${event.eventLevel === 'national' ? 'a-wlvl-n' : ''}`}>{event.eventLevel === 'national' ? 'National' : event.eventLevel === 'state' ? 'State' : 'Club'}</span>
+                  {event.cancelled && <span className="a-wlvl" style={{ color: '#FF8A8A', borderColor: 'rgba(255,107,107,0.4)', background: 'rgba(255,107,107,0.08)' }}>Cancelled</span>}
+                </div>
+                <h2 className="a-display m-0 text-[26px] sm:text-[34px] font-semibold leading-[1.1]" style={{ color: "#fff" }}>
+                  {event.eventName || event.clubName}
+                </h2>
+                {(event.venue || event.clubName) && (
+                  <p className="m-0 mt-2 flex items-center gap-[7px] text-[15px]" style={{ color: 'rgba(241,244,250,0.82)' }}>
+                    <MapPin size={15} />{event.venue || event.clubName}
+                  </p>
+                )}
               </div>
             </div>
           </div>
-          
-          {/* Enhanced Tab Navigation */}
-          <div className={`flex border-b ${darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
-            <button
-              onClick={() => setActiveTab('details')}
-              className={`
-                flex-1 py-4 text-center text-sm font-semibold transition-all duration-200 relative
-                ${activeTab === 'details'
-                  ? darkMode
-                    ? 'text-blue-400 bg-slate-800'
-                    : 'text-blue-600 bg-white'
-                  : darkMode
-                    ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'}
-              `}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Info size={16} />
-                <span>Event Details</span>
-              </div>
-              {activeTab === 'details' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-blue-500 to-cyan-500"></div>
-              )}
-            </button>
-            {event.isPaid && event.entryFee && event.entryFee > 0 && (
-              <button
-                onClick={() => setActiveTab('registrations')}
-                className={`
-                  flex-1 py-4 text-center text-sm font-semibold transition-all duration-200 relative
-                  ${activeTab === 'registrations'
-                    ? darkMode
-                      ? 'text-green-400 bg-slate-800'
-                      : 'text-green-600 bg-white'
-                    : darkMode
-                      ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'}
-                `}
-              >
-                <div className="flex items-center justify-center gap-2">
-                  <DollarSign size={16} />
-                  <span>Registrations</span>
-                </div>
-                {activeTab === 'registrations' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5"></div>
-                )}
-              </button>
-            )}
-            <button
-              onClick={() => setActiveTab('documents')}
-              className={`
-                flex-1 py-4 text-center text-sm font-semibold transition-all duration-200 relative
-                ${activeTab === 'documents'
-                  ? darkMode
-                    ? 'text-blue-400 bg-slate-800'
-                    : 'text-blue-600 bg-white'
-                  : darkMode
-                    ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'}
-              `}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <FileText size={16} />
-                <span>Documents</span>
-              </div>
-              {activeTab === 'documents' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-blue-500 to-cyan-500"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('media')}
-              className={`
-                flex-1 py-4 text-center text-sm font-semibold transition-all duration-200 relative
-                ${activeTab === 'media'
-                  ? darkMode
-                    ? 'text-blue-400 bg-slate-800'
-                    : 'text-blue-600 bg-white'
-                  : darkMode
-                    ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'}
-              `}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Image size={16} />
-                <span>Media</span>
-              </div>
-              {activeTab === 'media' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-blue-500 to-cyan-500"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('results')}
-              className={`
-                flex-1 py-4 text-center text-sm font-semibold transition-all duration-200 relative
-                ${activeTab === 'results'
-                  ? darkMode
-                    ? 'text-blue-400 bg-slate-800'
-                    : 'text-blue-600 bg-white'
-                  : darkMode
-                    ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'}
-              `}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Trophy size={16} />
-                <span>Results</span>
-              </div>
-              {activeTab === 'results' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-blue-500 to-cyan-500"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('weather')}
-              className={`
-                flex-1 py-4 text-center text-sm font-semibold transition-all duration-200 relative
-                ${activeTab === 'weather'
-                  ? darkMode
-                    ? 'text-cyan-400 bg-gradient-to-br from-cyan-900/40 to-blue-900/40'
-                    : 'text-cyan-600 bg-gradient-to-br from-cyan-50 to-blue-50'
-                  : darkMode
-                    ? 'text-slate-400 hover:text-cyan-300 hover:bg-slate-700/30'
-                    : 'text-slate-600 hover:text-cyan-600 hover:bg-white/50'}
-              `}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Cloud size={16} />
-                <span>Weather</span>
-              </div>
-              {activeTab === 'weather' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-cyan-500 to-blue-500"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('signon')}
-              className={`
-                flex-1 py-4 text-center text-sm font-semibold transition-all duration-200 relative
-                ${activeTab === 'signon'
-                  ? darkMode
-                    ? 'text-green-400 bg-slate-800'
-                    : 'text-green-600 bg-white'
-                  : darkMode
-                    ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'}
-              `}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <ClipboardList size={16} />
-                <span>Sign On</span>
-              </div>
-              {activeTab === 'signon' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-green-500 to-emerald-500"></div>
-              )}
-            </button>
-            {(isAdmin || isEditor) && (
-              <button
-                onClick={() => setActiveTab('protests')}
-                className={`
-                  flex-1 py-4 text-center text-sm font-semibold transition-all duration-200 relative
-                  ${activeTab === 'protests'
-                    ? darkMode
-                      ? 'text-red-400 bg-slate-800'
-                      : 'text-red-600 bg-white'
-                    : darkMode
-                      ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'}
-                `}
-              >
-                <div className="flex items-center justify-center gap-2">
-                  <Gavel size={16} />
-                  <span>Protests</span>
-                </div>
-                {activeTab === 'protests' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 from-red-500 to-orange-500"></div>
-                )}
-              </button>
-            )}
+
+          {/* Tabs */}
+          <div className="overflow-x-auto flex-shrink-0" style={{ padding: '6px 36px 0' }}>
+            <div className="a-seg" role="tablist" aria-label="Event sections" style={{ flexWrap: 'nowrap' }}>
+              {([
+                { key: 'details', label: 'Event Details', icon: <Info size={15} />, show: true },
+                { key: 'registrations', label: 'Registrations', icon: <DollarSign size={15} />, show: !!(event.isPaid && event.entryFee && event.entryFee > 0) },
+                { key: 'documents', label: 'Documents', icon: <FileText size={15} />, show: true },
+                { key: 'media', label: 'Media', icon: <Image size={15} />, show: true },
+                { key: 'results', label: 'Results', icon: <Trophy size={15} />, show: true },
+                { key: 'weather', label: 'Weather', icon: <Cloud size={15} />, show: true },
+                { key: 'signon', label: 'Sign On', icon: <ClipboardList size={15} />, show: true },
+                { key: 'protests', label: 'Protests', icon: <Gavel size={15} />, show: !!(isAdmin || isEditor) },
+              ] as { key: typeof activeTab; label: string; icon: React.ReactNode; show: boolean }[]).filter(t => t.show).map(t => (
+                <button key={t.key} role="tab" aria-selected={activeTab === t.key} onClick={() => setActiveTab(t.key)} className={`a-seg-i ${activeTab === t.key ? 'a-seg-on' : ''}`}>
+                  {t.icon}{t.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto" style={{ padding: '24px 36px' }}>
             {activeTab === 'details' && renderDetailsTab()}
             {activeTab === 'registrations' && renderRegistrationsTab()}
             {activeTab === 'documents' && renderDocumentsTab()}

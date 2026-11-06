@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
-import { X, Image, Video, Link as LinkIcon, MapPin, Smile, Users, Lock, Globe, MessageSquare, ChevronDown, User } from 'lucide-react';
+import { X, Image, Video, Link as LinkIcon, MapPin, Smile, Users, Lock, Globe, MessageSquare, ChevronDown, User, Send } from 'lucide-react';
+import { AAvatar } from '../alfie/Kit';
 import { useAuth } from '../../contexts/AuthContext';
 import { socialStorage, SocialGroup } from '../../utils/socialStorage';
 import { supabase } from '../../utils/supabase';
@@ -221,117 +222,79 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
 
   const currentPrivacy = privacyOptions.find(p => p.value === privacy);
 
+  const selectedGroup = userGroups.find(g => g.id === selectedGroupId);
+  const [pFirst, ...pRest] = (profile?.full_name || user?.email || 'You').split(' ');
+  const tool = (label: string, icon: React.ReactNode, onClick: () => void) => (
+    <button type="button" onClick={onClick} title={label} className="a-tool">
+      <span className="a-tile a-tile-sm" style={{ width: 32, height: 32 }}>{icon}</span>
+      {label}
+    </button>
+  );
+  const groupLogo = (group: SocialGroup, size = 32) => {
+    const logo = (group as any).club?.logo || group.avatar_url;
+    return logo
+      ? <img src={logo} alt="" className="rounded-[10px] object-cover flex-shrink-0" style={{ width: size, height: size }} />
+      : <span className="a-grp-logo" style={{ width: size, height: size, borderRadius: 10, fontSize: 11 }}>{group.name.slice(0, 2).toUpperCase()}</span>;
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-      <div className={`
-        w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border animate-slideUp
-        ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-      `}>
-        {/* Modern Gradient Header - Same as Create Event Modal */}
-        <div className="from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent"></div>
-          <div className="flex items-center gap-3 relative z-10">
-            <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
-              <MessageSquare className="text-white drop-shadow-lg" size={24} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-white drop-shadow-lg">
-                Create Post
-              </h2>
-              <p className="text-blue-100 text-sm mt-0.5">Share something with the community</p>
-            </div>
+      <section className="a-sheet w-full max-w-[520px] max-h-[90vh] flex flex-col animate-slideUp" role="dialog" aria-label="Create post">
+        <div className="flex items-center gap-3" style={{ padding: '20px 18px 14px 22px' }}>
+          <span className="a-tile a-tile-rim" style={{ width: 40, height: 40 }}><MessageSquare size={18} /></span>
+          <div className="flex-1 min-w-0">
+            <h2 className="a-display a-ink m-0 text-[20px] font-semibold">Create post</h2>
+            <div className="a-dim text-[12.5px] mt-0.5">Share something with the community</div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-white/80 hover:text-white rounded-xl p-2.5 hover:bg-white/10 transition-all hover:rotate-90 transform duration-300 relative z-10"
-          >
-            <X size={20} />
+          <button onClick={onClose} className="a-ib" aria-label="Close">
+            <X size={18} />
           </button>
         </div>
 
-        {/* Content Area */}
-        <div className={`flex-1 overflow-y-auto p-6 ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
-          <div className="flex items-start space-x-3 mb-4">
-            <div className="flex-shrink-0">
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.full_name || 'You'}
-                  className="w-14 h-14 rounded-full object-cover shadow-lg border-2 border-white/20"
-                />
-              ) : (
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                  {profile?.full_name?.charAt(0) || user?.email?.charAt(0).toUpperCase()}
-                </div>
-              )}
-            </div>
-            <div className="flex-1">
-              <div className={`font-semibold text-lg ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                {profile?.full_name || 'You'}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex-1 overflow-y-auto flex flex-col gap-3.5" style={{ padding: '0 22px 18px' }}>
+          <div className="flex items-center gap-3">
+            <AAvatar url={profile?.avatar_url} first={pFirst} last={pRest.join(' ')} size={44} />
+            <div className="min-w-0">
+              <div className="a-ink text-[15px] font-semibold">{profile?.full_name || 'You'}</div>
+              <div className="flex items-center gap-1.5 flex-wrap mt-1">
                 <div className="relative">
                   <button
                     onClick={() => { setShowPostTargetMenu(!showPostTargetMenu); setShowPrivacyMenu(false); }}
-                    className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${lightMode ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-300'}`}
+                    className="a-pick"
+                    style={{ height: 30, padding: '0 10px', borderRadius: 9, fontSize: 12.5 }}
+                    aria-expanded={showPostTargetMenu}
                   >
-                    {selectedGroupId ? (
-                      <>
-                        <Users className="w-4 h-4" />
-                        <span className="truncate max-w-[140px]">{userGroups.find(g => g.id === selectedGroupId)?.name || 'Group'}</span>
-                      </>
-                    ) : (
-                      <>
-                        <User className="w-4 h-4" />
-                        <span>My Feed</span>
-                      </>
-                    )}
-                    <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
+                    {selectedGroupId ? <Users size={14} /> : <User size={14} />}
+                    <span className="truncate max-w-[180px]">{selectedGroup?.name || (selectedGroupId ? 'Group' : 'My feed')}</span>
+                    <ChevronDown size={14} />
                   </button>
 
                   {showPostTargetMenu && (
-                    <div className={`absolute top-full left-0 mt-2 w-72 rounded-xl shadow-xl border z-20 max-h-64 overflow-y-auto ${lightMode ? 'bg-white border-gray-200' : 'bg-slate-800 border-slate-700'}`}>
+                    <div className="a-pop absolute top-full left-0 mt-2 w-72 z-20 max-h-64 overflow-y-auto">
                       <button
-                        onClick={() => {
-                          setSelectedGroupId(undefined);
-                          setShowPostTargetMenu(false);
-                        }}
-                        className={`w-full flex items-center space-x-3 p-3 transition-colors first:rounded-t-xl ${!selectedGroupId ? (lightMode ? 'bg-blue-50' : 'bg-blue-900/30') : ''} ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
+                        onClick={() => { setSelectedGroupId(undefined); setShowPostTargetMenu(false); }}
+                        className={`a-pop-item w-full ${!selectedGroupId ? 'a-pop-item-on' : ''}`}
+                        style={{ height: 'auto', padding: '8px 10px' }}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white flex-shrink-0">
-                          <User className="w-4 h-4" />
-                        </div>
+                        <span className="a-tile" style={{ width: 32, height: 32, borderRadius: 10 }}><User size={15} /></span>
                         <div className="flex-1 text-left">
-                          <div className={`font-medium text-sm ${lightMode ? 'text-gray-900' : 'text-white'}`}>My Feed</div>
-                          <div className={`text-xs ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>Post to your personal feed</div>
+                          <div className="a-ink text-[13.5px] font-semibold">My feed</div>
+                          <div className="a-dim text-[12px]">Post to your personal feed</div>
                         </div>
                       </button>
-                      {userGroups.length > 0 && (
-                        <div className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider ${lightMode ? 'text-gray-400 bg-gray-50' : 'text-slate-500 bg-slate-800'}`}>
-                          My Groups
-                        </div>
-                      )}
+                      {userGroups.length > 0 && <div className="a-pop-rule" />}
+                      {userGroups.length > 0 && <div className="a-ghd" style={{ padding: '6px 10px 4px' }}>My groups</div>}
                       {userGroups.map(group => (
                         <button
                           key={group.id}
-                          onClick={() => {
-                            setSelectedGroupId(group.id);
-                            setShowPostTargetMenu(false);
-                          }}
-                          className={`w-full flex items-center space-x-3 p-3 transition-colors last:rounded-b-xl ${selectedGroupId === group.id ? (lightMode ? 'bg-blue-50' : 'bg-blue-900/30') : ''} ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
+                          onClick={() => { setSelectedGroupId(group.id); setShowPostTargetMenu(false); }}
+                          className={`a-pop-item w-full ${selectedGroupId === group.id ? 'a-pop-item-on' : ''}`}
+                          style={{ height: 'auto', padding: '8px 10px' }}
                         >
-                          {(group as any).club?.logo ? (
-                            <img src={(group as any).club.logo} alt={group.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
-                          ) : group.avatar_url ? (
-                            <img src={group.avatar_url} alt={group.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                              {group.name.charAt(0)}
-                            </div>
-                          )}
+                          {groupLogo(group)}
                           <div className="flex-1 text-left min-w-0">
-                            <div className={`font-medium text-sm truncate ${lightMode ? 'text-gray-900' : 'text-white'}`}>{group.name}</div>
-                            <div className={`text-xs ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>{group.member_count || 0} members</div>
+                            <div className="a-ink text-[13.5px] font-semibold truncate">{group.name}</div>
+                            <div className="a-dim text-[12px]">{group.member_count || 0} members</div>
                           </div>
                         </button>
                       ))}
@@ -342,26 +305,27 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
                   <div className="relative">
                     <button
                       onClick={() => { setShowPrivacyMenu(!showPrivacyMenu); setShowPostTargetMenu(false); }}
-                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${lightMode ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-300'}`}
+                      className="a-pick"
+                      style={{ height: 30, padding: '0 10px', borderRadius: 9, fontSize: 12.5 }}
+                      aria-expanded={showPrivacyMenu}
                     >
-                      {currentPrivacy && <currentPrivacy.icon className="w-4 h-4" />}
+                      {currentPrivacy && <currentPrivacy.icon size={14} />}
                       <span>{currentPrivacy?.label}</span>
+                      <ChevronDown size={14} />
                     </button>
                     {showPrivacyMenu && (
-                      <div className={`absolute top-full left-0 mt-2 w-72 rounded-xl shadow-xl border z-20 ${lightMode ? 'bg-white border-gray-200' : 'bg-slate-800 border-slate-700'}`}>
+                      <div className="a-pop absolute top-full left-0 mt-2 w-72 z-20">
                         {privacyOptions.filter(o => o.value !== 'group').map(option => (
                           <button
                             key={option.value}
-                            onClick={() => {
-                              setPrivacy(option.value as any);
-                              setShowPrivacyMenu(false);
-                            }}
-                            className={`w-full flex items-start space-x-3 p-4 transition-colors first:rounded-t-xl last:rounded-b-xl ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
+                            onClick={() => { setPrivacy(option.value as any); setShowPrivacyMenu(false); }}
+                            className={`a-pop-item w-full ${privacy === option.value ? 'a-pop-item-on' : ''}`}
+                            style={{ height: 'auto', padding: '9px 10px', alignItems: 'flex-start' }}
                           >
-                            <option.icon className="w-5 h-5 mt-0.5 flex-shrink-0 text-blue-500" />
+                            <option.icon size={17} className="a-txt-b mt-0.5 flex-shrink-0" />
                             <div className="flex-1 text-left">
-                              <div className={`font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>{option.label}</div>
-                              <div className={`text-xs mt-0.5 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>{option.description}</div>
+                              <div className="a-ink text-[13.5px] font-semibold">{option.label}</div>
+                              <div className="a-dim text-[12px] mt-0.5">{option.description}</div>
                             </div>
                           </button>
                         ))}
@@ -376,126 +340,86 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="What's on your mind?"
-            className={`w-full border-0 resize-none focus:ring-0 text-lg min-h-[140px] rounded-lg p-4 ${lightMode ? 'bg-gray-50 text-gray-900 placeholder-gray-400' : 'bg-slate-700/50 text-white placeholder-slate-500'}`}
+            placeholder="What's happening on the water?"
+            className="a-post-ta"
             autoFocus
           />
 
-          {/* Display added features */}
           {(videoUrl || linkUrl || location) && (
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap gap-1.5">
               {videoUrl && (
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${lightMode ? 'bg-red-50 text-red-700' : 'bg-red-900/30 text-red-300'}`}>
-                  <Video size={16} />
-                  <span className="text-sm font-medium">YouTube Video</span>
-                  <button onClick={() => setVideoUrl('')} className="ml-1 hover:opacity-70">
-                    <X size={14} />
-                  </button>
-                </div>
+                <span className="a-lb-fmt" style={{ height: 28 }}>
+                  <Video size={14} className="a-txt-r" />YouTube video
+                  <button onClick={() => setVideoUrl('')} className="a-dim flex" aria-label="Remove video"><X size={13} /></button>
+                </span>
               )}
               {linkUrl && (
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${lightMode ? 'bg-blue-50 text-blue-700' : 'bg-blue-900/30 text-blue-300'}`}>
-                  <LinkIcon size={16} />
-                  <span className="text-sm font-medium truncate max-w-[200px]">{linkTitle || 'Link'}</span>
-                  <button onClick={() => { setLinkUrl(''); setLinkTitle(''); }} className="ml-1 hover:opacity-70">
-                    <X size={14} />
-                  </button>
-                </div>
+                <span className="a-lb-fmt" style={{ height: 28 }}>
+                  <LinkIcon size={14} className="a-txt-b" /><span className="truncate max-w-[200px]">{linkTitle || 'Link'}</span>
+                  <button onClick={() => { setLinkUrl(''); setLinkTitle(''); }} className="a-dim flex" aria-label="Remove link"><X size={13} /></button>
+                </span>
               )}
               {location && (
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${lightMode ? 'bg-orange-50 text-orange-700' : 'bg-orange-900/30 text-orange-300'}`}>
-                  <MapPin size={16} />
-                  <span className="text-sm font-medium">{location}</span>
-                  <button onClick={() => setLocation('')} className="ml-1 hover:opacity-70">
-                    <X size={14} />
-                  </button>
-                </div>
+                <span className="a-lb-fmt" style={{ height: 28 }}>
+                  <MapPin size={14} className="a-txt-a" />{location}
+                  <button onClick={() => setLocation('')} className="a-dim flex" aria-label="Remove location"><X size={13} /></button>
+                </span>
               )}
             </div>
           )}
 
           {previews.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="grid grid-cols-2 gap-1">
               {previews.map((preview, index) => (
-                <div key={index} className="relative group">
-                  <img
-                    src={preview}
-                    alt={`Preview ${index + 1}`}
-                    className="w-full h-56 object-cover rounded-xl"
-                  />
+                <div key={index} className="relative group overflow-hidden" style={{ borderRadius: 14 }}>
+                  <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-40 object-cover block" />
                   <button
                     onClick={() => removeAttachment(index)}
-                    className="absolute top-2 right-2 p-2 bg-black/70 hover:bg-black/90 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="a-gb absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ width: 30, height: 30 }}
+                    aria-label="Remove photo"
                   >
-                    <X className="w-4 h-4 text-white" />
+                    <X size={15} />
                   </button>
                 </div>
               ))}
             </div>
           )}
 
-          <div className={`flex items-center justify-between mt-6 pt-6 border-t ${lightMode ? 'border-gray-200' : 'border-slate-700'}`}>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className={`p-3 rounded-xl transition-all hover:scale-110 ${lightMode ? 'hover:bg-green-50' : 'hover:bg-green-900/30'}`}
-                title="Add photos"
-              >
-                <Image className="w-6 h-6 text-green-500" />
-              </button>
-              <button
-                onClick={() => setShowVideoModal(true)}
-                className={`p-3 rounded-xl transition-all hover:scale-110 ${lightMode ? 'hover:bg-red-50' : 'hover:bg-red-900/30'}`}
-                title="Add YouTube video"
-              >
-                <Video className="w-6 h-6 text-red-500" />
-              </button>
-              <button
-                onClick={() => setShowLinkModal(true)}
-                className={`p-3 rounded-xl transition-all hover:scale-110 ${lightMode ? 'hover:bg-blue-50' : 'hover:bg-blue-900/30'}`}
-                title="Add link"
-              >
-                <LinkIcon className="w-6 h-6 text-blue-500" />
-              </button>
-              <button
-                onClick={() => setShowLocationModal(true)}
-                className={`p-3 rounded-xl transition-all hover:scale-110 ${lightMode ? 'hover:bg-orange-50' : 'hover:bg-orange-900/30'}`}
-                title="Add location"
-              >
-                <MapPin className="w-6 h-6 text-orange-500" />
-              </button>
-              <div className="relative">
-                <button
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className={`p-3 rounded-xl transition-all hover:scale-110 ${lightMode ? 'hover:bg-yellow-50' : 'hover:bg-yellow-900/30'}`}
-                  title="Add emoji"
-                >
-                  <Smile className="w-6 h-6 text-yellow-500" />
-                </button>
-                {showEmojiPicker && (
-                  <div className="absolute bottom-full left-0 mb-2 z-50">
-                    <EmojiPicker
-                      onEmojiClick={(emojiData) => {
-                        setContent(prev => prev + emojiData.emoji);
-                        setShowEmojiPicker(false);
-                      }}
-                      theme={darkMode ? Theme.DARK : Theme.LIGHT}
-                      width={320}
-                      height={400}
-                    />
-                  </div>
-                )}
+          <div className="flex gap-1.5 relative">
+            {tool('Photo', <Image size={16} />, () => fileInputRef.current?.click())}
+            {tool('Video', <Video size={16} />, () => setShowVideoModal(true))}
+            {tool('Link', <LinkIcon size={16} />, () => setShowLinkModal(true))}
+            {tool('Place', <MapPin size={16} />, () => setShowLocationModal(true))}
+            {tool('Feeling', <Smile size={16} />, () => setShowEmojiPicker(!showEmojiPicker))}
+            {showEmojiPicker && (
+              <div className="absolute bottom-full right-0 mb-2 z-50">
+                <EmojiPicker
+                  onEmojiClick={(emojiData) => {
+                    setContent(prev => prev + emojiData.emoji);
+                    setShowEmojiPicker(false);
+                  }}
+                  theme={darkMode ? Theme.DARK : Theme.LIGHT}
+                  width={320}
+                  height={400}
+                />
               </div>
-            </div>
-
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting || (!content.trim() && attachments.length === 0 && !videoUrl && !linkUrl)}
-              className="btn-primary-green px-8 py-3 from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-lg hover:shadow-xl disabled:hover:shadow-lg transform hover:scale-105 disabled:hover:scale-100"
-            >
-              {isSubmitting ? 'Posting...' : 'Post'}
-            </button>
+            )}
           </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 border-t a-bd" style={{ padding: '14px 22px' }}>
+          <span className="a-dim flex-1 text-[12.5px] truncate">
+            {selectedGroup ? `Visible to ${selectedGroup.member_count || 0} members` : currentPrivacy?.description}
+          </span>
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || (!content.trim() && attachments.length === 0 && !videoUrl && !linkUrl)}
+            className="a-btn a-btn-p disabled:opacity-45 disabled:cursor-not-allowed"
+          >
+            <Send size={16} />
+            {isSubmitting ? 'Posting…' : 'Post'}
+          </button>
         </div>
 
         <input
@@ -506,16 +430,16 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
           onChange={handleFileSelect}
           className="hidden"
         />
-      </div>
+      </section>
 
       {/* Video URL Modal */}
       {showVideoModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={() => setShowVideoModal(false)}>
-          <div className={`w-full max-w-md rounded-xl shadow-xl p-6 ${darkMode ? 'bg-slate-800' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
+          <div className="a-sheet w-full max-w-md" style={{ padding: 22 }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>Add YouTube Video</h3>
-              <button onClick={() => setShowVideoModal(false)} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} className={lightMode ? 'text-gray-500' : 'text-gray-400'} />
+              <h3 className="a-display a-ink m-0 text-[18px] font-semibold">Add YouTube Video</h3>
+              <button onClick={() => setShowVideoModal(false)} className="a-ib" aria-label="Close">
+                <X size={18} />
               </button>
             </div>
             <input
@@ -523,19 +447,19 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
               value={videoUrl}
               onChange={(e) => setVideoUrl(e.target.value)}
               placeholder="Paste YouTube URL..."
-              className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${lightMode ? 'bg-white border-gray-300 text-gray-900' : 'bg-slate-700 border-slate-600 text-white'}`}
+              className="a-inp w-full"
               autoFocus
             />
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => setShowVideoModal(false)}
-                className={`px-4 py-2 rounded-lg ${lightMode ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
+                className="a-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddVideo}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
+                className="a-btn a-btn-p"
               >
                 Add Video
               </button>
@@ -547,11 +471,11 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
       {/* Link URL Modal */}
       {showLinkModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={() => setShowLinkModal(false)}>
-          <div className={`w-full max-w-md rounded-xl shadow-xl p-6 ${darkMode ? 'bg-slate-800' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
+          <div className="a-sheet w-full max-w-md" style={{ padding: 22 }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>Add Link</h3>
-              <button onClick={() => setShowLinkModal(false)} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} className={lightMode ? 'text-gray-500' : 'text-gray-400'} />
+              <h3 className="a-display a-ink m-0 text-[18px] font-semibold">Add Link</h3>
+              <button onClick={() => setShowLinkModal(false)} className="a-ib" aria-label="Close">
+                <X size={18} />
               </button>
             </div>
             <div className="space-y-3">
@@ -560,7 +484,7 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 placeholder="Enter URL..."
-                className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${lightMode ? 'bg-white border-gray-300 text-gray-900' : 'bg-slate-700 border-slate-600 text-white'}`}
+                className="a-inp w-full"
                 autoFocus
               />
               <input
@@ -568,19 +492,19 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
                 value={linkTitle}
                 onChange={(e) => setLinkTitle(e.target.value)}
                 placeholder="Link title (optional)..."
-                className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${lightMode ? 'bg-white border-gray-300 text-gray-900' : 'bg-slate-700 border-slate-600 text-white'}`}
+                className="a-inp w-full"
               />
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => setShowLinkModal(false)}
-                className={`px-4 py-2 rounded-lg ${lightMode ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
+                className="a-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddLink}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
+                className="a-btn a-btn-p"
               >
                 Add Link
               </button>
@@ -592,11 +516,11 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
       {/* Location Modal */}
       {showLocationModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={() => setShowLocationModal(false)}>
-          <div className={`w-full max-w-md rounded-xl shadow-xl p-6 ${darkMode ? 'bg-slate-800' : 'bg-white'}`} onClick={(e) => e.stopPropagation()}>
+          <div className="a-sheet w-full max-w-md" style={{ padding: 22 }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>Add Location</h3>
-              <button onClick={() => setShowLocationModal(false)} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} className={lightMode ? 'text-gray-500' : 'text-gray-400'} />
+              <h3 className="a-display a-ink m-0 text-[18px] font-semibold">Add Location</h3>
+              <button onClick={() => setShowLocationModal(false)} className="a-ib" aria-label="Close">
+                <X size={18} />
               </button>
             </div>
             <input
@@ -604,19 +528,19 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Where are you?"
-              className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${lightMode ? 'bg-white border-gray-300 text-gray-900' : 'bg-slate-700 border-slate-600 text-white'}`}
+              className="a-inp w-full"
               autoFocus
             />
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => setShowLocationModal(false)}
-                className={`px-4 py-2 rounded-lg ${lightMode ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
+                className="a-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={() => { setShowLocationModal(false); }}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
+                className="a-btn a-btn-p"
               >
                 Add Location
               </button>

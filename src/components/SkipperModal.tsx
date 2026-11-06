@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { AAvatar } from './alfie/Kit';
 import { createPortal } from 'react-dom';
-import { X, Plus, Users, UserPlus, UserCog, CircleAlert as AlertCircle, Check, CircleCheck as CheckCircle, SquarePen as Edit2, Search, ChevronRight, Sailboat, ArrowUpDown, Upload, FileUp, Trash2, ClipboardPaste, ArrowRight, Zap, TriangleAlert as AlertTriangle } from 'lucide-react';
+import { X, Plus, Users, UserPlus, UserCog, CircleAlert as AlertCircle, Check, CircleCheck as CheckCircle, SquarePen as Edit2, Search, ChevronRight, Sailboat, ArrowUpDown, Upload, FileUp, Trash2, ClipboardPaste, ArrowRight, Zap, TriangleAlert as AlertTriangle , ChevronLeft } from 'lucide-react';
 import Papa from 'papaparse';
 import { Skipper } from '../types';
 import { getStoredMembers, isValidUUID, updateMember } from '../utils/storage';
@@ -1249,9 +1250,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60]">
-        <div className="w-full max-w-md rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700">
-          <div className="p-6 border-b border-slate-700">
-            <h3 className="text-lg font-medium text-slate-100">
+        <div className="a-sheet w-full max-w-md overflow-hidden">
+          <div className="px-6 pt-5 pb-2">
+            <h3 className="a-display a-ink text-[18px] font-semibold">
               Complete Skipper Information
             </h3>
           </div>
@@ -1280,7 +1281,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             )}
             
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
+              <label className="a-flab">
                 Sail Number *
               </label>
               <input
@@ -1297,13 +1298,13 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                     setEditingMemberBoat(prev => prev ? { ...prev, sailNumber: value } : null);
                   }
                 }}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                className="a-inp"
                 placeholder="Enter sail number"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
+              <label className="a-flab">
                 Boat Design (Hull) *
               </label>
               <input
@@ -1317,13 +1318,13 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                     setEditingMemberBoat(prev => prev ? { ...prev, hull: e.target.value } : null);
                   }
                 }}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                className="a-inp"
                 placeholder="Enter boat design (e.g., Trance, B6)"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
+              <label className="a-flab">
                 Club *
               </label>
               <input
@@ -1337,7 +1338,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                     setEditingMemberBoat(prev => prev ? { ...prev, club: e.target.value } : null);
                   }
                 }}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                className="a-inp"
                 placeholder="Enter club name"
               />
             </div>
@@ -1347,10 +1348,10 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             </p>
           </div>
           
-          <div className="flex justify-end gap-3 p-6 border-t border-slate-700">
+          <div className="a-sheet-foot flex justify-end gap-2.5 px-5 py-3.5">
             <button
               onClick={cancelEditingBoat}
-              className="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors font-medium"
+              className="a-btn"
               disabled={updateLoading}
             >
               Cancel
@@ -1358,7 +1359,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             <button
               onClick={handleUpdateMemberBoat}
               disabled={updateLoading || !boatToEdit.sailNumber || !boatToEdit.hull || !boatToEdit.club}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="a-btn a-btn-p disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {updateLoading ? (
                 <>
@@ -1378,260 +1379,201 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   if (view === 'initial') {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="w-full max-w-lg max-h-[90vh] rounded-xl shadow-xl overflow-hidden flex flex-col backdrop-blur-sm bg-slate-800/95 border border-slate-700">
-          {/* Blue gradient header */}
-          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <Users className="text-white" size={24} />
-              <div>
-                <h2 className="text-xl font-semibold text-white">
-                  Race Skippers
-                </h2>
-                <p className="text-sm text-blue-100">
-                  {currentEvent?.raceClass} Class
-                  {currentEvent?.isInterclub && " • Interclub Event"}
-                </p>
+        <section className="a-sheet w-full max-w-[440px] max-h-[90vh] overflow-hidden flex flex-col" role="dialog" aria-modal="true" aria-label="Race skippers">
+          <div className="flex items-center gap-3 flex-shrink-0" style={{ padding: '20px 18px 16px 22px' }}>
+            <span className="a-tile a-tile-rim"><Users size={19} /></span>
+            <div className="flex-1 min-w-0">
+              <div className="a-display a-ink text-[20px] font-semibold">Race skippers</div>
+              <div className="a-dim text-[12.5px] mt-0.5">
+                {currentEvent?.raceClass} class
+                {currentEvent?.isInterclub && " · Interclub event"}
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="rounded-full p-2 text-white hover:bg-white/20 transition-colors"
-            >
+            <button onClick={onClose} className="a-ib" aria-label="Close">
               <X size={20} />
             </button>
           </div>
 
-          <div className="p-6 overflow-y-auto flex-1 min-h-0">
+          <div className="overflow-y-auto flex-1 min-h-0 flex flex-col gap-3" style={{ padding: '0 16px 16px' }}>
             {error && (
-              <div className="mb-4 p-3 rounded-md bg-red-900/20 border border-red-900/30 text-red-400 text-sm">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <AlertCircle className="h-4 w-4 text-red-400" aria-hidden="true" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-300">
-                      {error}
-                    </p>
-                  </div>
-                </div>
+              <div className="a-note a-note-r flex items-start gap-2.5 text-[13px]">
+                <AlertCircle size={16} className="flex-shrink-0 mt-px" aria-hidden="true" />
+                <p>{error}</p>
               </div>
             )}
-            
+
             {skippers.length > 0 ? (
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-slate-300">
-                    Current Skippers ({skippers.length})
-                  </h3>
-                  <div className="flex items-center gap-2">
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="a-cap flex-1">Current skippers <span className="a-cnt ml-1">{skippers.length}</span></span>
+                  {selectedSkippers.size > 0 && (
                     <button
-                      onClick={toggleSelectAll}
-                      className="text-xs px-2.5 py-1 rounded-md bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
+                      onClick={() => setShowBulkDeleteConfirm(true)}
+                      className="a-btn a-btn-q a-txt-r"
+                      style={{ height: 30, fontSize: 12.5 }}
                     >
-                      {selectedSkippers.size === skippers.length ? 'Deselect All' : 'Select All'}
+                      <Trash2 size={14} />
+                      Delete ({selectedSkippers.size})
                     </button>
-                    {selectedSkippers.size > 0 && (
-                      <button
-                        onClick={() => setShowBulkDeleteConfirm(true)}
-                        className="text-xs px-2.5 py-1 rounded-md bg-red-600/80 text-white hover:bg-red-600 transition-colors flex items-center gap-1"
-                      >
-                        <Trash2 size={12} />
-                        Delete ({selectedSkippers.size})
-                      </button>
-                    )}
-                  </div>
+                  )}
+                  <button
+                    onClick={toggleSelectAll}
+                    className="a-btn a-btn-q"
+                    style={{ height: 30, fontSize: 12.5 }}
+                  >
+                    {selectedSkippers.size === skippers.length ? 'Deselect all' : 'Select all'}
+                  </button>
                 </div>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-                  {skippers.map((skipper, index) => (
+                <div className="a-grp max-h-[320px] overflow-y-auto">
+                  {skippers.map((skipper, index) => {
+                    const matchingMember = members.find(m =>
+                      `${m.first_name} ${m.last_name}`.toLowerCase() === skipper.name.toLowerCase()
+                    );
+                    const avatar = matchingMember ? memberAvatars[matchingMember.id] : undefined;
+                    return (
                     <div
                       key={index}
-                      className={`flex items-center justify-between p-3 rounded-lg text-slate-200 transition-colors ${
-                        selectedSkippers.has(index)
-                          ? 'bg-blue-900/40 ring-1 ring-blue-500/50'
-                          : 'bg-slate-700'
-                      }`}
+                      className={`a-ir ${selectedSkippers.has(index) ? 'a-row-sel' : ''}`}
+                      style={{ padding: '9px 12px' }}
                     >
-                      <div className="flex items-center gap-3 flex-1">
-                        <button
-                          onClick={() => toggleSelectSkipper(index)}
-                          className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                            selectedSkippers.has(index)
-                              ? 'bg-blue-600 border-blue-500'
-                              : 'border-slate-500 hover:border-slate-400'
-                          }`}
-                        >
-                          {selectedSkippers.has(index) && <Check size={12} className="text-white" />}
-                        </button>
-                        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center">
-                          {(() => {
-                            const matchingMember = members.find(m =>
-                              `${m.first_name} ${m.last_name}`.toLowerCase() === skipper.name.toLowerCase()
-                            );
-
-                            if (matchingMember && memberAvatars[matchingMember.id]) {
-                              return (
-                                <img
-                                  src={memberAvatars[matchingMember.id]}
-                                  alt={skipper.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              );
-                            } else {
-                              return (
-                                <div className="w-full h-full flex items-center justify-center bg-slate-600">
-                                  <span className="text-lg font-semibold text-slate-300">
-                                    {getInitials(skipper.name.split(' ')[0], skipper.name.split(' ')[1] || '')}
-                                  </span>
-                                </div>
-                              );
-                            }
-                          })()}
-                        </div>
-                        <div>
-                          <div className="font-medium">{skipper.name}</div>
-                          <div className="text-xs opacity-80">
-                            {skipper.sailNo} {skipper.club && `• ${skipper.club}`} {skipper.hull && `• ${skipper.hull}`}
-                          </div>
+                      <button
+                        onClick={() => toggleSelectSkipper(index)}
+                        className={`a-chk ${selectedSkippers.has(index) ? 'a-chk-on' : ''}`}
+                        role="checkbox"
+                        aria-checked={selectedSkippers.has(index)}
+                        aria-label={`Select ${skipper.name}`}
+                      >
+                        {selectedSkippers.has(index) && <Check size={12} />}
+                      </button>
+                      <AAvatar url={avatar} first={skipper.name.split(' ')[0]} last={skipper.name.split(' ')[1] || ''} size={38} />
+                      <div className="flex-1 min-w-0">
+                        <div className="a-ink text-[14px] font-semibold truncate">{skipper.name}</div>
+                        <div className="a-dim text-[12px] mt-0.5 truncate">
+                          {[skipper.sailNo, skipper.club, skipper.hull].filter(Boolean).join(' · ')}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEditSkipper(index)}
-                          className="p-1.5 rounded-lg text-blue-400 hover:bg-blue-900/30 transition-colors"
-                          title="Edit skipper"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleRemoveSkipper(index)}
-                          className="p-1.5 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
-                          title={skipperHasResults(index) ? "Cannot delete - has race results" : "Remove skipper"}
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleEditSkipper(index)}
+                        className="a-ib"
+                        aria-label="Edit"
+                        title="Edit skipper"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleRemoveSkipper(index)}
+                        className="a-ib a-ib-d"
+                        aria-label="Remove"
+                        title={skipperHasResults(index) ? "Cannot delete - has race results" : "Remove skipper"}
+                      >
+                        <X size={16} />
+                      </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              </div>
+              </>
             ) : null}
-            
-            <div className="space-y-4">
+
+            <p className="a-cap" style={{ margin: '4px 0 0' }}>Add skippers</p>
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setView('members')}
-                className="w-full flex items-center gap-4 p-4 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors text-left"
+                className="a-opt"
+                style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, padding: 14 }}
               >
-                <div className="p-3 rounded-lg bg-blue-600 text-white">
-                  <Users size={24} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-medium text-slate-200">
-                    {isRaceOfficer && !currentEvent?.clubId ? 'Add from Skippers' : 'Add from Club Members'}
-                  </h3>
-                  <p className="text-sm text-slate-400">
+                <span className="a-tile"><Users size={18} /></span>
+                <span>
+                  <span className="a-ink block text-[14px] font-semibold">
+                    {isRaceOfficer && !currentEvent?.clubId ? 'From skippers' : 'From club members'}
+                  </span>
+                  <span className="a-dim block text-[12px] mt-0.5">
                     {isRaceOfficer && !currentEvent?.clubId
-                      ? "Select from your imported skipper contacts"
+                      ? "Your imported skipper contacts"
                       : currentEvent?.isInterclub
-                        ? "Select from registered members of both clubs"
-                        : "Select from registered club members"}
-                  </p>
-                </div>
+                        ? "Members of both clubs"
+                        : "Pick registered members"}
+                  </span>
+                </span>
               </button>
 
               <button
                 onClick={() => setView('manual')}
-                className="w-full flex items-center gap-4 p-4 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors text-left"
+                className="a-opt"
+                style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, padding: 14 }}
               >
-                <div className="p-3 rounded-lg bg-blue-600 text-white">
-                  <UserPlus size={24} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-medium text-slate-200">
-                    Add Skipper Manually
-                  </h3>
-                  <p className="text-sm text-slate-400">
-                    Enter skipper details manually
-                  </p>
-                </div>
+                <span className="a-tile"><UserPlus size={18} /></span>
+                <span>
+                  <span className="a-ink block text-[14px] font-semibold">Add manually</span>
+                  <span className="a-dim block text-[12px] mt-0.5">Enter skipper details</span>
+                </span>
               </button>
 
               <button
                 onClick={() => setView('import')}
-                className="w-full flex items-center gap-4 p-4 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors text-left"
+                className="a-opt"
+                style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, padding: 14 }}
               >
-                <div className="p-3 rounded-lg bg-blue-600 text-white">
-                  <Upload size={24} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-medium text-slate-200">
-                    Import Skippers
-                  </h3>
-                  <p className="text-sm text-slate-400">
-                    Upload CSV or XLS file with skipper details
-                  </p>
-                </div>
+                <span className="a-tile"><Upload size={18} /></span>
+                <span>
+                  <span className="a-ink block text-[14px] font-semibold">Import skippers</span>
+                  <span className="a-dim block text-[12px] mt-0.5">CSV or XLS file</span>
+                </span>
               </button>
 
               {onImportSkippersWithAssignments && (
                 <button
                   onClick={() => setView('import-assignments')}
-                  className="w-full flex items-center gap-4 p-4 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors text-left"
+                  className="a-opt"
+                  style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, padding: 14 }}
                 >
-                  <div className="p-3 rounded-lg bg-green-600 text-white">
-                    <Upload size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-medium text-slate-200">
-                      Import Assignments
-                    </h3>
-                    <p className="text-sm text-slate-400">
-                      Import skippers with SHRS heat assignments from CSV
-                    </p>
-                  </div>
+                  <span className="a-tile a-txt-g"><Upload size={18} /></span>
+                  <span>
+                    <span className="a-ink block text-[14px] font-semibold">Import assignments</span>
+                    <span className="a-dim block text-[12px] mt-0.5">Skippers with SHRS heats from CSV</span>
+                  </span>
                 </button>
               )}
             </div>
           </div>
-          
-          <div className="flex justify-end gap-3 p-6 border-t border-slate-700 flex-shrink-0">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
-            >
+
+          <div className="a-sheet-foot flex items-center gap-2.5 flex-shrink-0" style={{ padding: '14px 18px' }}>
+            <div className="flex-1" />
+            <button onClick={onClose} className="a-btn">
               Close
             </button>
           </div>
-        </div>
-        
+        </section>
+
         {/* Remove Confirmation Dialog */}
         {showRemoveConfirm && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60]">
-            <div className="w-full max-w-md rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700">
-              <div className="p-6 border-b border-slate-700">
-                <h3 className="text-lg font-medium text-slate-100">
+            <div className="a-sheet w-full max-w-md overflow-hidden">
+              <div className="px-6 pt-5 pb-2">
+                <h3 className="a-display a-ink text-[18px] font-semibold">
                   Remove Skipper
                 </h3>
               </div>
               
               <div className="p-6">
-                <p className="text-slate-300">
+                <p className="a-mute">
                   Are you sure you want to remove this skipper?
                 </p>
               </div>
               
-              <div className="flex justify-end gap-3 p-6 border-t border-slate-700">
+              <div className="a-sheet-foot flex justify-end gap-2.5 px-5 py-3.5">
                 <button
                   onClick={() => {
                     setShowRemoveConfirm(false);
                     setSkipperToRemove(null);
                   }}
-                  className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
+                  className="a-btn a-btn-q"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmRemoveSkipper}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
+                  className="a-btn a-btn-d"
                 >
                   Remove
                 </button>
@@ -1642,27 +1584,27 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
         {showBulkDeleteConfirm && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60]">
-            <div className="w-full max-w-md rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700">
-              <div className="p-6 border-b border-slate-700">
-                <h3 className="text-lg font-medium text-slate-100">
+            <div className="a-sheet w-full max-w-md overflow-hidden">
+              <div className="px-6 pt-5 pb-2">
+                <h3 className="a-display a-ink text-[18px] font-semibold">
                   Delete {selectedSkippers.size} Skipper{selectedSkippers.size !== 1 ? 's' : ''}
                 </h3>
               </div>
               <div className="p-6">
-                <p className="text-slate-300">
+                <p className="a-mute">
                   Are you sure you want to remove {selectedSkippers.size} selected skipper{selectedSkippers.size !== 1 ? 's' : ''}? This cannot be undone.
                 </p>
               </div>
-              <div className="flex justify-end gap-3 p-6 border-t border-slate-700">
+              <div className="a-sheet-foot flex justify-end gap-2.5 px-5 py-3.5">
                 <button
                   onClick={() => setShowBulkDeleteConfirm(false)}
-                  className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
+                  className="a-btn a-btn-q"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmBulkDelete}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
+                  className="a-btn a-btn-d"
                 >
                   Delete {selectedSkippers.size} Skipper{selectedSkippers.size !== 1 ? 's' : ''}
                 </button>
@@ -1683,44 +1625,44 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           >
             {console.log('Rendering delete modal')}
             <div
-              className="w-full max-w-md rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700"
+              className="a-sheet w-full max-w-md overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-slate-700">
-                <h3 className="text-lg font-medium text-slate-100">
+              <div className="px-6 pt-5 pb-2">
+                <h3 className="a-display a-ink text-[18px] font-semibold">
                   Delete Boat
                 </h3>
               </div>
 
               <div className="p-6">
-                <p className="text-slate-300 mb-3">
+                <p className="a-mute mb-3">
                   Are you sure you want to delete this boat from {boatToDelete.member.first_name} {boatToDelete.member.last_name}'s garage?
                 </p>
                 <div className="bg-slate-700/50 p-3 rounded-lg">
-                  <p className="text-sm text-slate-300">
+                  <p className="text-[13.5px] a-mute">
                     <span className="font-medium">Sail #:</span> {boatToDelete.boat.sail_number}
                   </p>
-                  <p className="text-sm text-slate-300">
+                  <p className="text-[13.5px] a-mute">
                     <span className="font-medium">Hull:</span> {boatToDelete.boat.hull}
                   </p>
                 </div>
-                <p className="text-sm text-slate-400 mt-3">
+                <p className="text-[13px] a-dim mt-3">
                   Note: This will not affect any previous race results or scores with this boat.
                 </p>
               </div>
 
-              <div className="flex justify-end gap-3 p-6 border-t border-slate-700">
+              <div className="a-sheet-foot flex justify-end gap-2.5 px-5 py-3.5">
                 <button
                   onClick={() => setBoatToDelete(null)}
                   disabled={updateLoading}
-                  className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="a-btn a-btn-q disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteBoat}
                   disabled={updateLoading}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="a-btn a-btn-d disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {updateLoading ? 'Deleting...' : 'Delete Boat'}
                 </button>
@@ -1736,64 +1678,44 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   if (view === 'manual') {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="w-full max-w-lg rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700">
-          {/* Blue gradient header */}
-          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <UserPlus className="text-white" size={24} />
-              <div>
-                <h2 className="text-xl font-semibold text-white">
-                  Add Skipper Manually
-                </h2>
-                {skippers.length > 0 && (
-                  <p className="text-sm text-blue-100">
-                    {skippers.length} skipper{skippers.length !== 1 ? 's' : ''} added
-                  </p>
-                )}
-              </div>
+        <section className="a-sheet w-full max-w-[420px] max-h-[92vh] overflow-hidden flex flex-col" role="dialog" aria-modal="true" aria-label="Add skipper manually">
+          <div className="flex items-center gap-3 flex-shrink-0" style={{ padding: '20px 18px 16px 22px' }}>
+            <span className="a-tile a-tile-rim"><UserPlus size={19} /></span>
+            <div className="flex-1 min-w-0">
+              <div className="a-display a-ink text-[19px] font-semibold">Add skipper</div>
+              {skippers.length > 0 && (
+                <div className="a-dim text-[12.5px] mt-0.5">
+                  {skippers.length} skipper{skippers.length !== 1 ? 's' : ''} added
+                </div>
+              )}
             </div>
-            <button
-              onClick={onClose}
-              className="rounded-full p-2 text-white hover:bg-white/20 transition-colors"
-            >
+            <button onClick={onClose} className="a-ib" aria-label="Close">
               <X size={20} />
             </button>
           </div>
 
-          <div className="p-6 space-y-4">
+          <div className="overflow-y-auto flex-1 min-h-0 grid grid-cols-2 gap-3" style={{ padding: '0 20px 16px' }}>
             {error && (
-              <div className="mb-4 p-3 rounded-md bg-red-900/20 border border-red-900/30 text-red-400 text-sm">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <AlertCircle className="h-4 w-4 text-red-400" aria-hidden="true" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-300">
-                      {error}
-                    </p>
-                  </div>
-                </div>
+              <div className="col-span-2 a-note a-note-r flex items-start gap-2.5 text-[13px]">
+                <AlertCircle size={16} className="flex-shrink-0 mt-px" aria-hidden="true" />
+                <p>{error}</p>
               </div>
             )}
-            
-            <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
-                Skipper Name *
-              </label>
+
+            <label className="col-span-2">
+              <span className="a-flab">Skipper name *</span>
               <input
                 type="text"
                 required
                 value={manualSkipper.name}
                 onChange={(e) => setManualSkipper(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
-                placeholder="Enter skipper name"
+                className="a-inp"
+                placeholder="Full name"
               />
-            </div>
+            </label>
 
-            <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
-                Sail Number *
-              </label>
+            <label>
+              <span className="a-flab">Sail no. *</span>
               <input
                 type="text"
                 inputMode="numeric"
@@ -1804,45 +1726,39 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   const value = e.target.value.replace(/[^0-9]/g, '');
                   setManualSkipper(prev => ({ ...prev, sailNo: value }));
                 }}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
-                placeholder="Enter sail number"
+                className="a-inp"
+                placeholder="e.g. 42"
               />
-            </div>
+            </label>
 
-            <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
-                Boat Design (Hull) *
-              </label>
+            <label>
+              <span className="a-flab">Design (hull) *</span>
               <input
                 type="text"
                 required
                 value={manualSkipper.hull}
                 onChange={(e) => setManualSkipper(prev => ({ ...prev, hull: e.target.value }))}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
-                placeholder="Enter boat design (e.g., Trance, B6)"
+                className="a-inp"
+                placeholder="Trance, B6…"
               />
-            </div>
+            </label>
 
-            <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
-                Club *
-              </label>
+            <label className="col-span-2">
+              <span className="a-flab">Club *</span>
               <input
                 type="text"
                 required
                 value={manualSkipper.club}
                 onChange={(e) => setManualSkipper(prev => ({ ...prev, club: e.target.value }))}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
-                placeholder="Enter club name"
+                className="a-inp"
+                placeholder="Club name"
               />
-            </div>
+            </label>
 
             {/* Country field - ALWAYS shown */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
-                Country <span className="text-red-400">*</span>
-              </label>
-              <div className="relative">
+            <label>
+              <span className="a-flab">Country *</span>
+              <span className="relative block">
                 <select
                   value={manualSkipper.countryCode || 'AU'}
                   onChange={(e) => {
@@ -1854,7 +1770,8 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                     }));
                   }}
                   required
-                  className="w-full pl-12 pr-4 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="a-inp a-inp-sel"
+                  style={{ paddingLeft: 40 }}
                 >
                   {SAILING_NATIONS.map((country) => (
                     <option key={country.code} value={country.code}>
@@ -1862,90 +1779,83 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                     </option>
                   ))}
                 </select>
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-2xl pointer-events-none">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg pointer-events-none">
                   {getCountryFlag(manualSkipper.countryCode || 'AU')}
                 </span>
-              </div>
-            </div>
+              </span>
+            </label>
 
             {/* Category field - ALWAYS shown */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
-                Category <span className="text-red-400">*</span>
-              </label>
+            <label>
+              <span className="a-flab">Category *</span>
               <select
                 value={manualSkipper.category || ''}
                 onChange={(e) => setManualSkipper(prev => ({ ...prev, category: e.target.value }))}
                 required
-                className="w-full px-4 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="a-inp a-inp-sel"
               >
-                <option value="">Select Category</option>
+                <option value="">Select</option>
                 <option value="Junior">Junior</option>
                 <option value="Open">Open</option>
                 <option value="Master">Master</option>
                 <option value="Grand Master">Grand Master</option>
                 <option value="Legend">Legend</option>
               </select>
-            </div>
+            </label>
 
             {/* National Ranking - optional */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
-                National Ranking
-              </label>
+            <label className="col-span-2">
+              <span className="a-flab">National ranking <span className="a-dim font-normal">· optional</span></span>
               <input
                 type="number"
                 min="0"
                 value={manualSkipper.nationalRanking || ''}
                 onChange={(e) => setManualSkipper(prev => ({ ...prev, nationalRanking: parseInt(e.target.value) || 0 }))}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
-                placeholder="e.g. 5 (leave blank if unknown)"
+                className="a-inp"
+                placeholder="e.g. 5"
               />
-            </div>
+            </label>
 
             {/* Show State field if event display settings require it */}
             {currentEvent?.show_club_state && (
-              <div>
-                <label className="block text-sm font-medium mb-1 text-slate-300">
-                  State *
-                </label>
+              <label className="col-span-2">
+                <span className="a-flab">State *</span>
                 <input
                   type="text"
                   required
                   value={manualSkipper.clubState}
                   onChange={(e) => setManualSkipper(prev => ({ ...prev, clubState: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
-                  placeholder="Enter state (e.g., NSW, QLD)"
+                  className="a-inp"
+                  placeholder="e.g. NSW, QLD"
                 />
-              </div>
+              </label>
             )}
-
-            <div className="flex justify-between gap-3 pt-4">
-              <button
-                onClick={() => setView('initial')}
-                className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
-              >
-                Back
-              </button>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleAddManualSkipper(true)}
-                  disabled={!manualSkipper.name || !manualSkipper.sailNo || !manualSkipper.hull || !manualSkipper.club || !manualSkipper.countryCode || !manualSkipper.category}
-                  className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-600 text-white hover:bg-slate-700"
-                >
-                  Add & Continue
-                </button>
-                <button
-                  onClick={() => handleAddManualSkipper(false)}
-                  disabled={!manualSkipper.name || !manualSkipper.sailNo || !manualSkipper.hull || !manualSkipper.club || !manualSkipper.countryCode || !manualSkipper.category}
-                  className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700"
-                >
-                  Add & Done
-                </button>
-              </div>
-            </div>
           </div>
-        </div>
+
+          <div className="a-sheet-foot flex items-center gap-2.5 flex-shrink-0" style={{ padding: '14px 18px' }}>
+            <button
+              onClick={() => setView('initial')}
+              className="a-btn a-btn-q"
+            >
+              Back
+            </button>
+            <div className="flex-1" />
+            <button
+              onClick={() => handleAddManualSkipper(true)}
+              disabled={!manualSkipper.name || !manualSkipper.sailNo || !manualSkipper.hull || !manualSkipper.club || !manualSkipper.countryCode || !manualSkipper.category}
+              className="a-btn disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Add & next
+            </button>
+            <button
+              onClick={() => handleAddManualSkipper(false)}
+              disabled={!manualSkipper.name || !manualSkipper.sailNo || !manualSkipper.hull || !manualSkipper.club || !manualSkipper.countryCode || !manualSkipper.category}
+              className="a-btn a-btn-p disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Add & done
+            </button>
+          </div>
+        </section>
       </div>
     );
   }
@@ -1958,15 +1868,15 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     return (
     <>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="w-full max-w-lg rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700 max-h-[90vh] flex flex-col">
-          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
+        <div className="w-full max-w-lg a-sheet overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="px-6 pt-5 pb-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
-              <Edit2 className="text-white" size={24} />
+              <Edit2 className="a-mute" size={22} />
               <div>
-                <h2 className="text-xl font-semibold text-white">
+                <h2 className="a-display a-ink text-[19px] font-semibold">
                   Edit Skipper Details
                 </h2>
-                <p className="text-sm text-blue-100">
+                <p className="a-dim text-[12.5px]">
                   Update skipper information
                 </p>
               </div>
@@ -1976,7 +1886,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                 setView('initial');
                 setEditingSkipperIndex(null);
               }}
-              className="rounded-full p-2 text-white hover:bg-white/20 transition-colors"
+              className="a-ib"
             >
               <X size={20} />
             </button>
@@ -1993,7 +1903,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             )}
 
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
+              <label className="a-flab">
                 Skipper Name *
               </label>
               <input
@@ -2001,7 +1911,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                 required
                 value={manualSkipper.name}
                 onChange={(e) => setManualSkipper(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                className="a-inp"
                 placeholder="Enter skipper name"
               />
             </div>
@@ -2092,7 +2002,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                         const value = e.target.value.replace(/[^0-9]/g, '');
                         setEditNewBoatData(prev => ({ ...prev, sailNumber: value }));
                       }}
-                      className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 text-sm"
+                      className="a-inp"
                       placeholder="Sail #"
                     />
                   </div>
@@ -2102,7 +2012,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                       type="text"
                       value={editNewBoatData.hull}
                       onChange={(e) => setEditNewBoatData(prev => ({ ...prev, hull: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 text-sm"
+                      className="a-inp"
                       placeholder="e.g., Trance"
                     />
                   </div>
@@ -2138,7 +2048,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             {(!isMemberLinked || editMemberBoats.length === 0) && (
               <>
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-300">
+                  <label className="a-flab">
                     Sail Number *
                   </label>
                   <input
@@ -2151,13 +2061,13 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                       const value = e.target.value.replace(/[^0-9]/g, '');
                       setManualSkipper(prev => ({ ...prev, sailNo: value }));
                     }}
-                    className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                    className="a-inp"
                     placeholder="Enter sail number"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-300">
+                  <label className="a-flab">
                     Boat Design (Hull) *
                   </label>
                   <input
@@ -2165,7 +2075,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                     required
                     value={manualSkipper.hull}
                     onChange={(e) => setManualSkipper(prev => ({ ...prev, hull: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                    className="a-inp"
                     placeholder="Enter boat design (e.g., Trance, B6)"
                   />
                 </div>
@@ -2173,7 +2083,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             )}
 
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
+              <label className="a-flab">
                 Club *
               </label>
               <input
@@ -2181,13 +2091,13 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                 required
                 value={manualSkipper.club}
                 onChange={(e) => setManualSkipper(prev => ({ ...prev, club: e.target.value }))}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                className="a-inp"
                 placeholder="Enter club name"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
+              <label className="a-flab">
                 Country <span className="text-red-400">*</span>
               </label>
               <div className="relative">
@@ -2217,7 +2127,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
+              <label className="a-flab">
                 Category <span className="text-red-400">*</span>
               </label>
               <select
@@ -2237,7 +2147,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
             {/* National Ranking - optional */}
             <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
+              <label className="a-flab">
                 National Ranking
               </label>
               <input
@@ -2245,14 +2155,14 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                 min="0"
                 value={manualSkipper.nationalRanking || ''}
                 onChange={(e) => setManualSkipper(prev => ({ ...prev, nationalRanking: parseInt(e.target.value) || 0 }))}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                className="a-inp"
                 placeholder="e.g. 5 (leave blank if unknown)"
               />
             </div>
 
             {currentEvent?.show_club_state && (
               <div>
-                <label className="block text-sm font-medium mb-1 text-slate-300">
+                <label className="a-flab">
                   State *
                 </label>
                 <input
@@ -2260,7 +2170,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   required
                   value={manualSkipper.clubState}
                   onChange={(e) => setManualSkipper(prev => ({ ...prev, clubState: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                  className="a-inp"
                   placeholder="Enter state (e.g., NSW, QLD)"
                 />
               </div>
@@ -2272,7 +2182,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   setView('initial');
                   setEditingSkipperIndex(null);
                 }}
-                className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
+                className="a-btn a-btn-q"
               >
                 Cancel
               </button>
@@ -2782,22 +2692,22 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="w-full max-w-3xl rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700 max-h-[90vh] flex flex-col">
-          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+        <div className="w-full max-w-3xl a-sheet overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="px-6 pt-5 pb-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Upload className="text-white" size={24} />
+              <Upload className="a-mute" size={22} />
               <div>
-                <h2 className="text-xl font-semibold text-white">
+                <h2 className="a-display a-ink text-[19px] font-semibold">
                   Import Skippers
                 </h2>
-                <p className="text-sm text-blue-100">
+                <p className="a-dim text-[12.5px]">
                   Upload a file or paste skipper data
                 </p>
               </div>
             </div>
             <button
               onClick={() => setView('initial')}
-              className="rounded-full p-2 text-white hover:bg-white/20 transition-colors"
+              className="a-ib"
             >
               <X size={20} />
             </button>
@@ -2807,9 +2717,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             {importStep === 'upload' && (
               <div className="space-y-6">
                 <div className="border-2 border-dashed border-slate-600 rounded-xl p-8 text-center hover:border-slate-500 transition-colors">
-                  <FileUp className="mx-auto mb-3 text-slate-500" size={40} />
-                  <h3 className="text-lg font-medium text-slate-200 mb-1">Upload Skipper File</h3>
-                  <p className="text-sm text-slate-400 mb-4">
+                  <FileUp className="mx-auto mb-3 a-dim" size={40} />
+                  <h3 className="a-ink text-[16px] font-semibold mb-1">Upload Skipper File</h3>
+                  <p className="text-[13px] a-dim mb-4">
                     CSV or XLS with skipper details (any format supported)
                   </p>
                   <label className="inline-block px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium cursor-pointer transition-colors">
@@ -2824,14 +2734,14 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <div className="flex-1 h-px bg-slate-700" />
+                  <div className="flex-1 h-px a-hr" />
                   <span className="text-sm text-slate-500 font-medium">OR</span>
-                  <div className="flex-1 h-px bg-slate-700" />
+                  <div className="flex-1 h-px a-hr" />
                 </div>
 
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <ClipboardPaste size={16} className="text-slate-400" />
+                    <ClipboardPaste size={16} className="a-dim" />
                     <h3 className="text-sm font-medium text-slate-300">Paste Data</h3>
                   </div>
                   <p className="text-xs text-slate-500 mb-3">
@@ -2878,9 +2788,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
                 <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 overflow-hidden">
                   <div className="grid grid-cols-[1fr,32px,1fr,36px] items-center gap-0 px-4 py-2.5 bg-slate-800/80 border-b border-slate-700/50">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Skipper Field</span>
+                    <span className="a-cap">Skipper Field</span>
                     <span />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Your Column</span>
+                    <span className="a-cap">Your Column</span>
                     <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 text-center">Status</span>
                   </div>
                   <div className="divide-y divide-slate-700/30 max-h-[340px] overflow-y-auto">
@@ -2973,24 +2883,24 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-4">
                       <div>
-                        <span className="text-slate-400">Mapped: </span>
+                        <span className="a-dim">Mapped: </span>
                         <span className="text-white font-medium">{mappedCount}/{importFieldsList.length}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400">Required: </span>
+                        <span className="a-dim">Required: </span>
                         <span className={`font-medium ${canImport ? 'text-emerald-400' : 'text-red-400'}`}>
                           {canImport ? 'OK' : 'Missing'}
                         </span>
                       </div>
                     </div>
-                    <span className="text-xs text-slate-500">{importHeaders.length} columns in source</span>
+                    <span className="text-[12px] a-dim">{importHeaders.length} columns in source</span>
                   </div>
                 </div>
 
                 {hasNameField && (
                   <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/30">
                     <div className="flex items-center justify-between">
-                      <div className="text-sm text-slate-300">Name Display Format</div>
+                      <div className="text-[13.5px] a-mute">Name Display Format</div>
                       <div className="flex items-center gap-1 bg-slate-900/60 rounded-lg p-0.5 border border-slate-700/50">
                         <button
                           onClick={() => setNameDisplayFormat('first_last')}
@@ -3105,7 +3015,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             {importStep === 'importing' && (
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-slate-400">Importing skippers...</p>
+                <p className="a-dim">Importing skippers...</p>
               </div>
             )}
 
@@ -3117,7 +3027,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   </div>
                   <div>
                     <h3 className="text-base font-semibold text-white">Sail Number Conflicts</h3>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-[13px] a-dim">
                       {conflictGroups.length} sail number{conflictGroups.length !== 1 ? 's are' : ' is'} shared by multiple skippers. Update at least one skipper in each group so all sail numbers are unique.
                     </p>
                   </div>
@@ -3153,7 +3063,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                             Sail Number
                           </span>
                           <span className="text-sm font-bold font-mono text-amber-400">{group.sailNo}</span>
-                          <span className="text-xs text-slate-500">
+                          <span className="text-[12px] a-dim">
                             ({group.skippers.length + existingWithSame.length} skippers)
                           </span>
                           {!hasDuplicatesStill && <Check size={14} className="text-emerald-400 ml-auto" />}
@@ -3219,10 +3129,10 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
                 <div className="mt-4 p-3 rounded-lg bg-slate-800/60 border border-slate-700/50">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-400">
+                    <span className="a-dim">
                       {allParsedSkippers.length} total skippers to import
                     </span>
-                    <span className="text-slate-400">
+                    <span className="a-dim">
                       {conflictGroups.filter(g => {
                         const existingWithSame = skippers.filter(s => s.sailNo === g.sailNo);
                         const allSailNosInGroup = g.skippers.map(s => s.skipper.sailNo);
@@ -3244,7 +3154,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   <Check className="text-emerald-400" size={32} />
                 </div>
                 <h3 className="text-lg font-medium text-slate-200 mb-2">Import Complete</h3>
-                <p className="text-slate-400">
+                <p className="a-dim">
                   {skippers.length} skipper{skippers.length !== 1 ? 's' : ''} now in the list
                 </p>
               </div>
@@ -3270,7 +3180,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   setView('initial');
                 }
               }}
-              className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
+              className="a-btn a-btn-q"
             >
               {importStep === 'complete' ? 'Close' : importStep === 'conflicts' ? 'Back to Mapping' : importStep === 'mapping' ? 'Upload Different Data' : 'Back'}
             </button>
@@ -3282,7 +3192,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   onChange={e => setSaveToContacts(e.target.checked)}
                   className="w-4 h-4 rounded border-slate-600 text-blue-500 focus:ring-blue-500 bg-slate-700"
                 />
-                <span className="text-sm text-slate-300">Save to Skippers</span>
+                <span className="text-[13.5px] a-mute">Save to Skippers</span>
               </label>
             )}
             {importStep === 'mapping' && (
@@ -3449,13 +3359,13 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="w-full max-w-2xl rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700 max-h-[90vh] flex flex-col">
+        <div className="w-full max-w-2xl a-sheet overflow-hidden max-h-[90vh] flex flex-col">
           <div className="px-6 py-4 flex items-center justify-between border-b border-slate-700">
             <div className="flex items-center gap-3">
               <Upload className="text-green-400" size={24} />
               <div>
-                <h2 className="text-xl font-semibold text-white">Import Assignments</h2>
-                <p className="text-sm text-slate-400">Import skippers with SHRS heat assignments</p>
+                <h2 className="a-display a-ink text-[19px] font-semibold">Import Assignments</h2>
+                <p className="text-[13px] a-dim">Import skippers with SHRS heat assignments</p>
               </div>
             </div>
             <button
@@ -3468,9 +3378,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             <div className="border-2 border-dashed border-slate-600 rounded-xl p-8 text-center hover:border-green-500/50 transition-colors">
-              <Upload className="mx-auto mb-3 text-slate-500" size={40} />
-              <h3 className="text-lg font-medium text-slate-200 mb-1">Upload Assignment File</h3>
-              <p className="text-sm text-slate-400 mb-4">
+              <Upload className="mx-auto mb-3 a-dim" size={40} />
+              <h3 className="a-ink text-[16px] font-semibold mb-1">Upload Assignment File</h3>
+              <p className="text-[13px] a-dim mb-4">
                 CSV with columns: Round, Heat, Sail Number, Skipper Name, Club
               </p>
               <label className="inline-block px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium cursor-pointer transition-colors">
@@ -3524,7 +3434,7 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
           <div className="flex justify-between p-6 border-t border-slate-700">
             <button
               onClick={() => { setView('initial'); setError(null); }}
-              className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
+              className="a-btn a-btn-q"
             >
               Back
             </button>
@@ -3537,162 +3447,126 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
   // Members view with list-based selection
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] backdrop-blur-sm bg-slate-800/95 border border-slate-700">
-        {/* Blue gradient header */}
-        <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <Users className="text-white" size={24} />
-            <div>
-              <h2 className="text-xl font-semibold text-white">
-                {isRaceOfficer && !currentEvent?.clubId ? 'Select Skippers to Add' : 'Select Members to Add'}
-              </h2>
-              <p className="text-sm text-blue-100">
-                {currentEvent?.raceClass} Class
-                {currentEvent?.isInterclub && " • Interclub Event"}
-              </p>
+      <section className="a-sheet w-full max-w-[560px] overflow-hidden flex flex-col max-h-[90vh]" role="dialog" aria-modal="true" aria-label="Select members">
+        <div className="flex items-center gap-3 flex-shrink-0" style={{ padding: '20px 18px 16px 18px' }}>
+          <button onClick={() => setView('initial')} className="a-ib" aria-label="Back"><ChevronLeft size={20} /></button>
+          <div className="flex-1 min-w-0">
+            <div className="a-display a-ink text-[20px] font-semibold">
+              {isRaceOfficer && !currentEvent?.clubId ? 'Select skippers' : 'Select members'}
+            </div>
+            <div className="a-dim text-[12.5px] mt-0.5 truncate">
+              {currentEvent?.raceClass} class · pick the boat each skipper is sailing
+              {currentEvent?.isInterclub && " · Interclub event"}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-full p-2 text-white hover:bg-white/20 transition-colors"
-          >
+          <button onClick={onClose} className="a-ib" aria-label="Close">
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* Search bar and Select All/Deselect All buttons */}
-          <div className="mb-6 space-y-3">
-            <div className="relative">
-              <Search
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                type="text"
-                placeholder={isRaceOfficer && !currentEvent?.clubId ? "Search skippers..." : "Search members..."}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-700 text-slate-200 placeholder-slate-400 rounded-lg"
-              />
-            </div>
+        {/* Search bar and Select All/Deselect All buttons */}
+        <div className="flex flex-col gap-2.5 flex-shrink-0" style={{ padding: '0 18px 12px' }}>
+          <label className="a-field">
+            <Search size={17} />
+            <input
+              type="text"
+              placeholder={isRaceOfficer && !currentEvent?.clubId ? "Search skippers" : "Search members"}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </label>
 
-            <div className="flex items-center justify-between px-2">
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <ArrowUpDown size={14} />
-                <span>Sorted by last name (A-Z)</span>
-              </div>
-              <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="a-pick" style={{ height: 32, fontSize: 12.5, borderRadius: 10, cursor: 'default' }}>
+              <ArrowUpDown size={14} />
+              Last name A–Z
+            </span>
+            <div className="flex-1" />
+            <div className="a-seg">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAllMembers(prev => !prev);
+                }}
+                className={`a-seg-i ${!showAllMembers ? 'a-seg-on' : ''}`}
+                style={{ height: 28, fontSize: 12 }}
+                aria-pressed={!showAllMembers}
+                title={showAllMembers ? 'Showing all boats — tap to show this class only' : 'Showing this class only — tap to show all boats'}
+              >
+                {showAllMembers ? 'All boats' : `${currentEvent?.raceClass || 'Class'} only`}
+              </button>
+              {!(isRaceOfficer && !currentEvent?.clubId) && (
                 <button
-                  onClick={() => {
-                    setShowAllMembers(prev => !prev);
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                    showAllMembers
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-700 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Users size={12} />
-                  {showAllMembers ? 'All Boats' : `${currentEvent?.raceClass || 'Class'} Only`}
-                </button>
-                {!(isRaceOfficer && !currentEvent?.clubId) && (
-                <button
+                  type="button"
                   onClick={() => {
                     setShowOtherClubs(prev => !prev);
                     setSelectedMemberBoats({});
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                    showOtherClubs
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-700 text-slate-400 hover:text-slate-200'
-                  }`}
+                  className={`a-seg-i ${showOtherClubs ? 'a-seg-on' : ''}`}
+                  style={{ height: 28, fontSize: 12 }}
+                  aria-pressed={showOtherClubs}
                 >
-                  <Sailboat size={12} />
-                  Other Clubs
+                  Other clubs
                 </button>
-                )}
-              </div>
+              )}
             </div>
-
             {membersWithMatchingBoats.length > 0 && (
-              <div className="flex gap-2">
-                <button
-                  onClick={handleSelectAll}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={handleDeselectAll}
-                  className="flex-1 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors text-sm font-medium"
-                >
-                  Deselect All
-                </button>
-              </div>
+              <>
+                {Object.keys(selectedMemberBoats).length > 0 && (
+                  <button onClick={handleDeselectAll} className="a-btn a-btn-q" style={{ height: 30, fontSize: 12.5 }}>Deselect all</button>
+                )}
+                <button onClick={handleSelectAll} className="a-btn a-btn-q" style={{ height: 30, fontSize: 12.5 }}>Select all</button>
+              </>
             )}
           </div>
+        </div>
 
+        <div className="flex-1 overflow-y-auto min-h-0" style={{ padding: '0 18px 14px' }}>
           {(loading || (showOtherClubs && loadingOtherClubs)) ? (
-            <div className="text-center py-12 bg-slate-700/50 rounded-lg border border-slate-600 m-6">
+            <div className="a-empty py-12 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <p className="text-slate-400">{showOtherClubs ? 'Loading other clubs...' : 'Loading members...'}</p>
+              <p className="a-dim text-[13.5px]">{showOtherClubs ? 'Loading other clubs…' : 'Loading members…'}</p>
             </div>
           ) : error ? (
-            <div className="text-center py-12 bg-red-900/10 border border-red-900/20 rounded-lg m-6">
-              <p className="text-red-400">{error}</p>
+            <div className="a-note a-note-r justify-center py-10 text-[13.5px]">
+              <p>{error}</p>
             </div>
           ) : membersWithMatchingBoats.length === 0 ? (
-            <div className="text-center py-12 bg-slate-700/50 rounded-lg border border-slate-600 m-6">
-              <Users size={48} className="mx-auto mb-4 text-slate-600" />
-              <p className="text-lg font-medium text-slate-300 mb-2">No Members Found</p>
-              <p className="text-slate-400">No members found{showAllMembers ? '' : ` with ${currentEvent?.raceClass} boats`}</p>
+            <div className="a-grp py-12 px-6 text-center">
+              <span className="a-tile mx-auto mb-3"><Users size={20} /></span>
+              <p className="a-ink text-[15px] font-semibold mb-1">No members found</p>
+              <p className="a-dim text-[13px]">No members found{showAllMembers ? '' : ` with ${currentEvent?.raceClass} boats`}</p>
               {!showAllMembers && (
                 <button
                   onClick={() => setShowAllMembers(true)}
-                  className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                  className="a-btn a-btn-p mt-4"
+                  style={{ height: 38 }}
                 >
-                  Show All Members
+                  Show all members
                 </button>
               )}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="flex flex-col gap-2.5">
               {membersWithMatchingBoats.map((member) => {
                 const matchingBoats = getMatchingBoats(member);
                 const hasBoats = matchingBoats.length > 0;
-                const hasMultipleBoats = matchingBoats.length > 1;
 
                 return (
-                  <div key={member.id} className="bg-slate-700/50 rounded-lg overflow-hidden">
+                  <div key={member.id} className="a-grp">
                     {/* Member Header */}
-                    <div className="flex items-center gap-3 p-3 bg-slate-700">
-                      <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
-                        {activeAvatars[member.id] ? (
-                          <img
-                            src={activeAvatars[member.id]}
-                            alt={`${member.first_name} ${member.last_name}`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-slate-600">
-                            <span className="text-lg font-semibold text-slate-300">
-                              {getInitials(member.first_name, member.last_name)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                    <div className="a-ir">
+                      <AAvatar url={activeAvatars[member.id]} first={member.first_name} last={member.last_name} size={36} />
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-white truncate">
+                        <div className="a-ink text-[14.5px] font-semibold truncate">
                           {member.first_name} {member.last_name}
-                        </h3>
-                        <p className="text-xs text-slate-400 truncate">
-                          {member.club || 'No club'} • {hasBoats ? `${matchingBoats.length} boat${matchingBoats.length !== 1 ? 's' : ''}` : `No ${currentEvent?.raceClass || ''} boats`}
-                        </p>
+                        </div>
+                        <div className="a-dim text-[12px] mt-0.5 truncate">
+                          {member.club || 'No club'} · {hasBoats ? `${matchingBoats.length} boat${matchingBoats.length !== 1 ? 's' : ''}` : `No ${currentEvent?.raceClass || ''} boats`}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="divide-y divide-slate-600">
                       {hasBoats ? matchingBoats.map((boat) => {
                         const key = `${member.id}-${boat.id}`;
                         const isSelected = !!selectedMemberBoats[key];
@@ -3706,51 +3580,35 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
                         return (
                           <div
                             key={key}
-                            className={`
-                              flex items-center justify-between p-3 transition-colors
-                              ${isAlreadyAdded
-                                ? 'bg-slate-700/30 text-slate-400 cursor-not-allowed'
-                                : isSelected
-                                  ? 'bg-blue-600/20 border-l-2 border-blue-500 text-white'
-                                  : 'text-white cursor-pointer hover:bg-slate-700/70'
-                              }
-                              ${!isValid && !isAlreadyAdded ? 'border-l-2 border-amber-500' : ''}
-                            `}
+                            className={`a-ir a-boat-row ${isAlreadyAdded ? 'opacity-55 cursor-not-allowed' : 'cursor-pointer'} ${isSelected ? 'a-boat-on' : ''} ${!isValid && !isAlreadyAdded ? 'a-boat-warn' : ''}`}
+                            style={{ padding: '8px 12px 8px 58px' }}
                             onClick={() => {
                               if (!isAlreadyAdded) {
                                 handleMemberBoatSelect(member, boat);
                               }
                             }}
                           >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(30, 58, 138, 0.3)' }}>
-                                <Sailboat size={16} className="text-blue-400" />
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-white">
-                                    Sail # {boat.sail_number || 'No sail number'}
-                                  </span>
-                                  {boat.hull && (
-                                    <span className="text-sm text-slate-400">
-                                      • {boat.hull}
-                                    </span>
-                                  )}
-                                </div>
-                                {!isValid && !isAlreadyAdded && (
-                                  <span className="text-xs text-amber-400">Missing required info</span>
-                                )}
-                              </div>
-                            </div>
+                            <span className="a-lb-cls">
+                              <svg width="9" height="11" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M1 .75v10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M1.75 1.25h6.5L1.75 5.5z" fill="currentColor" /></svg>
+                              {boat.boat_type || currentEvent?.raceClass}
+                              <span className="a-dim" style={{ fontWeight: 500, letterSpacing: 0 }}>{boat.sail_number || '—'}</span>
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              <span className="a-mute text-[13px] block truncate">{boat.hull || 'No design'}</span>
+                              {!isValid && !isAlreadyAdded && (
+                                <span className="a-txt-a text-[11.5px] block">Missing required info</span>
+                              )}
+                            </span>
 
-                            <div className="flex items-center gap-2 flex-shrink-0">
                               {!isAlreadyAdded && isValid && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleEditMemberBoat(member, boat);
                                   }}
-                                  className="p-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white transition-colors"
+                                  className="a-ib"
+                                  style={{ width: 30, height: 30 }}
+                                  aria-label="Edit boat"
                                   title="Edit boat details"
                                 >
                                   <Edit2 size={14} />
@@ -3763,40 +3621,37 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
                                     e.preventDefault();
                                     setBoatToDelete({ member, boat });
                                   }}
-                                  className="p-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 transition-colors"
+                                  className="a-ib a-ib-d"
+                                  style={{ width: 30, height: 30 }}
+                                  aria-label="Delete boat"
                                   title="Delete boat"
                                 >
                                   <Trash2 size={14} />
                                 </button>
                               )}
                               {isAlreadyAdded ? (
-                                <Check size={18} className="text-green-400" />
-                              ) : isSelected ? (
-                                <div className="w-5 h-5 rounded-full bg-blue-500 border-2 border-blue-500 flex items-center justify-center">
-                                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                                </div>
+                                <span className="a-txt-g flex items-center gap-1 text-[12px] font-semibold"><Check size={16} />Added</span>
                               ) : !isValid ? (
-                                <Edit2 size={16} className="text-amber-400" />
+                                <Edit2 size={16} className="a-txt-a" />
                               ) : (
-                                <div className="w-5 h-5 rounded-full border-2 border-slate-400"></div>
+                                <span className={`a-rad ${isSelected ? 'a-rad-on' : ''}`} role="radio" aria-checked={isSelected} />
                               )}
-                            </div>
                           </div>
                         );
                       }) : (
-                        <div className="p-3 text-center">
-                          <p className="text-xs text-slate-500 mb-2">No {currentEvent?.raceClass} boat registered</p>
+                        <div className="a-ir a-dim text-[12.5px]" style={{ padding: '8px 14px 8px 58px' }}>
+                          No {currentEvent?.raceClass} boat registered
                         </div>
                       )}
 
                       <button
                         onClick={() => setShowAddBoatModal(member)}
-                        className="flex items-center gap-2 p-3 text-blue-400 hover:bg-slate-700/50 transition-colors w-full text-left"
+                        className="a-ir a-lnk-add w-full text-left"
+                        style={{ padding: '8px 14px 9px 58px' }}
                       >
-                        <Plus size={16} />
-                        <span className="text-sm font-medium">Add New {currentEvent?.raceClass} Boat for {member.first_name}</span>
+                        <Plus size={15} />
+                        <span className="text-[13px] font-semibold">Add a {currentEvent?.raceClass} boat for {member.first_name}</span>
                       </button>
-                    </div>
                   </div>
                 );
               })}
@@ -3804,47 +3659,45 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
           )}
         </div>
 
-        <div className="flex flex-wrap justify-between gap-3 p-4 sm:p-6 border-t border-slate-700 flex-shrink-0">
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setView('initial')}
-              className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
-            >
-              Back
-            </button>
+        <div className="a-sheet-foot flex flex-wrap items-center gap-1.5 flex-shrink-0" style={{ padding: '14px 18px' }}>
             <button
               onClick={() => setView('manual')}
-              className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700 flex items-center gap-2"
+              className="a-btn a-btn-q"
+              style={{ padding: '0 10px' }}
             >
               <UserPlus size={16} />
-              Add Manually
+              Manual
             </button>
             <button
               onClick={() => setView('import')}
-              className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700 flex items-center gap-2"
+              className="a-btn a-btn-q"
+              style={{ padding: '0 10px' }}
             >
               <Upload size={16} />
-              Import Skippers
+              Skippers
             </button>
             {onImportSkippersWithAssignments && (
               <button
                 onClick={() => setView('import-assignments')}
-                className="px-4 py-2 rounded-lg font-medium transition-colors text-green-300 hover:text-green-100 hover:bg-green-900/30 flex items-center gap-2"
+                className="a-btn a-btn-q a-txt-g"
+                style={{ padding: '0 10px' }}
               >
                 <Upload size={16} />
-                Import Assignments
+                Assignments
               </button>
             )}
-          </div>
+          <div className="flex-1" />
           <button
             onClick={handleAddSelectedMembers}
             disabled={Object.keys(selectedMemberBoats).length === 0}
-            className="btn-primary-green px-4 py-2 rounded-lg font-medium transition-colors text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="a-btn a-btn-p disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ height: 44 }}
           >
-            Add Selected ({Object.keys(selectedMemberBoats).length})
+            <Plus size={16} />
+            Add {Object.keys(selectedMemberBoats).length} selected
           </button>
         </div>
-      </div>
+      </section>
 
       {/* Edit boat modal */}
       {renderEditBoatModal()}
@@ -3852,11 +3705,11 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
       {/* Add New Boat Modal */}
       {showAddBoatModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="w-full max-w-md rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700">
-            <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+          <div className="a-sheet w-full max-w-md overflow-hidden">
+            <div className="px-6 pt-5 pb-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Plus className="text-white" size={24} />
-                <h2 className="text-xl font-semibold text-white">
+                <Plus className="a-mute" size={22} />
+                <h2 className="a-display a-ink text-[19px] font-semibold">
                   Add New Boat
                 </h2>
               </div>
@@ -3865,19 +3718,19 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
                   setShowAddBoatModal(null);
                   setNewBoatData({ sailNumber: '', hull: '' });
                 }}
-                className="rounded-full p-2 text-white hover:bg-white/20 transition-colors"
+                className="a-ib"
               >
                 <X size={20} />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
-              <p className="text-sm text-slate-400">
+              <p className="text-[13px] a-dim">
                 Adding boat for <span className="font-medium text-white">{showAddBoatModal.first_name} {showAddBoatModal.last_name}</span>
               </p>
 
               <div>
-                <label className="block text-sm font-medium mb-1 text-slate-300">
+                <label className="a-flab">
                   Sail Number *
                 </label>
                 <input
@@ -3890,13 +3743,13 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
                     const value = e.target.value.replace(/[^0-9]/g, '');
                     setNewBoatData(prev => ({ ...prev, sailNumber: value }));
                   }}
-                  className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                  className="a-inp"
                   placeholder="Enter sail number"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1 text-slate-300">
+                <label className="a-flab">
                   Boat Design (Hull) *
                 </label>
                 <input
@@ -3904,7 +3757,7 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
                   required
                   value={newBoatData.hull}
                   onChange={(e) => setNewBoatData(prev => ({ ...prev, hull: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                  className="a-inp"
                   placeholder="Enter boat design (e.g., Trance, B6)"
                 />
               </div>
@@ -3915,7 +3768,7 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
                     setShowAddBoatModal(null);
                     setNewBoatData({ sailNumber: '', hull: '' });
                   }}
-                  className="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors font-medium"
+                  className="a-btn"
                   disabled={updateLoading}
                 >
                   Cancel
@@ -3923,7 +3776,7 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
                 <button
                   onClick={handleAddNewBoat}
                   disabled={updateLoading || !newBoatData.sailNumber || !newBoatData.hull}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="a-btn a-btn-p disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {updateLoading ? (
                     <>
@@ -3955,44 +3808,44 @@ Q2,Heat 2,91,Peter Sherwood,ERYC,`}
         >
           {console.log('Rendering delete modal')}
           <div
-            className="w-full max-w-md rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700"
+            className="a-sheet w-full max-w-md overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-slate-700">
-              <h3 className="text-lg font-medium text-slate-100">
+            <div className="px-6 pt-5 pb-2">
+              <h3 className="a-display a-ink text-[18px] font-semibold">
                 Delete Boat
               </h3>
             </div>
 
             <div className="p-6">
-              <p className="text-slate-300 mb-3">
+              <p className="a-mute mb-3">
                 Are you sure you want to delete this boat from {boatToDelete.member.first_name} {boatToDelete.member.last_name}'s garage?
               </p>
               <div className="bg-slate-700/50 p-3 rounded-lg">
-                <p className="text-sm text-slate-300">
+                <p className="text-[13.5px] a-mute">
                   <span className="font-medium">Sail #:</span> {boatToDelete.boat.sail_number}
                 </p>
-                <p className="text-sm text-slate-300">
+                <p className="text-[13.5px] a-mute">
                   <span className="font-medium">Hull:</span> {boatToDelete.boat.hull}
                 </p>
               </div>
-              <p className="text-sm text-slate-400 mt-3">
+              <p className="text-[13px] a-dim mt-3">
                 Note: This will not affect any previous race results or scores with this boat.
               </p>
             </div>
 
-            <div className="flex justify-end gap-3 p-6 border-t border-slate-700">
+            <div className="a-sheet-foot flex justify-end gap-2.5 px-5 py-3.5">
               <button
                 onClick={() => setBoatToDelete(null)}
                 disabled={updateLoading}
-                className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="a-btn a-btn-q disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteBoat}
                 disabled={updateLoading}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="a-btn a-btn-d disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {updateLoading ? 'Deleting...' : 'Delete Boat'}
               </button>

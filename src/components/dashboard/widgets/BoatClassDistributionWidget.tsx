@@ -12,7 +12,7 @@ export const BoatClassDistributionWidget: React.FC<WidgetProps> = ({ widgetId, i
           <X size={16} />
         </button>
       )}
-      <div className="flex items-center gap-2"><Trophy className="text-blue-400" size={20} /><h2 className="text-lg font-semibold text-white">Boat Classes</h2></div>
+      <div className="flex items-center gap-3"><span className="a-tile flex-shrink-0" style={{ width: 36, height: 36 }}><Trophy size={19} /></span><h2 className="a-display a-ink text-[18px] font-semibold">Boat Classes</h2></div>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Eye, EyeOff, Loader2, GripVertical } from 'lucide-react';
+import { Plus, Edit2, Trash2, Eye, EyeOff, Loader2, GripVertical , Menu, FileText } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -40,67 +40,56 @@ const SortablePageItem: React.FC<SortablePageItemProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group bg-slate-800/40 rounded-lg border border-slate-700/50 hover:bg-slate-800/60 hover:border-slate-600/50 transition-all ${isDragging ? 'shadow-lg ring-2 ring-cyan-500/50' : ''}`}
+      className={`a-pg group ${isDragging ? 'a-pg-drag' : ''}`}
     >
-      <div className="flex items-start gap-4 p-4">
-        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing pt-1">
-          <GripVertical size={18} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+        <div {...attributes} {...listeners} className="a-dim flex cursor-grab active:cursor-grabbing" aria-label="Drag to reorder">
+          <GripVertical size={18} />
         </div>
 
-        <div className="flex-1 min-w-0">
-          <h4 className="text-base font-semibold text-white mb-1.5">{page.title}</h4>
-          <p className="text-sm text-slate-400 mb-3">
-            /{page.slug} • {page.content_blocks.length} content blocks
-          </p>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${getPageTypeColor(page.page_type)}`}>
-              {page.page_type}
-            </span>
-            {!page.is_published && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700/50 text-slate-400 border border-slate-600/50">
-                Draft
-              </span>
-            )}
-            {page.show_in_navigation && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-600/20 text-blue-400 border border-blue-600/30">
-                In Nav
-              </span>
-            )}
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="a-ink text-[15px] font-semibold">{page.title}</span>
+            <span className="a-lb-fmt" style={{ height: 22, fontSize: 11.5 }}><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: ({ home: '#8A4DFF', about: '#2E7BFF', schedule: '#30D158', results: '#FFB340', media: '#FF3E9A', sponsors: '#FF8A2B', competitors: '#40C8C0', news: '#FF6B6B', contact: '#7A5AF8', custom: '#9AA6BD' } as Record<string, string>)[page.page_type] || '#9AA6BD' }} />{page.page_type}</span>
           </div>
+          <div className="a-dim a-mono mt-1">/{page.slug} · {page.content_blocks.length} block{page.content_blocks.length !== 1 ? 's' : ''}</div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-3.5">
+          {page.show_in_navigation ? (
+            <span className={`a-st text-[12.5px] ${page.is_published ? '' : 'a-txt-a'}`}><Menu size={14} />In menu</span>
+          ) : (
+            <span className="a-dim text-[12.5px]">Not in menu</span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="a-dim text-[12.5px] max-sm:hidden">{page.is_published ? 'Published' : 'Draft'}</span>
           <button
+            type="button"
+            role="switch"
+            aria-checked={page.is_published}
+            aria-label={page.is_published ? 'Unpublish page' : 'Publish page'}
             onClick={onTogglePublish}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors font-medium text-sm ${
-              page.is_published
-                ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
-                : 'bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 border border-amber-600/30'
-            }`}
+            className="a-sw"
             title={page.is_published ? 'Unpublish page' : 'Click to publish page'}
-          >
-            {page.is_published ? <Eye size={16} /> : <EyeOff size={16} />}
-            <span className="hidden sm:inline">
-              {page.is_published ? 'Published' : 'Publish'}
-            </span>
-          </button>
+          />
           <button
             onClick={onEdit}
-            className="p-2 bg-slate-700/50 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg transition-colors"
+            className="a-ib"
             title="Edit page"
+            aria-label="Edit page"
           >
             <Edit2 size={16} />
           </button>
           <button
             onClick={onDelete}
-            className="p-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 hover:text-red-300 rounded-lg transition-colors"
+            className="a-ib a-ib-d"
             title="Delete page"
+            aria-label="Delete page"
           >
             <Trash2 size={16} />
           </button>
         </div>
-      </div>
     </div>
   );
 };
@@ -241,52 +230,44 @@ export const EventWebsitePageManager: React.FC<EventWebsitePageManagerProps> = (
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold text-white">Pages</h3>
-          <p className="text-sm text-slate-400 mt-1">Manage your event website pages</p>
+          <h2 className="a-display a-ink m-0 text-[22px] font-semibold">Pages</h2>
+          <p className="a-mute mt-1 text-[14px]">Drag to reorder. The menu follows this order.</p>
         </div>
         <button
           onClick={handleCreatePage}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          className="a-btn a-btn-p"
+          style={{ height: 42, borderRadius: 13 }}
         >
-          <Plus size={18} />
-          New Page
+          <Plus size={17} />
+          New page
         </button>
       </div>
 
       {pages.some(p => !p.is_published && p.show_in_navigation) && (
-        <div className="bg-amber-900/20 border border-amber-600/30 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5">
-              <Eye className="text-amber-400" size={20} />
-            </div>
-            <div>
-              <h4 className="font-medium text-amber-400 mb-1">Pages not visible in navigation</h4>
-              <p className="text-sm text-slate-300">
-                Some pages are marked "In Nav" but not published. Click the "Publish" button on each page to make them visible in your website's navigation menu.
-              </p>
-            </div>
-          </div>
+        <div className="a-banner-a">
+          <Eye className="a-txt-a flex-shrink-0" size={18} />
+          <span className="a-mute flex-1 text-[13px]">
+            <b className="a-txt-a font-semibold">{pages.filter(p => !p.is_published && p.show_in_navigation).length === 1 ? '1 page is' : `${pages.filter(p => !p.is_published && p.show_in_navigation).length} pages are`} in the menu but still a draft.</b> Publish {pages.filter(p => !p.is_published && p.show_in_navigation).length === 1 ? 'it' : 'them'} to show {pages.filter(p => !p.is_published && p.show_in_navigation).length === 1 ? 'it' : 'them'} on the website.
+          </span>
         </div>
       )}
 
       {pages.length === 0 ? (
-        <div className="bg-slate-900/50 rounded-lg p-12 border border-slate-700 text-center">
+        <div className="a-card a-empty p-12 text-center">
           <div className="max-w-md mx-auto">
-            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Plus className="text-slate-400" size={32} />
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-2">No Pages Yet</h3>
-            <p className="text-slate-400 mb-6">
+            <span className="a-tile mx-auto mb-3" style={{ width: 48, height: 48 }}><FileText size={22} /></span>
+            <h3 className="a-ink text-[16px] font-semibold mb-1">No pages yet</h3>
+            <p className="a-dim text-[13.5px] mb-5">
               Create your first page to start building your event website
             </p>
             <button
               onClick={handleCreatePage}
-              className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              className="a-btn a-btn-p"
             >
-              Create First Page
+              <Plus size={16} />Create first page
             </button>
           </div>
         </div>
@@ -297,7 +278,7 @@ export const EventWebsitePageManager: React.FC<EventWebsitePageManagerProps> = (
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={pages.map(p => p.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2">
+            <div className="a-card overflow-hidden">
               {pages.map((page) => (
                 <SortablePageItem
                   key={page.id}

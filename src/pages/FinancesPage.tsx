@@ -48,10 +48,12 @@ export const FinancesPage: React.FC<FinancesPageProps> = ({ darkMode }) => {
           <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500">
             <DollarSign className="text-white" size={28} />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Financial Management</h1>
             <p className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Manage your club's finances, invoices, and budgets</p>
           </div>
+          {/* Alfie theme: page-level actions (Overview's New transaction button) render here */}
+          <div id="alfie-page-actions" className="flex items-center gap-2.5" />
         </div>
 
         {/* Tabs */}
@@ -84,7 +86,7 @@ export const FinancesPage: React.FC<FinancesPageProps> = ({ darkMode }) => {
         </div>
 
         {/* Content */}
-        <div className={`backdrop-blur-sm rounded-xl border p-8 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div>
           <Routes>
             <Route path="/" element={
               <FinancesOverview

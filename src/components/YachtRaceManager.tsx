@@ -40,6 +40,8 @@ import { RaceSettingsModal } from './RaceSettingsModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
 import { StartBoxModal } from './start-box/StartBoxModal';
+import { AAvatar } from './alfie/Kit';
+import { ScoringTopBar } from './scoring/ScoringTopBar';
 import { LiveStatusControl } from './LiveStatusControl';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
@@ -162,6 +164,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [isDataFullyLoaded, setIsDataFullyLoaded] = useState(false);
   const [scoringMode, setScoringMode] = useState<'pro' | 'touch' | 'spreadsheet'>('pro');
   const [touchModeCurrentRace, setTouchModeCurrentRace] = useState<number>(1);
+  const [proFocusRace, setProFocusRace] = useState<number | null>(null);
   const [isFullscreenScoring, setIsFullscreenScoring] = useState(false);
   const [showOverallResults, setShowOverallResults] = useState(false);
   const [showShareScoringModal, setShowShareScoringModal] = useState(false);
@@ -3935,12 +3938,81 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     );
   }
 
+  // Alfie theme: single scoring top bar (board SC_pro) for every non-heat scoring view.
+  const useAlfieTopBar = !heatManagement?.configuration.enabled;
+  const isScratchSheet = scoringMode === 'spreadsheet' && raceType === 'scratch';
+  const stepperRace = (scoringMode === 'pro' || isScratchSheet) ? (proFocusRace ?? Math.min(lastCompletedRace + 1, currentNumRaces || 1)) : touchModeCurrentRace;
+  const stepRace = (d: number) => {
+    const next = Math.min(Math.max(stepperRace + d, 1), currentNumRaces || 1);
+    if (scoringMode === 'pro' || isScratchSheet) {
+      setProFocusRace(next);
+      document.querySelector(`[data-race-col="${next}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    } else {
+      setTouchModeCurrentRace(next);
+    }
+  };
+
   return (
     <AlfieIconContext.Provider value={true}>
     <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50'}`}>
-      <div className={`w-full ${isFullscreenScoring ? 'px-0 py-0' : 'px-20 py-12'}`}>
-        <div className={`flex-1 flex flex-col justify-center ${isFullscreenScoring ? '' : 'min-h-[calc(100vh-24rem)]'}`}>
-          {getCurrentEvent() && !isFullscreenScoring && (
+      <div className={`w-full ${isFullscreenScoring ? (useAlfieTopBar ? 'a-scoring-fs' : 'px-0 py-0') : useAlfieTopBar ? 'px-5 pt-5 pb-6' : 'px-20 py-12'}`}>
+        <div className={`flex-1 flex flex-col ${useAlfieTopBar ? 'justify-start' : 'justify-center'} ${isFullscreenScoring ? (useAlfieTopBar ? 'min-h-0 gap-3' : '') : 'min-h-[calc(100vh-24rem)]'}`}>
+          {getCurrentEvent() && useAlfieTopBar && (
+            <div className={isFullscreenScoring ? 'flex-shrink-0' : 'mb-4'}>
+              <ScoringTopBar
+                event={getCurrentEvent()}
+                raceType={raceType}
+                mode={scoringMode}
+                modes={(['pro', 'touch', 'spreadsheet'] as const).filter(m => !(raceType === 'handicap' && m === 'spreadsheet'))}
+                onModeChange={async (mode) => {
+                  setScoringMode(mode);
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (user) {
+                    await supabase.from('profiles').update({ scoring_mode_preference: mode }).eq('id', user.id);
+                  }
+                }}
+                currentRace={stepperRace}
+                numRaces={currentNumRaces}
+                completedRaces={lastCompletedRace}
+                onPrevRace={() => stepRace(-1)}
+                onNextRace={() => stepRace(1)}
+                compact={isFullscreenScoring}
+                onBack={() => setShowExitConfirm(true)}
+                onStartBox={(scoringMode === 'pro' || isScratchSheet) ? () => setShowStartBoxModal(true) : undefined}
+                onOverallResults={raceType === 'scratch' ? () => setShowOverallResults(true) : undefined}
+                onCheckpoints={() => setShowCheckpointModal(true)}
+                onSettings={() => setShowRaceSettingsModal(true)}
+                fullscreen={isFullscreenScoring}
+                onToggleFullscreen={() => setIsFullscreenScoring(prev => !prev)}
+                completeLabel={lastCompletedRace >= 1
+                  ? (getCurrentEvent()?.multiDay && getCurrentEvent()?.numberOfDays && currentDay < (getCurrentEvent()?.numberOfDays || 0) ? `Complete day ${currentDay}` : 'Complete scoring')
+                  : null}
+                onComplete={() => setShowCompleteConfirm(true)}
+              />
+              {!isFullscreenScoring && (
+                <div className="a-dim flex flex-wrap items-center gap-3.5 text-[12.5px] mt-4 px-1.5">
+                  {scoringMode === 'pro' && (
+                    <>
+                      <span className="inline-flex items-center gap-1.5"><span className="a-sc-leg a-sc-leg-e" aria-hidden="true" />Tap to enter a finish</span>
+                      <span className="inline-flex items-center gap-1.5"><span className="a-sc-leg a-sc-leg-1" aria-hidden="true">1</span><span className="a-sc-leg a-sc-leg-2" aria-hidden="true">2</span><span className="a-sc-leg a-sc-leg-3" aria-hidden="true">3</span>Podium finishes</span>
+                    </>
+                  )}
+                  {isScratchSheet && (
+                    <span>Type sail numbers in finish order · <span className="a-kbd">Enter</span> or <span className="a-kbd">Tab</span> moves down, <span className="a-kbd">↑</span> <span className="a-kbd">↓</span> step between places</span>
+                  )}
+                  {(scoringMode === 'pro' || scoringMode === 'touch' || isScratchSheet) && (() => {
+                    const evt = getCurrentEvent();
+                    if (!evt?.id || (!evt.enableLiveTracking && !evt.enableLiveStream) || evt.completed) return null;
+                    return <LiveStatusControl eventId={evt.id} darkMode={darkMode} />;
+                  })()}
+                  <div className="flex-1" />
+                  <MemberCacheBanner darkMode={darkMode} />
+                  <SyncStatusIndicator darkMode={darkMode} compact />
+                </div>
+              )}
+            </div>
+          )}
+          {getCurrentEvent() && !useAlfieTopBar && !isFullscreenScoring && (
             <div className={`mb-4 ${(scoringMode === 'touch' || scoringMode === 'spreadsheet' || heatManagement?.configuration.enabled) ? 'pt-10' : ''}`}>
               <div className="flex items-center justify-between">
                 <div className="flex-1">
@@ -3968,7 +4040,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             </div>
           )}
 
-          <div className="mt-6">
+          <div className={useAlfieTopBar && isFullscreenScoring ? 'flex-1 min-h-0 overflow-auto' : useAlfieTopBar ? '' : 'mt-6'}>
             {showHandicapOptions && (
               <div className="flex justify-center gap-4 mb-8">
                 <button
@@ -3987,7 +4059,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             )}
 
             {/* Scoring Mode Buttons - Only show for non-heat races, hide when scratch spreadsheet uses HMS component */}
-            {!heatManagement?.configuration.enabled && !(scoringMode === 'spreadsheet' && raceType === 'scratch') && (
+            {!useAlfieTopBar && !heatManagement?.configuration.enabled && !(scoringMode === 'spreadsheet' && raceType === 'scratch') && (
               <div className="flex justify-between items-center mb-4">
                 {/* Left side: StartBox + Race Status (Pro Mode only) */}
                 <div className="flex items-center gap-2">
@@ -4048,7 +4120,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               </div>
             )}
 
-            {(scoringMode === 'touch' || scoringMode === 'spreadsheet' || heatManagement?.configuration.enabled) && (
+            {!useAlfieTopBar && (scoringMode === 'touch' || scoringMode === 'spreadsheet' || heatManagement?.configuration.enabled) && (
               <div className={`fixed ${isFullscreenScoring ? 'top-2 right-4' : 'top-4 right-[5.9375rem]'} z-40 flex items-center gap-2`}>
                 <button
                   type="button"
@@ -4493,12 +4565,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 darkMode={darkMode}
                 currentEvent={currentEvent}
                 isFullscreen={isFullscreenScoring}
+                alfieBar={useAlfieTopBar}
                 updateSkipper={updateSkipper}
                 setSkippers={setSkippers}
                 handicapReadOnly={activeRuleset?.config.persist_handicaps === false}
               />
             ) : scoringMode === 'spreadsheet' && raceType === 'scratch' ? (
-              <div className={`flex flex-col ${isFullscreenScoring ? 'h-full' : 'h-[calc(100vh-200px)]'} no-select`}>
+              <div className={`flex flex-col ${isFullscreenScoring ? 'h-full' : useAlfieTopBar ? 'h-[calc(100vh-190px)] min-h-[420px]' : 'h-[calc(100vh-200px)]'} no-select`}>
                 <HmsManualSpreadsheet
                   skippers={skippers}
                   darkMode={darkMode}
@@ -4509,14 +4582,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   isFullscreen={isFullscreenScoring}
                   singleFleetMode={true}
                   numRaces={currentNumRaces}
-                  onScoringModeChange={async (mode) => {
+                  onOpenStartBox={() => setShowStartBoxModal(true)}
+                  onScoringModeChange={useAlfieTopBar ? undefined : async (mode) => {
                     setScoringMode(mode);
                     const { data: { user } } = await supabase.auth.getUser();
                     if (user) {
                       await supabase.from('profiles').update({ scoring_mode_preference: mode }).eq('id', user.id);
                     }
                   }}
-                  onShowOverallResults={() => setShowOverallResults(true)}
+                  onShowOverallResults={useAlfieTopBar ? undefined : () => setShowOverallResults(true)}
                 />
               </div>
             ) : scoringMode === 'spreadsheet' ? (
@@ -4614,6 +4688,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 onRaceSettingsChange={handleRaceSettingsChange}
                 onOpenRaceSettings={() => setShowRaceSettingsModal(true)}
                 updateSkipper={updateSkipper}
+                hideCornerControls={useAlfieTopBar}
               />
             ) : (
               <ScratchRaceTable
@@ -4639,6 +4714,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 onOpenRaceSettings={() => setShowRaceSettingsModal(true)}
                 onNewSession={startNewSession}
                 updateSkipper={updateSkipper}
+                hideCornerControls={useAlfieTopBar}
               />
             )}
           </div>
@@ -5046,86 +5122,73 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             return count;
           })();
 
+          const ovCols = `30px minmax(180px,1fr) 52px ${completedRaceCount > 0 ? `repeat(${completedRaceCount}, 36px) ` : ''}52px`;
+          const ovWidth = 30 + 180 + 52 + completedRaceCount * 36 + 52 + (completedRaceCount + 4) * 12 + 32;
           return (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className={`
-                w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl overflow-hidden border flex flex-col
-                ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-              `}>
-                <div className={`
-                  flex items-center justify-between px-6 py-4 border-b shrink-0
-                  ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}
-                `}>
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${darkMode ? 'bg-amber-500/15' : 'bg-amber-50'}`}>
-                      <Trophy size={20} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
-                    </div>
-                    <div>
-                      <h2 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        Overall Results
-                      </h2>
-                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {getCurrentEvent()?.name || 'Event'} — {completedRaceCount} race{completedRaceCount !== 1 ? 's' : ''} completed
-                      </p>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowOverallResults(false)}>
+              <section
+                className="a-sheet w-full max-h-[90vh] overflow-hidden flex flex-col"
+                style={{ maxWidth: Math.max(520, Math.min(ovWidth + 20, 1100)) }}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Overall results"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3 flex-shrink-0" style={{ padding: '20px 18px 16px 22px' }}>
+                  <span className="a-tile a-tile-rim a-txt-a"><Trophy size={19} /></span>
+                  <div className="flex-1 min-w-0">
+                    <div className="a-display a-ink text-[20px] font-semibold">Overall results</div>
+                    <div className="a-dim text-[12.5px] mt-0.5 truncate">
+                      {getCurrentEvent()?.eventName ? `${getCurrentEvent()?.eventName} · ` : ''}{completedRaceCount} race{completedRaceCount !== 1 ? 's' : ''} completed
                     </div>
                   </div>
                   <button
                     onClick={() => setShowOverallResults(false)}
-                    className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
+                    className="a-ib"
+                    aria-label="Close"
                   >
                     <X size={20} />
                   </button>
                 </div>
 
-                <div className="overflow-auto flex-1">
-                  <table className="w-full">
-                    <thead className={`sticky top-0 z-10 ${darkMode ? 'bg-slate-750' : 'bg-slate-50'}`}>
-                      <tr className={`border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                        <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-14 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pos</th>
-                        <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Skipper</th>
-                        <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-20 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sail No</th>
-                        {Array.from({ length: completedRaceCount }, (_, i) => (
-                          <th key={i} className={`px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider w-14 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                            R{i + 1}
-                          </th>
-                        ))}
-                        <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider w-20 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                <div className="overflow-auto flex-1" style={{ padding: '0 10px 14px' }}>
+                  <div style={{ minWidth: ovWidth }}>
+                    <div className="a-dim grid items-center gap-3 sticky top-0 z-10 a-ov-head" style={{ gridTemplateColumns: ovCols, padding: '0 16px 8px', font: "600 10.5px 'Instrument Sans', sans-serif", letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                      <span>Pos</span>
+                      <span style={{ paddingLeft: 46 }}>Skipper</span>
+                      <span className="text-center">Sail</span>
+                      {Array.from({ length: completedRaceCount }, (_, i) => (
+                        <span key={i} className="text-center">R{i + 1}</span>
+                      ))}
+                      <span className="text-center a-txt-a">Total</span>
+                    </div>
+                    <div className="a-grp">
                       {results.map((result, idx) => {
                         const skipper = skippers[result.skipperIndex];
                         if (!skipper) return null;
                         const isTop3 = idx < 3;
+                        const parts = skipper.name.trim().split(/\s+/);
+                        const sub = [skipper.hull || skipper.boatModel, skipper.club].filter(Boolean).join(' · ');
 
                         return (
-                          <tr
+                          <div
                             key={result.skipperIndex}
-                            className={`
-                              border-b transition-colors
-                              ${darkMode
-                                ? `border-slate-700/50 ${isTop3 ? 'bg-amber-500/5' : idx % 2 === 0 ? 'bg-slate-800' : 'bg-slate-800/50'}`
-                                : `border-slate-100 ${isTop3 ? 'bg-amber-50/50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`
-                              }
-                            `}
+                            className={`a-ov-row grid items-center gap-3 ${isTop3 ? 'a-ov-top' : ''}`}
+                            style={{ gridTemplateColumns: ovCols, padding: '10px 16px' }}
                           >
-                            <td className="px-4 py-2.5">
-                              <span className={`
-                                inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold
-                                ${idx === 0 ? 'bg-amber-400 text-amber-900'
-                                  : idx === 1 ? (darkMode ? 'bg-slate-400 text-slate-900' : 'bg-slate-300 text-slate-800')
-                                  : idx === 2 ? 'bg-amber-600 text-white'
-                                  : darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}
-                              `}>
-                                {idx + 1}
-                              </span>
-                            </td>
-                            <td className={`px-4 py-2.5 font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                              {skipper.name}
-                            </td>
-                            <td className={`px-4 py-2.5 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                              {skipper.sailNumber || '-'}
-                            </td>
+                            <span className={`a-fo-pos ${idx === 0 ? 'p1' : idx === 1 ? 'p2' : idx === 2 ? 'p3' : ''}`} style={{ width: 30, height: 30 }}>
+                              {idx + 1}
+                            </span>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <AAvatar url={skipper.avatarUrl} first={parts[0]} last={parts.length > 1 ? parts[parts.length - 1] : ''} size={34} />
+                              <div className="min-w-0">
+                                <div className="a-ink text-[14.5px] font-semibold truncate">{skipper.name}</div>
+                                {sub && <div className="a-dim text-[12px] mt-0.5 truncate">{sub}</div>}
+                              </div>
+                            </div>
+                            <span className="a-mute text-center" style={{ font: "600 15px 'Bricolage Grotesque', sans-serif" }}>
+                              {skipper.sailNumber || skipper.sailNo || '-'}
+                            </span>
                             {Array.from({ length: completedRaceCount }, (_, raceIdx) => {
                               const raceNum = raceIdx + 1;
                               const raceDetail = result.raceDetails?.find((d: any) => d.race === raceNum);
@@ -5137,37 +5200,35 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                               const isDropped = raceDetail?.isDropped;
 
                               return (
-                                <td
+                                <span
                                   key={raceIdx}
-                                  className={`px-3 py-2.5 text-center text-sm ${
+                                  className={`a-num text-center text-[14px] ${
                                     isDropped
-                                      ? darkMode ? 'text-slate-600 line-through' : 'text-slate-300 line-through'
+                                      ? 'a-dim line-through opacity-60'
                                       : raceResult?.letterScore
-                                        ? darkMode ? 'text-red-400' : 'text-red-500'
-                                        : darkMode ? 'text-slate-300' : 'text-slate-700'
+                                        ? 'a-txt-r'
+                                        : 'a-dim'
                                   }`}
                                 >
                                   {displayValue}
-                                </td>
+                                </span>
                               );
                             })}
-                            <td className={`px-4 py-2.5 text-center font-bold ${darkMode ? 'text-amber-400' : 'text-amber-700'}`}>
+                            <span className="a-num a-txt-a text-center text-[17px] font-bold">
                               {Number.isInteger(result.totalPoints) ? result.totalPoints : result.totalPoints.toFixed(2)}
-                            </td>
-                          </tr>
+                            </span>
+                          </div>
                         );
                       })}
                       {results.length === 0 && (
-                        <tr>
-                          <td colSpan={3 + completedRaceCount + 1} className={`px-6 py-12 text-center ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                            No results recorded yet. Start scoring races to see overall standings.
-                          </td>
-                        </tr>
+                        <div className="a-dim px-6 py-12 text-center text-[13.5px]">
+                          No results recorded yet. Start scoring races to see overall standings.
+                        </div>
                       )}
-                    </tbody>
-                  </table>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </section>
             </div>
           );
         })()}

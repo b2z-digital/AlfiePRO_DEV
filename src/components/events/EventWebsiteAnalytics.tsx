@@ -268,69 +268,54 @@ export const EventWebsiteAnalytics: React.FC<EventWebsiteAnalyticsProps> = ({ we
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-white flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl">
-              <BarChart3 className="w-6 h-6 text-cyan-400" />
-            </div>
-            Website Analytics
-          </h3>
-          <p className="text-sm text-slate-400 mt-2">Track visitor engagement and performance</p>
+          <h2 className="a-display a-ink m-0 text-[22px] font-semibold">
+            Website analytics
+          </h2>
+          <p className="a-mute mt-1 text-[14px]">Track visitor engagement and performance</p>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-800/50 border border-slate-700 rounded-xl p-1">
+        <div className="a-seg">
           <button
             onClick={() => setTimeRange('7d')}
-            className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-              timeRange === '7d'
-                ? 'bg-cyan-500/20 text-cyan-400'
-                : 'text-slate-400 hover:text-slate-300'
-            }`}
+            className={`a-seg-i ${timeRange === '7d' ? 'a-seg-on' : ''}`}
           >
-            7 Days
+            7D
           </button>
           <button
             onClick={() => setTimeRange('30d')}
-            className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-              timeRange === '30d'
-                ? 'bg-cyan-500/20 text-cyan-400'
-                : 'text-slate-400 hover:text-slate-300'
-            }`}
+            className={`a-seg-i ${timeRange === '30d' ? 'a-seg-on' : ''}`}
           >
-            30 Days
+            30D
           </button>
           <button
             onClick={() => setTimeRange('90d')}
-            className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-              timeRange === '90d'
-                ? 'bg-cyan-500/20 text-cyan-400'
-                : 'text-slate-400 hover:text-slate-300'
-            }`}
+            className={`a-seg-i ${timeRange === '90d' ? 'a-seg-on' : ''}`}
           >
-            90 Days
+            90D
           </button>
         </div>
       </div>
 
       {analytics.totalViews === 0 && (
-        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex items-start gap-3">
-          <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+        <div className="a-note flex items-start gap-3">
+          <Info size={17} className="a-txt-b flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm text-slate-300">
-              <span className="font-semibold text-blue-400">No visitor data yet.</span> Analytics will start tracking once visitors view your published event website.
+            <p className="a-mute text-[13px]">
+              <span className="a-txt-b font-semibold">No visitor data yet.</span> Analytics will start tracking once visitors view your published event website.
             </p>
           </div>
         </div>
       )}
 
       {analytics.totalViews > 0 && (
-        <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
-          <Info className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+        <div className="a-note flex items-start gap-3">
+          <Info size={17} className="a-txt-b flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm text-slate-300">
-              <span className="font-semibold text-white">Real Data:</span> Total Views, Unique Visitors, and Top Pages are actual tracked metrics.
+            <p className="a-mute text-[13px]">
+              <span className="a-ink font-semibold">Real data:</span> Total Views, Unique Visitors, and Top Pages are actual tracked metrics.
               <span className="text-slate-400 ml-1">Other metrics (time on site, bounce rate, device breakdown, traffic sources) are estimated based on typical patterns.</span>
             </p>
           </div>
@@ -338,73 +323,65 @@ export const EventWebsiteAnalytics: React.FC<EventWebsiteAnalyticsProps> = ({ we
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 rounded-xl p-6 border border-cyan-500/20">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-cyan-500/20 rounded-lg">
-              <Eye className="w-6 h-6 text-cyan-400" />
-            </div>
-            <div className="flex items-center gap-1 text-green-400 text-sm">
+        <div className="a-card" style={{ padding: '16px 18px' }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="a-tile"><Eye size={18} /></span>
+            <div className="a-delta a-delta-g">
               <ArrowUp size={16} />
               <span>12%</span>
             </div>
           </div>
-          <p className="text-3xl font-bold text-white mb-1">{analytics.totalViews.toLocaleString()}</p>
-          <p className="text-sm text-slate-400">Total Views</p>
+          <p className="a-num a-ink text-[28px] font-semibold leading-[1.1] mb-1">{analytics.totalViews.toLocaleString()}</p>
+          <p className="a-cap">Total views</p>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl p-6 border border-purple-500/20">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-purple-500/20 rounded-lg">
-              <Users className="w-6 h-6 text-purple-400" />
-            </div>
-            <div className="flex items-center gap-1 text-green-400 text-sm">
+        <div className="a-card" style={{ padding: '16px 18px' }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="a-tile"><Users size={18} /></span>
+            <div className="a-delta a-delta-g">
               <ArrowUp size={16} />
               <span>8%</span>
             </div>
           </div>
-          <p className="text-3xl font-bold text-white mb-1">{analytics.uniqueVisitors.toLocaleString()}</p>
-          <p className="text-sm text-slate-400">Unique Visitors</p>
+          <p className="a-num a-ink text-[28px] font-semibold leading-[1.1] mb-1">{analytics.uniqueVisitors.toLocaleString()}</p>
+          <p className="a-cap">Unique visitors</p>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-xl p-6 border border-blue-500/20">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-blue-500/20 rounded-lg">
-              <Clock className="w-6 h-6 text-blue-400" />
-            </div>
-            <div className="flex items-center gap-1 text-green-400 text-sm">
+        <div className="a-card" style={{ padding: '16px 18px' }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="a-tile"><Clock size={18} /></span>
+            <div className="a-delta a-delta-g">
               <ArrowUp size={16} />
               <span>5%</span>
             </div>
           </div>
-          <p className="text-3xl font-bold text-white mb-1">{analytics.avgTimeOnSite}s</p>
-          <p className="text-sm text-slate-400">Avg. Time on Site</p>
+          <p className="a-num a-ink text-[28px] font-semibold leading-[1.1] mb-1">{analytics.avgTimeOnSite}s</p>
+          <p className="a-cap">Avg. time on site</p>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-6 border border-green-500/20">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-green-500/20 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-green-400" />
-            </div>
-            <div className="flex items-center gap-1 text-red-400 text-sm">
+        <div className="a-card" style={{ padding: '16px 18px' }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="a-tile"><TrendingUp size={18} /></span>
+            <div className="a-delta a-delta-r">
               <ArrowDown size={16} />
               <span>3%</span>
             </div>
           </div>
-          <p className="text-3xl font-bold text-white mb-1">{analytics.bounceRate}%</p>
-          <p className="text-sm text-slate-400">Bounce Rate</p>
+          <p className="a-num a-ink text-[28px] font-semibold leading-[1.1] mb-1">{analytics.bounceRate}%</p>
+          <p className="a-cap">Bounce rate</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6">
-          <h4 className="text-lg font-bold text-white mb-4">Traffic Over Time</h4>
+        <div className="a-card" style={{ padding: 22 }}>
+          <h4 className="a-display a-ink text-[17px] font-semibold mb-4">Traffic Over Time</h4>
           <div className="h-64">
             <Line data={trafficChartData} options={chartOptions} />
           </div>
         </div>
 
-        <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6">
-          <h4 className="text-lg font-bold text-white mb-4">Device Breakdown</h4>
+        <div className="a-card" style={{ padding: 22 }}>
+          <h4 className="a-display a-ink text-[17px] font-semibold mb-4">Device Breakdown</h4>
           <div className="h-64 flex items-center justify-center">
             <Doughnut data={deviceChartData} options={doughnutOptions} />
           </div>
@@ -412,15 +389,15 @@ export const EventWebsiteAnalytics: React.FC<EventWebsiteAnalyticsProps> = ({ we
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6">
-          <h4 className="text-lg font-bold text-white mb-4">Top Pages</h4>
+        <div className="a-card" style={{ padding: 22 }}>
+          <h4 className="a-display a-ink text-[17px] font-semibold mb-4">Top Pages</h4>
           <div className="h-64">
             <Bar data={pageViewsChartData} options={chartOptions} />
           </div>
         </div>
 
-        <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6">
-          <h4 className="text-lg font-bold text-white mb-4">Traffic Sources</h4>
+        <div className="a-card" style={{ padding: 22 }}>
+          <h4 className="a-display a-ink text-[17px] font-semibold mb-4">Traffic Sources</h4>
           <div className="space-y-3">
             {analytics.topReferrers.map((referrer, index) => (
               <div key={index} className="flex items-center justify-between">

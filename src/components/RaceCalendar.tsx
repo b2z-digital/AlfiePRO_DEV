@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Calendar, CalendarDays, CalendarRange, List, Grid2x2 as Grid, X, ChevronDown, ChevronRight, ChevronLeft, ListFilter as Filter, FileImage, Download, Medal, Maximize2, Minimize2, TrendingUp as TrendyUp, FileText, Globe, MapPin, Link2, Map as MapIcon, Clock } from 'lucide-react';
+import { Trophy, Calendar, CalendarDays, CalendarRange, List, Grid2x2 as Grid, X, ChevronDown, ChevronRight, ChevronLeft, ListFilter as Filter, FileImage, Download, Medal, Maximize2, Minimize2, TrendingUp as TrendyUp, FileText, Globe, MapPin, Link2, Map as MapIcon, Clock, Info } from 'lucide-react';
 import { RaceType } from '../types';
 import { RaceEvent, RaceSeries } from '../types/race';
 import { formatDate } from '../utils/date';
 import { VenueDetails } from './VenueDetails';
+import { AAvatar } from './alfie/Kit';
 import { getStoredRaceSeries, getStoredRaceEvents } from '../utils/raceStorage';
 import { getStoredVenues } from '../utils/venueStorage';
 import { Venue } from '../types/venue';
@@ -1073,6 +1074,30 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
     }
   };
 
+  const ClassFlagIcon = () => (
+    <svg width="9" height="11" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M1 .75v10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M1.75 1.25h6.5L1.75 5.5z" fill="currentColor" /></svg>
+  );
+  const DateChip: React.FC<{ date: string; big?: boolean; tone?: 'up' | 'past' | 'meet' }> = ({ date, big, tone }) => {
+    const d = new Date(date);
+    return (
+      <div className={`a-dc ${tone === 'past' ? 'a-dc-past' : tone === 'meet' ? 'a-dc-meet' : ''}`} style={big ? { width: 64, alignSelf: 'flex-start' } : undefined}>
+        <b>{d.toLocaleDateString('en-AU', { month: 'short' }).toUpperCase()}</b>
+        <span style={big ? { fontSize: 26 } : undefined}>{d.getDate()}</span>
+        <i>{d.toLocaleDateString('en-AU', { weekday: 'short' })}</i>
+      </div>
+    );
+  };
+  const AvatarStack: React.FC<{ people: { name: string; url?: string | null }[]; max?: number; total: number; size?: number }> = ({ people, max = 5, total, size = 24 }) => (
+    <span className="inline-flex items-center">
+      {people.slice(0, max).map((p, i) => (
+        <span key={i} className="inline-flex" style={{ marginLeft: i ? -7 : 0 }} title={p.name}>
+          <AAvatar url={p.url} first={p.name.split(' ')[0]} last={p.name.split(' ').slice(-1)[0]} size={size} className="a-av-ring" />
+        </span>
+      ))}
+      {total > max && <span className="a-av a-av-more" style={{ marginLeft: -7, width: size, height: size }}>+{total - max}</span>}
+    </span>
+  );
+
   const renderMeetingListCard = (meeting: CalendarMeeting, index: number) => {
     const orgConfig = meeting.national_association_id
       ? { label: 'National', color: 'amber', Icon: Globe2 }
@@ -1087,135 +1112,37 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
       <button
         key={`meeting-${meeting.id}-${index}`}
         onClick={() => setSelectedMeeting(meeting)}
-        className={`
-          group w-full flex flex-col sm:flex-row gap-4 p-4 rounded-xl transition-all duration-300
-          ${darkMode
-            ? 'bg-slate-800/50 hover:bg-slate-800 border border-teal-500/20'
-            : 'bg-white hover:bg-slate-50 border border-teal-200'}
-          hover:shadow-lg
-        `}
+        className="a-cal-ev w-full text-left"
       >
-        <div className="flex flex-col sm:flex-row gap-4 flex-1 min-w-0">
-          <div className="relative w-full sm:w-48 h-32 rounded-lg overflow-hidden flex-shrink-0">
-            <div className={`w-full h-full flex flex-col items-center justify-center ${
-              darkMode ? 'bg-gradient-to-br from-teal-900/50 to-slate-800' : 'bg-gradient-to-br from-teal-50 to-slate-100'
-            }`}>
-              <Users size={24} className={darkMode ? 'text-teal-400' : 'text-teal-600'} />
-              <span className={`text-xs mt-2 font-medium ${darkMode ? 'text-teal-400' : 'text-teal-600'}`}>Meeting</span>
+        <DateChip date={meeting.date} tone={isPast ? 'past' : 'meet'} />
+        <div className="flex-1 min-w-0 flex flex-col gap-[7px]">
+          <div className="a-ink text-[15px] font-semibold truncate">{meeting.name}</div>
+          {(meeting.location || meeting.start_time) && (
+            <div className="a-mute flex flex-wrap items-center gap-3 text-[12.5px]">
+              {meeting.location && <span className="inline-flex items-center gap-1.5 min-w-0"><MapPin size={13} /><span className="truncate">{meeting.location}</span></span>}
+              {meeting.start_time && <span className="inline-flex items-center gap-1.5"><Clock size={13} />{meeting.start_time.substring(0, 5)}</span>}
             </div>
-            <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2.5 py-1.5 shadow-lg">
-              <div className="text-center">
-                <div className="text-xs font-semibold text-slate-900 leading-none">
-                  {new Date(meeting.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
-                </div>
-                <div className="text-xl font-bold text-slate-900 leading-tight">
-                  {new Date(meeting.date).getDate()}
-                </div>
-              </div>
-            </div>
+          )}
+          <div className="flex flex-wrap gap-1.5">
+            <span className="a-lb-fmt"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: '#40C8C0' }} />Meeting</span>
+            <span className="a-lb-fmt"><orgConfig.Icon size={12} />{meeting.organization_name || orgConfig.label}</span>
+            {isCommittee && <span className="a-lb-fmt"><Shield size={12} />Committee</span>}
           </div>
-
-          <div className="flex-1 flex flex-col justify-between min-w-0">
-            <div>
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <h4 className={`text-base font-semibold truncate ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                  {meeting.name}
-                </h4>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                {meeting.location && (
-                  <>
-                    <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      <MapPin size={13} />
-                      <span className="font-medium truncate">{meeting.location}</span>
-                    </div>
-                    <div className="w-1 h-1 rounded-full bg-slate-400"></div>
-                  </>
-                )}
-                {meeting.start_time && (
-                  <>
-                    <div className={`flex items-center gap-1 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      <Clock size={12} />
-                      <span>{meeting.start_time.substring(0, 5)}</span>
-                    </div>
-                    <div className="w-1 h-1 rounded-full bg-slate-400"></div>
-                  </>
-                )}
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                  orgConfig.color === 'amber'
-                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-                    : orgConfig.color === 'emerald'
-                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
-                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-                }`}>
-                  <orgConfig.Icon size={10} className="inline mr-1" />
-                  {meeting.organization_name || orgConfig.label}
-                </span>
-                {isCommittee && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                    <Shield size={10} className="inline mr-1" />
-                    Committee
-                  </span>
-                )}
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
-                  Meeting
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 mt-2">
-              {meeting.attendees && meeting.attendees.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <div className="flex -space-x-2">
-                    {meeting.attendees.slice(0, 5).map((attendee, i) => {
-                      const initials = `${(attendee.first_name || '').charAt(0)}${(attendee.last_name || '').charAt(0)}`.toUpperCase();
-                      return (
-                        <div
-                          key={i}
-                          title={`${attendee.first_name} ${attendee.last_name}`}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2 overflow-hidden ${
-                            darkMode ? 'ring-slate-800' : 'ring-white'
-                          }`}
-                        >
-                          {attendee.avatar_url ? (
-                            <img src={attendee.avatar_url} alt={`${attendee.first_name} ${attendee.last_name}`} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className={`w-full h-full flex items-center justify-center ${
-                              darkMode ? 'bg-gradient-to-br from-teal-500 to-emerald-500 text-white' : 'bg-gradient-to-br from-teal-400 to-emerald-400 text-white'
-                            }`}>
-                              {initials}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {meeting.attendees.length > 5 && (
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2 ${
-                        darkMode ? 'bg-slate-700 ring-slate-800 text-slate-300' : 'bg-slate-200 ring-white text-slate-700'
-                      }`}>
-                        +{meeting.attendees.length - 5}
-                      </div>
-                    )}
-                  </div>
-                  <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    {meeting.attendees.length} attending
-                  </span>
-                </div>
-              )}
-              {isPast && meeting.minutes_status === 'completed' && (
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-teal-500/20 text-teal-400 text-xs font-medium">
-                  <FileText size={12} />
-                  Minutes Available
-                </div>
-              )}
-              {isPast && meeting.minutes_status !== 'completed' && (
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/20 text-emerald-400 text-xs font-medium">
-                  <Trophy size={12} />
-                  Completed
-                </div>
-              )}
-            </div>
-          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {meeting.attendees && meeting.attendees.length > 0 && (
+            <span className="a-mute text-[12.5px] inline-flex items-center gap-1.5">
+              <AvatarStack people={meeting.attendees.map(a => ({ name: `${a.first_name || ''} ${a.last_name || ''}`.trim(), url: a.avatar_url }))} max={3} total={meeting.attendees.length} size={22} />
+              {meeting.attendees.length} attending
+            </span>
+          )}
+          {isPast && meeting.minutes_status === 'completed' && (
+            <span className="a-st a-txt-t text-[12.5px]"><FileText size={13} />Minutes</span>
+          )}
+          {isPast && meeting.minutes_status !== 'completed' && (
+            <span className="a-st a-txt-g text-[12.5px]"><Trophy size={13} />Completed</span>
+          )}
+          <ChevronRight size={17} className="a-dim" />
         </div>
       </button>
     );
@@ -1236,18 +1163,77 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
       return acc;
     }, {} as Record<string, { year: number; month: string; items: CalendarItem[] }>);
 
+    const eventMeta = (event: any) => {
+      const proInfo = event.isSeriesEvent
+        ? proAssignmentsByKey.get(`${event.seriesId}-${event.date}`)
+        : proAssignmentsByKey.get(`event-${event.id}`) || null;
+      return { proName: proInfo?.member_name || event.proMemberName, proAvatar: proInfo?.member_avatar || null };
+    };
+
+    const labels = (event: any, proName?: string, proAvatar?: string | null) => (
+      <div className="flex flex-wrap gap-1.5">
+        {event.isExternalEvent ? (
+          <span className="a-lb-fmt"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: event.displayCategory?.startsWith('state_') ? '#FF8A2B' : '#0A84FF' }} />
+            {event.displayCategory?.startsWith('state_') ? (stateAssociationNames[event.displayCategory.replace('state_', '')] || 'State event') : 'National event'}
+          </span>
+        ) : (
+          <span className="a-lb-fmt"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: event.raceFormat === 'handicap' ? '#FFB340' : '#30D158' }} />{event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}</span>
+        )}
+        {event.raceClass && <span className="a-lb-cls"><ClassFlagIcon />{event.raceClass}</span>}
+        {proName && (
+          <span className="a-pro"><AAvatar url={proAvatar} first={proName.split(' ')[0]} last={proName.split(' ').slice(-1)[0]} size={20} /><span className="a-dim font-semibold">PRO</span>{proName}</span>
+        )}
+      </div>
+    );
+
     return (
-      <div className="space-y-8">
-        {Object.entries(groupedItems).map(([key, { month, year, items }]) => (
-          <div key={key}>
-            <div className="flex items-baseline gap-3 mb-4">
-              <h3 className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
-                {month}
-              </h3>
-              <span className={`text-lg ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{year}</span>
+      <div className="flex flex-col gap-[22px]">
+        {Object.entries(groupedItems).map(([key, { month, year, items }]) => {
+          const hero = items.find(it => it.type !== 'meeting' && isNextUpcomingEvent(it.data as RaceEvent, filteredEvents));
+          const rest = items.filter(it => it !== hero);
+          return (
+          <div key={key} className="flex flex-col gap-4">
+            <div className="flex items-baseline gap-2.5">
+              <h3 className="a-display a-ink text-[24px] font-bold">{month}</h3>
+              <span className="a-dim text-[16px]">{year}</span>
+              <span className="a-cnt ml-1">{items.length}</span>
             </div>
-            <div className="space-y-3">
-              {items.map((item, index) => {
+
+            {hero && (() => {
+              const event = hero.data as RaceEvent;
+              const seriesName = getSeriesName(event);
+              const displayTitle = event.isSeriesEvent ? `${event.roundName} - ${seriesName}` : event.eventName || event.clubName;
+              const venueImage = getVenueImage(event.venue, event);
+              const { proName, proAvatar } = eventMeta(event);
+              const skippers = event.skippers || [];
+              const daysAway = Math.round((new Date(event.date).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
+              return (
+                <div className="a-card a-cal-hero grid grid-cols-1 md:grid-cols-[360px_1fr] overflow-hidden cursor-pointer" onClick={() => handleEventClick(event)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') handleEventClick(event); }}>
+                  <div className="relative min-h-[180px] a-cal-hero-img">
+                    {venueImage ? <img src={venueImage} alt="" className="absolute inset-0 w-full h-full object-cover" /> : <div className="absolute inset-0 flex items-center justify-center"><MapPin size={28} className="a-dim" /></div>}
+                    <span className="a-glass a-glass-g absolute left-3.5 top-3.5"><span className="a-light a-light-g" />Up next · {daysAway <= 0 ? 'today' : daysAway === 1 ? 'tomorrow' : `in ${daysAway} days`}</span>
+                  </div>
+                  <div className="flex gap-[18px]" style={{ padding: 22 }}>
+                    <DateChip date={event.date} big />
+                    <div className="flex-1 min-w-0 flex flex-col gap-2.5">
+                      <div className="a-display a-ink text-[22px] font-semibold">{displayTitle}</div>
+                      {(event.venue || event.clubName) && <div className="a-mute flex items-center gap-1.5 text-[13.5px]"><MapPin size={14} />{event.venue || event.clubName}</div>}
+                      {labels(event, proName, proAvatar)}
+                      <div className="flex flex-wrap items-center gap-2.5 mt-auto pt-1">
+                        {skippers.length > 0 && <AvatarStack people={skippers.map((sk: any) => ({ name: sk.name, url: sk.avatarUrl }))} total={skippers.length} size={26} />}
+                        <span className="a-mute text-[13px]">{skippers.length} registered</span>
+                        <div className="flex-1" />
+                        <span className="a-btn" style={{ height: 38 }}><Info size={16} />Details</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {rest.length > 0 && (
+            <div className="a-card overflow-hidden">
+              {rest.map((item, index) => {
                 if (item.type === 'meeting') {
                   return renderMeetingListCard(item.data, index);
                 }
@@ -1257,214 +1243,51 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                 const displayTitle = event.isSeriesEvent
                   ? `${event.roundName} - ${seriesName}`
                   : event.eventName || event.clubName;
-
-                const venueImage = getVenueImage(event.venue, event);
                 const isPastEvent = isDatePast(event.date);
-                const colors = event.raceClass ? boatTypeColors[event.raceClass] || defaultColorScheme : defaultColorScheme;
-                const isNextEvent = isNextUpcomingEvent(event, filteredEvents);
-
                 const skippers = event.skippers || [];
                 const skipperCount = skippers.length;
-                const isExpanded = expandedEventId === event.id;
-                const displayedSkippers = isExpanded ? skippers : skippers.slice(0, 12);
-                const avatars = displayedSkippers.map(skipper => {
-                  const nameParts = skipper.name.trim().split(' ');
-                  const initials = nameParts.length >= 2
-                    ? `${nameParts[0].charAt(0)}${nameParts[nameParts.length - 1].charAt(0)}`.toUpperCase()
-                    : skipper.name.substring(0, 2).toUpperCase();
-                  return {
-                    id: skipper.sailNo,
-                    initials,
-                    avatarUrl: skipper.avatarUrl,
-                    name: skipper.name
-                  };
-                });
+                const { proName, proAvatar } = eventMeta(event);
 
                 return (
                   <button
                     key={`event-${event.id}-${index}`}
                     onClick={() => handleEventClick(event)}
-                    className={`
-                      group w-full flex flex-col sm:flex-row gap-4 p-4 rounded-xl transition-all duration-300
-                      ${darkMode
-                        ? `bg-slate-800/50 hover:bg-slate-800 ${isNextEvent ? 'ring-2 ring-green-500/50' : ''}`
-                        : `bg-white hover:bg-slate-50 ${isNextEvent ? 'ring-2 ring-green-500/50' : 'border border-slate-200'}`}
-                      ${isNextEvent ? 'shadow-lg shadow-green-500/20' : 'hover:shadow-lg'}
-                    `}
+                    className="a-cal-ev w-full text-left"
                   >
-                    <div className="flex flex-col sm:flex-row gap-4 flex-1 min-w-0">
-                      <div className="relative w-full sm:w-48 h-32 rounded-lg overflow-hidden flex-shrink-0">
-                        {venueImage ? (
-                          <>
-                            <img
-                              src={venueImage}
-                              alt={event.venue}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                          </>
-                        ) : (
-                          <div className={`w-full h-full flex items-center justify-center ${darkMode ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
-                            <MapPin size={20} className={`${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
-                          </div>
-                        )}
-                        <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2.5 py-1.5 shadow-lg">
-                          <div className="text-center">
-                            <div className="text-xs font-semibold text-slate-900 leading-none">
-                              {new Date(event.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
-                            </div>
-                            <div className="text-xl font-bold text-slate-900 leading-tight">
-                              {new Date(event.date).getDate()}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex-1 flex flex-col justify-between min-w-0">
-                        <div>
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <h4 className={`text-base font-semibold truncate ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                              {displayTitle}
-                            </h4>
-                            {isNextEvent && (
-                              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold text-white whitespace-nowrap animate-pulse bg-green-500 shadow-lg shadow-green-500/30">
-                                <span className="w-2 h-2 rounded-full bg-white"></span>
-                                UP NEXT
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 mb-2">
-                            {(event.venue || event.clubName) && (
-                              <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                <MapPin size={13} className="flex-shrink-0" />
-                                <span className="font-medium truncate">{event.venue || event.clubName}</span>
-                              </div>
-                            )}
-                            {event.isExternalEvent ? (
-                              event.displayCategory?.startsWith('state_') ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                                  {stateAssociationNames[event.displayCategory.replace('state_', '')] || 'State Event'}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                                  National Event
-                                </span>
-                              )
-                            ) : (
-                              <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
-                                {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                              </span>
-                            )}
-                            <span className={getBoatClassBadge(event.raceClass, darkMode).className}>
-                              {event.raceClass}
-                            </span>
-                            {(() => {
-                              const proInfo = event.isSeriesEvent
-                                ? proAssignmentsByKey.get(`${event.seriesId}-${event.date}`)
-                                : proAssignmentsByKey.get(`event-${event.id}`) || null;
-                              const proName = proInfo?.member_name || event.proMemberName;
-                              const proAvatar = proInfo?.member_avatar || null;
-                              if (!proName) return null;
-                              return (
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                                  darkMode ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                }`}>
-                                  {proAvatar ? (
-                                    <img src={proAvatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
-                                  ) : (
-                                    <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-bold ${
-                                      darkMode ? 'bg-amber-600 text-white' : 'bg-amber-200 text-amber-800'
-                                    }`}>{proName.split(' ').map((n: string) => n[0]).join('')}</span>
-                                  )}
-                                  PRO: {proName}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 mt-2">
-                          {skipperCount > 0 && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedEventId(isExpanded ? null : event.id);
-                              }}
-                              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-                            >
-                              <div className="flex -space-x-2">
-                                {avatars.map((avatar, i) => (
-                                  <div
-                                    key={i}
-                                    title={avatar.name}
-                                    className={`
-                                      w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2 overflow-hidden
-                                      ${darkMode
-                                        ? 'ring-slate-800'
-                                        : 'ring-white'}
-                                    `}
-                                  >
-                                    {avatar.avatarUrl ? (
-                                      <img
-                                        src={avatar.avatarUrl}
-                                        alt={avatar.name}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className={`w-full h-full flex items-center justify-center ${
-                                        darkMode
-                                          ? 'bg-gradient-to-br from-blue-500 to-cyan-500 text-white'
-                                          : 'bg-gradient-to-br from-blue-400 to-cyan-400 text-white'
-                                      }`}>
-                                        {avatar.initials}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                                {!isExpanded && skipperCount > 5 && (
-                                  <div
-                                    className={`
-                                      w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2
-                                      ${darkMode
-                                        ? 'bg-slate-700 ring-slate-800 text-slate-300'
-                                        : 'bg-slate-200 ring-white text-slate-700'}
-                                    `}
-                                  >
-                                    +{skipperCount - 12}
-                                  </div>
-                                )}
-                              </div>
-                              <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                {skipperCount} {isPastEvent ? 'competed' : 'registered'}
-                              </span>
-                            </button>
-                          )}
-                          {isPastEvent && (
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/20 text-emerald-400 text-xs font-medium">
-                              <Trophy size={12} />
-                              Completed
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                    <DateChip date={event.date} tone={isPastEvent ? 'past' : 'up'} />
+                    <div className="flex-1 min-w-0 flex flex-col gap-[7px]">
+                      <div className="a-ink text-[15px] font-semibold truncate">{displayTitle}</div>
+                      {(event.venue || event.clubName) && (
+                        <div className="a-mute flex items-center gap-1.5 text-[12.5px] min-w-0"><MapPin size={13} className="flex-shrink-0" /><span className="truncate">{event.venue || event.clubName}</span></div>
+                      )}
+                      {labels(event, proName, proAvatar)}
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {skipperCount > 0 && (
+                        <span className="a-mute text-[12.5px] inline-flex items-center gap-1.5">
+                          <AvatarStack people={skippers.map((sk: any) => ({ name: sk.name, url: sk.avatarUrl }))} max={3} total={skipperCount} size={22} />
+                          {skipperCount} {isPastEvent ? 'competed' : 'registered'}
+                        </span>
+                      )}
+                      {isPastEvent && (
+                        <span className="a-st a-txt-g text-[12.5px]"><Trophy size={13} />Completed</span>
+                      )}
+                      <ChevronRight size={17} className="a-dim" />
                     </div>
                   </button>
                 );
               })}
             </div>
+            )}
           </div>
-        ))}
+          );
+        })}
 
         {allCalendarItems.length === 0 && !loading && (
-          <div className={`
-            text-center py-12 rounded-lg border
-            ${darkMode
-              ? 'bg-slate-700/50 border-slate-600 text-slate-400'
-              : 'bg-slate-50 border-slate-200 text-slate-600'}
-          `}>
-            <Calendar size={48} className="mx-auto mb-4 opacity-20" />
-            <p className="text-lg font-medium mb-2">No Events or Meetings Found</p>
-            <p className="text-sm">Try adjusting your filters or add a new event</p>
+          <div className="a-card a-empty py-12 text-center">
+            <span className="a-tile mx-auto" style={{ width: 48, height: 48 }}><Calendar size={22} /></span>
+            <p className="a-ink text-[16px] font-semibold mt-2">No events or meetings found</p>
+            <p className="a-dim text-[13.5px]">Try adjusting your filters or add a new event</p>
           </div>
         )}
       </div>
@@ -1472,49 +1295,30 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   };
 
   const renderMonthView = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={prevMonth}
-            className={`
-              p-2 rounded-lg transition-colors
-              ${darkMode
-                ? 'hover:bg-slate-700 text-slate-300'
-                : 'hover:bg-slate-100 text-slate-600'}
-            `}
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <h3 className={`text-lg font-medium ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-            {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-          </h3>
-          <button
-            onClick={nextMonth}
-            className={`
-              p-2 rounded-lg transition-colors
-              ${darkMode
-                ? 'hover:bg-slate-700 text-slate-300'
-                : 'hover:bg-slate-100 text-slate-600'}
-            `}
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <button onClick={prevMonth} className="a-ib" aria-label="Previous month">
+          <ChevronLeft size={20} />
+        </button>
+        <h3 className="a-display a-ink text-[22px] font-bold">
+          {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+        </h3>
+        <button onClick={nextMonth} className="a-ib" aria-label="Next month">
+          <ChevronRight size={20} />
+        </button>
+        <div className="flex-1" />
+        <span className="a-st a-dim text-[12.5px]"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: '#30D158' }} />Scratch</span>
+        <span className="a-st a-dim text-[12.5px]"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: 'linear-gradient(90deg,#B794FF 50%,transparent 50%)', boxShadow: 'inset 0 0 0 1.25px #B794FF' }} />Handicap</span>
+        <span className="a-st a-dim text-[12.5px]"><Users size={13} />Meeting</span>
       </div>
 
-      <div className="grid grid-cols-7 gap-px bg-slate-200 dark:bg-slate-700 rounded-lg overflow-hidden">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div
-            key={day}
-            className={`
-              p-2 text-center text-sm font-medium
-              ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-white text-slate-600'}
-            `}
-          >
-            {day}
-          </div>
-        ))}
+      <div className="a-card overflow-hidden">
+        <div className="grid grid-cols-7 a-bd border-b">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="a-cap" style={{ padding: '10px 8px' }}>{day}</div>
+          ))}
+        </div>
+        <div className="a-month grid grid-cols-7">
         {monthData.map((day, index) => {
           const dayItems = day ? getCalendarItemsForDate(day) : [];
           const isToday = day &&
@@ -1523,55 +1327,24 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             day === new Date().getDate();
 
           return (
-            <div
-              key={index}
-              className={`
-                min-h-[120px] p-2
-                ${darkMode ? 'bg-slate-800' : 'bg-white'}
-                ${isToday ? darkMode ? 'ring-2 ring-blue-500' : 'ring-2 ring-blue-500' : ''}
-              `}
-            >
+            <div key={index} className={`a-month-cell ${!day ? 'a-month-blank' : ''}`}>
               {day && (
                 <>
-                  <div className={`
-                    text-sm font-medium mb-2
-                    ${darkMode ? 'text-slate-400' : 'text-slate-600'}
-                  `}>
+                  <span className={`a-month-day ${isToday ? 'a-month-today' : ''}`}>
                     {day}
-                  </div>
-                  <div className="space-y-1">
-                    {dayItems.map((item, itemIndex) => {
+                  </span>
+                  {dayItems.map((item, itemIndex) => {
                       if (item.type === 'meeting') {
                         const meeting = item.data;
                         return (
                           <button
                             key={`m-${itemIndex}`}
                             onClick={() => setSelectedMeeting(meeting)}
-                            className={`
-                              w-full text-left p-1.5 rounded text-xs
-                              ${darkMode
-                                ? 'bg-teal-900/30 hover:bg-teal-900/50 border border-teal-500/20'
-                                : 'bg-teal-50 hover:bg-teal-100 border border-teal-200'}
-                            `}
+                            className="a-evp a-evp-meet"
+                            title={meeting.name}
                           >
-                            <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                              {meeting.name}
-                            </div>
-                            <div className="flex flex-wrap gap-1 mb-1">
-                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300">
-                                Meeting
-                              </div>
-                              {meeting.meeting_category === 'committee' && (
-                                <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
-                                  Committee
-                                </div>
-                              )}
-                            </div>
-                            {meeting.start_time && (
-                              <div className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                                {meeting.start_time.substring(0, 5)}
-                              </div>
-                            )}
+                            <Users size={12} className="flex-shrink-0" />
+                            <span className="truncate flex-1">{meeting.start_time ? `${meeting.start_time.substring(0, 5)} · ` : ''}{meeting.name}</span>
                           </button>
                         );
                       }
@@ -1581,58 +1354,27 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                       const displayTitle = event.isSeriesEvent
                         ? `${event.roundName} - ${seriesName}`
                         : event.eventName || event.clubName;
-                      const colors = event.raceClass ? boatTypeColors[event.raceClass] || defaultColorScheme : defaultColorScheme;
                       const isNextEvent = isNextUpcomingEvent(event, filteredEvents);
+                      const hc = event.raceFormat === 'handicap';
 
                       return (
                         <button
                           key={`e-${itemIndex}`}
                           onClick={() => handleEventClick(event)}
-                          className={`
-                            w-full text-left p-1.5 rounded text-xs
-                            ${darkMode
-                              ? `bg-slate-700 hover:bg-slate-600 ${isNextEvent ? 'ring-1 ring-green-500' : ''}`
-                              : `bg-slate-50 hover:bg-slate-100 ${isNextEvent ? 'ring-1 ring-green-500' : ''}`}
-                          `}
+                          className={`a-evp ${isNextEvent ? 'a-evp-next' : ''}`}
+                          title={`${displayTitle}${event.venue ? ` · ${event.venue}` : ''}`}
                         >
-                          <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                            {displayTitle}
-                          </div>
-
-                          <div className="flex flex-wrap gap-1 mb-1">
-                            <div className={`
-                              px-1.5 py-0.5 rounded text-[10px] font-medium
-                              ${event.raceFormat === 'handicap'
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'}
-                            `}>
-                              {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                            </div>
-                            <div className={`
-                              px-1.5 py-0.5 rounded text-[10px] font-medium
-                              ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}
-                            `}>
-                              {event.raceClass}
-                            </div>
-                            {isNextEvent && (
-                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
-                                Next
-                              </div>
-                            )}
-                          </div>
-
-                          <div className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                            {event.venue}
-                          </div>
+                          <span className="inline-block w-[7px] h-[7px] rounded-full flex-shrink-0" style={hc ? { background: 'linear-gradient(90deg,#B794FF 50%,transparent 50%)', boxShadow: 'inset 0 0 0 1.25px #B794FF' } : { background: '#30D158' }} />
+                          <span className="truncate flex-1">{displayTitle}</span>
                         </button>
                       );
-                    })}
-                  </div>
+                  })}
                 </>
               )}
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );
@@ -2143,26 +1885,22 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-4 sm:p-6 lg:p-16">
+      <div className="p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
         {/* Row 1: Title + Close */}
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
-              <Calendar className="text-white" size={28} />
-            </div>
-            <h2 className={`text-2xl sm:text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+        <div className="flex items-center gap-4 mb-[22px]">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><Calendar size={24} /></span>
+          <div className="flex-1 min-w-0">
+            <h2 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">
               Race Calendar
             </h2>
+            <p className="a-mute mt-1 text-[14.5px]">Upcoming races, regattas and meetings</p>
           </div>
           {onClose && (
             <button
               onClick={onClose}
-              className={`
-                rounded-full p-2 transition-colors flex-shrink-0
-                ${darkMode
-                  ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700'
-                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
-              `}
+              className="a-ib flex-shrink-0"
+              style={{ width: 42, height: 42 }}
+              aria-label="Close"
             >
               <X size={20} />
             </button>
@@ -2328,40 +2066,27 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           {/* Location Explorer Button */}
           <button
             onClick={handleOpenLocationExplorer}
-            className={`
-              relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border overflow-hidden group
-              ${darkMode
-                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 border-cyan-500 text-white'
-                : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 border-cyan-400 text-white'}
-            `}
+            className="a-btn"
           >
-            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-            <MapIcon size={16} className="relative z-10" />
-            <span className="relative z-10 whitespace-nowrap">Explore Locations</span>
-            <div className="relative z-10 w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+            <MapIcon size={16} />
+            <span className="whitespace-nowrap">Explore locations</span>
           </button>
 
           {/* Filter Dropdown */}
           <div className="relative" ref={filterDropdownRef}>
             <button
               onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
-                ${darkMode
-                  ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200'
-                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}
-              `}
+              className="a-btn"
             >
               <Filter size={16} />
               Filters
-              <ChevronDown size={16} />
+              {[activeFilters.raceFormat, activeFilters.raceClass, activeFilters.eventType && activeFilters.eventType !== 'all'].filter(Boolean).length > 0 && (
+                <span className="a-cnt a-cnt-blue">{[activeFilters.raceFormat, activeFilters.raceClass, activeFilters.eventType && activeFilters.eventType !== 'all'].filter(Boolean).length}</span>
+              )}
             </button>
 
             {showFilterDropdown && (
-              <div className={`
-                absolute left-0 sm:right-0 sm:left-auto mt-2 w-80 rounded-lg shadow-xl border py-3 z-50
-                ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-              `}>
+              <div className="a-pop absolute left-0 sm:right-0 sm:left-auto mt-2 w-80 py-3 z-50">
                 {/* Race Format */}
                 <div className="px-4 py-2">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
@@ -2513,6 +2238,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           `}>
             <button
               onClick={() => setView('list')}
+              aria-label="List view"
+              title="List view"
               className={`
                 p-2 transition-colors flex items-center justify-center gap-1
                 ${view === 'list'
@@ -2530,6 +2257,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             </button>
             <button
               onClick={() => setView('grid')}
+              aria-label="Grid view"
+              title="Grid view"
               className={`
                 p-2 transition-colors flex items-center justify-center gap-1
                 ${view === 'grid'
@@ -2547,6 +2276,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             </button>
             <button
               onClick={() => setView('month')}
+              aria-label="Month view"
+              title="Month view"
               className={`
                 p-2 transition-colors flex items-center justify-center gap-1
                 ${view === 'month'
@@ -2564,6 +2295,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             </button>
             <button
               onClick={() => setView('year')}
+              aria-label="Year view"
+              title="Year view"
               className={`
                 p-2 transition-colors flex items-center justify-center gap-1
                 ${view === 'year'
@@ -2585,12 +2318,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           <div className="relative" ref={subscribeMenuRef}>
             <button
               onClick={() => setShowSubscribeMenu(!showSubscribeMenu)}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap
-                ${darkMode
-                  ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 border-blue-500 text-white'
-                  : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border-blue-400 text-white'}
-              `}
+              className="a-btn a-btn-p"
             >
               <Link2 size={16} />
               Subscribe
@@ -2598,8 +2326,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
             {showSubscribeMenu && (
               <div className={`
-                absolute right-0 mt-2 w-72 rounded-lg shadow-xl border py-2 z-50
-                ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
+                a-pop absolute right-0 mt-2 w-72 py-2 z-50
               `}>
                 <div className="px-4 py-2 border-b border-slate-700">
                   <h4 className={`font-semibold text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
