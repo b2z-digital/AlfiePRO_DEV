@@ -1450,7 +1450,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         </div>
       </div>
 
-      <div className="p-4 sm:p-6 lg:p-16">
+      <div className="p-4 sm:p-6 lg:p-16 lg:pt-8">
         {/* Trial Status Banner */}
         <TrialStatusBanner />
 

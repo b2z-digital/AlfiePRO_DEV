@@ -66,10 +66,11 @@ html.alfie-theme :focus-visible {
 
 html.alfie-theme.alfie-dark {
   /* Alfie navy surfaces */
-  --slate-700: 27 36 54;    /* #1B2436 raised / borders */
-  --slate-800: 18 26 42;    /* #121A2A cards, modals */
-  --slate-900: 10 17 32;    /* #0A1120 page */
-  --slate-950: 5 10 20;     /* #050A14 */
+  /* Board neutrals (same hue as the design board's rgba(17,22,34) sheets) */
+  --slate-700: 27 33 48;    /* #1B2130 raised / borders */
+  --slate-800: 17 22 34;    /* #111622 cards, modals */
+  --slate-900: 10 15 26;    /* #0A0F1A page */
+  --slate-950: 5 8 15;      /* #05080F */
   color-scheme: dark;
 }
 
@@ -390,7 +391,7 @@ html.alfie-theme .fixed.inset-0:is(.bg-black\/50, .bg-black\/60, .bg-black\/70) 
   border-radius: 22px;
 }
 html.alfie-dark .fixed.inset-0:is(.bg-black\/50, .bg-black\/60, .bg-black\/70) > :is(.rounded-xl, .rounded-2xl, .rounded-lg):is(.bg-slate-800, .bg-slate-900) {
-  background-color: #111A2C;
+  background-color: #111622;
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 30px 80px rgba(0, 0, 0, 0.55);
 }
@@ -404,7 +405,7 @@ html.alfie-dark :is(input, select, textarea):is(.bg-slate-700, .bg-slate-700\/50
   border-color: rgb(10 132 255 / 0.7);
 }
 html.alfie-dark select:is(.bg-slate-700, .bg-slate-700\/50, .bg-slate-800, .bg-slate-900, .bg-slate-900\/50) option {
-  background-color: #111A2C;
+  background-color: #111622;
 }
 
 /* Full-bleed stretch tab bars (typically inside a modal) get breathing room */
@@ -768,6 +769,6 @@ html.alfie-dark :is(div, section, article, li, a):is(.rounded-xl, .rounded-2xl, 
   -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 html.alfie-dark .fixed.inset-0 > :is(.rounded-xl, .rounded-2xl, .rounded-3xl):is(.bg-slate-800, .bg-slate-900, [class*="bg-slate-800/"], [class*="bg-slate-900/"]) {
-  background-color: #111A2C !important;
+  background-color: #111622 !important;
 }
 html.alfie-dark .a-card-hi, html.alfie-dark .a-card { background: var(--a-card); border-color: var(--a-card-border); }

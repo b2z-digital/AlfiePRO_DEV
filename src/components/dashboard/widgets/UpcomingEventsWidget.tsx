@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Calendar, MapPin, ChevronRight, X, Users, Clock, Shield } from 'lucide-react';
+import { Calendar, ChevronRight, X, Users, Clock, Shield } from 'lucide-react';
+import { AlfieIcon } from '../../brand/AlfieIcon';
+
+/* Board venue glyph (sail on water) for event places */
+const MapPin = ({ size = 14, className }: { size?: number; className?: string }) => <AlfieIcon glyph="venue" size={size} strokeWidth={2} className={className} />;
+
+/* Board level label bars: state = two of three, national = all three */
+const LevelBars = ({ level }: { level: 'state' | 'national' }) => (
+  <svg width="11" height="10" viewBox="0 0 11 10" aria-hidden="true"><rect x="0" y="6" width="2.5" height="4" rx="1" fill="currentColor" /><rect x="4.25" y="3" width="2.5" height="7" rx="1" fill="currentColor" /><rect x="8.5" y="0" width="2.5" height="10" rx="1" fill="currentColor" opacity={level === 'national' ? 1 : 0.3} /></svg>
+);
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
@@ -793,12 +802,8 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
               )}
             </div>
             {event.eventLevel && (
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                event.eventLevel === 'national'
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-              }`}>
-                {event.eventLevel === 'national' ? 'National Event' : 'State Event'}
+              <span className="a-wlvl a-wlvl-lv">
+                <LevelBars level={event.eventLevel} />{event.eventLevel === 'national' ? 'National' : 'State'}
               </span>
             )}
           </div>
@@ -890,7 +895,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             <span className={getBoatClassBadge(event.raceClass, darkMode).className}>{event.raceClass}</span>
           )}
           {event.eventLevel && (
-            <span className={`a-wlvl ${event.eventLevel === 'national' ? 'a-wlvl-n' : ''}`}>{event.eventLevel === 'national' ? 'National' : 'State'}</span>
+            <span className="a-wlvl a-wlvl-lv"><LevelBars level={event.eventLevel} />{event.eventLevel === 'national' ? 'National' : 'State'}</span>
           )}
         </div>
       </div>

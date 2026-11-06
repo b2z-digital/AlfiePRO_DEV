@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark, Flag, SlidersHorizontal, Share2, Search, X } from 'lucide-react';
+import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark, Flag, SlidersHorizontal, Share2, Search, X, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { updateUserProfile } from '../../utils/auth';
@@ -34,6 +34,10 @@ import { supabase } from '../../utils/supabase';
 import { isValidUUID } from '../../utils/storage';
 import { MemberOnboardingModal } from '../MemberOnboardingModal';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { AlfieIcon } from '../brand/AlfieIcon';
+
+type SettingsItem = { id: string; title: string; desc: string; glyph: string; show: boolean; open: () => void };
+type SettingsGroup = { id: string; title: string; dot: string; items: SettingsItem[] };
 import { useNotifications } from '../../contexts/NotificationContext';
 
 interface SettingsPageProps {
@@ -66,22 +70,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const [settingsQuery, setSettingsQuery] = useState('');
   const settingsListRef = useRef<HTMLDivElement>(null);
 
-  // Settings search: hide setting rows (and empty sections) that don't match the query.
-  useEffect(() => {
-    const root = settingsListRef.current;
-    if (!root) return;
-    const q = settingsQuery.trim().toLowerCase();
-    root.querySelectorAll<HTMLElement>(':scope > div').forEach((section) => {
-      const rows = Array.from(section.querySelectorAll<HTMLElement>(':scope > div.grid > button'));
-      let visible = 0;
-      rows.forEach((row) => {
-        const hit = !q || (row.textContent || '').toLowerCase().includes(q);
-        row.toggleAttribute('data-alfie-hide', !hit);
-        if (hit) visible++;
-      });
-      section.toggleAttribute('data-alfie-hide', !!q && visible === 0);
+  const settingsSearchRef = useRef<HTMLInputElement>(null);
+  const [recentSettings, setRecentSettings] = useState<string[]>(() => {
+    try { const v = JSON.parse(localStorage.getItem('alfie.settings.recent') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+  });
+  const rememberSetting = (id: string) => {
+    setRecentSettings((prev) => {
+      const next = [id, ...prev.filter((x) => x !== id)].slice(0, 8);
+      try { localStorage.setItem('alfie.settings.recent', JSON.stringify(next)); } catch { /* storage unavailable */ }
+      return next;
     });
-  }, [settingsQuery]);
+  };
+  // ⌘, / Ctrl+, focuses the settings search (board hint)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ',' && settingsSearchRef.current) {
+        e.preventDefault();
+        settingsSearchRef.current.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [membershipStatus, setMembershipStatus] = useState<'active' | 'expired' | 'none'>('none');
@@ -489,12 +499,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
       <div className="p-16">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
-              <Settings className="text-white" size={28} />
-            </div>
+            <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><AlfieIcon glyph="gear" size={24} /></span>
             <div>
-              <h1 className={`text-3xl font-bold ${lightMode ? 'text-gray-900' : 'text-white'}`}>Settings</h1>
-              <p className={lightMode ? 'text-gray-600' : 'text-slate-400'}>Manage your account, team, and club settings</p>
+              <h1 className="a-display a-ink text-[30px] font-bold leading-tight">Settings</h1>
+              <p className="a-mute text-[14.5px] mt-1">Your account, club and platform settings</p>
             </div>
           </div>
 
@@ -578,11 +586,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           <label className="a-field a-settings-search mb-6">
             <Search size={19} />
             <input
+              ref={settingsSearchRef}
               value={settingsQuery}
               onChange={(e) => setSettingsQuery(e.target.value)}
-              placeholder="Search settings, e.g. bank details, start system, renewals"
+              placeholder="Search settings — e.g. bank details, start system, renewals"
               aria-label="Search settings"
             />
+            {!settingsQuery && <span className="a-kbd-pair hidden sm:inline-flex" aria-hidden="true"><kbd className="alfie-kbd">⌘</kbd><kbd className="alfie-kbd">,</kbd></span>}
             {settingsQuery && (
               <button type="button" className="a-ib" style={{ width: 28, height: 28 }} onClick={() => setSettingsQuery('')} aria-label="Clear search">
                 <X size={15} />
@@ -591,1063 +601,122 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           </label>
         )}
 
-        {!activeTab && (
-          <div ref={settingsListRef} className={`alfie-settings space-y-8 ${settingsQuery.trim() ? 'alfie-settings-searching' : ''}`}>
-
-            {/* Account Settings Section */}
-            <div>
-              <button
-                onClick={() => toggleSection('account')}
-                className={`w-full flex items-center justify-between p-4 rounded-lg mb-4 transition-all ${
-                  lightMode
-                    ? 'bg-white border border-gray-200 hover:bg-gray-50'
-                    : 'bg-slate-800/50 border border-slate-700 hover:bg-slate-800/70'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <User size={20} className={lightMode ? 'text-blue-600' : 'text-blue-400'} />
-                  <h2 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                    Account
-                  </h2>
-                </div>
-                <ChevronDown
-                  size={20}
-                  className={`transition-transform duration-200 ${
-                    expandedSections.account ? 'rotate-180' : ''
-                  } ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}
-                />
-              </button>
-              <div
-                className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200 overflow-hidden ${
-                  expandedSections.account ? 'opacity-100 max-h-[2000px]' : 'opacity-0 max-h-0'
-                }`}
-              >
-
-              {/* Profile Card */}
-              <button
-                onClick={() => setActiveTab('profile')}
-                className={`
-                  group p-6 rounded-xl text-left transition-all border
-                  ${activeTab === 'profile'
-                    ? lightMode
-                      ? 'bg-white border-blue-500 shadow-lg shadow-blue-500/10'
-                      : 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                    : lightMode
-                      ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                `}
-              >
-                <div className="flex items-start gap-4">
-                  <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-blue-50' : 'bg-blue-500/20'}`}>
-                    <User size={20} className="text-blue-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Profile settings</h3>
-                    <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                      Manage your personal information and preferences
-                    </p>
-                  </div>
-                </div>
-              </button>
-
-              {/* Team Access Card - standalone race officers */}
-              {isRaceOfficer && !currentClub && !currentOrganization && (
-                <button
-                  onClick={() => setActiveTab('team-access')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'team-access'
-                      ? lightMode
-                        ? 'bg-white border-blue-500 shadow-lg shadow-blue-500/10'
-                        : 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-cyan-50' : 'bg-cyan-500/20'}`}>
-                      <Users size={20} className="text-cyan-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Team Access</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Invite others to manage your race management account
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* Association Users Card - only show for association admins */}
-              {currentOrganization && can('users.manage') && (
-                <button
-                  onClick={() => setActiveTab('association-users')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'association-users'
-                      ? lightMode
-                        ? 'bg-white border-blue-500 shadow-lg shadow-blue-500/10'
-                        : 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-cyan-50' : 'bg-cyan-500/20'}`}>
-                      <Users size={20} className="text-cyan-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Users</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Manage admin and editor access to this association
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* Club Features Access Card - only for state/national association admins */}
-              {currentOrganization && (currentOrganization.type === 'state' || currentOrganization.type === 'national') && can('users.manage') && (
-                <button
-                  onClick={() => setActiveTab('club-features')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'club-features'
-                      ? lightMode
-                        ? 'bg-white border-blue-500 shadow-lg shadow-blue-500/10'
-                        : 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
-                      <Zap size={20} className="text-amber-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Club Features Access</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Control which features are available for your clubs
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* PWA Install Card */}
-              {!isInstalled && deferredPrompt && (
-                <button
-                  onClick={handleInstallPWA}
-                  className={`group p-6 rounded-xl text-left transition-all border ${lightMode ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300' : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-blue-50' : 'bg-blue-500/20'}`}>
-                      <Smartphone size={20} className="text-blue-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Install App</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Install as a standalone app on your device
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-            </div>
-          </div>
-
-          {/* Club Settings Section */}
-          {can('settings.club') && !currentOrganization && (
-            <div>
-              <button
-                onClick={() => toggleSection('club')}
-                className={`w-full flex items-center justify-between p-4 rounded-lg mb-4 transition-all ${
-                  lightMode
-                    ? 'bg-white border border-gray-200 hover:bg-gray-50'
-                    : 'bg-slate-800/50 border border-slate-700 hover:bg-slate-800/70'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Building size={20} className={lightMode ? 'text-emerald-600' : 'text-emerald-400'} />
-                  <h2 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                    Club
-                  </h2>
-                </div>
-                <ChevronDown
-                  size={20}
-                  className={`transition-transform duration-200 ${
-                    expandedSections.club ? 'rotate-180' : ''
-                  } ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}
-                />
-              </button>
-              <div
-                className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200 overflow-hidden ${
-                  expandedSections.club ? 'opacity-100 max-h-[2000px]' : 'opacity-0 max-h-0'
-                }`}
-              >
-
-                {/* Club Profile Card */}
-                <button
-                  onClick={() => setActiveTab('club')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'club'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-emerald-50' : 'bg-emerald-500/20'}`}>
-                      <Building size={20} className="text-emerald-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Club details</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Configure your club information and settings
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Yacht Classes Card */}
-                <button
-                  onClick={() => setActiveTab('yacht-classes')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'yacht-classes'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-emerald-50' : 'bg-emerald-500/20'}`}>
-                      <Sailboat size={20} className="text-emerald-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Yacht classes</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Manage the boat classes your club races
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Team Management Card */}
-                {can('settings.team') && (
-                  <button
-                    onClick={() => setActiveTab('team')}
-                    className={`
-                      group p-6 rounded-xl text-left transition-all border
-                      ${activeTab === 'team'
-                        ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                        : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                    `}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-emerald-50' : 'bg-emerald-500/20'}`}>
-                        <Users size={20} className="text-emerald-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Committee Management</h3>
-                        <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                          Manage roles and permissions for your club
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                )}
-
-                {/* Dashboard Templates Card */}
-                {can('settings.team') && (
-                  <button
-                    onClick={() => setActiveTab('dashboard-templates')}
-                    className={`
-                      group p-6 rounded-xl text-left transition-all border
-                      ${activeTab === 'dashboard-templates'
-                        ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                        : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                    `}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-purple-50' : 'bg-purple-500/20'}`}>
-                        <LayoutGrid size={20} className="text-purple-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Dashboard templates</h3>
-                        <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                          Configure dashboard layouts for committee roles
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                )}
-
+        {!activeTab && (() => {
+          const isSuper = !!user?.user_metadata?.is_super_admin;
+          const open = (id: string) => () => setActiveTab(id as SettingsTab);
+          const groups: SettingsGroup[] = [
+            { id: 'account', title: 'Account', dot: '#2E7BFF', items: [
+              { id: 'profile', title: 'Profile', desc: 'Your name, photo and contact details', glyph: 'user', show: true, open: open('profile') },
+              { id: 'team-access', title: 'Team access', desc: 'Invite admins and set what they can see', glyph: 'key', show: !!(isRaceOfficer && !currentClub && !currentOrganization), open: open('team-access') },
+              { id: 'association-users', title: 'Users', desc: 'Admin and editor access to this association', glyph: 'team', show: !!(currentOrganization && can('users.manage')), open: open('association-users') },
+              { id: 'club-features', title: 'Club features', desc: 'Turn platform features on or off for your clubs', glyph: 'toggle', show: !!(currentOrganization && (currentOrganization.type === 'state' || currentOrganization.type === 'national') && can('users.manage')), open: open('club-features') },
+              { id: 'install-app', title: 'Install app', desc: 'Add AlfiePRO to your phone or desktop', glyph: 'phone', show: !!(!isInstalled && deferredPrompt), open: handleInstallPWA },
+            ] },
+            { id: 'club', title: 'Club', dot: '#30D158', items: can('settings.club') && !currentOrganization ? [
+              { id: 'club', title: 'Club details', desc: 'Name, logo, contact and club information', glyph: 'build', show: true, open: open('club') },
+              { id: 'yacht-classes', title: 'Yacht classes', desc: 'The boat classes your club races', glyph: 'boat', show: true, open: open('yacht-classes') },
+              { id: 'team', title: 'Committee', desc: 'Roles and permissions for your committee', glyph: 'crown', show: can('settings.team'), open: open('team') },
+              { id: 'dashboard-templates', title: 'Dashboard templates', desc: 'Dashboard layouts for committee roles', glyph: 'dash', show: can('settings.team'), open: open('dashboard-templates') },
+            ] : [] },
+            { id: 'association', title: 'Association', dot: '#5AC8FA', items: currentOrganization && can('settings.club') ? [
+              { id: 'association', title: `${currentOrganization.type === 'state' ? 'State' : 'National'} association`, desc: 'Name, logo, contact and association information', glyph: 'build', show: true, open: open('association') },
+            ] : [] },
+            { id: 'race', title: 'Race management', dot: '#FF8A2B', items: [
+              { id: 'race-documents', title: 'Race documents', desc: 'Notices of race and sailing instructions', glyph: 'doc', show: !!(can('settings.documents') || (isRaceOfficer && !currentClub)), open: open('race-documents') },
+              { id: 'start-system', title: 'Start system', desc: 'Start sequence, timings and sounds', glyph: 'timer', show: !!(can('settings.startbox') || (isRaceOfficer && !currentClub)), open: open('start-system') },
+              { id: 'data-feeds', title: 'Data feeds', desc: 'Results and live data shared with other sites', glyph: 'rss', show: !!(isRaceOfficer && !currentClub), open: open('data-feeds') },
+              { id: 'handicap-rules', title: 'Handicap rules', desc: 'How handicaps adjust after each race', glyph: 'scale', show: can('settings.handicap_rules'), open: open('handicap-rules') },
+            ] },
+            { id: 'finance', title: 'Finance', dot: '#FFB340', items: can('settings.finance') ? [
+              { id: 'finance-tax', title: 'Tax', desc: 'GST and tax rates', glyph: 'percent', show: true, open: open('finance-tax') },
+              { id: 'finance-categories', title: 'Categories', desc: 'Income and expense categories', glyph: 'tag', show: true, open: open('finance-categories') },
+              { id: 'finance-documents', title: 'Documents', desc: 'Invoice and receipt templates', glyph: 'doc', show: true, open: open('finance-documents') },
+              { id: 'finance-payment', title: 'Bank details', desc: 'Account shown on invoices and renewals', glyph: 'bank', show: true, open: open('finance-payment') },
+              { id: 'finance-payment-settings', title: 'Payments', desc: 'Card and online payment settings', glyph: 'card', show: true, open: open('finance-payment-settings') },
+              { id: 'finance-opening-balance', title: 'Opening balance', desc: 'Starting balance for your books', glyph: 'wallet', show: true, open: open('finance-opening-balance') },
+            ] : [] },
+            { id: 'membership', title: 'Membership', dot: '#8A4DFF', items: can('settings.membership') ? [
+              { id: 'membership-types', title: 'Membership types', desc: 'Fees and categories of membership', glyph: 'card', show: true, open: open('membership-types') },
+              { id: 'membership-renewals', title: 'Renewals', desc: 'Renewal dates, reminders and grace period', glyph: 'renew', show: true, open: open('membership-renewals') },
+              { id: 'membership-emails', title: 'Email templates', desc: 'Welcome, renewal and reminder emails', glyph: 'mail', show: true, open: open('membership-emails') },
+              { id: 'membership-conduct', title: 'Code of conduct', desc: 'What members agree to when joining', glyph: 'shield', show: true, open: open('membership-conduct') },
+            ] : [] },
+            { id: 'system', title: 'System', dot: '#9AA6BD', items: [
+              { id: 'subscriptions', title: 'Subscription & billing', desc: 'Your AlfiePRO plan and invoices', glyph: 'card', show: can('settings.subscriptions'), open: open('subscriptions') },
+              { id: 'integrations', title: 'Integrations & webhooks', desc: 'Connect other tools', glyph: 'plug', show: can('settings.integrations'), open: open('integrations') },
+              { id: 'import-export', title: 'Backup & restore', desc: "Download or restore your club's data", glyph: 'history', show: can('settings.import'), open: open('import-export') },
+              { id: 'email-logs', title: 'Email logs', desc: 'Every email the platform has sent', glyph: 'mail', show: !!currentOrganization, open: open('email-logs') },
+              { id: 'club-email-logs', title: 'Email logs', desc: 'Every email the platform has sent', glyph: 'mail', show: !!(currentClub && !currentOrganization), open: open('club-email-logs') },
+              { id: 'advertising', title: 'Advertising', desc: 'Sponsor ads across your club pages', glyph: 'mega', show: isSuper, open: open('advertising') },
+              { id: 'privacy-policy', title: 'Privacy policy', desc: 'Your public privacy policy', glyph: 'lock', show: isSuper, open: () => navigate('/legal/privacy-policy/edit') },
+              { id: 'terms-of-service', title: 'Terms of service', desc: 'Your public terms of service', glyph: 'doc', show: isSuper, open: () => navigate('/legal/terms-of-service/edit') },
+            ] },
+          ];
+          const q = settingsQuery.trim().toLowerCase();
+          const visible = groups
+            .map((g) => ({ ...g, items: g.items.filter((it) => it.show && (!q || `${it.title} ${it.desc} ${g.title}`.toLowerCase().includes(q))) }))
+            .filter((g) => g.items.length > 0);
+          const all = groups.flatMap((g) => g.items.filter((it) => it.show).map((it) => ({ ...it, group: g.title })));
+          const byId = new Map(all.map((it) => [it.id, it]));
+          const recent = [...recentSettings, 'finance-payment', 'start-system', 'membership-renewals', 'club', 'profile', 'subscriptions']
+            .filter((id, i, a) => a.indexOf(id) === i && byId.has(id))
+            .slice(0, 4)
+            .map((id) => byId.get(id)!);
+          const go = (it: SettingsItem) => { rememberSetting(it.id); it.open(); };
+          const left = visible.filter((g) => ['account', 'club', 'association', 'race'].includes(g.id));
+          const right = visible.filter((g) => !['account', 'club', 'association', 'race'].includes(g.id));
+          const renderGroup = (g: SettingsGroup) => (
+            <section key={g.id} className="a-sg" aria-label={g.title}>
+              <div className="a-sgh">
+                <span className="a-sgh-dot" style={{ background: g.dot }} />
+                <h2 className="a-display">{g.title}</h2>
+                <span className="a-cnt">{g.items.length}</span>
               </div>
-            </div>
-          )}
-
-          {/* Race Management Settings Section */}
-          {(can('settings.documents') || can('settings.startbox') || can('settings.handicap_rules') || (isRaceOfficer && !currentClub)) && (
-            <div>
-              <button
-                onClick={() => toggleSection('raceManagement')}
-                className={`w-full flex items-center justify-between p-4 rounded-lg mb-4 transition-all ${
-                  lightMode
-                    ? 'bg-white border border-gray-200 hover:bg-gray-50'
-                    : 'bg-slate-800/50 border border-slate-700 hover:bg-slate-800/70'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Flag size={20} className={lightMode ? 'text-blue-600' : 'text-blue-400'} />
-                  <h2 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                    Race Management
-                  </h2>
+              {g.items.map((it) => (
+                <button key={it.id} type="button" className="a-sr" onClick={() => go(it)}>
+                  <span className="a-tile a-tile-sm"><AlfieIcon glyph={it.glyph} size={17} /></span>
+                  <span className="flex-1 min-w-0 text-left">
+                    <span className="block a-ink text-[14.5px] font-semibold truncate">{it.title}</span>
+                    <span className="block a-dim text-[12.5px] mt-0.5 truncate">{it.desc}</span>
+                  </span>
+                  <ChevronRight size={16} className="a-dim flex-shrink-0" />
+                </button>
+              ))}
+            </section>
+          );
+          return (
+            <div ref={settingsListRef} className="alfie-settings-board">
+              {!q && recent.length > 0 && (
+                <div className="mb-[18px]">
+                  <p className="a-cap mb-2.5">Recently used</p>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {recent.map((it) => (
+                      <button key={it.id} type="button" className="a-qk" onClick={() => go(it)}>
+                        <span className="a-tile"><AlfieIcon glyph={it.glyph} size={19} /></span>
+                        <span className="block text-left min-w-0">
+                          <span className="block a-ink text-[14.5px] font-semibold truncate">{it.title}</span>
+                          <span className="block a-dim text-[12px] mt-0.5 truncate">{it.group}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <ChevronDown
-                  size={20}
-                  className={`transition-transform duration-200 ${
-                    expandedSections.raceManagement ? 'rotate-180' : ''
-                  } ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}
-                />
-              </button>
-              <div
-                className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200 overflow-hidden ${
-                  expandedSections.raceManagement ? 'opacity-100 max-h-[2000px]' : 'opacity-0 max-h-0'
-                }`}
-              >
-
-                {/* Race Documents Card */}
-                {(can('settings.documents') || (isRaceOfficer && !currentClub)) && (
-                  <button
-                    onClick={() => setActiveTab('race-documents')}
-                    className={`
-                      group p-6 rounded-xl text-left transition-all border
-                      ${activeTab === 'race-documents'
-                        ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                        : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                    `}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-blue-50' : 'bg-blue-500/20'}`}>
-                        <FileText size={20} className="text-blue-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Race documents</h3>
-                        <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                          Manage race document templates and forms
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                )}
-
-                {/* Start System Card */}
-                {(can('settings.startbox') || (isRaceOfficer && !currentClub)) && (
-                  <button
-                    onClick={() => setActiveTab('start-system')}
-                    className={`
-                      group p-6 rounded-xl text-left transition-all border
-                      ${activeTab === 'start-system'
-                        ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                        : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                    `}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-green-50' : 'bg-green-500/20'}`}>
-                        <Zap size={20} className="text-green-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Start system</h3>
-                        <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                          Configure digital StartBox sounds and sequences
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                )}
-
-                {/* Data Feeds Card - Standalone Race Officers */}
-                {(isRaceOfficer && !currentClub) && (
-                  <button
-                    onClick={() => setActiveTab('data-feeds')}
-                    className={`
-                      group p-6 rounded-xl text-left transition-all border
-                      ${activeTab === 'data-feeds'
-                        ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                        : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                    `}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-sky-50' : 'bg-sky-500/20'}`}>
-                        <Share2 size={20} className="text-sky-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Data Feeds</h3>
-                        <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                          Manage external organizations for sharing results
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                )}
-
-                {/* Handicap Rules Card */}
-                {can('settings.handicap_rules') && (
-                <button
-                  onClick={() => setActiveTab('handicap-rules')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'handicap-rules'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                      ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                      : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
-                      <SlidersHorizontal size={20} className="text-amber-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Handicap Rules</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Build and test custom handicap calculation rules
-                      </p>
-                    </div>
-                  </div>
-                </button>
-                )}
-
-              </div>
-            </div>
-          )}
-
-          {/* Finance Settings Section */}
-          {can('settings.finance') && (
-            <div>
-              <button
-                onClick={() => toggleSection('finance')}
-                className={`w-full flex items-center justify-between p-4 rounded-lg mb-4 transition-all ${
-                  lightMode
-                    ? 'bg-white border border-gray-200 hover:bg-gray-50'
-                    : 'bg-slate-800/50 border border-slate-700 hover:bg-slate-800/70'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <DollarSign size={20} className={lightMode ? 'text-amber-600' : 'text-amber-400'} />
-                  <h2 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                    Finance
-                  </h2>
+              )}
+              {visible.length === 0 ? (
+                <div className="a-card a-empty py-14 px-6">
+                  <span className="a-tile" style={{ width: 52, height: 52 }}><Search size={22} /></span>
+                  <h3 className="a-display a-ink text-[17px] font-semibold">No settings match “{settingsQuery.trim()}”</h3>
+                  <p className="a-mute text-[14px]">Try another word, like bank, renewals or start.</p>
                 </div>
-                <ChevronDown
-                  size={20}
-                  className={`transition-transform duration-200 ${
-                    expandedSections.finance ? 'rotate-180' : ''
-                  } ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}
-                />
-              </button>
-              <div
-                className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200 overflow-hidden ${
-                  expandedSections.finance ? 'opacity-100 max-h-[2000px]' : 'opacity-0 max-h-0'
-                }`}
-              >
-
-                {/* Tax Card */}
-                <button
-                  onClick={() => setActiveTab('finance-tax')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'finance-tax'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
-                      <Percent size={20} className="text-amber-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Tax</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Manage tax rates for your organization
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Categories Card */}
-                <button
-                  onClick={() => setActiveTab('finance-categories')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'finance-categories'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
-                      <Tag size={20} className="text-amber-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Categories</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Configure income and expense categories
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Documents Card */}
-                <button
-                  onClick={() => setActiveTab('finance-documents')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'finance-documents'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
-                      <Receipt size={20} className="text-amber-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Documents</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Setup invoice and receipt templates
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Bank Details Card */}
-                <button
-                  onClick={() => setActiveTab('finance-payment')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'finance-payment'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
-                      <Landmark size={20} className="text-amber-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Bank Details</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Set bank name, BSB, and account number for payments
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Payment Settings Card */}
-                <button
-                  onClick={() => setActiveTab('finance-payment-settings')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'finance-payment-settings'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-green-50' : 'bg-green-500/20'}`}>
-                      <CreditCard size={20} className="text-green-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Payment Settings</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Configure Stripe and membership payment integration
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Opening Balance Card */}
-                <button
-                  onClick={() => setActiveTab('finance-opening-balance')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'finance-opening-balance'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-blue-50' : 'bg-blue-500/20'}`}>
-                      <Landmark size={20} className="text-blue-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Opening Balance</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Set your starting bank balance for accurate reporting
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-              </div>
-            </div>
-          )}
-
-          {/* Membership Settings Section */}
-          {can('settings.membership') && (
-            <div>
-              <button
-                onClick={() => toggleSection('membership')}
-                className={`w-full flex items-center justify-between p-4 rounded-lg mb-4 transition-all ${
-                  lightMode
-                    ? 'bg-white border border-gray-200 hover:bg-gray-50'
-                    : 'bg-slate-800/50 border border-slate-700 hover:bg-slate-800/70'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Users size={20} className={lightMode ? 'text-purple-600' : 'text-purple-400'} />
-                  <h2 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                    Membership
-                  </h2>
+              ) : (
+                <div className={`grid gap-[18px] items-start ${left.length && right.length ? 'lg:grid-cols-2' : ''}`}>
+                  {left.length > 0 && <div className="flex flex-col gap-[18px] min-w-0">{left.map(renderGroup)}</div>}
+                  {right.length > 0 && <div className="flex flex-col gap-[18px] min-w-0">{right.map(renderGroup)}</div>}
                 </div>
-                <ChevronDown
-                  size={20}
-                  className={`transition-transform duration-200 ${
-                    expandedSections.membership ? 'rotate-180' : ''
-                  } ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}
-                />
-              </button>
-              <div
-                className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200 overflow-hidden ${
-                  expandedSections.membership ? 'opacity-100 max-h-[2000px]' : 'opacity-0 max-h-0'
-                }`}
-              >
-
-                {/* Membership Types Card */}
-                <button
-                  onClick={() => setActiveTab('membership-types')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'membership-types'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-purple-50' : 'bg-purple-500/20'}`}>
-                      <Users size={20} className="text-purple-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Membership Types</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Configure membership types and fees
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Renewals Card */}
-                <button
-                  onClick={() => setActiveTab('membership-renewals')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'membership-renewals'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-purple-50' : 'bg-purple-500/20'}`}>
-                      <Calendar size={20} className="text-purple-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Renewals</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Configure renewal settings and schedules
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Email Templates Card */}
-                <button
-                  onClick={() => setActiveTab('membership-emails')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'membership-emails'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-purple-50' : 'bg-purple-500/20'}`}>
-                      <Mail size={20} className="text-purple-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Email Templates</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Customize membership email templates
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Code of Conduct Card */}
-                <button
-                  onClick={() => setActiveTab('membership-conduct')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'membership-conduct'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`
-                      p-3 rounded-lg transition-colors
-                      ${activeTab === 'membership-conduct'
-                        ? 'bg-blue-500/20 text-blue-400'
-                        : 'bg-slate-700 text-slate-400 group-hover:bg-slate-600'}
-                    `}>
-                      <ScrollText size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Code of Conduct</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Define club rules and conduct policies
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-              </div>
+              )}
             </div>
-          )}
-
-          {/* Association Settings Section - admin only */}
-          {currentOrganization && can('settings.club') && (
-            <div>
-              <h2 className={`text-lg font-semibold mb-4 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Association settings</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-
-                {/* Association Profile Card */}
-                <button
-                  onClick={() => setActiveTab('association')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'association'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-cyan-50' : 'bg-cyan-500/20'}`}>
-                      <Building size={20} className="text-cyan-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                        {currentOrganization.type === 'state' ? 'State' : 'National'} Association
-                      </h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Configure your association information
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-
-              </div>
-            </div>
-          )}
-
-          {/* System Settings Section */}
-          <div>
-            <button
-              onClick={() => toggleSection('system')}
-              className={`w-full flex items-center justify-between p-4 rounded-lg mb-4 transition-all ${
-                lightMode
-                  ? 'bg-white border border-gray-200 hover:bg-gray-50'
-                  : 'bg-slate-800/50 border border-slate-700 hover:bg-slate-800/70'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Settings size={20} className={lightMode ? 'text-slate-600' : 'text-slate-400'} />
-                <h2 className={`text-lg font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                  System
-                </h2>
-              </div>
-              <ChevronDown
-                size={20}
-                className={`transition-transform duration-200 ${
-                  expandedSections.system ? 'rotate-180' : ''
-                } ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}
-              />
-            </button>
-            <div
-              className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200 overflow-hidden ${
-                expandedSections.system ? 'opacity-100 max-h-[2000px]' : 'opacity-0 max-h-0'
-              }`}
-            >
-
-              {/* Subscriptions Card */}
-              {can('settings.subscriptions') && (
-                <button
-                  onClick={() => setActiveTab('subscriptions')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'subscriptions'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-rose-50' : 'bg-rose-500/20'}`}>
-                      <CreditCard size={20} className="text-rose-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Subscription & billing</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Manage your subscription plan and billing
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* Integrations Card */}
-              {can('settings.integrations') && (
-                <button
-                  onClick={() => setActiveTab('integrations')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'integrations'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-rose-50' : 'bg-rose-500/20'}`}>
-                      <Globe size={20} className="text-rose-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Integrations & webhooks</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Connect external services and APIs
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* Import/Export Card */}
-              {can('settings.import') && (
-                <button
-                  onClick={() => setActiveTab('import-export')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'import-export'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-rose-50' : 'bg-rose-500/20'}`}>
-                      <Download size={20} className="text-rose-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Backup & restore</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Import and export your club data
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* Email Logs Card - Association Admins Only */}
-              {currentOrganization && (
-                <button
-                  onClick={() => setActiveTab('email-logs')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'email-logs'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-rose-50' : 'bg-rose-500/20'}`}>
-                      <Mail size={20} className="text-rose-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Email Logs</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        View email delivery history across clubs
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* Email Logs Card - Club Admins */}
-              {currentClub && !currentOrganization && (
-                <button
-                  onClick={() => setActiveTab('club-email-logs')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'club-email-logs'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-rose-50' : 'bg-rose-500/20'}`}>
-                      <Mail size={20} className="text-rose-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Email Logs</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        View email delivery history for your club
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* Advertising Card - SuperAdmin Only */}
-              {user?.user_metadata?.is_super_admin && (
-                <button
-                  onClick={() => setActiveTab('advertising')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'advertising'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
-                      <Megaphone size={20} className="text-amber-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Advertising</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Manage advertisers, campaigns, and analytics
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* Privacy Policy Card - SuperAdmin Only */}
-              {user?.user_metadata?.is_super_admin && (
-                <button
-                  onClick={() => navigate('/legal/privacy-policy/edit')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${lightMode
-                      ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                      : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-indigo-50' : 'bg-indigo-500/20'}`}>
-                      <Shield size={20} className="text-indigo-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Privacy Policy</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Edit global privacy policy for all clubs
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* Terms of Service Card - SuperAdmin Only */}
-              {user?.user_metadata?.is_super_admin && (
-                <button
-                  onClick={() => navigate('/legal/terms-of-service/edit')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${lightMode
-                      ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                      : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-purple-50' : 'bg-purple-500/20'}`}>
-                      <ScrollText size={20} className="text-purple-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Terms of Service</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Edit global terms of service for all clubs
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-            </div>
-          </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Content - only show when a tab is selected */}
         {activeTab && (
