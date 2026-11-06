@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Save, X, DollarSign, Calendar, TrendingUp, TrendingDown, ChartBar as BarChart3, ChartPie as PieChartIcon, Target, Wallet, ChevronDown, ChevronRight, CreditCard as Edit3, Tag, ArrowRight } from 'lucide-react';
+import { Save, X, DollarSign, Calendar, TrendingUp, TrendingDown, ChartBar as BarChart3, ChartPie as PieChartIcon, Wallet, ChevronDown, ChevronRight, CreditCard as Edit3, Tag, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend, Filler } from 'chart.js';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend, Filler);
 
@@ -318,43 +318,9 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
 
   const allocationColors = ['#06b6d4', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#f97316', '#14b8a6', '#a855f7', '#ef4444'];
 
-  const expenseAllocationData = {
-    labels: expenseCategoryTotals.map(c => c.name),
-    datasets: [{
-      data: expenseCategoryTotals.map(c => c.total),
-      backgroundColor: expenseCategoryTotals.map((_, i) => allocationColors[i % allocationColors.length]),
-      borderColor: darkMode ? 'rgb(15, 23, 42)' : 'rgb(255, 255, 255)',
-      borderWidth: 2,
-    }],
-  };
 
-  const pieOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: true,
-        position: 'right' as const,
-        labels: { color: darkMode ? 'rgb(203, 213, 225)' : 'rgb(71, 85, 105)', padding: 10, font: { size: 11 } },
-      },
-      tooltip: {
-        backgroundColor: darkMode ? 'rgb(30, 41, 59)' : 'rgb(255, 255, 255)',
-        titleColor: darkMode ? 'rgb(226, 232, 240)' : 'rgb(15, 23, 42)',
-        bodyColor: darkMode ? 'rgb(203, 213, 225)' : 'rgb(71, 85, 105)',
-        borderColor: darkMode ? 'rgb(51, 65, 85)' : 'rgb(226, 232, 240)',
-        borderWidth: 1,
-        padding: 12,
-        callbacks: {
-          label: function (context: any) {
-            const value = formatCurrency(context.parsed);
-            const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
-            const pct = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : '0';
-            return `${context.label}: ${value} (${pct}%)`;
-          },
-        },
-      },
-    },
-  };
+
+
 
   if (loading) {
     return (
@@ -431,276 +397,183 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
     const Icon = isIncome ? TrendingUp : TrendingDown;
     const sectionTotal = calculateGrandTotal(type);
 
-    const iconBg = isIncome ? 'bg-emerald-500/10' : 'bg-red-500/10';
-    const iconColor = isIncome ? 'text-emerald-400' : 'text-red-400';
-    const totalColor = isIncome ? 'text-emerald-400' : 'text-red-400';
-    const totalRowBg = isIncome ? 'bg-emerald-500/5' : 'bg-red-500/5';
-    const totalRowBorder = isIncome ? 'border-emerald-500/20' : 'border-red-500/20';
-    const totalCellBg = isIncome ? 'bg-emerald-950/30' : 'bg-red-950/30';
 
     return (
-      <div className={`rounded-2xl border backdrop-blur-sm overflow-hidden ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-        <button
-          onClick={onToggle}
-          className={`w-full flex items-center justify-between px-6 py-4 transition-colors ${darkMode ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'}`}
-        >
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${iconBg}`}>
-              <Icon className={iconColor} size={20} />
-            </div>
-            <div className="text-left">
-              <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                {isIncome ? 'Income Budget' : 'Expense Budget'}
-              </h3>
-              <p className="text-xs text-slate-500">
-                {sectionCategories.length} {sectionCategories.length === 1 ? 'category' : 'categories'}
-              </p>
-            </div>
+      <div className="a-card overflow-hidden">
+        <button onClick={onToggle} className="w-full flex items-center gap-3 text-left bg-transparent border-0 cursor-pointer" style={{ padding: '18px 20px' }} aria-expanded={isExpanded}>
+          <span className="a-tile a-tile-sm"><Icon size={17} /></span>
+          <div className="flex-1 min-w-0">
+            <h2 className="a-display a-ink m-0 text-lg font-semibold">{isIncome ? 'Income budget' : 'Expense budget'}</h2>
+            <p className="a-dim mt-0.5 mb-0 text-[12.5px]">{sectionCategories.length} {sectionCategories.length === 1 ? 'category' : 'categories'} · click a month to edit</p>
           </div>
-          <div className="flex items-center gap-4">
-            <span className={`text-lg font-bold ${totalColor}`}>
-              {formatCurrency(sectionTotal)}
-            </span>
-            {isExpanded ? <ChevronDown size={18} className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`} /> : <ChevronRight size={18} className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />}
-          </div>
+          <span className={`a-big ${isIncome ? 'a-txt-g' : 'a-txt-r'}`} style={{ fontSize: 22 }}>{formatCurrency(sectionTotal)}</span>
+          <span className="a-dim flex">{isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</span>
         </button>
 
         {isExpanded && sectionCategories.length > 0 && (
-          <div className={`border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
-                <thead>
-                  <tr className={`border-b ${darkMode ? 'border-slate-700/40' : 'border-slate-200'}`}>
-                    <th className={`sticky left-0 z-10 backdrop-blur-sm px-4 py-3 text-left w-[180px] ${darkMode ? 'bg-slate-800/90' : 'bg-white/90'}`}>
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Category</span>
-                    </th>
-                    {MONTHS.map((m) => (
-                      <th key={m} className="px-1 py-3 text-center min-w-[80px]">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{m}</span>
-                      </th>
-                    ))}
-                    <th className={`sticky right-0 z-10 backdrop-blur-sm px-4 py-3 text-right w-[110px] ${darkMode ? 'bg-slate-800/90' : 'bg-white/90'}`}>
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Annual</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sectionCategories.map((category) => {
-                    const catTotal = calculateCategoryTotal(category.id);
-                    return (
-                      <tr key={category.id} className={`border-b transition-colors group ${darkMode ? 'border-slate-700/20 hover:bg-slate-700/15' : 'border-slate-100 hover:bg-slate-50'}`}>
-                        <td className={`sticky left-0 z-10 backdrop-blur-sm px-4 py-2.5 ${darkMode ? 'bg-slate-800/90 group-hover:bg-slate-700/90' : 'bg-white/90 group-hover:bg-slate-50/90'}`}>
-                          <span className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{category.name}</span>
-                        </td>
-                        {MONTHS.map((_, monthIndex) => (
-                          <td key={monthIndex} className="px-1 py-1.5 text-center">
-                            {renderEditableCell(category.id, monthIndex + 1, type)}
-                          </td>
-                        ))}
-                        <td className={`sticky right-0 z-10 backdrop-blur-sm px-4 py-2.5 text-right ${darkMode ? 'bg-slate-800/90 group-hover:bg-slate-700/90' : 'bg-white/90 group-hover:bg-slate-50/90'}`}>
-                          <span className={`text-sm font-semibold ${totalColor}`}>
-                            {formatCurrency(catTotal)}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  <tr className={`${totalRowBg} border-t ${totalRowBorder}`}>
-                    <td className={`sticky left-0 z-10 ${totalCellBg} backdrop-blur-sm px-4 py-3`}>
-                      <span className={`text-xs font-bold uppercase tracking-wider ${totalColor}`}>
-                        Total {isIncome ? 'Income' : 'Expenses'}
-                      </span>
-                    </td>
+          <div className="overflow-x-auto">
+            <table className="a-btable w-full min-w-[900px]">
+              <thead>
+                <tr>
+                  <th className="a-btable-sticky-l text-left" style={{ width: 180 }}>Category</th>
+                  {MONTHS.map((m) => <th key={m}>{m}</th>)}
+                  <th className="a-btable-sticky-r text-right" style={{ width: 110 }}>Annual</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sectionCategories.map((category) => (
+                  <tr key={category.id}>
+                    <td className="a-btable-sticky-l a-ink text-sm">{category.name}</td>
                     {MONTHS.map((_, monthIndex) => (
-                      <td key={monthIndex} className="px-1 py-3 text-center">
-                        <span className={`text-xs font-semibold ${totalColor}`}>
-                          {formatCurrency(calculateMonthTotal(monthIndex + 1, type))}
-                        </span>
-                      </td>
+                      <td key={monthIndex} className="text-center">{renderEditableCell(category.id, monthIndex + 1, type)}</td>
                     ))}
-                    <td className={`sticky right-0 z-10 ${totalCellBg} backdrop-blur-sm px-4 py-3 text-right`}>
-                      <span className={`text-sm font-bold ${totalColor}`}>
-                        {formatCurrency(sectionTotal)}
-                      </span>
-                    </td>
+                    <td className={`a-btable-sticky-r a-num text-right font-semibold ${isIncome ? 'a-txt-g' : 'a-txt-r'}`}>{formatCurrency(calculateCategoryTotal(category.id))}</td>
                   </tr>
-                </tbody>
-              </table>
-            </div>
+                ))}
+                <tr className="a-btable-total">
+                  <td className="a-btable-sticky-l a-cap" style={{ color: 'inherit' }}>Total {isIncome ? 'income' : 'expenses'}</td>
+                  {MONTHS.map((_, monthIndex) => (
+                    <td key={monthIndex} className="text-center a-num text-xs font-semibold">{formatCurrency(calculateMonthTotal(monthIndex + 1, type))}</td>
+                  ))}
+                  <td className={`a-btable-sticky-r a-num text-right font-semibold ${isIncome ? 'a-txt-g' : 'a-txt-r'}`}>{formatCurrency(sectionTotal)}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         )}
 
         {isExpanded && sectionCategories.length === 0 && (
-          <div className={`px-6 py-8 text-center border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
-            <p className="text-sm text-slate-500">
-              No {isIncome ? 'income' : 'expense'} categories yet. Add categories in Settings to start budgeting.
-            </p>
+          <div className="px-6 py-8 text-center a-mute text-sm">
+            No {isIncome ? 'income' : 'expense'} categories yet. Add categories to start budgeting.
           </div>
         )}
       </div>
     );
   };
 
+  const margin = totalIncome > 0 ? (netBudget / totalIncome) * 100 : 0;
+  const ringDeg = Math.max(0, Math.min(360, (Math.abs(margin) / 100) * 360));
+  const allocTotal = expenseCategoryTotals.reduce((s, c) => s + c.total, 0);
+  let acc = 0;
+  const allocStops = expenseCategoryTotals.map((c, i) => {
+    const from = (acc / (allocTotal || 1)) * 360;
+    acc += c.total;
+    const to = (acc / (allocTotal || 1)) * 360;
+    return `${allocationColors[i % allocationColors.length]} ${from}deg ${to}deg`;
+  }).join(', ');
+  const Stat = ({ label, icon, value, sub, tone = 'a-ink' }: { label: string; icon: React.ReactNode; value: React.ReactNode; sub: React.ReactNode; tone?: string }) => (
+    <div className="a-card flex flex-col gap-3.5" style={{ padding: '18px 20px' }}>
+      <div className="flex items-center justify-between"><p className="a-cap">{label}</p><span className="a-tile a-tile-sm">{icon}</span></div>
+      <div><div className={`a-big ${tone}`} style={{ fontSize: 30 }}>{value}</div><div className="a-mute mt-[7px] text-[12.5px]">{sub}</div></div>
+    </div>
+  );
+  const netMax = Math.max(...MONTHS.map((_, i) => Math.abs(calculateMonthTotal(i + 1, 'income') - calculateMonthTotal(i + 1, 'expense'))), 1);
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-[22px]">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Budget Planning</h2>
-          <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Plan and track your financial budget for {selectedYear}</p>
+          <h2 className="a-display a-ink m-0 text-[22px] font-semibold">Budget planning</h2>
+          <p className="a-mute mt-1 mb-0 text-sm">Plan and track your financial budget for {selectedYear}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className={`flex items-center gap-2 px-4 py-2.5 border rounded-xl backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-            <Calendar size={16} className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className={`bg-transparent text-sm font-medium outline-none cursor-pointer ${darkMode ? 'text-white' : 'text-slate-900'}`}
-            >
-              {Array.from({ length: 5 }, (_, i) => {
-                const year = new Date().getFullYear() - 2 + i;
-                return <option key={year} value={year}>{year}</option>;
-              })}
-            </select>
-          </div>
-        </div>
+        <label className="relative inline-flex">
+          <span className="sr-only">Budget year</span>
+          <Calendar size={16} className="a-mute absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <select value={selectedYear} onChange={(e) => setSelectedYear(parseInt(e.target.value))} className="a-pick" style={{ paddingLeft: 36 }}>
+            {Array.from({ length: 5 }, (_, i) => { const year = new Date().getFullYear() - 2 + i; return <option key={year} value={year}>{year}</option>; })}
+          </select>
+        </label>
       </div>
 
-      {error && (
-        <div className="bg-red-900/20 border border-red-500/20 text-red-300 px-4 py-3 rounded-xl text-sm">
-          {error}
-        </div>
-      )}
+      {error && <div className="a-note"><span className="a-txt-r text-sm">{error}</span></div>}
 
       {categories.length > 0 ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="group relative overflow-hidden bg-emerald-500/[0.08] rounded-2xl border border-emerald-500/20 p-5 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/10 backdrop-blur-sm">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2.5 bg-emerald-500/10 rounded-xl">
-                    <TrendingUp className="text-emerald-400" size={20} />
-                  </div>
-                </div>
-                <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Income Budget</p>
-                <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(totalIncome)}</p>
-                <p className="text-[11px] text-slate-500 mt-1">{incomeCategories.length} categories</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <Stat label="Income budget" icon={<TrendingUp size={17} />} value={formatCurrency(totalIncome)} sub={`${incomeCategories.length} categories`} />
+            <Stat label="Expense budget" icon={<TrendingDown size={17} />} value={formatCurrency(totalExpenses)} sub={`${expenseCategories.length} categories`} />
+            <Stat label="Net budget" icon={<Wallet size={17} />} value={formatCurrency(netBudget)} tone={netBudget >= 0 ? 'a-txt-g' : 'a-txt-r'} sub={<span className={netBudget >= 0 ? 'a-txt-g' : 'a-txt-r'}>{netBudget >= 0 ? 'Surplus' : 'Deficit'}</span>} />
+            <div className="a-card flex items-center gap-[18px]" style={{ padding: '18px 20px' }}>
+              <div className="relative flex-shrink-0" style={{ width: 78, height: 78 }} aria-hidden="true">
+                <div className="a-ring" style={{ background: `conic-gradient(${netBudget >= 0 ? '#FFB340' : '#FF6B6B'} 0deg ${ringDeg}deg, var(--a-ring-track) ${ringDeg}deg 360deg)` }} />
               </div>
-            </div>
-
-            <div className="group relative overflow-hidden bg-red-500/[0.08] rounded-2xl border border-red-500/20 p-5 transition-all duration-300 hover:border-red-500/40 hover:shadow-lg hover:shadow-red-500/10 backdrop-blur-sm">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2.5 bg-red-500/10 rounded-xl">
-                    <TrendingDown className="text-red-400" size={20} />
-                  </div>
-                </div>
-                <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Expense Budget</p>
-                <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(totalExpenses)}</p>
-                <p className="text-[11px] text-slate-500 mt-1">{expenseCategories.length} categories</p>
-              </div>
-            </div>
-
-            <div className="group relative overflow-hidden bg-cyan-500/[0.08] rounded-2xl border border-cyan-500/20 p-5 transition-all duration-300 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/10 backdrop-blur-sm">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2.5 bg-cyan-500/10 rounded-xl">
-                    <Wallet className="text-cyan-400" size={20} />
-                  </div>
-                </div>
-                <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Net Budget</p>
-                <p className={`text-2xl font-bold ${netBudget >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {formatCurrency(netBudget)}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-1">{netBudget >= 0 ? 'Surplus' : 'Deficit'}</p>
-              </div>
-            </div>
-
-            <div className="group relative overflow-hidden bg-amber-500/[0.08] rounded-2xl border border-amber-500/20 p-5 transition-all duration-300 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10 backdrop-blur-sm">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2.5 bg-amber-500/10 rounded-xl">
-                    <Target className="text-amber-400" size={20} />
-                  </div>
-                </div>
-                <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Budget Margin</p>
-                <p className={`text-2xl font-bold ${netBudget >= 0 ? 'text-amber-400' : 'text-red-400'}`}>
-                  {totalIncome > 0 ? ((netBudget / totalIncome) * 100).toFixed(1) : '0.0'}%
-                </p>
-                <p className="text-[11px] text-slate-500 mt-1">of planned income</p>
+              <div>
+                <p className="a-cap">Budget margin</p>
+                <div className={`a-big mt-2 ${netBudget >= 0 ? 'a-txt-a' : 'a-txt-r'}`} style={{ fontSize: 30 }}>{margin.toFixed(1)}%</div>
+                <div className="a-mute text-[12.5px] mt-1.5">of planned income</div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-              <div className="flex items-center gap-2 mb-6">
-                <BarChart3 size={20} className="text-cyan-400" />
-                <div>
-                  <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Monthly Budget Distribution</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Income vs Expenses by month</p>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="a-card xl:col-span-2 flex flex-col gap-3" style={{ padding: 22 }}>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="a-tile a-tile-sm"><BarChart3 size={17} /></span>
+                <div className="flex-1 min-w-0">
+                  <h2 className="a-display a-ink m-0 text-lg font-semibold">Monthly budget</h2>
+                  <p className="a-dim mt-0.5 mb-0 text-[12.5px]">Income vs expenses by month</p>
                 </div>
+                <span className="a-st text-[12.5px]"><span className="a-light" style={{ background: '#30D158', boxShadow: 'none' }} />Income</span>
+                <span className="a-st text-[12.5px] ml-3"><span className="a-light" style={{ background: '#FF6B6B', boxShadow: 'none' }} />Expenses</span>
               </div>
-              <div className="h-[280px]">
-                <Bar data={barChartData} options={barChartOptions} />
-              </div>
+              <div className="h-[280px]"><Bar data={barChartData} options={barChartOptions} /></div>
             </div>
 
-            <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-              <div className="flex items-center gap-2 mb-6">
-                <PieChartIcon size={20} className="text-cyan-400" />
-                <div>
-                  <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Expense Allocation</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Budget breakdown by category</p>
+            <div className="a-card flex flex-col gap-4" style={{ padding: 22 }}>
+              <div className="flex items-center gap-3">
+                <span className="a-tile a-tile-sm"><PieChartIcon size={17} /></span>
+                <div className="flex-1 min-w-0">
+                  <h2 className="a-display a-ink m-0 text-lg font-semibold">Expense allocation</h2>
+                  <p className="a-dim mt-0.5 mb-0 text-[12.5px]">By category</p>
                 </div>
               </div>
               {expenseCategoryTotals.length > 0 ? (
-                <div className="h-[280px]">
-                  <Doughnut data={expenseAllocationData} options={pieOptions} />
-                </div>
+                <>
+                  <div className="flex justify-center">
+                    <div className="relative flex-shrink-0" style={{ width: 170, height: 170 }}>
+                      <div className="a-ring a-ring-lg" style={{ background: `conic-gradient(${allocStops})` }} />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="a-big a-ink" style={{ fontSize: 22 }}>{formatCurrency(allocTotal)}</span>
+                        <span className="a-dim text-[11.5px] mt-[3px]">budgeted</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="a-divide">
+                    {expenseCategoryTotals.map((c, i) => (
+                      <div key={c.name} className="flex items-center gap-2.5 py-2.5">
+                        <span className="a-light" style={{ background: allocationColors[i % allocationColors.length], boxShadow: 'none' }} />
+                        <span className="flex-1 a-ink text-[13.5px] truncate">{c.name}</span>
+                        <span className="a-num a-ink text-sm font-semibold">{formatCurrency(c.total)}</span>
+                        <span className="a-dim a-num text-right text-[12.5px]" style={{ width: 44 }}>{Math.round((c.total / (allocTotal || 1)) * 100)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
               ) : (
-                <div className="h-[280px] flex items-center justify-center">
-                  <p className="text-sm text-slate-500">No expense budget entries yet</p>
-                </div>
+                <div className="flex-1 flex items-center justify-center a-mute text-sm py-10">No expense budget entries yet</div>
               )}
             </div>
           </div>
 
-          <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <DollarSign size={20} className="text-cyan-400" />
-                <div>
-                  <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Net Monthly Position</h3>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Income minus expenses per month</p>
-                </div>
+          <div className="a-card flex flex-col gap-3.5" style={{ padding: 22 }}>
+            <div className="flex items-center gap-3">
+              <span className="a-tile a-tile-sm"><DollarSign size={17} /></span>
+              <div className="flex-1 min-w-0">
+                <h2 className="a-display a-ink m-0 text-lg font-semibold">Net monthly position</h2>
+                <p className="a-dim mt-0.5 mb-0 text-[12.5px]">Income minus expenses</p>
               </div>
             </div>
-            <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-2">
+            <div className="grid grid-cols-6 lg:grid-cols-12 gap-1.5">
               {MONTHS.map((m, idx) => {
-                const income = calculateMonthTotal(idx + 1, 'income');
-                const expense = calculateMonthTotal(idx + 1, 'expense');
-                const net = income - expense;
-                const maxVal = Math.max(...monthlyBudgetData.map(d => Math.abs(d.income - d.expense)), 1);
-                const barHeight = Math.min(Math.abs(net) / maxVal * 48, 48);
-
+                const net = calculateMonthTotal(idx + 1, 'income') - calculateMonthTotal(idx + 1, 'expense');
+                const h = net === 0 ? 3 : Math.max(4, Math.round((Math.abs(net) / netMax) * 64));
                 return (
-                  <div key={m} className="flex flex-col items-center gap-1">
-                    <div className="h-12 w-full flex items-end justify-center">
-                      <div
-                        className={`w-full max-w-[28px] rounded-t-md transition-all ${
-                          net >= 0 ? 'bg-emerald-500/60' : 'bg-red-500/60'
-                        }`}
-                        style={{ height: `${Math.max(barHeight, 2)}px` }}
-                      />
+                  <div key={m} className="flex flex-col items-center gap-1.5">
+                    <div className="w-full flex flex-col justify-end items-center" style={{ height: 70 }}>
+                      <div className={`a-netbar ${net > 0 ? 'a-netbar-g' : net < 0 ? 'a-netbar-r' : ''}`} style={{ height: h }} />
                     </div>
-                    <span className="text-[10px] text-slate-500 font-medium">{m}</span>
-                    <span className={`text-[10px] font-semibold ${net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {formatCurrency(net)}
-                    </span>
+                    <span className="a-dim text-[11.5px]">{m.charAt(0) + m.slice(1).toLowerCase()}</span>
+                    <span className={`a-num text-[12.5px] font-semibold ${net > 0 ? 'a-txt-g' : net < 0 ? 'a-txt-r' : 'a-dim'}`}>{net < 0 ? '−' : ''}{formatCurrency(Math.abs(net))}</span>
                   </div>
                 );
               })}
@@ -710,45 +583,24 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
           {renderCategorySection('income', incomeCategories, incomeExpanded, () => setIncomeExpanded(!incomeExpanded))}
           {renderCategorySection('expense', expenseCategories, expenseExpanded, () => setExpenseExpanded(!expenseExpanded))}
 
-          <div className={`rounded-2xl border p-5 ${darkMode ? 'from-cyan-500/10 via-slate-800/50 to-slate-800/30 border-cyan-500/20' : 'bg-cyan-50/50 border-cyan-500/20'}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-cyan-500/10 rounded-xl">
-                  <Wallet className="text-cyan-400" size={20} />
-                </div>
-                <div>
-                  <p className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Annual Net Position</p>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedYear} total income minus total expenses</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className={`text-2xl font-bold ${netBudget >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {formatCurrency(netBudget)}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {formatCurrency(totalIncome)} income - {formatCurrency(totalExpenses)} expenses
-                </p>
-              </div>
+          <div className="a-card a-hero a-hero-b flex flex-wrap items-center gap-3.5" style={{ padding: '18px 20px' }}>
+            <span className="a-tile"><Wallet size={19} /></span>
+            <div className="flex-1 min-w-[200px]">
+              <div className="a-ink text-[14.5px] font-semibold">Annual net position</div>
+              <div className="a-dim text-[12.5px] mt-0.5">{selectedYear} total income minus total expenses</div>
+            </div>
+            <div className="text-right">
+              <div className={`a-big ${netBudget >= 0 ? 'a-txt-g' : 'a-txt-r'}`} style={{ fontSize: 26 }}>{formatCurrency(netBudget)}</div>
+              <div className="a-dim text-xs mt-1">{formatCurrency(totalIncome)} income − {formatCurrency(totalExpenses)} expenses</div>
             </div>
           </div>
         </>
       ) : (
-        <div className={`text-center py-20 rounded-2xl border backdrop-blur-sm ${darkMode ? 'border-slate-700/50 bg-slate-800/50' : 'border-slate-200 bg-white'}`}>
-          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 ${darkMode ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
-            <Tag size={32} className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
-          </div>
-          <h3 className={`text-xl font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>No Budget Categories</h3>
-          <p className={`mb-4 max-w-md mx-auto text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            Create budget categories before you can plan your budget.
-          </p>
-          <button
-            onClick={() => navigate('/finances/categories')}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <Tag size={16} />
-            Set Up Categories
-            <ArrowRight size={16} />
-          </button>
+        <div className="a-card a-empty" style={{ padding: '48px 24px' }}>
+          <span className="a-tile" style={{ width: 56, height: 56 }}><Tag size={24} /></span>
+          <div className="a-display a-ink text-lg font-semibold">No budget categories</div>
+          <p className="a-mute m-0 text-sm">Create budget categories before you can plan your budget.</p>
+          <button onClick={() => navigate('/finances/categories')} className="a-btn a-btn-p mt-1"><Tag size={16} />Set up categories<ArrowRight size={16} /></button>
         </div>
       )}
     </div>
