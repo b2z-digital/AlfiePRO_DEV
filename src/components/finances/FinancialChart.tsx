@@ -37,6 +37,7 @@ interface FinancialChartProps {
   onPeriodChange?: (period: PeriodType) => void;
   associationId?: string;
   associationType?: 'state' | 'national';
+  className?: string;
 }
 
 interface TransactionData {
@@ -54,7 +55,8 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
   period: externalPeriod,
   onPeriodChange,
   associationId,
-  associationType
+  associationType,
+  className = ''
 }) => {
   const { currentClub } = useAuth();
   const [internalPeriod, setInternalPeriod] = useState<PeriodType>('30d');
@@ -447,124 +449,54 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
                    trend.direction === 'down' ? TrendingDown : Minus;
 
   return (
-    <div className={`
-      rounded-xl border backdrop-blur-sm p-6 mb-8
-      ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}
-    `}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-blue-500/15">
-            <TrendingUp className="text-blue-500" size={20} />
-          </div>
-          <div>
-            <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Financial Position</h3>
-            <div className="flex items-center gap-2 text-sm">
-              <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>$</span>
-              <div className={`flex items-center gap-1 ${
-                trend.direction === 'up' ? 'text-green-500' :
-                trend.direction === 'down' ? 'text-red-500' : (darkMode ? 'text-slate-400' : 'text-slate-500')
-              }`}>
-                <TrendIcon size={14} />
-                <span>
-                  {trend.value > 0 ? `${trend.value.toFixed(1)}% ` : 'No '}
-                  change
-                </span>
-              </div>
-            </div>
-          </div>
+    <div className={`a-card flex flex-col gap-4 ${className}`} style={{ padding: 22 }}>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="a-tile a-tile-sm"><TrendingUp size={17} /></span>
+        <div className="flex-1 min-w-[180px]">
+          <h2 className="a-display a-ink m-0 text-lg font-semibold">Financial position</h2>
+          <p className={`mt-0.5 mb-0 text-[12.5px] flex items-center gap-1 ${trend.direction === 'up' ? 'a-txt-g' : trend.direction === 'down' ? 'a-txt-r' : 'a-dim'}`}>
+            {trend.value > 0 && <TrendIcon size={13} />}
+            {trend.value > 0 ? `${trend.value.toFixed(1)}% ${trend.direction === 'down' ? 'down' : 'up'}` : 'No change'} in the last {({ '7d': '7 days', '30d': '30 days', '90d': '90 days', '1y': 'year' } as Record<string, string>)[period] || 'period'}
+          </p>
         </div>
-
-        {/* Controls */}
-        <div className="flex items-center gap-2">
-          {/* View Type Toggle */}
-          <div className={`
-            flex rounded-lg p-1
-            ${darkMode ? 'bg-slate-700/50' : 'bg-slate-100'}
-          `}>
-            <button
-              onClick={() => setViewType('daily')}
-              className={`
-                px-3 py-1 rounded-md text-sm font-medium transition-all
-                ${viewType === 'daily'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}
-              `}
-            >
-              Daily
-            </button>
-            <button
-              onClick={() => setViewType('cumulative')}
-              className={`
-                px-3 py-1 rounded-md text-sm font-medium transition-all
-                ${viewType === 'cumulative'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}
-              `}
-            >
-              Cumulative
-            </button>
-          </div>
-
-          {/* Period Buttons */}
-          <div className="flex gap-1">
-            {[
-              { key: '7d' as PeriodType, label: '7 Days' },
-              { key: '30d' as PeriodType, label: '30 Days' },
-              { key: '90d' as PeriodType, label: '90 Days' },
-              { key: '1y' as PeriodType, label: '1 Year' }
-            ].map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => handlePeriodChange(key)}
-                className={`
-                  px-3 py-1 rounded-lg text-sm font-medium transition-all
-                  ${period === key
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : darkMode
-                      ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/30'
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}
-                `}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        <div className="a-seg" role="tablist" aria-label="Chart view">
+          <button role="tab" aria-selected={viewType === 'daily'} onClick={() => setViewType('daily')} className={`a-seg-i ${viewType === 'daily' ? 'a-seg-on' : ''}`}>Daily</button>
+          <button role="tab" aria-selected={viewType === 'cumulative'} onClick={() => setViewType('cumulative')} className={`a-seg-i ${viewType === 'cumulative' ? 'a-seg-on' : ''}`}>Cumulative</button>
+        </div>
+        <div className="a-seg" role="tablist" aria-label="Period">
+          {([['7d', '7D'], ['30d', '30D'], ['90d', '90D'], ['1y', '1Y']] as [PeriodType, string][]).map(([key, label]) => (
+            <button key={key} role="tab" aria-selected={period === key} onClick={() => handlePeriodChange(key)} className={`a-seg-i ${period === key ? 'a-seg-on' : ''}`}>{label}</button>
+          ))}
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="h-80 mb-6">
+      <div className="h-80 relative">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/10 border-t-[#0A84FF]"></div>
           </div>
         ) : (
-          <Line data={getChartData()} options={chartOptions} />
+          <>
+            <Line data={getChartData()} options={chartOptions} />
+            {periodTotals.income === 0 && periodTotals.expenses === 0 && (
+              <div className="a-chart-empty"><span className="a-light" />No transactions in this period</div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-6">
-        <div className="text-center">
-          <p className={`text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Period Total Income</p>
-          <p className="text-xl font-semibold text-green-500">
-            ${formatCurrency(periodTotals.income)}
-          </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <div className="a-inset" style={{ padding: '14px 16px', borderRadius: 16 }}>
+          <span className="a-st a-mute text-[12.5px]"><span className="a-light" style={{ background: '#30D158', boxShadow: 'none' }} />Period income</span>
+          <div className="a-num a-ink text-2xl font-semibold mt-2 leading-none">${formatCurrency(periodTotals.income)}</div>
         </div>
-        <div className="text-center">
-          <p className={`text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Period Total Expenses</p>
-          <p className="text-xl font-semibold text-red-500">
-            ${formatCurrency(periodTotals.expenses)}
-          </p>
+        <div className="a-inset" style={{ padding: '14px 16px', borderRadius: 16 }}>
+          <span className="a-st a-mute text-[12.5px]"><span className="a-light" style={{ background: '#FF6B6B', boxShadow: 'none' }} />Period expenses</span>
+          <div className="a-num a-ink text-2xl font-semibold mt-2 leading-none">${formatCurrency(periodTotals.expenses)}</div>
         </div>
-        <div className="text-center">
-          <p className={`text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Net Position</p>
-          <p className={`text-xl font-semibold ${
-            periodTotals.net >= 0 ? 'text-blue-500' : 'text-red-500'
-          }`}>
-            ${periodTotals.net >= 0 ? '' : '-'}${formatCurrency(Math.abs(periodTotals.net))}
-          </p>
+        <div className="a-inset" style={{ padding: '14px 16px', borderRadius: 16 }}>
+          <span className="a-st a-mute text-[12.5px]"><span className="a-light" style={{ background: '#0A84FF', boxShadow: 'none' }} />Net position</span>
+          <div className={`a-num text-2xl font-semibold mt-2 leading-none ${periodTotals.net < 0 ? 'a-txt-r' : 'a-ink'}`}>{periodTotals.net < 0 ? '−' : ''}${formatCurrency(Math.abs(periodTotals.net))}</div>
         </div>
       </div>
     </div>

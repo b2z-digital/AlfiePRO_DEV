@@ -196,3 +196,25 @@ html.alfie-light .a-tile-danger { border-color: rgba(229, 72, 77, 0.35) !importa
 .a-profile-av { box-shadow: 0 0 0 3px #111622 !important; }
 html.alfie-light .a-profile-hero { background: radial-gradient(420px 200px at 50% 0%, rgba(46, 123, 255, 0.12), transparent 70%); }
 html.alfie-light .a-profile-av { box-shadow: 0 0 0 3px #fff !important; }
+.a-chart-empty { position: absolute; left: 50%; top: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 12px; background: rgba(14, 19, 31, 0.9); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 13px; color: rgba(235, 240, 255, 0.62); pointer-events: none; white-space: nowrap; }
+html.alfie-light .a-chart-empty { background: rgba(255, 255, 255, 0.95); border-color: rgba(15, 23, 42, 0.1); color: #475569; }
+
+/* ── Finance (board: Fin_*) ── */
+.a-big { font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; font-weight: 600; line-height: 1; }
+.a-hero-spec { border: 1px solid transparent; background: linear-gradient(#0D1424, #0D1424) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-hero-spec { background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; border-color: transparent; }
+.a-vrule { width: 1px; align-self: stretch; background: rgba(255, 255, 255, 0.1); }
+html.alfie-light .a-vrule { background: rgba(15, 23, 42, 0.1); }
+.a-tx { display: grid; align-items: center; gap: 16px; padding: 12px 18px; cursor: default; }
+.a-tx + .a-tx { border-top: 1px solid rgba(255, 255, 255, 0.055); }
+.a-tx:hover { background: rgba(255, 255, 255, 0.025); }
+html.alfie-light .a-tx + .a-tx { border-top-color: rgba(15, 23, 42, 0.07); }
+html.alfie-light .a-tx:hover { background: rgba(15, 23, 42, 0.025); }
+.a-chip-d { width: 44px; text-align: center; }
+.a-chip-d b { display: block; font: 600 18px/1.05 'Bricolage Grotesque', sans-serif; color: #fff; }
+.a-chip-d i { display: block; font: 500 11px 'Instrument Sans', sans-serif; font-style: normal; color: rgba(235, 240, 255, 0.5); }
+html.alfie-light .a-chip-d b { color: #0B1220; }
+html.alfie-light .a-chip-d i { color: #64748B; }
+.a-link { border: 0; background: none; padding: 0; color: #6FB4FF; cursor: pointer; text-decoration: none; }
+.a-link:hover { text-decoration: underline; }
+html.alfie-light .a-link { color: #0A6FD6; }
