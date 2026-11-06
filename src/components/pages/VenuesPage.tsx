@@ -829,9 +829,9 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                       });
                       setShowForm(true);
                     }}
-                    className="px-4 py-2 text-white rounded-lg transition-all shadow-lg hover:shadow-xl animate-pulse"
+                    className="a-btn a-btn-p"
                   >
-                    Add Venue
+                    <Plus size={17} />Add venue
                   </button>
                 )}
               </div>
@@ -965,6 +965,21 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                     </div>
                   </button>
                 ))}
+                {can('venues.create') && !isAssociationView() && !searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({ name: '', description: '', address: '', latitude: -32.9688, longitude: 151.7174, image: null, isDefault: false });
+                      setSelectedClubId('');
+                      setShowForm(true);
+                    }}
+                    className="a-addtile"
+                  >
+                    <span className="a-tile"><Plus size={19} /></span>
+                    <span className="a-ink text-[14px] font-semibold">Add a venue</span>
+                    <span className="a-dim text-[12.5px]">Search Google Places or enter manually</span>
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-5">
