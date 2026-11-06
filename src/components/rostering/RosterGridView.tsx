@@ -4,7 +4,7 @@ import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
   DragOverlay, DragStartEvent, DragEndEvent, useDroppable, useDraggable
 } from '@dnd-kit/core';
-import { Calendar, UserCheck, Circle as XCircle, Clock, CircleCheck as CheckCircle2, RefreshCw, Shuffle, TriangleAlert as AlertTriangle, X } from 'lucide-react';
+import { Calendar, UserCheck, Circle as XCircle, Clock, CircleCheck as CheckCircle2, RefreshCw, Shuffle, TriangleAlert as AlertTriangle, X, Search } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import {
   manualAssign, removeAssignment, generateFairAllocation, applyAllocation, getRosterWithDetails,
@@ -28,6 +28,8 @@ export const RosterGridView: React.FC<RosterGridViewPropsExtended> = ({ roster, 
   const { addNotification } = useNotifications();
   const [draggedMember, setDraggedMember] = useState<string | null>(null);
   const [reallocating, setReallocating] = useState(false);
+  const [memberQuery, setMemberQuery] = useState('');
+  const [memberSort, setMemberSort] = useState<'fewest' | 'az'>('fewest');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -196,8 +198,27 @@ export const RosterGridView: React.FC<RosterGridViewPropsExtended> = ({ roster, 
               <p className="a-cap">Members</p>
               <span className="a-dim text-[12px]">Drag onto a day</span>
             </div>
+            <label className="a-field" style={{ height: 38, fontSize: 13 }}>
+              <Search size={15} />
+              <input value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} placeholder="Find a member" aria-label="Find a member" />
+            </label>
+            <div className="a-seg" style={{ display: 'flex' }} role="radiogroup" aria-label="Sort members">
+              <button type="button" role="radio" aria-checked={memberSort === 'fewest'} onClick={() => setMemberSort('fewest')} className={`a-seg-i flex-1 justify-center ${memberSort === 'fewest' ? 'a-seg-on' : ''}`} style={{ height: 30, fontSize: 12.5 }}>Fewest duties</button>
+              <button type="button" role="radio" aria-checked={memberSort === 'az'} onClick={() => setMemberSort('az')} className={`a-seg-i flex-1 justify-center ${memberSort === 'az' ? 'a-seg-on' : ''}`} style={{ height: 30, fontSize: 12.5 }}>A–Z</button>
+            </div>
             <div className="flex flex-col gap-0.5 max-h-[600px] overflow-y-auto">
-              {roster.members.filter(m => m.is_active).map(rosterMember => {
+              {roster.members
+                .filter(m => m.is_active)
+                .filter(m => !memberQuery.trim() || getMemberInfo(m.member_id).name.toLowerCase().includes(memberQuery.trim().toLowerCase()))
+                .sort((a, b) => {
+                  const an = getMemberInfo(a.member_id).name, bn = getMemberInfo(b.member_id).name;
+                  if (memberSort === 'fewest') {
+                    const d = (dutyStats.get(a.member_id) || 0) - (dutyStats.get(b.member_id) || 0);
+                    if (d !== 0) return d;
+                  }
+                  return an.localeCompare(bn);
+                })
+                .map(rosterMember => {
                 const info = getMemberInfo(rosterMember.member_id);
                 const duties = dutyStats.get(rosterMember.member_id) || 0;
                 return (

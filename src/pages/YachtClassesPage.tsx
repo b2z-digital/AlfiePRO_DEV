@@ -3,6 +3,17 @@ import { Sailboat, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { BoatClass } from '../types/boatClass';
 import { getClubBoatClasses, getBoatClasses } from '../utils/boatClassStorage';
+import { getBoatClassBadge } from '../constants/colors';
+
+/* Short class label for the card chip (board S_classes: DF95, DF65, IOM …) */
+const shortClassName = (name: string) => {
+  const n = (name || '').trim();
+  if (/dragon\s*flite\s*95/i.test(n)) return 'DF95';
+  if (/dragon\s*force\s*65/i.test(n)) return 'DF65';
+  if (/international\s+one\s+met(re|er)/i.test(n)) return 'IOM';
+  if (/^ten\s*rater$/i.test(n)) return '10R';
+  return n;
+};
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 
@@ -114,7 +125,8 @@ export const YachtClassesPage: React.FC<YachtClassesPageProps> = ({ darkMode }) 
                 ) : (
                   <div className="w-full h-full flex items-center justify-center"><Sailboat size={48} className="a-dim" /></div>
                 )}
-                {photos > 1 && <span className="a-glass absolute left-3.5 top-3.5 z-[1]">{photos} photos</span>}
+                <span className={`${getBoatClassBadge(shortClassName(boatClass.name), true).className} a-cc-cls absolute left-3.5 top-3.5 z-[1]`}>{shortClassName(boatClass.name)}</span>
+                {photos > 1 && <span className="a-glass absolute right-3.5 top-3.5 z-[1]">{photos} photos</span>}
               </div>
               <div className="flex flex-col gap-2" style={{ padding: '16px 18px 18px' }}>
                 <div className="a-display a-ink text-[19px] font-semibold">{boatClass.name}</div>
