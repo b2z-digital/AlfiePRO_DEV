@@ -671,3 +671,22 @@ html.alfie-light body.light-mode .bg-gradient-to-br[class*="from-slate-800"][cla
   background-color: rgba(255, 255, 255, 0.78) !important;
   border-color: rgba(15, 23, 42, 0.08) !important;
 }
+
+/* ── Empty states: the big centred icon sits in an Alfie tile ── */
+html.alfie-theme .text-center > svg.mx-auto:is([width="40"], [width="48"], [width="56"], [width="64"]) {
+  width: 60px;
+  height: 60px;
+  padding: 16px;
+  border-radius: 30%;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(235, 240, 255, 0.7) !important;
+  opacity: 1 !important;
+  overflow: visible;
+}
+html.alfie-light .text-center > svg.mx-auto:is([width="40"], [width="48"], [width="56"], [width="64"]) {
+  border-color: rgba(15, 23, 42, 0.10);
+  background: #fff;
+  color: #475569 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
