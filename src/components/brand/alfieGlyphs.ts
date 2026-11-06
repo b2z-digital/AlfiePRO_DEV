@@ -75,7 +75,7 @@ export const ALFIE_GLYPHS: Record<string, AlfieGlyph> = {
   "more": { els: [["circle",{"cx":"6","cy":"12","r":"1.3","fill":"currentColor"}],["circle",{"cx":"12","cy":"12","r":"1.3","fill":"currentColor"}],["circle",{"cx":"18","cy":"12","r":"1.3","fill":"currentColor"}]] },
   "nav": { els: [["path",{"d":"M20 4L4 11l7 2 2 7z"}]] },
   "news": { els: [["path",{"d":"M5 5.5h11v13a2 2 0 0 0 2 2H6a1 1 0 0 1-1-1z"}],["path",{"d":"M16 9.5h3.5v9a2 2 0 0 1-2 2M8 9h5M8 12.5h5M8 16h3"}]] },
-  "out": { els: [["path",{"d":"M7 7l10 10M17 9v8H9"}]] },
+  "out": { els: [["path",{"d":"M10 4.5H6.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2H10"}],["path",{"d":"M14.5 8l4 4-4 4M18.5 12h-9"}]] },
   "palette": { els: [["path",{"d":"M12 3.5a8.5 8.5 0 1 0 0 17c1.4 0 1.9-1 1.6-2l-.4-1.1a1.6 1.6 0 0 1 1.5-2.2h2.2a3.6 3.6 0 0 0 3.6-3.7c0-4.4-3.8-8-8.5-8z"}],["circle",{"cx":"8","cy":"11","r":"1.2","fill":"currentColor"}],["circle",{"cx":"11","cy":"7.5","r":"1.2","fill":"currentColor"}],["circle",{"cx":"15.5","cy":"8.5","r":"1.2","fill":"currentColor"}]] },
   "paper": { els: [["path",{"d":"M19 11.5l-7.2 7.2a4.6 4.6 0 0 1-6.5-6.5l7.6-7.6a3 3 0 0 1 4.3 4.3l-7.4 7.4a1.5 1.5 0 0 1-2.1-2.1l6.6-6.6"}]] },
   "pause": { els: [["rect",{"x":"7","y":"5","width":"3.5","height":"14","rx":"1"}],["rect",{"x":"13.5","y":"5","width":"3.5","height":"14","rx":"1"}]] },

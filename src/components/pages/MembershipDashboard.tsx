@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
+import { AlfieIcon } from '../brand/AlfieIcon';
 import { Users, TrendingUp, Calendar, Settings, FileText, ListFilter as Filter, ChartBar as BarChart2, ChartPie as PieChart, Activity, UserCheck, Globe, CreditCard, Mail, Check, TriangleAlert as AlertTriangle, ClipboardList, Shield } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { onDataChange } from '../../utils/dataEvents';
@@ -1158,7 +1159,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
               }`}
             >
               <div className="flex items-center gap-2">
-                <AlertTriangle size={16} />
+                <AlfieIcon glyph="renew" size={16} />
                 <span>Renewals</span>
                 {paymentPendingCount > 0 && (
                   <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-orange-500 text-white text-xs font-bold rounded-full animate-pulse">
@@ -1177,7 +1178,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
               }`}
             >
               <div className="flex items-center gap-2">
-                <CreditCard size={16} />
+                <AlfieIcon glyph="remit" size={16} />
                 <span>Remittances</span>
                 {pendingRemittancesCount > 0 && (
                   <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
