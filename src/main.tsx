@@ -12,6 +12,7 @@ import MobileStreamPage from './pages/MobileStreamPage';
 import { registerServiceWorker } from './utils/registerServiceWorker';
 
 import './index.css';
+import './styles/alfie-theme.css';
 import './styles/animations.css';
 import './styles/article.css';
 
