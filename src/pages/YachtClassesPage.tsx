@@ -134,15 +134,15 @@ export const YachtClassesPage: React.FC<YachtClassesPageProps> = ({ darkMode }) 
       {/* Detail Modal */}
       {selectedClass && (
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedClass(null)}
         >
           <div
-            className="a-sheet w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+            className="a-sheet w-full max-w-[640px] max-h-[90vh] overflow-y-auto overflow-x-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Header Image */}
-            <div className="relative h-96">
+            <div className="a-sheet-hero relative" style={{ height: 250 }}>
               {selectedClass.class_image ? (
                 <img
                   src={selectedClass.class_image}
@@ -151,36 +151,36 @@ export const YachtClassesPage: React.FC<YachtClassesPageProps> = ({ darkMode }) 
                   onClick={() => selectedClass.class_image && openLightbox(selectedClass, 0)}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
-                  <Sailboat size={96} className="text-slate-500" />
+                <div className="w-full h-full flex items-center justify-center">
+                  <Sailboat size={64} className="a-dim" />
                 </div>
               )}
 
               {/* Close Button */}
               <button
                 onClick={() => setSelectedClass(null)}
-                className="absolute top-4 right-4 p-3 bg-black/50 backdrop-blur-md text-white rounded-full hover:bg-black/70 transition-colors"
+                className="a-gb absolute top-3.5 right-3.5 z-[2]"
+                style={{ width: 38, height: 38 }}
+                aria-label="Close"
               >
-                <X size={24} />
+                <X size={18} />
               </button>
 
               {/* Title Overlay */}
-              <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-                <h2 className="text-4xl font-bold text-white drop-shadow-lg">
+              <div className="absolute left-6 bottom-[18px] right-6 z-[1] pointer-events-none">
+                <span className="a-glass"><Sailboat size={13} />Yacht class</span>
+                <h2 className="a-display a-ink text-[30px] font-bold mt-2.5">
                   {selectedClass.name}
                 </h2>
               </div>
             </div>
 
             {/* Content */}
-            <div className="p-8">
+            <div style={{ padding: '6px 24px 24px' }}>
               {/* Description */}
               {selectedClass.description && (
-                <div className="mb-8">
-                  <h3 className="a-display a-ink text-[19px] font-semibold mb-3">
-                    About this Class
-                  </h3>
-                  <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap a-mute">
+                <div className="mb-6">
+                  <p className="text-[14px] leading-[1.6] whitespace-pre-wrap a-mute">
                     {selectedClass.description}
                   </p>
                 </div>
@@ -189,15 +189,13 @@ export const YachtClassesPage: React.FC<YachtClassesPageProps> = ({ darkMode }) 
               {/* Gallery */}
               {selectedClass.gallery_images && selectedClass.gallery_images.length > 0 && (
                 <div>
-                  <h3 className="a-display a-ink text-[19px] font-semibold mb-3">
-                    Gallery
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <p className="a-cap mb-2.5">Gallery</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                     {selectedClass.gallery_images.map((image, index) => (
                       <button
                         key={index}
                         onClick={() => openLightbox(selectedClass, index + (selectedClass.class_image ? 1 : 0))}
-                        className="relative aspect-video rounded-lg overflow-hidden group cursor-pointer"
+                        className="relative aspect-video rounded-[14px] overflow-hidden group cursor-pointer"
                       >
                         <img
                           src={image}
