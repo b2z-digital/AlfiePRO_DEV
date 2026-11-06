@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { AAvatar } from './alfie/Kit';
 import { ChevronLeft, ChevronRight, MoveHorizontal as MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Timer, Flag, Pause, Pencil, Lock } from 'lucide-react';
 import { Skipper, RaceResult } from '../types';
 import { RaceEvent } from '../types/race';
@@ -44,6 +46,8 @@ interface TouchModeScoringProps {
   allRaceResults?: RaceResult[];
   isFullscreen?: boolean;
   handicapReadOnly?: boolean;
+  /** Alfie theme: the scoring top bar carries race navigation and StartBox. */
+  alfieBar?: boolean;
 }
 
 interface FinishingEntry {
@@ -75,7 +79,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   allSkippers,
   allRaceResults,
   handicapReadOnly = false,
-  isFullscreen = false
+  isFullscreen = false,
+  alfieBar = false
 }) => {
   const [currentRace, setCurrentRace] = useState(initialRace);
   const [finishOrder, setFinishOrder] = useState<FinishingEntry[]>([]);
@@ -99,6 +104,12 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   const [showStartBoxModal, setShowStartBoxModal] = useState(false);
   const [raceTimerRunning, setRaceTimerRunning] = useState(false);
   const [storedHandicaps, setStoredHandicaps] = useState<StoredHandicapData[]>([]);
+  const [entrySort, setEntrySort] = useState<'sail' | 'name'>('sail');
+  const [startBoxSlotEl, setStartBoxSlotEl] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!alfieBar) return;
+    setStartBoxSlotEl(document.getElementById('alfie-startbox-slot'));
+  }, [alfieBar, isFullscreen]);
 
   const { user } = useAuth();
 
@@ -1001,43 +1012,59 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     updateRaceResults(updatedResults);
   };
 
+  const posClass = (entry: FinishingEntry) =>
+    entry.letterScore ? 'ls' : entry.position === 1 ? 'p1' : entry.position === 2 ? 'p2' : entry.position === 3 ? 'p3' : '';
+  const letterCode = (entry: FinishingEntry) =>
+    getLetterScoreDisplayCode(entry.letterScore!, entry.customPoints, currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs' ? 'shrs' : 'hms');
+  const finishByIndex = new Map(finishOrder.map(e => [e.skipperIndex, e]));
+  const tileOrder = entrySort === 'name'
+    ? [...sortedSkipperIndices].sort((a, b) => (skippers[a]?.name || '').localeCompare(skippers[b]?.name || ''))
+    : sortedSkipperIndices;
+  const startBoxSlot = alfieBar && !isHeatScoring ? startBoxSlotEl : null;
+  const startBoxControls = !isHeatScoring && (
+    <>
+      <button
+        onClick={() => setShowStartBoxModal(true)}
+        className="a-btn a-btn-sb"
+        style={{ height: alfieBar ? 40 : 34, ...(raceTimerRunning ? { opacity: 0.7 } : {}) }}
+      >
+        <Timer size={17} />
+        StartBox
+      </button>
+      {raceTimerRunning && (
+        <RaceElapsedTimer
+          isRunning={raceTimerRunning}
+          onStop={() => setRaceTimerRunning(false)}
+          darkMode={darkMode}
+        />
+      )}
+    </>
+  );
+
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-20 h-screen' : 'h-[75vh]'} flex flex-col overflow-hidden ${isFullscreen ? '' : 'rounded-lg'} no-select ${darkMode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-900'}`}>
-      {/* Header - Race Navigation with StartBox + Race Timer */}
-      <div className={`border-b px-4 py-3 flex items-center justify-between flex-shrink-0 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-        <div className="flex items-center gap-2">
-          {!isHeatScoring && (
-            <button
-              onClick={() => setShowStartBoxModal(true)}
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all active:scale-95 ${
-                raceTimerRunning
-                  ? darkMode
-                    ? 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
-                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                  : darkMode
-                    ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
-                    : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
-              }`}
-            >
-              <Timer size={16} />
-              StartBox
-            </button>
-          )}
+    <div className={`${alfieBar ? (isFullscreen ? 'h-full' : 'h-[calc(100vh-170px)] min-h-[560px]') : isFullscreen ? 'fixed inset-0 z-20 h-screen p-3 a-bg' : 'h-[75vh]'} a-tm no-select`}>
+      {startBoxSlot && createPortal(startBoxControls, startBoxSlot)}
+      {/* Header - Race Navigation with StartBox + Race Timer (the Alfie scoring bar carries these when present) */}
+      {!alfieBar && (
+      <div className="a-sbar flex-shrink-0" style={{ minHeight: 56 }}>
+        <div className="flex-1 flex items-center gap-2 min-w-0">
+          {startBoxControls}
           {currentEvent?.id && (currentEvent?.enableLiveTracking || currentEvent?.enableLiveStream) && !currentEvent?.completed && (
             <LiveStatusControl eventId={currentEvent.id} darkMode={darkMode} />
           )}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="a-stepper">
           <button
             onClick={() => navigateRace('prev')}
             disabled={currentRace <= 1}
-            className={`p-2 rounded-lg ${currentRace <= 1 ? 'opacity-30 cursor-not-allowed' : darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
+            className="a-ib"
+            aria-label="Previous race"
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft size={18} />
           </button>
 
-          <div className="text-2xl font-bold">
+          <div className="a-display a-ink px-2.5 text-[17px] font-bold leading-none">
             {roundLabel || (isHeatScoring
               ? (() => {
                   const isShrs = currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs';
@@ -1055,50 +1082,33 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           <button
             onClick={() => navigateRace('next')}
             disabled={currentRace >= numRaces}
-            className={`p-2 rounded-lg ${currentRace >= numRaces ? 'opacity-30 cursor-not-allowed' : darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
+            className="a-ib"
+            aria-label="Next race"
           >
-            <ChevronRight size={24} />
+            <ChevronRight size={18} />
           </button>
         </div>
 
-        <div className="w-[160px] flex items-center justify-end">
-          {!isHeatScoring && raceTimerRunning && (
-            <RaceElapsedTimer
-              isRunning={raceTimerRunning}
-              onStop={() => setRaceTimerRunning(false)}
-              darkMode={darkMode}
-            />
-          )}
-        </div>
+        <div className="flex-1" />
       </div>
+      )}
 
       {/* Main Content - Split View */}
-      <div ref={containerRef} className="flex-1 flex overflow-hidden min-h-0 relative">
+      <div ref={containerRef} className="a-tm-panels relative">
         {/* Left Side - Finishing Order */}
         <div
-          className={`flex flex-col min-h-0 transition-all ${darkMode ? 'bg-slate-800/30' : 'bg-white'}`}
+          className="a-tm-card"
           style={{ width: `${splitPosition}%` }}
         >
-          <div className={`px-4 py-3 font-semibold border-b flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
-            Finish Order
+          <div className="a-tm-head">
+            <span className="a-display a-ink">Finish order</span>
+            <span className="a-cnt">{finishOrder.length}</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto min-h-0">
-            {finishOrder.length === 0 ? (
-              <div className={`flex items-center justify-center h-full ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                Tap sail numbers to record finishes
-              </div>
-            ) : (
-              <div className={`p-2 ${finishOrderTwoColumns ? 'grid grid-cols-2 gap-2' : 'space-y-2'}`}>
+          <div className="flex-1 overflow-y-auto min-h-0" style={{ padding: '0 12px 12px' }}>
+              <div className={finishOrderTwoColumns ? 'grid grid-cols-2 gap-2' : 'flex flex-col gap-2'}>
                 {finishOrder.map((entry, index) => {
                   const skipper = skippers[entry.skipperIndex];
-                  const initials = entry.skipperName
-                    .split(' ')
-                    .map(n => n[0])
-                    .join('')
-                    .toUpperCase()
-                    .slice(0, 2);
-
                   return (
                     <div
                       key={entry.skipperIndex}
@@ -1116,39 +1126,28 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                       onTouchEnd={(e) => !isPreviousRace() && handleTouchEnd(e, index)}
                       style={{ touchAction: !entry.letterScore && !isPreviousRace() ? 'none' : 'auto' }}
                       className={`
-                        rounded-lg p-2.5 flex items-center gap-3 border select-none
+                        a-fo select-none
                         ${!entry.letterScore && !isPreviousRace() ? 'cursor-grab active:cursor-grabbing' : ''}
-                        ${dragOverIndex === index ? 'ring-2 ring-blue-500' : ''}
+                        ${dragOverIndex === index ? 'a-fo-over' : ''}
                         ${draggedIndex === index && touchDragging ? 'opacity-50 scale-105' : ''}
                         ${isPreviousRace() ? 'opacity-70' : ''}
-                        transition-all
-                        ${darkMode
-                          ? 'bg-slate-800/40 border-slate-700/40 hover:bg-slate-800/60'
-                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                        }
                       `}
                     >
                       {/* Drag Handle */}
-                      {!entry.letterScore && !isPreviousRace() && (
+                      {!entry.letterScore && !isPreviousRace() ? (
                         <div
                           data-grip-handle="true"
                           style={{ touchAction: 'none' }}
-                          className={`flex-shrink-0 p-3 -m-2 cursor-grab active:cursor-grabbing ${darkMode ? 'text-slate-500 hover:text-slate-400' : 'text-slate-400 hover:text-slate-500'}`}
+                          className="a-dim flex-shrink-0 flex p-2 -m-1 cursor-grab active:cursor-grabbing"
                         >
-                          <GripVertical size={20} />
+                          <GripVertical size={18} />
                         </div>
-                      )}
+                      ) : <span className="w-4 flex-shrink-0" />}
 
                       {/* Position Badge */}
-                      <div className={`
-                        w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0
-                        ${entry.letterScore
-                          ? 'bg-red-900 text-red-200'
-                          : 'bg-blue-600 text-white'
-                        }
-                      `}>
-                        {entry.letterScore ? getLetterScoreDisplayCode(entry.letterScore, entry.customPoints, currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs' ? 'shrs' : 'hms') : entry.position}
-                      </div>
+                      <span className={`a-fo-pos ${posClass(entry)}`}>
+                        {entry.letterScore ? letterCode(entry) : entry.position}
+                      </span>
 
                       {/* Flag (if event shows flag) */}
                       {currentEvent?.show_flag && skipper?.country_code && (
@@ -1158,27 +1157,17 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                       )}
 
                       {/* Avatar */}
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-xs border-2 overflow-hidden flex-shrink-0 ${darkMode ? 'bg-slate-700 text-slate-300 border-slate-600' : 'bg-slate-200 text-slate-600 border-slate-300'}`}>
-                        {skipper?.avatarUrl ? (
-                          <img
-                            src={skipper.avatarUrl}
-                            alt={entry.skipperName}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span>{initials}</span>
-                        )}
-                      </div>
+                      <AAvatar url={skipper?.avatarUrl} first={entry.skipperName.split(' ')[0]} last={entry.skipperName.split(' ').slice(-1)[0] !== entry.skipperName.split(' ')[0] ? entry.skipperName.split(' ').slice(-1)[0] : ''} size={40} />
 
                       {/* Skipper Info */}
                       <div className="flex-1 min-w-0">
-                        <div className={`font-medium text-sm truncate ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                        <div className="a-dim text-[12.5px] truncate">
                           {entry.skipperName}
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className={`font-bold text-2xl leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          <div className="a-fo-sail a-ink">
                             {currentEvent?.show_country && skipper?.country_code && (
-                              <span className={`font-bold text-2xl leading-tight ${darkMode ? 'text-white' : 'text-slate-900'} mr-1`}>
+                              <span className="mr-1">
                                 {getIOCCode(skipper.country_code)}
                               </span>
                             )}
@@ -1199,13 +1188,14 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
                             if (!isPreviousRace()) {
-                              handleRemoveFromFinish(entry.skipperIndex);
+                              setSelectedSkipperForScore(entry.skipperIndex);
+                              setShowLetterScoreModal(true);
                             }
                           }}
                           onPointerDown={(e) => {
@@ -1218,14 +1208,16 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                             e.stopPropagation();
                             e.preventDefault();
                             if (!isPreviousRace()) {
-                              handleRemoveFromFinish(entry.skipperIndex);
+                              setSelectedSkipperForScore(entry.skipperIndex);
+                              setShowLetterScoreModal(true);
                             }
                           }}
                           disabled={isPreviousRace()}
-                          className={`p-3.5 rounded-lg transition-colors ${isPreviousRace() ? 'opacity-30 cursor-not-allowed' : 'active:scale-95'} ${darkMode ? 'text-slate-500 hover:text-red-400 hover:bg-slate-700 active:bg-slate-600' : 'text-slate-400 hover:text-red-500 hover:bg-slate-200 active:bg-slate-300'} ${isPreviousRace() ? 'pointer-events-none' : ''}`}
-                          title={isPreviousRace() ? "Previous races cannot be edited" : "Remove"}
+                          className={`a-ib ${isPreviousRace() ? 'opacity-30 pointer-events-none' : ''}`}
+                          aria-label="Score options"
+                          title={isPreviousRace() ? "Previous races cannot be edited" : "Score Options"}
                         >
-                          <X size={22} />
+                          <MoreHorizontal size={20} />
                         </button>
 
                         <button
@@ -1233,8 +1225,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                             e.stopPropagation();
                             e.preventDefault();
                             if (!isPreviousRace()) {
-                              setSelectedSkipperForScore(entry.skipperIndex);
-                              setShowLetterScoreModal(true);
+                              handleRemoveFromFinish(entry.skipperIndex);
                             }
                           }}
                           onPointerDown={(e) => {
@@ -1247,36 +1238,43 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                             e.stopPropagation();
                             e.preventDefault();
                             if (!isPreviousRace()) {
-                              setSelectedSkipperForScore(entry.skipperIndex);
-                              setShowLetterScoreModal(true);
+                              handleRemoveFromFinish(entry.skipperIndex);
                             }
                           }}
                           disabled={isPreviousRace()}
-                          className={`p-3.5 rounded-lg transition-colors ${isPreviousRace() ? 'opacity-30 cursor-not-allowed' : 'active:scale-95'} ${darkMode ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700 active:bg-slate-600' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 active:bg-slate-300'} ${isPreviousRace() ? 'pointer-events-none' : ''}`}
-                          title={isPreviousRace() ? "Previous races cannot be edited" : "Score Options"}
+                          className={`a-ib a-ib-d ${isPreviousRace() ? 'opacity-30 pointer-events-none' : ''}`}
+                          aria-label="Remove from finish order"
+                          title={isPreviousRace() ? "Previous races cannot be edited" : "Remove"}
                         >
-                          <MoreHorizontal size={22} />
+                          <X size={20} />
                         </button>
                       </div>
                     </div>
                   );
                 })}
+                {finishOrder.length < skippers.length && !isPreviousRace() && (
+                  <div className={`a-fo a-fo-next ${finishOrder.length > 0 ? 'mt-1.5' : ''}`}>
+                    <span className="w-4 flex-shrink-0" />
+                    <span className="a-fo-pos nx">{finishOrder.length + 1}</span>
+                    <div className="a-dim flex-1 text-[13.5px]">Tap a sail number to add the next finisher</div>
+                  </div>
+                )}
               </div>
-            )}
           </div>
 
           {/* Locked previous race - show Edit Results button */}
           {isCompletedPreviousRace() && !isEditingPreviousRace && (
-            <div className={`px-4 py-3 border-t flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
-              <div className={`flex items-center justify-center gap-2 mb-2 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className="a-tm-foot">
+              <div className="a-dim flex items-center justify-center gap-2 mb-2.5 text-[13px]">
                 <Lock size={14} />
                 Race {currentRace} results are locked
               </div>
               <button
                 onClick={() => setIsEditingPreviousRace(true)}
-                className={`w-full py-3 px-4 rounded-lg font-semibold text-white bg-amber-600 hover:bg-amber-700 transition-colors flex items-center justify-center gap-2 shadow-lg active:scale-98`}
+                className="a-btn a-btn-a w-full"
+                style={{ height: 48, justifyContent: 'center' }}
               >
-                <Pencil size={20} />
+                <Pencil size={18} />
                 Edit Results
               </button>
             </div>
@@ -1284,7 +1282,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
           {/* Confirm Button - appears when all racing skippers scored but not confirmed, and not viewing a locked previous race */}
           {finishOrder.length === skippers.length && !isConfirmed && !isCompletedPreviousRace() && (
-            <div className={`px-4 py-3 border-t flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
+            <div className="a-tm-foot" style={{ padding: 14 }}>
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -1292,21 +1290,17 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                   console.log('🎯 Confirm button clicked - Race:', currentRace);
                   handleConfirmResults();
                 }}
-                className={`w-full py-3 px-4 rounded-lg font-semibold text-white ${
-                  isScoringLastHeat
-                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                    : 'bg-green-600 hover:bg-green-700'
-                } transition-colors flex items-center justify-center gap-2 shadow-lg active:scale-98`}
+                className="a-btn a-btn-verify"
               >
                 <Check size={20} />
-                {isScoringLastHeat ? 'Verify Results & Complete Round' : 'Verify & Apply Results'}
+                {isScoringLastHeat ? 'Verify Results & Complete Round' : 'Verify & apply results'}
               </button>
             </div>
           )}
 
           {/* Re-verify button when editing a previous race */}
           {isEditingPreviousRace && finishOrder.length === skippers.length && (
-            <div className={`px-4 py-3 border-t flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
+            <div className="a-tm-foot" style={{ padding: 14 }}>
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -1314,57 +1308,51 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                   setIsEditingPreviousRace(false);
                   handleConfirmResults();
                 }}
-                className="w-full py-3 px-4 rounded-lg font-semibold text-white bg-green-600 hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-lg active:scale-98"
+                className="a-btn a-btn-verify"
               >
                 <Check size={20} />
                 Save Changes
               </button>
             </div>
           )}
+
+          {/* Progress while finishers are still coming in */}
+          {finishOrder.length < skippers.length && !isCompletedPreviousRace() && (
+            <div className="a-tm-foot flex items-center gap-2.5">
+              <div className="a-progress"><i style={{ width: `${skippers.length ? (finishOrder.length / skippers.length) * 100 : 0}%` }} /></div>
+              <span className="a-mute text-[13px] whitespace-nowrap"><b className="a-num a-ink">{finishOrder.length}</b> of {skippers.length} finished · {skippers.length - finishOrder.length} to go</span>
+            </div>
+          )}
         </div>
 
         {/* Draggable Divider */}
         <div
-          className={`
-            w-1 flex-shrink-0 relative group cursor-col-resize transition-colors
-            ${isDraggingDivider
-              ? darkMode ? 'bg-cyan-500/40' : 'bg-blue-500/40'
-              : darkMode ? 'bg-slate-700/30 hover:bg-cyan-500/30' : 'bg-slate-300/30 hover:bg-blue-400/30'
-            }
-          `}
+          className={`a-tm-div ${isDraggingDivider ? 'on' : ''}`}
           onMouseDown={handleDividerMouseDown}
           onTouchStart={handleDividerTouchStart}
+          aria-hidden="true"
         >
-          {/* Grab Handle - Subtle */}
-          <div className={`
-            absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-            w-6 h-12 rounded-md flex items-center justify-center
-            transition-all duration-200
-            ${isDraggingDivider
-              ? darkMode ? 'bg-cyan-500/50 scale-105' : 'bg-blue-500/50 scale-105'
-              : darkMode ? 'bg-slate-700/40 group-hover:bg-cyan-500/40' : 'bg-slate-400/40 group-hover:bg-blue-500/40'
-            }
-          `}>
-            <GripVertical
-              size={14}
-              className={`opacity-50 ${isDraggingDivider ? 'opacity-100' : 'group-hover:opacity-70'} ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}
-            />
-          </div>
+          <span />
         </div>
 
         {/* Right Side - Sail Number Grid */}
-        <div className="flex-1 flex flex-col min-h-0"
+        <div className="a-tm-card flex-1 min-w-0"
           style={{ width: `${rightPanelWidth}%` }}
         >
-          <div className={`px-4 py-3 font-semibold border-b flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
-            Scheduled Entries ({skippers.length})
+          <div className="a-tm-head">
+            <span className="a-display a-ink">Entries</span>
+            <div className="a-seg" role="radiogroup" aria-label="Sort entries">
+              <button type="button" role="radio" aria-checked={entrySort === 'sail'} onClick={() => setEntrySort('sail')} className={`a-seg-i ${entrySort === 'sail' ? 'a-seg-on' : ''}`} style={{ height: 30, fontSize: 12.5 }}>Sail no.</button>
+              <button type="button" role="radio" aria-checked={entrySort === 'name'} onClick={() => setEntrySort('name')} className={`a-seg-i ${entrySort === 'name' ? 'a-seg-on' : ''}`} style={{ height: 30, fontSize: 12.5 }}>Name</button>
+            </div>
           </div>
 
-          <div className={`flex-1 overflow-y-auto p-6 min-h-0 ${darkMode ? 'bg-slate-800/20' : 'bg-gradient-to-br from-slate-50 to-slate-100'}`}>
-            <div className={`grid ${gridCols} gap-6 sm:gap-8`}>
-              {sortedSkipperIndices.map((index) => {
+          <div className="flex-1 overflow-y-auto min-h-0" style={{ padding: '0 16px 16px' }}>
+            <div className={`grid ${gridCols} gap-3`}>
+              {tileOrder.map((index) => {
                 const skipper = skippers[index];
                 const isFinished = usedSkipperIndices.has(index);
+                const fin = finishByIndex.get(index);
 
                 return (
                   <button
@@ -1381,26 +1369,12 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                     onTouchStart={() => handleLongPressStart(index)}
                     onTouchEnd={handleLongPressEnd}
                     disabled={isFinished}
-                    className={`
-                      a-tile2 ${isFinished ? 'a-t-done' : 'a-t-open'}
-                      relative w-full aspect-square
-                      flex items-center justify-center
-                      transition-all duration-200 font-semibold text-2xl sm:text-3xl lg:text-4xl
-                      ${isFinished
-                        ? 'text-white bg-gradient-to-br from-blue-600 to-blue-700 opacity-60 rounded-xl'
-                        : darkMode
-                          ? 'text-slate-100 bg-transparent border-2 border-slate-700/50 rounded-xl hover:border-cyan-400/60 hover:text-cyan-300 hover:shadow-lg hover:shadow-cyan-500/20 hover:scale-105 active:scale-100'
-                          : 'text-slate-700 bg-transparent border-2 border-slate-300/50 rounded-xl hover:border-blue-400/60 hover:text-blue-600 hover:shadow-lg hover:shadow-blue-500/10 hover:scale-105 active:scale-100'
-                      }
-                    `}
-                    style={{
-                      fontFamily: "'Inter', 'SF Pro Display', -apple-system, system-ui, sans-serif",
-                      letterSpacing: '-0.02em'
-                    }}
+                    className={`a-tile2 ${isFinished ? 'a-t-done' : 'a-t-open'} relative w-full flex items-center justify-center transition-all duration-200`}
+                    style={{ height: isFullscreen ? 128 : 150 }}
                   >
-                    <span className="relative z-10 flex flex-col items-center justify-center gap-1">
+                    <span className="relative z-10 flex flex-col items-center justify-center gap-1 leading-none">
                       {currentEvent?.show_country && skipper?.country_code && (
-                        <span className="text-sm sm:text-base lg:text-lg opacity-80">
+                        <span className="text-base opacity-80">
                           {getIOCCode(skipper.country_code)}
                         </span>
                       )}
@@ -1408,29 +1382,25 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                         {skipper.sailNumber || skipper.sailNo}
                       </span>
                     </span>
-                    {isFinished && (
-                      <div className="absolute top-0.5 right-0.5 w-6 h-6 rounded-full flex items-center justify-center shadow-md">
-                        <Check size={14} className="text-white" strokeWidth={3} />
-                      </div>
+                    {fin && (
+                      <span className={`a-tpos ${posClass(fin)}`}>{fin.letterScore ? letterCode(fin) : fin.position}</span>
                     )}
-                    {!isFinished && (
-                      <div className={`absolute inset-0 rounded-xl transition-all duration-200 ${darkMode ? 'bg-gradient-to-br from-cyan-500/0 to-blue-500/0 hover:from-cyan-500/5 hover:to-blue-500/5' : 'bg-gradient-to-br from-blue-500/0 to-cyan-500/0 hover:from-blue-500/3 hover:to-cyan-500/3'}`} />
-                    )}
+                    {skipper?.name && <span className="a-tname">{skipper.name.split(' ')[0]}</span>}
                   </button>
                 );
               })}
             </div>
           </div>
+          <div className="a-tm-hint a-dim">Tap a sail to add it to the finish order · tap again to undo</div>
         </div>
       </div>
 
       {/* Observers Section - At bottom above info bar */}
       {heatObservers.length > 0 && (
-        <div className={`px-4 py-2 border-t ${darkMode ? 'bg-slate-800/20 border-slate-700/50' : 'bg-slate-50/50 border-slate-200'} flex-shrink-0`}>
-          <div className="flex items-center gap-3">
+        <div className="a-dim flex items-center gap-3 flex-wrap px-1.5 text-[12.5px] flex-shrink-0">
             <div className="flex items-center gap-1.5">
-              <Eye size={14} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
-              <span className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              <Eye size={14} />
+              <span>
                 Observers ({heatObservers.length}):
               </span>
             </div>
@@ -1438,53 +1408,37 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
               {heatObservers.map((observer, idx) => {
                 console.log(`👁️ Rendering observer ${idx + 1}/${heatObservers.length}:`, observer.skipper_name, '#' + observer.skipper_sail_number);
                 return (
-                  <div
+                  <span
                     key={`${observer.skipper_index}-${observer.skipper_sail_number}-${idx}`}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs ${
-                      darkMode
-                        ? 'bg-slate-700/50 text-slate-300 border border-slate-600/50'
-                        : 'bg-slate-100 text-slate-700 border border-slate-200'
-                    }`}
+                    className="a-pill"
                   >
-                    <span className="font-medium">{observer.skipper_name}</span>
-                    <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
+                    <span className="a-ink font-medium">{observer.skipper_name}</span>
+                    <span className="a-dim">
                       #{observer.skipper_sail_number}
                     </span>
-                  </div>
+                  </span>
                 );
               })}
             </div>
-          </div>
         </div>
       )}
 
       {/* Bottom Info Bar - Skipper Count and Scoring System */}
-      <div className={`px-4 py-3 flex items-center justify-between border-t flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
-        {/* Left: Skipper and Race Count */}
-        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${
-          darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
-        }`}>
-          <Users size={14} />
-          <span className="text-xs">{skippers.length} skippers</span>
+      {!isFullscreen && (
+      <div className="a-dim flex items-center gap-4 pl-1.5 pr-24 text-[12.5px] flex-shrink-0">
+          <span className="inline-flex items-center gap-1.5"><Users size={14} />{skippers.length} skippers</span>
           {heatObservers.length > 0 && (
             <>
-              <span className="text-xs">•</span>
-              <span className="text-xs">{heatObservers.length} {heatObservers.length === 1 ? 'observer' : 'observers'}</span>
+              <span>·</span>
+              <span>{heatObservers.length} {heatObservers.length === 1 ? 'observer' : 'observers'}</span>
             </>
           )}
-          <span className="text-xs">•</span>
-          <span className="text-xs">{getCompletedRacesCount()} of {numRaces} races completed</span>
-        </div>
-
-        {/* Right: Scoring System */}
-        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${
-          darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
-        }`}>
-          <Award size={14} />
-          <span className="text-xs font-medium">Scoring System:</span>
-          <span className="text-xs">{getScoringSystemName()}</span>
-        </div>
+          <span>·</span>
+          <span><b className="a-num a-ink">{getCompletedRacesCount()}</b> of {numRaces} races completed</span>
+          <div className="flex-1" />
+          <span className="inline-flex items-center gap-1.5"><Award size={14} />{getScoringSystemName()}</span>
       </div>
+      )}
 
       {/* Letter Score Modal */}
       {selectedSkipperForScore !== null && (() => {
