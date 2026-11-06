@@ -1065,3 +1065,72 @@ html.alfie-theme .a-em-wb { width: 28px; height: 28px; padding: 0; display: flex
 html.alfie-theme .a-em-wb:hover { background: rgba(30,38,58,0.95); color: #fff; }
 html.alfie-theme .a-em-wb svg { width: 14px; height: 14px; }
 html.alfie-light .a-em-wb { background: #fff; border-color: rgba(15,23,42,0.14); color: rgba(15,23,42,0.7); }
+
+/* ---- Race management (RaceMgmt board) ---- */
+html.alfie-theme .a-tbar { display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 14px; background: rgba(22,26,36,0.62); border: 1px solid rgba(255,255,255,0.10); -webkit-backdrop-filter: blur(32px) saturate(180%); backdrop-filter: blur(32px) saturate(180%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 16px 48px rgba(0,0,0,0.3); }
+html.alfie-theme .a-tb-btn { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: rgba(235,240,255,0.85); font: 500 13.5px 'Instrument Sans', system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
+html.alfie-theme .a-tb-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+html.alfie-theme .a-tb-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.1); flex-shrink: 0; }
+html.alfie-light .a-tbar { background: rgba(255,255,255,0.85); border-color: rgba(15,23,42,0.08); box-shadow: 0 8px 24px rgba(15,23,42,0.06); }
+html.alfie-light .a-tb-btn { color: rgba(15,23,42,0.75); }
+html.alfie-light .a-tb-btn:hover { background: rgba(15,23,42,0.05); color: #0B1220; }
+html.alfie-light .a-tb-sep { background: rgba(15,23,42,0.1); }
+html.alfie-theme .a-fchip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: rgba(235,240,255,0.85); font: 500 12.5px 'Instrument Sans', system-ui, sans-serif; cursor: pointer; }
+html.alfie-theme .a-fchip:hover { background: rgba(255,255,255,0.08); }
+html.alfie-theme .a-fchip-on, html.alfie-theme .a-fchip-on:hover { background: rgba(10,132,255,0.18); border-color: rgba(10,132,255,0.5); color: #fff; }
+html.alfie-light .a-fchip { border-color: rgba(15,23,42,0.1); background: rgba(15,23,42,0.03); color: rgba(15,23,42,0.8); }
+html.alfie-light .a-fchip-on, html.alfie-light .a-fchip-on:hover { background: rgba(10,132,255,0.1); border-color: rgba(10,132,255,0.45); color: #0A64D8; }
+/* face stacks */
+html.alfie-theme .a-sf-stack { display: inline-flex; padding-left: 7px; }
+html.alfie-theme .a-sf { position: relative; width: 26px; height: 26px; border-radius: 999px; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; margin-left: -7px; box-shadow: 0 0 0 2px #0E1526; font: 600 9.5px 'Bricolage Grotesque', system-ui, sans-serif; color: #fff; background: #2F6FDE; flex-shrink: 0; }
+html.alfie-theme .a-sf img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+html.alfie-theme .a-sf-more { background: rgba(255,255,255,0.1); color: rgba(235,240,255,0.85); }
+html.alfie-light .a-sf { box-shadow: 0 0 0 2px #fff; }
+html.alfie-light .a-sf-more { background: rgba(15,23,42,0.08); color: #334155; }
+/* round table */
+html.alfie-theme .a-rw { display: grid; grid-template-columns: 110px 140px 160px minmax(0,1fr) 170px; align-items: center; gap: 16px; padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.05); transition: background .12s ease; }
+html.alfie-theme .a-rw:not(.a-rw-h):hover { background: rgba(255,255,255,0.025); }
+html.alfie-theme .a-rw-h { padding-top: 8px; padding-bottom: 8px; }
+html.alfie-theme .a-rw-prog { background: rgba(255,179,64,0.05); }
+html.alfie-light .a-rw { border-top-color: rgba(15,23,42,0.06); }
+html.alfie-light .a-rw:not(.a-rw-h):hover { background: rgba(15,23,42,0.02); }
+@media (max-width: 767px) { html.alfie-theme .a-rw { grid-template-columns: minmax(0,1fr) auto; gap: 6px 12px; } html.alfie-theme .a-rw > :nth-child(2) { order: 3; } html.alfie-theme .a-rw > :nth-child(3) { order: 4; } html.alfie-theme .a-rw > :nth-child(5) { order: 2; } html.alfie-theme .a-rw-h { display: none; } }
+html.alfie-theme .a-ring-dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; box-shadow: inset 0 0 0 2px rgba(235,240,255,0.5); flex-shrink: 0; }
+html.alfie-theme .a-ring-dot-a { box-shadow: inset 0 0 0 2px #FFB340; }
+html.alfie-light .a-ring-dot { box-shadow: inset 0 0 0 2px rgba(15,23,42,0.4); }
+/* season timeline */
+html.alfie-theme .a-stl { display: grid; grid-template-columns: 300px minmax(0,1fr); }
+html.alfie-theme .a-stl-lab { display: flex; flex-direction: column; justify-content: center; gap: 5px; height: 64px; padding: 0 18px; border-top: 1px solid rgba(255,255,255,0.05); min-width: 0; }
+html.alfie-theme .a-stl-track { position: relative; height: 64px; border-top: 1px solid rgba(255,255,255,0.05); margin-right: 18px; }
+html.alfie-theme .a-stl-track::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(255,255,255,0.07); }
+html.alfie-theme .a-stl-months { position: relative; height: 30px; border-top: 1px solid rgba(255,255,255,0.05); display: grid; grid-template-columns: repeat(12, minmax(0,1fr)); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: rgba(235,240,255,0.5); margin-right: 18px; }
+html.alfie-theme .a-stl-months > span { padding: 9px 0 0 6px; }
+html.alfie-theme .a-stl-now { color: #fff; }
+html.alfie-theme .a-stl-today { position: absolute; top: 2px; transform: translateX(-50%); padding: 2px 7px; border-radius: 6px; background: var(--alfie-spectrum); color: #fff; font-size: 10px; letter-spacing: 0.04em; }
+html.alfie-theme .a-stl-line { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,62,154,0.5); pointer-events: none; }
+html.alfie-theme .a-stl-span { position: absolute; top: 50%; height: 3px; margin-top: -1.5px; border-radius: 3px; opacity: .45; }
+html.alfie-theme .a-mk { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; padding: 0; border: 0; border-radius: 999px; cursor: pointer; z-index: 1; }
+html.alfie-theme .a-mk-done { background: var(--c); box-shadow: 0 0 0 3px #0D1322; }
+html.alfie-theme .a-mk-prog { background: #FFB340; box-shadow: 0 0 0 3px #0D1322, 0 0 0 6px rgba(255,179,64,0.3); }
+html.alfie-theme .a-mk-pend { border: 2px dashed #FFB340; background: #0D1322; }
+html.alfie-theme .a-mk-up { border: 2px solid rgba(235,240,255,0.5); background: #0D1322; }
+html.alfie-theme .a-mk-x { border: 2px solid rgba(255,107,107,0.6); background: #0D1322; }
+html.alfie-theme .a-mk-next { width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid transparent; background: linear-gradient(#0D1322,#0D1322) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-theme .a-mk-ev { width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; border-radius: 3px; transform: rotate(45deg); background: #FFC56B; box-shadow: 0 0 0 3px #0D1322; }
+html.alfie-theme .a-mk-ev.a-mk-ev-done { background: #8A4DFF; }
+html.alfie-theme .a-mk:hover { filter: brightness(1.2); }
+html.alfie-theme .a-stl-more { position: absolute; right: 4px; top: 6px; font-size: 11px; font-weight: 600; color: rgba(235,240,255,0.55); white-space: nowrap; }
+html.alfie-theme .a-stl-key { display: inline-flex; align-items: center; gap: 6px; }
+html.alfie-theme .a-stl-key i { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+html.alfie-light .a-stl-lab, html.alfie-light .a-stl-track, html.alfie-light .a-stl-months { border-top-color: rgba(15,23,42,0.06); }
+html.alfie-light .a-stl-track::before { background: rgba(15,23,42,0.08); }
+html.alfie-light .a-stl-months { color: rgba(15,23,42,0.5); }
+html.alfie-light .a-stl-now { color: #0B1220; }
+html.alfie-light .a-mk-done, html.alfie-light .a-mk-ev { box-shadow: 0 0 0 3px #fff; }
+html.alfie-light .a-mk-prog { box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(255,179,64,0.3); }
+html.alfie-light :is(.a-mk-pend, .a-mk-up, .a-mk-x) { background: #fff; }
+html.alfie-light .a-mk-up { border-color: rgba(15,23,42,0.4); }
+html.alfie-light .a-mk-next { background: linear-gradient(#fff,#fff) padding-box, var(--alfie-spectrum) border-box; }
+html.alfie-light .a-stl-more { color: rgba(15,23,42,0.5); }
+@media (max-width: 900px) { html.alfie-theme .a-stl { grid-template-columns: 170px minmax(0,1fr); } html.alfie-theme .a-stl-lab .a-stl-meta { display: none; } }
+html.alfie-light select.a-inp { background-repeat: no-repeat; background-position: right 12px center; }

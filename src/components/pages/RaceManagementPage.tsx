@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, Plus, SquarePen as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio, FlaskConical } from 'lucide-react';
+import { Trophy, Plus, SquarePen as Edit2, CalendarRange, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio, FlaskConical } from 'lucide-react';
 import { RaceType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
 import { getStoredRaceEvents, getStoredRaceSeries, getSimulatedRaceEvents, deleteRaceEvent, deleteSimulatedRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
@@ -8,7 +8,7 @@ import { getStoredVenues } from '../../utils/venueStorage';
 import { Venue } from '../../types/venue';
 import { formatDate } from '../../utils/date';
 import { ConfirmationModal } from '../ConfirmationModal';
-import { boatTypeColors, defaultColorScheme } from '../../constants/colors';
+import { boatTypeColors, defaultColorScheme, getBoatClassBadge, getRaceFormatBadge } from '../../constants/colors';
 import { CreateRaceModal } from './CreateRaceModal';
 import { EventSimulationModal } from '../EventSimulationModal';
 import { EventDetails } from '../EventDetails';
@@ -1533,443 +1533,285 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     );
   };
 
-  const renderSeriesCard = (s: RaceSeries) => {
-    const colors = boatTypeColors[s.raceClass] || defaultColorScheme;
-    const completedRounds = s.rounds.filter(r => r.completed).length;
-    const totalRounds = s.rounds.length;
-    const isExpanded = expandedSeries === s.id;
+  const initialsOf = (name: string) => {
+    const parts = (name || '').trim().split(' ').filter(Boolean);
+    return parts.length >= 2 ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase() : (parts[0] || '?').substring(0, 2).toUpperCase();
+  };
 
-    // Enhanced debug logging
-    console.log('Rendering series card:', {
-      seriesName: s.seriesName,
-      seriesId: s.id,
-      idType: typeof s.id,
-      expandedSeries: expandedSeries,
-      expandedSeriesType: typeof expandedSeries,
-      isExpanded: isExpanded,
-      strictEquality: expandedSeries === s.id,
-      looseEquality: expandedSeries == s.id
-    });
+  const faceStack = (people: any[], max: number) => (
+    <span className="a-sf-stack">
+      {people.slice(0, max).map((p: any, i: number) => (
+        <span key={i} className="a-sf" title={p.name}>
+          {p.avatarUrl ? <img src={p.avatarUrl} alt="" /> : initialsOf(p.name)}
+        </span>
+      ))}
+      {people.length > max && <span className="a-sf a-sf-more">+{people.length - max}</span>}
+    </span>
+  );
 
-    const venueImage = s.rounds[0] ? getVenueImage(s.rounds[0].venue) : null;
-    const nextRoundIndex = getNextUpcomingRound(s);
-    const progressPercent = totalRounds > 0 ? (completedRounds / totalRounds) * 100 : 0;
-
-    // Get all unique participants across all rounds
-    const allParticipants = s.rounds.reduce((acc: any[], round) => {
-      const roundParticipants = (round.skippers && round.skippers.length > 0) ? round.skippers : (round.attendees || []);
-      roundParticipants.forEach(participant => {
-        if (!acc.find(p => p.name === participant.name)) {
-          acc.push(participant);
-        }
-      });
-      return acc;
-    }, []);
-
-    const avatars = allParticipants.slice(0, 5).map((skipper, i) => {
-      const nameParts = skipper.name.trim().split(' ');
-      const initials = nameParts.length >= 2
-        ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`
-        : nameParts[0][0] || '?';
-
-      return (
-        <div
-          key={i}
-          className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
-            darkMode ? 'border-slate-800 bg-slate-700 text-slate-300' : 'border-white bg-slate-200 text-slate-700'
-          } -ml-2 first:ml-0`}
-          style={{
-            backgroundImage: skipper.avatarUrl ? `url(${skipper.avatarUrl})` : undefined,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center'
-          }}
-        >
-          {!skipper.avatarUrl && initials}
-        </div>
-      );
-    });
-
+  const renderSeason = () => {
+    const yr = selectedYear;
+    const start = new Date(yr, 0, 1).getTime();
+    const end = new Date(yr + 1, 0, 1).getTime();
+    const pos = (d: string | Date) => Math.min(99.4, Math.max(0.6, ((new Date(d).getTime() - start) / (end - start)) * 100));
+    const inYear = (d: string) => new Date(d).getFullYear() === yr;
+    const now = new Date();
+    const todayPos = now.getFullYear() === yr ? pos(now) : null;
+    const seriesRows = sortedSeries.filter(s => s.rounds.some(r => inYear(r.date)));
+    const singles = sortedQuickRaces.filter(r => inYear(r.date));
+    if (seriesRows.length === 0 && singles.length === 0) return null;
+    const palette = ['#8A4DFF', '#2E7BFF', '#30D158', '#FF8A2B', '#40C8C0', '#FF3E9A'];
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const fmt = (d: string) => new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+    const todayLine = todayPos !== null ? <span aria-hidden="true" className="a-stl-line" style={{ left: `${todayPos}%` }} /> : null;
     return (
-      <div
-        className={`
-          group relative overflow-hidden cursor-pointer rounded-xl transition-all duration-300
-          ${darkMode
-            ? 'bg-slate-800/50 hover:bg-slate-800 border border-slate-700'
-            : 'bg-white hover:shadow-xl border border-slate-200'}
-          ${s.completed ? 'opacity-75' : ''}
-        `}
-      >
-        {/* Series Image */}
-        {venueImage && (
-          <div className="relative h-48 overflow-hidden">
-            <img
-              src={venueImage}
-              alt={s.rounds[0]?.venue}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+      <section className="a-card overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3.5" style={{ padding: '18px 20px' }}>
+          <span className="a-tile" style={{ width: 36, height: 36 }}><CalendarRange size={18} /></span>
+          <div className="flex-1" style={{ minWidth: 160 }}>
+            <h2 className="a-display a-ink m-0 text-[19px] font-semibold">{yr} season</h2>
+            <p className="a-dim m-0 mt-0.5 text-[13px]">{seriesRows.length} series · {singles.length} single {singles.length === 1 ? 'event' : 'events'}</p>
+          </div>
+          <div className="a-mute flex flex-wrap items-center gap-3.5 text-[12px]">
+            <span className="a-stl-key"><i style={{ background: '#8A4DFF' }} />Done</span>
+            <span className="a-stl-key"><i style={{ background: '#FFB340' }} />Scoring</span>
+            <span className="a-stl-key"><i style={{ border: '2px dashed #FFB340' }} />Not scored</span>
+            <span className="a-stl-key"><i style={{ border: '2px solid currentColor', opacity: 0.6 }} />Upcoming</span>
+          </div>
+          {sortedSeries.length > 0 && (
+            <button onClick={() => setShowRolloverModal(true)} className="a-btn a-btn-sm"><RotateCcw size={14} />Roll Over to Next Year</button>
+          )}
+        </div>
+        <div className="a-stl">
+          <div className="a-stl-lab" style={{ height: 30 }} />
+          <div className="a-stl-months">
+            {months.map((m, i) => <span key={m} className={todayPos !== null && i === now.getMonth() ? 'a-stl-now' : ''}>{m}</span>)}
+            {todayPos !== null && <span className="a-stl-today" style={{ left: `${todayPos}%` }}>TODAY</span>}
+          </div>
 
-            {/* Date Badge Overlay - Show year range */}
-            {s.rounds[0]?.date && (
-              <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg">
-                <div className="text-center">
-                  <div className="text-xs font-semibold text-slate-500 leading-none uppercase">
-                    {(() => {
-                      const firstYear = new Date(s.rounds[0].date).getFullYear();
-                      const lastYear = new Date(s.rounds[s.rounds.length - 1].date).getFullYear();
-                      return firstYear === lastYear ? firstYear : `${firstYear}-${lastYear}`;
-                    })()}
-                  </div>
-                  <div className="text-xs font-medium text-slate-700 leading-tight mt-1">
-                    Series
+          {seriesRows.map((s, si) => {
+            const c = palette[si % palette.length];
+            const yrRounds = s.rounds.map((r, i) => ({ r, i })).filter(({ r }) => inYear(r.date));
+            const later = s.rounds.filter(r => new Date(r.date).getFullYear() > yr).length;
+            const done = s.rounds.filter(r => r.completed).length;
+            const nextIdx = getNextUpcomingRound(s);
+            const first = pos(yrRounds[0].r.date);
+            const last = pos(yrRounds[yrRounds.length - 1].r.date);
+            return (
+              <React.Fragment key={s.id}>
+                <div className="a-stl-lab cursor-pointer" style={si === 0 ? { borderLeft: `3px solid ${c}`, paddingLeft: 15 } : undefined} onClick={() => toggleSeriesExpansion(s.id)}>
+                  <p className="a-ink m-0 text-[13.5px] font-semibold truncate">{s.seriesName.replace(/\s*-\s*\d{4}$/, '')}</p>
+                  <div className="a-stl-meta flex items-center gap-1.5">
+                    {s.raceClass && <span className={getBoatClassBadge(s.raceClass, darkMode).className}>{s.raceClass}</span>}
+                    <span className={getRaceFormatBadge(s.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>{s.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}</span>
+                    <span className="a-dim text-[11.5px] whitespace-nowrap">{done} of {s.rounds.length}</span>
                   </div>
                 </div>
+                <div className="a-stl-track" style={{ ['--c' as any]: c }}>
+                  <span className="a-stl-span" style={{ left: `${first}%`, width: `${Math.max(0, last - first)}%`, background: c }} />
+                  {yrRounds.map(({ r, i }) => {
+                    const prog = !r.completed && !r.cancelled && (r.lastCompletedRace || 0) > 0;
+                    const cls = r.completed ? 'a-mk-done' : r.cancelled ? 'a-mk-x' : prog ? 'a-mk-prog' : i === nextIdx ? 'a-mk-next' : isDatePast(r.date) && !isDateToday(r.date) ? 'a-mk-pend' : 'a-mk-up';
+                    return <button key={i} className={`a-mk ${cls}`} style={{ left: `${pos(r.date)}%` }} title={`${r.name} · ${fmt(r.date)}`} aria-label={`${r.name} · ${fmt(r.date)}`} onClick={() => handleRoundClick(s, i)} />;
+                  })}
+                  {later > 0 && <span className="a-stl-more">+{later} in {yr + 1}</span>}
+                  {todayLine}
+                </div>
+              </React.Fragment>
+            );
+          })}
+
+          {singles.length > 0 && (
+            <>
+              <div className="a-stl-lab">
+                <p className="a-ink m-0 text-[13.5px] font-semibold">Single events</p>
+                <div className="a-stl-meta flex items-center gap-1.5"><span className="a-dim text-[11.5px]">{singles.length} {singles.length === 1 ? 'event' : 'events'}</span></div>
               </div>
-            )}
+              <div className="a-stl-track">
+                {singles.map(r => (
+                  <button key={r.id} className={`a-mk a-mk-ev ${r.completed ? 'a-mk-ev-done' : ''}`} style={{ left: `${pos(r.date)}%` }} title={`${r.eventName} · ${fmt(r.date)}`} aria-label={`${r.eventName} · ${fmt(r.date)}`} onClick={() => onEventSelect(r)} />
+                ))}
+                {todayLine}
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+    );
+  };
 
-            {/* Status Badge */}
-            <div className="absolute top-3 right-3">
-              {s.completed ? (
-                <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-green-500/90 backdrop-blur-sm text-white text-xs font-medium">
-                  <CheckCircle2 size={14} className="text-white" />
-                  <span className="text-white">Completed</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-purple-500/90 backdrop-blur-sm text-white text-xs font-medium">
-                  <TrendingUp size={14} />
-                  {completedRounds}/{totalRounds} Rounds
-                </div>
-              )}
+  const renderSummaryCards = () => {
+    if (loading || timeFilter === 'pending' || timeFilter === 'simulated') return null;
+    type Item = { date: string; name: string; sub: string; open: () => void; completed: boolean; cancelled: boolean; progress: boolean };
+    const items: Item[] = [];
+    quickRaces.forEach(r => {
+      const reg = (r.attendees || []).length;
+      items.push({ date: r.date, name: r.eventName, sub: `${r.clubName || r.venue || ''}${reg ? ` · ${reg} confirmed` : ''}`, open: () => onEventSelect(r), completed: !!r.completed, cancelled: !!(r as any).cancelled, progress: (r.lastCompletedRace || 0) > 0 && !r.completed });
+    });
+    series.forEach(s => s.rounds.forEach((rd: any, i: number) => {
+      const n = (rd.skippers || []).length;
+      items.push({ date: rd.date, name: `${rd.name} - ${s.seriesName}`, sub: `${s.clubName || rd.venue || ''}${n ? ` · ${n} competitors` : ''}`, open: () => handleRoundClick(s, i), completed: !!rd.completed, cancelled: !!rd.cancelled, progress: (rd.lastCompletedRace || 0) > 0 && !rd.completed });
+    }));
+    const next = items.filter(x => !x.completed && !x.cancelled && !x.progress && !isDatePast(x.date)).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+    const scoring = items.filter(x => x.progress && !x.cancelled).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    if (!next && !scoring) return null;
+    const chip = (d: string) => {
+      const dt = new Date(d);
+      return <div className="a-dc" style={{ width: 52 }}><b>{dt.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</b><span>{dt.getDate()}</span></div>;
+    };
+    const inDays = (d: string) => {
+      const t = new Date(); t.setHours(0, 0, 0, 0);
+      const dt = new Date(d); dt.setHours(0, 0, 0, 0);
+      const n = Math.round((dt.getTime() - t.getTime()) / 86400000);
+      return n <= 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`;
+    };
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-[22px]">
+        {next && (
+          <div className="a-card flex items-center gap-4" style={{ padding: '16px 18px' }}>
+            {chip(next.date)}
+            <div className="flex-1 min-w-0">
+              <p className="a-cap a-txt-b m-0">Next race day · {inDays(next.date)}</p>
+              <p className="a-ink m-0 mt-1 text-[15px] font-semibold truncate">{next.name}</p>
+              {next.sub && <p className="a-dim m-0 mt-0.5 text-[12.5px] truncate">{next.sub}</p>}
             </div>
+            <button onClick={next.open} className="a-btn a-btn-p">Start scoring</button>
           </div>
         )}
-
-        {/* Series Content */}
-        <div className="p-4" onClick={() => toggleSeriesExpansion(s.id)}>
-          {/* Action Buttons */}
-          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 touch-show transition-opacity">
-            <div className="flex gap-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const seriesEvent: RaceEvent = {
-                    id: s.id,
-                    eventName: s.seriesName,
-                    clubName: s.clubName,
-                    date: s.rounds[0]?.date || new Date().toISOString(),
-                    venue: s.rounds[0]?.venue || '',
-                    raceClass: s.raceClass,
-                    raceFormat: s.raceFormat,
-                    isSeriesEvent: true,
-                    seriesId: s.id,
-                    clubId: s.clubId
-                  };
-                  handleEditClick(seriesEvent);
-                }}
-                className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${
-                  isSeriesFullyCompleted(s)
-                    ? darkMode
-                      ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
-                      : 'bg-white/50 text-slate-400 cursor-not-allowed'
-                    : darkMode
-                      ? 'bg-slate-700/90 hover:bg-slate-600 text-slate-300'
-                      : 'bg-white/90 hover:bg-slate-100 text-slate-600'
-                }`}
-                title={isSeriesFullyCompleted(s) ? "Cannot edit - all rounds completed" : "Edit series"}
-                disabled={isSeriesFullyCompleted(s)}
-              >
-                <Edit2 size={16} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteClick(s.id, 'series');
-                }}
-                className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${
-                  darkMode
-                    ? 'bg-red-900/90 hover:bg-red-800 text-red-400'
-                    : 'bg-red-50/90 hover:bg-red-100 text-red-600'
-                }`}
-                title="Delete series"
-              >
-                <Trash2 size={16} />
-              </button>
+        {scoring && (
+          <div className="a-card flex items-center gap-4" style={{ padding: '16px 18px', borderColor: 'rgba(255,179,64,0.3)' }}>
+            {chip(scoring.date)}
+            <div className="flex-1 min-w-0">
+              <p className="a-cap a-txt-a m-0">Scoring in progress</p>
+              <p className="a-ink m-0 mt-1 text-[15px] font-semibold truncate">{scoring.name}</p>
+              {scoring.sub && <p className="a-dim m-0 mt-0.5 text-[12.5px] truncate">{scoring.sub}</p>}
             </div>
-          </div>
-
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className={`text-lg font-semibold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                  {s.seriesName}
-                </h3>
-                <div className={`px-2 py-1 rounded-full text-xs font-medium ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}>
-                  {s.raceClass}
-                </div>
-                {/* Completion badge for cards without images */}
-                {!venueImage && s.completed && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs font-medium">
-                    <CheckCircle2 size={12} className="text-white" />
-                    <span className="text-white">Completed</span>
-                  </div>
-                )}
-              </div>
-              {/* Only show date text when there's no image */}
-              {!venueImage && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar size={14} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
-                  <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                    {s.rounds.length > 0
-                      ? `${formatDate(s.rounds[0].date)} - ${formatDate(s.rounds[s.rounds.length - 1].date)}`
-                      : 'No rounds scheduled'}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          {!s.completed && totalRounds > 0 && (
-            <div className="mb-3">
-              <div className={`h-2 rounded-full overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
-                <div
-                  className="h-full from-purple-500 to-blue-500 transition-all duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 text-sm mb-3">
-            <MapPin size={14} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
-            <span className={`truncate ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              {s.rounds.length > 0
-                ? `${s.rounds.map(r => r.venue).filter((v, i, a) => a.indexOf(v) === i).join(', ')}`
-                : 'No venues set'}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between pt-3 border-t border-slate-700/50">
-            <div className="flex items-center">
-              {avatars.length > 0 ? (
-                <div className="flex items-center">
-                  {avatars}
-                  {allParticipants.length > 5 && (
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium border-2 -ml-2 ${
-                      darkMode ? 'border-slate-800 bg-slate-700 text-slate-300' : 'border-white bg-slate-200 text-slate-700'
-                    }`}>
-                      +{allParticipants.length - 5}
-                    </div>
-                  )}
-                  <span className={`ml-3 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    {allParticipants.length} registered
-                  </span>
-                </div>
-              ) : (
-                <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  No registrations yet
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                s.raceFormat === 'handicap'
-                  ? darkMode ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-800'
-                  : darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
-              }`}>
-                {s.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-              </div>
-              <button
-                className={`p-2 rounded-lg transition-colors ${
-                  darkMode
-                    ? 'hover:bg-slate-700 text-slate-300'
-                    : 'hover:bg-slate-100 text-slate-600'
-                }`}
-              >
-                {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Expanded Rounds */}
-        {isExpanded && s.rounds.length > 0 && (
-          <div className="px-4 pb-4">
-            <div className="pt-4 border-t border-slate-700/50">
-              <h4 className={`text-sm font-medium mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Series Rounds
-              </h4>
-              <div className="space-y-2">
-                {getSortedRounds(s).map((round, index) => {
-                  const isPastDate = isDatePast(round.date);
-                  const isToday = isDateToday(round.date);
-                  const originalIndex = s.rounds.findIndex(r => r.name === round.name);
-                  const isNextRound = originalIndex === nextRoundIndex;
-
-                  return (
-                    <div
-                      key={index}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!round.cancelled) {
-                          handleRoundClick(s, originalIndex);
-                        }
-                      }}
-                      className={`
-                        p-3 rounded-lg border transition-all duration-200
-                        ${darkMode
-                          ? 'bg-slate-800/50 border-slate-700 hover:bg-slate-700'
-                          : 'bg-slate-50 border-slate-200 hover:bg-white hover:shadow-md'}
-                        ${round.cancelled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
-                        ${isNextRound ? 'ring-2 ring-green-500/50' : ''}
-                      `}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className={`font-medium text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                          {round.name}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {s.enableLiveTracking && !round.completed && !round.cancelled && isToday && (
-                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/30 text-cyan-400" title="Live Tracking enabled">
-                              <Radio size={12} />
-                              Live
-                            </div>
-                          )}
-                          {round.completed ? (
-                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
-                              <CheckCircle2 size={12} />
-                              Completed
-                            </div>
-                          ) : round.cancelled ? (
-                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/30 text-red-400">
-                              <XCircle size={12} />
-                              Cancelled
-                            </div>
-                          ) : (round.lastCompletedRace && round.lastCompletedRace > 0) ? (
-                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-900/30 text-orange-400">
-                              <TrendingUp size={12} />
-                              In Progress
-                            </div>
-                          ) : isNextRound ? (
-                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400 animate-pulse">
-                              <Clock size={12} />
-                              Up Next
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1">
-                            <Calendar size={12} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
-                            <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                              {formatDate(round.date)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MapPin size={12} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
-                            <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                              {round.venue}
-                            </span>
-                          </div>
-                        </div>
-                        {/* Show competing skippers if available, otherwise show registered attendees */}
-                        {((round.skippers && round.skippers.length > 0) || (round.attendees && round.attendees.length > 0)) && (
-                          <div className="flex items-center gap-2">
-                            {round.skippers && round.skippers.length > 0 ? (
-                              <>
-                                <div className="flex -space-x-2">
-                                  {round.skippers.slice(0, 4).map((skipper: any, i: number) => {
-                                    const nameParts = skipper.name.trim().split(' ');
-                                    const initials = nameParts.length >= 2
-                                      ? `${nameParts[0].charAt(0)}${nameParts[nameParts.length - 1].charAt(0)}`.toUpperCase()
-                                      : skipper.name.substring(0, 2).toUpperCase();
-                                    return (
-                                      <div
-                                        key={i}
-                                        title={skipper.name}
-                                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium ring-2 ring-slate-800 overflow-hidden"
-                                      >
-                                        {skipper.avatarUrl ? (
-                                          <img
-                                            src={skipper.avatarUrl}
-                                            alt={skipper.name}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        ) : (
-                                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br text-white">
-                                            {initials}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                  {round.skippers.length > 4 && (
-                                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium ring-2 ring-slate-800 bg-slate-700 text-slate-300">
-                                      +{round.skippers.length - 4}
-                                    </div>
-                                  )}
-                                </div>
-                                <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  {round.skippers.length} competing
-                                </span>
-                              </>
-                            ) : round.attendees && round.attendees.length > 0 && (
-                              <>
-                                <div className="flex -space-x-2">
-                                  {round.attendees.slice(0, 4).map((attendee: any, i: number) => {
-                                    const nameParts = attendee.name.trim().split(' ');
-                                    const initials = nameParts.length >= 2
-                                      ? `${nameParts[0].charAt(0)}${nameParts[nameParts.length - 1].charAt(0)}`.toUpperCase()
-                                      : attendee.name.substring(0, 2).toUpperCase();
-                                    return (
-                                      <div
-                                        key={i}
-                                        title={attendee.name}
-                                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium ring-2 ring-slate-800 overflow-hidden"
-                                      >
-                                        {attendee.avatarUrl ? (
-                                          <img
-                                            src={attendee.avatarUrl}
-                                            alt={attendee.name}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        ) : (
-                                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-cyan-500 text-white">
-                                            {initials}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                  {round.attendees.length > 4 && (
-                                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium ring-2 ring-slate-800 bg-slate-700 text-slate-300">
-                                      +{round.attendees.length - 4}
-                                    </div>
-                                  )}
-                                </div>
-                                <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  {round.attendees.length} registered
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <button onClick={scoring.open} className="a-btn a-btn-p">Continue scoring</button>
           </div>
         )}
       </div>
     );
   };
 
+  const renderSeriesCard = (s: RaceSeries) => {
+    const completedRounds = s.rounds.filter(r => r.completed).length;
+    const totalRounds = s.rounds.length;
+    const isExpanded = expandedSeries === s.id;
+    const nextRoundIndex = getNextUpcomingRound(s);
+
+    const allParticipants = s.rounds.reduce((acc: any[], round) => {
+      const roundParticipants = (round.skippers && round.skippers.length > 0) ? round.skippers : (round.attendees || []);
+      roundParticipants.forEach(participant => {
+        if (!acc.find(p => p.name === participant.name)) acc.push(participant);
+      });
+      return acc;
+    }, []);
+
+    const fullyDone = isSeriesFullyCompleted(s);
+
+    return (
+      <section className={`a-card overflow-hidden ${s.completed ? 'opacity-80' : ''}`}>
+        <div className="flex flex-wrap items-center gap-3.5 cursor-pointer" style={{ padding: '18px 20px' }} onClick={() => toggleSeriesExpansion(s.id)}>
+          <div className="flex-1" style={{ minWidth: 260 }}>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="a-display a-ink m-0 text-[19px] font-semibold">{s.seriesName}</h2>
+              {s.raceClass && <span className={getBoatClassBadge(s.raceClass, darkMode).className}>{s.raceClass}</span>}
+              <span className={getRaceFormatBadge(s.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>{s.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}</span>
+              {s.completed && <span className="a-st a-txt-g text-[12.5px]"><span className="a-light a-light-g" />Completed</span>}
+            </div>
+            <div className="a-mute flex items-center gap-3.5 mt-2 text-[13px] flex-wrap">
+              {allParticipants.length > 0 ? <span className="inline-flex items-center gap-2.5">{faceStack(allParticipants, 4)}{allParticipants.length} registered</span> : <span>No registrations yet</span>}
+              <span>·</span>
+              <span>{completedRounds} of {totalRounds} rounds</span>
+              {s.clubName && <><span>·</span><span className="truncate">{s.clubName}</span></>}
+            </div>
+          </div>
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => {
+                const seriesEvent: RaceEvent = {
+                  id: s.id,
+                  eventName: s.seriesName,
+                  clubName: s.clubName,
+                  date: s.rounds[0]?.date || new Date().toISOString(),
+                  venue: s.rounds[0]?.venue || '',
+                  raceClass: s.raceClass,
+                  raceFormat: s.raceFormat,
+                  isSeriesEvent: true,
+                  seriesId: s.id,
+                  clubId: s.clubId
+                };
+                handleEditClick(seriesEvent);
+              }}
+              className="a-ib disabled:opacity-40 disabled:cursor-not-allowed"
+              title={fullyDone ? 'Cannot edit - all rounds completed' : 'Edit series'}
+              aria-label="Edit series"
+              disabled={fullyDone}
+            >
+              <Edit2 size={16} />
+            </button>
+            <button onClick={() => handleDeleteClick(s.id, 'series')} className="a-ib a-ib-d" title="Delete series" aria-label="Delete series">
+              <Trash2 size={16} />
+            </button>
+            <button onClick={() => toggleSeriesExpansion(s.id)} className="a-ib" aria-label={isExpanded ? 'Hide rounds' : 'Show rounds'} title={isExpanded ? 'Hide rounds' : 'Show rounds'}>
+              {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </button>
+          </div>
+        </div>
+
+        {isExpanded && s.rounds.length > 0 && (
+          <div>
+            <div className="a-rw a-rw-h"><span className="a-cap">Round</span><span className="a-cap">Date</span><span className="a-cap">Status</span><span className="a-cap max-md:hidden">Competitors</span><span /></div>
+            {getSortedRounds(s).map((round, index) => {
+              const isPastDate = isDatePast(round.date);
+              const isToday = isDateToday(round.date);
+              const originalIndex = s.rounds.findIndex(r => r.name === round.name);
+              const isNextRound = originalIndex === nextRoundIndex;
+              const inProgress = !round.completed && !round.cancelled && (round.lastCompletedRace || 0) > 0;
+              const notScored = !round.completed && !round.cancelled && !inProgress && isPastDate && !isToday;
+              const people = (round.skippers && round.skippers.length > 0) ? round.skippers : (round.attendees || []);
+              const label = round.completed ? 'Results' : inProgress ? 'Continue scoring' : (notScored || isToday) ? 'Start scoring' : 'Open';
+              const open = () => { if (!round.cancelled) handleRoundClick(s, originalIndex); };
+              return (
+                <div key={index} onClick={open} className={`a-rw ${inProgress ? 'a-rw-prog' : ''} ${round.cancelled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <span className="a-ink font-semibold truncate">{round.name}</span>
+                  <span className="a-mute text-[13px]">{new Date(round.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                  <span className="flex items-center gap-2 flex-wrap">
+                    {round.completed ? (
+                      <span className="a-st a-txt-g"><span className="a-light a-light-g" />Completed</span>
+                    ) : round.cancelled ? (
+                      <span className="a-st a-txt-r"><span className="a-light a-light-r" />Cancelled</span>
+                    ) : inProgress ? (
+                      <span className="a-st a-txt-a"><span className="a-light a-light-a" />Scoring</span>
+                    ) : notScored ? (
+                      <span className="a-st a-txt-a"><span className="a-ring-dot a-ring-dot-a" />Not scored</span>
+                    ) : isNextRound ? (
+                      <span className="a-st a-txt-b"><span className="a-light a-light-b" />Up next</span>
+                    ) : (
+                      <span className="a-st a-mute"><span className="a-ring-dot" />Upcoming</span>
+                    )}
+                    {s.enableLiveTracking && !round.completed && !round.cancelled && isToday && (
+                      <span className="a-st a-txt-b text-[12px]" title="Live Tracking enabled"><Radio size={12} />Live</span>
+                    )}
+                  </span>
+                  <span className="a-mute flex items-center gap-2.5 text-[13px] max-md:hidden">
+                    {people.length > 0 ? <>{faceStack(people, 3)}{people.length} {round.skippers && round.skippers.length > 0 ? 'competing' : 'registered'}</> : <span className="a-dim">No entries</span>}
+                  </span>
+                  <span className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                    {!round.cancelled && <button onClick={open} className={`a-btn a-btn-sm ${inProgress ? 'a-btn-p' : ''}`}>{label}</button>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    );
+  };
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-4 sm:p-6 lg:p-16">
+      <div className="p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-16 lg:pl-9">
         {/* Offline/Cached Data Banner */}
         {(!navigator.onLine || usingCachedData) && (
           <div className="mb-6 p-4 rounded-lg border border-amber-500/30 bg-amber-500/10 flex items-start gap-3">
@@ -1989,86 +1831,48 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
         )}
 
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
-              <Flag className="text-white" size={28} />
-            </div>
-            <div>
-              <h1 className={`text-3xl font-bold ${
-                darkMode ? 'text-white' : 'text-gray-900'
-              }`}>Race Management</h1>
-              <p className="text-sm text-slate-400">
-                {quickRaces.length + series.length} {quickRaces.length + series.length === 1 ? 'event' : 'events'} total
-              </p>
-            </div>
+        <div className="flex flex-wrap items-center gap-4 mb-[22px]">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><Flag size={22} /></span>
+          <div className="flex-1" style={{ minWidth: 180 }}>
+            <h1 className="a-display a-ink m-0 text-[32px] font-semibold leading-[1.1]">Race Management</h1>
+            <p className="a-mute mt-0.5 text-[14px]">
+              {quickRaces.length + series.length} {quickRaces.length + series.length === 1 ? 'event' : 'events'} total
+            </p>
           </div>
 
           {/* Toolbar */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Search */}
+          <div className="a-tbar">
             {showSearch ? (
-              <div className="relative flex-1 sm:w-64">
-                <Search
-                  size={18}
-                  className={`absolute left-3 top-1/2 -translate-y-1/2 ${
-                    darkMode ? 'text-slate-400' : 'text-slate-500'
-                  }`}
-                />
+              <div className="a-field" style={{ height: 36, width: 240 }}>
+                <Search size={16} />
                 <input
                   type="text"
-                  placeholder="Search events..."
+                  placeholder="Search events…"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onBlur={() => !searchTerm && setShowSearch(false)}
                   autoFocus
-                  className={`
-                    w-full pl-10 pr-4 py-2 rounded-lg transition-colors
-                    ${darkMode
-                      ? 'bg-slate-700 text-slate-200 placeholder-slate-400 border border-slate-600'
-                      : 'bg-white text-slate-900 placeholder-slate-400 border border-slate-200'}
-                  `}
                 />
               </div>
             ) : (
-              <button
-                onClick={() => setShowSearch(true)}
-                className={`
-                  p-2 rounded-lg transition-colors
-                  ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-200'}
-                `}
-                title="Search"
-              >
-                <Search size={18} />
+              <button onClick={() => setShowSearch(true)} className="a-tb-btn" style={{ width: 36, padding: 0, justifyContent: 'center' }} title="Search" aria-label="Search">
+                <Search size={17} />
               </button>
             )}
+            <span className="a-tb-sep" />
 
             {/* Sort Dropdown */}
             <div className="relative" ref={sortDropdownRef}>
-              <button
-                onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
-                  ${darkMode
-                    ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200'
-                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}
-                `}
-              >
-                <ArrowUpDown size={16} />
-                Sort
-                <ChevronDown size={16} />
+              <button onClick={() => setShowSortDropdown(!showSortDropdown)} className="a-tb-btn">
+                <ArrowUpDown size={15} />Sort<ChevronDown size={15} className="a-dim" />
               </button>
-
               {showSortDropdown && (
-                <div className={`
-                  absolute right-0 mt-2 w-56 rounded-lg shadow-xl border py-2 z-50
-                  ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-                `}>
+                <div className="a-pop absolute right-0 mt-2 w-56 z-50" style={{ padding: 6 }}>
                   {[
-                    { value: 'date-asc', label: 'Date (Oldest First)' },
-                    { value: 'date-desc', label: 'Date (Newest First)' },
-                    { value: 'name-asc', label: 'Name (A-Z)' },
-                    { value: 'name-desc', label: 'Name (Z-A)' },
+                    { value: 'date-asc', label: 'Date (oldest first)' },
+                    { value: 'date-desc', label: 'Date (newest first)' },
+                    { value: 'name-asc', label: 'Name (A–Z)' },
+                    { value: 'name-desc', label: 'Name (Z–A)' },
                     { value: 'status', label: 'Status' },
                   ].map((option) => (
                     <button
@@ -2077,17 +1881,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                         setSortBy(option.value as SortOption);
                         setShowSortDropdown(false);
                       }}
-                      className={`
-                        w-full text-left px-4 py-2 text-sm transition-colors
-                        ${sortBy === option.value
-                          ? darkMode
-                            ? 'bg-blue-600/20 text-blue-400'
-                            : 'bg-blue-50 text-blue-600'
-                          : darkMode
-                            ? 'text-slate-300 hover:bg-slate-700'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }
-                      `}
+                      className={`a-pop-item ${sortBy === option.value ? 'a-pop-item-on' : ''}`}
                     >
                       {option.label}
                     </button>
@@ -2098,263 +1892,104 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
 
             {/* Filter Dropdown */}
             <div className="relative" ref={filterDropdownRef}>
-              <button
-                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
-                  ${darkMode
-                    ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200'
-                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}
-                `}
-              >
-                <Filter size={16} />
-                Filters
-                <ChevronDown size={16} />
+              <button onClick={() => setShowFilterDropdown(!showFilterDropdown)} className="a-tb-btn">
+                <Filter size={15} />Filters
+                {(filterFormat !== 'all' || filterClass !== 'all' || filterEventType !== 'all') && <span className="a-light a-light-b" />}
+                <ChevronDown size={15} className="a-dim" />
               </button>
-
               {showFilterDropdown && (
-                <div className={`
-                  absolute right-0 mt-2 w-80 rounded-lg shadow-xl border py-3 z-50
-                  ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-                `}>
-                  {/* Race Format */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Race Type
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setFilterFormat(filterFormat === 'scratch' ? 'all' : 'scratch')}
-                        className={`
-                          px-3 py-1.5 rounded text-sm transition-colors
-                          ${filterFormat === 'scratch'
-                            ? 'bg-blue-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        Scratch
-                      </button>
-                      <button
-                        onClick={() => setFilterFormat(filterFormat === 'handicap' ? 'all' : 'handicap')}
-                        className={`
-                          px-3 py-1.5 rounded text-sm transition-colors
-                          ${filterFormat === 'handicap'
-                            ? 'bg-purple-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        Handicap
-                      </button>
+                <div className="a-pop absolute right-0 mt-2 w-80 z-50 flex flex-col gap-3" style={{ padding: 14 }}>
+                  <div>
+                    <p className="a-cap mb-2">Race type</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button onClick={() => setFilterFormat(filterFormat === 'scratch' ? 'all' : 'scratch')} className={`a-fchip ${filterFormat === 'scratch' ? 'a-fchip-on' : ''}`}>Scratch</button>
+                      <button onClick={() => setFilterFormat(filterFormat === 'handicap' ? 'all' : 'handicap')} className={`a-fchip ${filterFormat === 'handicap' ? 'a-fchip-on' : ''}`}>Handicap</button>
                     </div>
                   </div>
-
-                  <div className={`border-t my-2 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}></div>
-
-                  {/* Boat Class */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Class
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {boatClasses.map(boatClass => {
-                        const typeColors = boatTypeColors[boatClass] || defaultColorScheme;
-                        return (
-                          <button
-                            key={boatClass}
-                            onClick={() => setFilterClass(filterClass === boatClass ? 'all' : boatClass)}
-                            className={`
-                              px-3 py-1.5 rounded text-sm transition-colors
-                              ${filterClass === boatClass
-                                ? `${typeColors.bg} ${typeColors.text} ${typeColors.darkBg} ${typeColors.darkText}`
-                                : darkMode
-                                  ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                              }
-                            `}
-                          >
-                            {boatClass}
-                          </button>
-                        );
-                      })}
+                  <div className="a-pop-rule" style={{ margin: 0 }} />
+                  <div>
+                    <p className="a-cap mb-2">Class</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {boatClasses.map(boatClass => (
+                        <button key={boatClass} onClick={() => setFilterClass(filterClass === boatClass ? 'all' : boatClass)} className={`a-fchip ${filterClass === boatClass ? 'a-fchip-on' : ''}`}>
+                          {boatClass}
+                        </button>
+                      ))}
                     </div>
                   </div>
-
-                  <div className={`border-t my-2 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}></div>
-
-                  {/* Event Type */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Event Type
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setFilterEventType(filterEventType === 'single' ? 'all' : 'single')}
-                        className={`
-                          px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1
-                          ${filterEventType === 'single'
-                            ? 'bg-blue-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        <Trophy size={14} />
-                        Single Events
-                      </button>
-                      <button
-                        onClick={() => setFilterEventType(filterEventType === 'series' ? 'all' : 'series')}
-                        className={`
-                          flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
-                          ${filterEventType === 'series'
-                            ? 'bg-purple-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        <Calendar size={14} />
-                        Race Series
-                      </button>
+                  <div className="a-pop-rule" style={{ margin: 0 }} />
+                  <div>
+                    <p className="a-cap mb-2">Event type</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button onClick={() => setFilterEventType(filterEventType === 'single' ? 'all' : 'single')} className={`a-fchip ${filterEventType === 'single' ? 'a-fchip-on' : ''}`}><Trophy size={13} />Single events</button>
+                      <button onClick={() => setFilterEventType(filterEventType === 'series' ? 'all' : 'series')} className={`a-fchip ${filterEventType === 'series' ? 'a-fchip-on' : ''}`}><Calendar size={13} />Race series</button>
                     </div>
                   </div>
                 </div>
               )}
             </div>
+            <span className="a-tb-sep" />
 
             {/* View Toggle */}
-            <div className={`flex items-center gap-1 p-1 rounded-lg ${
-              darkMode ? 'bg-slate-700' : 'bg-slate-200'
-            }`}>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-blue-600 text-white'
-                    : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                }`}
-                title="Grid view"
-              >
-                <Grid size={18} />
+            <div className="a-seg" style={{ padding: 2, borderRadius: 10 }}>
+              <button onClick={() => setViewMode('grid')} className={`a-seg-i ${viewMode === 'grid' ? 'a-seg-on' : ''}`} style={{ width: 34, height: 30, padding: 0, justifyContent: 'center', borderRadius: 8 }} title="Grid view" aria-label="Grid view">
+                <Grid size={16} />
               </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-blue-600 text-white'
-                    : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                }`}
-                title="List view"
-              >
-                <List size={18} />
+              <button onClick={() => setViewMode('list')} className={`a-seg-i ${viewMode === 'list' ? 'a-seg-on' : ''}`} style={{ width: 34, height: 30, padding: 0, justifyContent: 'center', borderRadius: 8 }} title="List view" aria-label="List view">
+                <List size={16} />
               </button>
             </div>
+          </div>
 
-            {/* New Event Button */}
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setShowDropdown(!showDropdown)}
-                className="btn-primary-green flex items-center justify-center gap-2 px-5 py-2.5 !text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl animate-pulse"
-              >
-                <Plus size={20} strokeWidth={2.5} className="!text-white" />
-                <span className="!text-white">New Event</span>
-                <ChevronDown size={18} className="!text-white" />
-              </button>
-
-              {showDropdown && (
-                <div className="absolute right-0 mt-2 w-72 bg-slate-800 rounded-lg shadow-xl border border-slate-700 py-2 z-50">
-                  <button
-                    onClick={() => {
-                      setShowDropdown(false);
-                      handleCreateClick('quick');
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
-                  >
-                    <div className="p-2 rounded-lg bg-blue-600/20">
-                      <Trophy className="text-blue-400" size={20} />
-                    </div>
-                    <div>
-                      <div className="text-white font-medium text-sm">Single Event</div>
-                      <div className="text-slate-400 text-xs">Create a standalone race event</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setShowDropdown(false);
-                      handleCreateClick('series');
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
-                  >
-                    <div className="p-2 rounded-lg bg-teal-600/20">
-                      <Calendar className="text-teal-400" size={20} />
-                    </div>
-                    <div>
-                      <div className="text-white font-medium text-sm">Race Series</div>
-                      <div className="text-slate-400 text-xs">Create a multi-round race series</div>
-                    </div>
-                  </button>
-
-                  <div className="mx-3 my-1 border-t border-slate-700/50"></div>
-
-                  <button
-                    onClick={() => {
-                      setShowDropdown(false);
-                      setShowSimulationModal(true);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
-                  >
-                    <div className="p-2 rounded-lg bg-amber-600/20">
-                      <FlaskConical className="text-amber-400" size={20} />
-                    </div>
-                    <div>
-                      <div className="text-white font-medium text-sm">Event Simulation</div>
-                      <div className="text-slate-400 text-xs">Import HMS data or create a test event</div>
-                    </div>
-                  </button>
-                </div>
-              )}
-            </div>
+          {/* New Event Button */}
+          <div className="relative" ref={dropdownRef}>
+            <button onClick={() => setShowDropdown(!showDropdown)} className="a-btn a-btn-p" style={{ height: 44, padding: '0 14px 0 16px', fontSize: 14 }}>
+              <Plus size={18} strokeWidth={2.4} />New Event<ChevronDown size={17} style={{ marginLeft: 2, opacity: 0.85 }} />
+            </button>
+            {showDropdown && (
+              <div className="a-pop absolute right-0 mt-2 w-72 z-50" style={{ padding: 6 }}>
+                <button onClick={() => { setShowDropdown(false); handleCreateClick('quick'); }} className="a-pop-item" style={{ padding: 10 }}>
+                  <span className="a-tile" style={{ width: 36, height: 36 }}><Trophy size={17} /></span>
+                  <div className="min-w-0">
+                    <div className="a-ink text-[14px] font-semibold">Single event</div>
+                    <div className="a-dim text-[12px]">Create a standalone race event</div>
+                  </div>
+                </button>
+                <button onClick={() => { setShowDropdown(false); handleCreateClick('series'); }} className="a-pop-item" style={{ padding: 10 }}>
+                  <span className="a-tile" style={{ width: 36, height: 36 }}><Calendar size={17} /></span>
+                  <div className="min-w-0">
+                    <div className="a-ink text-[14px] font-semibold">Race series</div>
+                    <div className="a-dim text-[12px]">Create a multi-round race series</div>
+                  </div>
+                </button>
+                <div className="a-pop-rule" />
+                <button onClick={() => { setShowDropdown(false); setShowSimulationModal(true); }} className="a-pop-item" style={{ padding: 10 }}>
+                  <span className="a-tile" style={{ width: 36, height: 36 }}><FlaskConical size={17} /></span>
+                  <div className="min-w-0">
+                    <div className="a-ink text-[14px] font-semibold">Event simulation</div>
+                    <div className="a-dim text-[12px]">Import HMS data or create a test event</div>
+                  </div>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Filters Section */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
-          {/* Year Filter */}
-          <div className="relative">
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className={`
-                px-4 py-2 rounded-lg text-sm font-medium transition-colors border appearance-none pr-10
-                ${darkMode
-                  ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200'
-                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}
-              `}
-            >
-              {availableYears.map(year => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              size={16}
-              className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${
-                darkMode ? 'text-slate-400' : 'text-slate-600'
-              }`}
-            />
-          </div>
+        <div className="flex flex-wrap items-center gap-3 mb-[22px]">
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="a-inp font-semibold"
+            style={{ width: 'auto', height: 40, minWidth: 96 }}
+            aria-label="Season year"
+          >
+            {availableYears.map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
 
-          {/* Time Filter Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+          <div className="a-seg overflow-x-auto" role="tablist" aria-label="Event filter" style={{ flexWrap: 'nowrap' }}>
             {[
               { value: 'all', label: 'All Events', count: quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear).length + series.filter(s => s.rounds.some(r => new Date(r.date).getFullYear() === selectedYear)).length },
               { value: 'upcoming', label: 'Upcoming', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => !isDatePast(e.date) && !e.completed).length },
@@ -2365,33 +2000,18 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             ].map((tab) => (
               <button
                 key={tab.value}
+                role="tab"
+                aria-selected={timeFilter === tab.value}
                 onClick={() => setTimeFilter(tab.value as TimeFilter)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap
-                  ${timeFilter === tab.value
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20'
-                    : darkMode
-                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
-                  }
-                `}
+                className={`a-seg-i ${timeFilter === tab.value ? 'a-seg-on' : ''}`}
               >
-                <span className={timeFilter === tab.value ? 'text-white' : ''}>{tab.label}</span>
-                <span className={`
-                  px-2 py-0.5 rounded-full text-xs font-semibold
-                  ${timeFilter === tab.value
-                    ? 'bg-white/20 text-white'
-                    : darkMode
-                      ? 'bg-slate-600 text-slate-300'
-                      : 'bg-slate-100 text-slate-600'
-                  }
-                `}>
-                  {tab.count}
-                </span>
+                {tab.label}<span className="a-cnt">{tab.count}</span>
               </button>
             ))}
           </div>
         </div>
+
+        {renderSummaryCards()}
 
         {/* Content */}
         {loading ? (
@@ -2452,16 +2072,14 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             )}
           </div>
         ) : (
-          <div className="space-y-12">
+          <div className="flex flex-col gap-[22px]">
             {/* Pending Events Section */}
             {timeFilter === 'pending' && (
               <div>
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 rounded-lg bg-amber-600/20">
-                    <Clock className="text-amber-400" size={24} />
-                  </div>
+                  <span className="a-tile" style={{ width: 36, height: 36 }}><Clock size={18} /></span>
                   <div>
-                    <h2 className={`text-2xl font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                    <h2 className="a-display a-ink m-0 text-[19px] font-semibold">
                       Pending Approval
                     </h2>
                     <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -2714,11 +2332,9 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             {timeFilter === 'simulated' && (
               <div>
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 rounded-lg bg-cyan-600/20">
-                    <FlaskConical className="text-cyan-400" size={24} />
-                  </div>
+                  <span className="a-tile" style={{ width: 36, height: 36 }}><FlaskConical size={18} /></span>
                   <div>
-                    <h2 className={`text-2xl font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                    <h2 className="a-display a-ink m-0 text-[19px] font-semibold">
                       Simulated Events
                     </h2>
                     <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -2753,67 +2369,34 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
               </div>
             )}
 
-            {/* Series Section */}
+            {/* Season timeline + series */}
+            {timeFilter !== 'pending' && timeFilter !== 'simulated' && (timeFilter === 'all' || timeFilter === 'upcoming') && !searchTerm && renderSeason()}
+
             {timeFilter !== 'pending' && timeFilter !== 'simulated' && sortedSeries.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-600/20">
-                      <Calendar className="text-purple-400" size={24} />
-                    </div>
-                    <div>
-                      <h2 className={`text-2xl font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                        Race Series
-                      </h2>
-                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {sortedSeries.length} {sortedSeries.length === 1 ? 'series' : 'series'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowRolloverModal(true)}
-                    className={`
-                      flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors
-                      ${darkMode
-                        ? 'bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600'
-                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-sm'}
-                    `}
-                  >
-                    <RotateCcw size={15} />
-                    Roll Over to Next Year
-                  </button>
-                </div>
-                <div className={`grid gap-6 items-start ${
-                  viewMode === 'grid'
-                    ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-                    : 'grid-cols-1'
-                }`}>
-                  {sortedSeries.map((s) => (
-                    <React.Fragment key={s.id}>
-                      {renderSeriesCard(s)}
-                    </React.Fragment>
-                  ))}
-                </div>
+              <div className="flex flex-col gap-4">
+                {sortedSeries.map((s) => (
+                  <React.Fragment key={s.id}>
+                    {renderSeriesCard(s)}
+                  </React.Fragment>
+                ))}
               </div>
             )}
 
             {/* Separator between Series and Single Events */}
             {timeFilter !== 'pending' && timeFilter !== 'simulated' && sortedSeries.length > 0 && Object.entries(groupedSingleEvents).length > 0 && (
-              <div className={`my-8 border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}></div>
+              <div className="a-month-rule" />
             )}
 
             {/* Single Events Section */}
             {timeFilter !== 'pending' && timeFilter !== 'simulated' && Object.entries(groupedSingleEvents).length > 0 && (
               <div>
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 rounded-lg bg-blue-600/20">
-                    <Trophy className="text-blue-400" size={24} />
-                  </div>
+                  <span className="a-tile" style={{ width: 36, height: 36 }}><Trophy size={18} /></span>
                   <div>
-                    <h2 className={`text-2xl font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                    <h2 className="a-display a-ink m-0 text-[19px] font-semibold">
                       Single Events
                     </h2>
-                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    <p className="a-dim m-0 mt-0.5 text-[13px]">
                       {sortedQuickRaces.length} {sortedQuickRaces.length === 1 ? 'event' : 'events'}
                     </p>
                   </div>
@@ -2827,10 +2410,10 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                       <div key={monthKey}>
                         {/* Month Header */}
                         <div className="flex items-baseline gap-3 mb-4">
-                          <h3 className={`text-xl font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                          <h3 className="a-display a-ink m-0 text-[17px] font-semibold">
                             {monthName}
                           </h3>
-                          <span className={`text-base ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          <span className="a-dim text-[14px]">
                             {year}
                           </span>
                         </div>
