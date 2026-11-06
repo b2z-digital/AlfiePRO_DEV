@@ -598,3 +598,8 @@ html.alfie-light .a-trend-pill { fill: #fff; stroke: rgba(15, 23, 42, 0.12); }
 html.alfie-light .a-memdash-bar { background: rgba(15, 23, 42, 0.06); }
 html.alfie-light .a-memdash-well { background: rgba(15, 23, 42, 0.04); box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06); }
 html.alfie-light .a-memdash .a-ink { color: #0B1220 !important; }
+
+/* Members list (board MemMembers) */
+.a-members-search { flex: 1 1 280px; min-width: 220px; }
+.a-btn-icon { width: 42px; padding: 0; }
+html.alfie-theme .a-badge-cls .a-dim { margin-left: 2px; }

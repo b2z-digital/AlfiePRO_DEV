@@ -1103,37 +1103,22 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         </div>
 
         {/* Search and Filter Section */}
-        <div className="flex items-center gap-2">
-            {showSearch && (
-              <div className="relative w-80">
-                <Search
-                  size={18}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  type="text"
-                  placeholder="Search members..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700 text-slate-200 placeholder-slate-400 rounded-lg transition-colors"
-                />
-              </div>
-            )}
-
-            {!showSearch && (
-              <button
-                onClick={() => setShowSearch(true)}
-                className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
-                title="Search"
-              >
-                <Search size={18} />
-              </button>
-            )}
+        <div className="flex items-center gap-2 w-full flex-wrap">
+            <label className="a-field a-members-search">
+              <Search size={18} />
+              <input
+                type="text"
+                placeholder="Search name, email, sail number or boat"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                aria-label="Search members"
+              />
+            </label>
 
             {/* Map View Button */}
             <button
               onClick={() => setShowMapView(true)}
-              className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+              className="a-btn a-btn-icon"
               title="Map View"
             >
               <MapIcon size={18} />
@@ -1142,7 +1127,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
             {/* Payment Reconciliation Button */}
             <button
               onClick={() => setShowPaymentReconciliation(true)}
-              className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-all shadow-lg hover:shadow-xl font-medium"
+              className="a-btn"
               title="Payment Reconciliation"
             >
               <DollarSign size={18} />
@@ -1152,7 +1137,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
             {/* Import/Export Button */}
             <button
               onClick={() => setShowImportExportModal(true)}
-              className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+              className="a-btn a-btn-icon"
               title="Import / Export Members"
             >
               <FileDown size={18} />
@@ -1232,7 +1217,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
             <button
               onClick={handleAddMember}
-              className="btn-primary-green flex items-center gap-2 px-5 py-2.5 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl whitespace-nowrap"
+              className="a-btn a-btn-p"
             >
               <Plus size={20} strokeWidth={2.5} />
               Add Member
@@ -1405,12 +1390,12 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                     <ArrowUpDown size={14} className="text-slate-400" />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Contact</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Boats</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Type</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Status</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Dates</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Actions</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Joined</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Renews</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-slate-300"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
@@ -1475,39 +1460,27 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                               );
                             })()}
                           </div>
-                          <span className="text-white font-medium">
-                            {member.first_name} {member.last_name}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="space-y-1">
-                          {member.email && (
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                              <Mail size={14} className="text-slate-400" />
-                              {member.email}
+                          <div className="min-w-0">
+                            <div className="text-white font-semibold truncate">
+                              {member.first_name} {member.last_name}
                             </div>
-                          )}
-                          {member.phone && (
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                              <Phone size={14} className="text-slate-400" />
-                              {member.phone}
-                            </div>
-                          )}
+                            {(member.email || member.phone) && (
+                              <div className="a-dim text-[13px] truncate">
+                                {member.email}{member.email && member.phone ? ' · ' : ''}{member.phone}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex flex-wrap gap-1.5 max-w-[180px]">
                           {member.boats?.map((boat: any, index: number) => (
-                            <span
-                              key={index}
-                              className="px-2 py-1 text-xs rounded-full bg-blue-900/30 text-blue-400 whitespace-nowrap"
-                            >
-                              {boat.boat_type} {boat.sail_number && `#${boat.sail_number}`}
+                            <span key={index} className="a-badge-cls" title={boat.sail_number ? `${boat.boat_type} #${boat.sail_number}` : boat.boat_type}>
+                              {boat.boat_type}{boat.sail_number ? <span className="a-dim font-medium normal-case tracking-normal">#{boat.sail_number}</span> : null}
                             </span>
                           ))}
                           {(!member.boats || member.boats.length === 0) && (
-                            <span className="text-slate-500 text-sm">No boats</span>
+                            <span className="a-dim text-sm">—</span>
                           )}
                         </div>
                       </td>
@@ -1516,8 +1489,8 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                           const typeConfig = getMembershipTypeConfig(member.membership_level);
                           const IconComponent = typeConfig.icon;
                           return (
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${typeConfig.color}`}>
-                              <IconComponent size={12} className={typeConfig.iconColor} />
+                            <span className="a-lb-fmt" title={typeConfig.label}>
+                              <span className="a-light" style={{ background: ({ full: '#2F7BFF', senior: '#8A4DFF', junior: '#40C8C0', associate: '#FF8A2B', life: '#FFC56B', family: '#FF3E9A', social: '#30D158' } as Record<string, string>)[String(typeConfig.label).toLowerCase().split(' ')[0]] || '#9AA6BD' }} />
                               {typeConfig.label}
                             </span>
                           );
@@ -1578,21 +1551,12 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="space-y-1 text-sm">
-                          {member.date_joined && (
-                            <div className="text-slate-400">
-                              <span className="text-slate-500">Joined</span> {formatDate(member.date_joined)}
-                            </div>
-                          )}
-                          {member.renewal_date && (
-                            <div className="text-slate-400">
-                              <span className="text-slate-500">Renewal</span> {formatDate(member.renewal_date)}
-                            </div>
-                          )}
-                          {!member.date_joined && !member.renewal_date && (
-                            <span className="text-slate-500">No dates set</span>
-                          )}
-                        </div>
+                        <span className="a-mute text-sm whitespace-nowrap">{member.date_joined ? formatDate(member.date_joined) : '—'}</span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`text-sm whitespace-nowrap ${member.renewal_date && new Date(member.renewal_date) < new Date() ? 'a-txt-a' : 'a-mute'}`}>
+                          {member.renewal_date ? formatDate(member.renewal_date) : '—'}
+                        </span>
                       </td>
                       <td className="px-4 py-4 text-right">
                         <div className="flex justify-end gap-2">
