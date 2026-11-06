@@ -619,13 +619,12 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className={`w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] ${
+      <div className={`a-memsheet w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] ${
         darkMode ? 'bg-slate-800' : 'bg-white'
       }`}>
         {/* Header - matches Add Member gradient style */}
-        <div className="bg-gradient-to-br from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden flex-shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
-          <div className="flex items-center gap-4 relative z-10">
+        <div className="a-sheet-head px-6 pt-6 pb-4 flex items-center justify-between relative overflow-hidden flex-shrink-0">
+          <div className="flex items-center gap-4 relative z-10 min-w-0">
             {memberData ? (
               <div className="relative group cursor-pointer" onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}>
                 <Avatar
@@ -638,7 +637,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
                   )}
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white shadow-lg flex items-center justify-center border-2 border-cyan-700">
+                <div className="a-cam absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white shadow-lg flex items-center justify-center border-2 border-cyan-700">
                   <Camera size={13} className="text-slate-700" />
                 </div>
                 <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
@@ -648,23 +647,36 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                 <User className="text-white drop-shadow-lg" size={24} />
               </div>
             )}
-            <div>
-              <h2 className="text-2xl font-bold text-white drop-shadow-lg">Edit Member</h2>
+            <div className="min-w-0">
+              <p className="a-cap">Edit member</p>
+              <h2 className="a-display text-2xl font-bold text-white truncate">
+                {memberData ? `${memberData.first_name} ${memberData.last_name}` : 'Member'}
+              </h2>
               {memberData && (
-                <p className="text-cyan-100 text-sm mt-0.5">{memberData.first_name} {memberData.last_name}</p>
+                <div className="flex items-center gap-4 mt-1.5 flex-wrap">
+                  <span className={`a-st ${(memberData as any).is_financial ? 'a-mute' : 'a-txt-r'}`}>
+                    <span className={`a-light ${(memberData as any).is_financial ? 'a-light-g' : 'a-light-r'}`}></span>
+                    {(memberData as any).is_financial ? 'Financial' : 'Unfinancial'}
+                  </span>
+                  {(memberData as any).membership_level && (
+                    <span className="a-st a-mute"><span className="a-light a-light-b"></span>{(memberData as any).membership_level}</span>
+                  )}
+                </div>
               )}
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-white/80 hover:text-white rounded-xl p-2.5 hover:bg-white/10 transition-all hover:rotate-90 transform duration-300 relative z-10"
+            className="a-ib relative z-10"
+            aria-label="Close"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Tab Navigation - matches Add Member underline style */}
-        <div className={`flex border-b flex-shrink-0 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+        <div className="px-6 pb-4 flex-shrink-0">
+          <div className="a-seg a-seg-lg flex w-full" role="tablist">
           {([
             { key: 'details', icon: User, label: 'Details' },
             { key: 'boats', icon: Sailboat, label: 'Boats' },
@@ -672,23 +684,17 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === key}
               onClick={() => setActiveTab(key)}
-              className={`flex-1 px-4 py-3 font-medium transition-colors ${
-                activeTab === key
-                  ? darkMode
-                    ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700/50'
-                    : 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                  : darkMode
-                  ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/30'
-                  : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
-              }`}
+              className={`a-seg-i flex-1 justify-center ${activeTab === key ? 'a-seg-on' : ''}`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <Icon size={18} />
-                <span className="text-sm">{label}</span>
-              </div>
+              <Icon size={17} />
+              <span>{label}</span>
             </button>
           ))}
+          </div>
         </div>
 
         {loading ? (
@@ -697,7 +703,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
             <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Loading member data...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+          <form onSubmit={handleSubmit} className="a-form flex-1 overflow-y-auto">
             <div className="p-6 space-y-6">
             {activeTab === 'details' && memberData && (
               <div className="space-y-6">

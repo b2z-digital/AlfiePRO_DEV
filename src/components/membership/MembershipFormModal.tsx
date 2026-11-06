@@ -483,27 +483,25 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-4xl bg-slate-800 rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
+      <div className="a-memsheet w-full max-w-4xl bg-slate-800 rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="a-sheet-head flex items-center justify-between px-6 pt-6 pb-4">
           {existingMemberId && formData.first_name ? (
             <div className="flex items-center gap-3">
               <Avatar
                 firstName={formData.first_name}
                 lastName={formData.last_name}
                 imageUrl={memberAvatar}
-                size="md"
+                size="lg"
               />
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-xl font-semibold text-white">
+              <div className="min-w-0">
+                <p className="a-cap">{readOnly ? 'Membership' : 'Edit membership'}</p>
+                <h2 className="a-display text-2xl font-bold text-white truncate">
                   {formData.first_name} {formData.last_name}
                 </h2>
-                {!readOnly && (
-                  <span className="text-slate-400 text-sm">- Edit Membership</span>
-                )}
               </div>
             </div>
           ) : (
-            <h2 className="text-xl font-semibold text-white">
+            <h2 className="a-display text-2xl font-bold text-white">
               {readOnly ? 'Member Details' :
                 isRenewal ? 'Renew Membership' :
                 existingMemberId ? 'Edit Membership' :
@@ -512,7 +510,8 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
           )}
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-slate-400 hover:text-slate-300 hover:bg-slate-700 transition-colors"
+            className="a-ib"
+            aria-label="Close"
           >
             <X size={20} />
           </button>
@@ -644,7 +643,7 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
                   </p>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="a-form space-y-6">
                   {/* Personal Information */}
                   <div>
                     <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
