@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { X, Send, Users, ChevronRight, Search, Paperclip, FileText, ListChecks, Mail, Sparkles, ArrowLeft, CircleUser as UserCircle2 } from 'lucide-react';
+import { X, Send, ChevronRight, Search, Paperclip, FileText, ListChecks, Mail, Sparkles, ArrowLeft, Check, Reply, Forward } from 'lucide-react';
+import { AAvatar, ASwitch } from '../alfie/Kit';
 import { RichTextEditor } from '../communications/RichTextEditor';
 import EmojiPicker from 'emoji-picker-react';
 
@@ -68,36 +69,8 @@ interface ComposeModalProps {
 }
 
 const UserAvatar = ({ name, avatarUrl, size = 32 }: { name: string; avatarUrl?: string; size?: number }) => {
-  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  const colors = [
-    'from-blue-500 to-cyan-500',
-    'from-emerald-500 to-teal-500',
-    'from-amber-500 to-orange-500',
-    'from-rose-500 to-pink-500',
-    'from-sky-500 to-blue-500',
-    'from-green-500 to-emerald-500',
-  ];
-  const colorIdx = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % colors.length;
-
-  if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={name}
-        className="rounded-full object-cover"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-
-  return (
-    <div
-      className={`rounded-full flex items-center justify-center text-white font-semibold bg-gradient-to-br ${colors[colorIdx]}`}
-      style={{ width: size, height: size, fontSize: size * 0.38 }}
-    >
-      {initials || '?'}
-    </div>
-  );
+  const [first, ...rest] = (name || '?').split(' ');
+  return <AAvatar url={avatarUrl} first={first} last={rest.join(' ')} size={size} />;
 };
 
 const formatFileSize = (bytes: number) => {
@@ -170,246 +143,186 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
     );
   });
 
+  const isPicker = step === 'people-picker' && !replyMode;
+  const title = replyMode === 'reply' ? 'Reply' : replyMode === 'forward' ? 'Forward' : isPicker ? 'New message' : 'Compose message';
+
+  const sortedMembers = [...filteredMembers].sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`));
+  let lastLetter = '';
+
+  const chips = selectedCount > 0 && (
+    <div className="flex gap-1.5 flex-wrap">
+      {composeForm.recipients.map(recipientKey => {
+        const member = members.find(m => (m.user_id ? m.user_id : `email:${m.id}`) === recipientKey);
+        const nonMember = nonMemberRecipients.get(recipientKey);
+        const profile = member || nonMember;
+        if (!profile) return null;
+        const fullName = `${profile.first_name} ${profile.last_name}`.trim();
+        return (
+          <span key={recipientKey} className="a-rchip">
+            <UserAvatar name={fullName} avatarUrl={profile.avatar_url} size={26} />
+            <span className="a-ink">{fullName}</span>
+            <button
+              onClick={() => onComposeFormChange({ ...composeForm, recipients: composeForm.recipients.filter(r => r !== recipientKey) })}
+              className="a-dim flex"
+              aria-label={`Remove ${fullName}`}
+            >
+              <X size={14} />
+            </button>
+          </span>
+        );
+      })}
+      {composeForm.externalEmails.map((email, index) => (
+        <span key={index} className="a-rchip a-rchip-e">
+          <span className="a-tile" style={{ width: 26, height: 26, borderRadius: 999 }}><Mail size={13} /></span>
+          <span className="a-ink">{email}</span>
+          <button
+            onClick={() => onComposeFormChange({ ...composeForm, externalEmails: composeForm.externalEmails.filter((_, i) => i !== index) })}
+            className="a-dim flex"
+            aria-label={`Remove ${email}`}
+          >
+            <X size={14} />
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-slate-800/95 via-slate-800/90 to-slate-900/95 backdrop-blur-sm rounded-2xl border border-slate-700/50 w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-black/40">
+      <section className={`a-sheet w-full ${isPicker ? 'max-w-[420px]' : 'max-w-[640px]'} max-h-[90vh] flex flex-col`} role="dialog" aria-label={title}>
 
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 from-blue-600/10 via-transparent to-emerald-600/10">
-          <div className="flex items-center gap-3">
-            {step === 'compose' && !replyMode && (
-              <button
-                onClick={() => setStep('people-picker')}
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700/40 rounded-lg transition-all"
-              >
-                <ArrowLeft size={16} />
-              </button>
-            )}
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Send size={14} className="text-white" />
-            </div>
-            <h2 className="text-lg font-semibold text-white">
-              {replyMode === 'reply' ? 'Reply' : replyMode === 'forward' ? 'Forward' : step === 'people-picker' ? 'New Conversation' : 'Compose Message'}
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/40 rounded-lg transition-all"
-          >
+        <div className="flex items-center gap-3" style={{ padding: '20px 18px 12px 22px' }}>
+          {step === 'compose' && !replyMode && (
+            <button onClick={() => setStep('people-picker')} className="a-ib" aria-label="Back to recipients">
+              <ArrowLeft size={18} />
+            </button>
+          )}
+          <span className="a-tile a-tile-rim" style={{ width: 40, height: 40 }}>
+            {replyMode === 'reply' ? <Reply size={18} /> : replyMode === 'forward' ? <Forward size={18} /> : <Send size={18} />}
+          </span>
+          <h2 className="a-display a-ink flex-1 m-0 text-[20px] font-semibold">{title}</h2>
+          <button onClick={onClose} className="a-ib" aria-label="Close">
             <X size={18} />
           </button>
         </div>
 
-        {step === 'people-picker' && !replyMode ? (
-          <div className="flex-1 overflow-y-auto p-6 space-y-5">
-            <p className="text-sm text-slate-300">Who would you like to message?</p>
-
-            <div className="relative">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={memberSearchTerm}
-                onChange={(e) => setMemberSearchTerm(e.target.value)}
-                placeholder="Search members..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                autoFocus
-              />
+        {isPicker ? (
+          <>
+            <div className="flex flex-col gap-2.5" style={{ padding: '0 18px 10px' }}>
+              <label className="a-field">
+                <Search size={16} />
+                <input
+                  type="text"
+                  value={memberSearchTerm}
+                  onChange={(e) => setMemberSearchTerm(e.target.value)}
+                  placeholder="Search members"
+                  autoFocus
+                />
+              </label>
+              {chips}
             </div>
 
-            {members.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <Users size={13} />
-                  Club Members
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {filteredMembers.map(member => {
-                    const recipientKey = member.user_id ? member.user_id : `email:${member.id}`;
-                    const isSelected = composeForm.recipients.includes(recipientKey);
-                    const fullName = `${member.first_name} ${member.last_name}`.trim();
+            <div className="flex-1 overflow-y-auto" style={{ padding: '0 8px 10px' }}>
+              {members.length > 0 && sortedMembers.map(member => {
+                const recipientKey = member.user_id ? member.user_id : `email:${member.id}`;
+                const isSelected = composeForm.recipients.includes(recipientKey);
+                const fullName = `${member.first_name} ${member.last_name}`.trim();
+                const letter = (fullName[0] || '#').toUpperCase();
+                const showLetter = letter !== lastLetter;
+                lastLetter = letter;
+                return (
+                  <React.Fragment key={member.id}>
+                    {showLetter && <div className="a-ghd" style={{ padding: '10px 10px 4px' }}>{letter}</div>}
+                    <button
+                      onClick={() => toggleMember(recipientKey)}
+                      className={`a-pr ${isSelected ? 'a-pr-on' : ''}`}
+                      role="checkbox"
+                      aria-checked={isSelected}
+                    >
+                      <UserAvatar name={fullName} avatarUrl={member.avatar_url} size={36} />
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="a-ink text-[14px] font-medium truncate">{fullName}</div>
+                        {!member.user_id && <div className="a-txt-a text-[12px] mt-px">Email only · not on the app</div>}
+                      </div>
+                      <span className={`a-chk ${isSelected ? 'a-chk-on' : ''}`} style={{ borderRadius: 999 }}>
+                        {isSelected && <Check size={13} strokeWidth={3} />}
+                      </span>
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+              {filteredMembers.length === 0 && memberSearchTerm && (
+                <p className="a-dim text-[13.5px] text-center py-6">No members match your search</p>
+              )}
+
+              {marketingLists.length > 0 && (
+                <>
+                  <button
+                    onClick={() => setShowMarketingLists(!showMarketingLists)}
+                    className="a-ghd w-full flex items-center gap-2 text-left"
+                    style={{ padding: '14px 10px 4px' }}
+                  >
+                    <ListChecks size={13} />
+                    <span className="flex-1">Subscriber lists</span>
+                    {selectedListIds.length > 0 && <span className="a-txt-g normal-case tracking-normal">{selectedListIds.length} selected</span>}
+                    <ChevronRight size={14} className={`transition-transform ${showMarketingLists ? 'rotate-90' : ''}`} />
+                  </button>
+                  {showMarketingLists && marketingLists.map(list => {
+                    const on = selectedListIds.includes(list.id);
                     return (
-                      <button
-                        key={member.id}
-                        onClick={() => toggleMember(recipientKey)}
-                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                          isSelected
-                            ? 'bg-blue-600/20 border-blue-500/40 ring-1 ring-blue-500/30'
-                            : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-700/40 hover:border-slate-600/50'
-                        }`}
-                      >
-                        <div className="relative flex-shrink-0">
-                          <UserAvatar name={fullName} avatarUrl={member.avatar_url} size={38} />
-                          {isSelected && (
-                            <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-blue-500 rounded-full border-2 border-[#131c31] flex items-center justify-center">
-                              <svg width="8" height="8" viewBox="0 0 12 12" fill="none">
-                                <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </div>
-                          )}
+                      <button key={list.id} onClick={() => onToggleList(list.id)} className={`a-pr ${on ? 'a-pr-on' : ''}`} role="checkbox" aria-checked={on}>
+                        <span className="a-tile" style={{ width: 36, height: 36, borderRadius: 999 }}><ListChecks size={16} /></span>
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="a-ink text-[14px] font-medium truncate">{list.name}</div>
+                          <div className="a-dim text-[12px] mt-px">{list.active_subscriber_count || list.total_contacts || 0} subscribers</div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white truncate">{fullName}</p>
-                          {!member.user_id && (
-                            <span className="text-[10px] text-amber-400 font-medium">Email only</span>
-                          )}
-                        </div>
+                        <span className={`a-chk ${on ? 'a-chk-on' : ''}`}>{on && <Check size={13} strokeWidth={3} />}</span>
                       </button>
                     );
                   })}
-                </div>
-                {filteredMembers.length === 0 && memberSearchTerm && (
-                  <p className="text-sm text-slate-500 text-center py-6">No members match your search</p>
-                )}
-              </div>
-            )}
-
-            {marketingLists.length > 0 && (
-              <div>
-                <button
-                  onClick={() => setShowMarketingLists(!showMarketingLists)}
-                  className="flex items-center justify-between w-full px-4 py-3 bg-slate-800/40 hover:bg-slate-700/40 text-white rounded-xl transition-all border border-slate-700/50"
-                >
-                  <div className="flex items-center gap-2">
-                    <ListChecks size={16} className="text-slate-400" />
-                    <span className="text-sm font-medium">Subscriber Lists</span>
-                    {selectedListIds.length > 0 && (
-                      <span className="text-xs text-emerald-400 font-medium">{selectedListIds.length} selected</span>
-                    )}
-                  </div>
-                  <ChevronRight size={16} className={`text-slate-500 transition-transform ${showMarketingLists ? 'rotate-90' : ''}`} />
-                </button>
-
-                {showMarketingLists && (
-                  <div className="mt-2 border border-slate-700/50 rounded-xl bg-slate-800/40 max-h-40 overflow-y-auto p-2 space-y-0.5">
-                    {marketingLists.map(list => (
-                      <label
-                        key={list.id}
-                        className="flex items-center gap-2.5 p-2 hover:bg-slate-700/40 cursor-pointer transition-colors rounded-lg"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedListIds.includes(list.id)}
-                          onChange={() => onToggleList(list.id)}
-                          className="w-3.5 h-3.5 text-blue-600 rounded flex-shrink-0 border-slate-600"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-xs font-medium truncate">{list.name}</p>
-                          <p className="text-slate-500 text-[10px]">
-                            {list.active_subscriber_count || list.total_contacts || 0} subscribers
-                          </p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div>
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                <Mail size={13} />
-                Or add by email
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  value={externalEmailInput}
-                  onChange={(e) => setExternalEmailInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addExternalEmail();
-                    }
-                  }}
-                  placeholder="Enter email address..."
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                />
-                <button
-                  onClick={addExternalEmail}
-                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all text-sm font-medium"
-                >
-                  Add
-                </button>
-              </div>
-              {composeForm.externalEmails.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {composeForm.externalEmails.map((email, index) => (
-                    <div key={index} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/80 border border-slate-700/50 rounded-lg">
-                      <Mail size={12} className="text-slate-400" />
-                      <span className="text-white text-xs">{email}</span>
-                      <button
-                        onClick={() => {
-                          onComposeFormChange({
-                            ...composeForm,
-                            externalEmails: composeForm.externalEmails.filter((_, i) => i !== index),
-                          });
-                        }}
-                        className="p-0.5 text-slate-500 hover:text-white transition-colors"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                </>
               )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto p-6 space-y-5">
-            {selectedCount > 0 && (
-              <div className="flex flex-wrap gap-2 p-3 bg-slate-800/40 rounded-xl border border-slate-700/50">
-                {composeForm.recipients.map(recipientKey => {
-                  const member = members.find(m => (m.user_id ? m.user_id : `email:${m.id}`) === recipientKey);
-                  const nonMember = nonMemberRecipients.get(recipientKey);
-                  const profile = member || nonMember;
-                  if (!profile) return null;
-                  const fullName = `${profile.first_name} ${profile.last_name}`.trim();
-                  return (
-                    <div key={recipientKey} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600/20 border border-blue-500/30 rounded-lg">
-                      <UserAvatar name={fullName} avatarUrl={profile.avatar_url} size={18} />
-                      <span className="text-white text-xs font-medium">{fullName}</span>
-                      <button
-                        onClick={() => onComposeFormChange({ ...composeForm, recipients: composeForm.recipients.filter(r => r !== recipientKey) })}
-                        className="p-0.5 text-blue-300 hover:text-white transition-colors"
-                      >
-                        <X size={11} />
-                      </button>
-                    </div>
-                  );
-                })}
-                {composeForm.externalEmails.map((email, index) => (
-                  <div key={index} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/80 border border-slate-700/50 rounded-lg">
-                    <Mail size={12} className="text-slate-400" />
-                    <span className="text-white text-xs">{email}</span>
-                    <button
-                      onClick={() => onComposeFormChange({ ...composeForm, externalEmails: composeForm.externalEmails.filter((_, i) => i !== index) })}
-                      className="p-0.5 text-slate-500 hover:text-white transition-colors"
-                    >
-                      <X size={11} />
-                    </button>
-                  </div>
-                ))}
+
+              <div className="a-ghd flex items-center gap-2" style={{ padding: '14px 10px 6px' }}><Mail size={13} />Or add by email</div>
+              <div className="flex gap-2" style={{ padding: '0 10px' }}>
+                <label className="a-field flex-1">
+                  <input
+                    type="email"
+                    value={externalEmailInput}
+                    onChange={(e) => setExternalEmailInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addExternalEmail();
+                      }
+                    }}
+                    placeholder="name@example.com"
+                  />
+                </label>
+                <button onClick={addExternalEmail} className="a-btn">Add</button>
               </div>
-            )}
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 overflow-y-auto flex flex-col gap-4" style={{ padding: '0 22px 18px' }}>
+            {chips}
 
             <div>
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Subject</label>
+              <label className="a-flab">Subject</label>
               <input
                 type="text"
                 value={composeForm.subject}
                 onChange={(e) => onComposeFormChange({ ...composeForm, subject: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                className="a-inp w-full"
                 placeholder="What is this about?"
               />
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Message</label>
-                <button
-                  onClick={onToggleRichText}
-                  className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
-                >
-                  <Sparkles size={12} />
+              <div className="flex items-center justify-between">
+                <label className="a-flab">Message</label>
+                <button onClick={onToggleRichText} className="a-txt-b text-[12px] font-semibold flex items-center gap-1 mb-1.5">
+                  <Sparkles size={13} />
                   {useRichText ? 'Plain text' : 'Rich text'}
                 </button>
               </div>
@@ -429,8 +342,8 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
                   value={composeForm.body}
                   onChange={(e) => onComposeFormChange({ ...composeForm, body: e.target.value })}
                   rows={6}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
-                  placeholder="Type your message..."
+                  className="a-inp a-ta w-full"
+                  placeholder="Type your message"
                 />
               )}
 
@@ -467,94 +380,94 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingAttachment}
-                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-white bg-slate-800/40 hover:bg-slate-700/40 rounded-lg transition-all border border-slate-700/50 disabled:opacity-50"
+                className="a-btn a-btn-q disabled:opacity-50"
               >
-                <Paperclip size={14} />
-                {uploadingAttachment ? 'Uploading...' : 'Attach Files'}
-                <span className="text-slate-600">Max 10MB</span>
+                <Paperclip size={16} />
+                {uploadingAttachment ? 'Uploading…' : 'Attach files'}
+                <span className="a-dim font-normal text-[12px]">Max 10MB</span>
               </button>
               {attachments.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {attachments.map((att, idx) => (
-                    <div key={idx} className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 border border-slate-700/50 rounded-lg">
-                      <FileText size={12} className="text-slate-400" />
-                      <span className="text-xs text-white truncate max-w-[120px]">{att.name}</span>
-                      <span className="text-[10px] text-slate-500">{formatFileSize(att.size)}</span>
-                      <button onClick={() => onRemoveAttachment(idx)} className="text-slate-500 hover:text-red-400 transition-colors">
-                        <X size={12} />
+                    <span key={idx} className="a-rchip a-rchip-e">
+                      <FileText size={14} className="a-dim ml-1.5" />
+                      <span className="a-ink truncate max-w-[160px]">{att.name}</span>
+                      <span className="a-dim text-[11.5px]">{formatFileSize(att.size)}</span>
+                      <button onClick={() => onRemoveAttachment(idx)} className="a-dim flex" aria-label={`Remove ${att.name}`}>
+                        <X size={14} />
                       </button>
-                    </div>
+                    </span>
                   ))}
                 </div>
               )}
             </div>
 
             {composeForm.recipients.length > 0 && (
-              <div className="space-y-3 pt-2 border-t border-slate-700/50">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Type</label>
+              <div className="a-grp">
+                <div className="a-ir">
+                  <span className="a-ink text-[14px] font-medium flex-1">Type</span>
                   <select
                     value={composeForm.notification_type}
                     onChange={(e) => onComposeFormChange({ ...composeForm, notification_type: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    className="a-inp a-inp-sel"
+                    style={{ height: 36, width: 200 }}
                   >
-                    <option value="message">General Message</option>
-                    <option value="club_news">Club News</option>
-                    <option value="race_results">Race Results</option>
+                    <option value="message">General message</option>
+                    <option value="club_news">Club news</option>
+                    <option value="race_results">Race results</option>
                     <option value="membership">Membership</option>
                     <option value="alert">Alert</option>
                   </select>
                 </div>
-
-                <label className="flex items-center gap-2.5 text-slate-300 cursor-pointer">
-                  <input
-                    type="checkbox"
+                <div className="a-ir">
+                  <span className="a-ink text-[14px] font-medium flex-1">Also send as email</span>
+                  <ASwitch
                     checked={composeForm.send_email}
-                    onChange={(e) => onComposeFormChange({ ...composeForm, send_email: e.target.checked })}
-                    className="rounded border-slate-600 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                    onChange={(v) => onComposeFormChange({ ...composeForm, send_email: v })}
+                    label="Also send as email"
                   />
-                  <span className="text-xs">Also send as email</span>
-                </label>
+                </div>
               </div>
             )}
           </div>
         )}
 
-        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-700/50">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">
+        <div className="flex gap-2.5 border-t a-bd" style={{ padding: '14px 18px' }}>
+          <button onClick={onClose} className="a-btn" style={{ flex: 1 }}>
             Cancel
           </button>
 
-          {step === 'people-picker' && !replyMode ? (
+          {isPicker ? (
             <button
               onClick={() => setStep('compose')}
               disabled={selectedCount === 0 && selectedListIds.length === 0}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium"
+              className="a-btn a-btn-p disabled:opacity-45 disabled:cursor-not-allowed"
+              style={{ flex: 1.4 }}
             >
-              Next
-              <ChevronRight size={15} />
+              Next{selectedCount + selectedListIds.length > 0 ? ` · ${selectedCount + selectedListIds.length} selected` : ''}
             </button>
           ) : (
             <button
               onClick={onSend}
               disabled={sending || !composeForm.subject || !composeForm.body || (composeForm.recipients.length === 0 && composeForm.externalEmails.length === 0 && selectedListIds.length === 0)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:shadow-none font-medium text-sm"
+              className="a-btn a-btn-p disabled:opacity-45 disabled:cursor-not-allowed"
+              style={{ flex: 1.4 }}
             >
               {sending ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Sending...
+                  Sending…
                 </>
               ) : (
                 <>
-                  <Send size={15} />
+                  <Send size={16} />
                   Send
                 </>
               )}
             </button>
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 };

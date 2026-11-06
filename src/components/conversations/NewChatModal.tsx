@@ -3,6 +3,7 @@ import { X, Search, MessageSquare, UserPlus, Users, Clock, Check, UserX, Bell } 
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
+import { AAvatar } from '../alfie/Kit';
 
 interface Connection {
   id: string;
@@ -255,277 +256,184 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
     u.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const av = (name: string, url?: string, size = 40) => {
+    const [first, ...rest] = (name || '?').split(' ');
+    return <AAvatar url={url} first={first} last={rest.join(' ')} size={size} />;
+  };
+  const spinner = (
+    <div className="flex items-center justify-center py-12">
+      <div className="w-7 h-7 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+    </div>
+  );
+  const empty = (icon: React.ReactNode, title: string, sub?: string, action?: React.ReactNode) => (
+    <div className="flex flex-col items-center justify-center py-12 text-center px-6">
+      <span className="a-tile mb-3" style={{ width: 48, height: 48 }}>{icon}</span>
+      <p className="a-ink text-[14px] font-semibold">{title}</p>
+      {sub && <p className="a-dim text-[12.5px] mt-1">{sub}</p>}
+      {action}
+    </div>
+  );
+  const personRow = (conn: Connection) => (
+    <button
+      key={conn.id}
+      onClick={() => {
+        onSelectUser(conn.id, conn.name, conn.avatar);
+        onClose();
+      }}
+      className="a-pr"
+      aria-label={`Chat with ${conn.name}`}
+    >
+      {av(conn.name, conn.avatar)}
+      <div className="flex-1 min-w-0 text-left">
+        <div className={`a-ink text-[14.5px] truncate ${conn.isConnection ? 'font-semibold' : 'font-medium'}`}>{conn.name}</div>
+        <div className="a-dim text-[12px] mt-0.5">{conn.isConnection ? 'Connection' : 'Club member'}</div>
+      </div>
+      <span className={`a-ib ${conn.isConnection ? 'a-ib-call-b' : ''}`} aria-hidden="true"><MessageSquare size={17} /></span>
+    </button>
+  );
+  const conns = filtered.filter(c => c.isConnection);
+  const others = filtered.filter(c => !c.isConnection);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative w-full max-w-md rounded-2xl shadow-2xl overflow-hidden ${
-        darkMode ? 'bg-slate-800 border border-slate-700/50' : 'bg-white'
-      }`}>
-        <div className={`flex items-center justify-between px-5 py-4 border-b ${
-          darkMode ? 'border-slate-700/50' : 'border-gray-200'
-        }`}>
-          <div className="flex items-center gap-2.5">
-            <MessageSquare size={20} className="text-blue-500" />
-            <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              New Chat
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-500'
-            }`}
-          >
+      <section className="a-sheet relative w-full max-w-[420px] max-h-[85vh] flex flex-col" role="dialog" aria-label="New chat">
+        <div className="flex items-center gap-3" style={{ padding: '20px 18px 12px 22px' }}>
+          <span className="a-tile a-tile-rim" style={{ width: 40, height: 40 }}><MessageSquare size={18} /></span>
+          <h2 className="a-display a-ink flex-1 m-0 text-[20px] font-semibold">New chat</h2>
+          <button onClick={onClose} className="a-ib" aria-label="Close">
             <X size={18} />
           </button>
         </div>
 
-        <div className={`flex border-b ${darkMode ? 'border-slate-700/50' : 'border-gray-200'}`}>
-          <button
-            onClick={() => { setActiveTab('chat'); setSearchTerm(''); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'chat'
-                ? 'text-blue-500 border-b-2 border-blue-500'
-                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Users size={16} />
-            People
-          </button>
-          <button
-            onClick={() => { setActiveTab('connect'); setSearchTerm(''); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'connect'
-                ? 'text-blue-500 border-b-2 border-blue-500'
-                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <UserPlus size={16} />
-            Find
-          </button>
-          <button
-            onClick={() => { setActiveTab('requests'); setSearchTerm(''); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative ${
-              activeTab === 'requests'
-                ? 'text-blue-500 border-b-2 border-blue-500'
-                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Bell size={16} />
-            Requests
-            {pendingRequests.length > 0 && (
-              <span className="absolute top-2 right-3 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1">
-                {pendingRequests.length}
-              </span>
-            )}
-          </button>
-        </div>
-
-        <div className="p-4">
+        <div className="flex flex-col gap-2.5" style={{ padding: '0 18px 10px' }}>
+          <div className="a-seg" style={{ display: 'flex' }} role="tablist">
+            <button onClick={() => { setActiveTab('chat'); setSearchTerm(''); }} className={`a-seg-i flex-1 justify-center ${activeTab === 'chat' ? 'a-seg-on' : ''}`} role="tab" aria-selected={activeTab === 'chat'}>
+              <Users size={16} />People
+            </button>
+            <button onClick={() => { setActiveTab('connect'); setSearchTerm(''); }} className={`a-seg-i flex-1 justify-center ${activeTab === 'connect' ? 'a-seg-on' : ''}`} role="tab" aria-selected={activeTab === 'connect'}>
+              <UserPlus size={16} />Find
+            </button>
+            <button onClick={() => { setActiveTab('requests'); setSearchTerm(''); }} className={`a-seg-i flex-1 justify-center ${activeTab === 'requests' ? 'a-seg-on' : ''}`} role="tab" aria-selected={activeTab === 'requests'}>
+              <Bell size={16} />Requests
+              {pendingRequests.length > 0 && <span className="a-cnt">{pendingRequests.length}</span>}
+            </button>
+          </div>
           {activeTab !== 'requests' && (
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+            <label className="a-field">
+              <Search size={16} />
               <input
                 type="text"
-                placeholder={activeTab === 'chat' ? 'Search connections...' : 'Search people to connect...'}
+                placeholder={activeTab === 'chat' ? 'Search connections' : 'Search people to connect'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 autoFocus
-                className={`w-full pl-9 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all ${
-                  darkMode
-                    ? 'bg-slate-700/60 border border-slate-600/50 text-white placeholder-slate-500'
-                    : 'bg-gray-100 border border-gray-200 text-gray-900 placeholder-gray-400'
-                }`}
               />
-            </div>
+            </label>
+          )}
+        </div>
+
+        <div className="flex-1 min-h-[200px] overflow-y-auto" style={{ padding: '0 8px 14px' }}>
+          {activeTab === 'chat' && (
+            loading ? spinner : filtered.length === 0 ? empty(
+              <Users size={22} />,
+              searchTerm ? 'No matching people' : 'No people found',
+              searchTerm ? 'Try a different search' : 'Use Find to connect with other members',
+              !searchTerm && (
+                <button onClick={() => setActiveTab('connect')} className="a-btn a-btn-p mt-4">
+                  <UserPlus size={16} />
+                  Find people
+                </button>
+              ),
+            ) : (
+              <>
+                {conns.length > 0 && <div className="a-ghd" style={{ padding: '8px 10px 4px' }}>Connections</div>}
+                {conns.map(personRow)}
+                {others.length > 0 && <div className="a-ghd" style={{ padding: conns.length ? '12px 10px 4px' : '8px 10px 4px' }}>Club members</div>}
+                {others.map(personRow)}
+              </>
+            )
           )}
 
-          <div className="max-h-[360px] overflow-y-auto -mx-1 px-1">
-            {activeTab === 'chat' && (
-              loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="w-7 h-7 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-                </div>
-              ) : filtered.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                    {searchTerm ? 'No matching people' : 'No people found'}
-                  </p>
-                  <p className={`text-xs mt-1 ${darkMode ? 'text-slate-600' : 'text-gray-400'}`}>
-                    {searchTerm ? 'Try a different search' : 'Use "Find" to connect with other members'}
-                  </p>
-                  {!searchTerm && (
-                    <button
-                      onClick={() => setActiveTab('connect')}
-                      className="mt-3 flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-colors"
-                    >
-                      <UserPlus size={14} />
-                      Find People
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-0.5">
-                  {filtered.map(conn => (
-                    <button
-                      key={conn.id}
-                      onClick={() => {
-                        onSelectUser(conn.id, conn.name, conn.avatar);
-                        onClose();
-                      }}
-                      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
-                        darkMode ? 'hover:bg-slate-700/60' : 'hover:bg-gray-100'
-                      }`}
-                    >
-                      {conn.avatar ? (
-                        <img src={conn.avatar} alt={conn.name} className="w-10 h-10 rounded-full object-cover" />
+          {activeTab === 'connect' && (
+            loadingDiscover ? spinner : filteredDiscover.length === 0 ? empty(
+              <UserPlus size={22} />,
+              searchTerm ? 'No matching people' : 'No new people to connect with',
+            ) : (
+              <>
+                <div className="a-ghd" style={{ padding: '8px 10px 4px' }}>People you may know</div>
+                {filteredDiscover.map(person => {
+                  const isPending = pendingSentIds.has(person.id);
+                  const isConnecting = connectingId === person.id;
+                  return (
+                    <div key={person.id} className="a-pr" style={{ cursor: 'default' }}>
+                      {av(person.name, person.avatar)}
+                      <div className="flex-1 min-w-0">
+                        <div className="a-ink text-[14.5px] font-medium truncate">{person.name}</div>
+                      </div>
+                      {isPending ? (
+                        <span className="a-lb-fmt" style={{ height: 28 }}><Clock size={13} />Pending</span>
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">
-                          {conn.name.charAt(0)}
-                        </div>
+                        <button
+                          onClick={() => handleConnect(person.id)}
+                          disabled={isConnecting}
+                          className="a-btn a-btn-p disabled:opacity-50"
+                          style={{ height: 32, padding: '0 12px', fontSize: 13 }}
+                        >
+                          <UserPlus size={14} />
+                          {isConnecting ? '…' : 'Connect'}
+                        </button>
                       )}
-                      <div className="flex-1 text-left">
-                        <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {conn.name}
-                        </p>
-                        <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
-                          {conn.isConnection ? 'Connection' : 'Club Member'}
-                        </p>
-                      </div>
-                      <MessageSquare size={16} className={darkMode ? 'text-slate-600' : 'text-gray-300'} />
-                    </button>
-                  ))}
-                </div>
-              )
-            )}
+                    </div>
+                  );
+                })}
+              </>
+            )
+          )}
 
-            {activeTab === 'connect' && (
-              loadingDiscover ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="w-7 h-7 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-                </div>
-              ) : filteredDiscover.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                    {searchTerm ? 'No matching people' : 'No new people to connect with'}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-0.5">
-                  {filteredDiscover.map(person => {
-                    const isPending = pendingSentIds.has(person.id);
-                    const isConnecting = connectingId === person.id;
-                    return (
-                      <div
-                        key={person.id}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl ${
-                          darkMode ? 'hover:bg-slate-700/60' : 'hover:bg-gray-100'
-                        }`}
-                      >
-                        {person.avatar ? (
-                          <img src={person.avatar} alt={person.name} className="w-10 h-10 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">
-                            {person.name.charAt(0)}
-                          </div>
-                        )}
-                        <div className="flex-1 text-left min-w-0">
-                          <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                            {person.name}
-                          </p>
-                        </div>
-                        {isPending ? (
-                          <span className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium ${
-                            darkMode ? 'bg-slate-700 text-slate-400' : 'bg-gray-100 text-gray-500'
-                          }`}>
-                            <Clock size={12} />
-                            Pending
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => handleConnect(person.id)}
-                            disabled={isConnecting}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
-                          >
-                            <UserPlus size={12} />
-                            {isConnecting ? '...' : 'Connect'}
-                          </button>
-                        )}
+          {activeTab === 'requests' && (
+            pendingRequests.length === 0 ? empty(
+              <Bell size={22} />,
+              'No pending connection requests',
+              'When someone sends you a connection request, it will appear here',
+            ) : (
+              <>
+                <div className="a-ghd" style={{ padding: '8px 10px 4px' }}>Requests</div>
+                {pendingRequests.map(request => {
+                  const isResponding = respondingId === request.id;
+                  return (
+                    <div key={request.id} className="a-pr" style={{ cursor: 'default' }}>
+                      {av(request.name, request.avatar)}
+                      <div className="flex-1 min-w-0">
+                        <div className="a-ink text-[14.5px] font-medium truncate">{request.name}</div>
+                        <div className="a-dim text-[12px] mt-0.5">Wants to connect</div>
                       </div>
-                    );
-                  })}
-                </div>
-              )
-            )}
-
-            {activeTab === 'requests' && (
-              pendingRequests.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Bell size={32} className={darkMode ? 'text-slate-600' : 'text-gray-300'} />
-                  <p className={`text-sm mt-3 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                    No pending connection requests
-                  </p>
-                  <p className={`text-xs mt-1 ${darkMode ? 'text-slate-600' : 'text-gray-400'}`}>
-                    When someone sends you a connection request, it will appear here
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-0.5">
-                  {pendingRequests.map(request => {
-                    const isResponding = respondingId === request.id;
-                    return (
-                      <div
-                        key={request.id}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl ${
-                          darkMode ? 'bg-slate-700/30' : 'bg-gray-50'
-                        }`}
+                      <button
+                        onClick={() => handleRejectRequest(request.id)}
+                        disabled={isResponding}
+                        className="a-ib disabled:opacity-50"
+                        aria-label={`Decline ${request.name}`}
+                        title="Decline"
                       >
-                        {request.avatar ? (
-                          <img src={request.avatar} alt={request.name} className="w-10 h-10 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">
-                            {request.name.charAt(0)}
-                          </div>
-                        )}
-                        <div className="flex-1 text-left min-w-0">
-                          <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                            {request.name}
-                          </p>
-                          <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
-                            Wants to connect
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleAcceptRequest(request.id, request.user_id)}
-                            disabled={isResponding}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-green-600 text-white hover:bg-green-500 transition-colors disabled:opacity-50"
-                          >
-                            <Check size={12} />
-                            Accept
-                          </button>
-                          <button
-                            onClick={() => handleRejectRequest(request.id)}
-                            disabled={isResponding}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
-                              darkMode
-                                ? 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                            }`}
-                          >
-                            <UserX size={12} />
-                            Decline
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )
-            )}
-          </div>
+                        <UserX size={17} />
+                      </button>
+                      <button
+                        onClick={() => handleAcceptRequest(request.id, request.user_id)}
+                        disabled={isResponding}
+                        className="a-btn a-btn-g disabled:opacity-50"
+                        style={{ height: 32, padding: '0 12px', fontSize: 13 }}
+                      >
+                        <Check size={14} />
+                        Accept
+                      </button>
+                    </div>
+                  );
+                })}
+              </>
+            )
+          )}
         </div>
-      </div>
+      </section>
     </div>
   );
 };
