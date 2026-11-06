@@ -771,4 +771,12 @@ html.alfie-dark :is(div, section, article, li, a):is(.rounded-xl, .rounded-2xl, 
 html.alfie-dark .fixed.inset-0 > :is(.rounded-xl, .rounded-2xl, .rounded-3xl):is(.bg-slate-800, .bg-slate-900, [class*="bg-slate-800/"], [class*="bg-slate-900/"]) {
   background-color: #111622 !important;
 }
-html.alfie-dark .a-card-hi, html.alfie-dark .a-card { background: var(--a-card); border-color: var(--a-card-border); }
+:where(html.alfie-dark) :is(.a-card-hi, .a-card) { background: var(--a-card); border-color: var(--a-card-border); }
+
+/* Page gutters match the board (main padding 36 / 48 / 96 / 36). Older pages used p-16 / lg:p-14 / lg:p-16. */
+@media (min-width: 1024px) {
+  html.alfie-theme .h-full.overflow-y-auto > :is(.p-16, .lg\:p-16, .lg\:p-14) { padding: 36px 48px 96px 36px; }
+}
+@media (max-width: 1023px) {
+  html.alfie-theme .h-full.overflow-y-auto > .p-16 { padding: 24px 20px 96px; }
+}

@@ -466,26 +466,18 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
           <div className="space-y-6">
             {/* Logo Section */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-3">Logo & Branding</label>
+              <label className="a-flab">Logo & Branding</label>
               <div className="grid grid-cols-3 gap-3 mb-4">
                 <button
                   onClick={() => setHeader(prev => ({ ...prev, logo_type: 'text' }))}
-                  className={`p-3 rounded-lg border-2 transition-all ${
-                    header.logo_type === 'text'
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-slate-700 hover:border-slate-600'
-                  }`}
+                  className={`a-otile ${header.logo_type === 'text' ? 'a-otile-on' : ''}`}
                 >
                   <Type size={20} className="mx-auto mb-1 text-slate-300" />
                   <span className="text-xs text-slate-400">Text</span>
                 </button>
                 <button
                   onClick={() => setHeader(prev => ({ ...prev, logo_type: 'image' }))}
-                  className={`p-3 rounded-lg border-2 transition-all ${
-                    header.logo_type === 'image'
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-slate-700 hover:border-slate-600'
-                  }`}
+                  className={`a-otile ${header.logo_type === 'image' ? 'a-otile-on' : ''}`}
                 >
                   <Upload size={20} className="mx-auto mb-1 text-slate-300" />
                   <span className="text-xs text-slate-400">Upload</span>
@@ -493,11 +485,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                 {clubLogo && (
                   <button
                     onClick={() => setHeader(prev => ({ ...prev, logo_type: 'club_logo' }))}
-                    className={`p-3 rounded-lg border-2 transition-all ${
-                      header.logo_type === 'club_logo'
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : 'border-slate-700 hover:border-slate-600'
-                    }`}
+                    className={`a-otile ${header.logo_type === 'club_logo' ? 'a-otile-on' : ''}`}
                   >
                     <img src={clubLogo} alt="Club" className="h-8 mx-auto mb-1 object-contain" />
                     <span className="text-xs text-slate-400">Club Logo</span>
@@ -511,7 +499,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                   value={header.header_text}
                   onChange={(e) => setHeader(prev => ({ ...prev, header_text: e.target.value }))}
                   placeholder="Enter text"
-                  className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500"
+                  className="a-inp"
                 />
               )}
 
@@ -526,7 +514,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                   />
                   <label
                     htmlFor="logo-upload"
-                    className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors cursor-pointer"
+                    className="a-btn w-full cursor-pointer"
                   >
                     <Upload size={18} />
                     <span>{uploading ? 'Uploading...' : header.logo_url ? 'Change Logo' : 'Upload Logo'}</span>
@@ -538,7 +526,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
             {/* Colors */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Background Color</label>
+                <label className="a-flab">Background Color</label>
                 <div className="flex gap-2">
                   <input
                     type="color"
@@ -550,12 +538,12 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                     type="text"
                     value={header.background_color}
                     onChange={(e) => setHeader(prev => ({ ...prev, background_color: e.target.value }))}
-                    className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+                    className="a-inp flex-1"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Text Color</label>
+                <label className="a-flab">Text Color</label>
                 <div className="flex gap-2">
                   <input
                     type="color"
@@ -567,7 +555,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                     type="text"
                     value={header.text_color}
                     onChange={(e) => setHeader(prev => ({ ...prev, text_color: e.target.value }))}
-                    className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+                    className="a-inp flex-1"
                   />
                 </div>
               </div>
@@ -576,7 +564,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
             {/* Layout */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="a-flab">
                   Header Height: {header.height}px
                 </label>
                 <input
@@ -589,25 +577,17 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Logo Position</label>
-                <div className="flex gap-2">
+                <label className="a-flab">Logo Position</label>
+                <div className="a-seg flex">
                   <button
                     onClick={() => setHeader(prev => ({ ...prev, logo_position: 'left' }))}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm transition-all ${
-                      header.logo_position === 'left'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                    }`}
+                    className={`a-seg-i flex-1 justify-center ${header.logo_position === 'left' ? 'a-seg-on' : ''}`}
                   >
                     Left
                   </button>
                   <button
                     onClick={() => setHeader(prev => ({ ...prev, logo_position: 'center' }))}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm transition-all ${
-                      header.logo_position === 'center'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                    }`}
+                    className={`a-seg-i flex-1 justify-center ${header.logo_position === 'center' ? 'a-seg-on' : ''}`}
                   >
                     Center
                   </button>
@@ -617,26 +597,18 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
 
             {/* Menu Style */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Menu Style</label>
+              <label className="a-flab">Menu Style</label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setMenu(prev => ({ ...prev, menu_style: 'horizontal' }))}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    menu.menu_style === 'horizontal'
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-slate-700 hover:border-slate-600'
-                  }`}
+                  className={`a-otile ${menu.menu_style === 'horizontal' ? 'a-otile-on' : ''}`}
                 >
                   <Layout size={20} className="mx-auto mb-2 text-slate-300" />
                   <span className="text-sm text-slate-400">Horizontal</span>
                 </button>
                 <button
                   onClick={() => setMenu(prev => ({ ...prev, menu_style: 'hamburger' }))}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    menu.menu_style === 'hamburger'
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-slate-700 hover:border-slate-600'
-                  }`}
+                  className={`a-otile ${menu.menu_style === 'hamburger' ? 'a-otile-on' : ''}`}
                 >
                   <MenuIcon size={20} className="mx-auto mb-2 text-slate-300" />
                   <span className="text-sm text-slate-400">Hamburger</span>
@@ -646,25 +618,17 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
 
             {/* Scroll Behavior */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Scroll Behavior</label>
-              <div className="flex gap-2">
+              <label className="a-flab">Scroll Behavior</label>
+              <div className="a-seg flex">
                 <button
                   onClick={() => setMenu(prev => ({ ...prev, scroll_behavior: 'static' }))}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm transition-all ${
-                    menu.scroll_behavior === 'static'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
+                  className={`a-seg-i flex-1 justify-center ${menu.scroll_behavior === 'static' ? 'a-seg-on' : ''}`}
                 >
                   Static
                 </button>
                 <button
                   onClick={() => setMenu(prev => ({ ...prev, scroll_behavior: 'sticky' }))}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm transition-all ${
-                    menu.scroll_behavior === 'sticky'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
+                  className={`a-seg-i flex-1 justify-center ${menu.scroll_behavior === 'sticky' ? 'a-seg-on' : ''}`}
                 >
                   Sticky
                 </button>
@@ -677,15 +641,11 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
           <div className="space-y-6">
             {/* Menu Style */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-3">Menu Style</label>
+              <label className="a-flab">Menu Style</label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setMenu(prev => ({ ...prev, menu_style: 'horizontal' }))}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    menu.menu_style === 'horizontal'
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-slate-700 hover:border-slate-600'
-                  }`}
+                  className={`a-otile ${menu.menu_style === 'horizontal' ? 'a-otile-on' : ''}`}
                 >
                   <div className="w-full h-8 mb-2 bg-slate-700 rounded flex items-center justify-center gap-1">
                     <div className="w-12 h-1 bg-slate-400"></div>
@@ -696,11 +656,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                 </button>
                 <button
                   onClick={() => setMenu(prev => ({ ...prev, menu_style: 'hamburger' }))}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    menu.menu_style === 'hamburger'
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-slate-700 hover:border-slate-600'
-                  }`}
+                  className={`a-otile ${menu.menu_style === 'hamburger' ? 'a-otile-on' : ''}`}
                 >
                   <div className="w-full h-8 mb-2 bg-slate-700 rounded flex items-center justify-center">
                     <MenuIcon size={20} className="text-slate-400" />
@@ -712,25 +668,17 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
 
             {/* Scroll Behavior */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-3">Scroll Behavior</label>
-              <div className="grid grid-cols-2 gap-3">
+              <label className="a-flab">Scroll Behavior</label>
+              <div className="a-seg flex">
                 <button
                   onClick={() => setMenu(prev => ({ ...prev, scroll_behavior: 'static' }))}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    menu.scroll_behavior === 'static'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
+                  className={`a-seg-i flex-1 justify-center ${menu.scroll_behavior === 'static' ? 'a-seg-on' : ''}`}
                 >
                   Static
                 </button>
                 <button
                   onClick={() => setMenu(prev => ({ ...prev, scroll_behavior: 'sticky' }))}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    menu.scroll_behavior === 'sticky'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
+                  className={`a-seg-i flex-1 justify-center ${menu.scroll_behavior === 'sticky' ? 'a-seg-on' : ''}`}
                 >
                   Sticky
                 </button>
@@ -740,25 +688,17 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
             {/* Menu Position (for hamburger) */}
             {menu.menu_style === 'hamburger' && (
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-3">Menu Position</label>
-                <div className="grid grid-cols-2 gap-3">
+                <label className="a-flab">Menu Position</label>
+                <div className="a-seg flex">
                   <button
                     onClick={() => setMenu(prev => ({ ...prev, position: 'left' }))}
-                    className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      menu.position === 'left'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                    }`}
+                    className={`a-seg-i flex-1 justify-center ${menu.position === 'left' ? 'a-seg-on' : ''}`}
                   >
                     Left
                   </button>
                   <button
                     onClick={() => setMenu(prev => ({ ...prev, position: 'right' }))}
-                    className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      menu.position === 'right'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                    }`}
+                    className={`a-seg-i flex-1 justify-center ${menu.position === 'right' ? 'a-seg-on' : ''}`}
                   >
                     Right
                   </button>
@@ -769,7 +709,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
             {/* Colors */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Text Color</label>
+                <label className="a-flab">Text Color</label>
                 <div className="flex gap-2">
                   <input
                     type="color"
@@ -781,13 +721,13 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                     type="text"
                     value={menu.text_color}
                     onChange={(e) => setMenu(prev => ({ ...prev, text_color: e.target.value }))}
-                    className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+                    className="a-inp flex-1"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Hover Color</label>
+                <label className="a-flab">Hover Color</label>
                 <div className="flex gap-2">
                   <input
                     type="color"
@@ -799,7 +739,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                     type="text"
                     value={menu.hover_color}
                     onChange={(e) => setMenu(prev => ({ ...prev, hover_color: e.target.value }))}
-                    className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+                    className="a-inp flex-1"
                   />
                 </div>
               </div>
@@ -808,7 +748,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
             {menu.menu_style === 'hamburger' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Hamburger Icon Color</label>
+                  <label className="a-flab">Hamburger Icon Color</label>
                   <div className="flex gap-2">
                     <input
                       type="color"
@@ -820,13 +760,13 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                       type="text"
                       value={menu.hamburger_color}
                       onChange={(e) => setMenu(prev => ({ ...prev, hamburger_color: e.target.value }))}
-                      className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+                      className="a-inp flex-1"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="a-flab">
                     Hamburger Icon Size: {menu.hamburger_size}px
                   </label>
                   <input
@@ -843,25 +783,17 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
 
             {/* Navigation Width */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-3">Navigation Width</label>
+              <label className="a-flab">Navigation Width</label>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <button
                   onClick={() => setMenu(prev => ({ ...prev, width_type: 'responsive' }))}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    menu.width_type === 'responsive'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
+                  className={`a-seg-i flex-1 justify-center ${menu.width_type === 'responsive' ? 'a-seg-on' : ''}`}
                 >
                   Full Responsive
                 </button>
                 <button
                   onClick={() => setMenu(prev => ({ ...prev, width_type: 'fixed' }))}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    menu.width_type === 'fixed'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                  }`}
+                  className={`a-seg-i flex-1 justify-center ${menu.width_type === 'fixed' ? 'a-seg-on' : ''}`}
                 >
                   Fixed Width
                 </button>
@@ -879,7 +811,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                     step="50"
                     value={menu.fixed_width}
                     onChange={(e) => setMenu(prev => ({ ...prev, fixed_width: parseInt(e.target.value) || 1200 }))}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+                    className="a-inp"
                   />
                 </div>
               )}
@@ -992,7 +924,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-2">Button Color</label>
+                          <label className="a-flab">Button Color</label>
                           <div className="flex gap-2">
                             <input
                               type="color"
@@ -1010,7 +942,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                         </div>
 
                         <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-2">Text Color</label>
+                          <label className="a-flab">Text Color</label>
                           <div className="flex gap-2">
                             <input
                               type="color"
@@ -1030,25 +962,17 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-2">Position</label>
-                          <div className="flex gap-2">
+                          <label className="a-flab">Position</label>
+                          <div className="a-seg flex">
                             <button
                               onClick={() => updateCTAButton(btn.id, { position: 'left' })}
-                              className={`flex-1 px-3 py-1.5 rounded text-xs transition-all ${
-                                (btn.position || 'right') === 'left'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                              }`}
+                              className={`a-seg-i flex-1 justify-center ${(btn.position || 'right') === 'left' ? 'a-seg-on' : ''}`}
                             >
                               Left
                             </button>
                             <button
                               onClick={() => updateCTAButton(btn.id, { position: 'right' })}
-                              className={`flex-1 px-3 py-1.5 rounded text-xs transition-all ${
-                                (btn.position || 'right') === 'right'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                              }`}
+                              className={`a-seg-i flex-1 justify-center ${(btn.position || 'right') === 'right' ? 'a-seg-on' : ''}`}
                             >
                               Right
                             </button>
@@ -1056,25 +980,17 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
                         </div>
 
                         <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-2">Button Style</label>
-                          <div className="flex gap-2">
+                          <label className="a-flab">Button Style</label>
+                          <div className="a-seg flex">
                             <button
                               onClick={() => updateCTAButton(btn.id, { button_style: 'solid' })}
-                              className={`flex-1 px-3 py-1.5 rounded text-xs transition-all ${
-                                (btn.button_style || 'solid') === 'solid'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                              }`}
+                              className={`a-seg-i flex-1 justify-center ${(btn.button_style || 'solid') === 'solid' ? 'a-seg-on' : ''}`}
                             >
                               Solid
                             </button>
                             <button
                               onClick={() => updateCTAButton(btn.id, { button_style: 'outline' })}
-                              className={`flex-1 px-3 py-1.5 rounded text-xs transition-all ${
-                                (btn.button_style || 'solid') === 'outline'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                              }`}
+                              className={`a-seg-i flex-1 justify-center ${(btn.button_style || 'solid') === 'outline' ? 'a-seg-on' : ''}`}
                             >
                               Outline
                             </button>
