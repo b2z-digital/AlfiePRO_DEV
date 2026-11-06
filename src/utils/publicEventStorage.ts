@@ -157,6 +157,7 @@ export const convertToRaceEvent = (publicEvent: PublicEvent): RaceEvent => {
     entryFee: publicEvent.entry_fee,
     noticeOfRaceUrl: publicEvent.notice_of_race_url,
     sailingInstructionsUrl: publicEvent.sailing_instructions_url,
+    additionalDocuments: Array.isArray((publicEvent as any).additional_documents) ? (publicEvent as any).additional_documents : [],
     isInterclub: publicEvent.is_interclub,
     otherClubName: publicEvent.other_club_name,
     media: publicEvent.media,

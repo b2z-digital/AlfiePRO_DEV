@@ -73,6 +73,39 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
 }) => {
   const { can, currentOrganization, isAdmin, isEditor } = usePermissions();
   const [event, setEvent] = useState<RaceEvent>(initialEvent);
+
+  // Documents for the Documents tab: series rounds read their series; events read their own row
+  const [savedDocs, setSavedDocs] = useState<{ nor?: string; si?: string; extra: Array<{ name: string; url: string; type?: string }> }>({ extra: [] });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        let row: any = null;
+        if (event.isSeriesEvent && event.seriesId) {
+          ({ data: row } = await supabase.from('race_series').select('*').eq('id', extractDbId(event.seriesId)).maybeSingle());
+        } else if (event.isPublicEvent && event.id) {
+          ({ data: row } = await supabase.from('public_events').select('*').eq('id', event.id).maybeSingle());
+        } else if (event.id) {
+          ({ data: row } = await supabase.from('quick_races').select('*').eq('id', extractDbId(event.id)).maybeSingle());
+          const publicId = row?.public_event_id || (event as any).publicEventId || (event as any).public_event_id;
+          if (publicId && !row?.notice_of_race_url && !row?.sailing_instructions_url && !(row?.additional_documents || []).length) {
+            const { data: pub } = await supabase.from('public_events').select('*').eq('id', publicId).maybeSingle();
+            if (pub) row = pub;
+          }
+        }
+        if (!cancelled && row) {
+          setSavedDocs({
+            nor: row.notice_of_race_url || undefined,
+            si: row.sailing_instructions_url || undefined,
+            extra: Array.isArray(row.additional_documents) ? row.additional_documents.filter((d: any) => d && d.url) : [],
+          });
+        }
+      } catch {
+        /* keep whatever the event already carries */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [event.id, event.seriesId, event.isSeriesEvent, event.isPublicEvent]);
   const eventRef = useRef<RaceEvent>(initialEvent);
 
   // Keep ref in sync with state
@@ -2669,56 +2702,43 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
       );
     }
 
+    const norUrl = event.noticeOfRaceUrl || savedDocs.nor;
+    const siUrl = event.sailingInstructionsUrl || savedDocs.si;
+    const extraDocs = (event.additionalDocuments && event.additionalDocuments.length > 0 ? event.additionalDocuments : savedDocs.extra).filter(d => d && d.url);
+    const docRows: Array<{ key: string; name: string; kind: string; url?: string; tone: string }> = [
+      { key: 'nor', name: 'Notice of Race', kind: norUrl ? 'PDF document' : 'Not added yet', url: norUrl, tone: 'r' },
+      { key: 'si', name: 'Sailing Instructions', kind: siUrl ? 'PDF document' : 'Not added yet', url: siUrl, tone: 'b' },
+      ...extraDocs.map((d, i) => ({ key: `x${i}`, name: d.name || 'Document', kind: 'Additional document', url: d.url, tone: 'n' })),
+    ];
+
     return (
-      <div className="space-y-6">
-        <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}`}>
-          <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-            Event Documents
-          </h3>
-          <div className="space-y-4">
-            {event.noticeOfRaceUrl ? (
-              <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <FileText className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={20} />
-                    <div>
-                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>Notice of Race</p>
-                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>PDF Document</p>
-                    </div>
-                  </div>
-                  <a href={event.noticeOfRaceUrl} target="_blank" rel="noopener noreferrer"
-                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
-                    View
-                  </a>
-                </div>
-              </div>
+      <div className="a-card a-evdocs">
+        <div className="flex items-center gap-3 mb-3">
+          <span className="a-tile a-tile-sm"><FileText size={16} /></span>
+          <h3 className="a-display a-ink text-[16px] font-semibold flex-1">Event documents</h3>
+          <span className="a-cnt">{docRows.filter(r => r.url).length}</span>
+        </div>
+        <div className="flex flex-col">
+          {docRows.map(row => (
+            row.url ? (
+              <a key={row.key} href={row.url} target="_blank" rel="noopener noreferrer" className="a-evdoc">
+                <span className={`a-evdoc-ic a-evdoc-${row.tone}`}>PDF</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block a-ink text-[14.5px] font-semibold truncate">{row.name}</span>
+                  <span className="block a-dim text-[12.5px]">{row.kind}</span>
+                </span>
+                <span className="a-btn" style={{ height: 34, padding: '0 12px', fontSize: 13 }}><ExternalLink size={14} />View</span>
+              </a>
             ) : (
-              <div className={`p-4 rounded-lg border text-center ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
-                No Notice of Race document available
+              <div key={row.key} className="a-evdoc a-evdoc-empty">
+                <span className="a-evdoc-ic a-evdoc-n"><FileText size={15} /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block a-mute text-[14.5px] font-semibold truncate">{row.name}</span>
+                  <span className="block a-dim text-[12.5px]">{row.kind}</span>
+                </span>
               </div>
-            )}
-            {event.sailingInstructionsUrl ? (
-              <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <FileText className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={20} />
-                    <div>
-                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>Sailing Instructions</p>
-                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>PDF Document</p>
-                    </div>
-                  </div>
-                  <a href={event.sailingInstructionsUrl} target="_blank" rel="noopener noreferrer"
-                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
-                    View
-                  </a>
-                </div>
-              </div>
-            ) : (
-              <div className={`p-4 rounded-lg border text-center ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
-                No Sailing Instructions document available
-              </div>
-            )}
-          </div>
+            )
+          ))}
         </div>
       </div>
     );

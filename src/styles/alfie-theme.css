@@ -763,7 +763,7 @@ html.alfie-light .bg-gradient-to-br:is(.rounded-xl, .rounded-2xl):is([class*="-5
  * Screens set their own slate fills (bg-slate-800, /30, /50, bg-slate-900/50 …), so cards drifted
  * between sections. Every rounded card container now resolves to the same board surface. Floating
  * things (dropdowns, sticky cells, modals) keep their own solid fills. */
-html.alfie-dark :is(div, section, article, li, a):is(.rounded-xl, .rounded-2xl, .rounded-3xl):is(.bg-slate-800, .bg-slate-800\/20, .bg-slate-800\/30, .bg-slate-800\/40, .bg-slate-800\/50, .bg-slate-800\/60, .bg-slate-800\/70, .bg-slate-800\/80, .bg-slate-900, .bg-slate-900\/30, .bg-slate-900\/40, .bg-slate-900\/50, .bg-slate-900\/60, .bg-slate-900\/80, .bg-slate-700\/30, .bg-slate-700\/20):not(.absolute):not(.fixed):not(.sticky) {
+html.alfie-dark :is(div, section, article, li, a):is(.rounded-xl, .rounded-2xl, .rounded-3xl):is(.bg-slate-800, .bg-slate-800\/20, .bg-slate-800\/30, .bg-slate-800\/40, .bg-slate-800\/50, .bg-slate-800\/60, .bg-slate-800\/70, .bg-slate-800\/80, .bg-slate-900, .bg-slate-900\/30, .bg-slate-900\/40, .bg-slate-900\/50, .bg-slate-900\/60, .bg-slate-900\/80, .bg-slate-700\/30, .bg-slate-700\/20):not(.absolute):not(.fixed):not(.sticky):not(.fixed > *):not(.shadow-2xl) {
   background-color: var(--a-card) !important;
   border-color: var(--a-card-border) !important;
   -webkit-backdrop-filter: none; backdrop-filter: none;
@@ -780,3 +780,10 @@ html.alfie-dark .fixed.inset-0 > :is(.rounded-xl, .rounded-2xl, .rounded-3xl):is
 @media (max-width: 1023px) {
   html.alfie-theme .h-full.overflow-y-auto > .p-16 { padding: 24px 20px 96px; }
 }
+
+/* Modal sheets are solid (board sheet colour) so their content stays readable */
+html.alfie-dark :is(div, section).shadow-2xl:is(.rounded-xl, .rounded-2xl, .rounded-3xl):is(.bg-slate-800, .bg-slate-900, [class*="bg-slate-800/"], [class*="bg-slate-900/"]) {
+  background-color: #111622 !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+html.alfie-dark .fixed.inset-0:is(.bg-black\/50, .bg-black\/60) { background-color: rgba(4, 8, 16, 0.62); }
