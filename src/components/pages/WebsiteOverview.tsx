@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, CreditCard as Edit, Plus, Eye, ArrowUpRight, Activity, Users, Calendar, ChartBar as BarChart2, Clock, Settings, Palette, FileText, Image, TrendingUp, ExternalLink, Zap, Rocket, LayoutGrid as Layout, Navigation } from 'lucide-react';
+import { Globe, SquarePen as Edit, Eye, ArrowUpRight, Activity, ChartBar as BarChart2, Settings, Palette, FileText, Image, ExternalLink, Navigation } from 'lucide-react';
+import { AAvatar } from '../alfie/Kit';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNavigate } from 'react-router-dom';
@@ -255,288 +256,130 @@ export const WebsiteOverview: React.FC<WebsiteOverviewProps> = ({ darkMode }) =>
     }
   };
 
+  const previewHref = websiteStatus === 'live'
+    ? `https://${websiteUrl}`
+    : currentOrganization
+      ? `/${currentOrganization.type === 'state' ? 'state' : 'national'}/${currentOrganization.id}/public`
+      : `/club/${currentClub?.club?.id}/public`;
+  const cover = (currentClub as any)?.club?.cover_image_url as string | undefined;
+  const orgName = currentOrganization?.name || currentClub?.club?.name || 'Your club';
+  const statusTone = websiteStatus === 'live' ? 'g' : websiteStatus === 'draft' ? 'a' : 'r';
+  const ACTION_TONE: Record<string, string> = { created: 'a-txt-g', updated: 'a-txt-b', published: 'a-txt-v', deleted: 'a-txt-r' };
+  const quick = [
+    { label: 'Homepage', sub: 'Carousel slides and quick link tiles', icon: <Image size={20} />, to: '/website/homepage' },
+    { label: 'Theme', sub: 'Colours, fonts and logo', icon: <Palette size={20} />, to: '/website/theme' },
+    { label: 'Navigation', sub: 'Menu items and order', icon: <Navigation size={20} />, to: '/website/navigation' },
+    { label: 'Pages', sub: 'Create and edit pages', icon: <FileText size={20} />, to: '/website/pages' },
+    { label: 'Edit home', sub: 'Edit homepage content', icon: <Edit size={20} />, to: '/website/pages/edit/home' },
+    { label: 'Analytics', sub: 'Traffic and visitor insights', icon: <BarChart2 size={20} />, to: '/website/analytics' },
+  ];
+  const stat = (cap: string, value: React.ReactNode) => (
+    <div className="a-mini-stat">
+      <p className="a-cap" style={{ fontSize: 10 }}>{cap}</p>
+      <div className="a-num a-ink text-[24px] font-semibold mt-1.5 leading-none">{value}</div>
+    </div>
+  );
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-16">
-        {/* Main Header */}
-        <div className="mb-8 flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
-            <Globe className="text-white" size={28} />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Website Management</h1>
-            <p className="text-slate-400">
-              Manage your club's public-facing website
-            </p>
+      <div className="flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        <div className="flex items-center gap-4">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><Globe size={24} /></span>
+          <div className="flex-1 min-w-0">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">Website management</h1>
+            <p className="a-mute mt-1 text-[14.5px]">Manage your club’s public-facing website</p>
           </div>
         </div>
 
-        {/* Club Website Section */}
-        <div className="mb-8">
-          <div className="space-y-6">
-            <div className={`
-              rounded-2xl border backdrop-blur-sm overflow-hidden
-              ${darkMode
-                ? 'bg-gradient-to-br from-slate-800/50 to-slate-800/30 border-slate-700/50'
-                : 'bg-white/10 border-slate-200/20'}
-            `}>
-              {/* Club Website Header */}
-              <div className="p-6 border-b border-slate-700/50 from-blue-600/10 to-cyan-600/10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-600/20">
-                      <Layout size={24} className="text-blue-400" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-white">Club Website</h2>
-                      <p className="text-sm text-slate-400">Your main public-facing website</p>
-                    </div>
-                  </div>
-                  <div className={`
-                    px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2
-                    ${websiteStatus === 'live'
-                      ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-600/30'
-                      : websiteStatus === 'draft'
-                        ? 'bg-amber-900/30 text-amber-400 border border-amber-600/30'
-                        : 'bg-red-900/30 text-red-400 border border-red-600/30'}
-                  `}>
-                    <div className={`w-2 h-2 rounded-full ${websiteStatus === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                    {websiteStatus === 'live' ? 'Live' : websiteStatus === 'draft' ? 'Draft' : 'Offline'}
-                  </div>
-                </div>
-
-                {/* Quick Stats */}
-                <div className="grid grid-cols-4 gap-4 mt-4">
-                  <div className="text-center p-3 rounded-lg bg-slate-800/50">
-                    <div className="text-2xl font-bold text-blue-400">{analytics.pageViews}</div>
-                    <div className="text-xs text-slate-400 mt-1">Page Views</div>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-slate-800/50">
-                    <div className="text-2xl font-bold text-cyan-400">{analytics.uniqueVisitors}</div>
-                    <div className="text-xs text-slate-400 mt-1">Visitors</div>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-slate-800/50">
-                    <div className="text-lg font-bold text-green-400">{analytics.averageTimeOnSite}</div>
-                    <div className="text-xs text-slate-400 mt-1">Avg. Time</div>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-slate-800/50">
-                    <div className="flex items-center justify-center">
-                      <TrendingUp size={20} className="text-emerald-400" />
-                    </div>
-                    <div className="text-xs text-slate-400 mt-1">Analytics</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Actions Grid - Moved up */}
-              <div className="p-6 border-b border-slate-700/50">
-                <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
-                  <Zap size={16} className="text-blue-400" />
-                  Quick Actions
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <button
-                    onClick={() => navigate('/website/homepage')}
-                    className={`
-                      p-4 rounded-lg border text-center transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20
-                      ${darkMode
-                        ? 'bg-slate-700/50 border-slate-600/50 hover:bg-slate-700 hover:border-blue-500/50'
-                        : 'bg-white/5 border-slate-200/10 hover:bg-white/10'}
-                    `}
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="p-2 rounded-lg bg-blue-600/20">
-                        <Image size={18} className="text-blue-400" />
-                      </div>
-                      <span className="text-sm font-medium text-white">Homepage</span>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => navigate('/website/theme')}
-                    className={`
-                      p-4 rounded-lg border text-center transition-all hover:scale-105 hover:shadow-lg hover:shadow-amber-500/20
-                      ${darkMode
-                        ? 'bg-slate-700/50 border-slate-600/50 hover:bg-slate-700 hover:border-amber-500/50'
-                        : 'bg-white/5 border-slate-200/10 hover:bg-white/10'}
-                    `}
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="p-2 rounded-lg bg-amber-600/20">
-                        <Palette size={18} className="text-amber-400" />
-                      </div>
-                      <span className="text-sm font-medium text-white">Theme</span>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => navigate('/website/navigation')}
-                    className={`
-                      p-4 rounded-lg border text-center transition-all hover:scale-105 hover:shadow-lg hover:shadow-purple-500/20
-                      ${darkMode
-                        ? 'bg-slate-700/50 border-slate-600/50 hover:bg-slate-700 hover:border-purple-500/50'
-                        : 'bg-white/5 border-slate-200/10 hover:bg-white/10'}
-                    `}
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="p-2 rounded-lg bg-purple-600/20">
-                        <Navigation size={18} className="text-purple-400" />
-                      </div>
-                      <span className="text-sm font-medium text-white">Navigation</span>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => navigate('/website/pages')}
-                    className={`
-                      p-4 rounded-lg border text-center transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20
-                      ${darkMode
-                        ? 'bg-slate-700/50 border-slate-600/50 hover:bg-slate-700 hover:border-green-500/50'
-                        : 'bg-white/5 border-slate-200/10 hover:bg-white/10'}
-                    `}
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="p-2 rounded-lg bg-green-600/20">
-                        <FileText size={18} className="text-green-400" />
-                      </div>
-                      <span className="text-sm font-medium text-white">Pages</span>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => navigate('/website/pages/edit/home')}
-                    className={`
-                      p-4 rounded-lg border text-center transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20
-                      ${darkMode
-                        ? 'bg-slate-700/50 border-slate-600/50 hover:bg-slate-700 hover:border-blue-500/50'
-                        : 'bg-white/5 border-slate-200/10 hover:bg-white/10'}
-                    `}
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="p-2 rounded-lg bg-blue-600/20">
-                        <Edit size={18} className="text-blue-400" />
-                      </div>
-                      <span className="text-sm font-medium text-white">Edit Home</span>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => navigate('/website/analytics')}
-                    className={`
-                      p-4 rounded-lg border text-center transition-all hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/20
-                      ${darkMode
-                        ? 'bg-slate-700/50 border-slate-600/50 hover:bg-slate-700 hover:border-cyan-500/50'
-                        : 'bg-white/5 border-slate-200/10 hover:bg-white/10'}
-                    `}
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="p-2 rounded-lg bg-cyan-600/20">
-                        <BarChart2 size={18} className="text-cyan-400" />
-                      </div>
-                      <span className="text-sm font-medium text-white">Analytics</span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Domain Management Section */}
-              <div className="p-6 bg-slate-800/30">
-                <h3 className="text-sm font-semibold text-slate-300 mb-3">Domain Management</h3>
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1">Website URL</p>
-                    <a
-                      href={`https://${websiteUrl}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 transition-colors font-medium text-sm flex items-center gap-2"
-                    >
-                      {websiteUrl}
-                      <ExternalLink size={14} />
-                    </a>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <a
-                    href={
-                      websiteStatus === 'live'
-                        ? `https://${websiteUrl}`
-                        : currentOrganization
-                          ? `/${currentOrganization.type === 'state' ? 'state' : 'national'}/${currentOrganization.id}/public`
-                          : `/club/${currentClub?.club?.id}/public`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-all border border-blue-500/30 font-medium text-sm"
-                  >
-                    <Eye size={16} />
-                    Preview Website
-                  </a>
-                  <button
-                    onClick={() => navigate('/website/settings')}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-slate-700/50 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors text-sm border border-slate-600/50"
-                  >
-                    <Settings size={16} />
-                    Settings
-                  </button>
-                </div>
-              </div>
+        <div className="a-card a-spec-card overflow-hidden grid grid-cols-1 lg:grid-cols-[1.1fr_1fr]" style={{ padding: 0 }}>
+          <div className="a-browser relative" style={{ minHeight: 290, margin: 14 }}>
+            <div className="a-browser-bar">
+              <span style={{ background: '#FF6B6B' }} /><span style={{ background: '#FFB340' }} /><span style={{ background: '#30D158' }} />
+              <span className="a-dim flex-1 text-center text-[11.5px] truncate">{websiteUrl || 'your-club.alfiepro.com'}</span>
             </div>
-
-            {/* Recent Activity */}
-            <div className={`
-              p-6 rounded-2xl border backdrop-blur-sm
-              ${darkMode
-                ? 'bg-slate-800/30 border-slate-700/50'
-                : 'bg-white/10 border-slate-200/20'}
-            `}>
-              <div className="flex items-center gap-2 mb-4">
-                <Activity size={20} className="text-blue-400" />
-                <h2 className="text-lg font-semibold text-white">Recent Activity</h2>
-              </div>
-
-              <div className="space-y-3">
-                {activityFeed.slice(0, 4).map(activity => (
-                  <div
-                    key={activity.id}
-                    className={`
-                      p-4 rounded-lg border
-                      ${darkMode
-                        ? 'bg-slate-700/30 border-slate-600/30'
-                        : 'bg-white/5 border-slate-200/10'}
-                    `}
-                  >
-                    <div className="flex items-center gap-3">
-                      {activity.avatarUrl ? (
-                        <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-                          <img
-                            src={activity.avatarUrl}
-                            alt={activity.user}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-white font-medium flex-shrink-0">
-                          {activity.user.split(' ').map(n => n[0]).join('')}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm">
-                          <span className="font-medium">{activity.user}</span>{' '}
-                          <span className={getActionColor(activity.action)}>{activity.action}</span>{' '}
-                          <span className="text-blue-400">"{activity.page}"</span>
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          {formatTimeAgo(activity.timestamp)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="absolute left-0 right-0 bottom-0" style={{ top: 30, background: cover ? `url(${cover}) center/cover` : 'linear-gradient(135deg, #2E7BFF 0%, #8A4DFF 60%, #FF3E9A 100%)' }} />
+            <div className="absolute left-0 right-0 bottom-0" style={{ top: 30, background: 'linear-gradient(180deg, rgba(6,11,22,0.1), rgba(6,11,22,0.75))' }} />
+            <div className="absolute" style={{ left: 22, bottom: 20, right: 22 }}>
+              <div className="a-display text-[26px] font-bold" style={{ color: '#fff' }}>{orgName}</div>
+              <div className="text-[13px] mt-1" style={{ color: 'rgba(235,240,255,0.75)' }}>Public website preview</div>
             </div>
           </div>
+          <div className="flex flex-col gap-[18px]" style={{ padding: '26px 26px 22px 12px' }}>
+            <div className="flex items-center justify-between">
+              <p className="a-cap">Club website</p>
+              <span className={`a-status-pill a-status-${statusTone}`}><span className={`a-light a-light-${statusTone}`} />{websiteStatus === 'live' ? 'Live' : websiteStatus === 'draft' ? 'Draft' : 'Offline'}</span>
+            </div>
+            <div>
+              <div className="a-display a-ink text-[24px] font-semibold">Your main public-facing website</div>
+              {websiteUrl && (
+                <a href={`https://${websiteUrl}`} target="_blank" rel="noopener noreferrer" className="a-txt-b inline-flex items-center gap-1.5 mt-2 text-[14px] break-all">
+                  {websiteUrl}<ExternalLink size={14} />
+                </a>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2.5">
+              {stat('Page views', analytics.pageViews)}
+              {stat('Visitors', analytics.uniqueVisitors)}
+              {stat('Avg. time', analytics.averageTimeOnSite)}
+            </div>
+            <div className="flex gap-2.5 mt-auto flex-wrap">
+              <a href={previewHref} target="_blank" rel="noopener noreferrer" className="a-btn a-btn-p flex-1 justify-center" style={{ height: 44 }}>
+                <Eye size={17} />Preview website
+              </a>
+              <button onClick={() => navigate('/website/analytics')} className="a-btn" style={{ height: 44 }}>
+                <BarChart2 size={17} />Analytics
+              </button>
+              <button onClick={() => navigate('/website/settings')} className="a-btn" style={{ height: 44 }} aria-label="Website settings">
+                <Settings size={17} />Settings
+              </button>
+            </div>
+          </div>
+        </div>
 
+        <div>
+          <p className="a-cap mb-2.5">Quick actions</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {quick.map(q => (
+              <button key={q.label} onClick={() => navigate(q.to)} className="a-qa text-left">
+                <span className="a-tile" style={{ width: 44, height: 44 }}>{q.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="a-ink text-[15px] font-semibold">{q.label}</div>
+                  <div className="a-dim text-[12.5px] mt-0.5">{q.sub}</div>
+                </div>
+                <ArrowUpRight size={16} className="a-dim" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="a-card flex flex-col gap-[18px]" style={{ padding: 22 }}>
+          <div className="flex items-center gap-3">
+            <span className="a-tile a-tile-sm"><Activity size={16} /></span>
+            <h2 className="a-display a-ink flex-1 m-0 text-[18px] font-semibold">Recent activity</h2>
+          </div>
+          {activityFeed.length === 0 ? (
+            <p className="a-dim text-[13.5px]">No website changes yet.</p>
+          ) : (
+            <div>
+              {activityFeed.slice(0, 4).map((activity, i, arr) => {
+                const [first, ...rest] = (activity.user || '?').split(' ');
+                return (
+                  <div key={activity.id} className="flex gap-3.5 relative" style={{ paddingBottom: i < arr.length - 1 ? 18 : 0 }}>
+                    {i < arr.length - 1 && <span className="a-tl-line" style={{ left: 15, top: 34 }} />}
+                    <AAvatar url={activity.avatarUrl} first={first} last={rest.join(' ')} size={32} />
+                    <div className="flex-1 min-w-0 pt-0.5">
+                      <div className="a-ink text-[14px]">
+                        <b className="font-semibold">{activity.user}</b>{' '}
+                        <span className={ACTION_TONE[activity.action] || 'a-mute'}>{activity.action}</span> page{' '}
+                        <span className="font-semibold">“{activity.page}”</span>
+                      </div>
+                      <div className="a-dim text-[12px] mt-[3px]">{formatTimeAgo(activity.timestamp)}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
