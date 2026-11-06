@@ -504,86 +504,60 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-16">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
-              <MapPin className="text-white" size={28} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Venues</h1>
-              <p className="text-slate-400">
-                {venues.length} {venues.length === 1 ? 'venue' : 'venues'} registered
-              </p>
-            </div>
+      <div className="p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        <div className="flex flex-wrap items-center gap-4 mb-[22px]">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><MapPin size={24} /></span>
+          <div className="flex-1 min-w-[180px]">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">Venues</h1>
+            <p className="a-mute mt-1 text-[14.5px]">
+              {venues.length} {venues.length === 1 ? 'venue' : 'venues'} registered
+            </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Expandable Search */}
-            <div className="relative">
-              {showHeaderSearch ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search venues..."
-                    className="w-64 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => {
-                      setShowHeaderSearch(false);
-                      setSearchTerm('');
-                    }}
-                    className="p-2 text-slate-400 hover:text-white transition-colors"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowHeaderSearch(true)}
-                  className="p-2 text-slate-400 hover:text-white transition-colors"
-                  title="Search venues"
-                >
-                  <Search size={20} />
-                </button>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <label className="a-field" style={{ width: 260 }}>
+              <Search size={17} />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search venues"
+              />
+              {searchTerm && (
+                <button type="button" onClick={() => setSearchTerm('')} className="a-dim flex" aria-label="Clear search"><X size={15} /></button>
               )}
-            </div>
+            </label>
 
             {/* Sort Button */}
             <button
               onClick={toggleSort}
-              className="p-2 text-slate-400 hover:text-white transition-colors"
+              className="a-ib"
+              style={{ width: 42, height: 42 }}
+              aria-label="Sort"
               title={`Sort by ${sortBy === 'name' ? 'name' : 'date'} (${sortOrder === 'asc' ? 'ascending' : 'descending'})`}
             >
-              <ArrowUpDown size={20} />
+              <ArrowUpDown size={18} />
             </button>
 
             {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+            <div className="a-seg" role="radiogroup" aria-label="View">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-slate-700 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                className={`a-seg-i ${viewMode === 'grid' ? 'a-seg-on' : ''}`}
+                style={{ padding: '0 10px' }}
                 title="Thumbnail view"
+                aria-label="Grid"
               >
-                <LayoutGrid size={18} />
+                <LayoutGrid size={16} />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-slate-700 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                className={`a-seg-i ${viewMode === 'list' ? 'a-seg-on' : ''}`}
+                style={{ padding: '0 10px' }}
                 title="List view"
+                aria-label="List"
               >
-                <List size={18} />
+                <List size={16} />
               </button>
             </div>
 
@@ -604,23 +578,25 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                       setSelectedClubId('');
                       setShowForm(true);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl"
+                    className="a-btn a-btn-p"
+                    style={{ height: 42, borderRadius: 13 }}
                   >
-                    <Plus size={18} />
-                    Add Venue
+                    <Plus size={17} />
+                    Add venue
                   </button>
                 ) : (
                   <>
                     <button
                       onClick={() => setShowAddDropdown(!showAddDropdown)}
-                      className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl"
+                      className="a-btn a-btn-p"
+                      style={{ height: 42, borderRadius: 13 }}
                     >
-                      <Plus size={18} />
-                      Add Venue
+                      <Plus size={17} />
+                      Add venue
                       <ChevronDown size={16} className={`transition-transform ${showAddDropdown ? 'rotate-180' : ''}`} />
                     </button>
                     {showAddDropdown && (
-                      <div className="absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-20 overflow-hidden">
+                      <div className="a-pop absolute right-0 top-full mt-2 w-60 z-20 overflow-hidden">
                         <button
                           onClick={() => {
                             setShowAddDropdown(false);
@@ -636,26 +612,26 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                             setSelectedClubId('');
                             setShowForm(true);
                           }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-slate-200 hover:bg-slate-700/50 transition-colors"
+                          className="a-pop-item w-full"
                         >
-                          <Plus size={18} className="text-green-400" />
+                          <span className="a-tile a-tile-sm"><Plus size={16} /></span>
                           <div>
-                            <div className="font-medium">Create New</div>
-                            <div className="text-xs text-slate-400">Add a brand new venue</div>
+                            <div className="a-ink font-medium">Create new</div>
+                            <div className="a-dim text-xs">Add a brand new venue</div>
                           </div>
                         </button>
-                        <div className="border-t border-slate-700/50" />
+                        <div className="a-pop-rule" />
                         <button
                           onClick={() => {
                             setShowAddDropdown(false);
                             setShowAddExistingModal(true);
                           }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-slate-200 hover:bg-slate-700/50 transition-colors"
+                          className="a-pop-item w-full"
                         >
-                          <Link2 size={18} className="text-blue-400" />
+                          <span className="a-tile a-tile-sm"><Link2 size={16} /></span>
                           <div>
-                            <div className="font-medium">Add Existing</div>
-                            <div className="text-xs text-slate-400">Browse venues from other clubs</div>
+                            <div className="a-ink font-medium">Add existing</div>
+                            <div className="a-dim text-xs">Browse venues from other clubs</div>
                           </div>
                         </button>
                       </div>
@@ -860,18 +836,15 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                 )}
               </div>
             ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {sortedVenues.map(venue => (
                   <button
                     key={venue.id}
                     onClick={() => handleViewVenue(venue)}
-                    className="group relative rounded-2xl overflow-hidden transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-500/20 text-left cursor-pointer w-full"
+                    className="a-cc group text-left w-full"
                   >
-                    {/* Card Background with Glassmorphism */}
-                    <div className="absolute inset-0 bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl group-hover:border-blue-500/30 transition-colors duration-300" />
-
-                    {/* Image Container with Parallax Effect */}
-                    <div className="relative w-full overflow-hidden rounded-t-2xl" style={{ aspectRatio: '16/9' }}>
+                    {/* Image */}
+                    <div className="a-cc-img relative w-full" style={{ height: 200 }}>
                       {venue.image ? (
                         <img
                           src={venue.image}
@@ -879,27 +852,17 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                           className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         />
                       ) : (
-                        <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
-                          <MapPin size={48} className="text-slate-500" />
+                        <div className="absolute inset-0 w-full h-full flex items-center justify-center">
+                          <MapPin size={44} className="a-dim" />
                         </div>
                       )}
 
-                      {/* Gradient Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent opacity-80" />
-
-                      {/* Hover Eye Icon */}
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/20">
-                        <div className="p-4 rounded-full bg-blue-600/90 backdrop-blur-sm shadow-2xl transform scale-90 group-hover:scale-100 transition-transform duration-300">
-                          <Eye size={32} className="text-white" />
-                        </div>
-                      </div>
-
                       {/* Badges in Top Right Corner */}
-                      <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+                      <div className="absolute top-3.5 right-3.5 z-[1] flex flex-col items-end gap-2">
                         {isAssociationView() && (venue.shared_clubs?.length || venue.clubs) && (
                           <div className="flex flex-wrap justify-end gap-1">
                             {(venue.shared_clubs && venue.shared_clubs.length > 0 ? venue.shared_clubs : (venue.clubs ? [venue.clubs] : [])).map((club, idx) => (
-                              <div key={idx} className="bg-blue-600/90 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg border border-blue-500/30">
+                              <div key={idx} className="a-glass">
                                 {club.abbreviation || club.name}
                               </div>
                             ))}
@@ -907,23 +870,21 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                         )}
 
                         {venue.is_default && (
-                          <div className="animate-pulse">
-                            <div className="from-amber-500 to-yellow-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-lg backdrop-blur-sm">
-                              <Star size={14} fill="currentColor" />
-                              Main Venue
-                            </div>
-                          </div>
+                          <span className="a-glass" style={{ color: '#FFC56B' }}>
+                            <Star size={13} fill="currentColor" />
+                            Main venue
+                          </span>
                         )}
 
                         {isLinkedVenue(venue) && (
-                          <div className="bg-slate-700/90 backdrop-blur-md text-blue-300 px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg border border-blue-500/20 flex items-center gap-1.5">
+                          <span className="a-glass" style={{ color: '#9CCBFF' }}>
                             <Link2 size={12} />
                             Linked
-                          </div>
+                          </span>
                         )}
                       </div>
 
-                      <div className="absolute top-4 left-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform -translate-y-2 group-hover:translate-y-0 z-10">
+                      <div className="absolute top-3.5 left-3.5 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                         {isLinkedVenue(venue) ? (
                           <>
                             {!venue.is_default && (
@@ -932,7 +893,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                                   e.stopPropagation();
                                   handleSetDefault(venue);
                                 }}
-                                className="p-2.5 rounded-xl bg-amber-500/20 backdrop-blur-md border border-amber-500/30 text-amber-400 hover:bg-amber-500/30 transition-all duration-300 hover:scale-110 shadow-lg"
+                                className="a-gb"
                                 title="Set as main venue"
                               >
                                 <Star size={16} />
@@ -943,7 +904,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                                 e.stopPropagation();
                                 handleUnlinkClick(venue);
                               }}
-                              className="p-2.5 rounded-xl bg-red-500/20 backdrop-blur-md border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all duration-300 hover:scale-110 shadow-lg"
+                              className="a-gb"
                               title="Remove from my venues"
                             >
                               <Unlink size={16} />
@@ -956,7 +917,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                                 e.stopPropagation();
                                 handleEdit(venue);
                               }}
-                              className="p-2.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-all duration-300 hover:scale-110 shadow-lg"
+                              className="a-gb"
                               title="Edit venue"
                             >
                               <Edit2 size={16} />
@@ -967,7 +928,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                                   e.stopPropagation();
                                   handleShareVenue(venue);
                                 }}
-                                className="p-2.5 rounded-xl bg-blue-500/20 backdrop-blur-md border border-blue-500/30 text-blue-400 hover:bg-blue-500/30 transition-all duration-300 hover:scale-110 shadow-lg"
+                                className="a-gb"
                                 title="Share with clubs"
                               >
                                 <Share2 size={16} />
@@ -978,7 +939,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                                 e.stopPropagation();
                                 handleDeleteClick(venue);
                               }}
-                              className="p-2.5 rounded-xl bg-red-500/20 backdrop-blur-md border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all duration-300 hover:scale-110 shadow-lg"
+                              className="a-gb"
                               title="Delete venue"
                             >
                               <Trash2 size={16} />
@@ -987,27 +948,17 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                         )}
                       </div>
 
-                      {/* Title Overlay */}
-                      <div className="absolute bottom-0 left-0 right-0 p-5">
-                        <h3 className="text-xl font-bold text-white mb-1 drop-shadow-lg">
-                          {venue.name}
-                        </h3>
-                      </div>
                     </div>
 
                     {/* Content Section */}
-                    <div className="relative p-5 space-y-3">
-                      {/* Address with Icon */}
-                      <div className="flex items-start gap-2">
-                        <MapPin size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
-                        <span className="text-sm text-slate-300 line-clamp-2 leading-relaxed">
-                          {venue.address}
-                        </span>
+                    <div className="flex flex-col gap-2" style={{ padding: '16px 18px 18px' }}>
+                      <div className="a-display a-ink text-[19px] font-semibold">{venue.name}</div>
+                      <div className="a-mute flex items-start gap-1.5 text-[13px]">
+                        <MapPin size={14} className="mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-2">{venue.address}</span>
                       </div>
-
-                      {/* Description */}
                       {venue.description && (
-                        <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">
+                        <p className="a-dim text-[13px] line-clamp-2 leading-[1.5]">
                           {venue.description}
                         </p>
                       )}
