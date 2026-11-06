@@ -541,9 +541,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
 
           {filteredTasks.length === 0 ? (
             <div className="text-center py-12 bg-slate-800/50 rounded-xl border border-slate-700/50">
-              <div className="text-6xl mb-4 text-slate-600">
-                📋
-              </div>
+              <CheckSquare size={48} className="mx-auto mb-4 text-slate-500" />
               <h3 className="text-lg font-medium mb-2 text-slate-300">
                 No tasks found
               </h3>
