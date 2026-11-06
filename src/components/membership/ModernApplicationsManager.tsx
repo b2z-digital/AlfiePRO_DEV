@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Search, ListFilter as Filter, CircleCheck as CheckCircle, Circle as XCircle, Clock, Eye, Mail, Phone, MapPin, Anchor, CircleAlert as AlertCircle, CreditCard, Award, X, Check, MessageSquare, Trash2 } from 'lucide-react';
+import { Users, Search, CircleCheck as CheckCircle, Circle as XCircle, Clock, Eye, X, Check, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
 import { ApplicationSummaryView } from './ApplicationSummaryView';
+import { AAvatar, AStatus } from '../alfie/Kit';
 
 interface Application {
   id: string;
@@ -384,244 +385,146 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/10 border-t-[#0A84FF]"></div>
       </div>
     );
   }
 
+  const pendingCount = applications.filter(a => a.status === 'pending').length;
+  const formatApplied = (date: string) =>
+    new Date(date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const statusTone = (s: string) => (s === 'approved' ? 'g' : s === 'rejected' ? 'r' : 'a') as 'g' | 'r' | 'a';
+  const money = (n?: number) => (n || n === 0 ? `$${Number(n).toFixed(2)}` : '—');
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="flex flex-col gap-[22px]">
+      <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
         <div>
-          <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            Membership Applications
-          </h2>
-          <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-            Review and process membership applications
-          </p>
+          <h2 className="a-display a-ink m-0 text-[22px] font-semibold">Applications</h2>
+          <p className="a-mute mt-1 text-sm">Review and process membership applications</p>
         </div>
-
-        <div className="flex gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search applications..."
-              className={`pl-10 pr-4 py-2 rounded-lg ${
-                darkMode
-                  ? 'bg-slate-800 text-white border-slate-700'
-                  : 'bg-slate-50 text-slate-900 border-slate-300'
-              } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-            />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <label className="a-field w-full sm:w-[300px]">
+            <Search size={17} />
+            <span className="sr-only">Search applications</span>
+            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search applications" />
+          </label>
+          <div className="a-seg" role="tablist" aria-label="Status">
+            {([['pending', 'Pending'], ['approved', 'Approved'], ['rejected', 'Rejected'], ['all', 'All']] as const).map(([k, label]) => (
+              <button key={k} role="tab" aria-selected={statusFilter === k} onClick={() => setStatusFilter(k)} className={`a-seg-i ${statusFilter === k ? 'a-seg-on' : ''}`}>
+                {label}{k === 'pending' && pendingCount > 0 && <span className="a-cnt">{pendingCount}</span>}
+              </button>
+            ))}
           </div>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className={`px-4 py-2 rounded-lg ${
-              darkMode
-                ? 'bg-slate-800 text-white border-slate-700'
-                : 'bg-slate-50 text-slate-900 border-slate-300'
-            } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
         </div>
       </div>
 
-      <div className="grid gap-4">
-        {filteredApplications.length === 0 ? (
-          <div className={`p-12 rounded-xl text-center border backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white/10 border-slate-200/20'}`}>
-            <Users className={`mx-auto mb-3 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} size={48} />
-            <p className={`text-lg font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              No applications found
-            </p>
-            <p className={`text-sm mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-              {statusFilter === 'pending' ? 'All applications have been processed' : 'Try adjusting your filters'}
-            </p>
+      {filteredApplications.length === 0 ? (
+        <div className="a-card a-empty" style={{ padding: '40px 24px' }}>
+          <span className="a-tile" style={{ width: 56, height: 56 }}><Users size={24} /></span>
+          <div className="a-display a-ink text-lg font-semibold">
+            {statusFilter === 'pending' && !searchQuery ? "You're all caught up" : 'No applications found'}
           </div>
-        ) : (
-          filteredApplications.map((application) => (
-            <div
-              key={application.id}
-              className={`p-6 rounded-xl transition-all ${
-                darkMode ? 'bg-slate-800/80 backdrop-blur-sm hover:bg-slate-800/90' : 'bg-white hover:shadow-md'
-              } border ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 flex-1">
-                  {application.avatar_url ? (
-                    <img
-                      src={application.avatar_url}
-                      alt={`${application.first_name} ${application.last_name}`}
-                      className="w-16 h-16 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                      darkMode ? 'bg-slate-700' : 'bg-slate-200'
-                    }`}>
-                      <Users size={32} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
-                    </div>
-                  )}
+          <p className="a-mute m-0 text-sm">
+            {statusFilter === 'pending' && !searchQuery
+              ? 'All applications have been processed. New ones will show here.'
+              : 'Try a different search or status.'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {filteredApplications.map((application) => (
+            <div key={application.id} className="a-card a-hov p-5 flex flex-col gap-4">
+              <div className="flex items-center gap-3.5">
+                <AAvatar url={application.avatar_url} first={application.first_name} last={application.last_name} />
+                <div className="flex-1 min-w-0">
+                  <div className="a-ink text-base font-semibold truncate">{application.first_name} {application.last_name}</div>
+                  <div className="a-dim text-[12.5px] mt-0.5 truncate">{application.email} · Applied {formatApplied(application.created_at)}</div>
+                </div>
+                <AStatus tone={statusTone(application.status)}>{application.status.charAt(0).toUpperCase() + application.status.slice(1)}</AStatus>
+              </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                          {application.first_name} {application.last_name}
-                        </h3>
-                        <div className="flex flex-wrap items-center gap-3 mt-1">
-                          <span className={`text-sm flex items-center gap-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <Mail size={14} />
-                            {application.email}
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.4fr] gap-2.5">
+                <div className="a-inset">
+                  <p className="a-cap">Membership</p>
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mt-2">
+                    <span className="a-lb-fmt"><span className="a-light a-light-b" style={{ boxShadow: 'none' }} /><span>{application.membership_type_name || '—'}</span></span>
+                    <span className="a-num a-ink text-[17px] font-semibold">{money(application.membership_amount)}</span>
+                  </div>
+                </div>
+                <div className="a-inset">
+                  <p className="a-cap">Payment</p>
+                  <div className="a-ink mt-2 text-[13.5px] font-semibold">{application.payment_method === 'card' ? 'Card' : 'Bank transfer'}</div>
+                  <AStatus tone={application.payment_method === 'card' ? 'g' : 'a'} className="mt-1 text-[12.5px]">
+                    <span className="a-mute">{application.payment_method === 'card' ? 'Online payment' : 'Awaiting bank transfer'}</span>
+                  </AStatus>
+                </div>
+                <div className="a-inset">
+                  <p className="a-cap">Boats</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {application.boats && application.boats.length > 0 ? (
+                      <>
+                        {application.boats.slice(0, 2).map((boat, index) => (
+                          <span key={index} className="inline-flex items-center gap-2 min-w-0">
+                            <span className="a-lb-cls"><ClassFlag />{boat.type}{boat.sailNumber && <span className="a-dim" style={{ fontWeight: 500, letterSpacing: 0 }}>{boat.sailNumber}</span>}</span>
+                            {boat.hullName && <span className="a-mute text-[13px] truncate">{boat.hullName}</span>}
                           </span>
-                          <span className={`text-sm flex items-center gap-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <Phone size={14} />
-                            {application.phone}
-                          </span>
-                        </div>
-                      </div>
-                      {getStatusBadge(application.status)}
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4 mt-4">
-                      <div>
-                        <div className={`text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                          Membership
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Award size={16} className="text-blue-500" />
-                          <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                            {application.membership_type_name}
-                          </span>
-                          {application.membership_amount && (
-                            <span className="text-sm text-blue-500 font-medium">
-                              ${application.membership_amount}/year
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {application.boats && application.boats.length > 0 && (
-                        <div>
-                          <div className={`text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            Boat(s)
-                          </div>
-                          <div className="space-y-1">
-                            {application.boats.slice(0, 2).map((boat, index) => (
-                              <div key={index} className="flex items-center gap-2">
-                                <Anchor size={14} className="text-cyan-500" />
-                                <span className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                  {boat.type} #{boat.sailNumber}
-                                </span>
-                              </div>
-                            ))}
-                            {application.boats.length > 2 && (
-                              <span className="text-xs text-slate-500">+{application.boats.length - 2} more</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-700/30">
-                      <span className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                        Applied {formatTimeAgo(application.created_at)}
-                      </span>
-
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setSelectedApplication(application)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                            darkMode
-                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
-                        >
-                          <Eye size={16} />
-                          View Full
-                        </button>
-
-                        {application.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => handleApprove(application)}
-                              disabled={processing === application.id}
-                              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                            >
-                              <Check size={16} />
-                              Approve
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                setSelectedApplication(application);
-                                setShowRejectModal(true);
-                              }}
-                              disabled={processing === application.id}
-                              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
-                            >
-                              <X size={16} />
-                              Reject
-                            </button>
-
-                            <button
-                              onClick={() => handleDelete(application)}
-                              disabled={processing === application.id}
-                              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-600 transition-colors disabled:opacity-50"
-                              title="Permanently delete application and user account (for testing)"
-                            >
-                              <Trash2 size={16} />
-                              Delete
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                        ))}
+                        {application.boats.length > 2 && <span className="a-dim text-xs">+{application.boats.length - 2} more</span>}
+                      </>
+                    ) : (
+                      <span className="a-dim text-[13px]">No boats listed</span>
+                    )}
                   </div>
                 </div>
               </div>
+
+              <div className="flex items-center gap-2.5">
+                <button onClick={() => setSelectedApplication(application)} className="a-btn a-btn-q"><Eye size={16} />View details</button>
+                <div className="flex-1" />
+                {application.status === 'pending' && (
+                  <>
+                    <button
+                      onClick={() => handleDelete(application)}
+                      disabled={processing === application.id}
+                      className="a-ib a-ib-d"
+                      aria-label="Delete application"
+                      title="Permanently delete application and user account (for testing)"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => { setSelectedApplication(application); setShowRejectModal(true); }}
+                      disabled={processing === application.id}
+                      className="a-btn a-btn-reject"
+                    >
+                      <X size={16} />Reject
+                    </button>
+                    <button
+                      onClick={() => handleApprove(application)}
+                      disabled={processing === application.id}
+                      className="a-btn a-btn-p"
+                    >
+                      <Check size={16} />Approve
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       {selectedApplication && !showRejectModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div
-            className={`max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-2xl ${
-              darkMode ? 'bg-slate-800/95 backdrop-blur-xl border border-slate-700/50' : 'bg-white/95 backdrop-blur-xl border border-slate-200'
-            } shadow-2xl`}
-          >
-            <div className={`sticky top-0 p-6 border-b ${darkMode ? 'border-slate-700/50 bg-slate-800/95 backdrop-blur-xl' : 'border-slate-200 bg-white/95 backdrop-blur-xl'} z-10`}>
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                    <Users className="text-white" size={24} />
-                  </div>
-                  <div>
-                    <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      Review Application
-                    </h3>
-                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {selectedApplication.first_name} {selectedApplication.last_name}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelectedApplication(null)}
-                  className={`p-2 rounded-lg transition-colors ${
-                    darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  <X size={20} />
-                </button>
+          <div className="a-sheet max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 z-10 a-panel-head a-sheet-head">
+              <AAvatar url={selectedApplication.avatar_url} first={selectedApplication.first_name} last={selectedApplication.last_name} size={44} />
+              <div className="flex-1 min-w-0">
+                <p className="a-cap">Review application</p>
+                <h3 className="a-display a-ink text-[22px] font-semibold mt-[3px]">{selectedApplication.first_name} {selectedApplication.last_name}</h3>
               </div>
+              <button onClick={() => setSelectedApplication(null)} className="a-ib" aria-label="Close"><X size={20} /></button>
             </div>
 
             <div className="p-6">
@@ -647,48 +550,27 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
 
       {showRejectModal && selectedApplication && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className={`max-w-md w-full rounded-2xl p-6 ${darkMode ? 'bg-slate-800/95 backdrop-blur-xl border border-slate-700/50' : 'bg-white/95 backdrop-blur-xl border border-slate-200'} shadow-2xl`}>
-            <h3 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Reject Application
-            </h3>
-
-            <p className={`text-sm mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+          <div className="a-sheet max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="a-tile"><X size={18} /></span>
+              <h3 className="a-display a-ink text-xl font-semibold">Reject application</h3>
+            </div>
+            <p className="a-mute text-sm mb-4">
               Please provide a reason for rejecting this application. This will be shared with the applicant.
             </p>
-
+            <label className="sr-only" htmlFor="reject-reason">Rejection reason</label>
             <textarea
+              id="reject-reason"
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
-              placeholder="Enter rejection reason..."
+              placeholder="Enter rejection reason…"
               rows={4}
-              className={`w-full px-4 py-3 rounded-lg ${
-                darkMode
-                  ? 'bg-slate-800 text-white border-slate-700'
-                  : 'bg-slate-50 text-slate-900 border-slate-300'
-              } border focus:ring-2 focus:ring-red-500 focus:border-transparent`}
+              className="a-inp"
             />
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowRejectModal(false);
-                  setRejectionReason('');
-                }}
-                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  darkMode
-                    ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={handleReject}
-                disabled={!rejectionReason || processing === selectedApplication.id}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
-              >
-                Reject
+            <div className="flex gap-2.5 mt-6 justify-end">
+              <button onClick={() => { setShowRejectModal(false); setRejectionReason(''); }} className="a-btn">Cancel</button>
+              <button onClick={handleReject} disabled={!rejectionReason || processing === selectedApplication.id} className="a-btn a-btn-d">
+                <X size={16} />Reject
               </button>
             </div>
           </div>
@@ -697,3 +579,11 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
     </div>
   );
 };
+
+/** Class label flag (board label system). */
+const ClassFlag = () => (
+  <svg width="9" height="11" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}>
+    <path d="M1 .75v10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <path d="M1.75 1.25h6.5L1.75 5.5z" fill="currentColor" />
+  </svg>
+);
