@@ -288,3 +288,30 @@ html.alfie-light .a-btable-total .a-btable-sticky-l, html.alfie-light .a-btable-
 .a-delta-r { color: #FF8A8A; background: rgba(255, 107, 107, 0.12); }
 html.alfie-light .a-delta-g { color: #167A3A; background: rgba(48, 209, 88, 0.12); }
 html.alfie-light .a-delta-r { color: #C8323A; background: rgba(229, 72, 77, 0.1); }
+
+/* ── Scoring top bar (board: SC_pro) ── */
+.a-sbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-height: 60px; padding: 8px 10px 8px 14px; border-radius: 20px; background: rgba(22, 26, 36, 0.62); border: 1px solid rgba(255, 255, 255, 0.10); -webkit-backdrop-filter: blur(32px) saturate(180%); backdrop-filter: blur(32px) saturate(180%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 16px 48px rgba(0, 0, 0, 0.45); }
+.a-stepper { display: flex; align-items: center; gap: 4px; padding: 3px; border-radius: 14px; background: rgba(0, 0, 0, 0.28); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45); }
+.a-stepper .a-ib { width: 34px; height: 34px; }
+.a-stepper .a-ib:disabled { opacity: 0.35; cursor: default; }
+.a-dots { display: flex; justify-content: center; gap: 3px; }
+.a-dots i { display: block; width: 6px; height: 6px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); }
+.a-dots i.d { background: #30D158; }
+.a-dots i.a { background: #0A84FF; width: 14px; }
+.a-vd { width: 1px; height: 28px; background: rgba(255, 255, 255, 0.09); margin: 0 4px; }
+.a-ib-on { background: rgba(255, 255, 255, 0.06); }
+.a-sc-leg { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 20px; border-radius: 6px; font: 600 11px 'Bricolage Grotesque', sans-serif; }
+.a-sc-leg-e { border: 1.5px dashed rgba(10, 132, 255, 0.7); }
+.a-sc-leg-1 { background: rgba(255, 197, 107, 0.16); color: #FFC56B; box-shadow: inset 0 0 0 1px rgba(255, 197, 107, 0.4); }
+.a-sc-leg-2 { background: rgba(203, 213, 225, 0.12); color: #E2E8F0; box-shadow: inset 0 0 0 1px rgba(203, 213, 225, 0.35); }
+.a-sc-leg-3 { background: rgba(232, 141, 82, 0.14); color: #F2A374; box-shadow: inset 0 0 0 1px rgba(232, 141, 82, 0.4); }
+html.alfie-light .a-sbar { background: rgba(255, 255, 255, 0.85); border-color: rgba(15, 23, 42, 0.1); box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1); }
+html.alfie-light .a-stepper { background: rgba(15, 23, 42, 0.06); box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08); }
+html.alfie-light .a-dots i { background: rgba(15, 23, 42, 0.12); }
+html.alfie-light .a-vd { background: rgba(15, 23, 42, 0.1); }
+html.alfie-light .a-ib-on { background: rgba(15, 23, 42, 0.05); }
+html.alfie-light .a-sc-leg-1 { color: #B25E00; }
+html.alfie-light .a-sc-leg-2 { color: #475569; background: rgba(100, 116, 139, 0.1); }
+html.alfie-light .a-sc-leg-3 { color: #B4541F; }
+html.alfie-light .a-dots i.d { background: #22A757; }
+html.alfie-light .a-dots i.a { background: #0A84FF; }

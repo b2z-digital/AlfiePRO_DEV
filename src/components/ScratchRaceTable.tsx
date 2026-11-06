@@ -58,6 +58,8 @@ const abbreviateClubName = (clubName: string): string => {
 };
 
 interface ScratchRaceTableProps {
+  /** Alfie theme: the scoring top bar provides back/settings/complete, so hide the floating corner controls. */
+  hideCornerControls?: boolean;
   skippers: Skipper[];
   numRaces?: number;
   dropRules: number[];
@@ -89,6 +91,7 @@ interface ScratchRaceTableProps {
 const DEFAULT_DROP_RULES = [4, 8, 16, 24, 32, 40];
 
 export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
+  hideCornerControls = false,
   skippers,
   numRaces: initialNumRaces = 12,
   dropRules = DEFAULT_DROP_RULES,
@@ -830,7 +833,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
   return (
     <div ref={fullscreenContainerRef} className={`pb-8 no-select ${isFocusMode ? 'bg-slate-900' : ''}`}>
       {/* Fixed Top Right Controls - Outside main flow */}
-      {!isFocusMode && (
+      {!isFocusMode && !hideCornerControls && (
         <div className="fixed top-4 right-[5.9375rem] z-30 flex items-center gap-2">
           <button
             type="button"
@@ -901,6 +904,20 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
               </span>
             </button>
           )}
+        </div>
+      )}
+
+      {!isFocusMode && hideCornerControls && (
+        <div className="flex justify-end mb-2">
+          <button
+            type="button"
+            onClick={() => setIsCompactView(!isCompactView)}
+            className={`a-btn a-btn-sm a-compact-toggle ${isCompactView ? 'a-btn-p' : 'a-btn-q'}`}
+            title={isCompactView ? 'Switch to normal view' : 'Compact view: shows more skippers on screen'}
+            aria-pressed={isCompactView}
+          >
+            <Minimize2 size={14} />Compact
+          </button>
         </div>
       )}
 
@@ -1146,6 +1163,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                     return (
                       <th
                         key={race}
+                        data-race-col={race}
                         className={`text-center font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'} ${
                           isFocusMode ? 'p-6' : isCompactView ? 'p-2' : 'p-4'
                         } ${isActiveRace ? (darkMode ? 'bg-blue-900/30' : 'bg-blue-50') : ''}`}
