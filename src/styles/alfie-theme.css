@@ -615,3 +615,39 @@ html.alfie-theme span.rounded-full.text-xs:is([class*="bg-green-5"], [class*="bg
 html.alfie-light .a-light:not([class*="a-light-"]) { background: #CBD5E1; }
 html.alfie-light table tbody tr { border-color: rgba(15, 23, 42, 0.07) !important; }
 html.alfie-light table :is(thead, thead tr) { border-color: rgba(15, 23, 42, 0.08) !important; }
+
+/* ── Rounded filter pills in a row (All | Upcoming | Past …) → segmented control ── */
+html.alfie-theme div.flex:has(> button.rounded-full + button.rounded-full):not(:has(> :not(button))):not(:has(> button.rounded-full.w-2, > button.rounded-full.h-2, > button.rounded-full.w-3)) {
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.04);
+  width: fit-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+html.alfie-theme div.flex:has(> button.rounded-full + button.rounded-full):not(:has(> :not(button))):not(:has(> button.rounded-full.w-2, > button.rounded-full.h-2, > button.rounded-full.w-3)) > button.rounded-full {
+  border-radius: 9px;
+  border-color: transparent !important;
+  background-image: none;
+  box-shadow: none;
+  margin: 0 !important;
+}
+html.alfie-theme div.flex:has(> button.rounded-full + button.rounded-full):not(:has(> :not(button))):not(:has(> button.rounded-full.w-2, > button.rounded-full.h-2, > button.rounded-full.w-3)) > button.rounded-full:not(:is(.bg-blue-600, .bg-blue-500, .bg-cyan-600, .bg-sky-600, .bg-green-600, .bg-green-500, .bg-emerald-600, .bg-purple-600, .bg-white)) {
+  background-color: transparent !important;
+}
+html.alfie-theme div.flex:has(> button.rounded-full + button.rounded-full):not(:has(> :not(button))):not(:has(> button.rounded-full.w-2, > button.rounded-full.h-2, > button.rounded-full.w-3)) > button.rounded-full:is(.bg-blue-600, .bg-blue-500, .bg-cyan-600, .bg-sky-600, .bg-green-600, .bg-green-500, .bg-emerald-600, .bg-purple-600, .bg-white) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08)) !important;
+  color: #fff !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+html.alfie-light div.flex:has(> button.rounded-full + button.rounded-full):not(:has(> :not(button))):not(:has(> button.rounded-full.w-2, > button.rounded-full.h-2, > button.rounded-full.w-3)) {
+  background: rgba(15, 23, 42, 0.06);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+html.alfie-light div.flex:has(> button.rounded-full + button.rounded-full):not(:has(> :not(button))):not(:has(> button.rounded-full.w-2, > button.rounded-full.h-2, > button.rounded-full.w-3)) > button.rounded-full:is(.bg-blue-600, .bg-blue-500, .bg-cyan-600, .bg-sky-600, .bg-green-600, .bg-green-500, .bg-emerald-600, .bg-purple-600, .bg-white) {
+  background: #fff !important;
+  color: #0B1220 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10), 0 2px 8px rgba(15, 23, 42, 0.06);
+}
