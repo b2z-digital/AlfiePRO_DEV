@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Plus, Inbox, Send, FileText, Star, MessageCircle, X, MessageSquare, Trash2, UserPlus, SquareCheck as CheckSquare, Square , Bell } from 'lucide-react';
+import { Search, Plus, Inbox, Send, FileText, Star, MessageCircle, X, MessageSquare, Trash2, UserPlus, SquareCheck as CheckSquare, Square , Bell, PhoneMissed } from 'lucide-react';
+import { AAvatar } from '../alfie/Kit';
 
 export type SidebarTab = 'inbox' | 'sent' | 'starred' | 'drafts';
 export type TopLevelTab = 'inbox' | 'chats';
@@ -61,38 +62,12 @@ interface ConversationsSidebarProps {
 }
 
 const UserAvatar = ({ name, avatarUrl, size = 48, isOnline }: { name: string; avatarUrl?: string; size?: number; isOnline?: boolean }) => {
-  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  const colors = [
-    'from-blue-500 to-cyan-500',
-    'from-emerald-500 to-teal-500',
-    'from-amber-500 to-orange-500',
-    'from-rose-500 to-pink-500',
-    'from-sky-500 to-blue-500',
-    'from-green-500 to-emerald-500',
-  ];
-  const colorIdx = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % colors.length;
-
+  const [first, ...rest] = (name || '?').split(' ');
   return (
-    <div className="relative flex-shrink-0">
-      {avatarUrl ? (
-        <img
-          src={avatarUrl}
-          alt={name}
-          className="rounded-full object-cover ring-2 ring-white/10"
-          style={{ width: size, height: size }}
-        />
-      ) : (
-        <div
-          className={`rounded-full flex items-center justify-center text-white font-semibold bg-gradient-to-br ${colors[colorIdx]} ring-2 ring-white/10`}
-          style={{ width: size, height: size, fontSize: size * 0.38 }}
-        >
-          {initials || '?'}
-        </div>
-      )}
-      {isOnline && (
-        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#131c31]" />
-      )}
-    </div>
+    <span className="relative inline-flex flex-shrink-0">
+      <AAvatar url={avatarUrl} first={first} last={rest.join(' ')} size={size} />
+      {isOnline && <span className="a-pres" style={{ width: 12, height: 12, background: '#30D158' }} />}
+    </span>
   );
 };
 
@@ -108,7 +83,7 @@ const formatTimeAgo = (dateString: string) => {
   if (diffMins < 60) return `${diffMins}m`;
   if (diffHours < 24) return `${diffHours}h`;
   if (diffDays < 7) return `${diffDays}d`;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${date.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][date.getMonth()]}`;
 };
 
 export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
@@ -262,7 +237,8 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
               subtitle={searchTerm ? 'Try a different search' : 'Start a chat from the Community page'}
             />
           ) : (
-            <div className="space-y-0.5">
+            <div>
+              <div className="a-ghd">All chats</div>
               {filteredChats.map(chat => {
                 const isSelected = selectedChatId === chat.id;
                 const showDelete = swipedChatId === chat.id;
@@ -277,31 +253,29 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                       className={`a-it w-full text-left ${isSelected ? 'a-it-on' : ''}`}
                     >
                       {chat.is_unread && <span className="a-unread" />}
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <UserAvatar
-                            name={chat.participant_name}
-                            avatarUrl={chat.participant_avatar}
-                            size={44}
-                          />
+                      <UserAvatar
+                        name={chat.participant_name}
+                        avatarUrl={chat.participant_avatar}
+                        size={44}
+                      />
+                      <div className="flex-1 min-w-0 self-center">
+                        <div className="flex gap-2">
+                          <span className={`a-ink flex-1 text-[14.5px] truncate ${chat.is_unread ? 'font-semibold' : 'font-medium'}`}>
+                            {chat.participant_name}
+                          </span>
+                          {chat.last_message_at && (
+                            <span className={`text-[12px] flex-shrink-0 ${chat.is_unread ? 'a-txt-b' : 'a-dim'}`}>
+                              {formatTimeAgo(chat.last_message_at)}
+                            </span>
+                          )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className={`a-ink text-[14.5px] truncate ${chat.is_unread ? 'font-semibold' : 'font-medium'}`}>
-                              {chat.participant_name}
-                            </p>
-                            <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                              {chat.last_message_at && (
-                                <span className={`text-[12px] ${chat.is_unread ? 'a-txt-b' : 'a-dim'}`}>
-                                  {formatTimeAgo(chat.last_message_at)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <p className={`text-[13px] truncate mt-0.5 pr-6 ${chat.is_unread ? 'a-ink' : 'a-dim'}`}>
+                        {/^Missed (voice |video )?call/i.test(chat.last_message_text || '') ? (
+                          <p className="a-txt-r flex items-center gap-1.5 text-[13px] mt-[3px] pr-6"><PhoneMissed size={14} />{chat.last_message_text}</p>
+                        ) : (
+                          <p className={`text-[13px] truncate mt-[3px] pr-6 ${chat.is_unread ? 'a-ink' : 'a-dim'}`}>
                             {chat.last_message_text || 'No messages yet'}
                           </p>
-                        </div>
+                        )}
                       </div>
                     </button>
                     <button
@@ -309,8 +283,10 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                         e.stopPropagation();
                         onDeleteChat(chat.id);
                       }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 text-slate-600 hover:text-red-400"
+                      className="a-ib a-ib-d absolute right-4 bottom-2 opacity-0 group-hover:opacity-100"
+                      style={{ width: 28, height: 28 }}
                       title="Delete chat"
+                      aria-label="Delete chat"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -323,30 +299,23 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
           drafts.length === 0 ? (
             <EmptyState icon={<FileText size={22} />} title="No drafts" subtitle="Saved drafts will appear here" />
           ) : (
-            <div className="space-y-0.5">
+            <div>
+              <div className="a-ghd">Drafts</div>
               {drafts.map(draft => (
                 <button
                   key={draft.id}
                   onClick={() => onLoadDraft(draft)}
-                  className="w-full text-left p-3 rounded-xl hover:bg-slate-700/40 transition-all group"
+                  className="a-it"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-700/80 flex items-center justify-center flex-shrink-0">
-                      <FileText size={18} className="text-slate-400" />
+                  <span className="a-tile" style={{ width: 40, height: 40, borderRadius: 999 }}><FileText size={17} /></span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex gap-2">
+                      <span className="a-ink flex-1 text-[14.5px] font-medium truncate">{draft.subject || 'No subject'}</span>
+                      <span className="a-dim text-[12px] flex-shrink-0">{formatTimeAgo(draft.updated_at)}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-slate-300 truncate">
-                          {draft.subject || 'No subject'}
-                        </p>
-                        <span className="text-[11px] text-slate-600 ml-2 flex-shrink-0">
-                          {formatTimeAgo(draft.updated_at)}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 truncate mt-0.5">
-                        {draft.body?.replace(/<[^>]*>/g, '') || 'Empty draft'}
-                      </p>
-                    </div>
+                    <p className="a-dim text-[12.5px] truncate mt-0.5">
+                      {draft.body?.replace(/<[^>]*>/g, '') || 'Empty draft'}
+                    </p>
                   </div>
                 </button>
               ))}
@@ -364,28 +333,28 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
               <div className="a-bulkbar flex items-center gap-2 mx-2 mb-1" style={{ padding: '6px 8px' }}>
                 <button
                   onClick={toggleSelectAll}
-                  className="p-1 rounded hover:bg-slate-700/50 transition-colors"
+                  className="a-dim flex p-1"
                   title={selectedIds.size === displayList.length ? 'Deselect all' : 'Select all'}
                 >
                   {selectedIds.size === displayList.length ? (
-                    <CheckSquare size={16} className="text-blue-400" />
+                    <CheckSquare size={16} className="a-txt-b" />
                   ) : (
-                    <Square size={16} className="text-slate-400" />
+                    <Square size={16} />
                   )}
                 </button>
-                <span className="text-xs text-blue-400 font-medium flex-1">
+                <span className="a-txt-b text-[12.5px] font-semibold flex-1">
                   {selectedIds.size} selected
                 </span>
                 <button
                   onClick={handleBulkDelete}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs font-medium transition-colors"
+                  className="a-btn a-btn-d" style={{ height: 30, padding: '0 10px', fontSize: 12.5 }}
                 >
                   <Trash2 size={12} />
                   Delete
                 </button>
                 <button
                   onClick={cancelSelection}
-                  className="p-1 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"
+                  className="a-ib" style={{ width: 30, height: 30 }} aria-label="Cancel selection"
                 >
                   <X size={14} />
                 </button>

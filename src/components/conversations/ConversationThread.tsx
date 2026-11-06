@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Star, Archive, Trash2, Reply, Forward, ChevronRight, Bell, ExternalLink, Trophy } from 'lucide-react';
 import { sanitizeHtml } from '../../utils/sanitize';
+import { AAvatar } from '../alfie/Kit';
 
 interface Notification {
   id: string;
@@ -45,36 +46,8 @@ interface ConversationThreadProps {
 }
 
 const UserAvatar = ({ name, avatarUrl, size = 48 }: { name: string; avatarUrl?: string; size?: number }) => {
-  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  const colors = [
-    'from-blue-500 to-cyan-500',
-    'from-emerald-500 to-teal-500',
-    'from-amber-500 to-orange-500',
-    'from-rose-500 to-pink-500',
-    'from-sky-500 to-blue-500',
-    'from-green-500 to-emerald-500',
-  ];
-  const colorIdx = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % colors.length;
-
-  if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={name}
-        className="rounded-full object-cover flex-shrink-0"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-
-  return (
-    <div
-      className={`rounded-full flex items-center justify-center text-white font-semibold bg-gradient-to-br ${colors[colorIdx]} flex-shrink-0`}
-      style={{ width: size, height: size, fontSize: size * 0.38 }}
-    >
-      {initials || '?'}
-    </div>
-  );
+  const [first, ...rest] = (name || '?').split(' ');
+  return <AAvatar url={avatarUrl} first={first} last={rest.join(' ')} size={size} />;
 };
 
 const getTypeConfig = (type: string) => {

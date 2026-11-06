@@ -933,7 +933,7 @@ export const Conversations: React.FC<ConversationsProps> = ({
         </button>
       </div>
       <div className="a-pane flex-1 min-h-0">
-      <div className="w-[340px] xl:w-[400px] flex-shrink-0 h-full overflow-hidden">
+      <div className={`w-[340px] ${topLevelTab === 'chats' ? 'xl:w-[360px]' : 'xl:w-[400px]'} flex-shrink-0 h-full overflow-hidden`}>
         <ConversationsSidebar
           activeTab={activeTab}
           onTabChange={(tab) => { setActiveTab(tab); setSelectedNotification(null); }}

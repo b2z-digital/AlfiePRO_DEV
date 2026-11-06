@@ -701,3 +701,29 @@ html.alfie-light .a-ghd { color: rgba(15,23,42,0.45); }
 html.alfie-light .a-it:hover { background: rgba(15,23,42,0.04); }
 html.alfie-light .a-it.a-it-on { background: linear-gradient(#fff,#fff) padding-box, linear-gradient(180deg,#2E7BFF 0%,#8A4DFF 38%,#FF3E9A 70%,#FF8A2B 100%) border-box; box-shadow: 0 1px 2px rgba(15,23,42,0.06), 0 4px 14px rgba(15,23,42,0.06); }
 html.alfie-light .a-msg-body a { color: #0A64D8; }
+html.alfie-theme .a-pres { position: absolute; right: -1px; bottom: -1px; border-radius: 999px; box-shadow: 0 0 0 2.5px #10151F; }
+html.alfie-theme .a-ib.a-ib-call-g { color: #30D158; background: rgba(48,209,88,0.1); }
+html.alfie-theme .a-ib.a-ib-call-b { color: #6FB4FF; background: rgba(10,132,255,0.1); }
+html.alfie-theme .a-bub { max-width: 62%; padding: 11px 15px; border-radius: 20px; font-size: 14.5px; line-height: 1.45; color: #F1F4FA; }
+html.alfie-theme .a-bin { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.07); border-bottom-left-radius: 6px; align-self: flex-start; }
+html.alfie-theme .a-bout { background: linear-gradient(180deg,#2A93FF,#0A78F0); color: #fff; border-bottom-right-radius: 6px; align-self: flex-end; box-shadow: 0 6px 16px rgba(10,132,255,0.2); }
+html.alfie-theme .a-chat-tm { font-size: 11px; color: rgba(235,240,255,0.4); margin-top: 3px; }
+html.alfie-theme .a-chat-sep { align-self: center; padding: 4px 12px; border-radius: 999px; background: rgba(255,255,255,0.05); font: 600 11.5px 'Instrument Sans', sans-serif; color: rgba(235,240,255,0.55); margin: 8px 0; }
+html.alfie-theme .a-chat-call { align-self: center; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.22); font: 500 12.5px 'Instrument Sans', sans-serif; color: #FF9A9A; }
+html.alfie-theme .a-chat-call.a-chat-call-n { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: rgba(235,240,255,0.7); }
+html.alfie-theme .a-composer { display: flex; align-items: center; gap: 4px; min-height: 54px; padding: 6px 6px 6px 16px; border-radius: 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); }
+html.alfie-theme .a-composer textarea { flex: 1; border: 0; background: transparent; color: #fff; font: 400 15px 'Instrument Sans', sans-serif; outline: none; resize: none; padding: 8px 0; line-height: 1.4; }
+html.alfie-theme .a-composer textarea::placeholder { color: rgba(235,240,255,0.4); }
+html.alfie-theme .a-send { width: 40px; height: 40px; flex-shrink: 0; border: 0; border-radius: 14px; background: linear-gradient(135deg,#2E7BFF 0%,#8A4DFF 45%,#FF3E9A 100%); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(138,77,255,0.3); align-self: flex-end; }
+html.alfie-theme .a-send:disabled { opacity: .45; box-shadow: none; }
+html.alfie-light .a-pres { box-shadow: 0 0 0 2.5px #fff; }
+html.alfie-light .a-bub { color: #0F172A; }
+html.alfie-light .a-bin { background: #F1F4F9; border-color: rgba(15,23,42,0.06); }
+html.alfie-light .a-bout { color: #fff; }
+html.alfie-light .a-chat-tm { color: rgba(15,23,42,0.42); }
+html.alfie-light .a-chat-sep { background: rgba(15,23,42,0.05); color: rgba(15,23,42,0.55); }
+html.alfie-light .a-chat-call { background: rgba(255,69,58,0.06); border-color: rgba(255,69,58,0.2); color: #D92D20; }
+html.alfie-light .a-chat-call.a-chat-call-n { background: rgba(15,23,42,0.04); border-color: rgba(15,23,42,0.1); color: rgba(15,23,42,0.65); }
+html.alfie-light .a-composer { background: #F6F8FB; border-color: rgba(15,23,42,0.1); }
+html.alfie-light .a-composer textarea { color: #0F172A; }
+html.alfie-light .a-composer textarea::placeholder { color: rgba(15,23,42,0.4); }
