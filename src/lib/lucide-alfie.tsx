@@ -185,6 +185,7 @@ export const Forward = themed(L.Forward as IconComponent, "fwd", 'Forward');
 export const FilePlus = themed(L.FilePlus as IconComponent, "fplus", 'FilePlus');
 export const FileUp = themed(L.FileUp as IconComponent, "fileup", 'FileUp');
 export const PenTool = themed(L.PenTool as IconComponent, "pen", 'PenTool');
+export const ChevronsUpDown = themed(L.ChevronsUpDown as IconComponent, "updown", 'ChevronsUpDown');
 export const LayoutTemplate = themed(L.LayoutTemplate as IconComponent, "tpl", 'LayoutTemplate');
 export const ArrowUpRight = themed(L.ArrowUpRight as IconComponent, "in", 'ArrowUpRight');
 export const Bed = themed(L.Bed as IconComponent, "bed", 'Bed');
