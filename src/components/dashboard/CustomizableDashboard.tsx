@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
   arrayMove
 } from '@dnd-kit/sortable';
-import { SquarePen as Edit2, Check, Plus, RotateCcw, Columns2 as Columns, LayoutGrid, GripVertical, Sparkles, Pencil, Save, X } from 'lucide-react';
+import { SquarePen as Edit2, Check, Plus, RotateCcw, Columns2 as Columns, LayoutGrid, GripVertical, Sparkles, Pencil, Save, X, Trash2, ChevronsUpDown, ChevronsDownUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { WidgetConfig, DashboardLayout, DashboardRow } from '../../types/dashboard';
 import { loadDashboardLayout, saveDashboardLayout, resetDashboardLayout, getTemplateForUser } from '../../utils/dashboardStorage';
@@ -50,14 +50,12 @@ const DroppableSlot: React.FC<DroppableSlotProps> = ({ rowId, columnIndex, isEdi
     <div
       ref={setNodeRef}
       onClick={() => onAddWidgetToSlot(rowId, columnIndex)}
-      className={`h-full rounded-2xl border-2 border-dashed ${
-        isOver ? 'border-blue-500 bg-blue-500/10' : 'border-slate-600/50 hover:border-slate-500'
-      } flex items-center justify-center cursor-pointer transition-colors`}
+      className={`a-em-slot ${isOver ? 'a-em-slot-over' : ''}`}
+      role="button"
+      tabIndex={0}
     >
-      <div className="text-center">
-        <Plus className="mx-auto mb-2 text-slate-500" size={32} />
-        <p className="text-sm text-slate-400">Add Widget</p>
-      </div>
+      <span className="a-tile" style={{ width: 36, height: 36 }}><Plus size={18} /></span>
+      Add widget
     </div>
   );
 };
@@ -115,34 +113,33 @@ const SortableRow: React.FC<SortableRowProps> = ({
   });
 
   return (
-    <div ref={setNodeRef} style={style} className="relative">
+    <div ref={setNodeRef} style={style} className={`relative ${isEditMode ? 'a-em-row' : ''}`}>
       {isEditMode && (
-        <div className="flex items-center justify-between mb-2 group">
-          <div className="flex items-center gap-2">
-            <div
-              {...attributes}
-              {...listeners}
-              className="cursor-grab active:cursor-grabbing p-1 hover:bg-slate-700/30 rounded transition-colors"
-              title="Drag to reorder row"
-            >
-              <GripVertical size={16} className="text-slate-500" />
-            </div>
-            <span className="text-xs text-slate-400">
-              {row.columns} Column{row.columns > 1 ? 's' : ''} Row
-            </span>
-            <button
-              onClick={() => onToggleRowHeight(row.id)}
-              className="text-xs text-blue-400 hover:text-blue-300 px-2 py-0.5 bg-slate-700/30 hover:bg-slate-700/50 rounded transition-colors"
-              title="Toggle row height"
-            >
-              {row.height === 'compact' ? 'Default' : 'Compact'}
-            </button>
+        <div className="a-em-ctl">
+          <div
+            {...attributes}
+            {...listeners}
+            className="a-em-cb cursor-grab active:cursor-grabbing"
+            title="Drag to reorder row"
+            aria-label="Drag to reorder row"
+          >
+            <GripVertical size={16} />
           </div>
           <button
-            onClick={() => onRemoveRow(row.id)}
-            className="text-xs text-red-400 hover:text-red-300"
+            onClick={() => onToggleRowHeight(row.id)}
+            className="a-em-cb"
+            title={row.height === 'compact' ? 'Switch to default height' : 'Switch to compact height'}
+            aria-label="Toggle row height"
           >
-            Remove Row
+            {row.height === 'compact' ? <ChevronsUpDown size={16} /> : <ChevronsDownUp size={16} />}
+          </button>
+          <button
+            onClick={() => onRemoveRow(row.id)}
+            className="a-em-cb a-em-cb-d"
+            title="Remove row"
+            aria-label="Remove row"
+          >
+            <Trash2 size={15} />
           </button>
         </div>
       )}
@@ -151,7 +148,7 @@ const SortableRow: React.FC<SortableRowProps> = ({
         strategy={verticalListSortingStrategy}
         disabled={!isEditMode}
       >
-        <div className={`grid ${getColumnClass(row.columns)} gap-6`}>
+        <div className={`grid ${getColumnClass(row.columns)} ${isEditMode ? 'gap-5 flex-1 min-w-0' : 'gap-6'}`}>
           {columns.map(({ index, widget }) => (
             <div key={`${row.id}-col-${index}`} className={row.height === 'compact' ? 'min-h-[120px]' : 'min-h-[200px]'}>
               {widget ? (
@@ -1118,96 +1115,89 @@ export const CustomizableDashboard: React.FC = () => {
           </div>
         </div>
       )}
-      <div className="flex items-center justify-end gap-2 mb-2">
+      <div className={`flex items-center justify-end gap-2 flex-wrap ${isEditMode ? 'mb-1' : 'mb-2'}`}>
         {isEditMode && (
           <>
-            <div className="flex items-center gap-2 mr-auto">
-              <span className="text-sm text-slate-400">Add Row:</span>
+            <p className="a-cap mr-auto m-0">Editing dashboard</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="a-dim text-[12.5px] max-md:hidden">Add row</span>
               <button
                 onClick={() => handleAddRow(1)}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-white transition-colors"
-              >
-                <Columns size={16} />
-                <span className="text-xs">1 Col</span>
+                className="a-btn">
+                <Columns size={16} />1 Col
               </button>
               <button
                 onClick={() => handleAddRow(2)}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-white transition-colors"
-              >
-                <Columns size={16} />
-                <span className="text-xs">2 Cols</span>
+                className="a-btn">
+                <Columns size={16} />2 Cols
               </button>
               <button
                 onClick={() => handleAddRow(3)}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-white transition-colors"
-              >
-                <LayoutGrid size={16} />
-                <span className="text-xs">3 Cols</span>
+                className="a-btn">
+                <LayoutGrid size={16} />3 Cols
               </button>
               <button
                 onClick={() => handleAddRow(4)}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-white transition-colors"
-              >
-                <LayoutGrid size={16} />
-                <span className="text-xs">4 Cols</span>
+                className="a-btn">
+                <LayoutGrid size={16} />4 Cols
               </button>
             </div>
             <button
               onClick={() => setShowLibrary(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600/80 hover:bg-blue-600 text-white transition-colors"
+              className="a-btn a-btn-p"
             >
               <Sparkles size={16} />
-              <span className="text-sm">Templates</span>
+              Templates
             </button>
             {isAdmin && (
               <button
                 onClick={() => setShowSaveTemplate(true)}
-                className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600/80 text-white transition-colors"
+                className="a-btn a-em-green"
               >
                 <Save size={16} />
-                <span className="text-sm">Save as Template</span>
+                Save as Template
               </button>
             )}
             <button
               onClick={handleResetLayout}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-white transition-colors"
+              className="a-btn"
             >
               <RotateCcw size={16} />
-              <span className="text-sm">Reset</span>
+              Reset
             </button>
             {editingSystemTemplate ? (
               <>
                 <button
                   onClick={handleCancelSystemTemplateEdit}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-white transition-colors"
+                  className="a-btn"
                 >
                   <X size={16} />
-                  <span className="text-sm">Cancel Template Edit</span>
+                  Cancel Template Edit
                 </button>
                 <button
                   onClick={handleSaveSystemTemplate}
                   disabled={saving}
-                  className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50"
+                  className="a-btn a-em-green disabled:opacity-50"
                 >
                   <Check size={16} />
-                  <span className="text-sm">{saving ? 'Saving Template...' : 'Save System Template'}</span>
+                  {saving ? 'Saving Template...' : 'Save System Template'}
                 </button>
               </>
             ) : (
               <>
                 <button
                   onClick={handleCancelEdit}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-white transition-colors"
+                  className="a-btn"
                 >
-                  <span className="text-sm">Cancel</span>
+                  Cancel
                 </button>
                 <button
                   onClick={handleSaveAndExit}
                   disabled={saving}
-                  className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50"
+                  className="a-btn a-em-green disabled:opacity-50"
                 >
                   <Check size={16} />
-                  <span className="text-sm">{saving ? 'Saving...' : 'Save'}</span>
+                  {saving ? 'Saving…' : 'Save'}
                 </button>
               </>
             )}
