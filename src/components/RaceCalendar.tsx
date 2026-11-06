@@ -46,6 +46,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   const { currentClub, currentOrganization } = useAuth();
   const [view, setView] = useState<CalendarView>('list');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [monthDay, setMonthDay] = useState<number | null>(null);
   const [timeFilter, setTimeFilter] = useState<'upcoming' | 'past'>('upcoming');
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -1294,25 +1295,36 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
     );
   };
 
-  const renderMonthView = () => (
+  const renderMonthView = () => {
+    const now = new Date();
+    const isThisMonth = currentDate.getMonth() === now.getMonth() && currentDate.getFullYear() === now.getFullYear();
+    const firstBusyDay = monthData.find((d) => d && getCalendarItemsForDate(d).length > 0) || null;
+    const selDay: number | null = monthDay ?? (isThisMonth ? now.getDate() : firstBusyDay);
+    const selItems = selDay ? getCalendarItemsForDate(selDay) : [];
+    const selDate = selDay ? new Date(currentDate.getFullYear(), currentDate.getMonth(), selDay) : null;
+    return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <button onClick={prevMonth} className="a-ib" aria-label="Previous month">
+        <button onClick={() => { setMonthDay(null); prevMonth(); }} className="a-ib" aria-label="Previous month">
           <ChevronLeft size={20} />
         </button>
         <h3 className="a-display a-ink text-[22px] font-bold">
           {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
         </h3>
-        <button onClick={nextMonth} className="a-ib" aria-label="Next month">
+        <button onClick={() => { setMonthDay(null); nextMonth(); }} className="a-ib" aria-label="Next month">
           <ChevronRight size={20} />
         </button>
+        {!isThisMonth && (
+          <button type="button" onClick={() => { setMonthDay(null); setCurrentDate(new Date()); }} className="a-btn" style={{ height: 32, padding: '0 12px', fontSize: 12.5 }}>Today</button>
+        )}
         <div className="flex-1" />
         <span className="a-st a-dim text-[12.5px]"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: '#30D158' }} />Scratch</span>
         <span className="a-st a-dim text-[12.5px]"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: 'linear-gradient(90deg,#B794FF 50%,transparent 50%)', boxShadow: 'inset 0 0 0 1.25px #B794FF' }} />Handicap</span>
         <span className="a-st a-dim text-[12.5px]"><Users size={13} />Meeting</span>
       </div>
 
-      <div className="a-card overflow-hidden">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px] items-start">
+      <div className="a-card overflow-hidden min-w-0">
         <div className="grid grid-cols-7 a-bd border-b">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
             <div key={day} className="a-cap" style={{ padding: '10px 8px' }}>{day}</div>
@@ -1327,7 +1339,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             day === new Date().getDate();
 
           return (
-            <div key={index} className={`a-month-cell ${!day ? 'a-month-blank' : ''}`}>
+            <div key={index} className={`a-month-cell ${!day ? 'a-month-blank' : ''} ${day && day === selDay ? 'a-month-sel' : ''}`} onClick={() => { if (day) setMonthDay(day); }}>
               {day && (
                 <>
                   <span className={`a-month-day ${isToday ? 'a-month-today' : ''}`}>
@@ -1376,8 +1388,54 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
         })}
         </div>
       </div>
+
+      {/* Selected day (board S_cal_month side panel) */}
+      <aside className="a-card a-month-side" aria-label="Selected day">
+        {selDate ? (
+          <>
+            <p className="a-cap">{selDate.toLocaleDateString('en-AU', { weekday: 'long' })}</p>
+            <p className="a-display a-ink text-[20px] font-semibold mt-1">{selDate.toLocaleDateString('en-AU', { day: 'numeric', month: 'long' })}</p>
+            <p className="a-dim text-[12.5px] mt-0.5">{selItems.length === 0 ? 'Nothing scheduled' : `${selItems.length} ${selItems.length === 1 ? 'item' : 'items'}`}</p>
+            <div className="flex flex-col gap-1 mt-3">
+              {selItems.map((item, i) => {
+                if (item.type === 'meeting') {
+                  const meeting = item.data;
+                  return (
+                    <button key={`sm-${i}`} type="button" className="a-month-si" onClick={() => setSelectedMeeting(meeting)}>
+                      <span className="a-tile a-tile-sm"><Users size={16} /></span>
+                      <span className="min-w-0 flex-1 text-left">
+                        <span className="block a-ink text-[13.5px] font-semibold leading-snug">{meeting.name}</span>
+                        <span className="block a-dim text-[12px] mt-0.5">{meeting.start_time ? meeting.start_time.substring(0, 5) : 'Meeting'}</span>
+                      </span>
+                    </button>
+                  );
+                }
+                const event = item.data;
+                const title = event.isSeriesEvent ? `${event.roundName} - ${getSeriesName(event)}` : event.eventName || event.clubName;
+                return (
+                  <button key={`se-${i}`} type="button" className="a-month-si" onClick={() => handleEventClick(event)}>
+                    <span className="a-tile a-tile-sm"><Flag size={16} /></span>
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="block a-ink text-[13.5px] font-semibold leading-snug">{title}</span>
+                      {event.venue && <span className="block a-dim text-[12px] mt-0.5 truncate">{event.venue}</span>}
+                      <span className="flex flex-wrap gap-1.5 mt-1.5">
+                        {event.raceFormat && <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>{event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}</span>}
+                        {event.raceClass && <span className={getBoatClassBadge(event.raceClass, darkMode).className}>{event.raceClass}</span>}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <p className="a-dim text-[13px]">Pick a day to see what's on.</p>
+        )}
+      </aside>
+      </div>
     </div>
-  );
+    );
+  };
 
   const renderMeetingGridCard = (meeting: CalendarMeeting, index: number) => {
     const isPast = isDatePast(meeting.date);
