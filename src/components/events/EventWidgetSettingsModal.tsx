@@ -169,10 +169,10 @@ export const EventWidgetSettingsModal: React.FC<Props> = ({ widget, websiteId, o
       console.log('Public URL:', publicUrl);
 
       handleChange(key, publicUrl);
-      addNotification('Image uploaded successfully!', 'success');
+      addNotification('success', 'Image uploaded successfully!');
     } catch (error) {
       console.error('Error uploading image:', error);
-      addNotification(`Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      addNotification('error', `Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
     }

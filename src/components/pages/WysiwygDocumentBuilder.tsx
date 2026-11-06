@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Save, Eye, Upload, X, FileText, Plus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAlfieLight } from '../alfie/Kit';
 import { supabase } from '../../utils/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ReactQuill, { Quill } from 'react-quill';
@@ -51,7 +52,8 @@ const DEFAULT_MERGE_FIELDS = [
 ];
 
 export const WysiwygDocumentBuilder: React.FC<WysiwygDocumentBuilderProps> = ({ onSuccess }) => {
-  const { currentClub, darkMode } = useAuth();
+  const { currentClub } = useAuth();
+  const darkMode = !useAlfieLight();
   const navigate = useNavigate();
   const location = useLocation();
   const { addNotification } = useNotifications();
@@ -237,10 +239,10 @@ export const WysiwygDocumentBuilder: React.FC<WysiwygDocumentBuilderProps> = ({ 
         .getPublicUrl(filePath);
 
       setLogoUrl(publicUrl);
-      addNotification('Logo uploaded successfully', 'success');
+      addNotification('success', 'Logo uploaded successfully');
     } catch (error: any) {
       console.error('Error uploading logo:', error);
-      addNotification(error.message || 'Failed to upload logo', 'error');
+      addNotification('error', error.message || 'Failed to upload logo');
     } finally {
       setLoading(false);
     }
@@ -258,7 +260,7 @@ export const WysiwygDocumentBuilder: React.FC<WysiwygDocumentBuilderProps> = ({ 
 
   const handleSave = async () => {
     if (!currentClub || !templateName.trim() || !htmlContent.trim()) {
-      addNotification('Please fill in template name and content', 'error');
+      addNotification('error', 'Please fill in template name and content');
       return;
     }
 
@@ -286,14 +288,14 @@ export const WysiwygDocumentBuilder: React.FC<WysiwygDocumentBuilderProps> = ({ 
           .eq('id', editingTemplate.id);
 
         if (error) throw error;
-        addNotification('Template updated successfully', 'success');
+        addNotification('success', 'Template updated successfully');
       } else {
         const { error } = await supabase
           .from('document_templates')
           .insert([templateData]);
 
         if (error) throw error;
-        addNotification('Template created successfully', 'success');
+        addNotification('success', 'Template created successfully');
       }
 
       // Don't navigate away - just show success message and stay on page
@@ -302,7 +304,7 @@ export const WysiwygDocumentBuilder: React.FC<WysiwygDocumentBuilderProps> = ({ 
       }
     } catch (error: any) {
       console.error('Error saving template:', error);
-      addNotification(error.message || 'Failed to save template', 'error');
+      addNotification('error', error.message || 'Failed to save template');
     } finally {
       setLoading(false);
     }

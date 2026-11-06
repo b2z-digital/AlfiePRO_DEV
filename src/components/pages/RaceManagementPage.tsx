@@ -848,15 +848,15 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
 
       // Show appropriate notification
       if (updateData.approval_status === 'pending_national') {
-        addNotification('success', 'State Approval Complete', 'Event has been approved and forwarded to the National Association for final approval.');
+        addNotification('success', 'Event has been approved and forwarded to the National Association for final approval.');
       } else {
-        addNotification('success', 'Event Fully Approved', 'Event has been approved and is now visible in all calendars.');
+        addNotification('success', 'Event has been approved and is now visible in all calendars.');
       }
 
       await loadPendingEvents();
     } catch (error) {
       console.error('Error approving event:', error);
-      addNotification('error', 'Failed to Approve Event', 'An error occurred while approving the event. Please try again.');
+      addNotification('error', 'An error occurred while approving the event. Please try again.');
     }
   };
 
@@ -911,7 +911,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
 
       if (error) throw error;
 
-      addNotification('success', 'Event Withdrawn', 'Your event has been withdrawn from the approval process. You can now edit, delete, or resubmit it.');
+      addNotification('success', 'Your event has been withdrawn from the approval process. You can now edit, delete, or resubmit it.');
       await loadPendingEvents();
     } catch (error) {
       console.error('Error withdrawing event:', error);
@@ -950,11 +950,11 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
 
       if (error) throw error;
 
-      addNotification('success', 'Event Resubmitted', 'Your event has been resubmitted for approval. You\'ll be notified once it\'s reviewed.');
+      addNotification('success', 'Your event has been resubmitted for approval. You\'ll be notified once it\'s reviewed.');
       await loadPendingEvents();
     } catch (error) {
       console.error('Error resubmitting event:', error);
-      addNotification('error', 'Failed to Resubmit Event', 'An error occurred while resubmitting the event. Please try again.');
+      addNotification('error', 'An error occurred while resubmitting the event. Please try again.');
     }
   };
 
@@ -2525,7 +2525,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             setSelectedEventForWebsite(null);
           }}
           onSaved={() => {
-            addNotification('Event website settings saved successfully', 'success');
+            addNotification('success', 'Event website settings saved successfully');
           }}
           onOpenDashboard={() => {
             setShowEventWebsiteModal(false);

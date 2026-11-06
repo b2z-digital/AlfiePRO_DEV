@@ -37,7 +37,7 @@ export const BannersTab: React.FC = () => {
       setBannerPlacements(placementsMap);
     } catch (error) {
       console.error('Error loading banners:', error);
-      addNotification('Failed to load banners', 'error');
+      addNotification('error', 'Failed to load banners');
     } finally {
       setLoading(false);
     }
@@ -55,11 +55,11 @@ export const BannersTab: React.FC = () => {
 
     try {
       await advertisingStorage.deleteBanner(id);
-      addNotification('Banner deleted successfully', 'success');
+      addNotification('success', 'Banner deleted successfully');
       loadBanners();
     } catch (error) {
       console.error('Error deleting banner:', error);
-      addNotification('Failed to delete banner', 'error');
+      addNotification('error', 'Failed to delete banner');
     }
   };
 
@@ -68,11 +68,11 @@ export const BannersTab: React.FC = () => {
       await advertisingStorage.updateBanner(banner.id, {
         is_active: !banner.is_active,
       });
-      addNotification('Banner status updated', 'success');
+      addNotification('success', 'Banner status updated');
       loadBanners();
     } catch (error) {
       console.error('Error updating banner:', error);
-      addNotification('Failed to update banner', 'error');
+      addNotification('error', 'Failed to update banner');
     }
   };
 

@@ -284,7 +284,7 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
 
     } catch (err) {
       console.error('Error loading wizard data:', err);
-      addNotification('Failed to load form data', 'error');
+      addNotification('error', 'Failed to load form data');
     } finally {
       setLoading(false);
     }
@@ -451,11 +451,11 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
         generated_by: user?.id
       });
 
-      addNotification('PDF generated successfully', 'success');
+      addNotification('success', 'PDF generated successfully');
       onComplete(signedUrlData.signedUrl);
     } catch (err) {
       console.error('Error generating document:', err);
-      addNotification('Failed to generate document', 'error');
+      addNotification('error', 'Failed to generate document');
     } finally {
       setGenerating(false);
     }

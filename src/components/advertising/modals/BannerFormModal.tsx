@@ -64,10 +64,10 @@ export const BannerFormModal: React.FC<BannerFormModalProps> = ({ banner, onClos
       setUploading(true);
       const url = await advertisingStorage.uploadBannerImage(file);
       setFormData({ ...formData, image_url: url });
-      addNotification('Image uploaded successfully', 'success');
+      addNotification('success', 'Image uploaded successfully');
     } catch (error) {
       console.error('Error uploading image:', error);
-      addNotification('Failed to upload image', 'error');
+      addNotification('error', 'Failed to upload image');
     } finally {
       setUploading(false);
     }
@@ -76,7 +76,7 @@ export const BannerFormModal: React.FC<BannerFormModalProps> = ({ banner, onClos
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.campaign_id || !formData.name) {
-      addNotification('Please fill in required fields', 'error');
+      addNotification('error', 'Please fill in required fields');
       return;
     }
 
@@ -105,15 +105,15 @@ export const BannerFormModal: React.FC<BannerFormModalProps> = ({ banner, onClos
 
       if (banner) {
         await advertisingStorage.updateBanner(banner.id, bannerData);
-        addNotification('Banner updated successfully', 'success');
+        addNotification('success', 'Banner updated successfully');
       } else {
         await advertisingStorage.createBanner(bannerData);
-        addNotification('Banner created successfully', 'success');
+        addNotification('success', 'Banner created successfully');
       }
       onClose(true);
     } catch (error) {
       console.error('Error saving banner:', error);
-      addNotification('Failed to save banner', 'error');
+      addNotification('error', 'Failed to save banner');
     } finally {
       setLoading(false);
     }

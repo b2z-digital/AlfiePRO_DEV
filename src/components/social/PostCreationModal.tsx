@@ -106,13 +106,13 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
 
   const handleAddVideo = () => {
     if (!videoUrl.trim()) {
-      addNotification('Please enter a video URL', 'error');
+      addNotification('error', 'Please enter a video URL');
       return;
     }
 
     const youtubeId = extractYouTubeId(videoUrl);
     if (!youtubeId) {
-      addNotification('Please enter a valid YouTube URL', 'error');
+      addNotification('error', 'Please enter a valid YouTube URL');
       return;
     }
 
@@ -121,7 +121,7 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
 
   const handleAddLink = () => {
     if (!linkUrl.trim()) {
-      addNotification('Please enter a URL', 'error');
+      addNotification('error', 'Please enter a URL');
       return;
     }
     setShowLinkModal(false);
@@ -202,13 +202,13 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
       setLinkTitle('');
       setLocation('');
       setFeeling('');
-      addNotification('Post created successfully', 'success');
+      addNotification('success', 'Post created successfully');
       onPostCreated?.();
       onClose();
     } catch (error: any) {
       console.error('Error creating post:', error);
       const errorMessage = error?.message || 'Failed to create post';
-      addNotification(`Failed to create post: ${errorMessage}`, 'error');
+      addNotification('error', `Failed to create post: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }

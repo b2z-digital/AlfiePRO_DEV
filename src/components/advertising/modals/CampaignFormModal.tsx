@@ -56,7 +56,7 @@ export const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ campaign, 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.advertiser_id || !formData.name) {
-      addNotification('Please fill in required fields', 'error');
+      addNotification('error', 'Please fill in required fields');
       return;
     }
 
@@ -64,15 +64,15 @@ export const CampaignFormModal: React.FC<CampaignFormModalProps> = ({ campaign, 
       setLoading(true);
       if (campaign) {
         await advertisingStorage.updateCampaign(campaign.id, formData);
-        addNotification('Campaign updated successfully', 'success');
+        addNotification('success', 'Campaign updated successfully');
       } else {
         await advertisingStorage.createCampaign(formData);
-        addNotification('Campaign created successfully', 'success');
+        addNotification('success', 'Campaign created successfully');
       }
       onClose(true);
     } catch (error) {
       console.error('Error saving campaign:', error);
-      addNotification('Failed to save campaign', 'error');
+      addNotification('error', 'Failed to save campaign');
     } finally {
       setLoading(false);
     }

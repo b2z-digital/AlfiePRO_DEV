@@ -71,6 +71,7 @@ interface RoundResult {
   dropRules?: number[] | string;
   heatManagement?: any;
   numRaces?: number;
+  lastCompletedRace?: number;
 }
 
 interface StandingsRow {
@@ -370,6 +371,21 @@ ${bodyRows}
 </body>
 </html>`;
 };
+
+
+type ResultStatus = 'completed' | 'in-progress' | 'upcoming' | 'not-scored';
+/** Completed if marked done; In progress once any race is scored; otherwise Upcoming until the date passes, then Not scored. */
+const getResultStatus = (item: { completed?: boolean; date?: string; raceResults?: any[]; lastCompletedRace?: number }): ResultStatus => {
+  if (item.completed) return 'completed';
+  if ((item.raceResults && item.raceResults.length > 0) || ((item as any).results && (item as any).results.length > 0) || (item.lastCompletedRace || 0) > 0) return 'in-progress';
+  if (item.date) {
+    const d = new Date(item.date); d.setHours(0, 0, 0, 0);
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    if (d.getTime() >= t.getTime()) return 'upcoming';
+  }
+  return 'not-scored';
+};
+const RESULT_STATUS_LABEL: Record<ResultStatus, string> = { completed: 'Completed', 'in-progress': 'In Progress', upcoming: 'Upcoming', 'not-scored': 'Not scored' };
 
 export const ResultsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -805,6 +821,7 @@ export const ResultsPage: React.FC = () => {
               raceFormat: s.raceFormat,
               completed: round.completed || false,
               raceResults: round.raceResults || [],
+              lastCompletedRace: (round as any).lastCompletedRace || 0,
               skippers: (round.skippers || []).map(skipper => ({
                 ...skipper,
                 avatarUrl: memberAvatarMap[skipper.name] || skipper.avatarUrl
@@ -966,7 +983,7 @@ export const ResultsPage: React.FC = () => {
 
       // Status filter
       if (status === 'completed' && !item.completed) return false;
-      if (status === 'in-progress' && item.completed) return false;
+      if (status === 'in-progress' && ('seriesName' in item && !('roundName' in item) ? item.completed : getResultStatus(item) !== 'in-progress')) return false;
 
       // Class filter
       if (filterClass !== 'all' && item.raceClass !== filterClass) return false;
@@ -1118,6 +1135,7 @@ export const ResultsPage: React.FC = () => {
     const venue = isEvent || isRound ? (item as RaceEvent | RoundResult).venue : '';
     const raceClass = item.raceClass || '';
     const completed = item.completed || false;
+    const status = isSeries ? (completed ? 'completed' : 'in-progress') : getResultStatus(item as RaceEvent | RoundResult);
 
     const colors = raceClass ? boatTypeColors[raceClass] || defaultColorScheme : defaultColorScheme;
     const venueImage = venue ? getVenueImage(venue) : null;
@@ -1170,9 +1188,9 @@ export const ResultsPage: React.FC = () => {
               </div>
             )}
             {!completed && !isSeries && (
-              <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-500/90 text-white backdrop-blur-sm">
+              <div className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white backdrop-blur-sm ${status === 'upcoming' ? 'bg-blue-500/90' : status === 'not-scored' ? 'bg-slate-600/90' : 'bg-amber-500/90'}`}>
                 <Clock size={12} />
-                In Progress
+                {RESULT_STATUS_LABEL[status]}
               </div>
             )}
 
@@ -1296,9 +1314,9 @@ export const ResultsPage: React.FC = () => {
               </div>
             )}
             {!completed && !isSeries && (
-              <div className="flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300">
+              <div className={`flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${status === 'upcoming' ? 'bg-blue-500/20 text-blue-300' : status === 'not-scored' ? 'bg-slate-500/20 text-slate-300' : 'bg-amber-500/20 text-amber-300'}`}>
                 <Clock size={12} />
-                In Progress
+                {RESULT_STATUS_LABEL[status]}
               </div>
             )}
           </div>
@@ -1808,7 +1826,7 @@ export const ResultsPage: React.FC = () => {
   const renderResultsBoardList = (items: (RaceEvent | RoundResult)[]) => {
     if (items.length === 0) return <div className="a-card a-empty a-dim text-center" style={{ padding: 48 }}>No events found</div>;
     const open = (id: string) => navigate(`/results/${id}`);
-    const inProgress = items.filter(i => !i.completed && ((i.raceResults || []).length > 0 || (i.skippers || []).length > 0));
+    const inProgress = items.filter(i => getResultStatus(i) === 'in-progress');
     const groups: { key: string; series?: RaceSeries; name: string; items: (RaceEvent | RoundResult)[] }[] = [];
     const standalone: (RaceEvent | RoundResult)[] = [];
     items.forEach(i => {
@@ -1823,9 +1841,13 @@ export const ResultsPage: React.FC = () => {
       const dt = new Date(d);
       return <div className="a-dc a-dc-sm"><b>{dt.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</b><span>{dt.getDate()}</span></div>;
     };
-    const status = (i: RaceEvent | RoundResult) => i.completed
-      ? <span className="a-st a-txt-g"><span className="a-light a-light-g" />Completed</span>
-      : <span className="a-st a-txt-a"><span className="a-light a-light-a" />In Progress</span>;
+    const status = (i: RaceEvent | RoundResult) => {
+      const st = getResultStatus(i);
+      if (st === 'completed') return <span className="a-st a-txt-g"><span className="a-light a-light-g" />Completed</span>;
+      if (st === 'in-progress') return <span className="a-st a-txt-a"><span className="a-light a-light-a" />In Progress</span>;
+      if (st === 'upcoming') return <span className="a-st a-txt-b"><span className="a-light a-light-b" />Upcoming</span>;
+      return <span className="a-st a-mute"><span className="a-ring-dot a-ring-dot-a" />Not scored</span>;
+    };
     const row = (i: RaceEvent | RoundResult, inSeries: boolean) => {
       const pod = resultPodium(i);
       const n = (i.skippers || []).length;
@@ -1851,7 +1873,7 @@ export const ResultsPage: React.FC = () => {
                 <span className="a-pl-face">{p.avatarUrl ? <img src={p.avatarUrl} alt="" /> : plInitials(p.name)}</span>
                 <span className="a-pl-n">{p.pos}</span>
               </span>
-            )) : <span className="a-dim text-[12.5px]">{!i.completed && n > 0 ? 'Scoring' : ''}</span>}
+            )) : <span className="a-dim text-[12.5px]">{getResultStatus(i) === 'in-progress' ? 'Scoring' : ''}</span>}
           </span>
           <span className="a-mute inline-flex items-center gap-1.5 text-[12.5px] max-lg:hidden"><Users size={14} />{n} competitors</span>
           <ChevronRight size={16} className="a-dim" />
@@ -1948,7 +1970,7 @@ export const ResultsPage: React.FC = () => {
             <div className="grid grid-cols-3 gap-2.5 mt-3">
               <div><p className="a-display a-ink m-0 text-[26px] font-semibold">{items.length}</p><p className="a-dim m-0 mt-0.5 text-[12px]">Events</p></div>
               <div><p className="a-display a-ink m-0 text-[26px] font-semibold">{groups.length}</p><p className="a-dim m-0 mt-0.5 text-[12px]">Series</p></div>
-              <div><p className="a-display a-txt-a m-0 text-[26px] font-semibold">{items.filter(i => !i.completed).length}</p><p className="a-dim m-0 mt-0.5 text-[12px]">In progress</p></div>
+              <div><p className="a-display a-txt-a m-0 text-[26px] font-semibold">{items.filter(i => getResultStatus(i) === 'in-progress').length}</p><p className="a-dim m-0 mt-0.5 text-[12px]">In progress</p></div>
             </div>
           </div>
           {months.length > 0 && (

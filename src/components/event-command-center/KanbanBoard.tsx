@@ -77,7 +77,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       setTasks(tasksData);
     } catch (error) {
       console.error('Error loading board data:', error);
-      addNotification('Failed to load board data', 'error');
+      addNotification('error', 'Failed to load board data');
     } finally {
       setLoading(false);
     }
@@ -197,7 +197,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       await loadBoardData();
     } catch (error) {
       console.error('Error moving task:', error);
-      addNotification('Failed to move task', 'error');
+      addNotification('error', 'Failed to move task');
       await loadBoardData();
     }
   };
@@ -216,10 +216,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       });
 
       setLanes([...lanes, newLane]);
-      addNotification('Column added successfully', 'success');
+      addNotification('success', 'Column added successfully');
     } catch (error) {
       console.error('Error creating column:', error);
-      addNotification('Failed to add column', 'error');
+      addNotification('error', 'Failed to add column');
     }
   };
 

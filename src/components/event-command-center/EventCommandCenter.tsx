@@ -64,7 +64,7 @@ export const EventCommandCenter: React.FC<EventCommandCenterProps> = ({
       }
     } catch (error) {
       console.error('Error loading boards:', error);
-      addNotification('Failed to load event boards', 'error');
+      addNotification('error', 'Failed to load event boards');
     } finally {
       setLoading(false);
     }
@@ -84,10 +84,10 @@ export const EventCommandCenter: React.FC<EventCommandCenterProps> = ({
 
       setBoards([...boards, newBoard]);
       setActiveBoard(newBoard);
-      addNotification('Board created successfully', 'success');
+      addNotification('success', 'Board created successfully');
     } catch (error) {
       console.error('Error creating board:', error);
-      addNotification('Failed to create board', 'error');
+      addNotification('error', 'Failed to create board');
     }
   };
 
@@ -296,11 +296,11 @@ export const EventCommandCenter: React.FC<EventCommandCenterProps> = ({
                 state_association_id: currentOrganization?.type === 'state' ? currentOrganization.id : undefined,
                 national_association_id: currentOrganization?.type === 'national' ? currentOrganization.id : undefined,
               });
-              addNotification('Task created successfully', 'success');
+              addNotification('success', 'Task created successfully');
               handleTaskFormClose();
             } catch (error) {
               console.error('Error creating task:', error);
-              addNotification('Failed to create task', 'error');
+              addNotification('error', 'Failed to create task');
             }
           }}
           darkMode={darkMode}
