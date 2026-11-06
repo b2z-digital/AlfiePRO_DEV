@@ -101,3 +101,20 @@ html.alfie-light .a-btn-reject { color: #C8323A; }
 .a-sheet-head { background: inherit; }
 html.alfie-dark .a-sheet-head { background: #111A2C; }
 html.alfie-light .a-sheet-head { background: #fff; }
+
+/* ── Table header row + selected row + time-left segments ── */
+.a-thead { border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+html.alfie-light .a-thead { border-bottom-color: rgba(15, 23, 42, 0.08); }
+.a-row-sel { background: rgba(10, 132, 255, 0.06); }
+html.alfie-light .a-row-sel { background: rgba(10, 132, 255, 0.05); }
+.a-seg-bar { flex: 1; height: 8px; border-radius: 2px; background: rgba(255, 255, 255, 0.08); }
+.a-seg-bar-a { background: #FFB340; }
+.a-seg-bar-r { background: #FF6B6B; }
+.a-seg-bar-g { background: #30D158; }
+.a-seg-bar-b { background: #0A84FF; }
+html.alfie-light .a-seg-bar { background: rgba(15, 23, 42, 0.08); }
+html.alfie-light .a-seg-bar-a { background: #FF9F0A; }
+html.alfie-light .a-seg-bar-r { background: #E5484D; }
+html.alfie-light .a-seg-bar-g { background: #22A757; }
+html.alfie-light .a-seg-bar-b { background: #0A84FF; }
+.a-chk { padding: 0; border: 0; color: #fff; }

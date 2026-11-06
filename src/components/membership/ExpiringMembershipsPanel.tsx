@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { TriangleAlert as AlertTriangle, Calendar, Mail, Phone, Clock, RefreshCw, Download, Search, ListFilter as Filter, ArrowRightLeft, DollarSign, CircleCheck as CheckCircle, Banknote, X } from 'lucide-react';
+import { TriangleAlert as AlertTriangle, Calendar, Mail, Clock, RefreshCw, Download, Search, ArrowRightLeft, DollarSign, CircleCheck as CheckCircle, Banknote, X, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { formatDate } from '../../utils/date';
-import { Avatar } from '../ui/Avatar';
+import { AAvatar, AStatus } from '../alfie/Kit';
 import { sendPaymentConfirmation, sendRenewalPendingNotification } from '../../utils/membershipUtils';
 import { updateMembershipTransactionStatus } from '../../utils/membershipFinanceUtils';
 
@@ -44,7 +43,7 @@ interface ExpiringMembershipsPanelProps {
   darkMode: boolean;
 }
 
-export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> = ({ darkMode }) => {
+export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> = () => {
   const { currentClub } = useAuth();
   const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(true);
@@ -602,596 +601,288 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
     }
   );
 
-  const getUrgencyColor = (days: number) => {
-    if (days <= 7) return 'text-red-400 bg-red-900/20 border-red-500/30';
-    if (days <= 14) return 'text-orange-400 bg-orange-900/20 border-orange-500/30';
-    return 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30';
-  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/10 border-t-[#0A84FF]"></div>
       </div>
     );
   }
 
+  const COLS = '20px minmax(220px,1.5fr) 112px 130px minmax(180px,1.2fr) 240px';
+  const PCOLS = '20px minmax(220px,1.5fr) 140px 110px 150px 130px 190px';
+  const shortDate = (d: string) => new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const TimeLeft = ({ days, overdue }: { days: number; overdue?: boolean }) => {
+    const filled = overdue ? 10 : Math.max(0, Math.min(10, Math.round(((filterDays - days) / filterDays) * 10)));
+    const tone = overdue || days <= 7 ? 'r' : 'a';
+    return (
+      <div>
+        <div className="flex gap-[3px]" aria-hidden="true">
+          {Array.from({ length: 10 }, (_, i) => <span key={i} className={`a-seg-bar ${i < filled ? `a-seg-bar-${tone}` : ''}`} />)}
+        </div>
+        <div className={`mt-1.5 text-[12.5px] ${tone === 'r' ? 'a-txt-r' : 'a-txt-a'}`}>
+          {overdue ? `${days} day${days === 1 ? '' : 's'} overdue` : days === 0 ? 'Renews today' : `Renews in ${days} day${days === 1 ? '' : 's'}`}
+        </div>
+      </div>
+    );
+  };
+  const Chk = ({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) => (
+    <button type="button" role="checkbox" aria-checked={on} aria-label={label} onClick={onClick} className={`a-chk ${on ? 'a-chk-on' : ''}`}>
+      {on && <Check size={13} strokeWidth={3} />}
+    </button>
+  );
+  const listCount = activeTab === 'pending' ? pendingRenewals.length : filteredMembers.length;
+  const allSelected = selectedMembers.size === listCount && listCount > 0;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-[22px]">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h3 className="text-xl font-semibold text-white">Membership Renewals</h3>
-          <p className="text-slate-400 text-sm mt-1">
-            Monitor and manage upcoming membership renewals
-          </p>
+          <h2 className="a-display a-ink m-0 text-[22px] font-semibold">Renewals</h2>
+          <p className="a-mute mt-1 text-sm">Monitor and manage upcoming membership renewals</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchExpiringMemberships}
-            className="px-4 py-2 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-colors flex items-center gap-2"
-          >
-            <RefreshCw size={16} />
-            Refresh
-          </button>
-          <button
-            onClick={handleExportCSV}
-            className="px-4 py-2 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-colors flex items-center gap-2"
-          >
-            <Download size={16} />
-            Export
-          </button>
+        <div className="flex items-center gap-2.5">
+          <button onClick={fetchExpiringMemberships} className="a-btn"><RefreshCw size={16} />Refresh</button>
+          <button onClick={handleExportCSV} className="a-btn"><Download size={16} />Export</button>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {pendingRenewals.length > 0 && (
-          <div
-            className="bg-orange-900/20 border border-orange-500/30 rounded-lg p-4 backdrop-blur-sm cursor-pointer hover:bg-orange-900/30 transition-colors"
-            onClick={() => { setActiveTab('pending'); setSelectedMembers(new Set()); }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-orange-400 font-medium">Pending Renewals</p>
-                <p className="text-2xl font-bold text-white mt-1">{pendingRenewals.length}</p>
-                <p className="text-xs text-orange-400/70 mt-1">Awaiting payment confirmation</p>
-              </div>
-              <div className="relative">
-                <Banknote className="text-orange-400" size={32} />
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-pulse" />
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.35fr] gap-4">
+        <div className="a-card flex items-center gap-3.5" style={{ padding: '16px 18px' }}>
+          <span className="a-tile"><AlertTriangle size={19} /></span>
+          <div className="flex-1"><p className="a-cap">Expiring soon</p><div className="a-num a-txt-a mt-1 text-[30px] font-semibold leading-none">{expiringMembers.length}</div></div>
+        </div>
+        <div className="a-card flex items-center gap-3.5" style={{ padding: '16px 18px' }}>
+          <span className="a-tile"><Clock size={19} /></span>
+          <div className="flex-1"><p className="a-cap">Overdue</p><div className="a-num a-txt-r mt-1 text-[30px] font-semibold leading-none">{overdueMembers.length}</div></div>
+        </div>
+        <div className="a-card flex items-center gap-3.5" style={{ padding: '16px 18px' }}>
+          <span className="a-tile"><Mail size={19} /></span>
+          <div className="flex-1"><p className="a-cap">Selected</p><div className="a-num a-ink mt-1 text-[30px] font-semibold leading-none">{selectedMembers.size}</div></div>
+          {activeTab === 'pending' ? (
+            <button onClick={handleBulkMarkPaid} disabled={bulkMarkingPaid || selectedMembers.size === 0} className="a-btn a-btn-g" style={{ height: 36, borderRadius: 11 }}>
+              {bulkMarkingPaid ? <RefreshCw size={15} className="animate-spin" /> : <CheckCircle size={15} />}Mark paid
+            </button>
+          ) : (
+            <div className="flex flex-wrap justify-end gap-2">
+              {selectedMembers.size > 0 && (
+                <button onClick={handleBulkRenew} disabled={bulkRenewing} className="a-btn" style={{ height: 36, borderRadius: 11 }}>
+                  <RefreshCw size={15} className={bulkRenewing ? 'animate-spin' : ''} />{bulkRenewing ? 'Renewing…' : 'Renew'}
+                </button>
+              )}
+              <button onClick={handleBulkSendReminders} disabled={selectedMembers.size === 0} className="a-btn a-btn-p" style={{ height: 36, borderRadius: 11 }}>
+                <Mail size={15} />Send reminders
+              </button>
             </div>
+          )}
+        </div>
+      </div>
+
+      <div className="a-card flex items-center gap-3.5" style={{ padding: '14px 18px' }}>
+        <span className="a-tile a-tile-sm"><Banknote size={17} /></span>
+        <div className="flex-1 min-w-0">
+          <div className="a-ink text-[14.5px] font-semibold">Renewal payments to confirm</div>
+          <div className="a-mute text-[13px] mt-0.5">
+            {pendingRenewals.length === 0
+              ? 'No pending renewal payments to confirm'
+              : `${pendingRenewals.length} member${pendingRenewals.length === 1 ? ' has' : 's have'} paid and ${pendingRenewals.length === 1 ? 'is' : 'are'} waiting for you to confirm the payment`}
           </div>
+        </div>
+        {pendingRenewals.length === 0 ? (
+          <AStatus tone="g">Up to date</AStatus>
+        ) : activeTab === 'pending' ? (
+          <AStatus tone="a">{pendingRenewals.length} waiting</AStatus>
+        ) : (
+          <button onClick={() => { setActiveTab('pending'); setSelectedMembers(new Set()); }} className="a-btn a-btn-a a-btn-sm">Review {pendingRenewals.length}</button>
         )}
-
-        <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4 backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-yellow-400">Expiring Soon</p>
-              <p className="text-2xl font-bold text-white mt-1">{expiringMembers.length}</p>
-            </div>
-            <AlertTriangle className="text-yellow-400" size={32} />
-          </div>
-        </div>
-
-        <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4 backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-red-400">Overdue</p>
-              <p className="text-2xl font-bold text-white mt-1">{overdueMembers.length}</p>
-            </div>
-            <Clock className="text-red-400" size={32} />
-          </div>
-        </div>
-
-        <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4 backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-blue-400">Selected</p>
-              <p className="text-2xl font-bold text-white mt-1">{selectedMembers.size}</p>
-            </div>
-            <Mail className="text-blue-400" size={32} />
-          </div>
-        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-700">
-        {pendingRenewals.length > 0 && (
-          <button
-            onClick={() => {
-              setActiveTab('pending');
-              setSelectedMembers(new Set());
-            }}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
-              activeTab === 'pending'
-                ? 'border-orange-500 text-orange-400'
-                : 'border-transparent text-slate-400 hover:text-slate-300'
-            }`}
-          >
-            <DollarSign size={16} />
-            Pending Renewals ({pendingRenewals.length})
-            <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="a-seg" role="tablist" aria-label="Renewals">
+          {pendingRenewals.length > 0 && (
+            <button role="tab" aria-selected={activeTab === 'pending'} onClick={() => { setActiveTab('pending'); setSelectedMembers(new Set()); }} className={`a-seg-i ${activeTab === 'pending' ? 'a-seg-on' : ''}`}>
+              <DollarSign size={16} />To confirm<span className="a-cnt a-cnt-amber">{pendingRenewals.length}</span>
+            </button>
+          )}
+          <button role="tab" aria-selected={activeTab === 'expiring'} onClick={() => { setActiveTab('expiring'); setSelectedMembers(new Set()); }} className={`a-seg-i ${activeTab === 'expiring' ? 'a-seg-on' : ''}`}>
+            <AlertTriangle size={16} />Expiring<span className="a-cnt">{expiringMembers.length}</span>
           </button>
-        )}
-        <button
-          onClick={() => {
-            setActiveTab('expiring');
-            setSelectedMembers(new Set());
-          }}
-          className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
-            activeTab === 'expiring'
-              ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          Expiring ({expiringMembers.length})
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab('overdue');
-            setSelectedMembers(new Set());
-          }}
-          className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
-            activeTab === 'overdue'
-              ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          Overdue ({overdueMembers.length})
-        </button>
-      </div>
-
-      {/* Filters and Actions */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-          <input
-            type="text"
-            placeholder="Search members..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <button role="tab" aria-selected={activeTab === 'overdue'} onClick={() => { setActiveTab('overdue'); setSelectedMembers(new Set()); }} className={`a-seg-i ${activeTab === 'overdue' ? 'a-seg-on' : ''}`}>
+            <Clock size={16} />Overdue<span className="a-cnt">{overdueMembers.length}</span>
+          </button>
         </div>
-
         {activeTab === 'expiring' && (
-          <div className="flex items-center gap-2">
-            <Filter size={18} className="text-slate-400" />
-            <select
-              value={filterDays}
-              onChange={(e) => setFilterDays(parseInt(e.target.value))}
-              className="px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+          <>
+            <label className="sr-only" htmlFor="renew-window">Show renewals due within</label>
+            <select id="renew-window" value={filterDays} onChange={(e) => setFilterDays(parseInt(e.target.value))} className="a-pick">
               <option value={7}>Next 7 days</option>
               <option value={14}>Next 14 days</option>
               <option value={30}>Next 30 days</option>
               <option value={60}>Next 60 days</option>
               <option value={90}>Next 90 days</option>
             </select>
-          </div>
+          </>
         )}
-
-        {selectedMembers.size > 0 && activeTab !== 'pending' && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleBulkSendReminders}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-            >
-              <Mail size={16} />
-              Send Reminders ({selectedMembers.size})
-            </button>
-            <button
-              onClick={handleBulkRenew}
-              disabled={bulkRenewing}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {bulkRenewing ? (
-                <>
-                  <RefreshCw size={16} className="animate-spin" />
-                  Renewing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw size={16} />
-                  Renew Selected ({selectedMembers.size})
-                </>
-              )}
-            </button>
-          </div>
-        )}
-
-        {selectedMembers.size > 0 && activeTab === 'pending' && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleBulkMarkPaid}
-              disabled={bulkMarkingPaid}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {bulkMarkingPaid ? (
-                <>
-                  <RefreshCw size={16} className="animate-spin" />
-                  Marking Paid...
-                </>
-              ) : (
-                <>
-                  <CheckCircle size={16} />
-                  Mark Paid ({selectedMembers.size})
-                </>
-              )}
-            </button>
-          </div>
-        )}
+        <label className="a-field flex-1 min-w-[220px]">
+          <Search size={17} />
+          <span className="sr-only">Search members</span>
+          <input type="text" placeholder="Search members" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        </label>
       </div>
 
-      {/* Pending Renewals List */}
       {activeTab === 'pending' && (
-        <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 backdrop-blur-sm overflow-hidden">
-          {pendingRenewals.length === 0 ? (
-            <div className="text-center py-12">
-              <CheckCircle size={48} className="mx-auto mb-4 text-green-600" />
-              <p className="text-slate-400">No pending renewal payments to confirm</p>
-            </div>
-          ) : (
-            <div>
-              <div className="px-4 py-3 bg-orange-900/20 border-b border-orange-500/20">
-                <p className="text-sm text-orange-300">
-                  These members have submitted renewal payments and are waiting for you to confirm receipt of payment.
-                </p>
+        pendingRenewals.length === 0 ? (
+          <div className="a-card a-empty" style={{ padding: '36px 24px' }}>
+            <span className="a-tile" style={{ width: 56, height: 56 }}><CheckCircle size={24} /></span>
+            <div className="a-display a-ink text-lg font-semibold">Nothing to confirm</div>
+            <p className="a-mute m-0 text-sm">No pending renewal payments to confirm.</p>
+          </div>
+        ) : (
+          <div className="a-card overflow-x-auto">
+            <div className="min-w-[1000px]">
+              <div className="grid gap-4 items-center px-[18px] py-3 a-thead" style={{ gridTemplateColumns: PCOLS }}>
+                <Chk on={allSelected} onClick={toggleSelectAll} label="Select all" />
+                <p className="a-cap">Member</p><p className="a-cap">Membership</p><p className="a-cap">Amount</p><p className="a-cap">Payment</p><p className="a-cap">Submitted</p><p className="a-cap text-right">Actions</p>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-700/50">
-                    <tr>
-                      <th className="px-4 py-3 text-left">
-                        <input
-                          type="checkbox"
-                          checked={selectedMembers.size === pendingRenewals.length && pendingRenewals.length > 0}
-                          onChange={toggleSelectAll}
-                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-slate-700 border-slate-500"
-                        />
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Member</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Membership</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Amount</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Payment Method</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Submitted</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-700">
-                    {pendingRenewals.map((renewal) => (
-                      <tr key={renewal.id} className="hover:bg-slate-700/30 transition-colors">
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedMembers.has(renewal.id)}
-                            onChange={() => toggleSelectMember(renewal.id)}
-                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-slate-700 border-slate-500"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <Avatar
-                              name={`${renewal.first_name} ${renewal.last_name}`}
-                              imageUrl={renewal.avatar_url}
-                              size="sm"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-white font-medium">
-                                {renewal.first_name} {renewal.last_name}
-                              </span>
-                              <span className="text-slate-400 text-sm">{renewal.email}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-slate-300">{renewal.membership_level}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-green-400 font-medium">${renewal.payment_amount.toFixed(2)}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-700 text-slate-300">
-                            <Banknote size={12} />
-                            {renewal.payment_method === 'bank_transfer' ? 'Bank Transfer' : renewal.payment_method}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-slate-300 text-sm">
-                            {new Date(renewal.payment_date).toLocaleDateString('en-AU', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                            })}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => handleConfirmRenewalPayment(renewal)}
-                            disabled={confirmingPayment === renewal.id}
-                            className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ml-auto"
-                          >
-                            {confirmingPayment === renewal.id ? (
-                              <>
-                                <RefreshCw size={14} className="animate-spin" />
-                                Confirming...
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle size={14} />
-                                Confirm Payment
-                              </>
-                            )}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {pendingRenewals.map((renewal) => (
+                <div key={renewal.id} className={`a-row a-row-hover grid gap-4 ${selectedMembers.has(renewal.id) ? 'a-row-sel' : ''}`} style={{ display: 'grid', gridTemplateColumns: PCOLS }}>
+                  <Chk on={selectedMembers.has(renewal.id)} onClick={() => toggleSelectMember(renewal.id)} label={`Select ${renewal.first_name} ${renewal.last_name}`} />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <AAvatar url={renewal.avatar_url} first={renewal.first_name} last={renewal.last_name} />
+                    <div className="min-w-0"><div className="a-ink text-[14.5px] font-semibold truncate">{renewal.first_name} {renewal.last_name}</div><div className="a-dim text-[12.5px] truncate">{renewal.email}</div></div>
+                  </div>
+                  <span className="a-lb-fmt justify-self-start"><span className="a-light a-light-b" style={{ boxShadow: 'none' }} />{renewal.membership_level}</span>
+                  <span className="a-num a-txt-g text-[15px] font-semibold">${renewal.payment_amount.toFixed(2)}</span>
+                  <span className="a-mute text-[13px]">{renewal.payment_method === 'bank_transfer' ? 'Bank transfer' : renewal.payment_method}</span>
+                  <span className="a-mute a-num text-[13px]" style={{ letterSpacing: 0 }}>{shortDate(renewal.payment_date)}</span>
+                  <div className="flex justify-end">
+                    <button onClick={() => handleConfirmRenewalPayment(renewal)} disabled={confirmingPayment === renewal.id} className="a-btn a-btn-g" style={{ height: 36 }}>
+                      {confirmingPayment === renewal.id ? <><RefreshCw size={14} className="animate-spin" />Confirming…</> : <><CheckCircle size={14} />Confirm payment</>}
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        )
       )}
 
-      {/* Expiring/Overdue Members List */}
       {activeTab !== 'pending' && (
-      <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 backdrop-blur-sm overflow-hidden">
-        {filteredMembers.length === 0 ? (
-          <div className="text-center py-12">
-            <Calendar size={48} className="mx-auto mb-4 text-slate-600" />
-            <p className="text-slate-400">
+        filteredMembers.length === 0 ? (
+          <div className="a-card a-empty" style={{ padding: '36px 24px' }}>
+            <span className="a-tile" style={{ width: 56, height: 56 }}><Calendar size={24} /></span>
+            <div className="a-display a-ink text-lg font-semibold">
+              {searchQuery ? 'No members match' : activeTab === 'expiring' ? 'No renewals due' : 'Nobody is overdue'}
+            </div>
+            <p className="a-mute m-0 text-sm">
               {searchQuery
-                ? 'No members found matching your search'
+                ? 'Try a different name or email.'
                 : activeTab === 'expiring'
-                ? 'No memberships expiring in the selected period'
-                : 'No overdue memberships'}
+                  ? `Nobody's membership expires in the next ${filterDays} days.`
+                  : 'Every membership is current.'}
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-700/50">
-                <tr>
-                  <th className="px-4 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedMembers.size === filteredMembers.length && filteredMembers.length > 0}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-slate-700 border-slate-500"
-                    />
-                  </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Member</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Contact</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Membership</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Migration</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Renewal Date</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Status</th>
-                  <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700">
-                {filteredMembers.map((member) => (
-                  <tr key={member.member_id} className="hover:bg-slate-700/30 transition-colors">
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedMembers.has(member.member_id)}
-                        onChange={() => toggleSelectMember(member.member_id)}
-                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-slate-700 border-slate-500"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="text-white font-medium">
-                          {member.first_name} {member.last_name}
-                        </span>
-                        <span className="text-slate-400 text-sm">{member.email}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col text-sm text-slate-300">
-                        {member.phone && (
-                          <span className="flex items-center gap-1">
-                            <Phone size={14} />
-                            {member.phone}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-slate-300">{member.membership_level}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {replacementMap[member.membership_level] ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">
-                          <ArrowRightLeft size={12} />
-                          {replacementMap[member.membership_level]}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 text-xs">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-slate-300">{formatDate(member.renewal_date)}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {activeTab === 'expiring' ? (
-                        <span className={`px-2 py-1 text-xs rounded-full border ${getUrgencyColor(member.days_until_expiry)}`}>
-                          {member.days_until_expiry} days left
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 text-xs rounded-full border text-red-400 bg-red-900/20 border-red-500/30">
-                          {member.days_overdue} days overdue
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleSendReminder(member.member_id)}
-                          className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-                        >
-                          Send Reminder
-                        </button>
-                        <button
-                          onClick={() => openRenewModal(member)}
-                          disabled={renewingMember === member.member_id}
-                          className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                        >
-                          {renewingMember === member.member_id ? (
-                            <>
-                              <RefreshCw size={12} className="animate-spin" />
-                              Renewing...
-                            </>
-                          ) : (
-                            'Renew'
-                          )}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="a-card overflow-x-auto">
+            <div className="min-w-[980px]">
+              <div className="grid gap-4 items-center px-[18px] py-3 a-thead" style={{ gridTemplateColumns: COLS }}>
+                <Chk on={allSelected} onClick={toggleSelectAll} label="Select all" />
+                <p className="a-cap">Member</p><p className="a-cap">Type</p><p className="a-cap">Renewal date</p><p className="a-cap">Time left</p><p className="a-cap text-right">Actions</p>
+              </div>
+              {filteredMembers.map((member) => (
+                <div key={member.member_id} className={`a-row a-row-hover grid gap-4 ${selectedMembers.has(member.member_id) ? 'a-row-sel' : ''}`} style={{ display: 'grid', gridTemplateColumns: COLS }}>
+                  <Chk on={selectedMembers.has(member.member_id)} onClick={() => toggleSelectMember(member.member_id)} label={`Select ${member.first_name} ${member.last_name}`} />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <AAvatar first={member.first_name} last={member.last_name} />
+                    <div className="min-w-0"><div className="a-ink text-[14.5px] font-semibold truncate">{member.first_name} {member.last_name}</div><div className="a-dim text-[12.5px] truncate">{member.email}</div></div>
+                  </div>
+                  <div className="flex flex-col items-start gap-1 min-w-0">
+                    <span className="a-lb-fmt"><span className="a-light a-light-b" style={{ boxShadow: 'none' }} />{member.membership_level}</span>
+                    {replacementMap[member.membership_level] && (
+                      <span className="a-txt-a text-[11.5px] inline-flex items-center gap-1" title="Renews as"><ArrowRightLeft size={11} />{replacementMap[member.membership_level]}</span>
+                    )}
+                  </div>
+                  <span className="a-mute a-num text-[13px]" style={{ letterSpacing: 0 }}>{shortDate(member.renewal_date)}</span>
+                  {activeTab === 'expiring'
+                    ? <TimeLeft days={member.days_until_expiry} />
+                    : <TimeLeft days={member.days_overdue} overdue />}
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => handleSendReminder(member.member_id)} className="a-btn" style={{ height: 36 }}><Mail size={15} />Remind</button>
+                    <button onClick={() => openRenewModal(member)} disabled={renewingMember === member.member_id} className="a-btn a-btn-p" style={{ height: 36 }}>
+                      <RefreshCw size={15} className={renewingMember === member.member_id ? 'animate-spin' : ''} />{renewingMember === member.member_id ? 'Renewing…' : 'Renew'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
-      </div>
+        )
       )}
 
-      {/* Renew Member Modal */}
       {showRenewModal && renewTarget && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Renew Membership</h3>
-              <button
-                onClick={() => { setShowRenewModal(false); setRenewTarget(null); }}
-                className="text-slate-400 hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="a-sheet w-full max-w-md">
+            <div className="a-panel-head">
+              <span className="a-tile a-tile-rim"><RefreshCw size={18} /></span>
+              <div className="flex-1 min-w-0">
+                <p className="a-cap">Renew membership</p>
+                <h3 className="a-display a-ink text-xl font-semibold mt-[3px] truncate">{renewTarget.first_name} {renewTarget.last_name}</h3>
+              </div>
+              <button onClick={() => { setShowRenewModal(false); setRenewTarget(null); }} className="a-ib" aria-label="Close"><X size={20} /></button>
             </div>
-
-            <div className="mb-4">
-              <p className="text-slate-300">
-                Renewing membership for <span className="font-medium text-white">{renewTarget.first_name} {renewTarget.last_name}</span>
-              </p>
-              <p className="text-slate-400 text-sm mt-1">
-                Current type: {renewTarget.membership_level}
-              </p>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Renew as membership type
+            <div className="p-[22px] flex flex-col gap-4">
+              <p className="a-mute text-sm m-0">Current type: <span className="a-ink font-medium">{renewTarget.membership_level}</span></p>
+              <label>
+                <span className="a-flab">Renew as membership type</span>
+                <select value={selectedMembershipType} onChange={(e) => setSelectedMembershipType(e.target.value)} className="a-inp">
+                  {!membershipTypes.some(t => t.name === renewTarget.membership_level) && (
+                    <option value={renewTarget.membership_level}>{renewTarget.membership_level} (Current)</option>
+                  )}
+                  {membershipTypes.map((type) => (
+                    <option key={type.id} value={type.name}>{type.name} {type.fee > 0 ? `($${type.fee.toFixed(2)})` : '(Free)'}</option>
+                  ))}
+                </select>
               </label>
-              <select
-                value={selectedMembershipType}
-                onChange={(e) => setSelectedMembershipType(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                {!membershipTypes.some(t => t.name === renewTarget.membership_level) && (
-                  <option value={renewTarget.membership_level}>
-                    {renewTarget.membership_level} (Current)
-                  </option>
-                )}
-                {membershipTypes.map((type) => (
-                  <option key={type.id} value={type.name}>
-                    {type.name} {type.fee > 0 ? `($${type.fee.toFixed(2)})` : '(Free)'}
-                  </option>
-                ))}
-              </select>
               {selectedMembershipType !== renewTarget.membership_level && (
-                <p className="text-sm text-amber-400 mt-2">
-                  Membership type will be changed from "{renewTarget.membership_level}" to "{selectedMembershipType}"
-                </p>
+                <p className="a-txt-a text-[13px] m-0">Membership type will change from "{renewTarget.membership_level}" to "{selectedMembershipType}"</p>
               )}
             </div>
-
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => { setShowRenewModal(false); setRenewTarget(null); }}
-                className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleRenewMember(renewTarget, selectedMembershipType)}
-                disabled={renewingMember === renewTarget.member_id}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {renewingMember === renewTarget.member_id ? (
-                  <>
-                    <RefreshCw size={14} className="animate-spin" />
-                    Renewing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle size={14} />
-                    Confirm Renewal
-                  </>
-                )}
+            <div className="a-panel-foot">
+              <button onClick={() => { setShowRenewModal(false); setRenewTarget(null); }} className="a-btn">Cancel</button>
+              <button onClick={() => handleRenewMember(renewTarget, selectedMembershipType)} disabled={renewingMember === renewTarget.member_id} className="a-btn a-btn-p">
+                {renewingMember === renewTarget.member_id ? <><RefreshCw size={14} className="animate-spin" />Renewing…</> : <><CheckCircle size={14} />Confirm renewal</>}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Bulk Renew Modal */}
       {showBulkRenewModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Bulk Renew Memberships</h3>
-              <button
-                onClick={() => { setShowBulkRenewModal(false); setBulkRenewType(''); }}
-                className="text-slate-400 hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="a-sheet w-full max-w-md">
+            <div className="a-panel-head">
+              <span className="a-tile a-tile-rim"><RefreshCw size={18} /></span>
+              <div className="flex-1 min-w-0">
+                <p className="a-cap">Bulk renew</p>
+                <h3 className="a-display a-ink text-xl font-semibold mt-[3px]">{selectedMembers.size} selected member{selectedMembers.size !== 1 ? 's' : ''}</h3>
+              </div>
+              <button onClick={() => { setShowBulkRenewModal(false); setBulkRenewType(''); }} className="a-ib" aria-label="Close"><X size={20} /></button>
             </div>
-
-            <div className="mb-4">
-              <p className="text-slate-300">
-                Renewing <span className="font-medium text-white">{selectedMembers.size}</span> selected member{selectedMembers.size !== 1 ? 's' : ''}
-              </p>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Renew all as membership type (optional)
+            <div className="p-[22px]">
+              <label>
+                <span className="a-flab">Renew all as membership type (optional)</span>
+                <select value={bulkRenewType} onChange={(e) => setBulkRenewType(e.target.value)} className="a-inp">
+                  <option value="">Keep each member's current type</option>
+                  {membershipTypes.map((type) => (
+                    <option key={type.id} value={type.name}>{type.name} {type.fee > 0 ? `($${type.fee.toFixed(2)})` : '(Free)'}</option>
+                  ))}
+                </select>
               </label>
-              <select
-                value={bulkRenewType}
-                onChange={(e) => setBulkRenewType(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Keep each member's current type</option>
-                {membershipTypes.map((type) => (
-                  <option key={type.id} value={type.name}>
-                    {type.name} {type.fee > 0 ? `($${type.fee.toFixed(2)})` : '(Free)'}
-                  </option>
-                ))}
-              </select>
             </div>
-
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => { setShowBulkRenewModal(false); setBulkRenewType(''); }}
-                className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={executeBulkRenew}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-              >
-                <CheckCircle size={14} />
-                Renew {selectedMembers.size} Member{selectedMembers.size !== 1 ? 's' : ''}
-              </button>
+            <div className="a-panel-foot">
+              <button onClick={() => { setShowBulkRenewModal(false); setBulkRenewType(''); }} className="a-btn">Cancel</button>
+              <button onClick={executeBulkRenew} className="a-btn a-btn-p"><CheckCircle size={14} />Renew {selectedMembers.size} member{selectedMembers.size !== 1 ? 's' : ''}</button>
             </div>
           </div>
         </div>
