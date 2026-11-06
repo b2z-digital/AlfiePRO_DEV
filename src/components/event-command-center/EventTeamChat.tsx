@@ -56,7 +56,7 @@ export const EventTeamChat: React.FC<EventTeamChatProps> = ({ eventId, darkMode 
       }
     } catch (error) {
       console.error('Error loading channels:', error);
-      addNotification('Failed to load channels', 'error');
+      addNotification('error', 'Failed to load channels');
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ export const EventTeamChat: React.FC<EventTeamChatProps> = ({ eventId, darkMode 
       setMessages(messagesData);
     } catch (error) {
       console.error('Error loading messages:', error);
-      addNotification('Failed to load messages', 'error');
+      addNotification('error', 'Failed to load messages');
     }
   };
 
@@ -113,7 +113,7 @@ export const EventTeamChat: React.FC<EventTeamChatProps> = ({ eventId, darkMode 
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
-      addNotification('Failed to send message', 'error');
+      addNotification('error', 'Failed to send message');
     } finally {
       setSending(false);
     }
@@ -142,10 +142,10 @@ export const EventTeamChat: React.FC<EventTeamChatProps> = ({ eventId, darkMode 
 
       setChannels([...channels, newChannel]);
       setActiveChannel(newChannel);
-      addNotification('Channel created successfully', 'success');
+      addNotification('success', 'Channel created successfully');
     } catch (error) {
       console.error('Error creating channel:', error);
-      addNotification('Failed to create channel', 'error');
+      addNotification('error', 'Failed to create channel');
     }
   };
 

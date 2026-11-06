@@ -182,10 +182,10 @@ export const EventWebsiteNewsManager: React.FC<EventWebsiteNewsManagerProps> = (
       if (error) throw error;
 
       setArticles(articles.filter(article => article.id !== deleteConfirm.articleId));
-      addNotification('Article deleted successfully', 'success');
+      addNotification('success', 'Article deleted successfully');
     } catch (err) {
       console.error('Error deleting article:', err);
-      addNotification('Failed to delete article', 'error');
+      addNotification('error', 'Failed to delete article');
     } finally {
       setDeleteConfirm({ show: false, articleId: null });
     }

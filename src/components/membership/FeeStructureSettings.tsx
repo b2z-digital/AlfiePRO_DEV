@@ -42,11 +42,7 @@ export const FeeStructureSettings: React.FC<FeeStructureSettingsProps> = ({
       setFeeStructures(data);
     } catch (error) {
       console.error('Error loading fee structures:', error);
-      addNotification({
-        type: 'error',
-        message: 'Failed to load fee structures',
-        duration: 3000
-      });
+      addNotification('error', 'Failed to load fee structures');
     } finally {
       setLoading(false);
     }
@@ -73,11 +69,7 @@ export const FeeStructureSettings: React.FC<FeeStructureSettingsProps> = ({
       const result = await saveFeeStructure(structureData);
 
       if (result) {
-        addNotification({
-          type: 'success',
-          message: editingId ? 'Fee structure updated successfully' : 'Fee structure created successfully',
-          duration: 3000
-        });
+        addNotification('success', editingId ? 'Fee structure updated successfully' : 'Fee structure created successfully');
 
         setShowAddForm(false);
         setEditingId(null);
@@ -88,11 +80,7 @@ export const FeeStructureSettings: React.FC<FeeStructureSettingsProps> = ({
       }
     } catch (error) {
       console.error('Error saving fee structure:', error);
-      addNotification({
-        type: 'error',
-        message: 'Failed to save fee structure. Please try again.',
-        duration: 5000
-      });
+      addNotification('error', 'Failed to save fee structure. Please try again.');
     }
   };
 

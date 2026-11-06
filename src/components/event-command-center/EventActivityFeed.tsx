@@ -43,7 +43,7 @@ export const EventActivityFeed: React.FC<EventActivityFeedProps> = ({ eventId, d
       setActivities(activitiesData);
     } catch (error) {
       console.error('Error loading activities:', error);
-      addNotification('Failed to load activity feed', 'error');
+      addNotification('error', 'Failed to load activity feed');
     } finally {
       setLoading(false);
     }

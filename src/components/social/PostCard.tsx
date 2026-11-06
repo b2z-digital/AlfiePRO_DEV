@@ -77,14 +77,14 @@ export default function PostCard({ post, onUpdate, darkMode = false, onAuthorCli
         await socialStorage.deletePostAsAdmin(post.id);
       }
       setShowDeleteConfirmation(false);
-      addNotification('Post deleted successfully', 'success');
+      addNotification('success', 'Post deleted successfully');
       onUpdate?.();
     } catch (error: any) {
       console.error('Error deleting post:', error);
       const msg = error?.message?.includes('permission')
         ? 'You do not have permission to delete this post'
         : 'Failed to delete post. Please try again.';
-      addNotification(msg, 'error');
+      addNotification('error', msg);
       setShowDeleteConfirmation(false);
     }
   };
@@ -291,7 +291,7 @@ export default function PostCard({ post, onUpdate, darkMode = false, onAuthorCli
         groupId={post.group_id}
         darkMode={darkMode}
         onReported={() => {
-          addNotification('Post reported. Club admins have been notified.', 'success');
+          addNotification('success', 'Post reported. Club admins have been notified.');
         }}
       />
 

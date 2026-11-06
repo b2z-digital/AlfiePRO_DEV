@@ -102,7 +102,7 @@ export default function TuningGuidesTab({ darkMode }: TuningGuidesTabProps) {
       setUploadForm({ name: '', boat_type: '', hull_type: '', description: '', version: '1.0', file: null, inputType: 'pdf', content_text: '' });
 
       if (uploadForm.inputType === 'text') {
-        addNotification({ type: 'success', title: 'Guide Added', message: `"${guide.name}" is being processed automatically.` });
+        addNotification('success', `"${guide.name}" is being processed automatically.`);
         try {
           await triggerGuideProcessing(guide.id);
           setGuides(prev => prev.map(g => g.id === guide.id ? { ...g, status: 'processing' as const } : g));
@@ -119,10 +119,10 @@ export default function TuningGuidesTab({ darkMode }: TuningGuidesTabProps) {
           setTimeout(() => clearInterval(pollInterval), 120000);
         } catch { /* ignore auto-process errors */ }
       } else {
-        addNotification({ type: 'success', title: 'Guide Added', message: `"${guide.name}" has been added. Click Process to extract knowledge.` });
+        addNotification('success', `"${guide.name}" has been added. Click Process to extract knowledge.`);
       }
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Upload Failed', message: err.message });
+      addNotification('error', err.message);
     } finally {
       setUploading(false);
     }
@@ -133,7 +133,7 @@ export default function TuningGuidesTab({ darkMode }: TuningGuidesTabProps) {
     try {
       await triggerGuideProcessing(guide.id);
       setGuides(prev => prev.map(g => g.id === guide.id ? { ...g, status: 'processing' as const, processing_error: null } : g));
-      addNotification({ type: 'success', title: 'Processing Started', message: `"${guide.name}" is being processed. This may take a few minutes.` });
+      addNotification('success', `"${guide.name}" is being processed. This may take a few minutes.`);
       const pollInterval = setInterval(async () => {
         try {
           const updated = await getTuningGuides();
@@ -146,7 +146,7 @@ export default function TuningGuidesTab({ darkMode }: TuningGuidesTabProps) {
       }, 5000);
       setTimeout(() => clearInterval(pollInterval), 120000);
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Processing Failed', message: err.message });
+      addNotification('error', err.message);
       loadData();
     } finally {
       setProcessingGuides(prev => {
@@ -162,7 +162,7 @@ export default function TuningGuidesTab({ darkMode }: TuningGuidesTabProps) {
       const updated = await updateTuningGuide(guide.id, { is_active: !guide.is_active });
       setGuides(prev => prev.map(g => g.id === guide.id ? updated : g));
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Update Failed', message: err.message });
+      addNotification('error', err.message);
     }
   };
 
@@ -189,9 +189,9 @@ export default function TuningGuidesTab({ darkMode }: TuningGuidesTabProps) {
       setGuides(prev => prev.map(g => g.id === updated.id ? updated : g));
       setShowEditModal(false);
       setEditingGuide(null);
-      addNotification({ type: 'success', title: 'Guide Updated', message: 'Tuning guide details have been updated.' });
+      addNotification('success', 'Tuning guide details have been updated.');
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Update Failed', message: err.message });
+      addNotification('error', err.message);
     }
   };
 
@@ -200,9 +200,9 @@ export default function TuningGuidesTab({ darkMode }: TuningGuidesTabProps) {
     try {
       await deleteTuningGuide(guideToDelete);
       setGuides(prev => prev.filter(g => g.id !== guideToDelete));
-      addNotification({ type: 'success', title: 'Guide Deleted', message: 'Tuning guide and associated knowledge have been removed.' });
+      addNotification('success', 'Tuning guide and associated knowledge have been removed.');
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Delete Failed', message: err.message });
+      addNotification('error', err.message);
     } finally {
       setDeleteConfirmOpen(false);
       setGuideToDelete(null);

@@ -122,12 +122,12 @@ export const CampaignCreationWizard: React.FC<CampaignCreationWizardProps> = ({ 
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      addNotification('Please upload an image file', 'error');
+      addNotification('error', 'Please upload an image file');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      addNotification('Image size should be less than 5MB', 'error');
+      addNotification('error', 'Image size should be less than 5MB');
       return;
     }
 
@@ -164,33 +164,33 @@ export const CampaignCreationWizard: React.FC<CampaignCreationWizardProps> = ({ 
     switch (step) {
       case 1:
         if (!campaignData.advertiser_id || !campaignData.name.trim()) {
-          addNotification('Please fill in all required fields', 'error');
+          addNotification('error', 'Please fill in all required fields');
           return false;
         }
         return true;
       case 2:
         if (banners.length === 0) {
-          addNotification('Please add at least one banner', 'error');
+          addNotification('error', 'Please add at least one banner');
           return false;
         }
         for (const banner of banners) {
           if (!banner.name.trim()) {
-            addNotification('Please provide a name for all banners', 'error');
+            addNotification('error', 'Please provide a name for all banners');
             return false;
           }
           if (banner.ad_type === 'image' && !banner.image_url) {
-            addNotification('Please upload an image for all image banners', 'error');
+            addNotification('error', 'Please upload an image for all image banners');
             return false;
           }
         }
         return true;
       case 3:
         if (!targetingData.start_date || !targetingData.end_date) {
-          addNotification('Please select start and end dates', 'error');
+          addNotification('error', 'Please select start and end dates');
           return false;
         }
         if (new Date(targetingData.end_date) < new Date(targetingData.start_date)) {
-          addNotification('End date must be after start date', 'error');
+          addNotification('error', 'End date must be after start date');
           return false;
         }
         return true;
@@ -288,11 +288,11 @@ export const CampaignCreationWizard: React.FC<CampaignCreationWizardProps> = ({ 
         await advertisingStorage.createBanner(bannerPayload);
       }
 
-      addNotification('Campaign created successfully with all banners!', 'success');
+      addNotification('success', 'Campaign created successfully with all banners!');
       onClose(true);
     } catch (error) {
       console.error('Error creating campaign:', error);
-      addNotification('Failed to create campaign', 'error');
+      addNotification('error', 'Failed to create campaign');
     } finally {
       setLoading(false);
       setUploadingBannerId(null);

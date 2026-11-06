@@ -1932,7 +1932,7 @@ export const EventPageBuilderInline: React.FC<Props> = ({ websiteId, pageSlug, p
       setShowRowLayoutSelector(false);
     } catch (error) {
       console.error('Error adding row:', error);
-      addNotification('Failed to add row', 'error');
+      addNotification('error', 'Failed to add row');
       setShowRowLayoutSelector(false);
     }
   };
@@ -2376,14 +2376,14 @@ export const EventPageBuilderInline: React.FC<Props> = ({ websiteId, pageSlug, p
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2000);
         console.log('Page saved successfully!');
-        addNotification('Successfully Updated', 'success');
+        addNotification('success', 'Successfully Updated');
       } else {
         console.error('Save returned false');
-        addNotification('Failed to save page. Please try again.', 'error');
+        addNotification('error', 'Failed to save page. Please try again.');
       }
     } catch (error) {
       console.error('Error saving layout:', error);
-      addNotification(`Failed to save page: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      addNotification('error', `Failed to save page: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -3060,7 +3060,7 @@ export const EventPageBuilderInline: React.FC<Props> = ({ websiteId, pageSlug, p
 
                     if (error) throw error;
 
-                    addNotification('Page settings saved successfully!', 'success');
+                    addNotification('success', 'Page settings saved successfully!');
                     setShowPageSettings(false);
 
                     // Reload page settings to reflect any database changes

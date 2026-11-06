@@ -39,7 +39,7 @@ export const PlacementsTab: React.FC = () => {
       setActiveBanners(bannersMap);
     } catch (error) {
       console.error('Error loading placements:', error);
-      addNotification('Failed to load placements', 'error');
+      addNotification('error', 'Failed to load placements');
     } finally {
       setLoading(false);
     }
@@ -57,11 +57,11 @@ export const PlacementsTab: React.FC = () => {
 
     try {
       await advertisingStorage.deletePlacement(id);
-      addNotification('Placement deleted successfully', 'success');
+      addNotification('success', 'Placement deleted successfully');
       loadPlacements();
     } catch (error) {
       console.error('Error deleting placement:', error);
-      addNotification('Failed to delete placement', 'error');
+      addNotification('error', 'Failed to delete placement');
     }
   };
 
@@ -70,11 +70,11 @@ export const PlacementsTab: React.FC = () => {
       await advertisingStorage.updatePlacement(placement.id, {
         is_active: !placement.is_active,
       });
-      addNotification('Placement status updated', 'success');
+      addNotification('success', 'Placement status updated');
       loadPlacements();
     } catch (error) {
       console.error('Error updating placement:', error);
-      addNotification('Failed to update placement', 'error');
+      addNotification('error', 'Failed to update placement');
     }
   };
 

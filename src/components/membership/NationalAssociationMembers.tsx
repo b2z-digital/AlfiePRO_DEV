@@ -419,7 +419,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
     }
 
     if (totalCreated > 0) {
-      addNotification(`${totalCreated} member${totalCreated === 1 ? '' : 's'} activated and invited to AlfiePRO`, 'success');
+      addNotification('success', `${totalCreated} member${totalCreated === 1 ? '' : 's'} activated and invited to AlfiePRO`);
       loadNationalAssociationData();
     }
   };
@@ -432,13 +432,13 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
         .from('profiles')
         .update({ default_club_id: selectedDefaultClubId, primary_club_id: selectedDefaultClubId })
         .eq('id', defaultClubMember.user_id);
-      addNotification(`Default club updated for ${defaultClubMember.first_name} ${defaultClubMember.last_name}`, 'success');
+      addNotification('success', `Default club updated for ${defaultClubMember.first_name} ${defaultClubMember.last_name}`);
       setShowDefaultClubModal(false);
       setDefaultClubMember(null);
       setSelectedDefaultClubId('');
     } catch (err) {
       console.error('Error setting default club:', err);
-      addNotification('Failed to update default club', 'error');
+      addNotification('error', 'Failed to update default club');
     }
     setSettingDefaultClub(false);
   };

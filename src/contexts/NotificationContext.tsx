@@ -25,7 +25,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       id,
       type,
       message,
-      duration: duration || (type === 'info' ? 8000 : 5000)
+      duration: typeof duration === 'number' && duration > 0 ? duration : (type === 'info' ? 8000 : 5000)
     };
 
     setNotifications(prev => [...prev, newNotification]);

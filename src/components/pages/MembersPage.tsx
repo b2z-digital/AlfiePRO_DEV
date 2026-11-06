@@ -296,14 +296,14 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       if (error) throw error;
       if (data?.success) {
         const count = data.linked_count || 0;
-        addNotification(count > 0 ? `${count} member${count === 1 ? '' : 's'} linked to their accounts` : 'No new matches to link', 'success');
+        addNotification('success', count > 0 ? `${count} member${count === 1 ? '' : 's'} linked to their accounts` : 'No new matches to link');
         if (count > 0) {
           await fetchMembers();
           setEmailMatches({});
         }
       }
     } catch (err: any) {
-      addNotification(err.message || 'Failed to auto-link members', 'error');
+      addNotification('error', err.message || 'Failed to auto-link members');
     } finally {
       setAutoLinking(false);
     }
@@ -321,16 +321,16 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       });
       if (error) throw error;
       if (data?.success) {
-        addNotification('Member linked to their account', 'success');
+        addNotification('success', 'Member linked to their account');
         await fetchMembers();
         const newMatches = { ...emailMatches };
         delete newMatches[memberId];
         setEmailMatches(newMatches);
       } else {
-        addNotification(data?.error || 'Failed to link', 'error');
+        addNotification('error', data?.error || 'Failed to link');
       }
     } catch (err: any) {
-      addNotification(err.message || 'Failed to link member', 'error');
+      addNotification('error', err.message || 'Failed to link member');
     } finally {
       setLinkingMemberId(null);
     }
@@ -424,7 +424,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
       if (error) throw error;
 
-      addNotification('Filter preset deleted', 'success');
+      addNotification('success', 'Filter preset deleted');
       fetchFilterPresets();
 
       if (activeFilterPreset?.id === presetId) {
@@ -432,14 +432,14 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       }
     } catch (err) {
       console.error('Error deleting preset:', err);
-      addNotification('Failed to delete preset', 'error');
+      addNotification('error', 'Failed to delete preset');
     }
   };
 
   const handleSaveFilterSuccess = () => {
     fetchFilterPresets();
     setShowSaveFilterModal(false);
-    addNotification('Filter saved successfully', 'success');
+    addNotification('success', 'Filter saved successfully');
   };
 
   const fetchMembers = async (showLoadingState = true) => {
@@ -629,11 +629,11 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         throw new Error(result.error || 'Failed to restore member');
       }
 
-      addNotification(`${member.first_name} ${member.last_name} restored successfully`, 'success');
+      addNotification('success', `${member.first_name} ${member.last_name} restored successfully`);
       fetchMembers();
     } catch (err) {
       console.error('Error restoring member:', err);
-      addNotification(err instanceof Error ? err.message : 'Failed to restore member', 'error');
+      addNotification('error', err instanceof Error ? err.message : 'Failed to restore member');
     }
   };
 
@@ -655,11 +655,11 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
       if (error) throw error;
 
-      addNotification(`${member.first_name} ${member.last_name} reactivated successfully`, 'success');
+      addNotification('success', `${member.first_name} ${member.last_name} reactivated successfully`);
       fetchMembers();
     } catch (err) {
       console.error('Error reactivating member:', err);
-      addNotification(err instanceof Error ? err.message : 'Failed to reactivate member', 'error');
+      addNotification('error', err instanceof Error ? err.message : 'Failed to reactivate member');
     }
   };
 
@@ -687,7 +687,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         message += ' Authentication access removed.';
       }
 
-      addNotification(message, 'success');
+      addNotification('success', message);
 
       setShowArchiveModal(false);
       setMemberToArchive(null);
@@ -695,7 +695,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
     } catch (err) {
       console.error('Error archiving member:', err);
-      addNotification(err instanceof Error ? err.message : 'Failed to archive member', 'error');
+      addNotification('error', err instanceof Error ? err.message : 'Failed to archive member');
       setShowArchiveModal(false);
       setMemberToArchive(null);
     }
@@ -719,10 +719,10 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     const result = await sendMemberInvitation(memberToInvite.id, currentClub.clubId);
 
     if (result.success) {
-      addNotification('Invitation sent successfully!', 'success');
+      addNotification('success', 'Invitation sent successfully!');
       await fetchMemberInvitations();
     } else {
-      addNotification(result.error || 'Failed to send invitation', 'error');
+      addNotification('error', result.error || 'Failed to send invitation');
     }
     setInvitingMemberId(null);
     setMemberToInvite(null);
@@ -731,7 +731,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const handleSendRenewalReminder = async (member: Member) => {
     if (!currentClub?.clubId) return;
     if (!member.email) {
-      addNotification('This member has no email address on file', 'error');
+      addNotification('error', 'This member has no email address on file');
       return;
     }
 
@@ -747,10 +747,10 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
       if (error) throw error;
 
-      addNotification(`Renewal email sent to ${member.first_name} ${member.last_name}`, 'success');
+      addNotification('success', `Renewal email sent to ${member.first_name} ${member.last_name}`);
     } catch (error) {
       console.error('Error sending renewal reminder:', error);
-      addNotification('Failed to send renewal email', 'error');
+      addNotification('error', 'Failed to send renewal email');
     } finally {
       setSendingReminderMemberId(null);
     }
@@ -765,7 +765,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     );
 
     if (targets.length === 0) {
-      addNotification('No selected members are due for renewal with an email on file', 'error');
+      addNotification('error', 'No selected members are due for renewal with an email on file');
       return;
     }
 
@@ -789,9 +789,9 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     setSelectedMemberIds(new Set());
 
     if (sent === targets.length) {
-      addNotification(`Sent ${sent} renewal email${sent !== 1 ? 's' : ''}`, 'success');
+      addNotification('success', `Sent ${sent} renewal email${sent !== 1 ? 's' : ''}`);
     } else {
-      addNotification(`Sent ${sent} of ${targets.length} renewal emails`, sent > 0 ? 'success' : 'error');
+      addNotification(sent > 0 ? 'success' : 'error', `Sent ${sent} of ${targets.length} renewal emails`);
     }
   };
 
@@ -813,12 +813,12 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     const result = await sendMemberInvitation(selectedInvitation.member_id, currentClub.clubId);
 
     if (result.success) {
-      addNotification('Invitation resent successfully!', 'success');
+      addNotification('success', 'Invitation resent successfully!');
       await fetchMemberInvitations();
       setShowInvitationModal(false);
       setSelectedInvitation(null);
     } else {
-      addNotification(result.error || 'Failed to resend invitation', 'error');
+      addNotification('error', result.error || 'Failed to resend invitation');
     }
     setInvitingMemberId(null);
   };
@@ -856,15 +856,15 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     if (result.success) {
       if (result.summary.created > 0) {
         addNotification(
+          'success',
           silentMode
             ? `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated silently with default password`
-            : `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated and invited to AlfiePRO`,
-          'success'
+            : `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated and invited to AlfiePRO`
         );
       }
       fetchMembers();
     } else {
-      addNotification(result.error || 'Activation failed', 'error');
+      addNotification('error', result.error || 'Activation failed');
     }
   };
 
@@ -876,13 +876,13 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     }
 
     if (!activationTestEmail || !activationTestEmail.includes('@')) {
-      addNotification('Please enter a valid email address', 'error');
+      addNotification('error', 'Please enter a valid email address');
       return;
     }
 
     const clubName = currentClub?.club?.name || '';
     if (!currentClub?.clubId || !clubName) {
-      addNotification('Club information not available', 'error');
+      addNotification('error', 'Club information not available');
       return;
     }
 
@@ -910,11 +910,11 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to send test email');
 
-      addNotification(`Test activation email sent to ${activationTestEmail}`, 'success');
+      addNotification('success', `Test activation email sent to ${activationTestEmail}`);
       setShowActivationTestEmail(false);
       setActivationTestEmail('');
     } catch (err: any) {
-      addNotification(err.message || 'Failed to send test email', 'error');
+      addNotification('error', err.message || 'Failed to send test email');
     } finally {
       setSendingActivationTest(false);
     }
@@ -949,10 +949,10 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to resend activation');
 
-      addNotification(`Activation email resent to ${member.first_name} ${member.last_name}`, 'success');
+      addNotification('success', `Activation email resent to ${member.first_name} ${member.last_name}`);
       fetchMembers();
     } catch (err: any) {
-      addNotification(err.message || 'Failed to resend activation email', 'error');
+      addNotification('error', err.message || 'Failed to resend activation email');
     } finally {
       setResendingActivation(null);
     }
@@ -989,7 +989,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to set password');
 
-      addNotification(`Password set for ${setPasswordMember.first_name} ${setPasswordMember.last_name}`, 'success');
+      addNotification('success', `Password set for ${setPasswordMember.first_name} ${setPasswordMember.last_name}`);
       setShowSetPasswordModal(false);
       setSetPasswordMember(null);
       setNewPassword('');
@@ -1997,7 +1997,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(`${window.location.origin}/invite/${selectedInvitation.token}`);
-                      addNotification('Invitation link copied!', 'success');
+                      addNotification('success', 'Invitation link copied!');
                     }}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
                   >

@@ -1242,11 +1242,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           message = `Your event "${formData.eventName}" has been submitted to your State Association for approval. You'll be notified once it's reviewed.`;
         }
 
-        addNotification(
-          'success',
-          'Event Submitted for Approval',
-          message
-        );
+        addNotification('success', message);
       }
 
       if (currentClub?.clubId && user?.id) {

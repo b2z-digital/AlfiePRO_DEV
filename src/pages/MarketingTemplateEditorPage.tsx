@@ -68,7 +68,7 @@ export default function MarketingTemplateEditorPage({ darkMode = true }: Marketi
       }
     } catch (error) {
       console.error('Error loading template:', error);
-      addNotification('Failed to load template', 'error');
+      addNotification('error', 'Failed to load template');
     } finally {
       setLoading(false);
     }
@@ -85,12 +85,12 @@ export default function MarketingTemplateEditorPage({ darkMode = true }: Marketi
         email_content_html: JSON.stringify(emailContent)
       });
 
-      addNotification('Template saved successfully', 'success');
+      addNotification('success', 'Template saved successfully');
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
       console.error('Error saving template:', error);
-      addNotification('Failed to save template', 'error');
+      addNotification('error', 'Failed to save template');
     } finally {
       setSaving(false);
     }

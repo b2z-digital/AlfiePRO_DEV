@@ -23,7 +23,7 @@ export const AdvertisersTab: React.FC = () => {
       setAdvertisers(data);
     } catch (error) {
       console.error('Error loading advertisers:', error);
-      addNotification('Failed to load advertisers', 'error');
+      addNotification('error', 'Failed to load advertisers');
     } finally {
       setLoading(false);
     }
@@ -41,11 +41,11 @@ export const AdvertisersTab: React.FC = () => {
 
     try {
       await advertisingStorage.deleteAdvertiser(id);
-      addNotification('Advertiser deleted successfully', 'success');
+      addNotification('success', 'Advertiser deleted successfully');
       loadAdvertisers();
     } catch (error) {
       console.error('Error deleting advertiser:', error);
-      addNotification('Failed to delete advertiser', 'error');
+      addNotification('error', 'Failed to delete advertiser');
     }
   };
 

@@ -54,7 +54,7 @@ export const TableBoard: React.FC<TableBoardProps> = ({ board, event_id, darkMod
       setColumnData(dataMap);
     } catch (error) {
       console.error('Error loading board data:', error);
-      addNotification('Failed to load board', 'error');
+      addNotification('error', 'Failed to load board');
     } finally {
       setLoading(false);
     }
@@ -69,10 +69,10 @@ export const TableBoard: React.FC<TableBoardProps> = ({ board, event_id, darkMod
         position: groups.length,
       });
       setGroups([...groups, newGroup]);
-      addNotification('Group added', 'success');
+      addNotification('success', 'Group added');
     } catch (error) {
       console.error('Error adding group:', error);
-      addNotification('Failed to add group', 'error');
+      addNotification('error', 'Failed to add group');
     }
   };
 
@@ -87,10 +87,10 @@ export const TableBoard: React.FC<TableBoardProps> = ({ board, event_id, darkMod
         settings,
       });
       setColumns([...columns, newColumn]);
-      addNotification('Column added', 'success');
+      addNotification('success', 'Column added');
     } catch (error) {
       console.error('Error adding column:', error);
-      addNotification('Failed to add column', 'error');
+      addNotification('error', 'Failed to add column');
     }
   };
 
@@ -114,10 +114,10 @@ export const TableBoard: React.FC<TableBoardProps> = ({ board, event_id, darkMod
       });
 
       setTasks([...tasks, newTask]);
-      addNotification('Task added', 'success');
+      addNotification('success', 'Task added');
     } catch (error) {
       console.error('Error adding task:', error);
-      addNotification('Failed to add task', 'error');
+      addNotification('error', 'Failed to add task');
     }
   };
 
@@ -143,7 +143,7 @@ export const TableBoard: React.FC<TableBoardProps> = ({ board, event_id, darkMod
       }
     } catch (error) {
       console.error('Error updating column data:', error);
-      addNotification('Failed to update', 'error');
+      addNotification('error', 'Failed to update');
     }
   };
 

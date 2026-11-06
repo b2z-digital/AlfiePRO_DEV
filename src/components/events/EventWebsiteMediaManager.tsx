@@ -78,11 +78,11 @@ export const EventWebsiteMediaManager: React.FC<EventWebsiteMediaManagerProps> =
 
       if (error) throw error;
 
-      addNotification('Media deleted successfully', 'success');
+      addNotification('success', 'Media deleted successfully');
       fetchMedia();
     } catch (error) {
       console.error('Error deleting media:', error);
-      addNotification('Failed to delete media', 'error');
+      addNotification('error', 'Failed to delete media');
     }
   };
 

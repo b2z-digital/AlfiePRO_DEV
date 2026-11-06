@@ -93,17 +93,17 @@ export default function CorrectionsTab({ darkMode }: CorrectionsTabProps) {
       if (editingCorrection) {
         const updated = await updateCorrection(editingCorrection.id, formData);
         setCorrections(prev => prev.map(c => c.id === updated.id ? updated : c));
-        addNotification({ type: 'success', title: 'Correction Updated', message: 'Knowledge correction has been updated.' });
+        addNotification('success', 'Knowledge correction has been updated.');
       } else {
         const created = await createCorrection(formData, user.id);
         setCorrections(prev => [created, ...prev]);
-        addNotification({ type: 'success', title: 'Correction Created', message: 'New knowledge correction has been added to Alfie\'s knowledge base.' });
+        addNotification('success', 'New knowledge correction has been added to Alfie\'s knowledge base.');
       }
       setShowFormModal(false);
       setEditingCorrection(null);
       setFormData(emptyForm);
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Save Failed', message: err.message });
+      addNotification('error', err.message);
     } finally {
       setSaving(false);
     }
@@ -115,7 +115,7 @@ export default function CorrectionsTab({ darkMode }: CorrectionsTabProps) {
       const updated = await updateCorrection(correction.id, { status: newStatus });
       setCorrections(prev => prev.map(c => c.id === updated.id ? updated : c));
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Update Failed', message: err.message });
+      addNotification('error', err.message);
     }
   };
 
@@ -124,9 +124,9 @@ export default function CorrectionsTab({ darkMode }: CorrectionsTabProps) {
     try {
       await deleteCorrection(correctionToDelete);
       setCorrections(prev => prev.filter(c => c.id !== correctionToDelete));
-      addNotification({ type: 'success', title: 'Correction Deleted', message: 'Knowledge correction has been removed.' });
+      addNotification('success', 'Knowledge correction has been removed.');
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Delete Failed', message: err.message });
+      addNotification('error', err.message);
     } finally {
       setDeleteConfirmOpen(false);
       setCorrectionToDelete(null);

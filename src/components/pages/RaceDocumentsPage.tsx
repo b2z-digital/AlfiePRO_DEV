@@ -188,7 +188,7 @@ export const RaceDocumentsPage: React.FC<RaceDocumentsPageProps> = ({ darkMode }
       if (error) throw error;
 
       await fetchForms();
-      addNotification('Form deleted successfully', 'success');
+      addNotification('success', 'Form deleted successfully');
     } catch (err) {
       console.error('Error deleting form:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete form');
@@ -209,7 +209,7 @@ export const RaceDocumentsPage: React.FC<RaceDocumentsPageProps> = ({ darkMode }
       if (error) throw error;
       
       await fetchTemplatesData();
-      addNotification('Template deleted successfully', 'success');
+      addNotification('success', 'Template deleted successfully');
     } catch (err) {
       console.error('Error deleting template:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete template');
@@ -282,7 +282,7 @@ export const RaceDocumentsPage: React.FC<RaceDocumentsPageProps> = ({ darkMode }
         if (fieldsInsertError) throw fieldsInsertError;
       }
 
-      addNotification('Form duplicated successfully', 'success');
+      addNotification('success', 'Form duplicated successfully');
       await fetchForms();
     } catch (err) {
       console.error('Error duplicating form:', err);
@@ -329,7 +329,7 @@ export const RaceDocumentsPage: React.FC<RaceDocumentsPageProps> = ({ darkMode }
 
       if (error) throw error;
 
-      addNotification('Template duplicated successfully', 'success');
+      addNotification('success', 'Template duplicated successfully');
       await fetchTemplatesData();
     } catch (err) {
       console.error('Error duplicating template:', err);

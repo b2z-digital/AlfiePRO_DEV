@@ -225,10 +225,10 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
         .getPublicUrl(filePath);
 
       setHeader(prev => ({ ...prev, logo_url: publicUrl, logo_type: 'image' }));
-      addNotification('Logo uploaded successfully', 'success');
+      addNotification('success', 'Logo uploaded successfully');
     } catch (error) {
       console.error('Error uploading logo:', error);
-      addNotification('Failed to upload logo', 'error');
+      addNotification('error', 'Failed to upload logo');
     } finally {
       setUploading(false);
     }
@@ -275,7 +275,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
       setPages(prev => prev.map(p => p.id === pageId ? { ...p, show_in_navigation: include } : p));
     } catch (error) {
       console.error('Error updating page navigation:', error);
-      addNotification('Failed to update page', 'error');
+      addNotification('error', 'Failed to update page');
     }
   };
 

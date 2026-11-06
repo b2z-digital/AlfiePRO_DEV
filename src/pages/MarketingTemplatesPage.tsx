@@ -34,7 +34,7 @@ export default function MarketingTemplatesPage({ darkMode = true }: MarketingTem
       setTemplates(templatesData);
     } catch (error) {
       console.error('Error loading templates:', error);
-      addNotification('Failed to load templates', 'error');
+      addNotification('error', 'Failed to load templates');
     } finally {
       setLoading(false);
     }
@@ -49,12 +49,12 @@ export default function MarketingTemplatesPage({ darkMode = true }: MarketingTem
 
   async function handleCreateTemplate() {
     if (!currentClub) {
-      addNotification('Please select a club first', 'error');
+      addNotification('error', 'Please select a club first');
       return;
     }
 
     if (!templateName.trim()) {
-      addNotification('Please enter a template name', 'warning');
+      addNotification('warning', 'Please enter a template name');
       return;
     }
 
@@ -79,7 +79,7 @@ export default function MarketingTemplatesPage({ darkMode = true }: MarketingTem
         is_public: false
       });
 
-      addNotification('Template created successfully', 'success');
+      addNotification('success', 'Template created successfully');
       setShowCreateModal(false);
 
       // Reload templates list to show the new template
@@ -93,13 +93,13 @@ export default function MarketingTemplatesPage({ darkMode = true }: MarketingTem
         code: error?.code
       });
       const errorMessage = error?.message || 'Failed to create template';
-      addNotification(errorMessage, 'error');
+      addNotification('error', errorMessage);
     }
   }
 
   async function handleUseTemplate(template: MarketingEmailTemplate) {
     // For now, just navigate to campaigns page - they can create a campaign there
-    addNotification('Template ready to use. Go to Campaigns to create a campaign with this template.', 'info');
+    addNotification('info', 'Template ready to use. Go to Campaigns to create a campaign with this template.');
     navigate('/marketing/campaigns');
   }
 
@@ -116,11 +116,11 @@ export default function MarketingTemplatesPage({ darkMode = true }: MarketingTem
 
     try {
       await deleteMarketingEmailTemplate(template.id);
-      addNotification('Template deleted successfully', 'success');
+      addNotification('success', 'Template deleted successfully');
       await loadData();
     } catch (error) {
       console.error('Error deleting template:', error);
-      addNotification('Failed to delete template', 'error');
+      addNotification('error', 'Failed to delete template');
     }
   }
 

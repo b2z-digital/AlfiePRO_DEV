@@ -100,7 +100,7 @@ export default function RoTrainingTab({ darkMode }: RoTrainingTabProps) {
       setUploadForm({ title: '', category: 'general-ro-training', source_url: '', file: null, inputType: 'pdf', content_text: '' });
 
       if (uploadForm.inputType === 'text') {
-        addNotification({ type: 'success', title: 'Document Added', message: `"${doc.title}" is being processed automatically.` });
+        addNotification('success', `"${doc.title}" is being processed automatically.`);
         try {
           await triggerDocumentProcessing(doc.id);
           setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, processing_status: 'processing' } : d));
@@ -117,10 +117,10 @@ export default function RoTrainingTab({ darkMode }: RoTrainingTabProps) {
           setTimeout(() => clearInterval(pollInterval), 120000);
         } catch { /* ignore auto-process errors */ }
       } else {
-        addNotification({ type: 'success', title: 'Document Added', message: `"${doc.title}" has been added. Click Process to extract knowledge chunks.` });
+        addNotification('success', `"${doc.title}" has been added. Click Process to extract knowledge chunks.`);
       }
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Upload Failed', message: err.message });
+      addNotification('error', err.message);
     } finally {
       setUploading(false);
     }
@@ -131,7 +131,7 @@ export default function RoTrainingTab({ darkMode }: RoTrainingTabProps) {
     try {
       await triggerDocumentProcessing(doc.id);
       setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, processing_status: 'processing', processing_error: null } : d));
-      addNotification({ type: 'success', title: 'Processing Started', message: `"${doc.title}" is being processed. This may take a few minutes.` });
+      addNotification('success', `"${doc.title}" is being processed. This may take a few minutes.`);
       const pollInterval = setInterval(async () => {
         try {
           const updated = await getRoTrainingDocuments();
@@ -144,7 +144,7 @@ export default function RoTrainingTab({ darkMode }: RoTrainingTabProps) {
       }, 5000);
       setTimeout(() => clearInterval(pollInterval), 120000);
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Processing Failed', message: err.message });
+      addNotification('error', err.message);
       loadData();
     } finally {
       setProcessingDocs(prev => {
@@ -160,7 +160,7 @@ export default function RoTrainingTab({ darkMode }: RoTrainingTabProps) {
       const updated = await updateKnowledgeDocument(doc.id, { is_active: !doc.is_active });
       setDocuments(prev => prev.map(d => d.id === doc.id ? updated : d));
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Update Failed', message: err.message });
+      addNotification('error', err.message);
     }
   };
 
@@ -185,9 +185,9 @@ export default function RoTrainingTab({ darkMode }: RoTrainingTabProps) {
       setDocuments(prev => prev.map(d => d.id === updated.id ? updated : d));
       setShowEditModal(false);
       setEditingDoc(null);
-      addNotification({ type: 'success', title: 'Document Updated', message: 'RO Training document details have been updated.' });
+      addNotification('success', 'RO Training document details have been updated.');
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Update Failed', message: err.message });
+      addNotification('error', err.message);
     }
   };
 
@@ -196,9 +196,9 @@ export default function RoTrainingTab({ darkMode }: RoTrainingTabProps) {
     try {
       await deleteKnowledgeDocument(docToDelete);
       setDocuments(prev => prev.filter(d => d.id !== docToDelete));
-      addNotification({ type: 'success', title: 'Document Deleted', message: 'RO Training document and associated knowledge chunks have been removed.' });
+      addNotification('success', 'RO Training document and associated knowledge chunks have been removed.');
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Delete Failed', message: err.message });
+      addNotification('error', err.message);
     } finally {
       setDeleteConfirmOpen(false);
       setDocToDelete(null);
@@ -210,9 +210,9 @@ export default function RoTrainingTab({ darkMode }: RoTrainingTabProps) {
     try {
       const updated = await reuploadKnowledgeDocumentFile(reuploadDocId, file);
       setDocuments(prev => prev.map(d => d.id === updated.id ? updated : d));
-      addNotification({ type: 'success', title: 'File Uploaded', message: `File attached. Click Process to extract knowledge chunks.` });
+      addNotification('success', `File attached. Click Process to extract knowledge chunks.`);
     } catch (err: any) {
-      addNotification({ type: 'error', title: 'Upload Failed', message: err.message });
+      addNotification('error', err.message);
     } finally {
       setReuploadDocId(null);
     }
