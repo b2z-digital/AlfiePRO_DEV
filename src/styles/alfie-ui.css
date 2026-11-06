@@ -733,3 +733,17 @@ html.alfie-light a.a-evdoc:hover { background: rgba(15,23,42,0.03); }
 html.alfie-light .a-evdoc-ic { border-color: rgba(15,23,42,0.1); background: #F6F8FB; color: #475569; }
 html.alfie-light .a-evdoc-r { color: #C8323A; border-color: rgba(229,72,77,0.3); background: rgba(229,72,77,0.06); }
 html.alfie-light .a-evdoc-b { color: #0A64D8; border-color: rgba(10,100,216,0.3); background: rgba(10,100,216,0.06); }
+
+/* Broken images (see src/lib/brokenImages.ts): hide the broken icon; avatars show initials */
+img[data-alfie-broken] { display: none !important; }
+[data-alfie-initials]::after {
+  content: attr(data-alfie-initials);
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%; min-width: 0; flex: 1 1 auto; align-self: stretch;
+  border-radius: inherit;
+  background: #1E2A44;
+  color: #fff;
+  font: 600 12px/1 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif;
+  letter-spacing: -0.01em;
+  pointer-events: none;
+}

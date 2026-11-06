@@ -493,7 +493,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
             const initials = (n: string) => n.split(' ').filter(Boolean).map((p: string) => p.charAt(0).toUpperCase()).slice(0, 2).join('');
             const shortName = (n: string) => { const p = n.split(' ').filter(Boolean); return p.length > 1 ? `${p[0]} ${p[p.length - 1].charAt(0)}.` : n; };
             const face = (w: { name: string; avatarUrl?: string }) => (
-              <span className="a-pl-face">{w.avatarUrl ? <img src={w.avatarUrl} alt={w.name} /> : initials(w.name)}</span>
+              <span className="a-pl-face">{w.avatarUrl ? <img src={w.avatarUrl} alt={w.name} referrerPolicy="no-referrer" /> : initials(w.name)}</span>
             );
             const labels = (race: RaceResult) => (
               <>
