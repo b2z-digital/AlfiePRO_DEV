@@ -118,6 +118,7 @@ import { SailorResultsPortal } from './SailorResultsPortal';
 import { usePlatformTracking } from '../hooks/usePlatformTracking';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { useImpersonation } from '../contexts/ImpersonationContext';
+import { useAlfieTheme } from '../hooks/useAlfieTheme';
 
 type DashboardSection = 'home' | 'race-management' | 'club-management' | 'race-calendar' | 'team-management' | 'results' | 'yacht-classes';
 
@@ -339,6 +340,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     // Apply light mode to body
     document.body.classList.toggle('light-mode', lightMode);
   }, [lightMode]);
+
+  // Alfie theme for the signed-in app, dark and light (see src/styles/alfie-theme.css)
+  useAlfieTheme(true, lightMode ? 'light' : 'dark');
 
   useEffect(() => {
     loadStats();
@@ -1159,7 +1163,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         })).filter(section => section.items.length > 0);
 
   return (
-    <div className={`min-h-screen ${lightMode ? 'bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200' : 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]'}`}>
+    <div className={`min-h-screen ${lightMode ? 'alfie-app-bg bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200' : 'alfie-app-bg bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]'}`}>
       <ImpersonationBanner />
       {/* Loading overlay when switching organizations or clubs */}
       {(isTransitioning || isSwitchingClub || localSwitchingClub) && (
@@ -1182,7 +1186,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           fixed left-0 z-40 transition-all duration-300 ease-in-out
           ${isImpersonating ? 'top-[44px]' : 'top-0'} bottom-0
           ${(collapsed && !isHoveringNav) ? 'w-[70px]' : 'w-64'}
-          ${lightMode ? 'bg-white/60' : darkMode ? 'bg-slate-800/50 border-r border-slate-700/50' : 'bg-white/10 border-r border-slate-200/20'}
+          ${lightMode ? 'alfie-chrome bg-white/60' : darkMode ? 'alfie-chrome bg-slate-800/50 border-r border-slate-700/50' : 'bg-white/10 border-r border-slate-200/20'}
           backdrop-blur-xl
         `}
         onMouseEnter={() => !isTouchDevice && setIsHoveringNav(true)}
@@ -1335,7 +1339,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             ${(collapsed && !isHoveringNav) ? 'justify-center' : 'gap-3'}
                             ${section.collapsible && (!collapsed || isHoveringNav) ? 'pl-5' : ''}
                             ${isActive
-                              ? 'bg-cyan-600 text-white shadow-lg'
+                              ? 'nav-active bg-cyan-600 text-white shadow-lg'
                               : lightMode
                                 ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                                 : darkMode
@@ -1608,7 +1612,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     ${(collapsed && !isHoveringNav) ? 'flex items-center justify-center' : 'w-full flex items-center gap-3'} px-3 py-2.5
                     rounded-lg transition-colors
                     ${location.pathname === '/support'
-                      ? 'bg-cyan-600 text-white shadow-lg'
+                      ? 'nav-active bg-cyan-600 text-white shadow-lg'
                       : lightMode
                         ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                         : darkMode
@@ -1628,7 +1632,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   ${(collapsed && !isHoveringNav) ? 'flex items-center justify-center' : 'w-full flex items-center gap-3'} px-3 py-2.5
                   rounded-lg transition-colors
                   ${location.pathname === '/settings'
-                    ? 'bg-cyan-600 text-white shadow-lg'
+                    ? 'nav-active bg-cyan-600 text-white shadow-lg'
                     : lightMode
                       ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                       : darkMode
@@ -1790,7 +1794,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                               section.collapsible ? 'pl-5' : ''
                             } ${
                               isActive
-                                ? 'bg-blue-600 text-white'
+                                ? 'nav-active bg-blue-600 text-white'
                                 : lightMode
                                   ? 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'

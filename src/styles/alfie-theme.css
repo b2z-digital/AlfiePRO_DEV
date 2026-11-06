@@ -1,0 +1,219 @@
+/*
+ * Alfie theme (phase 1)
+ * --------------------------------------------------------------------------
+ * Everything visual in here is scoped to classes on <html> that are only
+ * added while the signed-in app (DashboardLayout / scoring) is mounted — see
+ * src/hooks/useAlfieTheme.ts:
+ *   html.alfie-theme              both modes (fonts, Alfie blue, polish)
+ *   html.alfie-theme.alfie-dark   dark mode
+ *   html.alfie-theme.alfie-light  light mode (layers on the existing
+ *                                 body.light-mode overrides in styles/index.css)
+ * Public club websites and event websites never get these classes, so they
+ * render exactly as before.
+ *
+ * The :root values are the original hard-coded colours, so with the classes
+ * absent nothing changes.
+ */
+
+:root {
+  --slate-700: 30 41 59;    /* #1e293b */
+  --slate-800: 26 35 50;    /* #1a2332 */
+  --slate-900: 15 20 25;    /* #0f1419 */
+  --slate-950: 2 6 23;      /* #020617 */
+  --blue-400: 96 165 250;   /* #60a5fa */
+  --blue-500: 59 130 246;   /* #3b82f6 */
+  --blue-600: 37 99 235;    /* #2563eb */
+  --blue-700: 29 78 216;    /* #1d4ed8 */
+
+  --alfie-spectrum: linear-gradient(135deg, #2E7BFF 0%, #8A4DFF 38%, #FF3E9A 70%, #FF8A2B 100%);
+  --alfie-spectrum-v: linear-gradient(180deg, #2E7BFF 0%, #8A4DFF 38%, #FF3E9A 70%, #FF8A2B 100%);
+}
+
+/* ═══════════════════════════ Both modes ═══════════════════════════ */
+
+html.alfie-theme {
+  /* Alfie blue */
+  --blue-400: 77 163 255;   /* #4DA3FF */
+  --blue-500: 42 147 255;   /* #2A93FF */
+  --blue-600: 10 132 255;   /* #0A84FF */
+  --blue-700: 10 111 214;   /* #0A6FD6 */
+
+  font-family: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* Display type for headings */
+html.alfie-theme h1,
+html.alfie-theme h2,
+html.alfie-theme h3 {
+  font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.015em;
+}
+
+/* Active navigation item: Spectrum bar built into the rounded left edge */
+html.alfie-theme .nav-active {
+  border-left: 3px solid transparent !important;
+  box-shadow: none !important;
+}
+
+/* Focus ring in Alfie blue */
+html.alfie-theme :focus-visible {
+  outline: 2px solid rgba(10, 132, 255, 0.7);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════ Dark ═══════════════════════════ */
+
+html.alfie-theme.alfie-dark {
+  /* Alfie navy surfaces */
+  --slate-700: 27 36 54;    /* #1B2436 raised / borders */
+  --slate-800: 18 26 42;    /* #121A2A cards, modals */
+  --slate-900: 10 17 32;    /* #0A1120 page */
+  --slate-950: 5 10 20;     /* #050A14 */
+  color-scheme: dark;
+}
+
+html.alfie-dark body {
+  background-color: #060B16;
+}
+
+html.alfie-dark .alfie-app-bg {
+  background-color: #060B16;
+  background-image:
+    radial-gradient(1100px 700px at 12% -10%, rgba(30, 108, 255, 0.22), transparent 60%),
+    radial-gradient(900px 600px at 95% -5%, rgba(88, 86, 214, 0.12), transparent 60%),
+    linear-gradient(180deg, #0A1428 0%, #060B16 55%);
+  background-attachment: fixed;
+}
+
+html.alfie-dark .alfie-chrome {
+  background: rgba(22, 26, 36, 0.62) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: blur(32px) saturate(180%);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03), 12px 0 40px rgba(0, 0, 0, 0.25);
+}
+
+html.alfie-dark .nav-active {
+  background:
+    linear-gradient(#222938, #222938) padding-box,
+    var(--alfie-spectrum-v) border-box !important;
+  color: #fff !important;
+}
+
+html.alfie-dark .alfie-orb-label {
+  background: rgba(22, 26, 36, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #EEF1F8;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+html.alfie-dark ::-webkit-scrollbar { width: 10px; height: 10px; }
+html.alfie-dark ::-webkit-scrollbar-track { background: transparent; }
+html.alfie-dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+html.alfie-dark ::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.18); }
+
+/* ═══════════════════════════ Light ═══════════════════════════
+ * Matches the Alfie.ai light theme: soft blue-grey page (#f3f6fb) with faint
+ * blue/violet glows, white cards with hairline slate borders and soft
+ * shadows, ink #0f172a headings, frosted white chrome. Selectors include
+ * `body.light-mode` so they outrank the existing light-mode overrides.
+ */
+
+html.alfie-theme.alfie-light {
+  color-scheme: light;
+}
+
+html.alfie-light body,
+html.alfie-light body.light-mode {
+  background: #f3f6fb !important;
+}
+
+html.alfie-light .alfie-app-bg {
+  background-color: #f3f6fb !important;
+  background-image:
+    radial-gradient(ellipse 70% 60% at 10% 0%, rgba(10, 132, 255, 0.10), transparent 70%),
+    radial-gradient(ellipse 60% 55% at 90% 15%, rgba(94, 92, 230, 0.07), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 60% 100%, rgba(64, 156, 255, 0.06), transparent 70%) !important;
+  background-attachment: fixed;
+}
+
+/* Headings: deep ink so titles stand out */
+html.alfie-light body.light-mode h1,
+html.alfie-light body.light-mode h2,
+html.alfie-light body.light-mode h3 {
+  color: #0B1220;
+}
+
+/* Frosted white sidebar */
+html.alfie-light .alfie-chrome {
+  background: rgba(255, 255, 255, 0.78) !important;
+  border-right: 1px solid rgba(15, 23, 42, 0.08) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 10px 32px rgba(15, 23, 42, 0.08);
+}
+
+/* Active nav: soft blue tint inside the Spectrum edge, ink-blue label/icon */
+html.alfie-light .nav-active {
+  background:
+    linear-gradient(#EAF2FF, #EAF2FF) padding-box,
+    var(--alfie-spectrum-v) border-box !important;
+}
+html.alfie-light body.light-mode .nav-active,
+html.alfie-light body.light-mode .nav-active *:not([class*="bg-red"]),
+html.alfie-light .nav-active,
+html.alfie-light .nav-active *:not([class*="bg-red"]) {
+  color: #0B4FB3 !important;
+}
+
+/* Cards: white with a hairline border and soft shadow so they lift off the page */
+html.alfie-light body.light-mode .bg-slate-800.rounded-xl,
+html.alfie-light body.light-mode .bg-slate-800.rounded-2xl,
+html.alfie-light body.light-mode .bg-slate-800\/50.rounded-xl,
+html.alfie-light body.light-mode .bg-slate-800\/50.rounded-2xl,
+html.alfie-light body.light-mode .bg-slate-800\/30.rounded-xl,
+html.alfie-light body.light-mode .bg-slate-800\/30.rounded-2xl,
+html.alfie-light body.light-mode .bg-white.rounded-xl,
+html.alfie-light body.light-mode .bg-white.rounded-2xl {
+  background-color: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+/* Borders: hairline slate rather than mid-grey */
+html.alfie-light body.light-mode .border-slate-700,
+html.alfie-light body.light-mode .border-slate-700\/50,
+html.alfie-light body.light-mode .border-slate-600\/50 {
+  border-color: rgba(15, 23, 42, 0.09) !important;
+}
+
+/* Modal backdrops: soft slate veil instead of black */
+html.alfie-light body.light-mode .bg-black\/50,
+html.alfie-light body.light-mode .bg-black\/60,
+html.alfie-light body.light-mode .bg-black\/70 {
+  background-color: rgba(15, 23, 42, 0.28) !important;
+}
+
+html.alfie-light .alfie-orb-label {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  color: #0B4FB3 !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+html.alfie-light ::-webkit-scrollbar { width: 10px; height: 10px; }
+html.alfie-light ::-webkit-scrollbar-track { background: transparent; }
+html.alfie-light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+html.alfie-light ::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
