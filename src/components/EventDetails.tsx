@@ -24,6 +24,8 @@ import LiveTrackingQRCodeModal from './live-tracking/LiveTrackingQRCodeModal';
 import { getLiveTrackingEvent } from '../utils/liveTrackingStorage';
 import { EventWebsiteSettingsModal } from './events/EventWebsiteSettingsModal';
 import { EventLivestreamModal } from './livestream/EventLivestreamModal';
+import { EventLiveTab } from './livestream/EventLiveTab';
+import type { LivestreamSession } from '../types/livestream';
 import { ImportRoundResultsModal } from './ImportRoundResultsModal';
 import { getStoredRaceSeries, storeRaceSeries } from '../utils/raceStorage';
 import { RaceSeries } from '../types/race';
@@ -113,7 +115,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   useEffect(() => {
     eventRef.current = event;
   }, [event]);
-  const [activeTab, setActiveTab] = useState<'details' | 'documents' | 'media' | 'registrations' | 'registration' | 'results' | 'weather' | 'signon' | 'protests'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'live' | 'documents' | 'media' | 'registrations' | 'registration' | 'results' | 'weather' | 'signon' | 'protests'>('details');
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +146,8 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   const [showLiveTrackingQR, setShowLiveTrackingQR] = useState(false);
   const [showLivestreamModal, setShowLivestreamModal] = useState(false);
   const [hasLivestreamSession, setHasLivestreamSession] = useState(false);
+  // The broadcast shown in the Live tab (live first, then upcoming, then the latest that ended)
+  const [liveTabSession, setLiveTabSession] = useState<LivestreamSession | null>(null);
   const [showImportResults, setShowImportResults] = useState(false);
   const [importSeriesData, setImportSeriesData] = useState<RaceSeries | null>(null);
   const [importRoundIndex, setImportRoundIndex] = useState<number>(0);
@@ -1425,12 +1429,15 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
         // Check for livestream session using the full event ID
         // (a series round may be linked as "<seriesId>-<roundIndex>" or by its round id)
         const eventIdsToCheck = await getEquivalentEventIds(eventIdToCheck);
-        const { data, error } = await supabase
+        const { data: rows, error } = await supabase
           .from('livestream_sessions')
-          .select('id')
+          .select('*')
           .in('event_id', eventIdsToCheck)
-          .limit(1)
-          .maybeSingle();
+          .order('created_at', { ascending: false })
+          .limit(10);
+        const data = rows && rows.length ? rows[0] : null;
+        const rank = (r: LivestreamSession) => (r.status === 'live' ? 0 : r.status === 'testing' || r.status === 'scheduled' || r.status === 'draft' ? 1 : 2);
+        setLiveTabSession(rows && rows.length ? [...(rows as LivestreamSession[])].sort((a, b) => rank(a) - rank(b))[0] : null);
 
         console.log('🔍 [EventDetails] Livestream session check result:', {
           hasSession: !!data,
@@ -3727,6 +3734,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             <div className="a-seg" role="tablist" aria-label="Event sections" style={{ flexWrap: 'nowrap' }}>
               {([
                 { key: 'details', label: 'Event Details', icon: <Info size={15} />, show: true },
+                { key: 'live', label: 'Live', icon: liveTabSession?.status === 'live' ? <span className="alv-tab-dot" aria-hidden="true" /> : <Radio size={15} />, show: !!(event.enableLiveStream && liveTabSession && (liveTabSession.is_public !== false || isAdmin || isEditor)) },
                 { key: 'registrations', label: 'Registrations', icon: <DollarSign size={15} />, show: !!(event.isPaid && event.entryFee && event.entryFee > 0) },
                 { key: 'documents', label: 'Documents', icon: <FileText size={15} />, show: true },
                 { key: 'media', label: 'Media', icon: <Image size={15} />, show: true },
@@ -3744,6 +3752,15 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
 
           <div className="flex-1 overflow-y-auto" style={{ padding: '24px 36px' }}>
             {activeTab === 'details' && renderDetailsTab()}
+            {activeTab === 'live' && liveTabSession && (
+              <EventLiveTab
+                session={liveTabSession}
+                venue={event.venue}
+                canRun={!!(isAdmin || isEditor)}
+                onOpenControlRoom={() => navigate('/livestream')}
+                onOpenAlfieTV={() => navigate(`/alfie-tv?watch=${liveTabSession.id}`)}
+              />
+            )}
             {activeTab === 'registrations' && renderRegistrationsTab()}
             {activeTab === 'documents' && renderDocumentsTab()}
             {activeTab === 'media' && renderMediaTab()}

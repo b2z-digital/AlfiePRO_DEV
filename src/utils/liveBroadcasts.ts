@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import { livestreamStorage } from './livestreamStorage';
 import { toLivestreamEventId } from './livestreamEventIds';
@@ -127,4 +128,29 @@ export async function createBroadcast(input: NewBroadcastInput): Promise<Livestr
     cloudflare_customer_code: customer,
   };
   return livestreamStorage.createSession(sessionData as Partial<LivestreamSession>);
+}
+
+/**
+ * Event ids with a public broadcast live right now, for LIVE badges on event cards.
+ * Series rounds match by their "<seriesId>-<roundIndex>" id, as the calendar uses.
+ */
+export function useLiveEventIds(clubId?: string | null): Set<string> {
+  const [ids, setIds] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    if (!clubId) { setIds(new Set()); return; }
+    let cancelled = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from('livestream_sessions')
+        .select('event_id')
+        .eq('club_id', clubId)
+        .eq('status', 'live')
+        .eq('is_public', true);
+      if (!cancelled) setIds(new Set((data || []).map((r: { event_id: string | null }) => r.event_id).filter((id): id is string => !!id)));
+    };
+    load();
+    const timer = setInterval(load, 30000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [clubId]);
+  return ids;
 }
