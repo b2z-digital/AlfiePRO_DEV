@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogOut, Lightbulb, Send } from 'lucide-react';
+import { AlfieIcon } from '../brand/AlfieIcon';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -81,109 +81,79 @@ export const SuggestChannelModal: React.FC<SuggestChannelModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div
-        className={`
-          relative w-full max-w-2xl rounded-2xl shadow-2xl
-          ${darkMode ? 'bg-slate-900 border border-slate-800' : 'bg-white border border-gray-200'}
-        `}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="p-2 from-yellow-500/20 to-orange-500/20 rounded-lg">
-              <Lightbulb className="w-6 h-6 text-yellow-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-white">Suggest a Channel</h2>
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center p-3 sm:p-6 atvm-modal atvm-font">
+      <div className="a-veil absolute inset-0 backdrop-blur-[2px]" onClick={() => !submitting && onClose()} aria-hidden="true" />
+      <form onSubmit={handleSubmit} className="a-sheet relative w-full max-w-xl flex flex-col max-h-[92vh] overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="atvm-sug-title">
+        <header className="a-sheet-head a-md-sheet-head">
+          <span className="a-tile a-tile-rim" style={{ width: 44, height: 44 }}><AlfieIcon glyph="spark" size={20} /></span>
+          <div className="min-w-0 flex-1">
+            <h2 id="atvm-sug-title" className="a-display a-ink m-0 text-[20px] font-semibold leading-tight">Suggest a Channel</h2>
+            <p className="a-mute m-0 mt-0.5 text-[13.5px]">Help grow AlfieTV for the whole community</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <LogOut className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
+          <button type="button" onClick={onClose} className="a-ib" aria-label="Close"><AlfieIcon glyph="x" size={20} /></button>
+        </header>
 
-        {/* Content */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          <p className="text-gray-400">
+        <div className="a-md-sheet-body">
+          <p className="a-mute m-0 text-[14px] leading-relaxed">
             Know a great sailing or radio control yacht channel? Suggest it for AlfieTV and help grow our community content!
           </p>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Channel Name *
-            </label>
+          <label className="a-md-fl">
+            <span>Channel Name *</span>
             <input
               type="text"
               value={channelName}
               onChange={(e) => setChannelName(e.target.value)}
               placeholder="e.g., SailGP, RC Sailing Weekly"
-              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50"
+              className="a-inp"
               required
             />
-          </div>
+          </label>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Channel URL *
-            </label>
-            <input
-              type="url"
-              value={channelUrl}
-              onChange={(e) => setChannelUrl(e.target.value)}
-              placeholder="https://www.youtube.com/@channelname"
-              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50"
-              required
-            />
-            <p className="mt-2 text-xs text-gray-500">
-              Paste the YouTube channel URL (e.g., https://www.youtube.com/@channelname)
-            </p>
-          </div>
+          <label className="a-md-fl">
+            <span>Channel URL *</span>
+            <span className="a-field">
+              <AlfieIcon glyph="link" size={16} />
+              <input
+                type="url"
+                value={channelUrl}
+                onChange={(e) => setChannelUrl(e.target.value)}
+                placeholder="https://www.youtube.com/@channelname"
+                required
+              />
+            </span>
+            <small>Paste the YouTube channel URL (e.g., https://www.youtube.com/@channelname)</small>
+          </label>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Why should we add this channel? (Optional)
-            </label>
+          <label className="a-md-fl">
+            <span>Why should we add this channel? (Optional)</span>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Tell us what makes this channel great..."
               rows={4}
-              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 resize-none"
+              className="a-inp"
             />
-          </div>
+          </label>
+        </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2.5 text-gray-400 hover:text-white transition-colors"
-              disabled={submitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="btn-primary-green flex items-center gap-2 px-6 py-2.5 from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold rounded-lg transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  Submit Suggestion
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
+        <footer className="a-sheet-foot a-md-sheet-foot">
+          <button type="button" onClick={onClose} className="a-btn a-btn-q" disabled={submitting}>Cancel</button>
+          <button type="submit" disabled={submitting} className="a-btn a-btn-p">
+            {submitting ? (
+              <>
+                <span className="a-nw-spin" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <AlfieIcon glyph="send" size={16} />
+                Submit Suggestion
+              </>
+            )}
+          </button>
+        </footer>
+      </form>
     </div>
   );
 };
