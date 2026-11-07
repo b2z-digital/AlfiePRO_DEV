@@ -31,8 +31,8 @@ export default function LivestreamPage() {
             <Video className="w-4 h-4 text-red-400" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-white leading-tight">Broadcast Studio</h1>
-            <p className="text-xs text-slate-500">Live production & streaming</p>
+            <h1 className="text-lg font-semibold text-white leading-tight">Live</h1>
+            <p className="text-xs text-slate-500">Broadcast your racing live in AlfieTV; every race goes to YouTube</p>
           </div>
         </div>
 
@@ -46,7 +46,7 @@ export default function LivestreamPage() {
             }`}
           >
             <Video className="w-3.5 h-3.5" />
-            Studio
+            Broadcasts
           </button>
           <button
             onClick={() => setActiveTab('archives')}
