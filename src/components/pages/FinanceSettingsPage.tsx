@@ -1745,7 +1745,8 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
   const renderCategoriesTab = () => {
     const CCOLS = '36px minmax(0,1fr) auto 150px 84px';
     const group = (type: 'income' | 'expense') => categories.filter((c) => c.type === type);
-    const Section = ({ type }: { type: 'income' | 'expense' }) => {
+    // A render function, not a component: a component declared here would be rebuilt on every render
+    const renderSection = (type: 'income' | 'expense') => {
       const list = group(type);
       return (
         <div className="a-card overflow-hidden">
@@ -1831,8 +1832,8 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            <Section type="income" />
-            <Section type="expense" />
+            {renderSection('income')}
+            {renderSection('expense')}
           </div>
         )}
       </div>
