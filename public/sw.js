@@ -1,4 +1,4 @@
-const CACHE_VERSION = '2.5';
+const CACHE_VERSION = '2.6';
 const CACHE_NAME = `alfiepro-v${CACHE_VERSION}`;
 const RUNTIME_CACHE = `alfiepro-runtime-v${CACHE_VERSION}`;
 const API_CACHE = `alfiepro-api-v${CACHE_VERSION}`;
@@ -30,8 +30,6 @@ const EXTERNAL_DOMAINS_TO_SKIP = [
   'ggpht.com'
 ];
 
-const API_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const STALE_WHILE_REVALIDATE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -103,12 +101,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Supabase API requests - stale-while-revalidate
+  // Supabase requests
   const isSupabaseRequest = SUPABASE_DOMAINS.some(domain => url.hostname.includes(domain));
   if (isSupabaseRequest) {
-    event.respondWith(
-      staleWhileRevalidate(request, API_CACHE)
-    );
+    // Public files (images, documents): show the saved copy, refresh it in the background
+    if (url.pathname.includes('/storage/v1/object/public/')) {
+      event.respondWith(cacheThenRefresh(request, RUNTIME_CACHE));
+      return;
+    }
+    // Database reads: always from the server so changes show straight away.
+    // The saved copy is only used when the device is offline.
+    if (url.pathname.startsWith('/rest/v1/')) {
+      event.respondWith(networkFirst(request, API_CACHE));
+      return;
+    }
+    // Sign-in, functions, realtime and everything else: straight to the network
     return;
   }
 
@@ -232,64 +239,44 @@ function removePendingChange(db, id) {
   });
 }
 
-async function staleWhileRevalidate(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cachedResponse = await cache.match(request);
-
-  const fetchPromise = fetch(request)
-    .then(response => {
-      if (response && response.status === 200) {
-        const responseToCache = response.clone();
-        const headers = new Headers(responseToCache.headers);
-        headers.set('sw-cache-time', Date.now().toString());
-
-        const responseWithTimestamp = new Response(responseToCache.body, {
-          status: responseToCache.status,
-          statusText: responseToCache.statusText,
-          headers: headers
-        });
-
-        cache.put(request, responseWithTimestamp);
-      }
-      return response;
-    })
-    .catch(error => {
-      console.log('Fetch failed, using cache:', error);
-      return cachedResponse || new Response(JSON.stringify({
-        error: 'offline',
-        message: 'Network unavailable. Showing cached data.'
-      }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    });
-
-  if (cachedResponse) {
-    const cacheTime = cachedResponse.headers.get('sw-cache-time');
-    const age = cacheTime ? Date.now() - parseInt(cacheTime) : Infinity;
-
-    if (age < API_CACHE_DURATION) {
-      fetchPromise.catch(() => {});
+async function networkFirst(request, cacheName) {
+  try {
+    const response = await fetch(request);
+    if (response && response.status === 200) {
+      const copy = response.clone();
+      caches.open(cacheName).then(cache => cache.put(request, copy)).catch(() => {});
+    }
+    return response;
+  } catch (error) {
+    const cache = await caches.open(cacheName);
+    const cachedResponse = await cache.match(request);
+    if (cachedResponse) {
       return cachedResponse;
     }
-
-    if (age < STALE_WHILE_REVALIDATE_DURATION) {
-      const cachedClone = cachedResponse.clone();
-      const headers = new Headers(cachedClone.headers);
-      headers.set('X-Cache-Status', 'stale');
-
-      const staleResponse = new Response(cachedClone.body, {
-        status: cachedClone.status,
-        statusText: cachedClone.statusText,
-        headers: headers
-      });
-
-      fetchPromise.catch(() => {});
-      return staleResponse;
-    }
+    return new Response(JSON.stringify({
+      error: 'offline',
+      message: 'Network unavailable.'
+    }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
+}
 
-  return fetchPromise;
+async function cacheThenRefresh(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cachedResponse = await cache.match(request);
+  const refresh = fetch(request).then(response => {
+    if (response && response.status === 200) {
+      cache.put(request, response.clone()).catch(() => {});
+    }
+    return response;
+  });
+  if (cachedResponse) {
+    refresh.catch(() => {});
+    return cachedResponse;
+  }
+  return refresh.catch(() => new Response('', { status: 503, statusText: 'Offline' }));
 }
 
 self.addEventListener('message', async (event) => {
