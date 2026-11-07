@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Youtube, Link as LinkIcon, Save, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react';
+import { AlfieIcon } from './brand/AlfieIcon';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -296,146 +296,86 @@ export const AddYouTubeUrlModal: React.FC<AddYouTubeUrlModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`
-        w-full max-w-2xl rounded-xl shadow-xl overflow-hidden
-        ${darkMode ? 'bg-slate-800' : 'bg-white'}
-      `}>
-        <div className={`
-          flex items-center justify-between p-6 border-b
-          ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-        `}>
-          <div className="flex items-center gap-3">
-            <Youtube className="text-red-600" size={24} />
-            <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-              Add YouTube Video
-            </h2>
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center p-3 sm:p-6">
+      <div className="a-veil absolute inset-0 backdrop-blur-[2px]" onClick={() => !saving && onClose()} aria-hidden="true" />
+      <section className="a-sheet a-md-sheet relative w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="a-md-yt-title">
+        <header className="a-sheet-head a-md-sheet-head">
+          <span className="a-md-yt-tile" aria-hidden="true"><i /></span>
+          <div className="min-w-0 flex-1">
+            <h2 id="a-md-yt-title" className="a-display a-ink m-0 text-[20px] font-semibold leading-tight">Add YouTube Video</h2>
+            <p className="a-mute m-0 mt-0.5 text-[13.5px]">Paste a link and we'll fill in the details</p>
           </div>
-          <button
-            onClick={onClose}
-            className={`
-              rounded-full p-2 transition-colors
-              ${darkMode
-                ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700'
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
-            `}
-          >
-            <X size={20} />
+          <button type="button" onClick={onClose} className="a-ib" aria-label="Close">
+            <AlfieIcon glyph="x" size={20} />
           </button>
-        </div>
+        </header>
 
-        <div className="p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              YouTube URL <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
+        <div className="a-md-sheet-body">
+          <label className="a-md-fl">
+            <span>YouTube URL <em>*</em></span>
+            <span className={`a-field a-md-url ${validUrl === true ? 'is-ok' : validUrl === false ? 'is-bad' : ''}`}>
+              <AlfieIcon glyph="link" size={16} />
               <input
                 type="text"
                 value={youtubeUrl}
                 onChange={(e) => handleUrlChange(e.target.value)}
                 placeholder="https://www.youtube.com/watch?v=..."
-                className={`
-                  w-full px-4 py-2 pr-10 rounded-lg border
-                  ${darkMode
-                    ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
-                    : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}
-                  focus:outline-none focus:ring-2 focus:ring-blue-500
-                `}
+                autoFocus
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                {validUrl === true && (
-                  <CheckCircle size={20} className="text-green-500" />
-                )}
-                {validUrl === false && (
-                  <AlertCircle size={20} className="text-red-500" />
-                )}
-              </div>
-            </div>
+              {validUrl === true && <AlfieIcon glyph="check" size={17} className="a-txt-g" strokeWidth={2.2} />}
+              {validUrl === false && <AlfieIcon glyph="warn" size={17} className="a-txt-r" />}
+            </span>
             {validUrl === false && (
-              <p className="text-red-500 text-sm mt-1">
-                Please enter a valid YouTube URL
-              </p>
+              <small className="a-txt-r">Please enter a valid YouTube URL</small>
             )}
-          </div>
+          </label>
 
           {fetchingMetadata && (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              <span className={`ml-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                Fetching video details...
-              </span>
+            <div className="a-md-yt-preview is-loading">
+              <span className="a-nw-spin a-nw-spin-lg" />
+              <span>Fetching video details...</span>
             </div>
           )}
 
           {!fetchingMetadata && videoId && thumbnailUrl && (
-            <div className="rounded-lg overflow-hidden border border-slate-700">
-              <div className="aspect-video">
-                <img
-                  src={thumbnailUrl}
-                  alt="Video thumbnail"
-                  className="w-full h-full object-cover"
-                />
-              </div>
+            <div className="a-md-yt-preview">
+              <img src={thumbnailUrl} alt="Video thumbnail" />
+              <span className="a-md-play" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor" /></svg>
+              </span>
             </div>
           )}
 
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              Title <span className="text-red-500">*</span>
-            </label>
+          <label className="a-md-fl">
+            <span>Title <em>*</em></span>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter video title"
               disabled={fetchingMetadata}
-              className={`
-                w-full px-4 py-2 rounded-lg border
-                ${darkMode
-                  ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
-                  : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}
-                focus:outline-none focus:ring-2 focus:ring-blue-500
-                ${fetchingMetadata ? 'opacity-50 cursor-not-allowed' : ''}
-              `}
+              className="a-inp"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              Description
-            </label>
+          <label className="a-md-fl">
+            <span>Description</span>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="Enter video description (optional)"
               disabled={fetchingMetadata}
-              className={`
-                w-full px-4 py-2 rounded-lg border
-                ${darkMode
-                  ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
-                  : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}
-                focus:outline-none focus:ring-2 focus:ring-blue-500
-                ${fetchingMetadata ? 'opacity-50 cursor-not-allowed' : ''}
-              `}
+              className="a-inp"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              Link to Event (Optional)
-            </label>
+          <label className="a-md-fl">
+            <span>Link to Event (Optional)</span>
             <select
               value={selectedEventId}
               onChange={(e) => handleEventChange(e.target.value)}
-              className={`
-                w-full px-4 py-2 rounded-lg border
-                ${darkMode
-                  ? 'bg-slate-700 border-slate-600 text-white'
-                  : 'bg-white border-slate-300 text-slate-900'}
-                focus:outline-none focus:ring-2 focus:ring-blue-500
-              `}
+              className="a-inp"
             >
               <option value="">No event selected</option>
               {availableEvents.map(event => (
@@ -444,67 +384,39 @@ export const AddYouTubeUrlModal: React.FC<AddYouTubeUrlModalProps> = ({
                 </option>
               ))}
             </select>
-          </div>
+          </label>
 
           {selectedRaceClass && (
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Race Class
-              </label>
-              <input
-                type="text"
-                value={selectedRaceClass}
-                readOnly
-                className={`
-                  w-full px-4 py-2 rounded-lg border opacity-60 cursor-not-allowed
-                  ${darkMode
-                    ? 'bg-slate-700 border-slate-600 text-white'
-                    : 'bg-white border-slate-300 text-slate-900'}
-                `}
-              />
+            <div className="a-md-fl">
+              <span>Race Class</span>
+              <div className="a-md-readonly"><AlfieIcon glyph="trophy" size={15} />{selectedRaceClass}</div>
             </div>
           )}
         </div>
 
-        <div className={`
-          flex justify-end gap-3 p-6 border-t
-          ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-        `}>
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className={`
-              px-4 py-2 rounded-lg font-medium transition-colors
-              ${darkMode
-                ? 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
-                : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'}
-              ${saving ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
-          >
+        <footer className="a-sheet-foot a-md-sheet-foot">
+          <button onClick={onClose} disabled={saving} className="a-btn a-btn-q">
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !videoId || !title || fetchingMetadata}
-            className={`
-              flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors
-              ${(saving || !videoId || !title || fetchingMetadata) ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
+            className="a-btn a-btn-p"
           >
             {saving ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span className="a-nw-spin" />
                 Saving...
               </>
             ) : (
               <>
-                <Save size={16} />
+                <AlfieIcon glyph="plus" size={16} />
                 Add Video
               </>
             )}
           </button>
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>
   );
 };

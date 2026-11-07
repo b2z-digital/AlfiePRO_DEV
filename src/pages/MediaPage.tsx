@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Video, Search, ListFilter as Filter, Grid2x2 as Grid, List, Play, Calendar, Trophy, Eye, Download, ExternalLink, Youtube, SquarePen as Edit2, Trash2, X, Save, Share2, SquareCheck as CheckSquare, Square, Building, Check, ArrowUpDown, ChevronDown, Upload as UploadIcon, Image as ImageIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
@@ -11,6 +10,8 @@ import { SocialShareModal } from '../components/SocialShareModal';
 import { ShareWithClubsModal } from '../components/ShareWithClubsModal';
 import { useNotifications } from '../contexts/NotificationContext';
 import JSZip from 'jszip';
+import { AlfieIcon } from '../components/brand/AlfieIcon';
+import { MediaRow, MediaThumb, MediaTile, MediaTileSkeleton, MediaViewer } from '../components/media/MediaParts';
 
 interface MediaPageProps {
   darkMode: boolean;
@@ -53,12 +54,9 @@ const MediaPage: React.FC<MediaPageProps> = ({ darkMode }) => {
   const uploadMenuRef = useRef<HTMLDivElement>(null);
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'event'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [showSortMenu, setShowSortMenu] = useState(false);
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<string>>(new Set());
   const [showShareModal, setShowShareModal] = useState(false);
   const [showClubShareModal, setShowClubShareModal] = useState(false);
-  const [showHeaderSearch, setShowHeaderSearch] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
   const [selectedEventName, setSelectedEventName] = useState('');
   const { addNotification } = useNotifications();
 
@@ -240,7 +238,8 @@ const MediaPage: React.FC<MediaPageProps> = ({ darkMode }) => {
 
       switch (sortBy) {
         case 'date':
-          comparison = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          // ascending by date, so "Newest first" (desc) really shows the newest first
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
           break;
         case 'name':
           comparison = (a.title || '').localeCompare(b.title || '');
@@ -533,1070 +532,454 @@ const MediaPage: React.FC<MediaPageProps> = ({ darkMode }) => {
     navigate('/settings?tab=integrations');
   };
 
-  const getYouTubeVideoId = (url: string) => {
-    // Extract video ID from various YouTube URL formats
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
+  const photoCount = media.filter(m => m.media_type === 'image').length;
+  const videoCount = media.filter(m => m.media_type === 'youtube_video').length;
+  const filtersActive = !!(searchTerm || selectedEventName || selectedClass || selectedType !== 'all');
+  const selectionCount = getSelectedMedia().length;
+  const selecting = selectionCount > 0;
+
+  // Sections: by month when sorted by date, by event when sorted by event
+  const groups: { key: string; label: string; items: EventMedia[] }[] = [];
+  if (sortBy === 'name') {
+    groups.push({ key: 'all', label: '', items: filteredMedia });
+  } else {
+    const byKey = new Map<string, { key: string; label: string; items: EventMedia[] }>();
+    filteredMedia.forEach(item => {
+      let key: string;
+      let label: string;
+      if (sortBy === 'event') {
+        key = item.event_name || '';
+        label = item.event_name || 'General media';
+      } else {
+        const d = new Date(item.created_at);
+        key = isNaN(d.getTime()) ? 'unknown' : `${d.getFullYear()}-${d.getMonth()}`;
+        label = isNaN(d.getTime()) ? 'Undated' : d.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+      }
+      if (!byKey.has(key)) {
+        const g = { key, label, items: [] as EventMedia[] };
+        byKey.set(key, g);
+        groups.push(g);
+      }
+      byKey.get(key)!.items.push(item);
+    });
+  }
+
+  const toggleGroup = (items: EventMedia[]) => {
+    const all = items.every(i => selectedMediaIds.has(i.id));
+    const next = new Set(selectedMediaIds);
+    items.forEach(i => (all ? next.delete(i.id) : next.add(i.id)));
+    setSelectedMediaIds(next);
   };
 
-  const renderMediaItem = (mediaItem: EventMedia) => {
-    const isVideo = mediaItem.media_type === 'youtube_video';
-    
-    if (viewMode === 'grid') {
-      return (
-        <div
-          key={mediaItem.id}
-          onClick={() => handleMediaClick(mediaItem)}
-          className={`
-            group cursor-pointer rounded-xl overflow-hidden transition-all duration-300 transform hover:scale-105 hover:shadow-xl relative
-            ${darkMode 
-              ? 'bg-slate-800/50 border border-slate-700/50 hover:bg-slate-700/50' 
-              : 'bg-white/80 border border-slate-200/50 hover:bg-white'}
-            ${selectedMediaIds.has(mediaItem.id) ? 'ring-2 ring-blue-500' : ''}
-          `}
-        >
-          {/* Selection Checkbox - Always Visible */}
-          <div className="absolute top-2 left-2 z-20">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleToggleSelection(mediaItem.id);
-              }}
-              className="p-1 bg-white/90 rounded-full shadow-md transition-all hover:scale-110"
-            >
-              {selectedMediaIds.has(mediaItem.id) ? (
-                <CheckSquare size={20} className="text-blue-600" />
-              ) : (
-                <Square size={20} className="text-gray-400" />
-              )}
-            </button>
-          </div>
-          
-          <div className="relative aspect-video overflow-hidden">
-            {isVideo ? (
-              <>
-                <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="flex gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditMedia(mediaItem);
-                      }}
-                      className="p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-                      title="Edit"
-                    >
-                      <Edit2 size={12} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteMedia(mediaItem);
-                      }}
-                      className="p-1.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                </div>
-                <img
-                  src={mediaItem.thumbnail_url || `https://img.youtube.com/vi/${getYouTubeVideoId(mediaItem.url)}/maxresdefault.jpg`}
-                  alt={mediaItem.title || 'Video thumbnail'}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center">
-                    <Play size={24} className="text-white ml-1" />
-                  </div>
-                </div>
-                <div className="absolute top-2 right-2 flex gap-2">
-                  {/* Club abbreviation label for shared media */}
-                  {mediaItem.isShared && mediaItem.sharedFrom && (
-                    <div className="px-2 py-1 bg-purple-600/90 text-white text-xs font-medium rounded-full">
-                      {mediaItem.sharedFrom.abbreviation}
-                    </div>
-                  )}
-                  <div className="bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                    <Youtube size={12} />
-                    Video
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="flex gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditMedia(mediaItem);
-                      }}
-                      className="p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-                      title="Edit"
-                    >
-                      <Edit2 size={12} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteMedia(mediaItem);
-                      }}
-                      className="p-1.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                </div>
-                <img
-                  src={mediaItem.url}
-                  alt={mediaItem.title || 'Event image'}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
-                    <Eye size={24} className="text-white" />
-                  </div>
-                </div>
-                <div className="absolute top-2 right-2 flex gap-2">
-                  {/* Club abbreviation label for shared media */}
-                  {mediaItem.isShared && mediaItem.sharedFrom && (
-                    <div className="px-2 py-1 bg-purple-600/90 text-white text-xs font-medium rounded-full">
-                      {mediaItem.sharedFrom.abbreviation}
-                    </div>
-                  )}
-                  <div className="bg-blue-600 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                    <Camera size={12} />
-                    Image
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          
-          <div className="p-4">
-            <h3 className={`font-medium mb-2 line-clamp-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-              {mediaItem.title || 'Untitled'}
-              {mediaItem.isShared && mediaItem.sharedFrom && (
-                <span className="ml-2 px-2 py-0.5 bg-purple-600/20 text-purple-400 text-xs rounded-full">
-                  from {mediaItem.sharedFrom.abbreviation}
-                </span>
-              )}
-            </h3>
-            
-            <div className="flex items-center gap-2 mb-2">
-              {mediaItem.event_name && (
-                <div className={`
-                  px-2 py-1 rounded-full text-xs font-medium
-                  ${darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-800'}
-                `}>
-                  {mediaItem.event_name}
-                </div>
-              )}
-              
-              {mediaItem.race_class && (
-                <div className={`
-                  px-2 py-1 rounded-full text-xs font-medium
-                  ${darkMode ? 'bg-purple-900/30 text-purple-400' : 'bg-purple-100 text-purple-800'}
-                `}>
-                  {mediaItem.race_class}
-                </div>
-              )}
-            </div>
-            
-            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              {new Date(mediaItem.created_at).toLocaleDateString()}
-            </p>
-          </div>
-        </div>
-      );
-    } else {
-      return (
-        <div
-          key={mediaItem.id}
-          onClick={() => handleMediaClick(mediaItem)}
-          className={`
-            group cursor-pointer p-4 rounded-lg border transition-all hover:scale-[1.02]
-            ${selectedMediaIds.has(mediaItem.id) ? 'ring-2 ring-blue-500' : ''}
-            ${darkMode 
-              ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50' 
-              : 'bg-white/80 border-slate-200/50 hover:bg-white'}
-          `}
-        >
-          <div className="flex items-center gap-4">
-            {/* Selection Checkbox - Always Visible */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleToggleSelection(mediaItem.id);
-              }}
-              className="flex-shrink-0 transition-all hover:scale-110"
-            >
-              {selectedMediaIds.has(mediaItem.id) ? (
-                <CheckSquare size={20} className="text-blue-600" />
-              ) : (
-                <Square size={20} className="text-gray-400" />
-              )}
-            </button>
-            
-            <div className="relative w-24 h-16 rounded-lg overflow-hidden flex-shrink-0">
-              {isVideo ? (
-                <>
-                  <img
-                    src={mediaItem.thumbnail_url || `https://img.youtube.com/vi/${getYouTubeVideoId(mediaItem.url)}/maxresdefault.jpg`}
-                    alt={mediaItem.title || 'Video thumbnail'}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                    <Play size={16} className="text-white" />
-                  </div>
-                </>
-              ) : (
-                <img
-                  src={mediaItem.url}
-                  alt={mediaItem.title || 'Event image'}
-                  className="w-full h-full object-cover"
-                />
-              )}
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <h3 className={`font-medium mb-1 truncate ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                    {mediaItem.title || 'Untitled'}
-                    {mediaItem.isShared && mediaItem.sharedFrom && (
-                      <span className="ml-2 px-2 py-0.5 bg-purple-600/20 text-purple-400 text-xs rounded-full">
-                        from {mediaItem.sharedFrom.abbreviation}
-                      </span>
-                    )}
-                  </h3>
-                  
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`
-                      px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1
-                      ${isVideo 
-                        ? darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-800'
-                        : darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-800'}
-                    `}>
-                      {isVideo ? <Youtube size={10} /> : <Camera size={10} />}
-                      {isVideo ? 'Video' : 'Image'}
-                    </div>
-                    
-                    {mediaItem.event_name && (
-                      <div className={`
-                        px-2 py-1 rounded-full text-xs font-medium
-                        ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'}
-                      `}>
-                        {mediaItem.event_name}
-                      </div>
-                    )}
-                    
-                    {mediaItem.race_class && (
-                      <div className={`
-                        px-2 py-1 rounded-full text-xs font-medium
-                        ${darkMode ? 'bg-purple-900/30 text-purple-400' : 'bg-purple-100 text-purple-800'}
-                      `}>
-                        {mediaItem.race_class}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {new Date(mediaItem.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                
-                <div className="flex items-center gap-2 ml-4">
-                  {/* Club abbreviation label for shared media */}
-                  {mediaItem.isShared && mediaItem.sharedFrom && (
-                    <div className="px-2 py-1 bg-purple-600/90 text-white text-xs font-medium rounded-full">
-                      {mediaItem.sharedFrom.abbreviation}
-                    </div>
-                  )}
-                  
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditMedia(mediaItem);
-                    }}
-                    className={`
-                      p-2 rounded-lg transition-colors
-                      ${darkMode 
-                        ? 'hover:bg-slate-600 text-slate-300' 
-                        : 'hover:bg-slate-200 text-slate-600'}
-                    `}
-                    title="Edit"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteMedia(mediaItem);
-                    }}
-                    className={`
-                      p-2 rounded-lg transition-colors
-                      ${darkMode 
-                        ? 'hover:bg-red-900/50 text-red-400' 
-                        : 'hover:bg-red-100 text-red-600'}
-                    `}
-                    title="Delete"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                  
-                  {!isVideo && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownload(mediaItem.url, mediaItem.title || 'image');
-                      }}
-                      className={`
-                        p-2 rounded-lg transition-colors
-                        ${darkMode
-                          ? 'hover:bg-slate-600 text-slate-300'
-                          : 'hover:bg-slate-200 text-slate-600'}
-                      `}
-                      title="Download"
-                    >
-                      <Download size={16} />
-                    </button>
-                  )}
-                  
-                  {isVideo && (
-                    <a
-                      href={`https://youtube.com/watch?v=${getYouTubeVideoId(mediaItem.url)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className={`
-                        p-2 rounded-lg transition-colors
-                        ${darkMode 
-                          ? 'hover:bg-slate-600 text-slate-300' 
-                          : 'hover:bg-slate-200 text-slate-600'}
-                      `}
-                      title="Open in YouTube"
-                    >
-                      <ExternalLink size={16} />
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
+  const viewerIndex = selectedMedia ? filteredMedia.findIndex(m => m.id === selectedMedia.id) : -1;
+  const openAt = (i: number) => { const m = filteredMedia[i]; if (m) setSelectedMedia(m); };
+
+  const itemProps = (mediaItem: EventMedia) => ({
+    selected: selectedMediaIds.has(mediaItem.id),
+    onOpen: () => handleMediaClick(mediaItem),
+    onToggle: () => handleToggleSelection(mediaItem.id),
+    onEdit: () => handleEditMedia(mediaItem),
+    onDelete: () => handleDeleteMedia(mediaItem),
+    onDownload: () => handleDownload(mediaItem.url, mediaItem.title || 'image'),
+  });
+
+  const closeEdit = () => {
+    setShowEditModal(false);
+    setEditingMedia(null);
+    setEditForm({
+      title: '',
+      description: '',
+      event_ref_id: '',
+      event_ref_type: '',
+      event_name: '',
+      race_class: ''
+    });
   };
+
+  const sortValue = `${sortBy}-${sortOrder}`;
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-16">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
-              <Camera className="text-white" size={28} style={{ color: '#ffffff' }} />
-            </div>
-            <div>
-              <h1 className={`text-3xl font-bold ${
-                darkMode ? 'text-white' : 'text-gray-900'
-              }`}>Media Center</h1>
-              <p className="text-slate-400">
-                Upload, organize and share your club's media content
-              </p>
-            </div>
+      <div className={`a-md-page flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-28 lg:pl-9 ${selecting ? 'a-md-selecting' : ''}`}>
+        {/* Header */}
+        <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}>
+            <AlfieIcon glyph="camera" size={24} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">Media Center</h1>
+            <p className="a-mute m-0 mt-1 text-[14px]">
+              {loading || media.length === 0
+                ? "Upload, organize and share your club's media content"
+                : `${photoCount} photo${photoCount === 1 ? '' : 's'} · ${videoCount} video${videoCount === 1 ? '' : 's'}`}
+            </p>
           </div>
-
-          {/* Header Actions */}
-          <div className="flex items-center gap-3">
-            {/* Search */}
-            <div className="relative">
-              {showHeaderSearch ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search media..."
-                    className="w-64 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => {
-                      setShowHeaderSearch(false);
-                      setSearchTerm('');
-                    }}
-                    className="p-2 text-slate-400 hover:text-white transition-colors"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowHeaderSearch(true)}
-                  className="p-2 text-slate-400 hover:text-white transition-colors"
-                  title="Search media"
-                >
-                  <Search size={20} />
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <label className="a-field a-nw-search">
+              <AlfieIcon glyph="search" size={16} />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search media"
+                aria-label="Search media"
+              />
+              {searchTerm && (
+                <button type="button" className="a-nw-clear" onClick={() => setSearchTerm('')} aria-label="Clear search">
+                  <AlfieIcon glyph="x" size={13} />
                 </button>
               )}
-            </div>
+            </label>
 
-            {/* View Mode Toggle */}
-            <div className="flex items-center bg-slate-800 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Grid view"
-              >
-                <Grid size={18} />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="List view"
-              >
-                <List size={18} />
-              </button>
-            </div>
-
-            {/* Sort */}
-            <div className="relative">
-              <button
-                onClick={() => setShowSortMenu(!showSortMenu)}
-                className={`p-2 transition-colors ${showSortMenu ? 'text-blue-400' : 'text-slate-400 hover:text-white'}`}
-                title="Sort"
-              >
-                <ArrowUpDown size={20} />
-              </button>
-
-              {showSortMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-xl border border-slate-700 py-2 z-50">
-                  <button
-                    onClick={() => {
-                      setSortBy('date');
-                      setSortOrder('desc');
-                      setShowSortMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 text-slate-300"
-                  >
-                    Newest First
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSortBy('date');
-                      setSortOrder('asc');
-                      setShowSortMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 text-slate-300"
-                  >
-                    Oldest First
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSortBy('name');
-                      setSortOrder('asc');
-                      setShowSortMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 text-slate-300"
-                  >
-                    Name (A-Z)
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSortBy('name');
-                      setSortOrder('desc');
-                      setShowSortMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 text-slate-300"
-                  >
-                    Name (Z-A)
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSortBy('event');
-                      setSortOrder('asc');
-                      setShowSortMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 text-slate-300"
-                  >
-                    Event (A-Z)
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Filters */}
-            <div className="relative">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`p-2 transition-colors ${showFilters ? 'text-blue-400' : 'text-slate-400 hover:text-white'}`}
-                title="Filters"
-              >
-                <Filter size={20} />
-              </button>
-
-              {showFilters && (
-                <div className="absolute right-0 mt-2 w-64 bg-slate-800 rounded-lg shadow-xl border border-slate-700 py-2 z-50">
-                  <div className="px-4 py-2">
-                    <label className="block text-sm font-medium mb-2 text-slate-300">Event Name</label>
-                    <select
-                      value={selectedEventName}
-                      onChange={(e) => setSelectedEventName(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-700 text-white border border-slate-600 rounded-lg"
-                    >
-                      <option value="">All Events</option>
-                      {eventNames.map(name => (
-                        <option key={name} value={name}>{name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="px-4 py-2">
-                    <label className="block text-sm font-medium mb-2 text-slate-300">Race Class</label>
-                    <select
-                      value={selectedClass}
-                      onChange={(e) => setSelectedClass(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-700 text-white border border-slate-600 rounded-lg"
-                    >
-                      <option value="">All Classes</option>
-                      {raceClasses.map(raceClass => (
-                        <option key={raceClass} value={raceClass}>{raceClass}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="px-4 py-2">
-                    <label className="block text-sm font-medium mb-2 text-slate-300">Media Type</label>
-                    <select
-                      value={selectedType}
-                      onChange={(e) => setSelectedType(e.target.value as 'all' | 'image' | 'youtube_video')}
-                      className="w-full px-3 py-2 bg-slate-700 text-white border border-slate-600 rounded-lg"
-                    >
-                      <option value="all">All Media</option>
-                      <option value="image">Images Only</option>
-                      <option value="youtube_video">Videos Only</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Selection Actions */}
-            {getSelectedMedia().length > 0 && (
-              <>
-                <div className="h-6 w-px bg-slate-600" />
-
-                <button
-                  onClick={handleBulkDownload}
-                  className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl"
-                  title="Download selected as zip"
-                >
-                  <Download size={18} />
-                  Download ({getSelectedMedia().length})
-                </button>
-
-                <button
-                  onClick={() => setShowShareModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
-                  title="Share on social media"
-                >
-                  <Share2 size={18} />
-                  Share ({getSelectedMedia().length})
-                </button>
-
-                <button
-                  onClick={() => setShowClubShareModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium transition-colors"
-                  title="Share with other clubs"
-                >
-                  <Building size={18} />
-                  Clubs ({getSelectedMedia().length})
-                </button>
-
-                <button
-                  onClick={handleClearSelection}
-                  className="p-2 text-slate-400 hover:text-white transition-colors"
-                  title="Clear selection"
-                >
-                  <X size={20} />
-                </button>
-              </>
-            )}
-
-            {/* Upload Media Split Button */}
+            {/* Upload split button */}
             <div className="relative" ref={uploadMenuRef}>
-              <div className="flex">
-                <button
-                  onClick={() => setShowImageUploadModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-l-lg transition-colors bg-emerald-600 hover:bg-emerald-500 text-white"
-                >
-                  <UploadIcon size={18} />
-                  Upload Media
+              <div className="a-md-split">
+                <button onClick={() => setShowImageUploadModal(true)} className="a-btn a-btn-p a-md-split-main" aria-label="Upload Media">
+                  <AlfieIcon glyph="upload" size={17} />
+                  <span className="a-nw-newbtn-lbl">Upload</span>
                 </button>
                 <button
                   onClick={() => setShowUploadMenu(!showUploadMenu)}
-                  className="px-2 py-2 rounded-r-lg border-l transition-colors bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500"
+                  className="a-btn a-btn-p a-md-split-more"
+                  aria-label="More upload options"
+                  aria-expanded={showUploadMenu}
                 >
-                  <ChevronDown size={18} />
+                  <AlfieIcon glyph="chev" size={16} />
                 </button>
               </div>
 
               {showUploadMenu && (
-                <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg z-50 bg-slate-800 border border-slate-700">
+                <div className="a-pop a-md-menu" role="menu">
                   <button
+                    role="menuitem"
                     onClick={() => {
                       setShowImageUploadModal(true);
                       setShowUploadMenu(false);
                     }}
-                    className="w-full text-left px-4 py-3 rounded-t-lg transition-colors flex items-center gap-3 hover:bg-slate-700 text-white"
+                    className="a-md-menu-i"
                   >
-                    <ImageIcon size={18} />
-                    <div>
-                      <div className="font-medium">Upload Images</div>
-                      <div className="text-xs text-slate-400">Add photos from your device</div>
-                    </div>
+                    <span className="a-md-menu-ic a-md-menu-ic-b"><AlfieIcon glyph="image" size={18} /></span>
+                    <span>
+                      <b>Upload Images</b>
+                      <span>Add photos from your device</span>
+                    </span>
                   </button>
                   <button
+                    role="menuitem"
                     onClick={() => {
                       setShowUploadModal(true);
                       setShowUploadMenu(false);
                     }}
-                    className="w-full text-left px-4 py-3 transition-colors flex items-center gap-3 hover:bg-slate-700 text-white"
+                    className="a-md-menu-i"
                   >
-                    <Youtube size={18} />
-                    <div>
-                      <div className="font-medium">Upload Video</div>
-                      <div className="text-xs text-slate-400">Upload directly to YouTube</div>
-                    </div>
+                    <span className="a-md-menu-ic a-md-menu-ic-r"><AlfieIcon glyph="video" size={18} /></span>
+                    <span>
+                      <b>Upload Video</b>
+                      <span>Upload directly to YouTube</span>
+                    </span>
                   </button>
                   <button
+                    role="menuitem"
                     onClick={() => {
                       setShowYouTubeUrlModal(true);
                       setShowUploadMenu(false);
                     }}
-                    className="w-full text-left px-4 py-3 rounded-b-lg transition-colors flex items-center gap-3 hover:bg-slate-700 text-white"
+                    className="a-md-menu-i"
                   >
-                    <ExternalLink size={18} />
-                    <div>
-                      <div className="font-medium">Add YouTube URL</div>
-                      <div className="text-xs text-slate-400">Link an existing YouTube video</div>
-                    </div>
+                    <span className="a-md-menu-ic a-md-menu-ic-p"><AlfieIcon glyph="link" size={18} /></span>
+                    <span>
+                      <b>Add YouTube URL</b>
+                      <span>Link an existing YouTube video</span>
+                    </span>
                   </button>
                 </div>
               )}
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Media Grid/List */}
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            </div>
-          ) : error ? (
-            <div className="text-center py-12">
-              <p className="text-red-400 mb-4">{error}</p>
-              <button
-                onClick={fetchMedia}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        {/* Toolbar */}
+        <div className="a-nw-toolbar">
+          <div className="a-seg" role="group" aria-label="Media type">
+            <button type="button" className={`a-seg-i ${selectedType === 'all' ? 'a-seg-on' : ''}`} onClick={() => setSelectedType('all')} aria-pressed={selectedType === 'all'}>
+              All<span className="a-cnt">{media.length}</span>
+            </button>
+            <button type="button" className={`a-seg-i ${selectedType === 'image' ? 'a-seg-on' : ''}`} onClick={() => setSelectedType('image')} aria-pressed={selectedType === 'image'}>
+              <AlfieIcon glyph="camera" size={15} />Photos<span className="a-cnt">{photoCount}</span>
+            </button>
+            <button type="button" className={`a-seg-i ${selectedType === 'youtube_video' ? 'a-seg-on' : ''}`} onClick={() => setSelectedType('youtube_video')} aria-pressed={selectedType === 'youtube_video'}>
+              <AlfieIcon glyph="video" size={15} />Videos<span className="a-cnt">{videoCount}</span>
+            </button>
+          </div>
+
+          <div className="a-nw-tools">
+            {eventNames.length > 0 && (
+              <select
+                value={selectedEventName}
+                onChange={(e) => setSelectedEventName(e.target.value)}
+                className="a-pick a-nw-pick a-md-pick-ev"
+                aria-label="Filter by event"
               >
-                Try Again
+                <option value="">All events</option>
+                {eventNames.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            )}
+            {raceClasses.length > 0 && (
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="a-pick a-nw-pick"
+                aria-label="Filter by class"
+              >
+                <option value="">All classes</option>
+                {raceClasses.map(raceClass => (
+                  <option key={raceClass} value={raceClass}>{raceClass}</option>
+                ))}
+              </select>
+            )}
+            <select
+              value={sortValue}
+              onChange={(e) => {
+                const [by, order] = e.target.value.split('-') as ['date' | 'name' | 'event', 'asc' | 'desc'];
+                setSortBy(by);
+                setSortOrder(order);
+              }}
+              className="a-pick a-nw-pick"
+              aria-label="Sort"
+            >
+              <option value="date-desc">Newest first</option>
+              <option value="date-asc">Oldest first</option>
+              <option value="name-asc">Name (A–Z)</option>
+              <option value="name-desc">Name (Z–A)</option>
+              <option value="event-asc">Event (A–Z)</option>
+            </select>
+            <div className="a-seg" role="group" aria-label="Layout">
+              <button type="button" className={`a-seg-i a-nw-seg-ic ${viewMode === 'grid' ? 'a-seg-on' : ''}`} onClick={() => setViewMode('grid')} title="Grid view" aria-label="Grid view" aria-pressed={viewMode === 'grid'}>
+                <AlfieIcon glyph="grid" size={16} />
+              </button>
+              <button type="button" className={`a-seg-i a-nw-seg-ic ${viewMode === 'list' ? 'a-seg-on' : ''}`} onClick={() => setViewMode('list')} title="List view" aria-label="List view" aria-pressed={viewMode === 'list'}>
+                <AlfieIcon glyph="list" size={16} />
               </button>
             </div>
-          ) : filteredMedia.length === 0 ? (
-            <div className="text-center py-12">
-              <Camera size={48} className="mx-auto mb-4 text-slate-500 opacity-50" />
-              <h3 className="text-lg font-medium text-white mb-2">No Media Found</h3>
-              <p className="text-slate-400">
-                {media.length === 0 
-                  ? 'No media has been uploaded yet. Add images or videos to your events to see them here.'
-                  : 'No media matches your current filters. Try adjusting your search criteria.'}
-              </p>
-            </div>
-          ) : (
-            <div className={
-              viewMode === 'grid'
-                ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-                : 'space-y-4'
-            }>
-              {viewMode === 'grid' && (
-                <div
-                  onClick={() => setShowImageUploadModal(true)}
-                  className={`
-                    group cursor-pointer rounded-xl border-2 border-dashed transition-all duration-300 transform hover:scale-105 hover:shadow-xl flex flex-col items-center justify-center
-                    ${darkMode
-                      ? 'bg-slate-800/30 border-slate-700/50 hover:border-green-500 hover:bg-slate-800/50'
-                      : 'bg-white/30 border-slate-300/50 hover:border-green-500 hover:bg-white/50'}
-                  `}
-                >
-                  <UploadIcon size={48} className="text-green-500 mb-3 group-hover:scale-110 transition-transform" />
-                  <h3 className={`font-semibold text-lg mb-1 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                    Upload Media
-                  </h3>
-                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Click to add images or videos
-                  </p>
-                </div>
-              )}
-              {filteredMedia.map(renderMediaItem)}
-            </div>
-          )}
+          </div>
+        </div>
 
-          {/* Media Modal */}
-          {showModal && selectedMedia && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className={`
-                w-full max-w-4xl rounded-xl shadow-xl overflow-hidden
-                ${darkMode ? 'bg-slate-800' : 'bg-white'}
-              `}>
-                <div className={`
-                  flex items-center justify-between p-6 border-b
-                  ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-                `}>
-                  <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                    {selectedMedia.title || 'Media Details'}
-                  </h2>
-                  <button
-                    onClick={() => setShowModal(false)}
-                    className={`
-                      rounded-full p-2 transition-colors
-                      ${darkMode 
-                        ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700' 
-                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
-                    `}
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <div className="p-6">
-                  {selectedMedia.media_type === 'youtube_video' ? (
-                    <div className="aspect-video mb-6">
-                      <iframe
-                        src={`https://www.youtube-nocookie.com/embed/${getYouTubeVideoId(selectedMedia.url)}`}
-                        title={selectedMedia.title || 'YouTube video'}
-                        className="w-full h-full rounded-lg"
-                        allowFullScreen
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      />
-                    </div>
-                  ) : (
-                    <div className="mb-6">
-                      <img
-                        src={selectedMedia.url}
-                        alt={selectedMedia.title || 'Event image'}
-                        className="w-full max-h-96 object-contain rounded-lg"
-                      />
+        {/* Media */}
+        {loading ? (
+          <div className="a-md-grid" aria-busy="true" aria-label="Loading media">
+            {Array.from({ length: 10 }).map((_, i) => <MediaTileSkeleton key={i} index={i} />)}
+          </div>
+        ) : error ? (
+          <div className="a-card a-empty py-14 px-6">
+            <span className="a-tile a-tile-lg a-tile-danger"><AlfieIcon glyph="warn" size={24} /></span>
+            <h3 className="a-ink m-0 text-[17px] font-semibold">Couldn't load media</h3>
+            <p className="a-mute m-0 text-[14px]">{error}</p>
+            <button onClick={fetchMedia} className="a-btn a-btn-p mt-2">Try Again</button>
+          </div>
+        ) : filteredMedia.length === 0 ? (
+          <div className="a-card a-empty py-14 px-6">
+            <span className="a-tile a-tile-lg a-tile-rim"><AlfieIcon glyph={media.length === 0 ? 'camera' : 'search'} size={24} /></span>
+            <h3 className="a-ink m-0 text-[17px] font-semibold">{media.length === 0 ? 'No media yet' : 'Nothing matches'}</h3>
+            <p className="a-mute m-0 max-w-md text-[14px]">
+              {media.length === 0
+                ? 'No media has been uploaded yet. Add images or videos to your events to see them here.'
+                : 'No media matches your current filters. Try adjusting your search criteria.'}
+            </p>
+            {media.length === 0 ? (
+              <button onClick={() => setShowImageUploadModal(true)} className="a-btn a-btn-p mt-2">
+                <AlfieIcon glyph="upload" size={16} />Upload Media
+              </button>
+            ) : filtersActive && (
+              <button
+                onClick={() => { setSearchTerm(''); setSelectedEventName(''); setSelectedClass(''); setSelectedType('all'); }}
+                className="a-btn mt-2"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-7">
+            {groups.map((group, gi) => {
+              const allSel = group.items.every(i => selectedMediaIds.has(i.id));
+              return (
+                <section key={group.key} className="flex flex-col gap-3.5" aria-label={group.label || 'Media'}>
+                  {group.label && (
+                    <div className="a-md-sec">
+                      <h2>{group.label}</h2>
+                      <span className="a-cnt">{group.items.length}</span>
+                      <button type="button" className="a-md-sec-sel" onClick={() => toggleGroup(group.items)}>
+                        {allSel ? 'Deselect' : 'Select'}
+                      </button>
                     </div>
                   )}
-
-                  <div className="space-y-4">
-                    {selectedMedia.description && (
-                      <div>
-                        <h3 className={`font-medium mb-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                          Description
-                        </h3>
-                        <p className={darkMode ? 'text-slate-300' : 'text-slate-600'}>
-                          {selectedMedia.description}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap gap-2">
-                      {selectedMedia.event_name && (
-                        <div className={`
-                          px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1
-                          ${darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-800'}
-                        `}>
-                          <Calendar size={14} />
-                          {selectedMedia.event_name}
-                        </div>
+                  {viewMode === 'grid' ? (
+                    <div className="a-md-grid">
+                      {gi === 0 && (
+                        <button type="button" className="a-md-add" onClick={() => setShowImageUploadModal(true)}>
+                          <span className="a-md-add-ic"><AlfieIcon glyph="plus" size={24} /></span>
+                          <b>Upload Media</b>
+                          <span>Click to add images or videos</span>
+                        </button>
                       )}
-                      
-                      {selectedMedia.race_class && (
-                        <div className={`
-                          px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1
-                          ${darkMode ? 'bg-purple-900/30 text-purple-400' : 'bg-purple-100 text-purple-800'}
-                        `}>
-                          <Trophy size={14} />
-                          {selectedMedia.race_class}
-                        </div>
-                      )}
-
-                      <div className={`
-                        px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1
-                        ${selectedMedia.media_type === 'youtube_video'
-                          ? darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-800'
-                          : darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-800'}
-                      `}>
-                        {selectedMedia.media_type === 'youtube_video' ? <Youtube size={14} /> : <Camera size={14} />}
-                        {selectedMedia.media_type === 'youtube_video' ? 'YouTube Video' : 'Image'}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-700">
-                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Added on {new Date(selectedMedia.created_at).toLocaleDateString()}
-                      </p>
-                      
-                      <div className="flex gap-2">
-                        {selectedMedia.media_type === 'youtube_video' ? (
-                          <a
-                            href={`https://youtube.com/watch?v=${getYouTubeVideoId(selectedMedia.url)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            <ExternalLink size={16} />
-                            Open in YouTube
-                          </a>
-                        ) : (
-                          <button
-                            onClick={() => handleDownload(selectedMedia.url, selectedMedia.title || 'image')}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                          >
-                            <Download size={16} />
-                            Download
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Edit Media Modal */}
-          {showEditModal && editingMedia && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className={`
-                w-full max-w-md rounded-xl shadow-xl overflow-hidden
-                ${darkMode ? 'bg-slate-800' : 'bg-white'}
-              `}>
-                <div className={`
-                  flex items-center justify-between p-6 border-b
-                  ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-                `}>
-                  <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                    Edit Media
-                  </h2>
-                  <button
-                    onClick={() => setShowEditModal(false)}
-                    className={`
-                      rounded-full p-2 transition-colors
-                      ${darkMode 
-                        ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700' 
-                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
-                    `}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <div className="p-6 space-y-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Title
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.title}
-                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                      className={`
-                        w-full px-3 py-2 rounded-lg border
-                        ${darkMode 
-                          ? 'bg-slate-700 border-slate-600 text-white' 
-                          : 'bg-white border-slate-300 text-slate-900'}
-                      `}
-                      placeholder="Enter media title"
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Description
-                    </label>
-                    <textarea
-                      value={editForm.description}
-                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                      rows={3}
-                      className={`
-                        w-full px-3 py-2 rounded-lg border
-                        ${darkMode 
-                          ? 'bg-slate-700 border-slate-600 text-white' 
-                          : 'bg-white border-slate-300 text-slate-900'}
-                      `}
-                      placeholder="Enter description"
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Event Name
-                    </label>
-                    <select
-                      value={editForm.event_ref_id}
-                      onChange={(e) => handleEventChange(e.target.value)}
-                      className={`
-                        w-full px-3 py-2 rounded-lg border
-                        ${darkMode 
-                          ? 'bg-slate-700 border-slate-600 text-white' 
-                          : 'bg-white border-slate-300 text-slate-900'}
-                      `}
-                    >
-                      <option value="">Select an event</option>
-                      {availableEvents.map(event => (
-                        <option key={`${event.type}-${event.id}`} value={event.id} data-type={event.type}>
-                          {event.name} {event.date && `(${new Date(event.date).toLocaleDateString()})`}
-                        </option>
+                      {group.items.map((mediaItem, i) => (
+                        <MediaTile
+                          key={mediaItem.id}
+                          item={mediaItem}
+                          index={i}
+                          showEvent={sortBy !== 'event'}
+                          {...itemProps(mediaItem)}
+                        />
                       ))}
-                    </select>
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="a-md-list">
+                      {group.items.map((mediaItem, i) => (
+                        <MediaRow key={mediaItem.id} item={mediaItem} index={i} {...itemProps(mediaItem)} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        )}
 
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Race Class
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.race_class}
-                      readOnly
-                      className={`
-                        w-full px-3 py-2 rounded-lg border opacity-60 cursor-not-allowed
-                        ${darkMode 
-                          ? 'bg-slate-700 border-slate-600 text-white' 
-                          : 'bg-white border-slate-300 text-slate-900'}
-                      `}
-                      placeholder="Select an event to see race class"
-                    />
-                    <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Race class is automatically set based on the selected event
-                    </p>
-                  </div>
+        {/* Selection bar */}
+        {selecting && (
+          <div className="a-md-selbar" role="toolbar" aria-label="Selected media">
+            <span className="a-md-selbar-n"><b>{selectionCount}</b> selected</span>
+            <button type="button" className="a-md-selbar-link" onClick={handleSelectAll}>
+              {selectedMediaIds.size === filteredMedia.length ? 'Deselect all' : 'Select all'}
+            </button>
+            <span className="a-md-selbar-sep" aria-hidden="true" />
+            <button onClick={handleBulkDownload} className="a-md-selbar-btn" title="Download selected as zip">
+              <AlfieIcon glyph="download" size={16} />
+              <span>Download</span>
+            </button>
+            <button onClick={() => setShowShareModal(true)} className="a-md-selbar-btn" title="Share on social media">
+              <AlfieIcon glyph="share" size={16} />
+              <span>Share</span>
+            </button>
+            <button onClick={() => setShowClubShareModal(true)} className="a-md-selbar-btn" title="Share with other clubs">
+              <AlfieIcon glyph="team" size={16} />
+              <span>Clubs</span>
+            </button>
+            <button onClick={handleClearSelection} className="a-md-selbar-x" title="Clear selection" aria-label="Clear selection">
+              <AlfieIcon glyph="x" size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Viewer */}
+        {showModal && selectedMedia && (
+          <MediaViewer
+            item={selectedMedia}
+            position={viewerIndex >= 0 ? viewerIndex + 1 : 1}
+            total={viewerIndex >= 0 ? filteredMedia.length : 1}
+            onPrev={viewerIndex > 0 ? () => openAt(viewerIndex - 1) : undefined}
+            onNext={viewerIndex >= 0 && viewerIndex < filteredMedia.length - 1 ? () => openAt(viewerIndex + 1) : undefined}
+            onClose={() => setShowModal(false)}
+            onEdit={() => { setShowModal(false); handleEditMedia(selectedMedia); }}
+            onDelete={() => { setShowModal(false); handleDeleteMedia(selectedMedia); }}
+            onDownload={() => handleDownload(selectedMedia.url, selectedMedia.title || 'image')}
+          />
+        )}
+
+        {/* Edit Media */}
+        {showEditModal && editingMedia && (
+          <div className="fixed inset-0 z-[9990] flex items-center justify-center p-3 sm:p-6">
+            <div className="a-veil absolute inset-0 backdrop-blur-[2px]" onClick={() => !saving && closeEdit()} aria-hidden="true" />
+            <section className="a-sheet a-md-sheet relative w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="a-md-edit-title">
+              <header className="a-sheet-head a-md-sheet-head">
+                <span className="a-md-sheet-thumb"><MediaThumb item={editingMedia} /></span>
+                <div className="min-w-0 flex-1">
+                  <h2 id="a-md-edit-title" className="a-display a-ink m-0 text-[20px] font-semibold leading-tight">Edit Media</h2>
+                  <p className="a-mute m-0 mt-0.5 truncate text-[13.5px]">{editingMedia.title || 'Untitled'}</p>
                 </div>
+                <button type="button" className="a-ib" onClick={closeEdit} disabled={saving} aria-label="Close"><AlfieIcon glyph="x" size={20} /></button>
+              </header>
 
-                <div className={`
-                  flex justify-end gap-3 p-6 border-t
-                  ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-                `}>
-                  <button
-                    onClick={() => {
-                      setShowEditModal(false);
-                      setEditingMedia(null);
-                      setEditForm({ 
-                        title: '', 
-                        description: '', 
-                        event_ref_id: '',
-                        event_ref_type: '',
-                        event_name: '', 
-                        race_class: '' 
-                      });
-                    }}
-                    disabled={saving}
-                    className={`
-                      px-4 py-2 rounded-lg font-medium transition-colors
-                      ${darkMode
-                        ? 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
-                        : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'}
-                      ${saving ? 'opacity-50 cursor-not-allowed' : ''}
-                    `}
+              <div className="a-md-sheet-body">
+                <label className="a-md-fl">
+                  <span>Title</span>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="a-inp"
+                    placeholder="Enter media title"
+                  />
+                </label>
+                <label className="a-md-fl">
+                  <span>Description</span>
+                  <textarea
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    rows={3}
+                    className="a-inp"
+                    placeholder="Enter description"
+                  />
+                </label>
+                <label className="a-md-fl">
+                  <span>Event</span>
+                  <select
+                    value={editForm.event_ref_id}
+                    onChange={(e) => handleEventChange(e.target.value)}
+                    className="a-inp"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveEdit}
-                    disabled={saving}
-                    className={`
-                      flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors
-                      ${saving ? 'opacity-50 cursor-not-allowed' : ''}
-                    `}
-                  >
-                    {saving ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save size={16} />
-                        Save Changes
-                      </>
-                    )}
-                  </button>
+                    <option value="">Select an event</option>
+                    {availableEvents.map(event => (
+                      <option key={`${event.type}-${event.id}`} value={event.id} data-type={event.type}>
+                        {event.name} {event.date && `(${new Date(event.date).toLocaleDateString()})`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="a-md-fl">
+                  <span>Race Class</span>
+                  <div className="a-md-readonly">
+                    <AlfieIcon glyph="trophy" size={15} />
+                    {editForm.race_class || <i>Select an event to see race class</i>}
+                  </div>
+                  <small>Race class is automatically set based on the selected event</small>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* Delete Confirmation Modal */}
-          {showDeleteConfirm && mediaToDelete && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className={`
-                w-full max-w-md rounded-xl shadow-xl overflow-hidden
-                ${darkMode ? 'bg-slate-800' : 'bg-white'}
-              `}>
-                <div className={`
-                  flex items-center justify-between p-6 border-b
-                  ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-                `}>
-                  <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                    Delete Media
-                  </h2>
-                  <button
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className={`
-                      rounded-full p-2 transition-colors
-                      ${darkMode 
-                        ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700' 
-                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
-                    `}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
+              <footer className="a-sheet-foot a-md-sheet-foot">
+                <button onClick={closeEdit} disabled={saving} className="a-btn a-btn-q">Cancel</button>
+                <button onClick={handleSaveEdit} disabled={saving} className="a-btn a-btn-p">
+                  {saving ? (<><span className="a-nw-spin" />Saving...</>) : (<><AlfieIcon glyph="save" size={16} />Save Changes</>)}
+                </button>
+              </footer>
+            </section>
+          </div>
+        )}
 
-                <div className="p-6">
-                  <p className={`mb-4 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Are you sure you want to delete "{mediaToDelete.title || 'this media item'}"? This action cannot be undone.
-                  </p>
-                  
-                  <div className="flex justify-end gap-3">
-                    <button
-                      onClick={() => setShowDeleteConfirm(false)}
-                      className={`
-                        px-4 py-2 rounded-lg font-medium transition-colors
-                        ${darkMode
-                          ? 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
-                          : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'}
-                      `}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={confirmDelete}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
-                    >
-                      <Trash2 size={16} />
-                      Delete
-                    </button>
-                  </div>
-                </div>
+        {/* Delete confirmation */}
+        {showDeleteConfirm && mediaToDelete && (
+          <div className="fixed inset-0 z-[9990] flex items-center justify-center p-3 sm:p-6">
+            <div className="a-veil absolute inset-0 backdrop-blur-[2px]" onClick={() => setShowDeleteConfirm(false)} aria-hidden="true" />
+            <section className="a-sheet a-md-sheet relative w-full max-w-md overflow-hidden" role="alertdialog" aria-modal="true" aria-labelledby="a-md-del-title">
+              <div className="a-md-del">
+                <span className="a-md-del-thumb"><MediaThumb item={mediaToDelete} /></span>
+                <h2 id="a-md-del-title" className="a-display a-ink m-0 text-[20px] font-semibold">Delete Media</h2>
+                <p className="a-mute m-0 text-[14px]">
+                  Are you sure you want to delete "{mediaToDelete.title || 'this media item'}"? This action cannot be undone.
+                </p>
               </div>
-            </div>
-          )}
+              <footer className="a-sheet-foot a-md-sheet-foot">
+                <button onClick={() => setShowDeleteConfirm(false)} className="a-btn a-btn-q">Cancel</button>
+                <button onClick={confirmDelete} className="a-btn a-btn-d">
+                  <AlfieIcon glyph="trash" size={16} />
+                  Delete
+                </button>
+              </footer>
+            </section>
+          </div>
+        )}
 
         {/* Social Share Modal */}
         <SocialShareModal
