@@ -211,3 +211,39 @@ body.alv-onair-dock .alv-onair-host { padding-right: 368px; }
 .alv-h2c .alv-ov-bar > span { position: relative; top: -0.55em; }
 .alv-h2c .alv-ov-bar .status .dot { position: relative; top: 0.5em; }
 .alv-h2c .alv-ov-bar .brand svg { position: relative; top: 0.35em; }
+
+/* ── Live home (board "Live: broadcasts home") ── */
+.alv-home { background: transparent; padding: 28px clamp(16px, 3vw, 36px) 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px; }
+.alv-home-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.alv-home-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+.alv-home-grid.is-narrow { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1100px) { .alv-home-grid { grid-template-columns: minmax(0, 1fr); } }
+.alv-card { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--alv-line); border-radius: 20px; }
+.alv-hero { padding: 20px; }
+.alv-hero.is-live { border-color: rgba(255, 90, 110, 0.45); background: linear-gradient(180deg, rgba(225, 29, 56, 0.1), rgba(255, 255, 255, 0.02)); }
+.alv-btn-p { background: linear-gradient(180deg, #2A93FF, #0A78F0); border-color: transparent; color: #fff; box-shadow: 0 6px 18px rgba(10, 132, 255, 0.32); }
+.alv-btn-p:hover { background: linear-gradient(180deg, #3D9DFF, #1683F5); }
+.alv-btn:disabled { opacity: 0.6; cursor: wait; }
+.alv-ib { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: transparent; border: 0; color: rgba(235, 240, 255, 0.66); cursor: pointer; }
+.alv-ib:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.alv-ib:focus-visible { outline: 2px solid var(--alv-blue); outline-offset: 2px; }
+.alv-date { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; width: 56px; height: 56px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); }
+.alv-date small { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: rgba(235, 240, 255, 0.66); }
+.alv-date b { font-family: 'Bricolage Grotesque', sans-serif; font-size: 20px; line-height: 1; }
+.alv-row { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 12px 18px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+@media (max-width: 640px) { .alv-row { grid-template-columns: 56px minmax(0, 1fr) auto; } .alv-row > .alv-chip { display: none; } }
+.alv .ok { color: #7BEA9C; }
+.alv-dest { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid rgba(255, 255, 255, 0.07); font-size: 14px; margin-top: 10px; }
+.alv-dest + .alv-dest { margin-top: 0; }
+.alv-dot { width: 36px; height: 36px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.alv-look { position: relative; height: 150px; border-radius: 14px; overflow: hidden; background: linear-gradient(180deg, #86AED6 0%, #557FAD 42%, #2B5A82 48%, #183F63 100%); font-size: 10px; font-weight: 700; }
+.alv-look .lb { position: absolute; left: 8px; top: 8px; padding: 2px 6px; border-radius: 4px; background: #E11D38; letter-spacing: 0.08em; }
+.alv-look .bar { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 8px; padding: 5px 8px; border-radius: 7px; background: rgba(6, 11, 22, 0.58); }
+.alv-look .fl { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: 7px; background: rgba(6, 11, 22, 0.58); font-weight: 600; }
+.alv-look .fl i { font-style: normal; color: #7BEA9C; margin-right: 6px; }
+.alv-seg { display: inline-flex; gap: 2px; padding: 4px; border-radius: 13px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--alv-line); }
+.alv-seg button { height: 36px; padding: 0 14px; border-radius: 9px; border: 0; background: transparent; color: rgba(235, 240, 255, 0.72); font: 600 13.5px 'Instrument Sans', system-ui, sans-serif; cursor: pointer; }
+.alv-seg button[aria-pressed="true"] { background: rgba(42, 147, 255, 0.18); color: #fff; }
+.alv-seg button:focus-visible { outline: 2px solid var(--alv-blue); outline-offset: 1px; }
+.alv-input { height: 44px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); color: var(--alv-ink); padding: 0 12px; font: 500 15px 'Instrument Sans', system-ui, sans-serif; }
+.alv-input:focus { outline: 2px solid var(--alv-blue); outline-offset: 1px; }
