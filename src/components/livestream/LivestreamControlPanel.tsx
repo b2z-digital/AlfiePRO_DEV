@@ -1,7 +1,9 @@
 // Build: 2026-03-18-fcp-studio-redesign
 import React, { useState, useEffect, useRef } from 'react';
-import { Video, Play, Square, Settings, Eye, EyeOff, Calendar, Camera, Layers, Loader as Loader2, X, Smartphone, RefreshCw, ChevronDown, ChevronRight, Monitor, Radio, Maximize2, Minimize2, ChartBar as BarChart3, Clock, Wifi, Users, MessageSquare, Plus, Trash2, CircleStop as StopCircle, Cloud, CloudOff, Copy, ExternalLink, Signal, Zap, Activity, CircleDot, Disc, Pause, FlaskConical } from 'lucide-react';
+import { Video, Play, Square, Settings, Eye, EyeOff, Calendar, Camera, Layers, Loader as Loader2, X, Smartphone, RefreshCw, ChevronDown, Monitor, Maximize2, Minimize2, ChartBar as BarChart3, Clock, Wifi, Users, MessageSquare, Trash2, CircleStop as StopCircle, Cloud, CloudOff, Copy, ExternalLink, Signal, Zap, Activity, CircleDot, Disc, Pause, FlaskConical } from 'lucide-react';
 import { TestBroadcastLinkModal } from './TestBroadcastLinkModal';
+import { LiveHome } from './LiveHome';
+import { NewBroadcastSheet } from './NewBroadcastSheet';
 import type { OnAirSnapshot, OnAirControls } from './onAirTypes';
 import { useAuth } from '../../contexts/AuthContext';
 import { livestreamStorage } from '../../utils/livestreamStorage';
@@ -69,6 +71,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   const [showMobileQR, setShowMobileQR] = useState(false);
   const [showSelectRace, setShowSelectRace] = useState(false);
   const [showTestLink, setShowTestLink] = useState(false);
+  const [showNewSheet, setShowNewSheet] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
@@ -1103,7 +1106,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     if (autoCreateForEvent) {
       activateStreamForEvent();
     } else {
-      setShowSetupWizard(true);
+      setShowNewSheet(true);
     }
   };
 
@@ -1638,117 +1641,47 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   }
 
   if (!activeSession) {
+    const openSession = (session: SessionWithVenue) => {
+      if ((session as any).engine === 'cloud') {
+        // Cloud broadcasts run from the cloud control room (test bench for now)
+        window.location.assign(`/live/cloud-test?session=${session.id}`);
+        return;
+      }
+      if (session.status === 'ended') {
+        setActiveSession({ ...session, _viewOnly: true } as any);
+      } else {
+        setActiveSession(session);
+      }
+      updateStreamStatus(session.status);
+      loadCameras(session.id);
+    };
     return (
-      <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-        <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 rounded-2xl p-10 text-center border border-slate-700/40">
-          <div className="w-16 h-16 bg-gradient-to-br from-red-500/20 to-red-600/10 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-red-500/20">
-            <Video className="w-8 h-8 text-red-400" />
-          </div>
-          <h3 className="text-xl font-bold text-white mb-2">Start Broadcasting</h3>
-          <p className="text-slate-400 mb-6 max-w-md mx-auto text-sm">
-            {autoCreateForEvent
-              ? `Activate a livestream for ${autoCreateForEvent.eventName}`
-              : 'Create a new livestream session to broadcast your races live'}
-          </p>
-          <button
-            onClick={createNewSession}
-            disabled={activatingStream}
-            className="px-6 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:cursor-wait text-white rounded-xl font-semibold inline-flex items-center gap-2.5 transition-all shadow-lg shadow-red-500/20 hover:shadow-red-500/30"
-          >
-            {activatingStream ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Activating...
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                {autoCreateForEvent ? 'Activate Stream' : 'New Stream'}
-              </>
-            )}
-          </button>
-        </div>
-
-        {sessions.length > 0 && (
-          <div>
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Previous Streams</h3>
-            <div className="grid gap-3">
-              {sessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="bg-slate-800/40 hover:bg-slate-800/60 rounded-xl border border-slate-700/40 hover:border-slate-600/50 transition-all group"
-                >
-                  <div className="flex items-center justify-between p-4">
-                    <div
-                      className="flex-1 cursor-pointer flex items-center gap-4"
-                      onClick={() => {
-                        if (session.status === 'ended') {
-                          setActiveSession({ ...session, _viewOnly: true } as any);
-                        } else {
-                          setActiveSession(session);
-                        }
-                        updateStreamStatus(session.status);
-                        loadCameras(session.id);
-                      }}
-                    >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        session.status === 'live' ? 'bg-red-500/20 border border-red-500/30' :
-                        session.status === 'testing' ? 'bg-amber-500/20 border border-amber-500/30' :
-                        session.status === 'ended' ? 'bg-slate-700/50 border border-slate-600/30' :
-                        'bg-blue-500/20 border border-blue-500/30'
-                      }`}>
-                        {session.status === 'live' ? <Radio className="w-4 h-4 text-red-400" /> :
-                         session.status === 'ended' ? <Square className="w-4 h-4 text-slate-400" /> :
-                         <Video className="w-4 h-4 text-blue-400" />}
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-white font-medium text-sm truncate">{session.title}</h4>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider ${
-                            session.status === 'live' ? 'bg-red-500/20 text-red-400' :
-                            session.status === 'ended' ? 'bg-slate-600/30 text-slate-500' :
-                            session.status === 'testing' ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-blue-500/20 text-blue-400'
-                          }`}>
-                            {session.status}
-                          </span>
-                          {session.scheduled_start_time && (
-                            <span className="text-[10px] text-slate-500">{new Date(session.scheduled_start_time).toLocaleDateString()}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => {
-                          if (session.status === 'ended') {
-                            setActiveSession({ ...session, _viewOnly: true } as any);
-                          } else {
-                            setActiveSession(session);
-                          }
-                          updateStreamStatus(session.status);
-                          loadCameras(session.id);
-                        }}
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => { setSessionToDelete(session); setShowDeleteConfirm(true); }}
-                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      <div>
+        <LiveHome
+          sessions={sessions}
+          autoCreateForEvent={autoCreateForEvent}
+          activating={activatingStream}
+          onOpen={openSession}
+          onNew={createNewSession}
+          onDelete={(session) => { setSessionToDelete(session); setShowDeleteConfirm(true); }}
+        />
 
         {showSetupWizard && (
           <LivestreamSetupWizard clubId={clubId} onClose={() => setShowSetupWizard(false)} onComplete={handleWizardComplete} />
+        )}
+        {showNewSheet && (
+          <NewBroadcastSheet
+            clubId={clubId}
+            onClose={() => setShowNewSheet(false)}
+            onCreated={(created) => {
+              setShowNewSheet(false);
+              if ((created as any).engine === 'cloud') {
+                window.location.assign(`/live/cloud-test?session=${created.id}`);
+                return;
+              }
+              handleWizardComplete(created);
+            }}
+          />
         )}
         {showDeleteConfirm && sessionToDelete && (
           <ConfirmationModal
