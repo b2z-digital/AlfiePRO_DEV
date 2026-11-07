@@ -1,6 +1,7 @@
 // Build: 2026-03-18-fcp-studio-redesign
 import React, { useState, useEffect, useRef } from 'react';
-import { Video, Play, Square, Settings, Eye, EyeOff, Calendar, Camera, Layers, Loader as Loader2, X, Smartphone, RefreshCw, ChevronDown, ChevronRight, Monitor, Radio, Maximize2, Minimize2, ChartBar as BarChart3, Clock, Wifi, Users, MessageSquare, Plus, Trash2, CircleStop as StopCircle, Cloud, CloudOff, Copy, ExternalLink, Signal, Zap, Activity, CircleDot, Disc, Pause } from 'lucide-react';
+import { Video, Play, Square, Settings, Eye, EyeOff, Calendar, Camera, Layers, Loader as Loader2, X, Smartphone, RefreshCw, ChevronDown, ChevronRight, Monitor, Radio, Maximize2, Minimize2, ChartBar as BarChart3, Clock, Wifi, Users, MessageSquare, Plus, Trash2, CircleStop as StopCircle, Cloud, CloudOff, Copy, ExternalLink, Signal, Zap, Activity, CircleDot, Disc, Pause, FlaskConical } from 'lucide-react';
+import { TestBroadcastLinkModal } from './TestBroadcastLinkModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { livestreamStorage } from '../../utils/livestreamStorage';
 import type { LivestreamSession, LivestreamCamera } from '../../types/livestream';
@@ -18,6 +19,7 @@ import { AdvancedStreamConsole } from './AdvancedStreamConsole';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useCanvasCompositor } from '../../hooks/useCanvasCompositor';
 import { subscribeToRaceStatus } from '../../utils/liveTrackingStorage';
+import { getRaceStatusEventId } from '../../utils/livestreamEventIds';
 import type { LivestreamRaceSegment } from '../../types/livestream';
 
 interface AutoCreateEventInfo {
@@ -62,6 +64,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
   const [whipStatus, setWhipStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [showMobileQR, setShowMobileQR] = useState(false);
   const [showSelectRace, setShowSelectRace] = useState(false);
+  const [showTestLink, setShowTestLink] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
@@ -414,28 +417,35 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
   useEffect(() => {
     if (!activeSession?.event_id || streamStatus !== 'live' || !autoSegmentEnabled) return;
 
-    const unsubscribe = subscribeToRaceStatus(
-      activeSession.event_id,
-      async (raceStatus, notes) => {
-        if (raceStatus === 'on_hold' || raceStatus === 'completed_for_day' || raceStatus === 'event_complete') {
-          pendingSegmentStartRef.current = false;
-          if (segmentTransitionRef.current) return;
-          await handleSegmentStop(
-            raceStatus === 'on_hold' ? 'on_hold' : 'race_scored',
-            raceStatus === 'event_complete' || raceStatus === 'completed_for_day'
-          );
-        } else if (raceStatus === 'live') {
-          if (segmentTransitionRef.current) {
-            console.log('[Segment] Stop transition in progress, queuing segment start');
-            pendingSegmentStartRef.current = true;
-            return;
+    // Series rounds linked by their round id keep race status under the series id
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
+    const linkedEventId = activeSession.event_id;
+    getRaceStatusEventId(linkedEventId).then(statusEventId => {
+      if (cancelled) return;
+      unsubscribe = subscribeToRaceStatus(
+        statusEventId,
+        async (raceStatus, notes) => {
+          if (raceStatus === 'on_hold' || raceStatus === 'completed_for_day' || raceStatus === 'event_complete') {
+            pendingSegmentStartRef.current = false;
+            if (segmentTransitionRef.current) return;
+            await handleSegmentStop(
+              raceStatus === 'on_hold' ? 'on_hold' : 'race_scored',
+              raceStatus === 'event_complete' || raceStatus === 'completed_for_day'
+            );
+          } else if (raceStatus === 'live') {
+            if (segmentTransitionRef.current) {
+              console.log('[Segment] Stop transition in progress, queuing segment start');
+              pendingSegmentStartRef.current = true;
+              return;
+            }
+            await handleSegmentStart();
           }
-          await handleSegmentStart();
         }
-      }
-    );
+      );
+    });
 
-    return unsubscribe;
+    return () => { cancelled = true; unsubscribe?.(); };
   }, [activeSession?.event_id, streamStatus, autoSegmentEnabled]);
 
   // Fallback: watch quick_races.last_completed_race for race scoring events.
@@ -1388,6 +1398,30 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
     }
   };
 
+  // Test mode: the broadcast runs for real but stays off AlfieTV and event pages, members
+  // aren't notified, and race videos go to YouTube unlisted. Watched from its own link.
+  const isTestBroadcast = activeSession?.is_public === false;
+  const toggleTestBroadcast = async () => {
+    if (!activeSession) return;
+    const makeTest = activeSession.is_public !== false;
+    if (!makeTest && streamStatus === 'live' && !confirm('Make this broadcast public? It will show in AlfieTV for everyone.')) return;
+    try {
+      await livestreamStorage.updateSession(activeSession.id, { is_public: !makeTest });
+      setActiveSession(prev => (prev ? { ...prev, is_public: !makeTest } : prev));
+      addNotification(
+        'success',
+        makeTest
+          ? 'Test mode on: hidden from AlfieTV, and race videos go to YouTube as unlisted.'
+          : 'Test mode off: this broadcast shows in AlfieTV when it\'s live.',
+        5000
+      );
+      if (makeTest) setShowTestLink(true);
+    } catch (error) {
+      console.error('Error changing test mode:', error);
+      addNotification('error', 'Could not change test mode. Please try again.');
+    }
+  };
+
   const stopTesting = async () => {
     if (!activeSession) return;
     try {
@@ -1720,7 +1754,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
           {streamStatus === 'live' ? (
             <div className="flex items-center gap-2 bg-red-500/15 border border-red-500/30 px-3 py-1.5 rounded-lg">
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
-              <span className="text-red-400 font-bold text-xs tracking-widest">LIVE</span>
+              <span className="text-red-400 font-bold text-xs tracking-widest">{isTestBroadcast ? 'LIVE · TEST' : 'LIVE'}</span>
             </div>
           ) : streamStatus === 'testing' ? (
             <div className="flex items-center gap-2 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-lg">
@@ -1791,6 +1825,38 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
 
         {/* Transport Controls */}
         <div className="flex items-center gap-2">
+          {activeSession && activeSession.status !== 'ended' && streamStatus !== 'connecting' && (
+            <>
+              <button
+                type="button"
+                onClick={toggleTestBroadcast}
+                aria-pressed={isTestBroadcast}
+                title={isTestBroadcast
+                  ? 'Test mode is on: hidden from AlfieTV and events, members not notified, race videos unlisted on YouTube. Click to make it public.'
+                  : 'Run this broadcast as a test: hidden from AlfieTV and events, watched from its own link.'}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors border ${
+                  isTestBroadcast
+                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25'
+                    : 'bg-slate-700/60 border-slate-600/40 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                <FlaskConical className="w-3.5 h-3.5 flex-shrink-0" />
+                {isTestBroadcast ? 'Test on' : 'Test'}
+              </button>
+              {isTestBroadcast && (
+                <button
+                  type="button"
+                  onClick={() => setShowTestLink(true)}
+                  title="Link and QR code to watch this test in AlfieTV"
+                  className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                  Watch
+                </button>
+              )}
+              <div className="w-px h-5 bg-slate-700" />
+            </>
+          )}
           {streamStatus === 'offline' && activeSession?.status === 'ended' && (
             <>
               <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-700/50 border border-slate-600/30 rounded-lg">
@@ -1827,7 +1893,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
                 <StopCircle className="w-3.5 h-3.5" />
                 Stop
               </button>
-              <button onClick={goLive} className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-red-500/20">
+              <button onClick={goLive} className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all shadow-lg shadow-red-500/20">
                 <Zap className="w-3.5 h-3.5" />
                 GO LIVE
               </button>
@@ -2219,7 +2285,27 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
 
       {/* ── Modals ── */}
       {showMobileQR && activeSession && <MobileCameraQRModal sessionId={activeSession.id} onClose={() => setShowMobileQR(false)} />}
-      {showSelectRace && <SelectRaceHeatModal clubId={clubId} onSelect={(eventId, heatId) => { if (activeSession) livestreamStorage.updateSession(activeSession.id, { event_id: eventId, heat_id: heatId }); setShowSelectRace(false); }} onClose={() => setShowSelectRace(false)} />}
+      {showTestLink && activeSession && (
+        <TestBroadcastLinkModal
+          sessionId={activeSession.id}
+          isLive={streamStatus === 'live'}
+          onClose={() => setShowTestLink(false)}
+        />
+      )}
+      {showSelectRace && activeSession && (
+        <SelectRaceHeatModal
+          sessionId={activeSession.id}
+          clubId={clubId}
+          currentEventId={activeSession.event_id || undefined}
+          currentHeatNumber={activeSession.heat_number || undefined}
+          onSelect={(eventId, heatNumber) => {
+            // The modal saves the link; keep the open studio (and its overlays) in step
+            setActiveSession(prev => (prev ? { ...prev, event_id: eventId, heat_number: heatNumber } : prev));
+            setShowSelectRace(false);
+          }}
+          onClose={() => setShowSelectRace(false)}
+        />
+      )}
       {showSchedule && activeSession && <ScheduleStreamModal session={activeSession} onSave={async (scheduledTime) => { await livestreamStorage.updateSession(activeSession.id, { scheduled_start_time: scheduledTime.toISOString(), status: 'scheduled' }); setShowSchedule(false); }} onClose={() => setShowSchedule(false)} />}
       {showAnalytics && activeSession && <StreamAnalyticsModal sessionId={activeSession.id} clubId={clubId} onClose={() => setShowAnalytics(false)} />}
       {showSetupWizard && <LivestreamSetupWizard clubId={clubId} onClose={() => setShowSetupWizard(false)} onComplete={handleWizardComplete} />}
