@@ -15,12 +15,15 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
  *   setup            admin   make sure the camera/director presets exist
  *   create           admin   meeting + Stream live input + camera link + session row
  *   director_token   admin   token to join as the control room
- *   camera_link      admin   (re)issue the no-login camera link
+ *   camera_link      admin   the no-login camera link (the current one, or a new one with { renew: true })
  *   join_camera      public  camera link key → camera token
- *   program_state    public  what the program page shows (program camera, title)
+ *   program_state    public  what the program page shows (program camera, title, hold,
+ *                            and the race data its overlays need: the recorder isn't signed in)
  *   set_program      admin   choose the program camera
+ *   program_hold     admin   hold screen on / off ({ paused })
  *   program_start    admin   start program out (live to AlfieTV)
- *   program_stop     admin   stop program out
+ *   program_stop     admin   stop program out ({ end: true } also ends the broadcast, stops a
+ *                            race that's recording and closes the room so cameras stop)
  *   race_start       admin   start recording a race
  *   race_stop        admin   stop recording a race
  *   status           admin   recordings and live input status
@@ -191,7 +194,14 @@ function randomKey() {
   return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-async function issueCameraLink(s: SupabaseClient, sessionId: string) {
+async function issueCameraLink(s: SupabaseClient, sessionId: string, reuse = false) {
+  if (reuse) {
+    // Keep the link volunteers already have (a QR on the clubhouse wall keeps working)
+    const { data: existing } = await s.from("livestream_camera_links").select("join_key, expires_at").eq("session_id", sessionId).maybeSingle();
+    if (existing && new Date(existing.expires_at).getTime() - Date.now() > 2 * 3600 * 1000) {
+      return { url: `${APP_ORIGIN}/live/camera/${sessionId}?k=${encodeURIComponent(existing.join_key)}`, expiresAt: existing.expires_at };
+    }
+  }
   const key = randomKey();
   const expires = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
   const { error } = await s.from("livestream_camera_links")
@@ -200,11 +210,62 @@ async function issueCameraLink(s: SupabaseClient, sessionId: string) {
   return { url: `${APP_ORIGIN}/live/camera/${sessionId}?k=${encodeURIComponent(key)}`, expiresAt: expires };
 }
 
+/** The club's time zone for the program page's clock (the recorder runs in UTC) */
+function tzParam(body: any): string {
+  const tz = String(body?.timeZone ?? "");
+  return /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){0,2}$/.test(tz) ? `tz=${encodeURIComponent(tz)}` : "tz=Australia%2FSydney";
+}
+
 function rtmpsTarget(session: any): string {
   const url = session.cloudflare_rtmps_url as string | null;
   const key = session.cloudflare_rtmps_stream_key as string | null;
   if (!url || !key) throw new HttpError(400, "This broadcast has no Cloudflare live input");
   return url.endsWith("/") ? `${url}${key}` : `${url}/${key}`;
+}
+
+// ── Overlay data for the program page ───────────────────────────────
+// Mirrors LivestreamOverlayRenderer's loader (quick race, series round by "<seriesId>-<index>"
+// or by round id, public event, race status) with the service client, because the program
+// page runs signed out inside Cloudflare's recorder.
+
+const ROUND_COLS = "id, round_name, date, race_results, completed, updated_at, skippers, heat_management, num_races, series_id, current_day, round_index, last_completed_race";
+const QUICK_COLS = "id, event_name, race_date, race_format, race_results, completed, updated_at, skippers, heat_management, num_races, current_day, public_event_id, last_completed_race";
+
+function roundAsRace(r: any, index: number) {
+  return {
+    id: r.id, event_name: r.round_name, race_date: r.date, race_format: null, race_results: r.race_results,
+    completed: r.completed, updated_at: r.updated_at, skippers: r.skippers, heat_management: r.heat_management,
+    num_races: r.num_races, current_day: index, public_event_id: null, last_completed_race: r.last_completed_race,
+  };
+}
+
+async function overlaySource(s: SupabaseClient, eventId: string | null) {
+  if (!eventId) return null;
+  const parts = eventId.split("-");
+  let race: any = null;
+  let statusId = eventId;
+  if (parts.length > 5 && /^\d+$/.test(parts[parts.length - 1])) {
+    const seriesId = parts.slice(0, -1).join("-");
+    const index = Number(parts[parts.length - 1]);
+    const { data } = await s.from("race_series_rounds").select(ROUND_COLS).eq("series_id", seriesId).eq("round_index", index).maybeSingle();
+    if (data) { race = roundAsRace(data, index); statusId = seriesId; }
+  } else {
+    const { data } = await s.from("quick_races").select(QUICK_COLS).eq("id", eventId).maybeSingle();
+    if (data) race = data;
+    else {
+      const { data: round } = await s.from("race_series_rounds").select(ROUND_COLS).eq("id", eventId).maybeSingle();
+      if (round) { race = roundAsRace(round, round.round_index); statusId = round.series_id || eventId; }
+    }
+  }
+  let event = null;
+  if (race?.public_event_id) {
+    const { data } = await s.from("public_events").select("id, event_name, date, end_date").eq("id", race.public_event_id).maybeSingle();
+    event = data;
+  }
+  const { data: st } = await s.from("live_tracking_events")
+    .select("race_status, last_status_update, status_notes, status_day").eq("event_id", statusId).maybeSingle();
+  const status = st ? { status: st.race_status || "on_hold", lastUpdate: st.last_status_update, notes: st.status_notes, day: st.status_day } : null;
+  return { race, event, status };
 }
 
 // ── Actions ──────────────────────────────────────────────────────────
@@ -238,7 +299,8 @@ Deno.serve(async (req) => {
           method: "POST",
           body: JSON.stringify({
             meta: { name: `${title} (cloud)` },
-            recording: { mode: "automatic", timeoutSeconds: 0, requireSignedURLs: false },
+            // Race videos come from RealtimeKit, so Stream needn't store the whole broadcast
+            recording: { mode: "off" },
             defaultCreator: "alfie-live-cloud",
           }),
         });
@@ -289,7 +351,7 @@ Deno.serve(async (req) => {
       case "camera_link": {
         const session = await loadSession(s, String(body.sessionId ?? ""));
         await requireClubAdmin(req, s, session.club_id);
-        return json({ success: true, cameraLink: await issueCameraLink(s, session.id) });
+        return json({ success: true, cameraLink: await issueCameraLink(s, session.id, body.renew !== true) });
       }
 
       case "join_camera": {
@@ -309,8 +371,10 @@ Deno.serve(async (req) => {
       }
 
       case "program_state": {
-        // Read by the program page inside Cloudflare's recorder: nothing secret here.
+        // Read by the program page inside Cloudflare's recorder: nothing secret here
+        // (no stream keys); the race data is what viewers see on the overlays anyway.
         const session = await loadSession(s, String(body.sessionId ?? ""));
+        const wantOverlay = body.overlay === true && session.enable_overlays !== false;
         return json({
           success: true,
           title: session.title,
@@ -319,7 +383,21 @@ Deno.serve(async (req) => {
           programParticipantId: session.program_participant_id,
           eventId: session.event_id,
           enableOverlays: session.enable_overlays !== false,
+          session: {
+            id: session.id, club_id: session.club_id, title: session.title, event_id: session.event_id,
+            heat_number: session.heat_number, status: session.status, is_paused: !!session.is_paused,
+            is_public: session.is_public, enable_overlays: session.enable_overlays !== false,
+            overlay_config: session.overlay_config, broadcast_mode: session.broadcast_mode,
+          },
+          overlay: wantOverlay ? await overlaySource(s, session.event_id).catch((e) => { console.warn("[live-cloud] overlay", e?.message); return null; }) : null,
         });
+      }
+
+      case "program_hold": {
+        const session = await loadSession(s, String(body.sessionId ?? ""));
+        await requireClubAdmin(req, s, session.club_id);
+        await s.from("livestream_sessions").update({ is_paused: !!body.paused }).eq("id", session.id);
+        return json({ success: true, paused: !!body.paused });
       }
 
       case "set_program": {
@@ -336,7 +414,7 @@ Deno.serve(async (req) => {
           method: "POST",
           body: JSON.stringify({
             meeting_id: session.rtk_meeting_id,
-            url: `${APP_ORIGIN}/live/program/${session.id}`,
+            url: `${APP_ORIGIN}/live/program/${session.id}?${tzParam(body)}`,
             allow_multiple_recordings: true,
             file_name_prefix: `program-${session.id}`,
             max_seconds: 12 * 3600,
@@ -361,11 +439,26 @@ Deno.serve(async (req) => {
         if (session.program_recording_id) {
           await rtk(s, `/recordings/${session.program_recording_id}`, { method: "PUT", body: JSON.stringify({ action: "stop" }) }).catch((e) => console.warn("[live-cloud] stop program", e.message));
         }
+        if (body.end) {
+          // A race still recording ends with the broadcast (its video still goes to YouTube)
+          const { data: open } = await s.from("livestream_race_segments").select("id, rtk_recording_id")
+            .eq("session_id", session.id).not("rtk_recording_id", "is", null).is("segment_end_time", null);
+          for (const seg of open ?? []) {
+            await rtk(s, `/recordings/${seg.rtk_recording_id}`, { method: "PUT", body: JSON.stringify({ action: "stop" }) })
+              .catch((e) => console.warn("[live-cloud] stop race", e.message));
+            await s.from("livestream_race_segments").update({ segment_end_time: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", seg.id);
+          }
+        }
         await s.from("livestream_sessions").update({
           program_recording_id: null,
-          ...(body.end ? { status: "ended", end_time: new Date().toISOString() } : {}),
+          ...(body.end ? { status: "ended", end_time: new Date().toISOString(), is_paused: false } : {}),
         }).eq("id", session.id);
-        if (body.end) await s.from("livestream_camera_links").delete().eq("session_id", session.id);
+        if (body.end) {
+          await s.from("livestream_camera_links").delete().eq("session_id", session.id);
+          // Close the room: cameras get roomLeft "ended" and stop sending
+          await rtk(s, `/meetings/${session.rtk_meeting_id}/active-session/kick-all`, { method: "POST" })
+            .catch((e) => console.warn("[live-cloud] kick-all", e.message));
+        }
         return json({ success: true });
       }
 
@@ -373,11 +466,14 @@ Deno.serve(async (req) => {
         const session = await loadSession(s, String(body.sessionId ?? ""));
         await requireClubAdmin(req, s, session.club_id);
         const raceNumber = Math.max(1, Number(body.raceNumber) || 1);
+        const { data: already } = await s.from("livestream_race_segments").select("id, race_number")
+          .eq("session_id", session.id).not("rtk_recording_id", "is", null).is("segment_end_time", null).limit(1).maybeSingle();
+        if (already) return json({ success: true, alreadyRecording: true, segment: already });
         const rec = await rtk(s, "/recordings", {
           method: "POST",
           body: JSON.stringify({
             meeting_id: session.rtk_meeting_id,
-            url: `${APP_ORIGIN}/live/program/${session.id}?race=${raceNumber}`,
+            url: `${APP_ORIGIN}/live/program/${session.id}?race=${raceNumber}&${tzParam(body)}`,
             allow_multiple_recordings: true,
             file_name_prefix: `race-${raceNumber}-${session.id}`,
             max_seconds: 3 * 3600,
@@ -386,12 +482,14 @@ Deno.serve(async (req) => {
             realtimekit_bucket_config: { enabled: true },
           }),
         });
-        const title = `Race ${raceNumber} | ${session.title}`;
+        const heatNumber = Number(body.heatNumber) || session.heat_number || null;
+        const title = heatNumber ? `Heat ${heatNumber} - Race ${raceNumber} | ${session.title}` : `Race ${raceNumber} | ${session.title}`;
         const { data: segment } = await s.from("livestream_race_segments").insert({
           session_id: session.id,
           club_id: session.club_id,
           event_id: session.event_id,
           race_number: raceNumber,
+          heat_number: heatNumber,
           segment_title: title,
           segment_start_time: new Date().toISOString(),
           upload_status: "pending",

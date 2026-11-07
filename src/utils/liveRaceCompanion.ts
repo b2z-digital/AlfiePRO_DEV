@@ -23,6 +23,8 @@ export interface RaceCompanion {
   status: string;
   statusLabel: string;
   statusNotes: string | null;
+  /** When scoring last changed the race status (a new "live" means a race has started) */
+  statusUpdatedAt: string | null;
   finishers: CompanionPlace[];
   stillRacing: CompanionBoat[];
   total: number;
@@ -111,6 +113,7 @@ export async function loadRaceCompanion(eventId: string): Promise<RaceCompanion 
     status,
     statusLabel: companionStatusLabel(status),
     statusNotes: statusData?.notes ?? null,
+    statusUpdatedAt: statusData?.lastUpdate ?? null,
     finishers,
     stillRacing,
     total: boats.length,

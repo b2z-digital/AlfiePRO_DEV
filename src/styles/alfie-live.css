@@ -644,3 +644,16 @@ body.light-mode .alv-elive { background: var(--alv-bg); padding: 16px; border-ra
 @media (max-width: 560px) { .alv-elive .alv-watch-info { flex-direction: column; } }
 .alv-tab-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #E11D38; box-shadow: 0 0 0 3px rgba(225, 29, 56, 0.25); animation: alv-pulse 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .alv-tab-dot { animation: none; } }
+
+/* ── Cloud control room extras ── */
+.alv-cr-note { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+.alv-cr-note .row { display: flex; gap: 6px; }
+.alv-cr-note .alv-input { height: 36px; font-size: 13.5px; padding: 0 10px; min-width: 0; flex: 1; }
+.alv-cr-modal { position: fixed; inset: 0; z-index: 9998; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2, 5, 12, 0.7); backdrop-filter: blur(4px); }
+.alv-cr-modalcard {
+  width: min(440px, 100%); display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: 20px;
+  background: var(--alv-raised); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+}
+.alv-cr-modalcard .row { display: flex; gap: 8px; }
+.alv-cr-modalcard .row .alv-input { flex: 1; min-width: 0; height: 40px; font-size: 13px; }
+@container alv-cr (max-width: 760px) { .alv-cr-note { display: none; } }
