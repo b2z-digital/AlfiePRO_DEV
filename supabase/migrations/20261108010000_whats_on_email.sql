@@ -401,7 +401,10 @@ BEGIN
   END;
 
   WITH q AS (
-    SELECT to_jsonb(qr) AS j FROM quick_races qr WHERE qr.club_id::text = p_club::text
+    SELECT to_jsonb(qr) AS j FROM quick_races qr
+    WHERE qr.club_id::text = p_club::text
+      AND qr.race_date::text >= (p_from - 60)::text
+      AND qr.race_date::text < (p_to + 1)::text
   ), ev AS (
     SELECT 'e:' || (j ->> 'id') AS event_key,
            'event'::text AS kind,
@@ -433,6 +436,8 @@ BEGIN
   ), tr AS (
     SELECT to_jsonb(rr) AS j FROM race_series_rounds rr
     WHERE rr.series_id::text IN (SELECT s.j ->> 'id' FROM s)
+      AND rr.date::text >= (p_from - 7)::text
+      AND rr.date::text < (p_to + 1)::text
   ), rounds AS (
     SELECT tr.j ->> 'series_id' AS sid,
            tr.j ->> 'round_name' AS rname,
@@ -456,9 +461,10 @@ BEGIN
     FROM s
     CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(s.j -> 'rounds') = 'array' THEN s.j -> 'rounds' ELSE '[]'::jsonb END) AS e(r)
     WHERE jsonb_typeof(e.r) = 'object'
-      AND NOT EXISTS (SELECT 1 FROM tr
-                      WHERE tr.j ->> 'series_id' = s.j ->> 'id'
-                        AND tr.j ->> 'round_name' = coalesce(nullif(e.r ->> 'name', ''), e.r ->> 'roundName'))
+      -- A round saved in race_series_rounds always wins over the series' JSON copy, whatever its date
+      AND NOT EXISTS (SELECT 1 FROM race_series_rounds rr2
+                      WHERE rr2.series_id::text = s.j ->> 'id'
+                        AND rr2.round_name = coalesce(nullif(e.r ->> 'name', ''), e.r ->> 'roundName'))
   ), rv AS (
     SELECT 'r:' || r.sid || ':' || r.rname,
            'round'::text,
@@ -636,7 +642,7 @@ BEGIN
     FROM (
       SELECT CASE WHEN ea.event_id IS NOT NULL THEN 'e:' || ea.event_id::text
                   ELSE 'r:' || ea.series_id::text || ':' || coalesce(ea.round_name, '') END AS k,
-             ea.status AS st, 1 AS pri
+             ea.status::text AS st, 1 AS pri
       FROM event_attendance ea
       WHERE v_user IS NOT NULL AND ea.user_id = v_user
       UNION ALL
@@ -1640,10 +1646,16 @@ BEGIN
         OR (v_ev IS NULL AND ea.series_id = v_se AND ea.round_name = v_round))
     LIMIT 1;
     IF v_existing IS NOT NULL THEN
-      UPDATE event_attendance SET status = p_status, updated_at = now() WHERE id = v_existing;
+      -- jsonb_populate_record converts the answer to the column's own type (attendance_status)
+      UPDATE event_attendance ea SET status = r.status, updated_at = now()
+      FROM jsonb_populate_record(NULL::public.event_attendance, jsonb_build_object('status', p_status)) r
+      WHERE ea.id = v_existing;
     ELSE
       INSERT INTO event_attendance (user_id, club_id, status, event_id, series_id, round_name)
-      VALUES (v_user, t.club_id, p_status, v_ev, v_se, v_round);
+      SELECT r.user_id, r.club_id, r.status, r.event_id, r.series_id, r.round_name
+      FROM jsonb_populate_record(NULL::public.event_attendance, jsonb_build_object(
+        'user_id', v_user, 'club_id', t.club_id, 'status', p_status,
+        'event_id', v_ev, 'series_id', v_se, 'round_name', v_round)) r;
     END IF;
   ELSE
     INSERT INTO whats_on_answers (member_id, club_id, event_id, series_id, round_name, status)
@@ -1699,7 +1711,10 @@ BEGIN
           AND ((a.event_id IS NOT NULL AND ea.event_id = a.event_id)
             OR (a.event_id IS NULL AND ea.series_id = a.series_id AND ea.round_name IS NOT DISTINCT FROM a.round_name))) THEN
         INSERT INTO event_attendance (user_id, club_id, status, event_id, series_id, round_name)
-        VALUES (NEW.user_id, a.club_id, a.status, a.event_id, a.series_id, a.round_name);
+        SELECT r.user_id, r.club_id, r.status, r.event_id, r.series_id, r.round_name
+        FROM jsonb_populate_record(NULL::public.event_attendance, jsonb_build_object(
+          'user_id', NEW.user_id, 'club_id', a.club_id, 'status', a.status,
+          'event_id', a.event_id, 'series_id', a.series_id, 'round_name', a.round_name)) r;
       END IF;
     END LOOP;
     DELETE FROM whats_on_answers WHERE member_id = NEW.id;
