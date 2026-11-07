@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Video, X, ChevronRight, ChevronLeft, Pause, Play, Type } from 'lucide-react';
 import { LivestreamControlPanel } from './LivestreamControlPanel';
