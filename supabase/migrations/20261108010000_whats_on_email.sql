@@ -401,7 +401,10 @@ BEGIN
   END;
 
   WITH q AS (
-    SELECT to_jsonb(qr) AS j FROM quick_races qr WHERE qr.club_id::text = p_club::text
+    SELECT to_jsonb(qr) AS j FROM quick_races qr
+    WHERE qr.club_id::text = p_club::text
+      AND qr.race_date::text >= (p_from - 60)::text
+      AND qr.race_date::text < (p_to + 1)::text
   ), ev AS (
     SELECT 'e:' || (j ->> 'id') AS event_key,
            'event'::text AS kind,
@@ -433,6 +436,8 @@ BEGIN
   ), tr AS (
     SELECT to_jsonb(rr) AS j FROM race_series_rounds rr
     WHERE rr.series_id::text IN (SELECT s.j ->> 'id' FROM s)
+      AND rr.date::text >= (p_from - 7)::text
+      AND rr.date::text < (p_to + 1)::text
   ), rounds AS (
     SELECT tr.j ->> 'series_id' AS sid,
            tr.j ->> 'round_name' AS rname,
@@ -456,9 +461,10 @@ BEGIN
     FROM s
     CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(s.j -> 'rounds') = 'array' THEN s.j -> 'rounds' ELSE '[]'::jsonb END) AS e(r)
     WHERE jsonb_typeof(e.r) = 'object'
-      AND NOT EXISTS (SELECT 1 FROM tr
-                      WHERE tr.j ->> 'series_id' = s.j ->> 'id'
-                        AND tr.j ->> 'round_name' = coalesce(nullif(e.r ->> 'name', ''), e.r ->> 'roundName'))
+      -- A round saved in race_series_rounds always wins over the series' JSON copy, whatever its date
+      AND NOT EXISTS (SELECT 1 FROM race_series_rounds rr2
+                      WHERE rr2.series_id::text = s.j ->> 'id'
+                        AND rr2.round_name = coalesce(nullif(e.r ->> 'name', ''), e.r ->> 'roundName'))
   ), rv AS (
     SELECT 'r:' || r.sid || ':' || r.rname,
            'round'::text,
@@ -636,7 +642,7 @@ BEGIN
     FROM (
       SELECT CASE WHEN ea.event_id IS NOT NULL THEN 'e:' || ea.event_id::text
                   ELSE 'r:' || ea.series_id::text || ':' || coalesce(ea.round_name, '') END AS k,
-             ea.status AS st, 1 AS pri
+             ea.status::text AS st, 1 AS pri
       FROM event_attendance ea
       WHERE v_user IS NOT NULL AND ea.user_id = v_user
       UNION ALL
@@ -792,7 +798,8 @@ BEGIN
   IF coalesce((cfg ->> 'show_rsvp')::boolean, true) THEN
     v_h := v_h || '<div style="' || v_meta || '">'
       || CASE WHEN v_going = 0 THEN 'Nobody has said they''re going yet'
-              ELSE v_going || ' going' || CASE WHEN v_cant > 0 THEN ' · ' || v_cant || ' can&#39;t make it' ELSE ' so far' END END
+              ELSE v_going || ' going' || CASE WHEN v_status = 'yes' THEN ' including you' ELSE '' END
+                   || CASE WHEN v_cant > 0 THEN ' · ' || v_cant || ' can&#39;t make it' WHEN v_status = 'yes' THEN '' ELSE ' so far' END END
       || '</div>';
   END IF;
   IF coalesce((cfg ->> 'show_docs')::boolean, true) AND (e ->> 'nor_url' IS NOT NULL OR e ->> 'si_url' IS NOT NULL) THEN
@@ -807,9 +814,9 @@ BEGIN
   IF coalesce((cfg ->> 'show_rsvp')::boolean, true) THEN
     IF v_status IS NOT NULL THEN
       v_h := v_h || '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;border-collapse:separate"><tr><td style="padding:10px 12px;border-radius:12px;font-size:13.5px;font-weight:500;'
-        || CASE v_status WHEN 'yes' THEN 'background:#EAF8EF;color:#136C34">&#10003;&nbsp; You&#39;re going'
-                         WHEN 'no' THEN 'background:#F1F4F9;color:#475569">You can&#39;t make it'
-                         ELSE 'background:#FFF6E5;color:#8A5300">You said maybe' END
+        || CASE v_status WHEN 'yes' THEN 'background:#EAF8EF;color:#136C34">&#10003;&nbsp; <strong>You&#39;re registered to sail</strong>'
+                         WHEN 'no' THEN 'background:#F1F4F9;color:#475569">You&#39;ve said you can&#39;t make it'
+                         ELSE 'background:#FFF6E5;color:#8A5300">You&#39;ve said maybe' END
         || ' · <a href="' || public.whats_on_esc(coalesce(v_base, '#')) || '" style="color:inherit;font-weight:600">Change</a></td></tr></table>';
     ELSE
       v_h := v_h || '<div style="margin-top:12px">'
@@ -865,6 +872,7 @@ DECLARE
   v_items text[];
   v_preheader text;
   v_all_audience boolean;
+  v_unanswered int := 0;
 BEGIN
   v_all_audience := coalesce(p_cfg ->> 'audience', 'class') = 'all' OR coalesce(p_member ->> 'scope', 'classes') = 'all';
 
@@ -875,6 +883,9 @@ BEGIN
   SELECT coalesce(jsonb_agg(x ORDER BY x ->> 'event_date', x ->> 'title'), '[]'::jsonb) INTO v_next_mine
   FROM jsonb_array_elements(coalesce(p_next, '[]'::jsonb)) x WHERE public.whats_on_is_mine(x, p_member, p_cfg);
   v_count := jsonb_array_length(v_mine);
+  -- Races this member hasn't answered yet (in AlfiePRO, by SMS, by entering, or from an email)
+  SELECT count(*) INTO v_unanswered FROM jsonb_array_elements(v_mine) x
+  WHERE (p_member -> 'answers' ->> (x ->> 'event_key')) IS NULL;
 
   SELECT coalesce(array_agg(DISTINCT b ->> 'class'), ARRAY[]::text[]) INTO v_classes
   FROM jsonb_array_elements(coalesce(p_member -> 'boats', '[]'::jsonb)) b;
@@ -897,7 +908,10 @@ BEGIN
   v_intro := coalesce(nullif(trim(p_cfg ->> 'intro'), ''),
     'Hi {first_name}, here''s what''s on at the club ' || v_period
     || CASE WHEN v_all_audience THEN '.' ELSE ' for your boats.' END
-    || CASE WHEN coalesce((p_cfg ->> 'show_rsvp')::boolean, true) THEN ' Tap Going or Can''t make it so the PRO can plan the starts.' ELSE '' END);
+    || CASE WHEN NOT coalesce((p_cfg ->> 'show_rsvp')::boolean, true) OR v_count = 0 THEN ''
+            WHEN v_unanswered = 0 THEN ' You''ve already let us know for ' || CASE WHEN v_count = 1 THEN 'it' ELSE 'all of them' END || ', thanks.'
+            WHEN v_unanswered < v_count THEN ' Tap Going or Can''t make it on the others so the PRO can plan the starts.'
+            ELSE ' Tap Going or Can''t make it so the PRO can plan the starts.' END);
 
   -- Merge tags
   v_subject := replace(replace(replace(replace(replace(v_subject,
@@ -915,7 +929,7 @@ BEGIN
   v_sub := CASE
     WHEN v_all_audience OR v_class_text = '' THEN 'At ' || public.whats_on_esc(p_club ->> 'name')
     ELSE 'For your ' || public.whats_on_list_text(ARRAY(SELECT '<strong style="color:#FFFFFF;font-weight:600">' || public.whats_on_esc(c) || '</strong>' FROM unnest(v_classes) c)) END
-    || CASE WHEN v_count > 0 AND coalesce((p_cfg ->> 'show_rsvp')::boolean, true) THEN ' · let the PRO know if you&#39;re coming' ELSE '' END;
+    || CASE WHEN v_unanswered > 0 AND coalesce((p_cfg ->> 'show_rsvp')::boolean, true) THEN ' · let the PRO know if you&#39;re coming' ELSE '' END;
 
   -- Links
   IF p_preview OR p_token IS NULL THEN
@@ -1640,10 +1654,16 @@ BEGIN
         OR (v_ev IS NULL AND ea.series_id = v_se AND ea.round_name = v_round))
     LIMIT 1;
     IF v_existing IS NOT NULL THEN
-      UPDATE event_attendance SET status = p_status, updated_at = now() WHERE id = v_existing;
+      -- jsonb_populate_record converts the answer to the column's own type (attendance_status)
+      UPDATE event_attendance ea SET status = r.status, updated_at = now()
+      FROM jsonb_populate_record(NULL::public.event_attendance, jsonb_build_object('status', p_status)) r
+      WHERE ea.id = v_existing;
     ELSE
       INSERT INTO event_attendance (user_id, club_id, status, event_id, series_id, round_name)
-      VALUES (v_user, t.club_id, p_status, v_ev, v_se, v_round);
+      SELECT r.user_id, r.club_id, r.status, r.event_id, r.series_id, r.round_name
+      FROM jsonb_populate_record(NULL::public.event_attendance, jsonb_build_object(
+        'user_id', v_user, 'club_id', t.club_id, 'status', p_status,
+        'event_id', v_ev, 'series_id', v_se, 'round_name', v_round)) r;
     END IF;
   ELSE
     INSERT INTO whats_on_answers (member_id, club_id, event_id, series_id, round_name, status)
@@ -1699,7 +1719,10 @@ BEGIN
           AND ((a.event_id IS NOT NULL AND ea.event_id = a.event_id)
             OR (a.event_id IS NULL AND ea.series_id = a.series_id AND ea.round_name IS NOT DISTINCT FROM a.round_name))) THEN
         INSERT INTO event_attendance (user_id, club_id, status, event_id, series_id, round_name)
-        VALUES (NEW.user_id, a.club_id, a.status, a.event_id, a.series_id, a.round_name);
+        SELECT r.user_id, r.club_id, r.status, r.event_id, r.series_id, r.round_name
+        FROM jsonb_populate_record(NULL::public.event_attendance, jsonb_build_object(
+          'user_id', NEW.user_id, 'club_id', a.club_id, 'status', a.status,
+          'event_id', a.event_id, 'series_id', a.series_id, 'round_name', a.round_name)) r;
       END IF;
     END LOOP;
     DELETE FROM whats_on_answers WHERE member_id = NEW.id;

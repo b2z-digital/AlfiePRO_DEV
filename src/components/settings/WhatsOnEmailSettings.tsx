@@ -285,6 +285,8 @@ const WhatsOnEditor: React.FC<{ clubId: string; clubAbbr: string; onSummary: (s:
   const [lastSend, setLastSend] = useState<LastSend | null>(null);
   const [audience, setAudience] = useState<Audience | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [audienceError, setAudienceError] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'phone'>('phone');
   const [previewAs, setPreviewAs] = useState<string>('');
   const [showList, setShowList] = useState(false);
@@ -357,8 +359,10 @@ const WhatsOnEditor: React.FC<{ clubId: string; clubAbbr: string; onSummary: (s:
         supabase.rpc('whats_on_preview', { p_club: clubId, p_settings: form, p_member: previewAs || null, p_variant: 'auto' }),
         supabase.rpc('whats_on_audience', { p_club: clubId, p_settings: form }),
       ]);
-      if (!pv.error && pv.data) setPreview(pv.data as Preview);
-      if (!au.error && au.data) setAudience(au.data as Audience);
+      if (pv.error) setPreviewError(pv.error.message || 'The preview could not be built');
+      else if (pv.data) { setPreview(pv.data as Preview); setPreviewError(null); }
+      if (au.error) setAudienceError(au.error.message || 'Members could not be counted');
+      else if (au.data) { setAudience(au.data as Audience); setAudienceError(null); }
     }, 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -514,7 +518,7 @@ const WhatsOnEditor: React.FC<{ clubId: string; clubAbbr: string; onSummary: (s:
               {audience ? <>
                 <strong>{audience.total}</strong> member{audience.total === 1 ? '' : 's'} get What's On
                 <span className="a-dim"> · {audience.activated} on AlfiePRO, {audience.unactivated} not yet · {audience.this_week} with racing {period}</span>
-              </> : 'Counting members…'}
+              </> : audienceError ? <span style={{ color: '#FF8A8A' }}>Couldn't count members: {audienceError}</span> : 'Counting members…'}
             </span>
             {audience && audience.total > 0 && (
               <button type="button" className="a-wo-link" onClick={() => setShowList(s => !s)}>{showList ? 'Hide list' : 'See list'}</button>
@@ -644,7 +648,9 @@ const WhatsOnEditor: React.FC<{ clubId: string; clubAbbr: string; onSummary: (s:
               {(audience?.members || []).map(m => <option key={m.member_id} value={m.member_id}>{m.name}{m.activated ? '' : ' · not on AlfiePRO'}</option>)}
             </select>
           </span>
-          {preview ? (
+          {previewError && !preview ? (
+            <div className="a-wo-pvbox a-wo-pvempty" style={{ color: '#B42318', padding: 20, textAlign: 'center' }}>Couldn't build the preview: {previewError}</div>
+          ) : preview ? (
             <>
               <div className="a-wo-subj"><span className="a-dim">Subject</span> {preview.subject}</div>
               <PreviewFrame html={preview.html} mode={previewMode} />
