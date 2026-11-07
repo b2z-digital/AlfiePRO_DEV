@@ -269,7 +269,7 @@ export function ScoringOnAir({ clubId, eventId, eventName }: ScoringOnAirProps) 
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className={`fixed right-0 top-0 bottom-0 w-[75vw] max-w-[1200px] shadow-2xl z-[9995] flex flex-col bg-slate-900 text-white transition-opacity duration-200 ${view === 'console' ? '' : 'alv-console-hidden'}`}
+          className={`fixed right-0 top-0 bottom-0 w-[75vw] max-w-[1200px] shadow-2xl z-[9995] flex flex-col bg-[#060B16] text-white transition-opacity duration-200 ${view === 'console' ? '' : 'alv-console-hidden'}`}
           aria-hidden={view !== 'console'}
           {...({ inert: view !== 'console' ? '' : undefined } as Record<string, unknown>)}
         >
@@ -279,7 +279,7 @@ export function ScoringOnAir({ clubId, eventId, eventName }: ScoringOnAirProps) 
                 <Video size={18} className="text-red-400" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-white">Livestream Console</h3>
+                <h3 className="text-base font-semibold text-white">Control room</h3>
                 <p className="text-xs text-slate-400">{eventName || 'Live Broadcast'}</p>
               </div>
             </div>
