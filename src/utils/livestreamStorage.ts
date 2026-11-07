@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { getEquivalentEventIds } from './livestreamEventIds';
 import type {
   LivestreamSession,
   LivestreamCamera,
@@ -55,19 +56,22 @@ export const livestreamStorage = {
     // Query for sessions matching the FULL event_id
     // For series rounds: "uuid-round-2", "uuid-day-3", etc.
     // For single events: just the UUID
-    // This ensures each series round has its own independent livestream session
+    // This ensures each series round has its own independent livestream session.
+    // A series round may be linked as "<seriesId>-<roundIndex>" or by its round id, so match both.
+    const eventIds = await getEquivalentEventIds(eventId);
     const { data, error } = await supabase
       .from('livestream_sessions')
       .select('*')
-      .eq('event_id', eventId)
+      .in('event_id', eventIds)
       .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     console.log('🔍 [livestreamStorage] Query result:', {
       found: !!data,
       sessionId: data?.id,
       sessionEventId: data?.event_id,
-      matched: data?.event_id === eventId,
+      matched: !!data?.event_id && eventIds.includes(data.event_id),
       error: error?.message
     });
 

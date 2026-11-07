@@ -75,8 +75,45 @@ export function SelectRaceHeatModal({
           club_id: clubId
         }));
 
-      console.log('[SelectRaceModal] Filtered events:', upcomingEvents);
-      setEvents(upcomingEvents as QuickRace[]);
+      // Series rounds, linked as "<seriesId>-<roundIndex>" (the id scoring uses for a round)
+      let seriesRoundEvents: any[] = [];
+      const roundIdToEventId = new Map<string, string>();
+      const { data: roundsData, error: roundsError } = await supabase
+        .from('race_series_rounds')
+        .select('id, series_id, round_index, round_name, date, venue, completed, cancelled, heat_management, race_series(series_name)')
+        .eq('club_id', clubId)
+        .order('date', { ascending: false });
+
+      if (roundsError) {
+        console.error('[SelectRaceModal] Error fetching series rounds:', roundsError);
+      } else {
+        seriesRoundEvents = (roundsData || [])
+          .filter((round: any) => round.series_id && round.round_index !== null && round.round_index !== undefined && round.date && !round.cancelled && new Date(round.date) >= sevenDaysAgo)
+          .map((round: any) => {
+            const eventId = `${round.series_id}-${round.round_index}`;
+            roundIdToEventId.set(round.id, eventId);
+            const seriesName = round.race_series?.series_name;
+            return {
+              id: eventId,
+              name: seriesName ? `${seriesName} - ${round.round_name}` : (round.round_name || 'Series round'),
+              date: round.date,
+              venue: round.venue || '',
+              status: round.completed ? 'completed' : 'upcoming',
+              scoring_method: round.heat_management ? 'heat_management_system' : 'standard',
+              club_id: clubId,
+              is_series_round: true
+            };
+          });
+      }
+
+      const allEvents = [...upcomingEvents, ...seriesRoundEvents]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // A stream linked by a round's own id shows that round as selected
+      setSelectedEventId(prev => (prev && roundIdToEventId.get(prev)) || prev);
+
+      console.log('[SelectRaceModal] Filtered events:', allEvents);
+      setEvents(allEvents as QuickRace[]);
     } catch (error) {
       console.error('Error loading events:', error);
     } finally {
@@ -172,6 +209,11 @@ export function SelectRaceHeatModal({
                               </span>
                             )}
                           </div>
+                          {(event as any).is_series_round && (
+                            <span className="inline-block mt-2 mr-2 px-2 py-1 bg-violet-500/20 text-violet-300 text-xs rounded">
+                              Series round
+                            </span>
+                          )}
                           {event.scoring_method === 'heat_management_system' && (
                             <span className="inline-block mt-2 px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded">
                               Heat Event

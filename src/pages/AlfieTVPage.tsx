@@ -175,13 +175,32 @@ const LiveStreamPlayerWrapper = ({ session, onClose, venueImage, clubName }: {
   }
 
   return (
-    <LiveStreamPlayer
-      key={playerKey}
-      session={session}
-      onClose={onClose}
-      venueImage={venueImage}
-      clubName={clubName}
-    />
+    <>
+      <LiveStreamPlayer
+        key={playerKey}
+        session={session}
+        onClose={onClose}
+        venueImage={venueImage}
+        clubName={clubName}
+      />
+      {session.is_public === false && (
+        <div
+          role="status"
+          className="atv-test-badge"
+          style={{
+            position: 'fixed', top: 80, left: 24, zIndex: 9999,
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 999,
+            background: 'rgba(255,178,36,0.16)', border: '1px solid rgba(255,178,36,0.55)',
+            color: '#FFD27A', font: '600 13px/1.2 "Instrument Sans", system-ui, sans-serif',
+            backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', pointerEvents: 'none',
+            maxWidth: 'calc(100vw - 48px)',
+          }}
+        >
+          <span style={{ fontWeight: 800, letterSpacing: '0.08em' }}>TEST</span>
+          <span>Only people with this link can see this broadcast</span>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -718,10 +737,12 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
 
     const loadLiveStreams = async () => {
       try {
+        // Only broadcasts that are actually live. A studio in Preview ('testing') isn't
+        // sending video yet, and test broadcasts (is_public false) open from their link only.
         const { data } = await supabase
           .from('livestream_sessions')
           .select('*')
-          .in('status', ['live', 'testing'])
+          .eq('status', 'live')
           .eq('is_public', true)
           .not('cloudflare_live_input_id', 'is', null)
           .not('cloudflare_customer_code', 'is', null)
@@ -761,6 +782,68 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     loadLiveStreams();
     const interval = setInterval(loadLiveStreams, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Open a broadcast straight from its link: /alfie-tv?watch=<sessionId>.
+  // The studio's "Watch test" uses this so a test broadcast can be checked on any
+  // device before it's public. If it isn't live yet, it opens as soon as it is.
+  useEffect(() => {
+    const watchId = new URLSearchParams(window.location.search).get('watch');
+    if (!watchId) return;
+    let cancelled = false;
+    let waitTimer: ReturnType<typeof setInterval> | null = null;
+    let toldWaiting = false;
+
+    const tryOpen = async (): Promise<boolean> => {
+      const { data: s } = await supabase
+        .from('livestream_sessions')
+        .select('*')
+        .eq('id', watchId)
+        .maybeSingle();
+      if (cancelled) return true;
+      if (!s) {
+        addNotification('error', 'That broadcast could not be found.');
+        return true;
+      }
+      if (s.status !== 'live') {
+        if (s.status === 'ended' || s.status === 'archived') {
+          addNotification('info', 'That broadcast has ended.');
+          return true;
+        }
+        if (!toldWaiting) {
+          toldWaiting = true;
+          addNotification('info', 'This broadcast isn\'t live yet. It will open here as soon as it starts.');
+        }
+        return false;
+      }
+      const { data: club } = await supabase
+        .from('clubs')
+        .select('name, cover_image_url, featured_image_url')
+        .eq('id', s.club_id)
+        .maybeSingle();
+      if (cancelled) return true;
+      setSelectedLiveStream({
+        ...(s as LivestreamSession),
+        club_name: club?.name || undefined,
+        venue_image: club?.cover_image_url || club?.featured_image_url || undefined,
+      });
+      return true;
+    };
+
+    tryOpen().then(done => {
+      if (done || cancelled) return;
+      waitTimer = setInterval(async () => {
+        if (await tryOpen()) {
+          if (waitTimer) clearInterval(waitTimer);
+          waitTimer = null;
+        }
+      }, 5000);
+    }).catch(err => console.error('Error opening broadcast link:', err));
+
+    return () => {
+      cancelled = true;
+      if (waitTimer) clearInterval(waitTimer);
+    };
   }, []);
 
   const loadCachedData = () => {
