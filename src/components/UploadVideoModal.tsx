@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, Youtube, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Video, Calendar, Trophy } from 'lucide-react';
+import { AlfieIcon } from './brand/AlfieIcon';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -311,277 +311,178 @@ export const UploadVideoModal: React.FC<UploadVideoModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`
-        w-full max-w-2xl rounded-xl shadow-xl overflow-hidden
-        ${darkMode ? 'bg-slate-800' : 'bg-white'}
-      `}>
-        <div className={`
-          flex items-center justify-between p-6 border-b
-          ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-        `}>
-          <div className="flex items-center gap-3">
-            <Youtube className="text-red-400" size={24} />
-            <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-              Upload Video to YouTube
-            </h2>
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center p-3 sm:p-6">
+      <div className="a-veil absolute inset-0 backdrop-blur-[2px]" onClick={() => !uploading && onClose()} aria-hidden="true" />
+      <section className="a-sheet a-md-sheet relative w-full max-w-2xl flex flex-col max-h-[92vh] overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="a-md-vid-title">
+        <header className="a-sheet-head a-md-sheet-head">
+          <span className="a-md-yt-tile" aria-hidden="true"><i /></span>
+          <div className="min-w-0 flex-1">
+            <h2 id="a-md-vid-title" className="a-display a-ink m-0 text-[20px] font-semibold leading-tight">Upload Video to YouTube</h2>
+            <p className="a-mute m-0 mt-0.5 text-[13.5px]">Posts to your club's connected YouTube channel and adds it here</p>
           </div>
-          <button
-            onClick={onClose}
-            disabled={uploading}
-            className={`
-              rounded-full p-2 transition-colors
-              ${darkMode 
-                ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700' 
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
-              ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
-          >
-            <X size={20} />
+          <button type="button" onClick={onClose} disabled={uploading} className="a-ib" aria-label="Close">
+            <AlfieIcon glyph="x" size={20} />
           </button>
-        </div>
+        </header>
 
-        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+        <div className="a-md-sheet-body">
           {error && (
-            <div className="p-4 rounded-lg bg-red-900/20 border border-red-900/30 flex items-start gap-3">
-              <AlertTriangle className="text-red-400 mt-0.5" size={18} />
-              <div>
-                <h3 className="text-red-400 font-medium">Upload Error</h3>
-                <p className="text-red-300 text-sm">{error}</p>
-              </div>
+            <div className="a-nw-ed-msg a-nw-ed-msg-r" role="alert">
+              <AlfieIcon glyph="warn" size={18} />
+              <p><b>Upload Error</b><br />{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="p-4 rounded-lg bg-green-900/20 border border-green-900/30 flex items-start gap-3">
-              <CheckCircle className="text-green-400 mt-0.5" size={18} />
-              <div>
-                <h3 className="text-green-400 font-medium">Upload Successful</h3>
-                <p className="text-green-300 text-sm">{success}</p>
-              </div>
+            <div className="a-nw-ed-msg a-nw-ed-msg-g" role="status">
+              <AlfieIcon glyph="check" size={18} />
+              <p><b>Upload Successful</b><br />{success}</p>
             </div>
           )}
 
-          {/* Video File Upload */}
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              Video File *
-            </label>
-            <div className={`
-              relative
-              border-2 border-dashed rounded-lg p-6 text-center transition-colors
-              ${videoFile 
-                ? darkMode ? 'border-green-600 bg-green-900/20' : 'border-green-500 bg-green-50'
-                : darkMode ? 'border-slate-600 hover:border-slate-500' : 'border-slate-300 hover:border-slate-400'}
-            `}>
+          {/* Video file */}
+          <div className="a-md-fl">
+            <span>Video File *</span>
+            <div className={`a-md-drop a-md-drop-sm ${videoFile ? 'is-set' : ''}`}>
               {videoFile ? (
-                <div className="space-y-2">
-                  <Video className="mx-auto text-green-400" size={32} />
-                  <p className={`font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                    {videoFile.name}
-                  </p>
-                  <p className={`text-sm ${darkMode ? 'text-green-300' : 'text-green-500'}`}>
-                    {(videoFile.size / (1024 * 1024)).toFixed(1)} MB
-                  </p>
+                <>
+                  <span className="a-md-drop-ic is-ok"><AlfieIcon glyph="video" size={24} /></span>
+                  <b className="truncate max-w-full">{videoFile.name}</b>
+                  <span>{(videoFile.size / (1024 * 1024)).toFixed(1)} MB</span>
                   <button
+                    type="button"
                     onClick={() => setVideoFile(null)}
                     disabled={uploading}
-                    className="text-sm text-red-400 hover:text-red-300 transition-colors"
+                    className="a-md-link-d"
                   >
                     Remove file
                   </button>
-                </div>
+                </>
               ) : (
-                <div className="space-y-2">
-                  <Upload className={`mx-auto ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} size={32} />
-                  <p className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Click to select video file
-                  </p>
-                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Supports MP4, MOV, AVI and other video formats (Max 2GB)
-                  </p>
-                </div>
+                <>
+                  <span className="a-md-drop-ic"><AlfieIcon glyph="upload" size={24} /></span>
+                  <b>Click to select video file</b>
+                  <span>Supports MP4, MOV, AVI and other video formats (Max 2GB)</span>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    onChange={handleFileChange}
+                    disabled={uploading}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    aria-label="Choose video file"
+                  />
+                </>
               )}
-              <input
-                type="file"
-                accept="video/*"
-                onChange={handleFileChange}
-                disabled={uploading}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
             </div>
           </div>
 
-          {/* Video Details */}
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Video Title *
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                disabled={uploading}
-                className={`
-                  w-full px-3 py-2 rounded-lg border
-                  ${darkMode 
-                    ? 'bg-slate-700 border-slate-600 text-white' 
-                    : 'bg-white border-slate-300 text-slate-900'}
-                  ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-                placeholder="Enter video title"
-              />
-            </div>
+          <label className="a-md-fl">
+            <span>Video Title *</span>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              disabled={uploading}
+              className="a-inp"
+              placeholder="Enter video title"
+            />
+          </label>
 
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Description
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                disabled={uploading}
-                rows={3}
-                className={`
-                  w-full px-3 py-2 rounded-lg border
-                  ${darkMode 
-                    ? 'bg-slate-700 border-slate-600 text-white' 
-                    : 'bg-white border-slate-300 text-slate-900'}
-                  ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-                placeholder="Enter video description"
-              />
-            </div>
+          <label className="a-md-fl">
+            <span>Description</span>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              disabled={uploading}
+              rows={3}
+              className="a-inp"
+              placeholder="Enter video description"
+            />
+          </label>
 
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Privacy Setting
-              </label>
-              <select
-                value={formData.privacy}
-                onChange={(e) => setFormData(prev => ({ ...prev, privacy: e.target.value as any }))}
-                disabled={uploading}
-                className={`
-                  w-full px-3 py-2 rounded-lg border
-                  ${darkMode 
-                    ? 'bg-slate-700 border-slate-600 text-white' 
-                    : 'bg-white border-slate-300 text-slate-900'}
-                  ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-              >
-                <option value="public">Public - Anyone can search for and view</option>
-                <option value="unlisted">Unlisted - Anyone with the link can view</option>
-                <option value="private">Private - Only you can view</option>
-              </select>
-            </div>
-
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Associated Event (Optional)
-              </label>
-              {loadingEvents ? (
-                <div className="flex items-center justify-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                </div>
-              ) : (
-                <select
-                  value={formData.eventId}
-                  onChange={(e) => handleEventChange(e.target.value)}
+          <div className="a-md-fl">
+            <span>Privacy Setting</span>
+            <div className="a-md-privacy" role="radiogroup" aria-label="Privacy Setting">
+              {([
+                ['public', 'Public', 'Anyone can search for and view', 'globe'],
+                ['unlisted', 'Unlisted', 'Anyone with the link can view', 'link'],
+                ['private', 'Private', 'Only you can view', 'lock'],
+              ] as const).map(([value, label, hint, glyph]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={formData.privacy === value}
                   disabled={uploading}
-                  className={`
-                    w-full px-3 py-2 rounded-lg border
-                    ${darkMode 
-                      ? 'bg-slate-700 border-slate-600 text-white' 
-                      : 'bg-white border-slate-300 text-slate-900'}
-                    ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
-                  `}
+                  className={`a-md-priv ${formData.privacy === value ? 'is-on' : ''}`}
+                  onClick={() => setFormData(prev => ({ ...prev, privacy: value }))}
                 >
-                  <option value="">Select an event</option>
-                  {availableEvents.map(event => (
-                    <option key={`${event.type}-${event.id}`} value={event.id}>
-                      {event.name} {event.date && `(${new Date(event.date).toLocaleDateString()})`}
-                    </option>
-                  ))}
-                </select>
-              )}
+                  <AlfieIcon glyph={glyph} size={17} />
+                  <b>{label}</b>
+                  <span>{hint}</span>
+                </button>
+              ))}
             </div>
-
-            {formData.eventName && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Event Name
-                  </label>
-                  <div className={`
-                    px-3 py-2 rounded-lg border
-                    ${darkMode ? 'bg-slate-700/50 border-slate-600 text-slate-300' : 'bg-slate-50 border-slate-300 text-slate-600'}
-                  `}>
-                    <div className="flex items-center gap-2">
-                      <Calendar size={16} />
-                      <span className="text-sm">{formData.eventName}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Race Class
-                  </label>
-                  <div className={`
-                    px-3 py-2 rounded-lg border
-                    ${darkMode ? 'bg-slate-700/50 border-slate-600 text-slate-300' : 'bg-slate-50 border-slate-300 text-slate-600'}
-                  `}>
-                    <div className="flex items-center gap-2">
-                      <Trophy size={16} />
-                      <span className="text-sm">{formData.raceClass}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
+
+          <label className="a-md-fl">
+            <span>Associated Event (Optional)</span>
+            {loadingEvents ? (
+              <span className="a-md-readonly"><span className="a-nw-spin" />Loading events…</span>
+            ) : (
+              <select
+                value={formData.eventId}
+                onChange={(e) => handleEventChange(e.target.value)}
+                disabled={uploading}
+                className="a-inp"
+              >
+                <option value="">Select an event</option>
+                {availableEvents.map(event => (
+                  <option key={`${event.type}-${event.id}`} value={event.id}>
+                    {event.name} {event.date && `(${new Date(event.date).toLocaleDateString()})`}
+                  </option>
+                ))}
+              </select>
+            )}
+          </label>
+
+          {formData.eventName && (
+            <div className="a-md-pair">
+              <div className="a-md-fl">
+                <span>Event Name</span>
+                <div className="a-md-readonly"><AlfieIcon glyph="cal" size={15} />{formData.eventName}</div>
+              </div>
+              <div className="a-md-fl">
+                <span>Race Class</span>
+                <div className="a-md-readonly"><AlfieIcon glyph="trophy" size={15} />{formData.raceClass}</div>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className={`
-          flex justify-end gap-3 p-6 border-t
-          ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-        `}>
-          <button
-            onClick={onClose}
-            disabled={uploading}
-            className={`
-              px-4 py-2 rounded-lg font-medium transition-colors
-              ${darkMode
-                ? 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
-                : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'}
-              ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
-          >
+        <footer className="a-sheet-foot a-md-sheet-foot">
+          <button onClick={onClose} disabled={uploading} className="a-btn a-btn-q">
             Cancel
           </button>
           <button
             onClick={handleUpload}
             disabled={!videoFile || !formData.title.trim() || uploading}
-            className={`
-              flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors
-              ${(!videoFile || !formData.title.trim() || uploading) ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
+            className="a-btn a-btn-p"
           >
             {uploading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span className="a-nw-spin" />
                 Uploading to YouTube...
               </>
             ) : (
               <>
-                <Youtube size={16} />
+                <AlfieIcon glyph="upload" size={16} />
                 Upload to YouTube
               </>
             )}
           </button>
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { LogOut, Upload, Image as ImageIcon, Trash2, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from 'lucide-react';
+import { AlfieIcon } from './brand/AlfieIcon';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -295,8 +295,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     }
 
     setUploading(true);
+    let successCount = 0;
+    let errorCount = 0;
 
     for (const image of images) {
+      if (image.status === 'success') { successCount++; continue; } // already uploaded on an earlier try
       try {
         setImages(prev =>
           prev.map(img => (img.id === image.id ? { ...img, status: 'uploading' } : img))
@@ -339,7 +342,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         setImages(prev =>
           prev.map(img => (img.id === image.id ? { ...img, status: 'success' } : img))
         );
+        successCount++;
       } catch (error) {
+        errorCount++;
         console.error('Error uploading image:', error);
         const errorMessage = error instanceof Error ? error.message : 'Upload failed';
         addNotification('error', `Failed to upload ${image.title}: ${errorMessage}`);
@@ -354,9 +359,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     }
 
     setUploading(false);
-
-    const successCount = images.filter(img => img.status === 'success').length;
-    const errorCount = images.filter(img => img.status === 'error').length;
 
     if (successCount > 0) {
       addNotification('success', `Successfully uploaded ${successCount} image(s)`);
@@ -385,185 +387,145 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
   if (!isOpen) return null;
 
+  const pendingCount = images.filter(img => img.status !== 'success').length;
+  const doneCount = images.length - pendingCount;
+  const formatSize = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col`}>
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <div>
-            <h2 className="text-2xl font-bold">Upload Images</h2>
-            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Upload multiple images to your media center
-            </p>
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center p-3 sm:p-6">
+      <div className="a-veil absolute inset-0 backdrop-blur-[2px]" onClick={() => !uploading && handleClose()} aria-hidden="true" />
+      <section
+        className="a-sheet a-md-sheet relative w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="a-md-up-title"
+        onDragEnter={handleDrag}
+        onDragOver={handleDrag}
+        onDragLeave={handleDrag}
+        onDrop={handleDrop}
+      >
+        <header className="a-sheet-head a-md-sheet-head">
+          <span className="a-tile a-tile-rim" style={{ width: 44, height: 44 }}><AlfieIcon glyph="image" size={20} /></span>
+          <div className="min-w-0 flex-1">
+            <h2 id="a-md-up-title" className="a-display a-ink m-0 text-[20px] font-semibold leading-tight">Upload Images</h2>
+            <p className="a-mute m-0 mt-0.5 text-[13.5px]">Upload multiple images to your media center</p>
           </div>
-          <button
-            onClick={handleClose}
-            disabled={uploading}
-            className={`p-2 rounded-lg transition-colors ${
-              darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-            } ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <LogOut className="w-5 h-5" />
+          <button type="button" onClick={handleClose} disabled={uploading} className="a-ib" aria-label="Close">
+            <AlfieIcon glyph="x" size={20} />
           </button>
-        </div>
+        </header>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {images.length === 0 && (
-            <div
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${
-                dragActive
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : darkMode
-                  ? 'border-gray-700 hover:border-gray-600'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              <ImageIcon className={`w-16 h-16 mx-auto mb-4 ${dragActive ? 'text-blue-500' : 'text-gray-400'}`} />
-              <h3 className="text-xl font-semibold mb-2">
-                {dragActive ? 'Drop your images here' : 'Drag and drop images'}
-              </h3>
-              <p className={`mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                or click to browse (supports multiple selection)
-              </p>
-              <label className="inline-flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors">
-                <Upload className="w-5 h-5" />
-                Choose Images
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileInput}
-                  className="hidden"
-                />
-              </label>
-              <p className={`mt-4 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                Images will be automatically compressed to maintain quality while reducing file size
-              </p>
-            </div>
-          )}
-
-          {images.length > 0 && (
+        <div className="a-md-sheet-body">
+          {images.length === 0 ? (
+            <label className={`a-md-drop ${dragActive ? 'is-drag' : ''}`}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFileInput}
+                className="hidden"
+              />
+              <span className="a-md-drop-ic"><AlfieIcon glyph={dragActive ? 'download' : 'image'} size={30} /></span>
+              <b>{dragActive ? 'Drop your images here' : 'Drag and drop images'}</b>
+              <span>or click to browse (supports multiple selection)</span>
+              <span className="a-btn a-btn-p a-md-drop-btn"><AlfieIcon glyph="upload" size={16} />Choose Images</span>
+              <small>Images will be automatically compressed to maintain quality while reducing file size</small>
+            </label>
+          ) : (
             <>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">{images.length} Image(s) Selected</h3>
-                  <label className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors text-sm">
-                    <Upload className="w-4 h-4" />
-                    Add More
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleFileInput}
-                      className="hidden"
-                      disabled={uploading}
-                    />
-                  </label>
-                </div>
-
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Event (Optional)
-                  </label>
-                  <select
-                    value={selectedEventId}
-                    onChange={(e) => handleEventChange(e.target.value)}
-                    disabled={uploading}
-                    className={`w-full px-3 py-2 rounded-lg border ${
-                      darkMode
-                        ? 'bg-gray-700 border-gray-600 text-white'
-                        : 'bg-white border-gray-300 text-gray-900'
-                    }`}
-                  >
-                    <option value="">No event - General media</option>
-                    {availableEvents.map(event => (
-                      <option key={`${event.type}-${event.id}`} value={event.id}>
-                        {event.name} {event.date && `(${new Date(event.date).toLocaleDateString()})`}
-                      </option>
-                    ))}
-                  </select>
-                  <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                    Allocate images to an event for better organization and reporting
+              <div className="a-md-up-top">
+                <div className="min-w-0">
+                  <h3 className="a-ink m-0 text-[16px] font-semibold">{images.length} image{images.length === 1 ? '' : 's'} selected</h3>
+                  <p className="a-mute m-0 mt-0.5 text-[13px]">
+                    {uploading ? `Uploading… ${doneCount} of ${images.length} done` : 'Give each one a title, or keep the file name. Drop more images anywhere here.'}
                   </p>
                 </div>
+                <label className={`a-btn ${uploading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}>
+                  <AlfieIcon glyph="plus" size={16} />
+                  Add More
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileInput}
+                    className="hidden"
+                    disabled={uploading}
+                  />
+                </label>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                {images.map((image) => (
-                  <div
-                    key={image.id}
-                    className={`p-4 rounded-lg border ${
-                      darkMode ? 'bg-gray-750 border-gray-700' : 'bg-gray-50 border-gray-200'
-                    } ${image.status === 'success' ? 'ring-2 ring-green-500' : ''}
-                    ${image.status === 'error' ? 'ring-2 ring-red-500' : ''}`}
-                  >
-                    <div className="flex gap-4">
-                      <div className="relative w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden">
-                        <img src={image.preview} alt={image.title} className="w-full h-full object-cover" />
-                        {image.status === 'uploading' && (
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                          </div>
-                        )}
-                        {image.status === 'success' && (
-                          <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-                            <CheckCircle className="w-8 h-8 text-green-500" />
-                          </div>
-                        )}
-                        {image.status === 'error' && (
-                          <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center">
-                            <AlertCircle className="w-8 h-8 text-red-500" />
-                          </div>
-                        )}
-                      </div>
+              {uploading && (
+                <div className="a-md-progress" aria-hidden="true"><span style={{ width: `${(doneCount / Math.max(images.length, 1)) * 100}%` }} /></div>
+              )}
 
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <input
-                          type="text"
-                          value={image.title}
-                          onChange={(e) => updateImageField(image.id, 'title', e.target.value)}
+              <label className="a-md-fl">
+                <span>Event (Optional)</span>
+                <select
+                  value={selectedEventId}
+                  onChange={(e) => handleEventChange(e.target.value)}
+                  disabled={uploading}
+                  className="a-inp"
+                >
+                  <option value="">No event - General media</option>
+                  {availableEvents.map(event => (
+                    <option key={`${event.type}-${event.id}`} value={event.id}>
+                      {event.name} {event.date && `(${new Date(event.date).toLocaleDateString()})`}
+                    </option>
+                  ))}
+                </select>
+                <small>Allocate images to an event for better organization and reporting</small>
+              </label>
+
+              <div className={`a-md-up-grid ${dragActive ? 'is-drag' : ''}`}>
+                {images.map((image) => (
+                  <div key={image.id} className={`a-md-up-card is-${image.status}`}>
+                    <div className="a-md-up-thumb">
+                      <img src={image.preview} alt={image.title} />
+                      {image.status === 'uploading' && (
+                        <span className="a-md-up-state"><span className="a-nw-spin a-nw-spin-lg" /></span>
+                      )}
+                      {image.status === 'success' && (
+                        <span className="a-md-up-state is-ok"><AlfieIcon glyph="check" size={22} strokeWidth={2.4} /></span>
+                      )}
+                      {image.status === 'error' && (
+                        <span className="a-md-up-state is-err"><AlfieIcon glyph="warn" size={22} /></span>
+                      )}
+                      {image.status !== 'uploading' && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(image.id)}
                           disabled={uploading}
-                          placeholder="Image title"
-                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                            darkMode
-                              ? 'bg-gray-700 border-gray-600 text-white'
-                              : 'bg-white border-gray-300 text-gray-900'
-                          }`}
-                        />
-                        <textarea
-                          value={image.description}
-                          onChange={(e) => updateImageField(image.id, 'description', e.target.value)}
-                          disabled={uploading}
-                          placeholder="Description (optional)"
-                          rows={2}
-                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
-                            darkMode
-                              ? 'bg-gray-700 border-gray-600 text-white'
-                              : 'bg-white border-gray-300 text-gray-900'
-                          }`}
-                        />
-                        {image.status === 'error' && (
-                          <p className="text-xs text-red-500">{image.error}</p>
-                        )}
-                        <div className="flex items-center justify-between">
-                          <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                            {(image.compressed?.size || image.file.size / 1024 / 1024).toFixed(2)} MB
-                          </span>
-                          {image.status !== 'uploading' && (
-                            <button
-                              onClick={() => handleRemoveImage(image.id)}
-                              disabled={uploading}
-                              className="p-1 text-red-500 hover:bg-red-500/10 rounded transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                          className="a-nw-gb a-nw-gb-d a-md-up-rm"
+                          aria-label={`Remove ${image.title}`}
+                        >
+                          <AlfieIcon glyph="trash" size={14} />
+                        </button>
+                      )}
+                      <span className="a-md-up-size">{formatSize(image.compressed?.size || image.file.size)}</span>
+                    </div>
+                    <div className="a-md-up-fields">
+                      <input
+                        type="text"
+                        value={image.title}
+                        onChange={(e) => updateImageField(image.id, 'title', e.target.value)}
+                        disabled={uploading}
+                        placeholder="Image title"
+                        aria-label="Image title"
+                        className="a-inp a-md-up-title"
+                      />
+                      <textarea
+                        value={image.description}
+                        onChange={(e) => updateImageField(image.id, 'description', e.target.value)}
+                        disabled={uploading}
+                        placeholder="Description (optional)"
+                        aria-label="Description"
+                        rows={2}
+                        className="a-inp a-md-up-desc"
+                      />
+                      {image.status === 'error' && (
+                        <p className="a-md-up-err">{image.error}</p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -573,38 +535,35 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         </div>
 
         {images.length > 0 && (
-          <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
-            <button
-              onClick={handleClose}
-              disabled={uploading}
-              className={`px-6 py-3 rounded-lg font-medium ${
-                darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
-              } ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
+          <footer className="a-sheet-foot a-md-sheet-foot">
+            <button onClick={handleClose} disabled={uploading} className="a-btn a-btn-q">
               Cancel
             </button>
             <button
               onClick={handleUpload}
-              disabled={uploading || images.length === 0}
-              className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors ${
-                uploading || images.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              disabled={uploading || images.length === 0 || pendingCount === 0}
+              className="a-btn a-btn-p a-md-foot-main"
             >
-              {uploading ? (
+              {pendingCount === 0 ? (
                 <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <AlfieIcon glyph="check" size={17} />
+                  Uploaded
+                </>
+              ) : uploading ? (
+                <>
+                  <span className="a-nw-spin" />
                   Uploading...
                 </>
               ) : (
                 <>
-                  <Upload className="w-5 h-5" />
-                  Upload {images.length} Image(s)
+                  <AlfieIcon glyph="upload" size={17} />
+                  Upload {pendingCount || images.length} Image{(pendingCount || images.length) === 1 ? '' : 's'}
                 </>
               )}
             </button>
-          </div>
+          </footer>
         )}
-      </div>
+      </section>
     </div>
   );
 };
