@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { StartBoxButton } from './scoring/StartBoxButton';
 import { createPortal } from 'react-dom';
 import { AAvatar } from './alfie/Kit';
-import { ChevronLeft, ChevronRight, MoveHorizontal as MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Timer, Flag, Pause, Pencil, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoveHorizontal as MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Flag, Pause, Pencil, Lock } from 'lucide-react';
 import { Skipper, RaceResult } from '../types';
 import { RaceEvent } from '../types/race';
 import { LetterScoreSelector } from './LetterScoreSelector';
@@ -1023,14 +1024,11 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   const startBoxSlot = alfieBar && !isHeatScoring ? startBoxSlotEl : null;
   const startBoxControls = !isHeatScoring && (
     <>
-      <button
+      <StartBoxButton
         onClick={() => setShowStartBoxModal(true)}
-        className="a-btn a-btn-sb"
-        style={{ height: alfieBar ? 40 : 34, ...(raceTimerRunning ? { opacity: 0.7 } : {}) }}
-      >
-        <Timer size={17} />
-        StartBox
-      </button>
+        size={alfieBar ? 40 : 36}
+        style={raceTimerRunning ? { opacity: 0.7 } : undefined}
+      />
       {raceTimerRunning && (
         <RaceElapsedTimer
           isRunning={raceTimerRunning}
