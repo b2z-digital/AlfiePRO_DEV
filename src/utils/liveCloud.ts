@@ -36,3 +36,7 @@ export const PROGRAM_MESSAGE = 'alfie-program';
 export const NOTE_MESSAGE = 'alfie-note';
 /** The broadcast has ended: cameras stop sending and say so */
 export const ENDED_MESSAGE = 'alfie-ended';
+/** Control room → program page: show the title card / the last race's results / hold on or off */
+export const TITLE_MESSAGE = 'alfie-title';
+export const RESULTS_MESSAGE = 'alfie-results';
+export const HOLD_MESSAGE = 'alfie-hold';

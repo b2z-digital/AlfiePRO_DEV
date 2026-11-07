@@ -16,6 +16,7 @@ import { StreamAnalyticsModal } from './StreamAnalyticsModal';
 import { LivestreamSetupWizard } from './LivestreamSetupWizard';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { OverlaysManager } from './OverlaysManager';
+import { CloudControlRoom } from './CloudControlRoom';
 import { LivestreamOverlayRenderer } from './LivestreamOverlayRenderer';
 import type { OverlayScoringSummary } from './LivestreamOverlayRenderer';
 import { CameraFeedGridRef } from './CameraFeedGrid';
@@ -111,7 +112,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   }, [clubId, sessionId]);
 
   useEffect(() => {
-    if (activeSession && (streamStatus === 'testing' || streamStatus === 'live') && !mediaStream) {
+    if (activeSession && activeSession.engine !== 'cloud' && (streamStatus === 'testing' || streamStatus === 'live') && !mediaStream) {
       requestCameraAccess();
     }
   }, [activeSession, streamStatus]);
@@ -1077,6 +1078,11 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   const checkActiveSession = async () => {
     try {
       const session = await livestreamStorage.getActiveSession(clubId);
+      if (session && (session as LivestreamSession).engine === 'cloud') {
+        // Cloud broadcasts run from the cloud control room: nothing to start on this device
+        if (session.status === 'live') setActiveSession(session);
+        return;
+      }
       if (session && (session.status === 'live' || session.status === 'testing')) {
         setActiveSession(session);
         updateStreamStatus(session.status);
@@ -1605,7 +1611,9 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   const primaryCamera = cameras.find(c => c.is_primary);
 
   // Report to compact on-air controls (scoring dock) and let them act on the studio
-  if (controlsRef) {
+  // (a cloud broadcast's control room reports and acts for itself)
+  const isCloudSession = activeSession?.engine === 'cloud';
+  if (controlsRef && !isCloudSession) {
     controlsRef.current = {
       hold: pauseBroadcast,
       resume: resumeBroadcast,
@@ -1614,7 +1622,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     };
   }
   useEffect(() => {
-    if (!onSnapshot) return;
+    if (!onSnapshot || isCloudSession) return;
     onSnapshot({
       sessionId: activeSession?.id ?? null,
       title: activeSession?.title ?? null,
@@ -1638,7 +1646,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
       recordingSince: currentSegment?.segment_start_time ?? null,
       uploading: segmentProcessing,
     });
-  }, [onSnapshot, activeSession?.id, activeSession?.title, activeSession?.is_public, activeSession?.actual_start_time,
+  }, [onSnapshot, isCloudSession, activeSession?.id, activeSession?.title, activeSession?.is_public, activeSession?.actual_start_time,
       streamStatus, isPaused, viewerCount, whipStatus, isCompositing, compositedStream, activePreviewStream, mediaStream,
       cameras, remoteStreams, autoSegmentEnabled, currentSegment, segmentProcessing]);
 
@@ -1772,9 +1780,9 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
 
   if (!activeSession) {
     const openSession = (session: SessionWithVenue) => {
-      if ((session as any).engine === 'cloud') {
-        // Cloud broadcasts run from the cloud control room (test bench for now)
-        window.location.assign(`/live/cloud-test?session=${session.id}`);
+      if (session.engine === 'cloud') {
+        // Cloud broadcasts run from the cloud control room
+        setActiveSession(session);
         return;
       }
       if (session.status === 'ended') {
@@ -1805,8 +1813,10 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
             onClose={() => setShowNewSheet(false)}
             onCreated={(created) => {
               setShowNewSheet(false);
-              if ((created as any).engine === 'cloud') {
-                window.location.assign(`/live/cloud-test?session=${created.id}`);
+              if (created.engine === 'cloud') {
+                // Straight into the cloud control room (add cameras, then go live)
+                setSessions(prev => [created as SessionWithVenue, ...prev]);
+                setActiveSession(created);
                 return;
               }
               handleWizardComplete(created);
@@ -1828,6 +1838,28 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   // ═══════════════════════════════════════════════════════════════
   // CONTROL ROOM (active session), livestream board "Control room"
   // ═══════════════════════════════════════════════════════════════
+
+  if (activeSession.engine === 'cloud') {
+    return (
+      <>
+        <CloudControlRoom
+          session={activeSession as SessionWithVenue}
+          clubId={clubId}
+          onBack={() => setActiveSession(null)}
+          onSessionChange={(updated) => {
+            setActiveSession(updated);
+            setSessions(prev => prev.map(x => (x.id === updated.id ? { ...x, ...updated } : x)));
+          }}
+          onDelete={() => { setSessionToDelete(activeSession as SessionWithVenue); setShowDeleteConfirm(true); }}
+          onSnapshot={onSnapshot}
+          controlsRef={controlsRef}
+        />
+        {showDeleteConfirm && sessionToDelete && (
+          <ConfirmationModal isOpen={true} onClose={() => { setShowDeleteConfirm(false); setSessionToDelete(null); }} onConfirm={async () => { await deleteSession(sessionToDelete); setShowDeleteConfirm(false); setSessionToDelete(null); }} title="Delete Stream" message={`Are you sure you want to delete "${sessionToDelete.title}"?`} confirmText="Delete" confirmStyle="danger" />
+        )}
+      </>
+    );
+  }
 
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -2378,7 +2410,18 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
           onClose={() => setShowSelectRace(false)}
         />
       )}
-      {showSchedule && activeSession && <ScheduleStreamModal session={activeSession} onSave={async (scheduledTime) => { await livestreamStorage.updateSession(activeSession.id, { scheduled_start_time: scheduledTime.toISOString(), status: 'scheduled' }); setShowSchedule(false); }} onClose={() => setShowSchedule(false)} />}
+      {showSchedule && activeSession && (
+        <ScheduleStreamModal
+          sessionId={activeSession.id}
+          currentScheduledTime={activeSession.scheduled_start_time || undefined}
+          onSchedule={(scheduledTime) => {
+            // The modal saves the time (and scheduled/draft status) itself
+            setActiveSession(prev => (prev ? { ...prev, scheduled_start_time: scheduledTime || undefined, status: scheduledTime ? 'scheduled' : 'draft' } : prev));
+            setShowSchedule(false);
+          }}
+          onClose={() => setShowSchedule(false)}
+        />
+      )}
       {showAnalytics && activeSession && <StreamAnalyticsModal sessionId={activeSession.id} clubId={clubId} onClose={() => setShowAnalytics(false)} />}
       {showSetupWizard && <LivestreamSetupWizard clubId={clubId} onClose={() => setShowSetupWizard(false)} onComplete={handleWizardComplete} />}
       {showDeleteConfirm && sessionToDelete && (

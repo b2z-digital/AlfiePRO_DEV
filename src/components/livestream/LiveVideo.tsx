@@ -26,7 +26,10 @@ export function LiveVideo({ session, muted: forceMuted = false, compact = false 
   const isFallbackRef = React.useRef(false);
   const unmountedRef = React.useRef(false);
 
-  const whepUrl = session.cloudflare_whip_playback_url;
+  // WHEP only plays streams sent in by WHIP. Cloud broadcasts and streaming encoders send
+  // RTMPS, so they play through Cloudflare's player (HLS) instead.
+  const rtmpIngest = session.engine === 'cloud' || session.stream_input_mode === 'rtmp_external';
+  const whepUrl = rtmpIngest ? null : session.cloudflare_whip_playback_url;
   const iframeEmbedUrl = session.cloudflare_customer_code && session.cloudflare_live_input_id
     ? `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe?autoplay=true&muted=false&preload=auto&letterboxColor=000000`
     : null;

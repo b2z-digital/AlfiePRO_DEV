@@ -56,6 +56,8 @@ export interface LivestreamRaceSegment {
   upload_error?: string;
   trigger_type: SegmentTriggerType;
   local_recording_path?: string;
+  /** Cloud engine: the RealtimeKit recording of this race */
+  rtk_recording_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -145,6 +147,13 @@ export interface LivestreamSession {
 
   is_public: boolean;
   is_paused: boolean;
+  /** 'device' (studio streams from this browser) or 'cloud' (RealtimeKit room + cloud recorder) */
+  engine?: 'device' | 'cloud';
+  rtk_meeting_id?: string | null;
+  program_participant_id?: string | null;
+  program_recording_id?: string | null;
+  /** Cloud: 'live' streams to AlfieTV; 'races_only' only records each race for YouTube */
+  broadcast_mode?: 'live' | 'races_only';
 
   audio_source: AudioSource;
   enable_commentary: boolean;
