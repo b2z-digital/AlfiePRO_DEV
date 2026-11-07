@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './components/DashboardLayout';
 import { YachtRaceManager } from './components/YachtRaceManager';
@@ -45,6 +45,11 @@ import LiveTrackingPage from './pages/LiveTrackingPage';
 import LiveDashboardPage from './pages/LiveDashboardPage';
 import ProBroadcastView from './components/live-tracking/ProBroadcastView';
 import MobileStreamPage from './pages/MobileStreamPage';
+// Cloud livestream pages load RealtimeKit, so they're split out of the main bundle
+const LiveProgramPage = lazy(() => import('./pages/live/LiveProgramPage'));
+const LiveCameraPage = lazy(() => import('./pages/live/LiveCameraPage'));
+const LiveCloudTestPage = lazy(() => import('./pages/live/LiveCloudTestPage'));
+const liveFallback = <div style={{ minHeight: '100vh', background: '#060B16' }} />;
 import { EventWebsitesPage } from './pages/EventWebsitesPage';
 import { EventWebsiteDashboardPage } from './pages/EventWebsiteDashboardPage';
 import { EventCommandCenterPage } from './pages/EventCommandCenterPage';
@@ -297,6 +302,13 @@ function App() {
 
         {/* Mobile Livestream Route (Public) */}
         <Route path="/mobile-stream/:sessionId" element={<MobileStreamPage />} />
+
+        {/* Cloud livestream: program picture (opened by Cloudflare's recorder) and no-login cameras (Public) */}
+        <Route path="/live/program/:sessionId" element={<Suspense fallback={liveFallback}><LiveProgramPage /></Suspense>} />
+        <Route path="/live/camera/:sessionId" element={<Suspense fallback={liveFallback}><LiveCameraPage /></Suspense>} />
+        <Route path="/live/cloud-test" element={
+          isAuthenticated ? <Suspense fallback={liveFallback}><LiveCloudTestPage /></Suspense> : <Navigate to="/login" />
+        } />
 
         {/* Public Video Player (used by native mobile app for AlfieTV) */}
         <Route path="/play/:videoId" element={<PublicVideoPlayer />} />
