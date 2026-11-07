@@ -61,6 +61,7 @@ import PublicVideoPlayer from './components/public/PublicVideoPlayer';
 import { DelegatedRollCallPage } from './pages/DelegatedRollCallPage';
 import { PublicSharedResultsPage } from './components/public/PublicSharedResultsPage';
 import SignOnKioskPage from './pages/SignOnKioskPage';
+import WhatsOnAnswerPage from './pages/WhatsOnAnswerPage';
 import { MobileAppComingSoon } from './components/MobileAppComingSoon';
 import { JoinScoringSessionPage } from './pages/JoinScoringSessionPage';
 import './styles/index.css';
@@ -173,6 +174,7 @@ function App() {
                         window.location.pathname.startsWith('/mobile-stream') ||
                         window.location.pathname.startsWith('/play/') ||
                         window.location.pathname.startsWith('/reset-password') ||
+                        window.location.pathname.startsWith('/whats-on/') ||
                         window.location.pathname.startsWith('/forgot-password');
 
   console.log('🔍 App.tsx auth check:', {
@@ -286,6 +288,9 @@ function App() {
 
         {/* Delegated Roll Call Route (Public) */}
         <Route path="/rc/:token" element={<DelegatedRollCallPage />} />
+
+        {/* What's On email answers (Public, token in the link) */}
+        <Route path="/whats-on/answer" element={<WhatsOnAnswerPage />} />
 
         {/* Self-service Sign On Kiosk (Public) */}
         <Route path="/sign-on/:eventId" element={<SignOnKioskPage />} />
