@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
-import { CAMERA_PRESET, NOTE_MESSAGE, PROGRAM_MESSAGE, liveCloud, loadRealtimeKit, type RtkMeeting } from '../../utils/liveCloud';
+import { CAMERA_PRESET, ENDED_MESSAGE, NOTE_MESSAGE, PROGRAM_MESSAGE, liveCloud, loadRealtimeKit, type RtkMeeting } from '../../utils/liveCloud';
 
 /**
  * Cloud engine test bench (club admins). Creates a hidden test broadcast on the
@@ -151,6 +151,18 @@ export default function LiveCloudTestPage() {
     setNoteText('');
   };
 
+  // End: stop program out, tell the cameras so they stop sending, and leave the room
+  const endBroadcast = async () => {
+    await act('End broadcast', () => liveCloud('program_stop', { sessionId, end: true }));
+    setProgramId(null);
+    if (meeting) {
+      await meeting.participants.broadcastMessage(ENDED_MESSAGE, { sessionId }).catch(() => {});
+      note('Told the cameras the broadcast has ended');
+      setTimeout(() => { meeting.leave().catch(() => {}); setMeeting(null); setCams([]); }, 1500);
+    }
+    refreshStatus();
+  };
+
   const pick = async (id: string) => {
     setProgramId(id);
     await act('Put camera on program', () => liveCloud('set_program', { sessionId, participantId: id }));
@@ -264,7 +276,7 @@ export default function LiveCloudTestPage() {
                 <button type="button" className="alv-btn is-small" disabled={!!busy} onClick={() => act('Stop race recording', () => liveCloud('race_stop', { sessionId })).then(() => { setRace((r) => r + 1); refreshStatus(); })}>Stop race</button>
               </div>
               <div><button type="button" className="alv-btn is-small" disabled={!!busy} style={{ borderColor: 'rgba(225,29,56,0.5)' }}
-                onClick={() => act('End broadcast', () => liveCloud('program_stop', { sessionId, end: true })).then(refreshStatus)}>End broadcast</button></div>
+                onClick={endBroadcast}>End broadcast</button></div>
               <span className="alv-mute" style={{ fontSize: 13 }}>Cloudflare input: {inputStatus || '…'}</span>
             </div>
 
