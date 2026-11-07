@@ -1,0 +1,34 @@
+import { supabase } from './supabase';
+
+/** Calls the live-cloud edge function (cloud production engine). Throws with the function's message. */
+export async function liveCloud<T = Record<string, any>>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('live-cloud', { body: { action, ...payload } });
+  if (error) {
+    let message = error.message;
+    try {
+      const ctx = (error as unknown as { context?: Response }).context;
+      if (ctx && typeof ctx.json === 'function') {
+        const body = await ctx.json();
+        if (body?.error) message = body.error;
+      }
+    } catch {
+      /* keep the generic message */
+    }
+    throw new Error(message);
+  }
+  if (data && typeof data === 'object' && 'error' in data && (data as { error?: string }).error) {
+    throw new Error((data as { error: string }).error);
+  }
+  return data as T;
+}
+
+/** The RealtimeKit client is large, so it's only loaded on the live pages that need it. */
+export async function loadRealtimeKit() {
+  const mod = await import('@cloudflare/realtimekit');
+  return mod.default;
+}
+
+export type RtkMeeting = Awaited<ReturnType<Awaited<ReturnType<typeof loadRealtimeKit>>['init']>>;
+
+export const CAMERA_PRESET = 'alfie_camera';
+export const PROGRAM_MESSAGE = 'alfie-program';
