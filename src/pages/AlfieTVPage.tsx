@@ -2,7 +2,11 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useNavigate } from 'react-router-dom';
-import { Play, Plus, Search, Info, Volume2, VolumeX, ChevronLeft, ChevronRight, Settings, X, LogOut, Youtube, ListFilter as Filter, Lightbulb, Radio, Calendar, Square } from 'lucide-react';
+import { LogOut, Radio, Square, Volume2, VolumeX } from 'lucide-react';
+import { AlfieIcon } from '../components/brand/AlfieIcon';
+import { ChannelAvatar, PlayIcon, TVCard, TVChannelCard, TVChannelLite, TVEventTile, TVInfoSheet, TVPlaylistCard, TVRow, TVSkeletonRow, TVVideo, compactNumber, formatDuration, formatScheduledDate } from '../components/alfie-tv/tv/TVParts';
+import { TVHero, TVHeroSlide } from '../components/alfie-tv/tv/TVHero';
+
 import { alfieTVStorage, AlfieTVVideo } from '../utils/alfieTVStorage';
 import { useNotification } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
@@ -39,6 +43,8 @@ interface Channel {
   channel_thumbnail: string;
   is_visible?: boolean;
   category?: string;
+  video_count?: number;
+  subscriber_count?: number;
 }
 
 const LiveStreamPlayerWrapper = ({ session, onClose, venueImage, clubName }: {
@@ -422,193 +428,101 @@ const LiveStreamPlayer = React.memo(({ session, onClose, venueImage, clubName }:
   );
 });
 
-// Hero video background component - MUST be outside to prevent re-creation on parent renders
-// Uses internal state to track current video and prevent reloads
-const HeroVideoBackground = React.memo(({ videoId, thumbnailUrl }: { videoId: string; thumbnailUrl: string }) => {
-  const [currentVideoId, setCurrentVideoId] = React.useState(videoId);
-  const [isTransitioning, setIsTransitioning] = React.useState(false);
-
-  React.useEffect(() => {
-    if (videoId !== currentVideoId) {
-      // Fade out current video before changing
-      setIsTransitioning(true);
-      const timer = setTimeout(() => {
-        setCurrentVideoId(videoId);
-        setIsTransitioning(false);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [videoId, currentVideoId]);
-
-  return (
-    <div className="absolute inset-0">
-      {currentVideoId ? (
-        <div className={`transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'} w-full h-full`}>
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${currentVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${currentVideoId}&playsinline=1&rel=0&modestbranding=1&showinfo=0&enablejsapi=0&cc_load_policy=0&disablekb=1&fs=0&iv_load_policy=3`}
-            className="w-full h-full object-cover scale-110"
-            allow="autoplay; encrypted-media"
-            style={{ pointerEvents: 'none' }}
-            title="Background video"
-            loading="eager"
-            frameBorder="0"
-          />
-        </div>
-      ) : (
-        <img
-          src={thumbnailUrl}
-          alt="Background"
-          className="w-full h-full object-cover object-center scale-105"
-        />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/60" />
-      <div className="absolute inset-0 from-black/80 via-black/30 to-transparent" />
-    </div>
-  );
-});
-
-// Fullscreen video modal - MUST be outside to prevent re-creation on parent renders
-// Uses internal state to prevent iframe reloads and YouTube Player API for auto-close
+// Fullscreen video player - lives outside the page component so the iframe never reloads on re-render.
+// Uses the YouTube Player API messages to close automatically when the video ends.
 const FullscreenVideoModal = React.memo(({ video, onClose }: { video: AlfieTVVideo | null; onClose: () => void }) => {
   const [currentVideo, setCurrentVideo] = React.useState<AlfieTVVideo | null>(video);
+  const [chromeVisible, setChromeVisible] = React.useState(true);
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const idleRef = React.useRef<ReturnType<typeof setTimeout>>();
 
   React.useEffect(() => {
     if (video?.youtube_id && video.youtube_id !== currentVideo?.youtube_id) {
       setCurrentVideo(video);
     } else if (!video) {
-      // Clear current video when prop becomes null
       setCurrentVideo(null);
     }
   }, [video?.youtube_id, video]);
 
-  // ESC key handler
+  // ESC closes the player
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
-
     if (currentVideo) {
       window.addEventListener('keydown', handleEscape);
       return () => window.removeEventListener('keydown', handleEscape);
     }
   }, [currentVideo, onClose]);
 
-  // Listen for video end messages from YouTube iframe
+  // Close shortly after the video ends (YouTube state 0)
   React.useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // YouTube posts messages when video state changes
       if (event.origin === 'https://www.youtube.com' || event.origin === 'https://www.youtube-nocookie.com') {
         try {
           const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-
-          // Log state changes for debugging
-          if (data.event === 'onStateChange') {
-            const stateNames: Record<number, string> = {
-              '-1': 'unstarted',
-              '0': 'ENDED',
-              '1': 'playing',
-              '2': 'paused',
-              '3': 'buffering',
-              '5': 'cued'
-            };
-            console.log('📺 YouTube state:', stateNames[data.info] || data.info);
-          }
-
-          // Check if video ended (state 0 = ended)
-          // YouTube API states: -1=unstarted, 0=ended, 1=playing, 2=paused, 3=buffering, 5=cued
           if (data.event === 'onStateChange' && data.info === 0) {
-            console.log('✅ VIDEO ENDED! Returning to AlfieTV in 1.5 seconds...');
-            setTimeout(() => {
-              console.log('🔙 Closing video player now...');
-              onClose();
-            }, 1500);
+            setTimeout(() => onClose(), 1500);
           }
-        } catch (e) {
-          // Ignore parsing errors from non-YouTube messages
+        } catch {
+          // Ignore messages that aren't from the player
         }
       }
     };
-
     if (currentVideo) {
-      console.log('🎬 Setting up video end listener for:', currentVideo.youtube_id);
       window.addEventListener('message', handleMessage);
-      return () => {
-        console.log('🧹 Cleaning up video end listener');
-        window.removeEventListener('message', handleMessage);
-      };
+      return () => window.removeEventListener('message', handleMessage);
     }
   }, [currentVideo, onClose]);
+
+  // The top bar fades away while watching and comes back when the mouse moves
+  const wake = React.useCallback(() => {
+    setChromeVisible(true);
+    if (idleRef.current) clearTimeout(idleRef.current);
+    idleRef.current = setTimeout(() => setChromeVisible(false), 3200);
+  }, []);
+  React.useEffect(() => {
+    if (!currentVideo) return;
+    wake();
+    return () => { if (idleRef.current) clearTimeout(idleRef.current); };
+  }, [currentVideo, wake]);
 
   if (!currentVideo) return null;
 
   const currentOrigin = window.location.origin;
   const videoUrl = `https://www.youtube-nocookie.com/embed/${currentVideo.youtube_id}?autoplay=1&controls=1&modestbranding=1&rel=0&fs=1&iv_load_policy=3&cc_load_policy=0&enablejsapi=1&playsinline=1&origin=${encodeURIComponent(currentOrigin)}`;
 
-  const handleCloseClick = () => {
-    console.log('✅✅✅ CLOSE BUTTON CLICKED - CLOSING VIDEO!');
-    onClose();
-  };
-
   return (
-    <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
+    <div className={`atv-player ${chromeVisible ? 'is-awake' : ''}`} style={{ zIndex: 9000 }} onMouseMove={wake}>
       <iframe
         ref={iframeRef}
         src={videoUrl}
-        className="absolute inset-0 w-full h-full"
+        className="atv-player-frame"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
         allowFullScreen
         title={currentVideo?.title || 'Video'}
         loading="eager"
-        style={{ border: 'none' }}
       />
 
-      <div className="absolute bottom-0 right-0 w-36 h-20" style={{ zIndex: 9001, pointerEvents: 'auto', background: 'transparent' }} />
+      {/* Covers YouTube's logo link so viewers stay in AlfieTV */}
+      <div className="atv-player-guard" />
 
-      {/* Close button - subtle design */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleCloseClick();
-        }}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          handleCloseClick();
-        }}
-        className="p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white transition-all backdrop-blur-sm border border-white/20 hover:border-white/40"
-        style={{
-          position: 'fixed',
-          top: '24px',
-          right: '24px',
-          zIndex: 9999,
-          cursor: 'pointer'
-        }}
-        title="Close (ESC)"
-        type="button"
-      >
-        <LogOut className="w-7 h-7 stroke-[2.5]" />
-      </button>
-
-      {/* Video title */}
-      <div
-        className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg text-white font-medium text-sm border border-white/10"
-        style={{
-          position: 'fixed',
-          top: '24px',
-          left: '24px',
-          zIndex: 9998,
-          pointerEvents: 'none',
-          maxWidth: '60%'
-        }}
-      >
-        {currentVideo.title}
+      <div className="atv-player-top" onMouseEnter={wake}>
+        <button
+          type="button"
+          className="atv-player-back"
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          title="Back to AlfieTV (Esc)"
+        >
+          <AlfieIcon glyph="chevL" size={22} strokeWidth={2.2} />
+          <span>Back</span>
+        </button>
+        <span className="atv-player-title">{currentVideo.title}</span>
       </div>
     </div>
   );
 });
+
 
 export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const { user, currentClub, currentOrganization, isSuperAdmin } = useAuth();
@@ -640,10 +554,8 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const [featuredVideos, setFeaturedVideos] = useState<AlfieTVVideo[]>([]);
   const [personalizedVideos, setPersonalizedVideos] = useState<AlfieTVVideo[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['rc_yachting', 'full_size_yachting', 'sailing_education', 'racing', 'general']);
-  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [selectedPlaylistCategory, setSelectedPlaylistCategory] = useState<string>('all');
   const [heroMuted, setHeroMuted] = useState(true);
-  const [showHeroInfo, setShowHeroInfo] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<AlfieTVVideo | null>(null);
   const [videoStartTime, setVideoStartTime] = useState<number>(0);
   const [currentView, setCurrentView] = useState<'home' | 'channels' | 'mylist' | 'settings'>('home');
@@ -655,7 +567,19 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const [replayArchives, setReplayArchives] = useState<LivestreamArchive[]>([]);
   const [selectedLiveStream, setSelectedLiveStream] = useState<(LivestreamSession & { venue_image?: string; club_name?: string }) | null>(null);
   const [selectedReplay, setSelectedReplay] = useState<LivestreamArchive | null>(null);
+  // Esc closes the replay player, like the video player
+  useEffect(() => {
+    if (!selectedReplay) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedReplay(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedReplay]);
   const heroVideoRef = useRef<HTMLVideoElement>(null);
+  const [infoVideo, setInfoVideo] = useState<TVVideo | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+  const [channelQuery, setChannelQuery] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Get organization ID for both clubs and associations
   const organizationId = currentClub?.clubId || currentOrganization?.id;
@@ -949,7 +873,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       // For associations or standalone: only load global channels
       let channelsQuery = supabase
         .from('alfie_tv_channels')
-        .select('id, channel_name, channel_thumbnail, is_visible, category, is_global')
+        .select('id, channel_name, channel_thumbnail, is_visible, category, is_global, video_count, subscriber_count')
         .order('channel_name');
 
       if (organizationType === 'club' && currentClub?.clubId) {
@@ -1215,1171 +1139,621 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     }
   };
 
-  const formatDuration = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
+  /* ── Derived data for the new layout ─────────────────────────────────── */
+
+  const listIds = useMemo(() => new Set(watchlist.map(v => v.id)), [watchlist]);
+  const isInList = useCallback((id: string) => listIds.has(id), [listIds]);
+  const channelById = useMemo(() => new Map(channels.map(c => [c.id, c])), [channels]);
+  const channelOf = useCallback((id?: string | null) => (id ? (channelById.get(id) as TVChannelLite | undefined) || null : null), [channelById]);
+  const playlistCountByChannel = useMemo(() => {
+    const m = new Map<string, number>();
+    playlists.forEach(p => { if (p.channel_id) m.set(p.channel_id, (m.get(p.channel_id) || 0) + 1); });
+    return m;
+  }, [playlists]);
+
+  const allLoadedVideos = useMemo(() => {
+    const seen = new Map<string, TVVideo>();
+    [heroVideos, popularVideos, latestVideos, featuredVideos, trendingVideos, personalizedVideos, ...Object.values(playlistVideos)]
+      .forEach(list => (list || []).forEach(v => { if (v?.id && !seen.has(v.id)) seen.set(v.id, v as TVVideo); }));
+    return [...seen.values()];
+  }, [heroVideos, popularVideos, latestVideos, featuredVideos, trendingVideos, personalizedVideos, playlistVideos]);
+
+  const relatedFor = useCallback((v: TVVideo) =>
+    allLoadedVideos.filter(x => x.channel_id && x.channel_id === v.channel_id && x.id !== v.id).slice(0, 9),
+  [allLoadedVideos]);
+
+  const categoryCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    playlists.forEach(p => {
+      const ch = channelById.get(p.channel_id || '');
+      if (!ch || ch.is_visible === false) return;
+      const key = p.playlist_category || 'general';
+      m.set(key, (m.get(key) || 0) + 1);
+    });
+    return m;
+  }, [playlists, channelById]);
+
+  const searching = searchTerm.trim().length > 0;
+  const searchMatches = useMemo(() => {
+    if (!searching) return [] as TVVideo[];
+    const q = searchTerm.trim().toLowerCase();
+    const out = new Map<string, TVVideo>();
+    (searchResults as TVVideo[]).forEach(r => { if (r?.id) out.set(r.id, r); });
+    allLoadedVideos.forEach(v => {
+      if (out.has(v.id)) return;
+      if (v.title?.toLowerCase().includes(q) || v.description?.toLowerCase().includes(q)) out.set(v.id, v);
+    });
+    return [...out.values()];
+  }, [searching, searchTerm, searchResults, allLoadedVideos]);
+
+  const goView = (view: 'home' | 'channels' | 'mylist' | 'settings') => {
+    setCurrentView(view);
+    setSelectedChannelId(null);
+    setInfoVideo(null);
+    scrollRef.current?.scrollTo({ top: 0 });
+  };
+
+  const openChannel = (channelId?: string | null, playlistId?: string) => {
+    if (!channelId) return;
+    setInfoVideo(null);
+    setSearchTerm('');
+    setCurrentView('channels');
+    handleSelectChannel(channelId);
+    scrollRef.current?.scrollTo({ top: 0 });
+    if (playlistId) {
+      setTimeout(() => document.getElementById(`playlist-row-${playlistId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 450);
     }
-    return `${minutes}m`;
   };
 
-  const formatScheduledDate = (dateStr: string): string => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = date.getTime() - now.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-
-    if (diffHours < 1) return 'Starting soon';
-    if (diffHours < 24) return `In ${diffHours} hour${diffHours === 1 ? '' : 's'}`;
-    if (diffDays === 1) return 'Tomorrow';
-    if (diffDays < 7) {
-      return date.toLocaleDateString('en-US', { weekday: 'long' });
-    }
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const playFromInfo = (v: TVVideo) => {
+    setInfoVideo(null);
+    handleVideoClick(v);
   };
 
-  const LiveHero = ({ stream }: { stream: LivestreamSession & { venue_image?: string; club_name?: string } }) => {
-    const venueImg = stream.venue_image;
-    const clubName = stream.club_name;
+  const cardProps = (v: TVVideo) => ({
+    video: v,
+    channel: channelOf(v.channel_id),
+    inList: isInList(v.id),
+    onPlay: handleVideoClick,
+    onToggleList: user ? handleAddToWatchlist : undefined,
+    onInfo: (x: TVVideo) => setInfoVideo(x),
+  });
 
-    return (
-      <div className="relative h-[85vh] w-full overflow-hidden">
-        {venueImg ? (
-          <img src={venueImg} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-red-950/30 to-gray-900" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-black/50" />
-        <div className="absolute inset-0 from-black/70 via-transparent to-transparent" />
+  const CATEGORY_LABELS: [string, string][] = [
+    ['live_events', 'Live Events'],
+    ['rc_yachting', 'RC Yachting'],
+    ['big_boat_yachting', 'Big Boat'],
+    ['training_tips', 'Training'],
+    ['highlights_recaps', 'Highlights'],
+    ['event_archives', 'Archives'],
+    ['general', 'General'],
+  ];
+  const categoryLabel = (key: string) => CATEGORY_LABELS.find(([k]) => k === key)?.[1] || 'General';
 
-        <div className="absolute bottom-[20%] left-20 right-0 px-12">
-          <div className="max-w-3xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex items-center gap-2 bg-red-600 px-3 py-1.5 rounded-md">
-                <Radio className="w-4 h-4 text-white" />
-                <span className="text-sm font-bold text-white uppercase tracking-wider">Live Now</span>
-              </div>
-              {stream.viewer_count > 0 && (
-                <span className="text-white/70 text-sm">{stream.viewer_count} watching</span>
-              )}
-            </div>
-            <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">
-              {stream.title}
-            </h1>
-            {clubName && (
-              <p className="text-lg text-white/70 mb-6 drop-shadow-lg">
-                Hosted by {clubName}
-              </p>
-            )}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setSelectedLiveStream(stream)}
-                className="flex items-center gap-2 px-10 py-3.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-500 transition-all shadow-2xl shadow-red-600/30 text-lg"
-              >
-                <Radio className="w-5 h-5" />
-                <span>Watch Live</span>
-              </button>
-            </div>
+  const showSkeleton = loading && heroSlides.length === 0 && popularVideos.length === 0 && playlists.length === 0;
+
+  /* ── Home rows ───────────────────────────────────────────────────────── */
+
+  const renderHomeRows = () => {
+    const rows: JSX.Element[] = [];
+    let rowIndex = 0;
+
+    // Ad after the 2nd row, then every 4th row (2, 6, 10, 14, ...)
+    const maybeAddAd = () => {
+      if (rowIndex === 2 || (rowIndex > 2 && (rowIndex - 2) % 4 === 0)) {
+        rows.push(
+          <div key={`ad-${rowIndex}`} className="atv-ad">
+            <AdDisplay
+              position="hero"
+              pageType="alfie_tv"
+              className="mx-auto"
+              state={currentClub?.state}
+              clubId={currentClub?.clubId}
+              instanceId={`alfie-tv-${rowIndex}`}
+            />
           </div>
-        </div>
-      </div>
-    );
-  };
-
-  const UpcomingStreamHero = ({ stream }: { stream: LivestreamSession & { venue_image?: string; club_name?: string } }) => (
-    <div className="relative h-[85vh] w-full overflow-hidden">
-      {stream.venue_image ? (
-        <img src={stream.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-950/20 to-gray-900" />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/60" />
-      <div className="absolute inset-0 from-black/80 via-black/30 to-transparent" />
-
-      <div className="absolute bottom-[20%] left-20 right-0 px-12">
-        <div className="max-w-3xl">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm px-3 py-1.5 rounded-md">
-              <Radio className="w-4 h-4 text-white" />
-              <span className="text-sm font-bold text-white uppercase tracking-wider">Coming Soon</span>
-            </div>
-            <span className="text-white/70 text-sm font-medium">
-              {formatScheduledDate(stream.scheduled_start_time!)}
-            </span>
-          </div>
-          <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">
-            {stream.title}
-          </h1>
-          {stream.club_name && (
-            <p className="text-lg text-white/70 mb-6 drop-shadow-lg">
-              Hosted by {stream.club_name}
-            </p>
-          )}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-6 py-3 rounded-lg bg-white/10 backdrop-blur-md text-white font-semibold border border-white/20">
-              <Calendar className="w-5 h-5" />
-              <span>
-                {new Date(stream.scheduled_start_time!).toLocaleDateString('en-US', {
-                  weekday: 'long', month: 'long', day: 'numeric'
-                })}
-                {' at '}
-                {new Date(stream.scheduled_start_time!).toLocaleTimeString('en-US', {
-                  hour: 'numeric', minute: '2-digit'
-                })}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const HeroCarousel = () => {
-    const slide = heroSlides[currentHeroIndex];
-    if (!slide) return null;
-
-    const renderSlideBackground = () => {
-      if (slide.type === 'live') {
-        const s = slide.stream;
-        return (
-          <>
-            {s.venue_image ? (
-              <img src={s.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            ) : (
-              <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-red-950/30 to-gray-900" />
-            )}
-          </>
         );
       }
-      if (slide.type === 'upcoming') {
-        const s = slide.stream;
-        return s.venue_image
-          ? <img src={s.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          : <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-950/20 to-gray-900" />;
-      }
-      const v = slide.video;
-      return <HeroVideoBackground videoId={v.youtube_id} thumbnailUrl={v.thumbnail_high_url || v.thumbnail_url} />;
     };
+    const push = (el: JSX.Element, ad = true) => { rows.push(el); rowIndex++; if (ad) maybeAddAd(); };
 
-    const renderSlideContent = () => {
-      if (slide.type === 'live') {
-        const s = slide.stream;
-        return (
-          <>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex items-center gap-2 bg-red-600 px-3 py-1.5 rounded-md">
-                <Radio className="w-4 h-4 text-white" />
-                <span className="text-sm font-bold text-white uppercase tracking-wider">Live Now</span>
-              </div>
-              {s.viewer_count > 0 && <span className="text-white/70 text-sm">{s.viewer_count} watching</span>}
-            </div>
-            <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">{s.title}</h1>
-            {s.club_name && <p className="text-lg text-white/70 mb-6 drop-shadow-lg">Hosted by {s.club_name}</p>}
-            <button
-              onClick={() => setSelectedLiveStream(s)}
-              className="flex items-center gap-2 px-10 py-3.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-500 transition-all shadow-2xl shadow-red-600/30 text-lg"
-            >
-              <Radio className="w-5 h-5" />
-              <span>Watch Live</span>
-            </button>
-          </>
-        );
-      }
-      if (slide.type === 'upcoming') {
-        const s = slide.stream;
-        return (
-          <>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm px-3 py-1.5 rounded-md">
-                <Radio className="w-4 h-4 text-white" />
-                <span className="text-sm font-bold text-white uppercase tracking-wider">Coming Soon</span>
-              </div>
-              <span className="text-white/70 text-sm font-medium">{formatScheduledDate(s.scheduled_start_time!)}</span>
-            </div>
-            <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">{s.title}</h1>
-            {s.club_name && <p className="text-lg text-white/70 mb-6 drop-shadow-lg">Hosted by {s.club_name}</p>}
-            <div className="flex items-center gap-2 px-6 py-3 rounded-lg bg-white/10 backdrop-blur-md text-white font-semibold border border-white/20 w-fit">
-              <Calendar className="w-5 h-5" />
-              <span>
-                {new Date(s.scheduled_start_time!).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                {' at '}
-                {new Date(s.scheduled_start_time!).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-              </span>
-            </div>
-          </>
-        );
-      }
-      const v = slide.video;
+    const playlistRow = (playlist: YouTubePlaylist, videos: AlfieTVVideo[], keyPrefix = '') => {
+      const channel = channelOf(playlist.channel_id);
       return (
-        <>
-          <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl">{v.title}</h1>
-          <p className="text-base text-white/90 mb-6 line-clamp-2 drop-shadow-lg">{v.description}</p>
-          <div className="flex items-center space-x-3">
-            <button onClick={() => handleVideoClick(v)} className="flex items-center space-x-2 px-8 py-3 rounded-lg bg-white text-black font-bold hover:bg-white/90 transition-all shadow-2xl">
-              <Play className="w-5 h-5 fill-current" />
-              <span>Play</span>
-            </button>
-            <button onClick={(e) => handleAddToWatchlist(e, v)} className="flex items-center space-x-2 px-8 py-3 rounded-lg bg-white/20 backdrop-blur-md text-white font-bold hover:bg-white/30 transition-all">
-              <Plus className="w-5 h-5" />
-              <span>My List</span>
-            </button>
-            <button onClick={() => setShowHeroInfo(!showHeroInfo)} className="p-3 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-all">
-              <Info className="w-5 h-5" />
-            </button>
-          </div>
-        </>
+        <TVRow
+          key={`${keyPrefix}${playlist.id}`}
+          title={playlist.title}
+          kicker={channel ? <ChannelAvatar channel={channel} size={26} /> : undefined}
+          onSeeAll={channel ? () => openChannel(playlist.channel_id, playlist.id) : undefined}
+          seeAllLabel={channel ? channel.channel_name : 'See all'}
+        >
+          {videos.map(v => <TVCard key={v.id} {...cardProps(v as TVVideo)} />)}
+        </TVRow>
       );
     };
 
-    return (
-      <div className="relative h-[85vh] w-full overflow-hidden">
-        {renderSlideBackground()}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-black/50" />
-        <div className="absolute inset-0 from-black/70 via-transparent to-transparent" />
-
-        {heroSlides.length > 1 && (
-          <div className="absolute bottom-[15%] left-1/2 transform -translate-x-1/2 flex space-x-2 z-20">
-            {heroSlides.map((s, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentHeroIndex(index)}
-                className={`h-1.5 rounded-full transition-all ${
-                  index === currentHeroIndex
-                    ? `w-8 ${s.type === 'live' ? 'bg-red-500' : s.type === 'upcoming' ? 'bg-blue-400' : 'bg-white'}`
-                    : 'w-1.5 bg-white/40 hover:bg-white/60'
-                }`}
-              />
-            ))}
-          </div>
-        )}
-
-        <div className="absolute bottom-[20%] left-20 right-0 px-12">
-          <div className="max-w-3xl">
-            {renderSlideContent()}
-          </div>
-        </div>
-
-        {heroSlides.length > 1 && (
-          <>
-            <button
-              onClick={() => setCurrentHeroIndex((prev) => (prev - 1 + heroSlides.length) % heroSlides.length)}
-              className="absolute left-8 top-1/2 transform -translate-y-1/2 p-4 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-all z-20"
-            >
-              <ChevronLeft className="w-8 h-8" />
-            </button>
-            <button
-              onClick={() => setCurrentHeroIndex((prev) => (prev + 1) % heroSlides.length)}
-              className="absolute right-8 top-1/2 transform -translate-y-1/2 p-4 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-all z-20"
-            >
-              <ChevronRight className="w-8 h-8" />
-            </button>
-          </>
-        )}
-      </div>
-    );
-  };
-
-  const VideoThumbnail = ({ video, showProgress }: { video: AlfieTVVideo; showProgress?: number }) => {
-    const [isHovering, setIsHovering] = useState(false);
-    const [showPreview, setShowPreview] = useState(false);
-    const hoverTimerRef = useRef<NodeJS.Timeout>();
-
-    const handleMouseEnter = () => {
-      setIsHovering(true);
-      // Delay preview by 500ms to avoid flickering
-      hoverTimerRef.current = setTimeout(() => {
-        setShowPreview(true);
-      }, 500);
-    };
-
-    const handleMouseLeave = () => {
-      setIsHovering(false);
-      setShowPreview(false);
-      if (hoverTimerRef.current) {
-        clearTimeout(hoverTimerRef.current);
-      }
-    };
-
-    useEffect(() => {
-      return () => {
-        if (hoverTimerRef.current) {
-          clearTimeout(hoverTimerRef.current);
-        }
-      };
-    }, []);
-
-    return (
-      <div
-        className="group relative flex-shrink-0 w-80 cursor-pointer"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        <div
-          onClick={() => handleVideoClick(video)}
-          className="relative transition-all duration-300 group-hover:scale-110"
-        >
-          <div className="relative aspect-video rounded-lg overflow-hidden">
-            {showPreview ? (
-              <iframe
-                src={`https://www.youtube-nocookie.com/embed/${video.youtube_id}?autoplay=1&mute=1&controls=0&loop=1&playlist=${video.youtube_id}&playsinline=1&rel=0&modestbranding=1&showinfo=0`}
-                className="w-full h-full object-cover"
-                allow="autoplay; encrypted-media"
-                style={{ pointerEvents: 'none' }}
-                title={video.title}
-                loading="lazy"
-                frameBorder="0"
-              />
-            ) : (
-              <img
-                src={video.thumbnail_high_url || video.thumbnail_url}
-                alt={video.title}
-                className="w-full h-full object-cover"
-              />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-16 h-16 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center">
-                  <Play className="w-8 h-8 text-white ml-1 fill-current" />
-                </div>
-              </div>
-            </div>
-            {showProgress !== undefined && showProgress > 0 && (
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
-                <div
-                  className="h-full bg-red-600"
-                  style={{ width: `${showProgress}%` }}
-                />
-              </div>
-            )}
-            {!showPreview && (
-              <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/80 text-white text-xs font-bold">
-                {formatDuration(video.duration)}
-              </div>
-            )}
-            <button
-              onClick={(e) => handleAddToWatchlist(e, video)}
-              className="absolute top-2 right-2 p-2 rounded-full bg-black/60 backdrop-blur-sm text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <h3 className="text-white font-medium line-clamp-2 text-xs">
-              {video.title}
-            </h3>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const SkeletonThumbnail = () => (
-    <div className="flex-shrink-0 w-80">
-      <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-800/50 animate-pulse" />
-    </div>
-  );
-
-  const SkeletonRow = ({ title }: { title: string }) => (
-    <div className="mb-12">
-      <div className="h-8 w-64 bg-gray-800/50 rounded mb-4 px-12 animate-pulse" />
-      <div className="flex space-x-4 px-12">
-        {[1, 2, 3, 4].map(i => <SkeletonThumbnail key={i} />)}
-      </div>
-    </div>
-  );
-
-  const VideoRow = ({ title, videos }: { title: string; videos: AlfieTVVideo[] }) => {
-    const scrollRef = useRef<HTMLDivElement>(null);
-    const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(true);
-
-    const checkScroll = () => {
-      if (scrollRef.current) {
-        const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-        setCanScrollLeft(scrollLeft > 0);
-        setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
-      }
-    };
-
-    useEffect(() => {
-      checkScroll();
-    }, [videos]);
-
-    const scroll = (direction: 'left' | 'right') => {
-      if (scrollRef.current) {
-        const scrollAmount = scrollRef.current.clientWidth * 0.8;
-        scrollRef.current.scrollBy({
-          left: direction === 'left' ? -scrollAmount : scrollAmount,
-          behavior: 'smooth'
+    if (selectedPlaylistCategory !== 'all') {
+      // Browsing one kind of playlist: just those playlists, biggest first
+      playlists
+        .filter(p => p.playlist_category === selectedPlaylistCategory || (selectedPlaylistCategory === 'general' && !p.playlist_category))
+        .filter(p => { const ch = channelById.get(p.channel_id || ''); return !!ch && ch.is_visible !== false; })
+        .sort((a, b) => {
+          if (a.is_featured && !b.is_featured) return -1;
+          if (!a.is_featured && b.is_featured) return 1;
+          return (b.video_count || 0) - (a.video_count || 0);
+        })
+        .forEach(p => {
+          const videos = playlistVideos[p.id] || [];
+          if (videos.length > 0) push(playlistRow(p, videos, 'cat-'));
         });
-        setTimeout(checkScroll, 300);
-      }
-    };
-
-    if (videos.length === 0) return null;
-
-    return (
-      <div className="mb-8 group/row relative z-10">
-        <h2 className="text-2xl font-bold text-white mb-2 px-12">{title}</h2>
-        <div className="relative">
-          {canScrollLeft && (
-            <button
-              onClick={() => scroll('left')}
-              className="btn-primary-green absolute left-0 top-0 bottom-0 z-[90] w-12 from-black/80 to-transparent flex items-center justify-start pl-2 opacity-0 group-hover/row:opacity-100 transition-opacity"
-            >
-              <ChevronLeft className="w-10 h-10 text-white" />
-            </button>
-          )}
-          <div
-            ref={scrollRef}
-            className="flex space-x-4 overflow-x-auto scrollbar-hide px-12 pb-4"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            onScroll={checkScroll}
-          >
-            {videos.map(video => (
-              <VideoThumbnail key={video.id} video={video} />
-            ))}
+      if (rows.length === 0) {
+        rows.push(
+          <div key="cat-empty" className="atv-empty">
+            <span className="atv-empty-ic"><AlfieIcon glyph="list" size={28} /></span>
+            <h3>No {categoryLabel(selectedPlaylistCategory)} playlists yet</h3>
+            <p>Try another category, or browse everything.</p>
+            <button type="button" className="atv-btn atv-btn-glass" onClick={() => setSelectedPlaylistCategory('all')}>Show everything</button>
           </div>
-          {canScrollRight && (
-            <button
-              onClick={() => scroll('right')}
-              className="absolute right-0 top-0 bottom-0 z-[90] w-12 bg-gradient-to-l from-black/80 to-transparent flex items-center justify-end pr-2 opacity-0 group-hover/row:opacity-100 transition-opacity"
-            >
-              <ChevronRight className="w-10 h-10 text-white" />
-            </button>
-          )}
-        </div>
-      </div>
-    );
+        );
+      }
+      return rows;
+    }
+
+    if (liveStreams.length > 1) {
+      push(
+        <TVRow key="more-live" title="Also live" kicker={<span className="atv-live-dot" aria-hidden="true" />}>
+          {liveStreams.slice(1).map(stream => (
+            <TVEventTile
+              key={stream.id}
+              kind="live"
+              image={stream.venue_image}
+              title={stream.title}
+              sub={stream.club_name ? `Hosted by ${stream.club_name}` : stream.description || undefined}
+              onClick={() => setSelectedLiveStream(stream)}
+            />
+          ))}
+        </TVRow>,
+        false
+      );
+    }
+
+    const streamsToShow = liveStreams.length === 0 ? upcomingStreams.slice(1) : upcomingStreams;
+    if (streamsToShow.length > 0) {
+      push(
+        <TVRow key="upcoming-streams" title="Coming soon" kicker={<span className="atv-row-ic is-soon"><AlfieIcon glyph="cal" size={15} /></span>}>
+          {streamsToShow.map(stream => (
+            <TVEventTile
+              key={stream.id}
+              kind="soon"
+              image={stream.venue_image}
+              title={stream.title}
+              badge={formatScheduledDate(stream.scheduled_start_time!)}
+              sub={new Date(stream.scheduled_start_time!).toLocaleDateString('en-AU', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            />
+          ))}
+        </TVRow>,
+        false
+      );
+    }
+
+    if (continueWatching.length > 0) {
+      push(
+        <TVRow key="continue-watching" title="Continue watching">
+          {continueWatching.filter(item => item.video).map(item => {
+            const v = { ...item.video, progress: item.video.duration ? (item.watch_position / item.video.duration) * 100 : 0 } as TVVideo;
+            return <TVCard key={v.id} {...cardProps(v)} />;
+          })}
+        </TVRow>
+      );
+    }
+
+    if (user && personalizedVideos.length > 0) {
+      push(
+        <TVRow key="for-you" title="For you" kicker={<span className="atv-row-ic is-spark"><AlfieIcon glyph="spark" size={15} /></span>}>
+          {personalizedVideos.map(v => <TVCard key={v.id} {...cardProps(v as TVVideo)} />)}
+        </TVRow>
+      );
+    }
+
+    if (popularVideos.length > 0) {
+      push(
+        <TVRow key="popular" title="Top 10 on AlfieTV" className="atv-row-ranked">
+          {popularVideos.slice(0, 10).map((v, i) => <TVCard key={v.id} rank={i + 1} {...cardProps(v as TVVideo)} />)}
+        </TVRow>
+      );
+    }
+
+    if (trendingVideos.length > 0) {
+      push(
+        <TVRow key="trending" title="Trending now" kicker={<span className="atv-row-ic is-trend"><AlfieIcon glyph="trend" size={15} /></span>}>
+          {trendingVideos.map(v => <TVCard key={v.id} {...cardProps(v as TVVideo)} />)}
+        </TVRow>
+      );
+    }
+
+    if (replayArchives.length > 0) {
+      push(
+        <TVRow key="race-replays" title="Race replays" kicker={<span className="atv-row-ic is-replay"><AlfieIcon glyph="video" size={15} /></span>}>
+          {replayArchives.map(archive => (
+            <TVEventTile
+              key={archive.id}
+              kind="replay"
+              image={archive.thumbnail_url}
+              title={archive.title}
+              duration={archive.duration ? formatDuration(archive.duration) : undefined}
+              sub={[archive.view_count > 0 ? `${compactNumber(archive.view_count)} views` : '', new Date(archive.recorded_at).toLocaleDateString('en-AU', { month: 'short', day: 'numeric' })].filter(Boolean).join(' · ')}
+              onClick={() => setSelectedReplay(archive)}
+            />
+          ))}
+        </TVRow>
+      );
+    }
+
+    if (latestVideos.length > 0) {
+      push(
+        <TVRow key="latest" title="New on AlfieTV" kicker={<span className="atv-badge atv-badge-spectrum atv-badge-sm">New</span>}>
+          {latestVideos.map(v => <TVCard key={v.id} {...cardProps(v as TVVideo)} />)}
+        </TVRow>
+      );
+    }
+
+    if (featuredVideos.length > 0) {
+      push(
+        <TVRow key="featured" title="Featured" kicker={<span className="atv-row-ic is-star"><AlfieIcon glyph="star" size={15} /></span>}>
+          {featuredVideos.map(v => <TVCard key={v.id} {...cardProps(v as TVVideo)} />)}
+        </TVRow>
+      );
+    }
+
+    // Featured playlists first, then every other playlist by size
+    const featuredPlaylists = playlists.filter(p => p.is_featured);
+    featuredPlaylists.forEach(playlist => {
+      const videos = playlistVideos[playlist.id] || [];
+      if (videos.length > 0) push(playlistRow(playlist, videos, 'featured-playlist-'));
+    });
+
+    const featuredPlaylistIds = new Set(featuredPlaylists.map(p => p.id));
+    playlists
+      .filter(playlist => {
+        if (featuredPlaylistIds.has(playlist.id)) return false;
+        const channel = channelById.get(playlist.channel_id || '');
+        if (!channel) return false;
+        return channel.is_visible !== false;
+      })
+      .sort((a, b) => (b.video_count || 0) - (a.video_count || 0))
+      .forEach(playlist => {
+        const videos = playlistVideos[playlist.id] || [];
+        if (videos.length > 0) push(playlistRow(playlist, videos));
+      });
+
+    return rows;
   };
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-red-600 mx-auto mb-4"></div>
-          <p className="text-white text-xl">Loading AlfieTV...</p>
-        </div>
-      </div>
-    );
-  }
+  /* ── Views ───────────────────────────────────────────────────────────── */
+
+  const selectedChannel = selectedChannelId ? channelById.get(selectedChannelId) : null;
+  const channelPlaylists = selectedChannelId
+    ? playlists
+        .filter(p => p.channel_id === selectedChannelId && p.is_visible !== false)
+        .sort((a, b) => {
+          if (a.is_featured && !b.is_featured) return -1;
+          if (!a.is_featured && b.is_featured) return 1;
+          const dateA = a.published_at || a.last_synced_at || '';
+          const dateB = b.published_at || b.last_synced_at || '';
+          return dateB.localeCompare(dateA);
+        })
+    : [];
+  const filteredChannels = channelQuery.trim()
+    ? channels.filter(c => c.channel_name.toLowerCase().includes(channelQuery.trim().toLowerCase()))
+    : channels;
+  const navSolid = scrolled || currentView !== 'home' || searching || selectedPlaylistCategory !== 'all';
 
   return (
     <>
-    <div className="fixed inset-0 bg-black overflow-y-auto">
-      {/* Top Navigation Bar */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-white/10">
-        <div className="flex items-center justify-between px-12 py-3">
-          <div className="flex items-center space-x-12">
-            <div className="flex items-center gap-3">
-              <Logo className="w-8 h-8" />
-              <h1 className="text-2xl text-white">
-                <span className="font-thin">Alfie</span><span className="font-black">TV</span>
-              </h1>
+    <div
+      ref={scrollRef}
+      className={`atv ${currentView === 'home' && !searching && heroSlides.length > 0 ? 'has-hero' : ''}`}
+      onScroll={(e) => {
+        const top = (e.currentTarget as HTMLDivElement).scrollTop > 24;
+        if (top !== scrolled) setScrolled(top);
+      }}
+    >
+      {/* Top bar */}
+      <header className={`atv-nav ${navSolid ? 'is-solid' : ''}`}>
+        <button type="button" className="atv-brand" onClick={() => { setSearchTerm(''); setSelectedPlaylistCategory('all'); goView('home'); }} aria-label="AlfieTV home">
+          <Logo className="atv-logo" />
+          <span className="atv-wordmark"><span>Alfie</span><b>TV</b></span>
+        </button>
+        <nav className="atv-tabs" aria-label="AlfieTV">
+          <button type="button" className={currentView === 'home' && !searching ? 'is-on' : ''} onClick={() => { setSearchTerm(''); goView('home'); }}>Home</button>
+          <button type="button" className={currentView === 'channels' ? 'is-on' : ''} onClick={() => goView('channels')}>Channels</button>
+          <button type="button" className={currentView === 'mylist' ? 'is-on' : ''} onClick={() => goView('mylist')}>
+            My List{watchlist.length > 0 && <span className="atv-tab-n">{watchlist.length}</span>}
+          </button>
+        </nav>
+        <div className="atv-nav-r">
+          <label className={`atv-search ${showSearch || searching ? 'is-open' : ''}`}>
+            <button type="button" className="atv-search-btn" onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 30); }} aria-label="Search">
+              <AlfieIcon glyph="search" size={19} />
+            </button>
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Titles, channels, classes…"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                if (currentView !== 'home') { setCurrentView('home'); setSelectedChannelId(null); }
+              }}
+              onFocus={() => setShowSearch(true)}
+              onBlur={() => { if (!searchTerm) setShowSearch(false); }}
+              onKeyDown={(e) => { if (e.key === 'Escape') { setSearchTerm(''); setShowSearch(false); (e.target as HTMLInputElement).blur(); } }}
+              aria-label="Search videos"
+            />
+            {searchTerm && (
+              <button type="button" className="atv-search-x" onClick={() => { setSearchTerm(''); searchInputRef.current?.focus(); }} aria-label="Clear search">
+                <AlfieIcon glyph="x" size={14} strokeWidth={2.2} />
+              </button>
+            )}
+          </label>
+          {canManageAlfieTV && (
+            <button type="button" className={`atv-icon ${currentView === 'settings' ? 'is-on' : ''}`} onClick={() => goView('settings')} title="Manage AlfieTV" aria-label="Manage AlfieTV">
+              <AlfieIcon glyph="gear" size={20} />
+            </button>
+          )}
+          <button type="button" className="atv-exit" onClick={() => navigate('/dashboard')} title="Exit AlfieTV">
+            <AlfieIcon glyph="out" size={18} />
+            <span>Exit</span>
+          </button>
+        </div>
+      </header>
+
+      {/* ── Settings ── */}
+      {currentView === 'settings' ? (
+        <main className="atv-page atv-admin">
+          <div className="atv-page-head">
+            <div>
+              <p className="atv-eyebrow">AlfieTV</p>
+              <h1>Manage channels</h1>
+              <p className="atv-sub">Add YouTube channels and videos, sync, and choose what shows on AlfieTV.</p>
             </div>
-            <nav className="flex space-x-8">
-              <button
-                onClick={() => {
-                  setCurrentView('home');
-                  setSelectedChannelId(null);
-                }}
-                className={`${currentView === 'home' ? 'text-white font-semibold' : 'text-gray-400'} hover:text-white transition-colors`}
-              >
-                Home
-              </button>
-              <button
-                onClick={() => {
-                  setCurrentView('channels');
-                  setSelectedChannelId(null);
-                }}
-                className={`${currentView === 'channels' ? 'text-white font-semibold' : 'text-gray-400'} hover:text-white transition-colors`}
-              >
-                Channels
-              </button>
-              <button
-                onClick={() => {
-                  setCurrentView('mylist');
-                  setSelectedChannelId(null);
-                }}
-                className={`${currentView === 'mylist' ? 'text-white font-semibold' : 'text-gray-400'} hover:text-white transition-colors`}
-              >
-                My List
-              </button>
-            </nav>
           </div>
-          <div className="flex items-center space-x-4">
-            {/* Playlist Category Filter */}
-            <div className="relative">
-              <button
-                onClick={() => setShowCategoryFilter(!showCategoryFilter)}
-                className={`p-2 rounded transition-colors ${
-                  selectedPlaylistCategory !== 'all' ? 'text-red-500 hover:text-red-400' : 'text-white hover:text-gray-300'
-                }`}
-                title="Filter playlist type"
-              >
-                <Filter className="w-6 h-6" />
-              </button>
-              {showCategoryFilter && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-black/95 border border-white/20 rounded-lg p-4 z-50">
-                  <h3 className="text-white font-semibold mb-3">Filter by Playlist Type</h3>
-                  <div className="space-y-2">
-                    {[
-                      { value: 'all', label: 'All' },
-                      { value: 'live_events', label: 'Live Events' },
-                      { value: 'big_boat_yachting', label: 'Big Boat' },
-                      { value: 'rc_yachting', label: 'RC Yachting' },
-                      { value: 'training_tips', label: 'Training' },
-                      { value: 'highlights_recaps', label: 'Highlights' },
-                      { value: 'event_archives', label: 'Archives' },
-                      { value: 'general', label: 'General' }
-                    ].map(category => (
-                      <label key={category.value} className="flex items-center space-x-2 text-white cursor-pointer hover:text-gray-300">
-                        <input
-                          type="radio"
-                          name="playlist-category"
-                          checked={selectedPlaylistCategory === category.value}
-                          onChange={() => setSelectedPlaylistCategory(category.value)}
-                          className="w-4 h-4"
-                        />
-                        <span>{category.label}</span>
-                      </label>
+          <AlfieTVAdmin darkMode={true} embedded />
+        </main>
+      ) : currentView === 'channels' ? (
+        selectedChannelId ? (
+          /* ── One channel ── */
+          <main className="atv-chpage">
+            <section className="atv-chhero">
+              <div className="atv-chhero-bg" aria-hidden="true">
+                {(selectedChannel?.channel_thumbnail || channelPlaylists[0]?.thumbnail_url) && (
+                  <img src={selectedChannel?.channel_thumbnail || channelPlaylists[0]?.thumbnail_url} alt="" />
+                )}
+              </div>
+              <div className="atv-chhero-in">
+                <button type="button" className="atv-back" onClick={() => setSelectedChannelId(null)}>
+                  <AlfieIcon glyph="chevL" size={18} strokeWidth={2.2} />All channels
+                </button>
+                <div className="atv-chhero-id">
+                  <ChannelAvatar channel={selectedChannel as TVChannelLite} size={112} className="atv-chhero-av" />
+                  <div className="min-w-0">
+                    <p className="atv-eyebrow">Channel</p>
+                    <h1>{selectedChannel?.channel_name}</h1>
+                    <p className="atv-sub">
+                      {[
+                        `${channelPlaylists.length} playlist${channelPlaylists.length !== 1 ? 's' : ''}`,
+                        selectedChannel?.video_count ? `${compactNumber(selectedChannel.video_count)} videos` : '',
+                        selectedChannel?.subscriber_count ? `${compactNumber(selectedChannel.subscriber_count)} subscribers` : '',
+                      ].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div className="atv-page atv-page-tight">
+              {channelPlaylists.length > 0 ? (
+                <section className="atv-block">
+                  <div className="atv-block-head"><h2>Playlists</h2><span className="atv-row-count">{channelPlaylists.length}</span></div>
+                  <div className="atv-pl-grid">
+                    {channelPlaylists.map(playlist => (
+                      <TVPlaylistCard
+                        key={playlist.id}
+                        playlist={playlist}
+                        onOpen={() => document.getElementById(`playlist-row-${playlist.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                      />
                     ))}
                   </div>
+                </section>
+              ) : (
+                <div className="atv-empty">
+                  <span className="atv-empty-ic"><AlfieIcon glyph="list" size={28} /></span>
+                  <h3>No playlists yet</h3>
+                  <p>Videos from this channel show up here once it has been synced.</p>
                 </div>
               )}
             </div>
 
-            {showSearch ? (
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  placeholder="Search videos..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-80 px-4 py-2 rounded bg-black/60 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-white/40"
-                  autoFocus
-                />
-                <button
-                  onClick={() => {
-                    setShowSearch(false);
-                    setSearchTerm('');
-                  }}
-                  className="p-2 text-white hover:text-gray-300"
-                >
-                  <LogOut className="w-5 h-5" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowSearch(true)}
-                className="p-2 text-white hover:text-gray-300 transition-colors"
-              >
-                <Search className="w-6 h-6" />
-              </button>
-            )}
-            {canManageAlfieTV && (
-              <button
-                onClick={() => setCurrentView('settings')}
-                className="p-2 text-white hover:text-gray-300 transition-colors"
-                title="Channel Management"
-              >
-                <Settings className="w-6 h-6" />
-              </button>
-            )}
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="p-2 text-white hover:text-gray-300 transition-colors"
-              title="Exit AlfieTV"
-            >
-              <LogOut className="w-6 h-6" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Content based on current view */}
-      {currentView === 'settings' ? (
-        <div className="pt-24 px-12 pb-12">
-          <AlfieTVAdmin darkMode={true} />
-        </div>
-      ) : currentView === 'channels' ? (
-        selectedChannelId ? (
-          <div className="pt-24">
-            <div className="px-12 mb-8">
-              <button
-                onClick={() => setSelectedChannelId(null)}
-                className="flex items-center text-gray-400 hover:text-white transition-colors mb-4"
-              >
-                <ChevronLeft className="w-5 h-5 mr-2" />
-                Back to all channels
-              </button>
-              {(() => {
-                const selectedChannel = channels.find(c => c.id === selectedChannelId);
-                const channelPlaylists = playlists
-                  .filter(p => p.channel_id === selectedChannelId && p.is_visible !== false)
-                  .sort((a, b) => {
-                    if (a.is_featured && !b.is_featured) return -1;
-                    if (!a.is_featured && b.is_featured) return 1;
-                    const dateA = a.published_at || a.last_synced_at || '';
-                    const dateB = b.published_at || b.last_synced_at || '';
-                    return dateB.localeCompare(dateA);
-                  });
-                return (
-                  <>
-                    <div className="flex items-center gap-4 mb-6">
-                      {selectedChannel?.channel_thumbnail && (
-                        <img
-                          src={selectedChannel.channel_thumbnail}
-                          alt={selectedChannel.channel_name}
-                          className="w-16 h-16 rounded-full ring-2 ring-white/20"
-                        />
-                      )}
-                      <div>
-                        <h1 className="text-4xl font-bold text-white">
-                          {selectedChannel?.channel_name}
-                        </h1>
-                        <p className="text-gray-400 text-sm mt-1">
-                          {channelPlaylists.length} playlist{channelPlaylists.length !== 1 ? 's' : ''}
-                          {selectedChannel?.video_count ? ` / ${selectedChannel.video_count} videos` : ''}
-                        </p>
-                      </div>
-                    </div>
-
-                    {channelPlaylists.length > 0 && (
-                      <div className="-mx-12 px-12 py-6 mb-6 bg-gradient-to-b from-white/[0.03] via-white/[0.02] to-transparent border-t border-b border-white/[0.06]">
-                        <h2 className="text-lg font-semibold text-white mb-4">
-                          All Playlists
-                          <span className="text-sm font-normal text-gray-500 ml-2">({channelPlaylists.length})</span>
-                        </h2>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                          {channelPlaylists.map(playlist => (
-                              <div
-                                key={playlist.id}
-                                onClick={() => {
-                                  const firstVideoRow = document.getElementById(`playlist-row-${playlist.id}`);
-                                  if (firstVideoRow) {
-                                    firstVideoRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                  }
-                                }}
-                                className="group cursor-pointer"
-                              >
-                                <div className={`relative aspect-video rounded-lg overflow-hidden bg-slate-800 mb-2 transition-all ${
-                                  playlist.is_featured ? 'ring-2 ring-amber-500/50 group-hover:ring-amber-500' : 'ring-1 ring-white/[0.06] group-hover:ring-white/20'
-                                }`}>
-                                  {playlist.thumbnail_url ? (
-                                    <img
-                                      src={playlist.thumbnail_url}
-                                      alt={playlist.title}
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                    />
-                                  ) : (
-                                    <div className="flex items-center justify-center h-full bg-gradient-to-br from-slate-700 to-slate-900">
-                                      <Play className="w-8 h-8 text-slate-500" />
-                                    </div>
-                                  )}
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                                  {playlist.is_featured && (
-                                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-amber-500/90 text-white text-[10px] font-semibold uppercase tracking-wider">
-                                      Featured
-                                    </div>
-                                  )}
-                                  <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-white text-xs font-medium">
-                                    {playlist.video_count} videos
-                                  </div>
-                                </div>
-                                <h3 className="text-sm font-medium text-white line-clamp-2 group-hover:text-blue-400 transition-colors">
-                                  {playlist.title}
-                                </h3>
-                              </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-
-            {playlists
-              .filter(p => p.channel_id === selectedChannelId && p.is_visible !== false)
-              .sort((a, b) => {
-                if (a.is_featured && !b.is_featured) return -1;
-                if (!a.is_featured && b.is_featured) return 1;
-                const dateA = a.published_at || a.last_synced_at || '';
-                const dateB = b.published_at || b.last_synced_at || '';
-                return dateB.localeCompare(dateA);
-              })
-              .map(playlist => {
+            <div className="atv-rows atv-rows-flat">
+              {channelPlaylists.map(playlist => {
                 const videos = playlistVideos[playlist.id] || [];
                 if (videos.length === 0) return null;
                 return (
-                  <div key={playlist.id} id={`playlist-row-${playlist.id}`}>
-                    <VideoRow
-                      title={playlist.is_featured ? `${playlist.title}` : playlist.title}
-                      videos={videos}
-                    />
+                  <div key={playlist.id} id={`playlist-row-${playlist.id}`} className="atv-anchor">
+                    <TVRow title={playlist.title} count={playlist.video_count}>
+                      {videos.map(v => <TVCard key={v.id} {...cardProps(v as TVVideo)} />)}
+                    </TVRow>
                   </div>
                 );
               })}
-          </div>
+            </div>
+          </main>
         ) : (
-          <div className="pt-24">
-            <div className="px-12 mb-8">
-              <h1 className="text-4xl font-bold text-white mb-4">Channels</h1>
-              <p className="text-gray-400">Browse content by channel</p>
+          /* ── All channels ── */
+          <main className="atv-page">
+            <div className="atv-page-head">
+              <div>
+                <h1>Channels</h1>
+                <p className="atv-sub">{channels.length} channel{channels.length === 1 ? '' : 's'} · browse content by channel</p>
+              </div>
+              <label className="atv-field">
+                <AlfieIcon glyph="search" size={16} />
+                <input type="text" value={channelQuery} onChange={(e) => setChannelQuery(e.target.value)} placeholder="Find a channel" aria-label="Find a channel" />
+              </label>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 px-12">
-              {channels.map(channel => {
-                const channelPlaylistCount = playlists.filter(p => p.channel_id === channel.id).length;
-                return (
-                  <div
-                    key={channel.id}
-                    onClick={() => handleSelectChannel(channel.id)}
-                    className="group cursor-pointer"
-                  >
-                    <div className="relative aspect-square rounded-full overflow-hidden bg-gray-800 mb-4 transform transition-transform group-hover:scale-110">
-                      {channel.channel_thumbnail ? (
-                        <img
-                          src={channel.channel_thumbnail}
-                          alt={channel.channel_name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <Youtube className="w-16 h-16 text-red-600" />
-                        </div>
-                      )}
-                    </div>
-                    <h3 className="text-white text-center font-semibold group-hover:text-gray-300 transition-colors">
-                      {channel.channel_name}
-                    </h3>
-                    <p className="text-gray-500 text-center text-xs mt-1">
-                      {channelPlaylistCount > 0 && `${channelPlaylistCount} playlist${channelPlaylistCount !== 1 ? 's' : ''} / `}{channel.video_count || 0} videos
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Suggest a Channel Button */}
-            <div className="px-12 mt-12 pb-12 flex justify-center">
-              <button
-                onClick={() => setShowSuggestChannel(true)}
-                className="flex items-center gap-2 px-5 py-2.5 text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded-lg transition-all text-sm"
-              >
-                <Lightbulb className="w-4 h-4" />
-                <span>Suggest a Channel</span>
+            <div className="atv-ch-grid">
+              {filteredChannels.map((channel, i) => (
+                <TVChannelCard
+                  key={channel.id}
+                  index={i}
+                  channel={channel as TVChannelLite}
+                  playlists={playlistCountByChannel.get(channel.id) || 0}
+                  onOpen={() => openChannel(channel.id)}
+                />
+              ))}
+              <button type="button" className="atv-ch atv-ch-suggest" onClick={() => setShowSuggestChannel(true)}>
+                <span className="atv-ch-av"><span className="atv-suggest-ic"><AlfieIcon glyph="plus" size={30} /></span></span>
+                <span className="atv-ch-name">Suggest a channel</span>
+                <span className="atv-ch-meta">Know a great sailing channel?</span>
               </button>
             </div>
-          </div>
+            {filteredChannels.length === 0 && channelQuery && (
+              <p className="atv-sub atv-center">No channels match “{channelQuery}”.</p>
+            )}
+          </main>
         )
       ) : currentView === 'mylist' ? (
-        <div className="pt-24">
-          <div className="px-12 mb-8">
-            <h1 className="text-4xl font-bold text-white mb-4">My List</h1>
-            <p className="text-gray-400">Videos you've saved to watch later</p>
+        /* ── My List ── */
+        <main className="atv-page">
+          <div className="atv-page-head">
+            <div>
+              <h1>My List</h1>
+              <p className="atv-sub">{watchlist.length > 0 ? `${watchlist.length} video${watchlist.length === 1 ? '' : 's'} saved to watch later` : "Videos you've saved to watch later"}</p>
+            </div>
           </div>
           {watchlist.length === 0 ? (
-            <div className="px-12 py-20 text-center">
-              <Plus className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400 text-lg">Your watchlist is empty</p>
-              <p className="text-gray-500 text-sm mt-2">Click the + button on any video to add it to your list</p>
+            <div className="atv-empty atv-empty-lg">
+              <span className="atv-empty-ic"><AlfieIcon glyph="plus" size={30} /></span>
+              <h3>Your list is empty</h3>
+              <p>Tap <b>+</b> on any video to save it here for later.</p>
+              <button type="button" className="atv-btn atv-btn-play" onClick={() => goView('home')}><PlayIcon size={18} />Browse AlfieTV</button>
             </div>
           ) : (
-            <div className="px-12">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {watchlist.map(video => (
-                  <div key={video.id} className="cursor-pointer">
-                    <VideoThumbnail video={video} />
-                  </div>
-                ))}
-              </div>
+            <div className="atv-grid">
+              {watchlist.map(video => <TVCard key={video.id} {...cardProps(video as TVVideo)} />)}
             </div>
           )}
-        </div>
-      ) : (
-        <>
-          {/* Hero Section: Unified carousel with live/upcoming/video slides */}
-          {loading && heroSlides.length === 0 ? (
-            <div className="relative h-[85vh] w-full overflow-hidden bg-gray-900">
-              <div className="absolute inset-0 bg-gray-800/50 animate-pulse" />
-            </div>
-          ) : heroSlides.length > 0 ? (
-            <HeroCarousel />
-          ) : null}
-
-          {/* Content Rows */}
-          <div className="relative -mt-32 z-10 px-12">
-            {/* Main Content */}
-            <div className="w-full">
-              {loading ? (
-                <>
-                  <SkeletonRow title="Loading..." />
-                  <SkeletonRow title="Loading..." />
-                  <SkeletonRow title="Loading..." />
-                </>
-              ) : (
-                <>
-                {(() => {
-                  // Build all rows dynamically
-                  const rows: JSX.Element[] = [];
-                  let rowIndex = 0;
-
-                  // Helper to add ad placement after specific rows
-                  const maybeAddAd = () => {
-                    // Add ad after 2nd row, then every 4th row (2, 6, 10, 14, etc.)
-                    if (rowIndex === 2 || (rowIndex > 2 && (rowIndex - 2) % 4 === 0)) {
-                      rows.push(
-                        <div key={`ad-${rowIndex}`} className="py-6">
-                          <AdDisplay
-                            position="hero"
-                            pageType="alfie_tv"
-                            className="mx-auto"
-                            state={currentClub?.state}
-                            clubId={currentClub?.clubId}
-                            instanceId={`alfie-tv-${rowIndex}`}
-                          />
-                        </div>
-                      );
-                    }
-                  };
-
-                  // Additional live streams (shown as tiles if more than 1)
-                  if (liveStreams.length > 1) {
-                    rows.push(
-                      <div key="more-live" className="mb-10">
-                        <div className="flex items-center gap-3 mb-5">
-                          <span className="relative flex h-3 w-3">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
-                          </span>
-                          <h2 className="text-2xl font-bold text-white">Also Live</h2>
-                        </div>
-                        <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide">
-                          {liveStreams.slice(1).map(stream => (
-                            <div
-                              key={stream.id}
-                              onClick={() => setSelectedLiveStream(stream)}
-                              className="group flex-shrink-0 cursor-pointer"
-                              style={{ width: '400px' }}
-                            >
-                              <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-800 border-2 border-red-500/50 group-hover:border-red-500 transition-colors">
-                                {stream.venue_image ? (
-                                  <img src={stream.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                                ) : (
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <Radio className="w-12 h-12 text-red-500 animate-pulse" />
-                                  </div>
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600 px-2.5 py-1 rounded text-[11px] font-bold text-white uppercase tracking-wider">
-                                  <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
-                                  </span>
-                                  Live
-                                </div>
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-                                    <Play className="w-7 h-7 text-white fill-white ml-1" />
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="mt-2.5">
-                                <h3 className="text-white font-semibold text-sm truncate group-hover:text-gray-300 transition-colors">{stream.title}</h3>
-                                {stream.description && (
-                                  <p className="text-gray-500 text-xs mt-0.5 truncate">{stream.description}</p>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                    rowIndex++;
-                  }
-
-                  // Upcoming streams row (when not already in hero)
-                  if (upcomingStreams.length > (liveStreams.length === 0 ? 1 : 0)) {
-                    const streamsToShow = liveStreams.length === 0 ? upcomingStreams.slice(1) : upcomingStreams;
-                    if (streamsToShow.length > 0) {
-                      rows.push(
-                        <div key="upcoming-streams" className="mb-10">
-                          <div className="flex items-center gap-3 mb-5">
-                            <Calendar className="w-5 h-5 text-blue-400" />
-                            <h2 className="text-2xl font-bold text-white">Coming Soon</h2>
-                          </div>
-                          <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide">
-                            {streamsToShow.map(stream => (
-                              <div
-                                key={stream.id}
-                                className="flex-shrink-0 rounded-lg overflow-hidden bg-gray-800/50 border border-gray-700/50"
-                                style={{ width: '400px' }}
-                              >
-                                <div className="relative aspect-video bg-gradient-to-br from-gray-800 via-blue-950/20 to-gray-800 flex items-center justify-center">
-                                  <Radio className="w-12 h-12 text-blue-400/50" />
-                                  <div className="absolute top-3 left-3 flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm px-2.5 py-1 rounded text-[11px] font-bold text-white uppercase tracking-wider">
-                                    <Calendar className="w-3 h-3" />
-                                    {formatScheduledDate(stream.scheduled_start_time!)}
-                                  </div>
-                                </div>
-                                <div className="p-3">
-                                  <h3 className="text-white font-semibold text-sm truncate">{stream.title}</h3>
-                                  <p className="text-gray-500 text-xs mt-1">
-                                    {new Date(stream.scheduled_start_time!).toLocaleDateString('en-US', {
-                                      weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-                                    })}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                      rowIndex++;
-                    }
-                  }
-
-                  if (replayArchives.length > 0) {
-                    rows.push(
-                      <div key="race-replays" className="mb-10">
-                        <div className="flex items-center gap-3 mb-5 px-12">
-                          <Play className="w-5 h-5 text-blue-400" />
-                          <h2 className="text-2xl font-bold text-white">Race Replays</h2>
-                        </div>
-                        <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide px-12">
-                          {replayArchives.map(archive => (
-                            <div
-                              key={archive.id}
-                              onClick={() => setSelectedReplay(archive)}
-                              className="group flex-shrink-0 cursor-pointer"
-                              style={{ width: '320px' }}
-                            >
-                              <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-800 border border-gray-700/50 group-hover:border-blue-500/50 transition-colors">
-                                {archive.thumbnail_url ? (
-                                  <img
-                                    src={archive.thumbnail_url}
-                                    alt={archive.title}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                  />
-                                ) : (
-                                  <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-blue-950/30 to-gray-800 flex items-center justify-center">
-                                    <Play className="w-10 h-10 text-gray-600" />
-                                  </div>
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-                                    <Play className="w-6 h-6 text-white fill-white ml-0.5" />
-                                  </div>
-                                </div>
-                                {archive.duration && archive.duration > 0 && (
-                                  <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-0.5 rounded text-[11px] text-white font-medium">
-                                    {formatDuration(archive.duration)}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="mt-2.5">
-                                <h3 className="text-white font-semibold text-sm truncate group-hover:text-gray-300 transition-colors">{archive.title}</h3>
-                                <div className="flex items-center gap-3 mt-1 text-gray-500 text-xs">
-                                  {archive.view_count > 0 && (
-                                    <span>{archive.view_count.toLocaleString()} views</span>
-                                  )}
-                                  <span>{new Date(archive.recorded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                    rowIndex++;
-                    maybeAddAd();
-                  }
-
-                  // Continue Watching
-                  if (continueWatching.length > 0) {
-                    rows.push(
-                      <VideoRow
-                        key="continue-watching"
-                        title="Continue Watching"
-                        videos={continueWatching.map(item => ({
-                          ...item.video,
-                          progress: (item.watch_position / item.video.duration) * 100
-                        }))}
-                      />
-                    );
-                    rowIndex++;
-                    maybeAddAd();
-                  }
-
-                  // For You - Personalized Recommendations
-                  if (user && personalizedVideos.length > 0) {
-                    rows.push(
-                      <VideoRow
-                        key="for-you"
-                        title="✨ For You"
-                        videos={personalizedVideos}
-                      />
-                    );
-                    rowIndex++;
-                    maybeAddAd();
-                  }
-
-                  // Trending Now
-                  if (trendingVideos.length > 0) {
-                    rows.push(
-                      <VideoRow
-                        key="trending"
-                        title="🔥 Trending Now"
-                        videos={trendingVideos}
-                      />
-                    );
-                    rowIndex++;
-                    maybeAddAd();
-                  }
-
-                  // Search Results
-                  if (searchResults.length > 0) {
-                    rows.push(
-                      <div key="search-results" className="mb-8">
-                        <h2 className="text-2xl font-bold text-white mb-4">
-                          Search Results ({searchResults.length})
-                        </h2>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                          {searchResults.map((result: any) => (
-                            <div
-                              key={result.id}
-                              onClick={() => handleVideoClick(result)}
-                              className="group cursor-pointer"
-                            >
-                              <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-800 mb-2">
-                                <img
-                                  src={result.thumbnail_url}
-                                  alt={result.title}
-                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                />
-                              </div>
-                              <h3 className="text-sm font-medium text-white line-clamp-2 mb-1">
-                                {result.title}
-                              </h3>
-                              <p className="text-xs text-slate-400">{result.channel_name}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                    rowIndex++;
-                    maybeAddAd();
-                  }
-
-                  // Popular Videos Row
-                  if (popularVideos.length > 0) {
-                    rows.push(
-                      <VideoRow
-                        key="popular"
-                        title="🔥 Popular"
-                        videos={popularVideos}
-                      />
-                    );
-                    rowIndex++;
-                    maybeAddAd();
-                  }
-
-                  // Latest Videos Row
-                  if (latestVideos.length > 0) {
-                    rows.push(
-                      <VideoRow
-                        key="latest"
-                        title="🆕 Latest"
-                        videos={latestVideos}
-                      />
-                    );
-                    rowIndex++;
-                    maybeAddAd();
-                  }
-
-                  // Featured Videos Row
-                  if (featuredVideos.length > 0) {
-                    rows.push(
-                      <VideoRow
-                        key="featured"
-                        title="⭐ Featured"
-                        videos={featuredVideos}
-                      />
-                    );
-                    rowIndex++;
-                    maybeAddAd();
-                  }
-
-                  // Featured Playlists - show as video rows prioritized on home screen
-                  const featuredPlaylists = playlists.filter(p => p.is_featured);
-                  featuredPlaylists.forEach(playlist => {
-                    const videos = playlistVideos[playlist.id] || [];
-                    const channel = channels.find(c => c.id === playlist.channel_id);
-                    if (videos.length > 0) {
-                      rows.push(
-                        <VideoRow
-                          key={`featured-playlist-${playlist.id}`}
-                          title={`${playlist.title}${channel ? ` - ${channel.channel_name}` : ''}`}
-                          videos={videos}
-                        />
-                      );
-                      rowIndex++;
-                      maybeAddAd();
-                    }
-                  });
-
-                  // Playlists as Rows (exclude featured - already shown above)
-                  const featuredPlaylistIds = new Set(featuredPlaylists.map(p => p.id));
-                  playlists
-                    .filter(playlist => {
-                      if (featuredPlaylistIds.has(playlist.id)) return false;
-                      if (selectedPlaylistCategory !== 'all' && playlist.playlist_category !== selectedPlaylistCategory) {
-                        return false;
-                      }
-                      const channel = channels.find(c => c.id === playlist.channel_id);
-                      if (!channel) return false;
-                      return channel.is_visible !== false;
-                    })
-                    .sort((a, b) => (b.video_count || 0) - (a.video_count || 0))
-                    .forEach((playlist, index) => {
-                      const videos = (playlistVideos[playlist.id] || [])
-                        .filter(video => {
-                          if (!searchTerm.trim()) return true;
-                          const searchLower = searchTerm.toLowerCase();
-                          return (
-                            video.title.toLowerCase().includes(searchLower) ||
-                            video.description?.toLowerCase().includes(searchLower)
-                          );
-                        });
-                      if (videos.length > 0) {
-                        rows.push(
-                          <VideoRow
-                            key={playlist.id}
-                            title={playlist.title}
-                            videos={videos}
-                          />
-                        );
-                        rowIndex++;
-                        maybeAddAd();
-                      }
-                    });
-
-                  return rows;
-                })()}
-                </>
-              )}
+        </main>
+      ) : searching ? (
+        /* ── Search ── */
+        <main className="atv-page">
+          <div className="atv-page-head">
+            <div>
+              <p className="atv-eyebrow">Search</p>
+              <h1>“{searchTerm.trim()}”</h1>
+              <p className="atv-sub">{searchMatches.length} result{searchMatches.length === 1 ? '' : 's'}</p>
             </div>
           </div>
-        </>
+          {searchMatches.length === 0 ? (
+            <div className="atv-empty atv-empty-lg">
+              <span className="atv-empty-ic"><AlfieIcon glyph="search" size={28} /></span>
+              <h3>Nothing found</h3>
+              <p>Try a boat class, a club, an event or a skipper's name.</p>
+            </div>
+          ) : (
+            <div className="atv-grid">
+              {searchMatches.map(v => <TVCard key={v.id} {...cardProps(v)} />)}
+            </div>
+          )}
+        </main>
+      ) : (
+        /* ── Home ── */
+        <main>
+          {heroSlides.length > 0 ? (
+            <TVHero
+              slides={heroSlides as TVHeroSlide[]}
+              index={Math.min(currentHeroIndex, heroSlides.length - 1)}
+              onIndex={setCurrentHeroIndex}
+              muted={heroMuted}
+              onToggleMute={() => setHeroMuted(m => !m)}
+              channelOf={channelOf}
+              inList={isInList}
+              onPlay={handleVideoClick}
+              onToggleList={handleAddToWatchlist}
+              onInfo={(v) => setInfoVideo(v)}
+              onWatchLive={(s) => setSelectedLiveStream(s)}
+            />
+          ) : showSkeleton ? (
+            <section className="atv-hero atv-hero-skel"><span className="atv-shim" /></section>
+          ) : (
+            <div className="atv-hero-spacer" />
+          )}
+
+          <div className={`atv-rows ${heroSlides.length > 0 ? 'atv-rows-over' : ''}`}>
+            {categoryCounts.size > 0 && (
+              <div className="atv-cats" role="tablist" aria-label="Browse by type">
+                <button type="button" role="tab" aria-selected={selectedPlaylistCategory === 'all'} className={`atv-cat ${selectedPlaylistCategory === 'all' ? 'is-on' : ''}`} onClick={() => setSelectedPlaylistCategory('all')}>
+                  All
+                </button>
+                {CATEGORY_LABELS.filter(([k]) => (categoryCounts.get(k) || 0) > 0).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={selectedPlaylistCategory === value}
+                    className={`atv-cat ${selectedPlaylistCategory === value ? 'is-on' : ''}`}
+                    onClick={() => setSelectedPlaylistCategory(selectedPlaylistCategory === value ? 'all' : value)}
+                  >
+                    {label}<span>{categoryCounts.get(value)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {showSkeleton ? (
+              <>
+                <TVSkeletonRow />
+                <TVSkeletonRow />
+                <TVSkeletonRow />
+              </>
+            ) : (
+              renderHomeRows()
+            )}
+          </div>
+        </main>
       )}
 
-      {/* Spacer at bottom */}
-      <div className="h-32" />
+      {/* Phone tab bar */}
+      <nav className="atv-tabbar" aria-label="AlfieTV">
+        <button type="button" className={currentView === 'home' && !searching ? 'is-on' : ''} onClick={() => { setSearchTerm(''); goView('home'); }}>
+          <AlfieIcon glyph="home" size={21} /><span>Home</span>
+        </button>
+        <button type="button" className={searching || showSearch ? 'is-on' : ''} onClick={() => { goView('home'); setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 60); }}>
+          <AlfieIcon glyph="search" size={21} /><span>Search</span>
+        </button>
+        <button type="button" className={currentView === 'channels' ? 'is-on' : ''} onClick={() => goView('channels')}>
+          <AlfieIcon glyph="video" size={21} /><span>Channels</span>
+        </button>
+        <button type="button" className={currentView === 'mylist' ? 'is-on' : ''} onClick={() => goView('mylist')}>
+          <AlfieIcon glyph="plus" size={21} /><span>My List</span>
+        </button>
+      </nav>
     </div>
+
+    {infoVideo && (
+      <TVInfoSheet
+        video={infoVideo}
+        channel={channelOf(infoVideo.channel_id)}
+        related={relatedFor(infoVideo)}
+        inList={isInList(infoVideo.id)}
+        isInList={isInList}
+        onClose={() => setInfoVideo(null)}
+        onPlay={playFromInfo}
+        onToggleList={user ? handleAddToWatchlist : undefined}
+        onOpenChannel={infoVideo.channel_id && channelById.has(infoVideo.channel_id) ? () => openChannel(infoVideo.channel_id) : undefined}
+      />
+    )}
+
     <FullscreenVideoModal video={selectedVideo} onClose={handleCloseVideo} />
     <LiveStreamPlayerWrapper
       session={selectedLiveStream}
@@ -2388,42 +1762,35 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       clubName={selectedLiveStream?.club_name}
     />
     {selectedReplay && (
-      <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
+      <div className="atv-player is-awake" style={{ zIndex: 9000 }}>
         {selectedReplay.source === 'cloudflare' && selectedReplay.cloudflare_playback_url ? (
           <iframe
             src={`${selectedReplay.cloudflare_playback_url}?autoplay=true&muted=false&preload=auto&letterboxColor=000000`}
-            className="absolute inset-0 w-full h-full"
+            className="atv-player-frame"
             allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
             title={selectedReplay.title}
-            style={{ border: 'none' }}
           />
         ) : selectedReplay.youtube_video_id ? (
           <iframe
             src={`https://www.youtube.com/embed/${selectedReplay.youtube_video_id}?autoplay=1`}
-            className="absolute inset-0 w-full h-full"
+            className="atv-player-frame"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
             title={selectedReplay.title}
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <p className="text-gray-400">Replay not available</p>
-          </div>
+          <div className="atv-player-none">Replay not available</div>
         )}
-        <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/80 to-transparent z-10 flex items-start justify-between">
-          <div>
-            <h2 className="text-white text-xl font-bold">{selectedReplay.title}</h2>
-            {selectedReplay.description && (
-              <p className="text-gray-400 text-sm mt-1 max-w-2xl">{selectedReplay.description}</p>
-            )}
-          </div>
-          <button
-            onClick={() => setSelectedReplay(null)}
-            className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors ml-4 flex-shrink-0"
-          >
-            <X className="w-6 h-6 text-white" />
+        <div className="atv-player-top">
+          <button type="button" className="atv-player-back" onClick={() => setSelectedReplay(null)} title="Back to AlfieTV">
+            <AlfieIcon glyph="chevL" size={22} strokeWidth={2.2} />
+            <span>Back</span>
           </button>
+          <span className="atv-player-title">
+            {selectedReplay.title}
+            {selectedReplay.description && <small>{selectedReplay.description}</small>}
+          </span>
         </div>
       </div>
     )}

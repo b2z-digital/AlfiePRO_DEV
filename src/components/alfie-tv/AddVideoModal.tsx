@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
-import { Youtube, LogOut } from 'lucide-react';
+import { AlfieIcon } from '../brand/AlfieIcon';
 import { alfieTVStorage, AlfieTVChannel } from '../../utils/alfieTVStorage';
 
 interface AddVideoModalProps {
@@ -104,92 +104,74 @@ export default function AddVideoModal({ isOpen, onClose, onSuccess, darkMode = f
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`w-full max-w-2xl rounded-2xl p-6 max-h-[90vh] overflow-y-auto ${lightMode ? 'bg-white' : 'bg-slate-800'}`}>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className={`text-2xl font-bold ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-            Add YouTube Video
-          </h2>
-          <button
-            onClick={handleClose}
-            className={`p-2 rounded-xl transition-colors ${
-              lightMode ? 'hover:bg-gray-100 text-gray-600' : 'hover:bg-slate-700/50 text-slate-400'
-            }`}
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
-        </div>
+  const previewId = extractYouTubeId(youtubeUrl.trim());
 
-        <div className="space-y-4">
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${lightMode ? 'text-gray-700' : 'text-slate-300'}`}>
-              YouTube URL *
-            </label>
-            <div className="relative">
+  return (
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center p-3 sm:p-6 atvm-modal">
+      <div className="a-veil absolute inset-0 backdrop-blur-[2px]" onClick={() => !saving && handleClose()} aria-hidden="true" />
+      <section className="a-sheet relative w-full max-w-xl flex flex-col max-h-[92vh] overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="atvm-vid-title">
+        <header className="a-sheet-head a-md-sheet-head">
+          <span className="atvm-yt" aria-hidden="true"><i /></span>
+          <div className="min-w-0 flex-1">
+            <h2 id="atvm-vid-title" className="a-display a-ink m-0 text-[20px] font-semibold leading-tight">Add YouTube Video</h2>
+            <p className="a-mute m-0 mt-0.5 text-[13.5px]">Add a single video to AlfieTV</p>
+          </div>
+          <button type="button" onClick={handleClose} className="a-ib" aria-label="Close"><AlfieIcon glyph="x" size={20} /></button>
+        </header>
+
+        <div className="a-md-sheet-body">
+          <label className="a-md-fl">
+            <span>YouTube URL *</span>
+            <span className={`a-field ${previewId ? 'atvm-ok' : ''}`}>
+              <AlfieIcon glyph="link" size={16} />
               <input
                 type="text"
                 value={youtubeUrl}
                 onChange={(e) => setYoutubeUrl(e.target.value)}
                 placeholder="https://www.youtube.com/watch?v=..."
-                className={`w-full pl-10 pr-4 py-3 rounded-xl transition-colors ${
-                  lightMode
-                    ? 'bg-gray-50 border border-gray-200 text-gray-900'
-                    : 'bg-slate-700/50 border border-slate-600 text-white'
-                }`}
+                autoFocus
               />
-              <Youtube className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                lightMode ? 'text-gray-400' : 'text-slate-500'
-              }`} />
-            </div>
-          </div>
+              {previewId && <AlfieIcon glyph="check" size={17} strokeWidth={2.2} className="a-txt-g" />}
+            </span>
+          </label>
 
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${lightMode ? 'text-gray-700' : 'text-slate-300'}`}>
-              Video Title *
-            </label>
+          {previewId && (
+            <div className="atvm-preview">
+              <img src={`https://i.ytimg.com/vi/${previewId}/hqdefault.jpg`} alt="" />
+              <span className="atvm-preview-play" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor" /></svg>
+              </span>
+            </div>
+          )}
+
+          <label className="a-md-fl">
+            <span>Video Title *</span>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter video title"
-              className={`w-full px-4 py-3 rounded-xl transition-colors ${
-                lightMode
-                  ? 'bg-gray-50 border border-gray-200 text-gray-900'
-                  : 'bg-slate-700/50 border border-slate-600 text-white'
-              }`}
+              className="a-inp"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${lightMode ? 'text-gray-700' : 'text-slate-300'}`}>
-              Description
-            </label>
+          <label className="a-md-fl">
+            <span>Description</span>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Enter video description"
               rows={3}
-              className={`w-full px-4 py-3 rounded-xl transition-colors resize-none ${
-                lightMode
-                  ? 'bg-gray-50 border border-gray-200 text-gray-900'
-                  : 'bg-slate-700/50 border border-slate-600 text-white'
-              }`}
+              className="a-inp"
             />
-          </div>
+          </label>
 
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${lightMode ? 'text-gray-700' : 'text-slate-300'}`}>
-              Channel (Optional)
-            </label>
+          <label className="a-md-fl">
+            <span>Channel (Optional)</span>
             <select
               value={channelId}
               onChange={(e) => setChannelId(e.target.value)}
-              className={`w-full px-4 py-3 rounded-xl transition-colors ${
-                lightMode
-                  ? 'bg-gray-50 border border-gray-200 text-gray-900'
-                  : 'bg-slate-700/50 border border-slate-600 text-white'
-              }`}
+              className="a-inp"
             >
               <option value="">Standalone Video (No Channel)</option>
               {channels.map(channel => (
@@ -198,31 +180,18 @@ export default function AddVideoModal({ isOpen, onClose, onSuccess, darkMode = f
                 </option>
               ))}
             </select>
-            <p className={`mt-2 text-sm ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>
-              Leave as standalone if this video is not part of a YouTube channel
-            </p>
-          </div>
+            <small>Leave as standalone if this video is not part of a YouTube channel</small>
+          </label>
         </div>
 
-        <div className="flex items-center justify-end space-x-3 mt-6">
-          <button
-            onClick={handleClose}
-            disabled={saving}
-            className={`px-6 py-3 rounded-xl transition-colors ${
-              lightMode ? 'hover:bg-gray-100 text-gray-700' : 'hover:bg-slate-700/50 text-slate-300'
-            }`}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-primary-green px-6 py-3 rounded-xl text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+        <footer className="a-sheet-foot a-md-sheet-foot">
+          <button onClick={handleClose} disabled={saving} className="a-btn a-btn-q">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="a-btn a-btn-p">
+            <AlfieIcon glyph="plus" size={16} />
             {saving ? 'Adding...' : 'Add Video'}
           </button>
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>
   );
 }
