@@ -363,6 +363,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Sign out from Supabase first
       await supabase.auth.signOut();
 
+      // Forget saved offline copies of this account's data on this device
+      try {
+        navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_API_CACHE' });
+        if ('caches' in window) {
+          const names = await caches.keys();
+          await Promise.all(names.filter(n => n.startsWith('alfiepro-api-')).map(n => caches.delete(n)));
+        }
+      } catch { /* not supported here: nothing saved */ }
+
       // Clear local storage items
       localStorage.removeItem('currentClubId');
       localStorage.removeItem('currentOrganization');
