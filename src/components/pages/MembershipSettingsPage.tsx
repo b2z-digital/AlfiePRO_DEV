@@ -6,6 +6,7 @@ import { supabase } from '../../utils/supabase';
 import { MembershipType, MembershipSettings, RenewalMode } from '../../types/membership';
 import { WysiwygEditor } from '../ui/WysiwygEditor';
 import { EmailTemplateEditor } from '../ui/EmailTemplateEditor';
+import { EmailTemplatesBoard } from '../settings/WhatsOnEmailSettings';
 
 interface MembershipSettingsPageProps {
   darkMode: boolean;
@@ -1097,8 +1098,13 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
           </div>
           )}
 
+          {/* Email Templates board (What's On + the existing templates) */}
+          {showEmails && initialView === 'emails' && (
+            <EmailTemplatesBoard onEditTemplate={handleEditEmailTemplate} />
+          )}
+
           {/* Email Templates Section */}
-          {showEmails && (
+          {showEmails && initialView !== 'emails' && (
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">

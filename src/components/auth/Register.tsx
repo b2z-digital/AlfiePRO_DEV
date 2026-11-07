@@ -39,14 +39,18 @@ type RegistrationMode = 'choice' | 'user' | 'club';
 
 export const Register: React.FC = () => {
   const [mode, setMode] = useState<RegistrationMode>('user');
-  const [email, setEmail] = useState('');
+  // Links from club emails ("Activate my login") pass ?email= so the form is ready to go
+  const emailParam = (() => {
+    try { return (new URLSearchParams(window.location.search).get('email') || '').trim(); } catch { return ''; }
+  })();
+  const [email, setEmail] = useState(emailParam);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [appLinks, setAppLinks] = useState<{ ios: string; android: string }>({ ios: '', android: '' });
-  const [showRegister, setShowRegister] = useState(false);
+  const [showRegister, setShowRegister] = useState(!!emailParam);
   const navigate = useNavigate();
   const isMobile = useIsMobilePhone();
 
