@@ -253,3 +253,254 @@ body.light-mode .alv .text-white { color: #fff !important; }
 .alv-seg button:focus-visible { outline: 2px solid var(--alv-blue); outline-offset: 1px; }
 .alv-input { height: 44px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); color: var(--alv-ink); padding: 0 12px; font: 500 15px 'Instrument Sans', system-ui, sans-serif; }
 .alv-input:focus { outline: 2px solid var(--alv-blue); outline-offset: 1px; }
+
+/* ── Control room (board "Control room") ──
+   Container queries, because the same room runs full page and inside the scoring console. */
+.alv-crq { container: alv-cr / inline-size; }
+.alv-cr {
+  display: flex; flex-direction: column; gap: 12px;
+  height: calc(100vh - 7rem); min-height: 560px; padding: 14px; box-sizing: border-box;
+  background: var(--alv-bg);
+}
+.alv-cr-top { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; flex-shrink: 0; }
+.alv-cr-back {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 12px; cursor: pointer;
+  background: var(--alv-panel); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--alv-ink);
+}
+.alv-cr-back:hover { background: var(--alv-raised); }
+.alv-cr-title { flex: 1 1 200px; min-width: 0; }
+.alv-cr-title h2 { margin: 0; font-size: 19px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alv-cr-title p { margin: 2px 0 0; font-size: 13px; color: var(--alv-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alv-cr-state { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.alv-cr-onair {
+  display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border-radius: 10px;
+  background: var(--alv-live); color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 0.08em; white-space: nowrap;
+}
+.alv-cr-onair .pulse { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: alv-pulse 1.6s ease-in-out infinite; }
+.alv-cr-onair .alv-mono { font-weight: 700; letter-spacing: 0.02em; }
+.alv-cr-onair.is-preview { background: #B7791F; }
+.alv-cr-onair.is-connecting { background: rgba(42, 147, 255, 0.2); color: #8CC4FF; }
+.alv-cr-onair.is-idle { background: rgba(255, 255, 255, 0.06); color: var(--alv-mute); border: 1px solid rgba(255, 255, 255, 0.1); }
+@media (prefers-reduced-motion: reduce) { .alv-cr-onair .pulse { animation: none; } }
+.alv-cr-chip {
+  display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.alv-cr-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--alv-green); }
+.alv-cr-chip.is-warn .dot { background: var(--alv-amber); }
+.alv-cr-chip.is-bad { color: #FF8796; }
+.alv-cr-chip.is-bad .dot { background: var(--alv-live); }
+.alv-cr-chip.is-scoring { background: rgba(138, 77, 255, 0.12); border-color: rgba(138, 77, 255, 0.45); color: #E3D6FF; }
+.alv-cr-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.alv-cr-auto { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; line-height: 1.15; cursor: pointer; }
+.alv-btn.is-xs { height: 30px; padding: 0 10px; border-radius: 9px; font-size: 12.5px; gap: 5px; }
+.alv-btn.is-test { background: rgba(255, 178, 36, 0.14); border-color: rgba(255, 178, 36, 0.45); color: #FFD27A; }
+.alv-btn-live { background: var(--alv-live); border-color: transparent; color: #fff; }
+.alv-btn-live:hover { background: #F0284A; }
+.alv-btn-end { background: rgba(225, 29, 56, 0.08); border-color: rgba(255, 90, 110, 0.55); color: #FF8796; }
+.alv-btn-end:hover { background: rgba(225, 29, 56, 0.16); }
+.alv-cr .alv-btn:disabled { cursor: not-allowed; opacity: 0.45; }
+.alv-ib.is-on { color: #8CC4FF; background: rgba(42, 147, 255, 0.12); }
+.alv-ib.is-xs { width: 26px; height: 26px; border-radius: 7px; }
+
+/* Switch (board .sw) */
+.alv-sw {
+  position: relative; flex-shrink: 0; width: 44px; height: 26px; padding: 0; border-radius: 13px; border: 0; cursor: pointer;
+  background: rgba(255, 255, 255, 0.16); transition: background 0.15s ease;
+}
+.alv-sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left 0.15s ease; }
+.alv-sw[aria-checked="true"] { background: var(--alv-blue); }
+.alv-sw[aria-checked="true"]::after { left: 21px; }
+.alv-sw:disabled { opacity: 0.4; cursor: not-allowed; }
+.alv-sw:focus-visible { outline: 2px solid var(--alv-blue); outline-offset: 2px; }
+
+/* Three columns: cameras · program · settings */
+.alv-cr-body {
+  flex: 1; min-height: 0; display: grid; gap: 12px;
+  grid-template-columns: 228px minmax(0, 1fr) 320px; grid-template-areas: "cams center side";
+}
+.alv-cr-body.no-side { grid-template-columns: 228px minmax(0, 1fr); grid-template-areas: "cams center"; }
+.alv-cr-panel { background: var(--alv-panel); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 18px; }
+.alv-cr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.alv-cr-head .alv-eyebrow { white-space: nowrap; }
+
+.alv-cr-cams { grid-area: cams; min-height: 0; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.alv-cr-camlist { display: flex; flex-direction: column; gap: 14px; }
+.alv-cr-cam { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.alv-cr-cam .th {
+  position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; border-radius: 12px; overflow: hidden; cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.08); background: linear-gradient(180deg, #2B4A6B, #142B44); color: rgba(235, 240, 255, 0.55);
+}
+.alv-cr-cam .th:disabled { cursor: default; }
+.alv-cr-cam .th:not(:disabled):hover { border-color: rgba(255, 255, 255, 0.3); }
+.alv-cr-cam .th:focus-visible { outline: 2px solid var(--alv-blue); outline-offset: 2px; }
+.alv-cr-cam.is-program .th { border-color: #FF3B4E; }
+.alv-cr-cam.is-next .th { border-color: var(--alv-green); }
+.alv-cr-cam.is-off .th { opacity: 0.6; }
+.alv-cr-cam .th video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.alv-cr-cam .th .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.alv-cr-cam .n {
+  position: absolute; left: 8px; top: 8px; width: 22px; height: 22px; border-radius: 7px; background: rgba(0, 0, 0, 0.65);
+  color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.alv-tally {
+  position: absolute; right: 8px; top: 8px; height: 20px; padding: 0 7px; border-radius: 5px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; display: flex; align-items: center; color: #fff;
+}
+.alv-tally.is-pgm { background: var(--alv-live); }
+.alv-tally.is-next { background: #1F9D48; }
+.alv-tally.is-off { background: rgba(0, 0, 0, 0.6); color: rgba(235, 240, 255, 0.8); }
+.alv-cr-cam .meta { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; min-width: 0; }
+.alv-cr-cam .meta .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alv-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex-shrink: 0; }
+.alv-bars i { display: block; width: 3px; border-radius: 1px; background: rgba(255, 255, 255, 0.18); }
+.alv-bars i.on { background: #7BEA9C; }
+.alv-bars.is-weak i.on { background: var(--alv-amber); }
+.alv-cr-empty { padding: 18px 12px; border-radius: 12px; border: 1px dashed rgba(255, 255, 255, 0.14); text-align: center; font-size: 13px; color: var(--alv-mute); line-height: 1.45; }
+
+/* Program, scenes, next shot, race videos */
+.alv-cr-center { grid-area: center; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+/* --cw is the centre column's width, so the stage is never taller than the 16:9 picture it holds */
+.alv-cr-body { --cw: calc(100cqw - 600px); }
+.alv-cr-body.no-side { --cw: calc(100cqw - 268px); }
+.alv-cr-stage {
+  flex: 1 1 auto; max-height: calc(var(--cw) * 9 / 16); min-height: min(max(220px, 56%), calc(var(--cw) * 9 / 16));
+  container-type: size; display: flex; align-items: center; justify-content: center; }
+.alv-cr-pgm {
+  position: relative; width: min(100cqw, calc(100cqh * 16 / 9)); aspect-ratio: 16 / 9; overflow: hidden;
+  border-radius: 16px; background: #000; border: 2px solid rgba(255, 255, 255, 0.1);
+}
+.alv-cr-pgm.is-live { border-color: var(--alv-live); }
+.alv-cr-pgm.is-preview { border-color: #B7791F; }
+.alv-cr-pgm > video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+.alv-cr-pgm-tag {
+  position: absolute; left: 0; top: 0; z-index: 30; display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px; border-radius: 0 0 10px 0; background: var(--alv-live);
+  font-size: 11px; font-weight: 800; letter-spacing: 0.12em; color: #fff;
+}
+.alv-cr-pgm.is-preview .alv-cr-pgm-tag { background: #B7791F; }
+.alv-cr-pgm-tag .cam { font-weight: 600; letter-spacing: 0.02em; opacity: 0.9; }
+.alv-cr-full {
+  position: absolute; right: 10px; bottom: 10px; z-index: 30; width: 34px; height: 34px; border-radius: 9px; border: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.55); color: #fff; opacity: 0.75;
+}
+.alv-cr-full:hover, .alv-cr-full:focus-visible { opacity: 1; }
+.alv-cr-stage:fullscreen { background: #000; }
+.alv-cr-stage:fullscreen .alv-cr-pgm { border-radius: 0; border: 0; }
+.alv-cr-stage.is-full { position: fixed; inset: 0; z-index: 9999; background: #000; }
+.alv-cr-stage.is-full .alv-cr-pgm { border-radius: 0; border: 0; }
+.alv-cr-card {
+  position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; text-align: center;
+  background: #05080F; color: var(--alv-mute); font-size: 13.5px; line-height: 1.45; padding: 16px;
+}
+.alv-cr-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.22; }
+.alv-cr-card > div { position: relative; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.alv-cr-card h3 { margin: 4px 0 0; font-family: 'Bricolage Grotesque', 'Instrument Sans', sans-serif; font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
+.alv-cr-card .chip { height: 24px; padding: 0 10px; border-radius: 7px; display: inline-flex; align-items: center; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; background: rgba(255, 178, 36, 0.18); color: #FFD27A; }
+.alv-cr-card .ic { width: 52px; height: 52px; border-radius: 16px; border: 1px dashed rgba(255, 255, 255, 0.2); display: flex; align-items: center; justify-content: center; color: rgba(235, 240, 255, 0.5); }
+
+.alv-cr-scenes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; flex-shrink: 0; }
+.alv-scene {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 58px; padding: 6px 8px;
+  border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.09); background: rgba(255, 255, 255, 0.03);
+  color: rgba(235, 240, 255, 0.86); font: 600 14px 'Instrument Sans', system-ui, sans-serif; cursor: pointer; text-align: center;
+}
+.alv-scene:hover:not(:disabled) { background: rgba(255, 255, 255, 0.07); }
+.alv-scene:focus-visible { outline: 2px solid var(--alv-blue); outline-offset: 2px; }
+.alv-scene small { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(235, 240, 255, 0.6); }
+.alv-scene.is-on { background: rgba(225, 29, 56, 0.16); border-color: rgba(255, 90, 110, 0.7); color: #fff; }
+.alv-scene.is-on small { color: #FFB3BD; }
+.alv-scene.is-hold.is-on { background: rgba(255, 178, 36, 0.14); border-color: rgba(255, 178, 36, 0.6); color: #FFE2A8; }
+.alv-scene.is-hold.is-on small { color: #FFD27A; }
+.alv-scene:disabled { opacity: 0.42; cursor: not-allowed; }
+
+.alv-cr-next { display: flex; align-items: center; gap: 14px; padding: 12px; flex-shrink: 0; }
+.alv-cr-next .th { position: relative; width: 132px; aspect-ratio: 16 / 9; flex-shrink: 0; border-radius: 10px; overflow: hidden; border: 2px solid var(--alv-green); background: linear-gradient(180deg, #2B4A6B, #142B44); }
+.alv-cr-next .th video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.alv-cr-next .th .alv-tally { left: 0; right: auto; top: 0; border-radius: 0 0 6px 0; }
+.alv-cr-next .txt { flex: 1; min-width: 0; }
+.alv-cr-next .txt b { display: block; font-size: 15px; font-weight: 600; }
+.alv-cr-next .txt span { display: block; margin-top: 2px; font-size: 13px; color: var(--alv-mute); line-height: 1.4; }
+
+.alv-cr-videos { padding: 12px 14px 14px; flex-shrink: 0; }
+.alv-cr-vlist { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.alv-mk {
+  display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px; border-radius: 8px;
+  font-size: 12.5px; font-weight: 600; white-space: nowrap; color: var(--alv-ink); text-decoration: none;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.alv-mk .t { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11.5px; color: rgba(235, 240, 255, 0.62); }
+.alv-mk .st { font-weight: 600; }
+.alv-mk .st.ok { color: #7BEA9C; }
+.alv-mk .st.up { color: #8CC4FF; }
+.alv-mk .st.rec { color: #FF8796; }
+.alv-mk .st.bad { color: #FFC864; }
+.alv-mk.is-rec { border-color: rgba(255, 90, 110, 0.45); background: rgba(225, 29, 56, 0.08); }
+.alv-mk.is-up { border-color: rgba(42, 147, 255, 0.4); background: rgba(42, 147, 255, 0.08); }
+a.alv-mk:hover { background: rgba(255, 255, 255, 0.09); }
+.alv-cr-hint { margin: 8px 0 0; font-size: 13px; color: var(--alv-mute); line-height: 1.45; }
+.alv-link { padding: 0; border: 0; background: none; color: #8CC4FF; font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+/* Right column: Overlays · Output · Details */
+/* Bottom padding keeps the last card clear of the Ask Alfie button in the corner */
+.alv-cr-side { grid-area: side; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 14px 76px; }
+.alv-cr-sidehead { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.alv-cr-sidehead .alv-tabs { flex: 1; }
+.alv-tabs { display: flex; gap: 2px; padding: 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); flex-shrink: 0; }
+.alv-tabs button { flex: 1; height: 34px; border: 0; border-radius: 9px; background: transparent; color: rgba(235, 240, 255, 0.72); font: 600 13px 'Instrument Sans', system-ui, sans-serif; cursor: pointer; }
+.alv-tabs button[aria-selected="true"] { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.alv-tabs button:focus-visible { outline: 2px solid var(--alv-blue); outline-offset: 1px; }
+.alv-cr-sidebody { flex: 1; min-height: 0; overflow-y: auto; }
+.alv-tg { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.alv-tg:first-child { border-top: 0; padding-top: 4px; }
+.alv-tg b { display: block; font-size: 14px; font-weight: 600; }
+.alv-tg span { display: block; margin-top: 1px; font-size: 12.5px; color: rgba(235, 240, 255, 0.66); line-height: 1.4; }
+.alv-tg.is-range { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.alv-range { width: 100%; accent-color: var(--alv-blue); }
+.alv-ovm-note { margin: 4px 0 0; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06); font-size: 12.5px; color: rgba(235, 240, 255, 0.6); line-height: 1.45; }
+.alv-cr-form { display: flex; flex-direction: column; gap: 12px; }
+.alv-field { display: flex; flex-direction: column; gap: 6px; }
+.alv-field > span { font-size: 12.5px; font-weight: 600; color: rgba(235, 240, 255, 0.72); }
+.alv-cr-form textarea.alv-input { height: auto; padding: 10px 12px; resize: vertical; line-height: 1.45; }
+.alv-cr-form .alv-btn { justify-content: flex-start; }
+.alv-cr-scorecard { flex-shrink: 0; padding: 14px; border-radius: 14px; background: rgba(138, 77, 255, 0.1); border: 1px solid rgba(138, 77, 255, 0.4); }
+.alv-cr-scorecard b { display: block; font-size: 14px; font-weight: 600; }
+.alv-cr-scorecard p { margin: 4px 0 0; font-size: 12.5px; color: rgba(235, 240, 255, 0.74); line-height: 1.45; }
+/* The Output tab still uses the older console component */
+.alv-cr-legacy { font-family: system-ui, sans-serif; }
+
+/* iPad and the scoring console: cameras stay on the left (narrower), settings open as a drawer */
+@container alv-cr (max-width: 1200px) {
+  .alv-cr-body, .alv-cr-body.no-side { position: relative; grid-template-columns: 184px minmax(0, 1fr); grid-template-areas: "cams center"; --cw: calc(100cqw - 224px); }
+  .alv-cr-cams { padding: 12px; }
+  .alv-cr-cams .alv-cr-head .lbl { display: none; }
+  .alv-cr-cams .alv-cr-head .alv-btn.is-xs { width: 30px; padding: 0; }
+  .alv-cr-camlist { gap: 12px; }
+  .alv-cr-side {
+    position: absolute; top: 0; right: 0; bottom: 0; z-index: 40; width: min(340px, 100%);
+    background: var(--alv-raised); border-color: rgba(255, 255, 255, 0.12); box-shadow: -18px 0 50px rgba(0, 0, 0, 0.55);
+  }
+}
+/* Phone or portrait tablet: one column that scrolls; program first, then scenes, cameras, next, race videos */
+@container alv-cr (max-width: 760px) {
+  .alv-cr { height: auto; min-height: 0; }
+  .alv-cr-body, .alv-cr-body.no-side { display: flex; flex-direction: column; }
+  .alv-cr-center { display: contents; }
+  .alv-cr-stage { order: 1; container-type: normal; min-height: 0; max-height: none; display: block; }
+  .alv-cr-pgm { width: 100%; }
+  .alv-cr-scenes { order: 2; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .alv-cr-cams { order: 3; overflow: visible; }
+  .alv-cr-camlist { flex-direction: row; overflow-x: auto; padding-bottom: 2px; }
+  .alv-cr-cam { width: 156px; flex-shrink: 0; }
+  .alv-cr-cams .alv-cr-head .lbl { display: inline; }
+  .alv-cr-cams .alv-cr-head .alv-btn.is-xs { width: auto; padding: 0 10px; }
+  .alv-cr-camlist .alv-cr-empty { width: 220px; flex-shrink: 0; display: flex; align-items: center; text-align: left; }
+  .alv-cr-next { order: 4; }
+  .alv-cr-next .th { width: 96px; }
+  .alv-cr-videos { order: 5; }
+  .alv-cr-side { order: 6; position: static; width: auto; box-shadow: none; padding-bottom: 14px; background: var(--alv-panel); }
+  .alv-cr-sidebody { overflow: visible; }
+  .alv-cr-actions { margin-left: 0; }
+}
