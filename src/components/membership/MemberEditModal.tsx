@@ -64,6 +64,30 @@ interface MemberData {
   }>;
 }
 
+/* Layout pieces live outside the sheet: declared inside it they would be new component
+   types on every render, and React would rebuild the inputs (losing focus after each key). */
+const Sec: React.FC<{ icon: React.ReactNode; title: string; right?: React.ReactNode }> = ({ icon, title, right }) => (
+  <div className="a-sec">
+    <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}>{icon}</span>
+    <h3>{title}</h3>
+    <div className="flex-1" />
+    {right}
+  </div>
+);
+const Cell: React.FC<{ label: React.ReactNode; icon?: React.ReactNode; trail?: React.ReactNode; children: React.ReactNode }> = ({ label, icon, trail, children }) => (
+  <label className="a-cell">
+    {icon && <span className="a-dim flex">{icon}</span>}
+    <span className="flex-1 min-w-0"><span className="a-cell-l">{label}</span>{children}</span>
+    {trail && <span className="a-dim flex">{trail}</span>}
+  </label>
+);
+const Req = () => <span className="a-txt-r">*</span>;
+const ClassFlag = () => (
+  <svg width="9" height="11" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}>
+    <path d="M1 .75v10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M1.75 1.25h6.5L1.75 5.5z" fill="currentColor" />
+  </svg>
+);
+
 export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   isOpen,
   onClose,
@@ -611,31 +635,10 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
 
   if (!isOpen) return null;
 
-  const Sec: React.FC<{ icon: React.ReactNode; title: string; right?: React.ReactNode }> = ({ icon, title, right }) => (
-    <div className="a-sec">
-      <span className="a-tile a-tile-sm" style={{ width: 30, height: 30 }}>{icon}</span>
-      <h3>{title}</h3>
-      <div className="flex-1" />
-      {right}
-    </div>
-  );
-  const Cell: React.FC<{ label: React.ReactNode; icon?: React.ReactNode; trail?: React.ReactNode; children: React.ReactNode }> = ({ label, icon, trail, children }) => (
-    <label className="a-cell">
-      {icon && <span className="a-dim flex">{icon}</span>}
-      <span className="flex-1 min-w-0"><span className="a-cell-l">{label}</span>{children}</span>
-      {trail && <span className="a-dim flex">{trail}</span>}
-    </label>
-  );
-  const Req = () => <span className="a-txt-r">*</span>;
   const typeName = memberData?.membership_level || '';
   const renewalDue = !!memberData?.is_financial && !!memberData?.renewal_date && new Date(memberData.renewal_date) < new Date();
   const fmt = (d?: string) => (d ? new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not set');
   const firstBoatIdx = (cls: string) => boats.findIndex(b => b.boat_type === cls);
-  const ClassFlag = () => (
-    <svg width="9" height="11" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}>
-      <path d="M1 .75v10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M1.75 1.25h6.5L1.75 5.5z" fill="currentColor" />
-    </svg>
-  );
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">

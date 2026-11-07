@@ -39,6 +39,11 @@ interface TransactionDetailModalProps {
   associationType?: 'state' | 'national';
 }
 
+// Outside the sheet so editing a field doesn't rebuild it (and lose focus) on every key
+const Row = ({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) => (
+  <div className="a-ir"><span className="a-ir-l">{icon}{label}</span><span className="a-ir-v">{children}</span></div>
+);
+
 export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   isOpen,
   onClose,
@@ -231,9 +236,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
   const inc = initialTransaction.type === 'deposit' || initialTransaction.type === 'income';
   const paid = formData.payment_status === 'paid' || formData.payment_status === 'completed';
-  const Row = ({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) => (
-    <div className="a-ir"><span className="a-ir-l">{icon}{label}</span><span className="a-ir-v">{children}</span></div>
-  );
 
   const modalContent = (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
