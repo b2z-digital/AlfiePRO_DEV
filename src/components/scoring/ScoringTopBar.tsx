@@ -1,7 +1,9 @@
 import React from 'react';
-import { ArrowLeft, CheckCheck, ChevronLeft, ChevronRight, Maximize2, Minimize2, RotateCcw, Settings, Timer, Trophy } from 'lucide-react';
+import { ArrowLeft, CheckCheck, ChevronLeft, ChevronRight, Maximize2, Minimize2, RotateCcw, Settings, Trophy } from 'lucide-react';
 import { AlfieIcon } from '../brand/AlfieIcon';
+import { StartBoxButton } from './StartBoxButton';
 import type { RaceEvent } from '../../types/race';
+
 
 /**
  * Alfie theme: the single scoring top bar (board "SC_pro").
@@ -83,7 +85,7 @@ export const ScoringTopBar: React.FC<{
       <div className="a-sbar a-sbar-compact" role="toolbar" aria-label="Scoring">
         <div className="flex-1 flex items-center gap-2 min-w-0">
           <div id="alfie-startbox-slot" className="contents" />
-          {onStartBox && <button type="button" className="a-btn a-btn-sb" style={{ height: 38 }} onClick={onStartBox}><Timer size={17} />StartBox</button>}
+          {onStartBox && <StartBoxButton onClick={onStartBox} size={38} />}
         </div>
         {stepper}
         <div className="flex-1 flex justify-end items-center gap-1.5">
@@ -120,7 +122,7 @@ export const ScoringTopBar: React.FC<{
         {modeSeg}
         <div id="alfie-startbox-slot" className="contents" />
         {(onStartBox || onOverallResults) && <span className="a-vd" />}
-        {onStartBox && <button type="button" className="a-btn a-btn-sb" style={{ height: 40 }} onClick={onStartBox}><Timer size={17} />StartBox</button>}
+        {onStartBox && <StartBoxButton onClick={onStartBox} />}
         {onOverallResults && <button type="button" className="a-btn a-btn-gold" style={{ height: 40 }} onClick={onOverallResults}><Trophy size={17} />Overall results</button>}
         <span className="a-vd" />
         <button type="button" className="a-ib" onClick={onCheckpoints} aria-label="Checkpoints" title="Checkpoints & rollback"><RotateCcw size={18} /></button>
