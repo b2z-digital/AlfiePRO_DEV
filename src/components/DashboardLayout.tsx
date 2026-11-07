@@ -193,6 +193,12 @@ interface DashboardLayoutProps {
 }
 
 
+/** Opens a broadcast from a go-live notification link (/alfie-tv/<sessionId>) in AlfieTV */
+function AlfieTVWatchRedirect() {
+  const { sessionId } = useParams<{ sessionId: string }>();
+  return <Navigate to={sessionId ? `/alfie-tv?watch=${encodeURIComponent(sessionId)}` : '/alfie-tv'} replace />;
+}
+
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   darkMode,
   selectedEvent,
@@ -2128,6 +2134,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/media" element={<MediaPage darkMode={darkMode} />} />
               <Route path="/alfie-tv" element={<AlfieTVPage darkMode={darkMode} />} />
               <Route path="/alfie-tv/admin" element={<AlfieTVAdmin darkMode={darkMode} />} />
+              {/* Go-live notifications link to /alfie-tv/<sessionId>?live=1 */}
+              <Route path="/alfie-tv/:sessionId" element={<AlfieTVWatchRedirect />} />
               <Route path="/ask-alfie-management" element={<AskAlfieManagementPage darkMode={darkMode} />} />
               <Route path="/livestream" element={<LivestreamPage />} />
 
