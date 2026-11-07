@@ -1,14 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, X, Tag, Plus, Calendar, TriangleAlert as AlertTriangle, Check, Upload, Eye, FileText, Image as ImageIcon, Settings, Sparkles, Type, ChevronLeft as AlignLeft, BookOpen, Users, Globe, Building2 } from 'lucide-react';
+import { ArrowLeft, Save, X, Plus, TriangleAlert as AlertTriangle, Check, Upload, Eye } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { WysiwygEditor } from '../components/ui/WysiwygEditor';
 import { getArticleById, createArticle, updateArticle, Article } from '../utils/articleStorage';
-import { formatDate } from '../utils/date';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfirmationModal } from '../components/ConfirmationModal';
+import { AlfieIcon } from '../components/brand/AlfieIcon';
+import { ASwitch, useAlfieLight } from '../components/alfie/Kit';
+import { SmartImage } from '../components/news/SmartImage';
+import { NewsCard } from '../components/news/NewsCard';
+import { stripHtml } from '../components/news/newsUtils';
 
 const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
 
@@ -47,6 +51,16 @@ const ArticleEditorPage: React.FC = () => {
   const [communityGroupIds, setCommunityGroupIds] = useState<string[]>([]);
   const [availableCommunityGroups, setAvailableCommunityGroups] = useState<Array<{ id: string; name: string; club_name?: string }>>([]);
   const [uploadingInlineImage, setUploadingInlineImage] = useState(false);
+  const light = useAlfieLight();
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+
+  // Headline box grows with the text
+  useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title, loading]);
 
   useEffect(() => {
     const fetchArticle = async () => {
@@ -444,22 +458,17 @@ const ArticleEditorPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="h-full overflow-y-auto">
-        <div className="p-16">
-          <div className="max-w-7xl mx-auto">
-            <div className="animate-pulse space-y-6">
-              <div className="h-12 bg-slate-700/50 rounded-lg w-1/2"></div>
-              <div className="grid grid-cols-3 gap-8">
-                <div className="col-span-2 space-y-4">
-                  <div className="h-64 bg-slate-700/50 rounded-lg"></div>
-                  <div className="h-96 bg-slate-700/50 rounded-lg"></div>
-                </div>
-                <div className="space-y-4">
-                  <div className="h-32 bg-slate-700/50 rounded-lg"></div>
-                  <div className="h-48 bg-slate-700/50 rounded-lg"></div>
-                </div>
-              </div>
-            </div>
+      <div className="a-nw-editor">
+        <div className="a-nw-ed-grid" aria-busy="true" aria-label="Loading article">
+          <div className="a-nw-ed-main">
+            <span className="a-nw-shim a-nw-ed-cover" />
+            <span className="a-nw-shim" style={{ height: 44, width: '70%', borderRadius: 12 }} />
+            <span className="a-nw-shim" style={{ height: 18, width: '45%' }} />
+            <span className="a-nw-shim" style={{ height: 420, borderRadius: 20 }} />
+          </div>
+          <div className="a-nw-ed-side">
+            <span className="a-nw-shim" style={{ height: 150, borderRadius: 20 }} />
+            <span className="a-nw-shim" style={{ height: 220, borderRadius: 20 }} />
           </div>
         </div>
       </div>
@@ -468,467 +477,339 @@ const ArticleEditorPage: React.FC = () => {
 
   const wordCount = content.replace(/<[^>]*>/g, '').split(/\s+/).filter(w => w.length > 0).length;
   const readingTime = Math.ceil(wordCount / 200);
+  const backToEvent = !!(eventWebsiteId && eventId);
+  const allGroupsSelected = availableCommunityGroups.every(g => communityGroupIds.includes(g.id));
+  const previewArticle = {
+    id: id && id !== 'new' ? id : 'new-article',
+    title: title.trim() || 'Your headline goes here',
+    content,
+    excerpt: excerpt.trim() || (stripHtml(content).slice(0, 150) || 'A short summary of the story appears here.'),
+    cover_image: coverImage || DEFAULT_COVER_IMAGE,
+    tags,
+    status: 'published',
+    published_at: new Date().toISOString(),
+    author_name: `${(user as any)?.user_metadata?.first_name || ''} ${(user as any)?.user_metadata?.last_name || ''}`.trim() || 'You',
+    source_type: currentOrganization && !currentClub ? currentOrganization.type : 'club',
+    event_name: eventName || undefined,
+  } as Article;
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="p-16">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
+    <div className="a-nw-editor">
+      {/* Action bar */}
+      <div className="a-nw-ed-bar">
+        <button
+          onClick={() => backToEvent ? navigate(`/event-websites/${eventId}`) : navigate('/news')}
+          className="a-btn a-btn-q a-nw-rd-back"
+        >
+          <ArrowLeft size={17} />
+          <span className="a-nw-ed-hide-sm">{eventName ? 'Event Website' : 'News'}</span>
+        </button>
+        {eventName && (
+          <span className="a-nw-event a-nw-ed-hide-sm"><AlfieIcon glyph="flag" size={13} />{eventName}</span>
+        )}
+        <div className="a-nw-ed-status">
+          <span className={`a-light ${isPublished ? 'a-light-g' : 'a-light-a'}`} />
+          <b>{isPublished ? 'Published' : 'Draft'}</b>
+          <span className="a-nw-ed-hide-sm">
+            <i className="a-nw-sep" aria-hidden="true" />{wordCount} words
+            <i className="a-nw-sep" aria-hidden="true" />{readingTime} min read
+          </span>
+          {uploadingInlineImage && (
+            <span className="a-nw-ed-uploading"><span className="a-nw-spin" />Uploading image…</span>
+          )}
+        </div>
+        <div className="a-nw-ed-acts">
+          <button onClick={handleCancel} className="a-btn a-btn-q a-nw-ed-hide-sm" disabled={saving}>
+            Cancel
+          </button>
+          <button onClick={() => handleSave(false)} className="a-btn" disabled={saving}>
+            <Save size={16} />
+            {saving ? 'Saving...' : 'Save Draft'}
+          </button>
+          <button onClick={() => handleSave(true)} className="a-btn a-btn-p" disabled={saving}>
+            <AlfieIcon glyph="send" size={16} />
+            {saving ? 'Publishing...' : isPublished ? 'Update' : 'Publish'}
+          </button>
+        </div>
+      </div>
+
+      {(error || success) && (
+        <div className="a-nw-ed-msgs">
+          {error && (
+            <div className="a-nw-ed-msg a-nw-ed-msg-r" role="alert">
+              <AlfieIcon glyph="warn" size={18} />
+              <p>{error}</p>
+            </div>
+          )}
+          {success && (
+            <div className="a-nw-ed-msg a-nw-ed-msg-g" role="status">
+              <AlfieIcon glyph="check" size={18} />
+              <p>{success}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="a-nw-ed-grid">
+        <div className="a-nw-ed-main">
+          {/* Cover */}
+          <div
+            className={`a-nw-ed-cover group ${dragActive ? 'is-drag' : ''}`}
+            onDragEnter={handleDrag}
+            onDragOver={handleDrag}
+            onDragLeave={handleDrag}
+            onDrop={handleDrop}
+            onClick={handleImageClick}
+            role="button"
+            tabIndex={0}
+            aria-label={coverImage ? 'Change cover image' : 'Upload a cover image'}
+            onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleImageClick(); } }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+              disabled={uploadingImage}
+            />
+            <SmartImage src={coverImage || DEFAULT_COVER_IMAGE} alt="Cover preview" eager />
+            <div className="a-nw-ed-cover-shade" />
+            <div className="a-nw-ed-cover-tl">
+              {coverImage ? (
+                <span className="a-nw-glass-tag"><AlfieIcon glyph="image" size={13} />Cover image</span>
+              ) : (
+                <span className="a-nw-glass-tag"><AlfieIcon glyph="image" size={13} />Default cover will be used</span>
+              )}
+            </div>
+            <div className="a-nw-ed-cover-tr">
+              <span className="a-nw-gb a-nw-ed-cover-btn"><Upload size={15} />{coverImage ? 'Change' : 'Upload cover'}</span>
+              {coverImage && (
                 <button
-                  onClick={() => eventWebsiteId && eventId ? navigate(`/event-websites/${eventId}`) : navigate('/news')}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all text-slate-300 hover:text-white bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 hover:border-slate-600"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCoverImage('');
+                  }}
+                  className="a-nw-gb a-nw-gb-d"
+                  aria-label="Remove cover image"
+                  title="Remove cover image"
                 >
-                  <ArrowLeft size={16} />
-                  Back to {eventName ? 'Event Website' : 'News'}
+                  <X size={16} />
                 </button>
-                {eventName && (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
-                    <Calendar size={16} className="text-cyan-400" />
-                    <span className="text-cyan-400 text-sm font-medium">{eventName}</span>
+              )}
+            </div>
+            <div className="a-nw-ed-drop">
+              <span className="a-nw-ed-drop-ic"><Upload size={22} /></span>
+              <b>Drop image here</b>
+              <span>or click to browse · JPG, PNG, WebP or GIF (max. 5MB)</span>
+            </div>
+            {uploadingImage && (
+              <div className="a-nw-ed-busy"><span className="a-nw-spin a-nw-spin-lg" />Uploading...</div>
+            )}
+          </div>
+
+          {/* Headline and summary */}
+          <div className="a-nw-ed-head">
+            <textarea
+              ref={titleRef}
+              value={title}
+              onChange={(e) => setTitle(e.target.value.replace(/[\r\n]+/g, ' '))}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+              className="a-nw-ed-title"
+              placeholder="Article title"
+              aria-label="Article title"
+              rows={1}
+            />
+            <div className="a-nw-ed-hints">
+              <span>{title.length} characters</span>
+              {title.length > 0 && (
+                <span className={title.length > 60 ? 'a-txt-a' : 'a-txt-g'}>
+                  <Check size={13} />
+                  {title.length > 60 ? 'Title is quite long' : 'Good length'}
+                </span>
+              )}
+            </div>
+            <textarea
+              value={excerpt}
+              onChange={(e) => setExcerpt(e.target.value)}
+              className="a-nw-ed-dek"
+              placeholder="Add a short summary for the news card (optional)"
+              aria-label="Excerpt"
+              rows={2}
+            />
+            <div className="a-nw-ed-hints">
+              <span>{excerpt.length > 0 ? `${excerpt.length} characters` : 'Auto-generated if left empty'}</span>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="a-nw-ed-editor">
+            <WysiwygEditor
+              value={content}
+              onChange={setContent}
+              darkMode={!light}
+              height={600}
+              placeholder="Start writing your article content here..."
+              onImageUpload={handleInlineImageUpload}
+            />
+          </div>
+        </div>
+
+        <aside className="a-nw-ed-side">
+          {/* Publishing */}
+          <section className="a-nw-ed-card">
+            <div className="a-nw-ed-card-h">
+              <span className="a-tile a-tile-sm"><AlfieIcon glyph="send" size={16} /></span>
+              <h2>Publishing</h2>
+              <span className={`a-nw-ed-pill ${isPublished ? 'is-live' : ''}`}>{isPublished ? 'Published' : 'Draft'}</span>
+            </div>
+            <p className="a-nw-ed-note">
+              {isPublished
+                ? 'Article is live and visible to members'
+                : 'Save as draft or publish when ready'}
+            </p>
+
+            {availableCommunityGroups.length > 0 && (
+              <div className="a-nw-ed-sub">
+                <div className="a-nw-ed-row">
+                  <div className="min-w-0 flex-1">
+                    <b>Publish to Community</b>
+                    <span>Share as a post in club groups when published</span>
+                  </div>
+                  <ASwitch checked={publishToCommunity} onChange={() => setPublishToCommunity(p => !p)} label="Publish to Community" />
+                </div>
+
+                {publishToCommunity && (
+                  <div className="a-nw-ed-groups">
+                    {availableCommunityGroups.length > 1 && (
+                      <div className="a-nw-ed-groups-h">
+                        <span>Select groups to post to</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (allGroupsSelected) {
+                              setCommunityGroupIds([]);
+                            } else {
+                              setCommunityGroupIds(availableCommunityGroups.map(g => g.id));
+                            }
+                          }}
+                          className="a-nw-ed-link"
+                        >
+                          {allGroupsSelected ? 'Deselect All' : 'Select All Clubs'}
+                        </button>
+                      </div>
+                    )}
+                    {availableCommunityGroups.map(group => {
+                      const on = communityGroupIds.includes(group.id);
+                      return (
+                        <button
+                          type="button"
+                          key={group.id}
+                          className={`a-nw-ed-group ${on ? 'is-on' : ''}`}
+                          onClick={() => handleToggleCommunityGroup(group.id)}
+                          aria-pressed={on}
+                        >
+                          <span className={`a-chk ${on ? 'a-chk-on' : ''}`}>{on && <Check size={12} />}</span>
+                          <span className="min-w-0 text-left">
+                            <b>{group.name}</b>
+                            {group.club_name && <span>{group.club_name}</span>}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
+            )}
+          </section>
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleCancel}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all text-slate-300 hover:text-white bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 hover:border-slate-600"
-                  disabled={saving}
-                >
-                  <X size={16} />
-                  Cancel
-                </button>
-
-                <button
-                  onClick={() => handleSave(false)}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all bg-slate-700 text-white hover:bg-slate-600 border border-slate-600 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={saving}
-                >
-                  <Save size={16} />
-                  {saving ? 'Saving...' : 'Save Draft'}
-                </button>
-
-                <button
-                  onClick={() => handleSave(true)}
-                  className="btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all from-blue-600 to-cyan-600 text-white hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  disabled={saving}
-                >
-                  <Sparkles size={16} />
-                  {saving ? 'Publishing...' : isPublished ? 'Update' : 'Publish'}
-                </button>
-              </div>
+          {/* Classes */}
+          <section className="a-nw-ed-card">
+            <div className="a-nw-ed-card-h">
+              <span className="a-tile a-tile-sm"><AlfieIcon glyph="boat" size={16} /></span>
+              <h2>Yacht Classes</h2>
             </div>
-
-            {error && (
-              <div className="mb-6 p-4 rounded-lg bg-red-900/20 border border-red-900/30 animate-in slide-in-from-top duration-300">
-                <div className="flex items-start">
-                  <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-300 ml-3">{error}</p>
-                </div>
-              </div>
+            <p className="a-nw-ed-note">Select which yacht classes this article relates to, or keep as Generic for all classes</p>
+            <div className="a-nw-ed-chips">
+              <button
+                type="button"
+                onClick={() => handleToggleYachtClass('generic')}
+                className={`a-nw-ed-chip ${selectedYachtClasses.includes('generic') ? 'is-on is-generic' : ''}`}
+                aria-pressed={selectedYachtClasses.includes('generic')}
+              >
+                {selectedYachtClasses.includes('generic') && <Check size={13} />}
+                Generic
+              </button>
+              {availableYachtClasses.map(yachtClass => (
+                <button
+                  key={yachtClass.id}
+                  type="button"
+                  onClick={() => handleToggleYachtClass(yachtClass.id)}
+                  className={`a-nw-ed-chip ${selectedYachtClasses.includes(yachtClass.id) ? 'is-on' : ''}`}
+                  aria-pressed={selectedYachtClasses.includes(yachtClass.id)}
+                >
+                  {selectedYachtClasses.includes(yachtClass.id) && <Check size={13} />}
+                  {yachtClass.name}
+                </button>
+              ))}
+            </div>
+            {selectedYachtClasses.length === 0 && (
+              <p className="a-nw-ed-warn">
+                <AlertTriangle size={12} />
+                At least one class must be selected. Generic will be used as default.
+              </p>
             )}
+          </section>
 
-            {success && (
-              <div className="mb-6 p-4 rounded-lg bg-green-900/20 border border-green-900/30 animate-in slide-in-from-top duration-300">
-                <div className="flex items-start">
-                  <Check className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-green-300 ml-3">{success}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 transition-all hover:border-slate-600/50">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/20">
-                    <Type size={20} className="text-blue-400" />
-                  </div>
-                  <h2 className="text-xl font-semibold text-white">Article Title</h2>
-                </div>
+          {/* Tags */}
+          <section className="a-nw-ed-card">
+            <div className="a-nw-ed-card-h">
+              <span className="a-tile a-tile-sm"><AlfieIcon glyph="tag" size={16} /></span>
+              <h2>Tags</h2>
+            </div>
+            <div className="a-nw-ed-chips">
+              {tags.map(tag => (
+                <span key={tag} className="a-nw-ed-tag">
+                  #{tag}
+                  <button onClick={() => handleRemoveTag(tag)} aria-label={`Remove tag ${tag}`}>
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+              {tags.length === 0 && (
+                <span className="a-nw-ed-note m-0">No tags added</span>
+              )}
+            </div>
+            <div className="a-nw-ed-tagadd">
+              <label className="a-field">
+                <AlfieIcon glyph="tag" size={15} />
                 <input
                   type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-5 py-4 bg-slate-800/60 text-white text-2xl font-bold rounded-lg border border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all placeholder-slate-500"
-                  placeholder="Enter your article title..."
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
+                  placeholder="Add a tag..."
                 />
-                <div className="mt-3 flex items-center gap-4 text-sm text-slate-400">
-                  <div className="flex items-center gap-1.5">
-                    <FileText size={14} />
-                    <span>{title.length} characters</span>
-                  </div>
-                  {title.length > 0 && (
-                    <div className={`flex items-center gap-1.5 ${title.length > 60 ? 'text-amber-400' : 'text-green-400'}`}>
-                      <Check size={14} />
-                      <span>{title.length > 60 ? 'Title is quite long' : 'Good length'}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-8 transition-all hover:border-slate-600/50">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/20">
-                    <BookOpen size={20} className="text-emerald-400" />
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="text-xl font-semibold text-white">Article Content</h2>
-                    <p className="text-sm text-slate-400 mt-0.5">Write your article using the rich text editor</p>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-slate-400">
-                    {uploadingInlineImage && (
-                      <div className="flex items-center gap-1.5 text-blue-400">
-                        <div className="animate-spin rounded-full h-3 w-3 border-b border-blue-400" />
-                        <span>Uploading image...</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-1.5">
-                      <FileText size={14} />
-                      <span>{wordCount} words</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Eye size={14} />
-                      <span>{readingTime} min read</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-lg overflow-hidden border border-slate-700/50">
-                  <WysiwygEditor
-                    value={content}
-                    onChange={setContent}
-                    darkMode={true}
-                    height={600}
-                    placeholder="Start writing your article content here..."
-                    onImageUpload={handleInlineImageUpload}
-                  />
-                </div>
-              </div>
+              </label>
+              <button onClick={handleAddTag} className="a-btn" aria-label="Add tag">
+                <Plus size={16} />
+              </button>
             </div>
+          </section>
 
-            <div className="space-y-6">
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 transition-all hover:border-slate-600/50">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/20">
-                    <Settings size={20} className="text-purple-400" />
-                  </div>
-                  <h2 className="text-lg font-semibold text-white">Settings</h2>
-                </div>
-
-                <div className="space-y-6">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="flex items-center gap-2 text-sm font-medium text-slate-300">
-                        <Calendar size={16} />
-                        Publication Status
-                      </label>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        isPublished
-                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                          : 'bg-slate-700/50 text-slate-400 border border-slate-600/50'
-                      }`}>
-                        {isPublished ? 'Published' : 'Draft'}
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-400 pl-6">
-                      {isPublished
-                        ? 'Article is live and visible to members'
-                        : 'Save as draft or publish when ready'}
-                    </p>
-                  </div>
-
-                  {availableCommunityGroups.length > 0 && (
-                    <div className="pt-4 border-t border-slate-700/50">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Users size={16} className="text-teal-400" />
-                        <label className="text-sm font-medium text-slate-300">Publish to Community</label>
-                      </div>
-                      <p className="text-xs text-slate-400 mb-3 pl-6">Share as a post in club groups when published</p>
-                      <div className="pl-6">
-                        <label className="flex items-center gap-3 cursor-pointer mb-3">
-                          <div
-                            onClick={() => setPublishToCommunity(p => !p)}
-                            className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${publishToCommunity ? 'bg-teal-500' : 'bg-slate-600'}`}
-                          >
-                            <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${publishToCommunity ? 'translate-x-5' : 'translate-x-0'}`} />
-                          </div>
-                          <span className="text-sm text-slate-300">
-                            {publishToCommunity ? 'On — will post on publish' : 'Off'}
-                          </span>
-                        </label>
-
-                        {publishToCommunity && (
-                          <div className="space-y-1.5">
-                            {availableCommunityGroups.length > 1 && (
-                              <div className="flex items-center justify-between mb-2">
-                                <p className="text-xs text-slate-400">Select groups to post to:</p>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const allSelected = availableCommunityGroups.every(g => communityGroupIds.includes(g.id));
-                                    if (allSelected) {
-                                      setCommunityGroupIds([]);
-                                    } else {
-                                      setCommunityGroupIds(availableCommunityGroups.map(g => g.id));
-                                    }
-                                  }}
-                                  className="text-xs text-teal-400 hover:text-teal-300 transition-colors font-medium"
-                                >
-                                  {availableCommunityGroups.every(g => communityGroupIds.includes(g.id))
-                                    ? 'Deselect All'
-                                    : 'Select All Clubs'}
-                                </button>
-                              </div>
-                            )}
-                            {availableCommunityGroups.map(group => (
-                              <label
-                                key={group.id}
-                                className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
-                                  communityGroupIds.includes(group.id)
-                                    ? 'border-teal-500/50 bg-teal-500/10'
-                                    : 'border-slate-700/50 bg-slate-700/20 hover:border-slate-600'
-                                }`}
-                                onClick={() => handleToggleCommunityGroup(group.id)}
-                              >
-                                <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
-                                  communityGroupIds.includes(group.id)
-                                    ? 'bg-teal-500 border-teal-500'
-                                    : 'border-slate-500'
-                                }`}>
-                                  {communityGroupIds.includes(group.id) && <Check size={10} className="text-white" />}
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="text-sm font-medium text-white truncate">{group.name}</div>
-                                  {group.club_name && (
-                                    <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                                      <Building2 size={10} />
-                                      {group.club_name}
-                                    </div>
-                                  )}
-                                </div>
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="pt-4 border-t border-slate-700/50">
-                    <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
-                      <Tag size={16} />
-                      Tags
-                    </label>
-                    <div className="flex flex-wrap gap-2 mb-3 min-h-[2rem]">
-                      {tags.map(tag => (
-                        <div
-                          key={tag}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg text-sm border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
-                        >
-                          <span className="font-medium">{tag}</span>
-                          <button
-                            onClick={() => handleRemoveTag(tag)}
-                            className="p-0.5 rounded-full hover:bg-blue-500/30 transition-colors"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
-                      {tags.length === 0 && (
-                        <div className="text-sm text-slate-500 italic">No tags added</div>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
-                        className="flex-1 px-3 py-2 bg-slate-800/60 text-white rounded-lg border border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent text-sm placeholder-slate-500"
-                        placeholder="Add a tag..."
-                      />
-                      <button
-                        onClick={handleAddTag}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-slate-700 text-white hover:bg-slate-600 border border-slate-600"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Yacht Classes Section */}
-                  <div className="pt-4 border-t border-slate-700/50">
-                    <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
-                      <Sparkles size={16} />
-                      Yacht Classes
-                    </label>
-                    <p className="text-xs text-slate-400 mb-3">
-                      Select which yacht classes this article relates to, or keep as Generic for all classes
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {/* Generic Option */}
-                      <button
-                        type="button"
-                        onClick={() => handleToggleYachtClass('generic')}
-                        className={`
-                          px-3 py-1.5 rounded-lg text-sm font-medium transition-all border
-                          ${selectedYachtClasses.includes('generic')
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 ring-2 ring-emerald-500/20'
-                            : 'bg-slate-700/50 text-slate-300 border-slate-600/50 hover:bg-slate-700 hover:border-slate-600'
-                          }
-                        `}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          {selectedYachtClasses.includes('generic') && <Check size={14} />}
-                          Generic
-                        </span>
-                      </button>
-
-                      {/* Yacht Class Options */}
-                      {availableYachtClasses.map(yachtClass => (
-                        <button
-                          key={yachtClass.id}
-                          type="button"
-                          onClick={() => handleToggleYachtClass(yachtClass.id)}
-                          className={`
-                            px-3 py-1.5 rounded-lg text-sm font-medium transition-all border
-                            ${selectedYachtClasses.includes(yachtClass.id)
-                              ? 'bg-blue-500/20 text-blue-400 border-blue-500/40 ring-2 ring-blue-500/20'
-                              : 'bg-slate-700/50 text-slate-300 border-slate-600/50 hover:bg-slate-700 hover:border-slate-600'
-                            }
-                          `}
-                        >
-                          <span className="flex items-center gap-1.5">
-                            {selectedYachtClasses.includes(yachtClass.id) && <Check size={14} />}
-                            {yachtClass.name}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    {selectedYachtClasses.length === 0 && (
-                      <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
-                        <AlertTriangle size={12} />
-                        At least one class must be selected. Generic will be used as default.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 transition-all hover:border-slate-600/50">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/20">
-                    <ImageIcon size={20} className="text-orange-400" />
-                  </div>
-                  <h2 className="text-lg font-semibold text-white">Cover Image</h2>
-                </div>
-
-                <div
-                  className={`
-                    relative border-2 border-dashed rounded-lg transition-all cursor-pointer overflow-hidden
-                    ${dragActive
-                      ? 'border-blue-500 bg-blue-500/10 scale-[1.02]'
-                      : coverImage
-                        ? 'border-green-500/50 bg-green-500/5'
-                        : 'border-slate-600 hover:border-blue-500/50 hover:bg-slate-700/30'}
-                  `}
-                  onDragEnter={handleDrag}
-                  onDragOver={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDrop={handleDrop}
-                  onClick={handleImageClick}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                    disabled={uploadingImage}
-                  />
-
-                  {coverImage || DEFAULT_COVER_IMAGE ? (
-                    <div className="relative group">
-                      <img
-                        src={coverImage || DEFAULT_COVER_IMAGE}
-                        alt="Cover preview"
-                        className="w-full h-56 object-cover"
-                      />
-                      {coverImage && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCoverImage('');
-                          }}
-                          className="absolute top-3 right-3 p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all shadow-lg opacity-0 group-hover:opacity-100"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="text-center">
-                          <Upload className="mx-auto h-10 w-10 text-white mb-2" />
-                          <p className="text-white font-medium">{coverImage ? 'Click to change image' : 'Click to upload custom image'}</p>
-                          {!coverImage && (
-                            <p className="text-white/70 text-sm mt-1">Default image will be used</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center">
-                      {uploadingImage ? (
-                        <div className="flex flex-col items-center">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-                          <p className="text-slate-300 font-medium">Uploading...</p>
-                        </div>
-                      ) : (
-                        <>
-                          <Upload className="mx-auto h-14 w-14 text-slate-500 mb-4" />
-                          <p className="text-slate-300 font-medium mb-1.5">
-                            Drop image here
-                          </p>
-                          <p className="text-slate-500 text-sm mb-3">
-                            or click to browse
-                          </p>
-                          <p className="text-slate-600 text-xs">
-                            JPG, PNG, WebP or GIF (max. 5MB)
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 transition-all hover:border-slate-600/50">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/20">
-                    <AlignLeft size={20} className="text-cyan-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-white">Excerpt</h2>
-                    <p className="text-xs text-slate-400">Optional preview text</p>
-                  </div>
-                </div>
-                <textarea
-                  value={excerpt}
-                  onChange={(e) => setExcerpt(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-800/60 text-white rounded-lg border border-slate-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent text-sm placeholder-slate-500 resize-none"
-                  placeholder="Brief summary for article previews..."
-                  rows={4}
-                />
-                <p className="mt-2 text-xs text-slate-500">
-                  {excerpt.length > 0 ? `${excerpt.length} characters` : 'Auto-generated if left empty'}
-                </p>
-              </div>
-
+          {/* Live card preview */}
+          <section className="a-nw-ed-card a-nw-ed-preview">
+            <div className="a-nw-ed-card-h">
+              <span className="a-tile a-tile-sm"><Eye size={16} /></span>
+              <h2>Card preview</h2>
             </div>
-          </div>
-        </div>
+            <p className="a-nw-ed-note">How this story appears in the news feed</p>
+            <div className="a-nw-ed-preview-card" aria-hidden="true">
+              <NewsCard article={previewArticle} onOpen={() => {}} preview />
+            </div>
+          </section>
+        </aside>
       </div>
 
       <ConfirmationModal
