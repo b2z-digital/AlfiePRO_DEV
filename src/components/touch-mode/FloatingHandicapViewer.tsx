@@ -1,6 +1,7 @@
 import { AAvatar } from '../alfie/Kit';
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Award, ChevronLeft, ChevronRight, RotateCcw, CreditCard as Edit3, Check, History, Zap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { X, Award, ChevronRight, RotateCcw, Check, History, Zap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { AlfieIcon } from '../brand/AlfieIcon';
 import { Skipper, RaceResult } from '../../types';
 import { RaceEvent } from '../../types/race';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -464,41 +465,20 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                   {!canEditHandicaps && !isScratchEvent && !isShrs && viewMode === 'handicaps' && onOverrideHandicap && (
                     <button
                       onClick={() => { setIsOverrideMode(!isOverrideMode); setEditingIndex(null); setEditValue(''); }}
-                      className={`px-3 py-1.5 rounded-lg font-medium text-xs transition-colors ${
-                        isOverrideMode
-                          ? 'bg-amber-500 text-white'
-                          : darkMode
-                            ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                            : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                      }`}
+                      className={`a-btn a-btn-sm ${isOverrideMode ? 'a-btn-a' : ''}`}
+                      style={{ height: 34 }}
                     >
-                      {isOverrideMode ? 'Done' : 'Edit'}
+                      {isOverrideMode ? <><Check size={15} />Done</> : <><AlfieIcon glyph="pen" size={15} />Edit</>}
                     </button>
                   )}
                 </div>
 
                 {!isScratchEvent && !isShrs && (
-                  <div className="flex px-4 pb-2 gap-2">
-                    <button
-                      onClick={() => setViewMode('handicaps')}
-                      className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                        viewMode === 'handicaps'
-                          ? darkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm'
-                          : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Handicaps
-                    </button>
-                    <button
-                      onClick={() => setViewMode('rankings')}
-                      className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                        viewMode === 'rankings'
-                          ? darkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm'
-                          : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Rankings
-                    </button>
+                  <div style={{ padding: '0 16px 10px' }}>
+                    <div className="a-seg a-hc-tabs" role="tablist" aria-label="Handicaps or rankings">
+                      <button type="button" role="tab" aria-selected={viewMode === 'handicaps'} onClick={() => setViewMode('handicaps')} className={`a-seg-i ${viewMode === 'handicaps' ? 'a-seg-on' : ''}`}>Handicaps</button>
+                      <button type="button" role="tab" aria-selected={viewMode === 'rankings'} onClick={() => setViewMode('rankings')} className={`a-seg-i ${viewMode === 'rankings' ? 'a-seg-on' : ''}`}>Rankings</button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -507,211 +487,118 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                 {viewMode === 'handicaps' && !isScratchEvent && !isShrs ? (
                   <>
                     {canEditHandicaps && (
-                      <div className="mb-4 space-y-2">
+                      <div className="a-hc-top">
                         {hasStoredHandicaps && allHandicapsZero && (
-                          <button
-                            onClick={() => onUsePreviousHandicaps?.()}
-                            className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
-                              darkMode
-                                ? 'bg-green-500/20 border-2 border-green-500 text-green-400 hover:bg-green-500/30'
-                                : 'bg-green-50 border-2 border-green-500 text-green-700 hover:bg-green-100'
-                            }`}
-                          >
-                            <History size={16} />
-                            Use Previous Handicaps
+                          <button type="button" onClick={() => onUsePreviousHandicaps?.()} className="a-hc-act">
+                            <span className="a-tile a-tile-sm a-hc-act-ic"><History size={17} /></span>
+                            <span className="a-hc-act-b">
+                              <span className="a-hc-act-t">Use previous handicaps</span>
+                              <span className="a-hc-act-d">Stored handicaps for {currentEvent?.raceClass || 'this class'}</span>
+                            </span>
+                            <ChevronRight size={18} className="a-dim" />
                           </button>
                         )}
                         {hasStoredHandicaps && !allHandicapsZero && storedHandicapsApplied && (
-                          <div className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm ${
-                            darkMode
-                              ? 'bg-green-500/15 border-2 border-green-500/50 text-green-400'
-                              : 'bg-green-50 border-2 border-green-400 text-green-700'
-                          }`}>
-                            <Check size={16} />
-                            Previous Handicaps Loaded
+                          <div className="a-hc-note a-hc-note-g" role="status">
+                            <span className="a-hc-note-ic"><Check size={15} strokeWidth={2.5} /></span>
+                            <span>Previous handicaps loaded</span>
                           </div>
                         )}
-                        <button
-                          onClick={handleScratchStart}
-                          className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
-                            allHandicapsZero
-                              ? hasStoredHandicaps
-                                ? darkMode
-                                  ? 'bg-amber-500/20 border-2 border-amber-500 text-amber-400'
-                                  : 'bg-amber-50 border-2 border-amber-500 text-amber-700'
-                                : darkMode
-                                  ? 'bg-amber-500/20 border-2 border-amber-500 text-amber-400'
-                                  : 'bg-amber-50 border-2 border-amber-500 text-amber-700'
-                              : darkMode
-                                ? 'bg-slate-700/50 border border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
-                                : 'bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200'
-                          }`}
-                        >
-                          <RotateCcw size={16} />
-                          {allHandicapsZero ? 'Scratch Start Active' : 'Scratch Start (Reset All to 0)'}
-                        </button>
-                        <p className={`text-xs text-center mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {allHandicapsZero ? (
+                          <button type="button" onClick={handleScratchStart} className="a-hc-note a-hc-note-a">
+                            <span className="a-hc-note-ic"><Zap size={15} /></span>
+                            <span>Scratch start active</span>
+                          </button>
+                        ) : (
+                          <button type="button" onClick={handleScratchStart} className="a-btn a-hc-scratch">
+                            <RotateCcw size={16} />Scratch start (reset all to 0)
+                          </button>
+                        )}
+                        <p className="a-hc-help">
                           {allHandicapsZero && hasStoredHandicaps
-                            ? 'Load stored handicaps or start from scratch - handicaps will build from race results'
+                            ? 'Load stored handicaps or start from scratch. Handicaps will build from race results.'
                             : allHandicapsZero
-                              ? 'First race scored as scratch - handicaps calculated from results'
-                              : 'Tap a handicap value to edit, or use scratch start for equal positions'}
+                              ? 'First race scored as scratch. Handicaps are calculated from the results.'
+                              : 'Tap a handicap to edit it, or use scratch start for equal positions.'}
                         </p>
                       </div>
                     )}
 
-                    <div className={`flex items-center justify-between px-3 py-2 mb-3 rounded-lg ${
-                      darkMode ? 'bg-slate-900/50' : 'bg-slate-100'
-                    }`}>
-                      <div className="flex-1">
-                        <span className={`text-xs font-semibold uppercase tracking-wide ${
-                          darkMode ? 'text-slate-400' : 'text-slate-600'
-                        }`}>Skipper</span>
-                      </div>
-                      <div className="text-right">
-                        <span className={`text-xs font-semibold uppercase tracking-wide ${
-                          darkMode ? 'text-slate-400' : 'text-slate-600'
-                        }`}>Handicap</span>
-                      </div>
+                    <div className="a-hc-cols">
+                      <span>Skipper</span>
+                      <span>Handicap</span>
                     </div>
 
-                    {canEditHandicaps && hasStoredHandicaps && allHandicapsZero && (
-                      <div className={`mb-3 px-3 py-2 rounded-lg border ${
-                        darkMode ? 'bg-blue-900/20 border-blue-500/30' : 'bg-blue-50 border-blue-200'
-                      }`}>
-                        <div className="flex items-center gap-2">
-                          <History size={14} className={darkMode ? 'text-blue-400' : 'text-blue-600'} />
-                          <span className={`text-xs font-medium ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-                            Stored handicaps available for {currentEvent?.raceClass || 'this class'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
+                    <div className="a-grp">
                       {handicaps.map((handicap) => {
-                        const initials = handicap.skipperName
-                          .split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                        const [firstName, ...rest] = handicap.skipperName.split(' ');
                         const isEditing = editingIndex === handicap.skipperIndex;
+                        const editable = canEditHandicaps || isOverrideMode;
                         return (
-                          <div
-                            key={handicap.skipperIndex}
-                            className={`rounded-lg p-3 border transition-all ${
-                              isEditing
-                                ? darkMode
-                                  ? 'bg-blue-900/30 border-blue-500/50 ring-1 ring-blue-500/30'
-                                  : 'bg-blue-50 border-blue-300 ring-1 ring-blue-300'
-                                : darkMode
-                                  ? 'bg-slate-900/30 border-slate-700/50 hover:bg-slate-900/50'
-                                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-xs border-2 overflow-hidden flex-shrink-0 ${
-                                darkMode ? 'bg-slate-700 text-slate-300 border-slate-600' : 'bg-slate-200 text-slate-600 border-slate-300'
-                              }`}>
-                                {handicap.avatarUrl ? (
-                                  <img src={handicap.avatarUrl} alt={handicap.skipperName} className="w-full h-full object-cover" />
-                                ) : (
-                                  <span>{initials}</span>
+                          <div key={handicap.skipperIndex} className={`a-ov-row a-hc-row ${isEditing ? 'a-hc-row-on' : ''}`}>
+                            <AAvatar url={handicap.avatarUrl} first={firstName} last={rest.join(' ')} size={36} />
+                            <div className="flex-1 min-w-0">
+                              <div className="a-ink font-semibold text-[14px] truncate">{handicap.skipperName}</div>
+                              <div className="a-dim text-[12px] mt-px flex items-center gap-1.5 flex-wrap">
+                                {currentEvent?.show_flag && skippers[handicap.skipperIndex]?.country_code && (
+                                  <span className="text-base">{getCountryFlag(skippers[handicap.skipperIndex].country_code!)}</span>
                                 )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-sm">{handicap.skipperName}</div>
-                                <div className={`text-xs flex items-center gap-1.5 flex-wrap ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  {currentEvent?.show_flag && skippers[handicap.skipperIndex]?.country_code && (
-                                    <span className="text-base">{getCountryFlag(skippers[handicap.skipperIndex].country_code!)}</span>
-                                  )}
-                                  {currentEvent?.show_country && skippers[handicap.skipperIndex]?.country_code && (
-                                    <span className="font-medium">{getIOCCode(skippers[handicap.skipperIndex].country_code!)}</span>
-                                  )}
-                                  <span>Sail {handicap.sailNumber}</span>
-                                </div>
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                {(canEditHandicaps || isOverrideMode) && isEditing ? (
-                                  <div className="flex items-center gap-1">
-                                    <input
-                                      type="number"
-                                      value={editValue}
-                                      onChange={(e) => setEditValue(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleConfirmEdit();
-                                        if (e.key === 'Escape') { setEditingIndex(null); setEditValue(''); }
-                                      }}
-                                      autoFocus
-                                      min="0"
-                                      max="300"
-                                      step="10"
-                                      className={`w-16 px-2 py-1 text-center text-lg font-bold rounded-lg border ${
-                                        darkMode
-                                          ? 'bg-slate-700 text-white border-blue-500 focus:ring-2 focus:ring-blue-500'
-                                          : 'bg-white text-slate-900 border-blue-400 focus:ring-2 focus:ring-blue-400'
-                                      } outline-none`}
-                                    />
-                                    <button
-                                      onClick={handleConfirmEdit}
-                                      className="p-1.5 rounded-lg bg-green-600 text-white hover:bg-green-500 transition-colors"
-                                    >
-                                      <Check size={16} />
-                                    </button>
-                                  </div>
-                                ) : (canEditHandicaps || isOverrideMode) ? (
-                                  <div className="flex flex-col items-end gap-0.5">
-                                    <button
-                                      onClick={() => handleStartEdit(handicap.skipperIndex, handicap.currentHandicap)}
-                                      className="group flex items-center gap-1.5 transition-colors"
-                                    >
-                                      {handicap.change !== 0 && (
-                                        <div className="flex flex-col items-end mr-1">
-                                          <div className="flex items-center gap-0.5">
-                                            {handicap.change < 0 ? (
-                                              <ArrowUpRight size={12} strokeWidth={2.5} className="text-green-400" />
-                                            ) : (
-                                              <ArrowDownRight size={12} strokeWidth={2.5} className="text-red-400" />
-                                            )}
-                                            <span className={`text-[10px] font-semibold ${handicap.change < 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                              {handicap.change < 0 ? handicap.change : `+${handicap.change}`}s
-                                            </span>
-                                          </div>
-                                          <span className={`text-[9px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                            was {handicap.previousHandicap}
-                                          </span>
-                                        </div>
-                                      )}
-                                      <span className="text-xl font-bold text-green-500">{handicap.currentHandicap}</span>
-                                      <Edit3 size={14} className={`${darkMode ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-600'} transition-colors`} />
-                                    </button>
-                                    {handicap.storedHandicap !== undefined && handicap.storedHandicap > 0 && handicap.currentHandicap === 0 && (
-                                      <span className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                        Stored: {handicap.storedHandicap}
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1.5">
-                                    {handicap.change !== 0 && (
-                                      <div className="flex flex-col items-end mr-1">
-                                        <div className="flex items-center gap-0.5">
-                                          {handicap.change < 0 ? (
-                                            <ArrowUpRight size={12} strokeWidth={2.5} className="text-green-400" />
-                                          ) : (
-                                            <ArrowDownRight size={12} strokeWidth={2.5} className="text-red-400" />
-                                          )}
-                                          <span className={`text-[10px] font-semibold ${handicap.change < 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                            {handicap.change < 0 ? handicap.change : `+${handicap.change}`}s
-                                          </span>
-                                        </div>
-                                        <span className={`text-[9px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                          was {handicap.previousHandicap}
-                                        </span>
-                                      </div>
-                                    )}
-                                    <span className="text-xl font-bold text-green-500">{handicap.currentHandicap}</span>
-                                  </div>
+                                {currentEvent?.show_country && skippers[handicap.skipperIndex]?.country_code && (
+                                  <span className="font-medium">{getIOCCode(skippers[handicap.skipperIndex].country_code!)}</span>
+                                )}
+                                <span>Sail {handicap.sailNumber}</span>
+                                {editable && handicap.storedHandicap !== undefined && handicap.storedHandicap > 0 && handicap.currentHandicap === 0 && (
+                                  <span className="a-hc-stored">Stored {handicap.storedHandicap}</span>
                                 )}
                               </div>
                             </div>
+                            {editable && isEditing ? (
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <input
+                                  type="number"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleConfirmEdit();
+                                    if (e.key === 'Escape') { setEditingIndex(null); setEditValue(''); }
+                                  }}
+                                  autoFocus
+                                  min="0"
+                                  max="300"
+                                  step="10"
+                                  aria-label={`Handicap for ${handicap.skipperName}`}
+                                  className="a-inp a-hc-inp"
+                                />
+                                <button type="button" onClick={handleConfirmEdit} className="a-hc-ok" aria-label="Save handicap">
+                                  <Check size={17} strokeWidth={2.5} />
+                                </button>
+                              </div>
+                            ) : editable ? (
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {handicap.change !== 0 && (
+                                <span className={`a-hc-chg ${handicap.change < 0 ? 'a-hc-chg-dn' : 'a-hc-chg-up'}`} title={`was ${handicap.previousHandicap}`}>
+                                  {handicap.change < 0 ? <ArrowUpRight size={12} strokeWidth={2.5} /> : <ArrowDownRight size={12} strokeWidth={2.5} />}
+                                  {handicap.change < 0 ? handicap.change : `+${handicap.change}`}s
+                                  <span className="a-hc-was">was {handicap.previousHandicap}</span>
+                                </span>
+                              )}
+                                <button type="button" onClick={() => handleStartEdit(handicap.skipperIndex, handicap.currentHandicap)} className="a-hc-val a-hc-val-edit" aria-label={`Edit handicap for ${handicap.skipperName}: ${handicap.currentHandicap}`}>
+                                  <span className="a-num">{handicap.currentHandicap}</span>
+                                  <AlfieIcon glyph="pen" size={14} className="a-hc-pen" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {handicap.change !== 0 && (
+                                <span className={`a-hc-chg ${handicap.change < 0 ? 'a-hc-chg-dn' : 'a-hc-chg-up'}`} title={`was ${handicap.previousHandicap}`}>
+                                  {handicap.change < 0 ? <ArrowUpRight size={12} strokeWidth={2.5} /> : <ArrowDownRight size={12} strokeWidth={2.5} />}
+                                  {handicap.change < 0 ? handicap.change : `+${handicap.change}`}s
+                                  <span className="a-hc-was">was {handicap.previousHandicap}</span>
+                                </span>
+                              )}
+                                <span className="a-hc-val"><span className="a-num">{handicap.currentHandicap}</span></span>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -753,14 +640,9 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
               </div>
 
               {canEditHandicaps && viewMode === 'handicaps' && !isScratchEvent && !isShrs && (
-                <div className={`px-4 py-3 border-t ${
-                  darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <button
-                    onClick={() => setIsOpen(false)}
-                    className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-500 transition-colors"
-                  >
-                    Done - Start Racing
+                <div className="a-sheet-foot" style={{ padding: '14px 16px' }}>
+                  <button type="button" onClick={() => setIsOpen(false)} className="a-btn a-btn-p w-full" style={{ height: 46 }}>
+                    <Check size={18} />Done · start racing
                   </button>
                 </div>
               )}

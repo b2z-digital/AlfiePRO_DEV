@@ -985,3 +985,78 @@ html.alfie-light .a-mf-chk-on { background: #0A84FF; box-shadow: none; }
 html.alfie-light .a-mf-list::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.18); }
 .a-mf-menu .a-mf-search input, .a-mf-menu .a-mf-search input:focus, .a-mf-menu .a-mf-search input:focus-visible { outline: none !important; box-shadow: none !important; border: 0 !important; background: transparent !important; height: auto; padding: 0; }
 .a-mf-search:focus-within { box-shadow: inset 0 0 0 1.5px rgba(10, 132, 255, 0.7); }
+
+/* Coloured buttons keep their colour on hover. The general .a-btn hover (grey in dark,
+   near-white in light) outranked these variants. */
+html.alfie-theme .a-btn.a-btn-verify:hover:not(:disabled) { background: linear-gradient(180deg, #48DE77, #2BBB56); filter: none; box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 10px 28px rgba(48,209,88,0.4); }
+html.alfie-theme .a-btn.a-btn-verify:active:not(:disabled) { background: linear-gradient(180deg, #2FC25D, #20A346); box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 4px 12px rgba(48,209,88,0.3); }
+html.alfie-light .a-btn.a-btn-d:hover:not(:disabled) { background: rgba(229, 72, 77, 0.14); }
+html.alfie-light .a-btn.a-btn-g:hover:not(:disabled) { background: rgba(48, 209, 88, 0.17); }
+html.alfie-light .a-btn.a-btn-a:hover:not(:disabled) { background: rgba(255, 159, 10, 0.17); }
+html.alfie-light .a-btn.a-btn-sb:hover:not(:disabled) { background: rgba(20, 160, 150, 0.15); }
+html.alfie-light .a-btn.a-btn-gold:hover:not(:disabled) { background: rgba(255, 179, 64, 0.2); }
+html.alfie-light .a-btn.a-btn-danger-soft:hover:not(:disabled) { background: rgba(217, 45, 32, 0.1); }
+
+/* StartBox dial (scoring bar). Hidden while the live countdown pill is showing. */
+.a-sbx { position: relative; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 0; border-radius: 999px; border: 1.5px solid transparent; background: radial-gradient(circle at 50% 35%, rgba(64, 200, 192, 0.16), transparent 70%) padding-box, linear-gradient(#141B2B, #141B2B) padding-box, linear-gradient(135deg, rgba(64, 200, 192, 0.55), rgba(46, 123, 255, 0.4)) border-box; color: #E8F6F5; cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); transition: box-shadow .18s ease, transform .12s ease; }
+.a-sbx:hover { background: radial-gradient(circle at 50% 35%, rgba(64, 200, 192, 0.22), transparent 70%) padding-box, linear-gradient(#18203A, #18203A) padding-box, var(--alfie-spectrum) border-box; box-shadow: 0 0 0 4px rgba(138, 77, 255, 0.14), 0 6px 18px rgba(0, 0, 0, 0.35); }
+.a-sbx:active { transform: scale(0.94); }
+.a-sbx:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.7); }
+.a-sbar:has(.a-sb-pill) .a-sbx { display: none; }
+html.alfie-light .a-sbx { background: radial-gradient(circle at 50% 35%, rgba(64, 200, 192, 0.14), transparent 70%) padding-box, linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, rgba(20, 160, 150, 0.6), rgba(46, 123, 255, 0.45)) border-box; color: #0B1220; box-shadow: 0 3px 10px rgba(15, 23, 42, 0.1); }
+html.alfie-light .a-sbx:hover { background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; box-shadow: 0 0 0 4px rgba(138, 77, 255, 0.12), 0 4px 14px rgba(15, 23, 42, 0.12); }
+
+/* Starting handicaps (scoring side sheet) */
+.a-hc-tabs { display: flex; width: 100%; }
+.a-hc-tabs .a-seg-i { flex: 1; justify-content: center; }
+.a-hc-top { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.a-hc-act { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 12px 12px 12px; border-radius: 16px; border: 1px solid transparent; background: linear-gradient(#141B2B, #141B2B) padding-box, linear-gradient(135deg, rgba(48, 209, 88, 0.6), rgba(64, 200, 192, 0.45)) border-box; color: #F1F4FA; text-align: left; cursor: pointer; }
+.a-hc-act:hover { background: linear-gradient(#18213A, #18213A) padding-box, linear-gradient(135deg, rgba(48, 209, 88, 0.8), rgba(64, 200, 192, 0.6)) border-box; }
+.a-hc-act-ic { color: #6BE38C; }
+.a-hc-act-b { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.a-hc-act-t { font-size: 14.5px; font-weight: 600; }
+.a-hc-act-d { font-size: 12.5px; color: rgba(235, 240, 255, 0.55); margin-top: 1px; }
+.a-hc-note { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: 14px; border: 0; font-size: 13.5px; font-weight: 600; text-align: left; }
+button.a-hc-note { cursor: pointer; }
+.a-hc-note-ic { width: 26px; height: 26px; flex-shrink: 0; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; }
+.a-hc-note-g { background: rgba(48, 209, 88, 0.1); color: #6BE38C; }
+.a-hc-note-g .a-hc-note-ic { background: rgba(48, 209, 88, 0.18); }
+.a-hc-note-a { background: rgba(255, 179, 64, 0.1); color: #FFC56B; }
+.a-hc-note-a .a-hc-note-ic { background: rgba(255, 179, 64, 0.18); }
+.a-hc-scratch { width: 100%; height: 44px; }
+.a-hc-help { margin: 2px 4px 0; font-size: 12.5px; line-height: 1.45; color: rgba(235, 240, 255, 0.5); text-align: center; }
+.a-hc-cols { display: flex; justify-content: space-between; padding: 0 14px 6px; font: 600 10.5px 'Instrument Sans', sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(235, 240, 255, 0.45); }
+.a-hc-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px; }
+.a-hc-row-on { background: rgba(10, 132, 255, 0.08); }
+.a-hc-stored { padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); font-size: 11px; font-weight: 600; color: rgba(235, 240, 255, 0.7); }
+.a-hc-val { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 64px; height: 38px; padding: 0 12px; border-radius: 12px; border: 1px solid transparent; background: transparent; color: #F1F4FA; font: 700 20px 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.02em; }
+.a-hc-val-edit { border-color: rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05); cursor: pointer; }
+.a-hc-val-edit:hover { background: rgba(255, 255, 255, 0.09); border-color: rgba(255, 255, 255, 0.18); }
+.a-hc-val-edit:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.7); }
+.a-hc-pen { color: rgba(235, 240, 255, 0.45); }
+.a-hc-val-edit:hover .a-hc-pen { color: rgba(235, 240, 255, 0.85); }
+.a-hc-inp { width: 82px !important; height: 40px !important; padding: 0 8px !important; text-align: center; font: 700 18px 'Bricolage Grotesque', system-ui, sans-serif !important; }
+.a-hc-ok { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 12px; background: linear-gradient(180deg, #3BD46A, #25B04F); color: #04140A; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.a-hc-ok:hover { background: linear-gradient(180deg, #48DE77, #2BBB56); }
+.a-hc-chg { display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.a-hc-chg-dn { background: rgba(48, 209, 88, 0.14); color: #6BE38C; }
+.a-hc-chg-up { background: rgba(255, 107, 107, 0.14); color: #FF8A8A; }
+.a-hc-was { margin-left: 4px; font-weight: 500; opacity: 0.75; }
+
+html.alfie-light .a-hc-act { background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, rgba(31, 157, 75, 0.6), rgba(20, 160, 150, 0.5)) border-box; color: #0B1220; }
+html.alfie-light .a-hc-act:hover { background: linear-gradient(#F6FBF8, #F6FBF8) padding-box, linear-gradient(135deg, rgba(31, 157, 75, 0.8), rgba(20, 160, 150, 0.7)) border-box; }
+html.alfie-light .a-hc-act-ic { color: #1F9D4B; }
+html.alfie-light .a-hc-act-d, html.alfie-light .a-hc-help, html.alfie-light .a-hc-cols { color: #64748B; }
+html.alfie-light .a-hc-note-g { background: rgba(48, 209, 88, 0.12); color: #167A3A; }
+html.alfie-light .a-hc-note-a { background: rgba(255, 159, 10, 0.12); color: #9A5B00; }
+html.alfie-light .a-hc-stored { background: rgba(15, 23, 42, 0.06); color: #475569; }
+html.alfie-light .a-hc-val { color: #0B1220; }
+html.alfie-light .a-hc-val-edit { border-color: rgba(15, 23, 42, 0.12); background: #fff; }
+html.alfie-light .a-hc-val-edit:hover { background: #F6F8FB; border-color: rgba(15, 23, 42, 0.2); }
+html.alfie-light .a-hc-pen { color: #94A3B8; }
+html.alfie-light .a-hc-val-edit:hover .a-hc-pen { color: #475569; }
+html.alfie-light .a-hc-chg-dn { background: rgba(48, 209, 88, 0.14); color: #167A3A; }
+html.alfie-light .a-hc-chg-up { background: rgba(229, 72, 77, 0.12); color: #C8323A; }
+html.alfie-light .a-hc-row-on { background: rgba(10, 132, 255, 0.07); }
+.a-hc-inp { -moz-appearance: textfield; appearance: textfield; }
+.a-hc-inp::-webkit-outer-spin-button, .a-hc-inp::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
