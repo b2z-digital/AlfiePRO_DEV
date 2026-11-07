@@ -130,3 +130,84 @@ body.alv-onair-dock .alv-onair-host { padding-right: 368px; }
 @media (max-width: 760px) {
   body.alv-onair-dock .alv-onair-host { padding-right: 0; }
 }
+
+/* ── Broadcast overlays (livestream board "Overlay pack") ──
+   Sized in container units so they scale with the picture: the studio preview,
+   the 1080p composite and the cloud program page all look the same. */
+.alv-ov { container-type: size; font-family: 'Instrument Sans', system-ui, sans-serif; color: #F4F6FB; }
+.alv-ov-glass {
+  position: absolute; border: 1px solid rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.alv-ov-fleet {
+  right: 1.6cqw; top: 1.6cqw; width: 21cqw; padding: 0.8cqw 1cqw; border-radius: 1cqw;
+  display: flex; flex-direction: column;
+}
+.alv-ov-fleet-head {
+  display: flex; justify-content: space-between; gap: 1cqw; margin-bottom: 0.2cqw;
+  height: 1.6cqw; line-height: 1.6cqw; white-space: nowrap;
+  font-size: 0.85cqw; font-weight: 800; letter-spacing: 0.1em; color: rgba(235, 240, 255, 0.8);
+}
+.alv-ov-fleet-head .in { color: #7BEA9C; }
+.alv-ov-row {
+  display: grid; grid-template-columns: 1.4cqw 2.2cqw minmax(0, 1fr) 6.2cqw; gap: 0.5cqw;
+  height: 1.7cqw; font-size: 1.02cqw; font-weight: 600;
+}
+.alv-ov-row span { display: block; height: 1.7cqw; line-height: 1.7cqw; white-space: nowrap; overflow: hidden; }
+.alv-ov-row.compact { height: 1.36cqw; font-size: 0.86cqw; }
+.alv-ov-row.compact span { height: 1.36cqw; line-height: 1.36cqw; }
+.alv-ov-row .p { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: rgba(235, 240, 255, 0.45); }
+.alv-ov-row.done .p { color: #7BEA9C; }
+.alv-ov-row .s { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #8CC4FF; }
+.alv-ov-row .t { font-weight: 500; color: rgba(235, 240, 255, 0.66); text-align: right; }
+.alv-ov-more { margin-top: 0.3cqw; height: 1.3cqw; line-height: 1.3cqw; font-size: 0.8cqw; color: rgba(235, 240, 255, 0.6); }
+
+.alv-ov-bar {
+  left: 1.6cqw; bottom: 1.6cqw; max-width: calc(100cqw - 26cqw); height: 3.4cqw; padding: 0 1.3cqw; border-radius: 1cqw;
+  display: flex; gap: 1.2cqw; font-size: 1.05cqw; font-weight: 600; white-space: nowrap;
+}
+.alv-ov-bar > span { display: block; height: 3.4cqw; line-height: 3.4cqw; }
+.alv-ov-bar .race { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.45cqw; font-weight: 700; letter-spacing: -0.01em; }
+.alv-ov-bar .status .dot { display: inline-block; width: 0.6cqw; height: 0.6cqw; margin-right: 0.45cqw; border-radius: 50%; background: currentColor; vertical-align: 0.15cqw; }
+.alv-ov-bar .status.is-racing { color: #FF8796; }
+.alv-ov-bar .status.is-hold { color: #FFC864; }
+.alv-ov-bar .status.is-done { color: rgba(235, 240, 255, 0.75); }
+.alv-ov-bar .clock { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.alv-ov-bar .event { color: rgba(235, 240, 255, 0.7); overflow: hidden; min-width: 0; }
+.alv-ov-bar .brand { font-weight: 700; margin-left: 0.4cqw; }
+.alv-ov-bar .brand svg { display: inline-block; width: 1.2cqw; height: 1.8cqw; margin-right: 0.35cqw; vertical-align: -0.45cqw; }
+.alv-ov-bar .brand b { color: #2A93FF; }
+
+.alv-ov-hold {
+  left: 1.6cqw; top: 50%; transform: translateY(-50%); max-width: 40cqw; padding: 1.8cqw 2.2cqw; border-radius: 1.2cqw;
+  display: flex; flex-direction: column; gap: 0.7cqw;
+}
+.alv-ov-hold .chip {
+  align-self: flex-start; padding: 0.3cqw 0.8cqw; border-radius: 999px; background: #FFB224; color: #1A1203;
+  font-size: 0.85cqw; font-weight: 800; letter-spacing: 0.08em;
+}
+.alv-ov-hold .h { font-family: 'Bricolage Grotesque', sans-serif; font-size: 2.6cqw; font-weight: 700; line-height: 1.1; }
+.alv-ov-hold .sub { font-size: 1.1cqw; color: rgba(235, 240, 255, 0.72); }
+
+.alv-ov-results {
+  left: 50%; top: 50%; transform: translate(-50%, -50%); width: 46cqw; padding: 1.8cqw 2.2cqw; border-radius: 1.2cqw;
+  display: flex; flex-direction: column; gap: 0.2cqw;
+}
+.alv-ov-results .h { font-family: 'Bricolage Grotesque', sans-serif; font-size: 2.2cqw; font-weight: 700; margin-bottom: 0.6cqw; }
+.alv-ov-res {
+  display: grid; grid-template-columns: 2.2cqw 3.6cqw minmax(0, 1fr); gap: 0.8cqw;
+  height: 2.3cqw; border-top: 1px solid rgba(255, 255, 255, 0.07); font-size: 1.25cqw; font-weight: 600;
+}
+.alv-ov-res > span { display: block; height: 2.3cqw; line-height: 2.3cqw; white-space: nowrap; overflow: hidden; }
+.alv-ov-res .p { color: #7BEA9C; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.alv-ov-res .s { color: #8CC4FF; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.alv-ov-res .t { font-weight: 500; color: rgba(235, 240, 255, 0.66); }
+
+/* html2canvas (the studio compositor) draws text lower in its line box than the browser does
+   and clips it. In the capture clone only (.alv-h2c on <html>), lift the text back into place. */
+.alv-h2c .alv-ov-row span,
+.alv-h2c .alv-ov-res > span,
+.alv-h2c .alv-ov-fleet-head span { position: relative; top: -0.3em; overflow: visible !important; }
+.alv-h2c .alv-ov-bar > span { position: relative; top: -0.55em; }
+.alv-h2c .alv-ov-bar .status .dot { position: relative; top: 0.5em; }
+.alv-h2c .alv-ov-bar .brand svg { position: relative; top: 0.35em; }

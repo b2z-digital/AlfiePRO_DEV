@@ -14,6 +14,8 @@ export interface OverlayConfig {
   showWeather: boolean;
   showHandicaps: boolean;
   statusText?: string;
+  /** Opacity of the overlay panels (fleet list, race bar, cards); 0.58 by default */
+  fleetOpacity?: number;
   position: 'top' | 'bottom' | 'left' | 'right' | 'center';
   theme: 'dark' | 'light' | 'transparent';
 }
