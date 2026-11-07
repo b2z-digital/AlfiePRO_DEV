@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { NOTE_MESSAGE, PROGRAM_MESSAGE, liveCloud, loadRealtimeKit, type RtkMeeting } from '../../utils/liveCloud';
+import { ENDED_MESSAGE, NOTE_MESSAGE, PROGRAM_MESSAGE, liveCloud, loadRealtimeKit, type RtkMeeting } from '../../utils/liveCloud';
 
 /**
  * Phone / iPad camera for a cloud broadcast (livestream board: "Phone camera app").
@@ -67,6 +67,9 @@ export default function LiveCameraPage() {
   const [awake, setAwake] = useState(false);
   const [portrait, setPortrait] = useState(() => window.matchMedia?.('(orientation: portrait)').matches ?? false);
   const [isNext, setIsNext] = useState(false);
+  const [endedByRoom, setEndedByRoom] = useState(false);
+  const lastProgramAtRef = useRef(0);
+  const meetingRef = useRef<RtkMeeting | null>(null);
   const [note, setNote] = useState<{ text: string; at: number } | null>(null);
   const [zoomRange, setZoomRange] = useState<ZoomRange | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -90,6 +93,7 @@ export default function LiveCameraPage() {
     try {
       const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } };
       if (!nav.wakeLock) { setAwake(false); return; }
+      if (wakeLockRef.current) { setAwake(true); return; }
       wakeLockRef.current = await nav.wakeLock.request('screen');
       setAwake(true);
     } catch { setAwake(false); }
@@ -111,6 +115,19 @@ export default function LiveCameraPage() {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [onAir]);
+
+  // The control room repeats who's on program every 5 seconds. If that stops (control
+  // room closed, broadcast ended), drop the tally after 15 seconds rather than stay on air.
+  useEffect(() => {
+    if (phase !== 'live') return;
+    const t = setInterval(() => {
+      if (lastProgramAtRef.current && Date.now() - lastProgramAtRef.current > 15000) {
+        setOnAir(false);
+        setIsNext(false);
+      }
+    }, 3000);
+    return () => clearInterval(t);
+  }, [phase]);
 
   // A director's note stays up for 45 seconds (or until dismissed)
   useEffect(() => {
@@ -143,8 +160,11 @@ export default function LiveCameraPage() {
   };
 
   const join = async () => {
+    // Ask for the screen to stay awake inside the tap: Safari only grants it to a user gesture
+    requestWakeLock();
     setPhase('joining');
     setError(null);
+    setEndedByRoom(false);
     try {
       const cameraName = `${name.trim() || position}`;
       const res = await liveCloud<{ token: string; title: string }>('join_camera', { sessionId, key, name: cameraName });
@@ -164,6 +184,10 @@ export default function LiveCameraPage() {
       } catch { /* keep the default camera */ }
       if (!m.self.videoEnabled) await m.self.enableVideo().catch(() => {});
       m.participants.on('broadcastedMessage', (({ type, payload }: { type: string; payload: Record<string, unknown> }) => {
+        if (type === ENDED_MESSAGE) {
+          finish(m, true);
+          return;
+        }
         if (type === NOTE_MESSAGE) {
           const to = payload?.to;
           const text = typeof payload?.text === 'string' ? payload.text.trim() : '';
@@ -171,6 +195,7 @@ export default function LiveCameraPage() {
           return;
         }
         if (type !== PROGRAM_MESSAGE) return;
+        lastProgramAtRef.current = Date.now();
         const mine = payload?.participantId === m.self.id;
         setIsNext(!mine && payload?.nextId === m.self.id);
         setOnAir((was) => {
@@ -178,7 +203,13 @@ export default function LiveCameraPage() {
           return mine;
         });
       }) as any);
+      // The room closing (broadcast ended, removed by the control room) ends filming here too
+      const selfEvents = m.self as unknown as { on?: (ev: string, f: (p: { state: string }) => void) => void };
+      selfEvents.on?.('roomLeft', ({ state }) => {
+        if (state === 'ended' || state === 'kicked' || state === 'rejected') finish(m, true);
+      });
       readTrack(m);
+      meetingRef.current = m;
       setMeeting(m);
       setPhase('live');
     } catch (e) {
@@ -206,12 +237,19 @@ export default function LiveCameraPage() {
     } catch { /* ignore */ }
   };
 
-  const leave = async () => {
-    try { await meeting?.leave(); } catch { /* already gone */ }
+  // Stop sending and show the end screen (byRoom: the control room ended the broadcast)
+  const finish = async (m: RtkMeeting | null, byRoom: boolean) => {
+    if (meetingRef.current !== m && m !== null) return;
+    meetingRef.current = null;
+    try { await m?.leave(); } catch { /* already gone */ }
     setMeeting(null);
     setOnAir(false);
+    setIsNext(false);
+    setNote(null);
+    setEndedByRoom(byRoom);
     setPhase('ended');
   };
+  const leave = () => finish(meeting, false);
 
   const elapsed = onAirSince ? Math.max(0, Math.floor((now - onAirSince) / 1000)) : 0;
   const mmss = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
@@ -229,7 +267,7 @@ export default function LiveCameraPage() {
       <div style={{ ...shell, position: 'fixed', inset: 0 }}>
         <video ref={videoRef} autoPlay playsInline muted style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000' }} />
         <div style={{ position: 'absolute', inset: 0, border: `6px solid ${tally}`, borderRadius: 4, pointerEvents: 'none', transition: 'border-color 0.2s ease' }} aria-hidden="true" />
-        <div style={{ position: 'absolute', left: 16, right: 84, top: 'max(16px, env(safe-area-inset-top))', display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ position: 'absolute', left: SAFE_LEFT, right: 'calc(max(16px, env(safe-area-inset-right)) + 64px)', top: 'max(12px, env(safe-area-inset-top))', display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
           <span role="status" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 34, padding: '0 12px', borderRadius: 10,
             background: onAir ? '#E11D38' : isNext ? '#1F9D48' : 'rgba(6,11,22,0.7)', color: '#fff', fontWeight: 800, letterSpacing: '0.04em', fontSize: 14, flexShrink: 0 }}>
             {onAir && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} aria-hidden="true" />}
@@ -247,7 +285,7 @@ export default function LiveCameraPage() {
           )}
         </div>
         {presets.length > 1 && (
-          <div role="group" aria-label="Zoom" style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div role="group" aria-label="Zoom" style={{ position: 'absolute', right: SAFE_RIGHT, top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {presets.map((z) => {
               const active = Math.abs(zoom - z) < 0.05;
               return (
@@ -261,11 +299,11 @@ export default function LiveCameraPage() {
           </div>
         )}
         {portrait && (
-          <div style={{ position: 'absolute', left: 16, right: 16, top: 'calc(max(16px, env(safe-area-inset-top)) + 50px)', padding: '10px 12px', borderRadius: 12, background: 'rgba(6,11,22,0.7)', fontSize: 14, textAlign: 'center' }}>
+          <div style={{ position: 'absolute', left: SAFE_LEFT, right: SAFE_RIGHT, top: 'calc(max(12px, env(safe-area-inset-top)) + 50px)', padding: '10px 12px', borderRadius: 12, background: 'rgba(6,11,22,0.7)', fontSize: 14, textAlign: 'center' }}>
             Turn your phone sideways for the best picture
           </div>
         )}
-        <div style={{ position: 'absolute', left: 16, right: 16, bottom: 'max(16px, env(safe-area-inset-bottom))', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ position: 'absolute', left: SAFE_LEFT, right: SAFE_RIGHT, bottom: 'max(12px, env(safe-area-inset-bottom))', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           {stats && (
             <span style={{ height: 34, padding: '0 12px', borderRadius: 10, background: 'rgba(6,11,22,0.7)', display: 'inline-flex', alignItems: 'center', fontSize: 13, fontWeight: 600 }}>
               {stats}
@@ -290,13 +328,17 @@ export default function LiveCameraPage() {
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(235,240,255,0.64)' }}>AlfiePRO Live</div>
           <h1 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 30, fontWeight: 700, letterSpacing: '-0.02em', margin: '6px 0 0' }}>
-            {phase === 'ended' ? 'Thanks for filming' : 'Join as a camera'}
+            {phase === 'ended' ? (endedByRoom ? 'Broadcast ended' : 'Thanks for filming') : 'Join as a camera'}
           </h1>
           {title && <p style={{ margin: '6px 0 0', color: 'rgba(235,240,255,0.72)' }}>{title}</p>}
         </div>
 
         {phase === 'ended' ? (
-          <p style={{ color: 'rgba(235,240,255,0.72)', lineHeight: 1.5 }}>You've left the broadcast. You can close this page, or join again.</p>
+          <p style={{ color: 'rgba(235,240,255,0.72)', lineHeight: 1.5 }}>
+            {endedByRoom
+              ? 'The race officer has ended the broadcast. Your camera has stopped sending. Thanks for filming. You can close this page.'
+              : 'You\'ve left the broadcast. You can close this page, or join again.'}
+          </p>
         ) : (
           <>
             <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
@@ -326,10 +368,10 @@ export default function LiveCameraPage() {
 
         {error && <p role="alert" style={{ margin: 0, padding: '10px 12px', borderRadius: 12, background: 'rgba(225,29,56,0.14)', color: '#FFB3BD', fontSize: 14 }}>{error}</p>}
 
-        <button type="button" onClick={join} disabled={phase === 'joining' || !key}
+        {!(phase === 'ended' && endedByRoom) && <button type="button" onClick={join} disabled={phase === 'joining' || !key}
           style={{ height: 52, borderRadius: 14, border: 0, background: 'linear-gradient(180deg,#2A93FF,#0A78F0)', color: '#fff', fontSize: 16, fontWeight: 700, opacity: phase === 'joining' ? 0.7 : 1 }}>
           {phase === 'joining' ? 'Joining…' : phase === 'ended' ? 'Join again' : 'Start camera'}
-        </button>
+        </button>}
         {!key && <p style={{ margin: 0, color: '#FFB3BD', fontSize: 14 }}>This link is missing its key. Ask the race officer for the camera link.</p>}
         <p style={{ margin: 0, color: 'rgba(235,240,255,0.6)', fontSize: 13, lineHeight: 1.5 }}>
           No app or login needed. Your camera and microphone go to the broadcast only while this page is open, and the link stops working when the broadcast ends.
@@ -339,8 +381,12 @@ export default function LiveCameraPage() {
   );
 }
 
+// Landscape phones: keep controls clear of the Dynamic Island / notch and the rounded corners
+const SAFE_LEFT = 'max(16px, env(safe-area-inset-left))';
+const SAFE_RIGHT = 'max(16px, env(safe-area-inset-right))';
+
 const btn: React.CSSProperties = {
-  height: 48, padding: '0 18px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.18)',
+  height: 44, padding: '0 16px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.18)',
   background: 'rgba(6,11,22,0.7)', color: '#fff', fontSize: 15, fontWeight: 700,
 };
 const chip: React.CSSProperties = {

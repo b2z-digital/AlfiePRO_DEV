@@ -34,3 +34,5 @@ export const CAMERA_PRESET = 'alfie_camera';
 export const PROGRAM_MESSAGE = 'alfie-program';
 /** A note from the control room to one camera ({ to: participantId }) or all of them ({ to: 'all' }) */
 export const NOTE_MESSAGE = 'alfie-note';
+/** The broadcast has ended: cameras stop sending and say so */
+export const ENDED_MESSAGE = 'alfie-ended';
