@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
-import { CAMERA_PRESET, PROGRAM_MESSAGE, liveCloud, loadRealtimeKit, type RtkMeeting } from '../../utils/liveCloud';
+import { CAMERA_PRESET, NOTE_MESSAGE, PROGRAM_MESSAGE, liveCloud, loadRealtimeKit, type RtkMeeting } from '../../utils/liveCloud';
 
 /**
  * Cloud engine test bench (club admins). Creates a hidden test broadcast on the
@@ -128,14 +128,28 @@ export default function LiveCloudTestPage() {
     return () => { events.forEach((ev) => joined.off(ev as any, refresh as any)); meeting.leave().catch(() => {}); };
   }, [meeting]);
 
-  // Tell cameras and the program page which camera is on program (repeated, so late joiners catch up)
+  // Tell cameras and the program page which camera is on program, and which is next
+  // (repeated, so late joiners catch up)
+  const programIndex = cams.findIndex((c) => c.id === programId);
+  const nextId = cams.length > 1 ? cams[(programIndex + 1) % cams.length]?.id ?? null : null;
   useEffect(() => {
     if (!meeting || !programId) return;
-    const send = () => meeting.participants.broadcastMessage(PROGRAM_MESSAGE, { participantId: programId }).catch(() => {});
+    const send = () => meeting.participants.broadcastMessage(PROGRAM_MESSAGE, nextId ? { participantId: programId, nextId } : { participantId: programId }).catch(() => {});
     send();
     const t = setInterval(send, 5000);
     return () => clearInterval(t);
-  }, [meeting, programId]);
+  }, [meeting, programId, nextId]);
+
+  // Notes to camera operators ("Follow 51 round the windward mark")
+  const [noteText, setNoteText] = useState('');
+  const [noteTo, setNoteTo] = useState('all');
+  const sendNote = async () => {
+    const text = noteText.trim();
+    if (!meeting || !text) return;
+    await act(`Note to ${noteTo === 'all' ? 'all cameras' : cams.find((c) => c.id === noteTo)?.name || 'camera'}`,
+      () => meeting.participants.broadcastMessage(NOTE_MESSAGE, { to: noteTo, text }));
+    setNoteText('');
+  };
 
   const pick = async (id: string) => {
     setProgramId(id);
@@ -218,9 +232,21 @@ export default function LiveCloudTestPage() {
               ) : cams.length === 0 ? (
                 <span className="alv-mute">Waiting for cameras to join…</span>
               ) : (
-                <div className="alv-cams">
-                  {cams.map((c) => <CamTile key={c.id} meeting={meeting} cam={c} isProgram={c.id === programId} onPick={() => pick(c.id)} />)}
-                </div>
+                <>
+                  <div className="alv-cams">
+                    {cams.map((c) => <CamTile key={c.id} meeting={meeting} cam={c} isProgram={c.id === programId} onPick={() => pick(c.id)} />)}
+                  </div>
+                  <form onSubmit={(e) => { e.preventDefault(); sendNote(); }} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <select value={noteTo} onChange={(e) => setNoteTo(e.target.value)} aria-label="Send the note to"
+                      style={{ height: 36, borderRadius: 8, border: '1px solid var(--alv-line)', background: 'var(--alv-fill)', color: 'var(--alv-ink)', padding: '0 8px' }}>
+                      <option value="all">All cameras</option>
+                      {cams.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    <input value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Note to the camera, e.g. follow 51" maxLength={160} aria-label="Note"
+                      style={{ flex: 1, minWidth: 160, height: 36, borderRadius: 8, border: '1px solid var(--alv-line)', background: 'var(--alv-fill)', color: 'var(--alv-ink)', padding: '0 10px' }} />
+                    <button type="submit" className="alv-btn is-small" disabled={!noteText.trim()}>Send note</button>
+                  </form>
+                </>
               )}
             </div>
 
