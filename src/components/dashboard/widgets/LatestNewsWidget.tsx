@@ -5,6 +5,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
 import { WidgetProps } from '../../../types/dashboard';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
+import { NewsCover } from '../../news/NewsCard';
 
 interface Article {
   id: string;
@@ -187,16 +188,7 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
               className={`a-news group ${isEditMode ? 'pointer-events-none' : 'cursor-pointer'}`}
             >
               <div className="a-news-img">
-                <img
-                  src={article.cover_image || '/alfie_app_logo.svg'}
-                  alt=""
-                  className={`w-full h-full ${article.cover_image ? 'object-cover' : 'object-contain p-2'}`}
-                  onError={(e) => {
-                    const img = e.currentTarget as HTMLImageElement;
-                    img.src = '/alfie_app_logo.svg';
-                    img.className = 'w-full h-full object-contain p-2';
-                  }}
-                />
+                <NewsCover article={article as any} />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="a-ink m-0 text-[14px] font-semibold leading-[1.35] line-clamp-2">{article.title}</p>
