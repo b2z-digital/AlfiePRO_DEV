@@ -238,7 +238,8 @@ async function uploadToYouTube(
   videoSource: string | ArrayBuffer,
   title: string,
   description: string,
-  contentType = "video/mp4"
+  contentType = "video/mp4",
+  privacyStatus: "public" | "unlisted" = "public"
 ): Promise<string> {
   let videoData: ArrayBuffer;
 
@@ -257,7 +258,7 @@ async function uploadToYouTube(
 
   const metadata = {
     snippet: { title, description, categoryId: "17" },
-    status: { privacyStatus: "public" },
+    status: { privacyStatus },
   };
 
   console.log("[Segment] Initiating YouTube resumable upload...");
@@ -394,9 +395,13 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  // Kept outside the try so a failure can be recorded (the request body can only be read once)
+  let segmentIdForError: string | undefined;
+
   try {
     const serviceClient = getServiceClient();
     const { segmentId } = await req.json();
+    segmentIdForError = segmentId;
 
     if (!segmentId) {
       return new Response(
@@ -479,9 +484,21 @@ Deno.serve(async (req: Request) => {
 
     const { credentials: ytCreds } = await getYouTubeCredentials(serviceClient);
 
-    let playlistId = segment.youtube_playlist_id;
+    // Test broadcasts (is_public false) upload unlisted, stay out of the event playlist
+    // and don't appear in AlfieTV replays.
+    let isTestBroadcast = false;
+    if (segment.session_id) {
+      const { data: sessionVisibility } = await serviceClient
+        .from("livestream_sessions")
+        .select("is_public")
+        .eq("id", segment.session_id)
+        .maybeSingle();
+      isTestBroadcast = sessionVisibility?.is_public === false;
+    }
 
-    if (!playlistId && segment.session_id) {
+    let playlistId = isTestBroadcast ? null : segment.youtube_playlist_id;
+
+    if (!isTestBroadcast && !playlistId && segment.session_id) {
       const { data: session } = await serviceClient
         .from("livestream_sessions")
         .select("youtube_playlist_id, title, event_id")
@@ -529,12 +546,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const youtubeTitle = isTestBroadcast ? `TEST · ${segment.segment_title}` : segment.segment_title;
     const youtubeVideoId = await uploadToYouTube(
       ytCreds,
       videoSource,
-      segment.segment_title,
+      youtubeTitle,
       `${segment.segment_title} - Powered by AlfiePRO`,
-      contentType
+      contentType,
+      isTestBroadcast ? "unlisted" : "public"
     );
 
     if (playlistId) {
@@ -566,7 +585,7 @@ Deno.serve(async (req: Request) => {
       youtube_url: `https://www.youtube.com/watch?v=${youtubeVideoId}`,
       source: "youtube",
       recorded_at: segment.segment_start_time,
-      is_public: true,
+      is_public: !isTestBroadcast,
       duration,
     }).select("id").maybeSingle();
 
@@ -621,7 +640,7 @@ Deno.serve(async (req: Request) => {
 
     try {
       const serviceClient = getServiceClient();
-      const { segmentId } = await new Response(req.body).json().catch(() => ({}));
+      const segmentId = segmentIdForError;
       if (segmentId) {
         await serviceClient
           .from("livestream_race_segments")

@@ -107,6 +107,8 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
       const isSeriesRound = session.event_id.includes('-') && session.event_id.split('-').length > 5;
       let quickRaces = null;
       let error = null;
+      // Race status is looked up under this id (series rounds linked by round id use the series id)
+      let statusEventId = session.event_id;
 
       if (isSeriesRound) {
         // Extract series ID and day number
@@ -181,6 +183,50 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
 
         quickRaces = data;
         error = raceError;
+
+        // Not a quick race: it may be a series round linked by its round id
+        // (Live setup wizard and Link Race/Heat saved links this way).
+        if (!quickRaces && !raceError) {
+          const { data: round } = await supabase
+            .from('race_series_rounds')
+            .select(`
+              id,
+              round_name,
+              date,
+              race_results,
+              completed,
+              updated_at,
+              skippers,
+              heat_management,
+              num_races,
+              series_id,
+              current_day,
+              round_index,
+              last_completed_race
+            `)
+            .eq('id', session.event_id)
+            .maybeSingle();
+
+          if (round) {
+            console.log('[Overlay Debug] Detected series round by round id:', { seriesId: round.series_id, roundIndex: round.round_index });
+            quickRaces = {
+              id: round.id,
+              event_name: round.round_name,
+              race_date: round.date,
+              race_format: null,
+              race_results: round.race_results,
+              completed: round.completed,
+              updated_at: round.updated_at,
+              skippers: round.skippers,
+              heat_management: round.heat_management,
+              num_races: round.num_races,
+              current_day: round.round_index,
+              public_event_id: null,
+              last_completed_race: (round as any).last_completed_race
+            } as any;
+            if (round.series_id) statusEventId = round.series_id;
+          }
+        }
       }
 
       console.log('[Overlay Debug] Quick race data:', quickRaces, error);
@@ -199,7 +245,7 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
       }
 
       // Get race status
-      const raceStatusData = await getRaceStatus(session.event_id);
+      const raceStatusData = await getRaceStatus(statusEventId);
       console.log('[Overlay Debug] Race status data:', raceStatusData);
 
       if (error) {

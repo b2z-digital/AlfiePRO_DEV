@@ -9,6 +9,7 @@ import EventResultsDisplay from './EventResultsDisplay';
 import { PublishToMetaModal } from './PublishToMetaModal';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
+import { getEquivalentEventIds } from '../utils/livestreamEventIds';
 import { useNavigate } from 'react-router-dom';
 import { getStoredVenues } from '../utils/venueStorage';
 import { MediaUploadGallery } from './MediaUploadGallery';
@@ -1422,10 +1423,13 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
         });
 
         // Check for livestream session using the full event ID
+        // (a series round may be linked as "<seriesId>-<roundIndex>" or by its round id)
+        const eventIdsToCheck = await getEquivalentEventIds(eventIdToCheck);
         const { data, error } = await supabase
           .from('livestream_sessions')
           .select('id')
-          .eq('event_id', eventIdToCheck)
+          .in('event_id', eventIdsToCheck)
+          .limit(1)
           .maybeSingle();
 
         console.log('🔍 [EventDetails] Livestream session check result:', {
