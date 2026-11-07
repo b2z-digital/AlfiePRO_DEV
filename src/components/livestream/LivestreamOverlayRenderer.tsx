@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Wind, Trophy, Users, Hash, Timer, CircleAlert as AlertCircle } from 'lucide-react';
+import { Timer } from 'lucide-react';
 import type { LivestreamSession, LivestreamOverlay } from '../../types/livestream';
 import { livestreamStorage } from '../../utils/livestreamStorage';
 import { getActiveSessionsForEvent, getRaceStatus } from '../../utils/liveTrackingStorage';
@@ -20,6 +20,9 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
   const [currentTime, setCurrentTime] = useState(new Date());
   const [liveTrackingData, setLiveTrackingData] = useState<any>(null);
   const [liveSkippers, setLiveSkippers] = useState<any[]>([]);
+  const [resultsUntil, setResultsUntil] = useState(0);
+  const prevCompletedRef = useRef<number | null>(null);
+  const lastRaceResultsRef = useRef<{ race: number; rows: { position: number; sail: string; name: string; hull: string }[] } | null>(null);
   const [titleCardVisible, setTitleCardVisible] = useState(false);
   const [titleCardPhase, setTitleCardPhase] = useState<'entering' | 'visible' | 'exiting' | 'hidden'>('hidden');
   const titleCardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -262,6 +265,7 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
           console.log('[Overlay Debug] Found skippers array:', quickRaces.skippers);
           allSkippers = quickRaces.skippers.map((skipper: any, index: number) => ({
             id: skipper.id || index,
+            skipperIndex: index,
             skipper_name: skipper.name || skipper.skipper_name,
             sail_number: skipper.sailNo || skipper.sail_number,
             sailNo: skipper.sailNo,
@@ -387,6 +391,7 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
                 const skipper = skippersArray[idx];
                 return {
                   id: idx,
+                  skipperIndex: idx,
                   skipper_name: skipper.name || skipper.skipper_name,
                   sail_number: skipper.sailNo || skipper.sail_number,
                   sailNo: skipper.sailNo,
@@ -402,6 +407,41 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
             }
           }
           console.log('[Overlay Debug] SHRS filtered to', allSkippers.length, 'skippers');
+        }
+
+        // Finishers in the race being sailed (and the last race's results, for the results card)
+        const lastCompleted = Number(quickRaces.last_completed_race) || 0;
+        const resultsForRace = (raceNo: number) => {
+          const map = new Map<number, { position: number | null; letter: string | null }>();
+          if (!Array.isArray(quickRaces.race_results)) return map;
+          (quickRaces.race_results as any[]).forEach((r: any) => {
+            if (!r || r.race !== raceNo || typeof r.skipperIndex !== 'number') return;
+            const pos = typeof r.position === 'number' && r.position > 0 ? r.position : null;
+            const letter = r.letterScore || r.letter_score || null;
+            if (pos !== null || letter) map.set(r.skipperIndex, { position: pos, letter });
+          });
+          return map;
+        };
+        if (!isHeatManagement) {
+          const finishes = resultsForRace(lastCompleted + 1);
+          allSkippers = allSkippers.map((sk: any) => ({
+            ...sk,
+            racePosition: typeof sk.skipperIndex === 'number' ? (finishes.get(sk.skipperIndex)?.position ?? null) : null,
+          }));
+          const last = resultsForRace(lastCompleted);
+          lastRaceResultsRef.current = lastCompleted > 0 ? {
+            race: lastCompleted,
+            rows: allSkippers
+              .map((sk: any) => ({ sk, r: typeof sk.skipperIndex === 'number' ? last.get(sk.skipperIndex) : undefined }))
+              .filter((x: any) => x.r && x.r.position)
+              .sort((a: any, b: any) => a.r.position - b.r.position)
+              .map((x: any) => ({ position: x.r.position, sail: x.sk.sail_number || x.sk.sailNo || '', name: x.sk.skipper_name || '', hull: x.sk.hull || x.sk.boatModel || '' })),
+          } : null;
+          // A newly scored race shows its results for 20 seconds
+          if (prevCompletedRef.current !== null && lastCompleted > prevCompletedRef.current && lastRaceResultsRef.current?.rows.length) {
+            setResultsUntil(Date.now() + 20000);
+          }
+          prevCompletedRef.current = lastCompleted;
         }
 
         console.log('[Overlay Debug] Final skippers list:', allSkippers);
@@ -428,6 +468,7 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
           event_name: eventData?.event_name || quickRaces.event_name,
           event_id: session.event_id,
           status: raceStatusData?.status || raceStatus,
+          status_notes: raceStatusData?.notes || null,
         }));
 
         console.log('[Overlay Debug] Updated live tracking data with status:', raceStatus);
@@ -466,104 +507,80 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
     return null;
   }
 
-  // Theme-based styles
-  const getThemeStyles = () => {
-    const theme = config.theme || 'dark';
-    if (theme === 'dark') {
-      return {
-        bg: 'from-slate-800/80 to-slate-900/80',
-        text: 'text-white',
-        subtext: 'text-slate-300',
-        border: 'border-slate-600/30'
-      };
-    } else if (theme === 'light') {
-      return {
-        bg: 'from-white/80 to-gray-100/80',
-        text: 'text-gray-900',
-        subtext: 'text-gray-700',
-        border: 'border-gray-300/30'
-      };
-    } else { // transparent
-      return {
-        bg: 'from-slate-800/50 to-slate-900/50',
-        text: 'text-white',
-        subtext: 'text-slate-200',
-        border: 'border-slate-600/20'
-      };
-    }
-  };
 
-  const themeStyles = getThemeStyles();
+  // Fleet list and race bar (livestream board "Overlay pack")
+  const fleetOpacity = Math.min(0.9, Math.max(0.25, Number(config.fleetOpacity ?? 0.58)));
+  const fleetRows = [...(displaySkippers || [])].sort((a: any, b: any) => {
+    const pa = a.racePosition ?? null, pb = b.racePosition ?? null;
+    if (pa !== null && pb !== null) return pa - pb;
+    if (pa !== null) return -1;
+    if (pb !== null) return 1;
+    return 0;
+  });
+  const finishedCount = fleetRows.filter((s: any) => s.racePosition).length;
+  const compactFleet = fleetRows.length > 14;
+  const fleetMax = 22;
+  const raceWord = displayData?.heat_label
+    ? String(displayData.heat_label).toUpperCase()
+    : `${displayData?.race_type === 'heat' ? 'HEAT' : 'RACE'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || 1}`;
+  const fleetHeading = `${raceWord} · ${fleetRows.length} BOATS`;
+  const rawStatus = String(displayData?.status || '');
+  const isOnHold = rawStatus === 'on_hold';
+  const [statusLabel, statusTone] =
+    rawStatus === 'live' || rawStatus === 'in_progress' ? ['Racing', 'is-racing'] :
+    rawStatus === 'on_hold' ? ['On hold', 'is-hold'] :
+    rawStatus === 'completed_for_day' ? ['Done for today', 'is-done'] :
+    rawStatus === 'event_complete' || rawStatus === 'completed' ? ['Finished', 'is-done'] :
+    rawStatus === 'preparing' ? ['Getting ready', 'is-done'] : ['', ''];
+  const showResults = resultsUntil > currentTime.getTime();
+  // The stream capture can't ellipsize, so long names are shortened up front
+  const clip = (text: string, max: number) => (text && text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
 
   return (
-    <div ref={ref} className="absolute inset-0 pointer-events-none z-10">
+    <div ref={ref} className="alv-ov absolute inset-0 pointer-events-none z-10">
 
-      {config.showWeather && weatherData && (
-        <div
-          className={`absolute top-3 right-3 bg-gradient-to-br ${themeStyles.bg} backdrop-blur-md px-2.5 py-2 rounded-md border ${themeStyles.border} shadow-lg`}
-        >
-          <div className="flex items-center gap-2">
-            <Wind className={`w-4 h-4 ${config.theme === 'light' ? 'text-cyan-600' : 'text-cyan-400'}`} />
-            <div>
-              <p className={`text-xs ${themeStyles.subtext} font-medium`}>Wind</p>
-              <p className={`text-sm font-bold ${themeStyles.text}`}>
-                {weatherData.windSpeed || '0'} kts
-              </p>
-            </div>
-            {weatherData.windDirection && (
-              <div className="ml-2">
-                <p className={`text-xs ${themeStyles.subtext}`}>Direction</p>
-                <p className={`text-sm font-semibold ${themeStyles.text}`}>{weatherData.windDirection}°</p>
-              </div>
-            )}
+      {/* Fleet list (livestream board "Overlay pack"): every boat in the race, see-through,
+          finishers move to the top in finishing order */}
+      {config.showSkippers && fleetRows.length > 0 && (
+        <div className="alv-ov-glass alv-ov-fleet" style={{ background: `rgba(6,11,22,${fleetOpacity})` }}>
+          <div className="alv-ov-fleet-head">
+            <span>{fleetHeading}</span>
+            {finishedCount > 0 && <span className="in">{finishedCount} IN</span>}
           </div>
+          {fleetRows.slice(0, fleetMax).map((sk: any, i: number) => (
+            <div key={`${sk.skipperIndex ?? sk.id ?? i}`} className={`alv-ov-row ${sk.racePosition ? 'done' : ''} ${compactFleet ? 'compact' : ''}`}>
+              <span className="p">{sk.racePosition ?? '–'}</span>
+              <span className="s">{sk.sail_number || sk.sailNo || ''}</span>
+              <span className="n">{clip(sk.skipper_name || sk.name || '', 20)}</span>
+              <span className="t">{clip(sk.hull || sk.boatModel || '', 12)}</span>
+            </div>
+          ))}
+          {fleetRows.length > fleetMax && <div className="alv-ov-more">+{fleetRows.length - fleetMax} more</div>}
         </div>
       )}
 
-      {/* Skippers List - Top Left */}
-      {config.showSkippers && displaySkippers && displaySkippers.length > 0 && (
-        <div className="absolute top-4 left-8" style={{ maxHeight: 'calc(100% - 70px)' }}>
-          <div className="bg-slate-800/80 backdrop-blur-md rounded-lg shadow-lg overflow-hidden min-w-[240px] max-w-[340px]" style={{ maxHeight: 'calc(100% - 4px)' }}>
-            <div className="px-3 py-1.5 bg-slate-900/80 border-b border-slate-600/40">
-              <div className="flex items-center gap-2">
-                <Users className="w-3.5 h-3.5 text-yellow-400" />
-                <p className="text-sm font-bold text-white tracking-wide">
-                  Skippers
-                </p>
-              </div>
-            </div>
-
-            <div className="overflow-y-auto" style={{ maxHeight: 'min(500px, calc(100% - 32px))' }}>
-              <table className="w-full">
-                <tbody className="text-white">
-                  {displaySkippers.slice(0, 25).map((skipper: any, index: number) => (
-                    <tr
-                      key={skipper.id || index}
-                      className={index % 2 === 0 ? 'bg-slate-700/30' : ''}
-                    >
-                      <td className="pl-3 pr-1 py-0.5 text-sm font-semibold text-yellow-400 w-[50px]">
-                        {skipper.sail_number || skipper.sailNo || ''}
-                      </td>
-                      <td className="pl-1 pr-3 py-0.5 text-sm font-medium">
-                        {skipper.skipper_name || skipper.name || `Skipper ${index + 1}`}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {displaySkippers.length > 25 && (
-                <div className="px-3 py-1 bg-slate-900/60 text-center border-t border-slate-600/30">
-                  <p className="text-xs text-white/60">
-                    +{displaySkippers.length - 25} more
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+      {/* Hold card */}
+      {isOnHold && !titleCardVisible && (
+        <div className="alv-ov-glass alv-ov-hold" style={{ background: `rgba(6,11,22,${Math.min(0.85, fleetOpacity + 0.15)})` }}>
+          <span className="chip">ON HOLD</span>
+          <div className="h">{displayData?.status_notes || 'Racing will resume shortly'}</div>
+          {displayData?.event_name && <div className="sub">{displayData.event_name}</div>}
         </div>
       )}
 
+      {/* Results card: shown for 20 seconds when a race is scored */}
+      {showResults && config.showStandings !== false && lastRaceResultsRef.current && (
+        <div className="alv-ov-glass alv-ov-results" style={{ background: `rgba(6,11,22,${Math.min(0.88, fleetOpacity + 0.2)})` }}>
+          <div className="h">Race {lastRaceResultsRef.current.race} results</div>
+          {lastRaceResultsRef.current.rows.slice(0, 8).map((r) => (
+            <div key={`${r.position}-${r.sail}`} className="alv-ov-res">
+              <span className="p">{r.position}</span>
+              <span className="s">{r.sail}</span>
+              <span className="n">{clip(r.name, 24)}{r.hull ? <span className="t"> · {clip(r.hull, 14)}</span> : null}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {raceData?.raceStatus === 'in_progress' && raceData?.startTime && (
         <div
@@ -602,30 +619,30 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
         </div>
       )}
 
-      {/* Footer Bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-12 flex items-center justify-between px-4" style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.85) 0%, rgba(15,23,42,0.80) 50%, rgba(0,0,0,0.85) 100%)' }}>
-        <div className="flex items-center gap-3">
-          {config.showHeatNumber && (displayData || session.heat_number) && (
-            <p className="text-lg font-bold text-yellow-400 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
-              {displayData?.heat_label || (
-                `${displayData?.race_type === 'heat' ? 'Heat' : 'Race'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || '1'}`
-              )}
-            </p>
-          )}
-          {displayData?.event_name && (
-            <>
-              <span className="text-slate-600 text-sm">|</span>
-              <p className="text-sm font-medium text-slate-300 truncate max-w-[300px]">{displayData.event_name}</p>
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-2 opacity-80">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" className="w-6 h-6">
-            <path fill="#0078d3" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
-            <path fill="#0066b4" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
+      {/* Race bar */}
+      <div className="alv-ov-glass alv-ov-bar" style={{ background: `rgba(6,11,22,${Math.min(0.85, fleetOpacity + 0.12)})` }}>
+        {config.showHeatNumber && (displayData || session.heat_number) && (
+          <span className="race">
+            {displayData?.heat_label || (
+              `${displayData?.race_type === 'heat' ? 'Heat' : 'Race'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || '1'}`
+            )}
+          </span>
+        )}
+        {statusLabel && (
+          <span className={`status ${statusTone}`}><span className="dot" />{statusLabel}</span>
+        )}
+        <span className="clock">{currentTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+        {config.showWeather && weatherData?.windSpeed ? (
+          <span className="wind">Wind {weatherData.windDirection ? `${weatherData.windDirection}° ` : ''}{weatherData.windSpeed} kn</span>
+        ) : null}
+        {displayData?.event_name && <span className="event">{displayData.event_name}</span>}
+        <span className="brand">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" aria-hidden="true">
+            <path fill="#2A93FF" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
+            <path fill="#0A78F0" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
           </svg>
-          <span className="text-sm font-bold text-white tracking-wide">Alfie<span style={{ color: '#0078d3' }}>PRO</span></span>
-        </div>
+          Alfie<b>PRO</b>
+        </span>
       </div>
 
       {titleCardVisible && (

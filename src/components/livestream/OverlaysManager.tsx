@@ -3,6 +3,21 @@ import { Hash, Users, CircleAlert as AlertCircle, Trophy, Eye, ChevronDown } fro
 import { livestreamStorage } from '../../utils/livestreamStorage';
 import type { LivestreamSession, OverlayConfig } from '../../types/livestream';
 
+interface OverlayItem {
+  id: string;
+  key: keyof OverlayConfig;
+  icon: React.ReactNode;
+  color: string;
+  bgColor: string;
+  label: string;
+  description: string;
+  position: string;
+  hasSubToggle?: boolean;
+  subToggleKey?: keyof OverlayConfig;
+  subToggleLabel?: string;
+  hasCustomText?: boolean;
+}
+
 interface OverlaysManagerProps {
   session: LivestreamSession;
   onUpdate?: (session: LivestreamSession) => void;
@@ -43,20 +58,22 @@ export function OverlaysManager({ session, onUpdate }: OverlaysManagerProps) {
     }
   };
 
+  const fleetOpacity = Math.min(0.9, Math.max(0.25, Number(config?.fleetOpacity ?? 0.58)));
+
   const toggleExpand = (id: string) => {
     setExpandedOverlay(expandedOverlay === id ? null : id);
   };
 
-  const overlays = [
+  const overlays: OverlayItem[] = [
     {
       id: 'heat',
       key: 'showHeatNumber' as keyof OverlayConfig,
       icon: <Hash className="w-3.5 h-3.5" />,
       color: 'text-blue-400',
       bgColor: 'bg-blue-500/15',
-      label: 'Race / Heat Number',
-      description: 'Current race or heat number',
-      position: 'Top Right',
+      label: 'Race bar',
+      description: 'Race or heat, status and time',
+      position: 'Bottom left',
     },
     {
       id: 'skippers',
@@ -64,12 +81,9 @@ export function OverlaysManager({ session, onUpdate }: OverlaysManagerProps) {
       icon: <Users className="w-3.5 h-3.5" />,
       color: 'text-green-400',
       bgColor: 'bg-green-500/15',
-      label: 'Skippers List',
-      description: 'Sail numbers & standings',
-      position: 'Top Left',
-      hasSubToggle: true,
-      subToggleKey: 'showHandicaps' as keyof OverlayConfig,
-      subToggleLabel: 'Show handicaps',
+      label: 'Fleet list',
+      description: 'Every boat: sail no., skipper, boat type. Finishers move up',
+      position: 'Top right',
     },
     {
       id: 'status',
@@ -77,10 +91,9 @@ export function OverlaysManager({ session, onUpdate }: OverlaysManagerProps) {
       icon: <AlertCircle className="w-3.5 h-3.5" />,
       color: 'text-orange-400',
       bgColor: 'bg-orange-500/15',
-      label: 'Status Updates',
-      description: 'Race status display',
-      position: 'Bottom Center',
-      hasCustomText: true,
+      label: 'Results card',
+      description: 'Each race\'s results for 20 seconds when it\'s scored',
+      position: 'Centre',
     },
     {
       id: 'weather',
@@ -88,9 +101,9 @@ export function OverlaysManager({ session, onUpdate }: OverlaysManagerProps) {
       icon: <Trophy className="w-3.5 h-3.5" />,
       color: 'text-cyan-400',
       bgColor: 'bg-cyan-500/15',
-      label: 'Weather',
-      description: 'Wind speed & direction',
-      position: 'Top Right',
+      label: 'Wind',
+      description: 'Shown in the race bar when weather is available',
+      position: 'Race bar',
     },
   ];
 
@@ -179,45 +192,23 @@ export function OverlaysManager({ session, onUpdate }: OverlaysManagerProps) {
       </div>
 
       <div className="border-t border-[#3a3a40] pt-3 space-y-2">
-        <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Theme</span>
-        <div className="grid grid-cols-3 gap-1.5">
-          {(['dark', 'light', 'transparent'] as const).map((theme) => (
-            <button
-              key={theme}
-              onClick={() => updateConfig({ theme })}
-              className={`px-2 py-2 rounded-lg border text-center transition-all ${
-                config.theme === theme
-                  ? 'border-blue-500 bg-blue-500/10 text-white'
-                  : 'border-[#3a3a40] bg-[#1a1a1e] text-slate-400 hover:border-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <span className="text-[11px] font-medium capitalize block">{theme}</span>
-            </button>
-          ))}
+        <div className="flex items-center justify-between">
+          <label htmlFor="alv-see-through" className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">See-through</label>
+          <span className="text-[11px] text-slate-400">{Math.round((1 - fleetOpacity) * 100)}% clear</span>
         </div>
-      </div>
-
-      <div className="space-y-2">
-        <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Status Position</span>
-        <div className="grid grid-cols-3 gap-1.5">
-          {([
-            { value: 'left', label: 'Left' },
-            { value: 'bottom', label: 'Center' },
-            { value: 'right', label: 'Right' }
-          ] as const).map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => updateConfig({ position: value })}
-              className={`px-2 py-2 rounded-lg border text-center transition-all ${
-                config.position === value
-                  ? 'border-blue-500 bg-blue-500/10 text-white'
-                  : 'border-[#3a3a40] bg-[#1a1a1e] text-slate-400 hover:border-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <span className="text-[11px] font-medium block">{label}</span>
-            </button>
-          ))}
-        </div>
+        <input
+          id="alv-see-through"
+          type="range"
+          min={10}
+          max={75}
+          step={5}
+          value={Math.round((1 - fleetOpacity) * 100)}
+          onChange={(e) => setConfig({ ...config, fleetOpacity: 1 - Number(e.target.value) / 100 })}
+          onPointerUp={(e) => updateConfig({ fleetOpacity: 1 - Number((e.target as HTMLInputElement).value) / 100 })}
+          onKeyUp={(e) => updateConfig({ fleetOpacity: 1 - Number((e.target as HTMLInputElement).value) / 100 })}
+          className="w-full accent-blue-500"
+        />
+        <p className="text-[10px] text-slate-500 leading-relaxed">How much of the racing shows through the fleet list, race bar and cards.</p>
       </div>
 
       <div className="flex items-center gap-2 p-2.5 bg-blue-500/5 border border-blue-500/20 rounded-lg">
