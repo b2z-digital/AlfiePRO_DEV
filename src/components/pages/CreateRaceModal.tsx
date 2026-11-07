@@ -2673,7 +2673,83 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       Sailing Instructions (SI)
                     </h4>
 
-                    {scheduledDocuments.si?.scheduled ? (
+                    {formData.sailingInstructionsUrl ? (
+                      /* Show the saved SI (as the NOR does), so editing a series or event shows it's attached */
+                      <div className="space-y-3">
+                        <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-white border-slate-200'}`}>
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 flex-1">
+                              <FileText className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={24} />
+                              <div>
+                                <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                  Sailing Instructions
+                                </p>
+                                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  PDF Document
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {availableTemplates.some(t => t.document_type === 'si' && t.linked_form_id) && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      const siTemplate = availableTemplates.find(t => t.document_type === 'si' && t.linked_form_id);
+                                      if (!siTemplate) {
+                                        addNotification('error', 'No SI template found.');
+                                        return;
+                                      }
+                                      const { data: genDocs } = await supabase
+                                        .from('generated_documents')
+                                        .select('form_submission_id')
+                                        .eq('club_id', currentClub?.clubId)
+                                        .eq('document_type', 'si')
+                                        .eq('template_id', siTemplate.id)
+                                        .order('generated_at', { ascending: false })
+                                        .limit(1);
+                                      setSelectedTemplate(siTemplate.id);
+                                      setEditingSubmissionId(genDocs && genDocs.length > 0 ? genDocs[0].form_submission_id : null);
+                                      setDocumentWizardType('si');
+                                      setShowDocumentWizard(true);
+                                    } catch (err) {
+                                      console.error('Error in Edit SI handler:', err);
+                                      addNotification('error', 'Failed to load document for editing');
+                                    }
+                                  }}
+                                  className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                                  title="Edit SI"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                              )}
+                              <a
+                                href={formData.sailingInstructionsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                                title="View and Print SI"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                }}
+                              >
+                                <Download size={16} />
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormData(prev => ({ ...prev, sailingInstructionsUrl: '', sailingInstructionsFile: null }));
+                                }}
+                                className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                                title="Delete SI"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : scheduledDocuments.si?.scheduled ? (
                       /* Show scheduled status */
                       <div className={`p-4 rounded-lg border ${darkMode ? 'bg-green-900/20 border-green-700/30' : 'bg-green-50 border-green-200'}`}>
                         <div className="flex items-center justify-between gap-4">
@@ -2823,28 +2899,6 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                         </button>
                       </div>
                     </div>
-                    )}
-                    {formData.sailingInstructionsUrl && (
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <a
-                          href={formData.sailingInstructionsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="a-btn a-btn-p"
-                        >
-                          <FileText size={16} />
-                          View SI
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, sailingInstructionsUrl: '', sailingInstructionsFile: null }))}
-                          className="a-btn a-btn-d"
-                          title="Delete SI"
-                        >
-                          <Trash2 size={16} />
-                          Delete SI
-                        </button>
-                      </div>
                     )}
                   </div>
 
