@@ -639,6 +639,8 @@ button.alv-rt:focus-visible { outline: 2px solid var(--alv-blue); outline-offset
 .alv-elive-races .st.is-up { color: #8CC4FF; }
 .alv-elive-note { margin: 4px 0 0; font-size: 13px; color: rgba(235, 240, 255, 0.66); line-height: 1.5; }
 @media (max-width: 900px) { .alv-elive { grid-template-columns: minmax(0, 1fr); } }
+/* Light mode: the Live tab stays a dark broadcast panel inside the light event page */
+body.light-mode .alv-elive { background: var(--alv-bg); padding: 16px; border-radius: 20px; }
 @media (max-width: 560px) { .alv-elive .alv-watch-info { flex-direction: column; } }
 .alv-tab-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #E11D38; box-shadow: 0 0 0 3px rgba(225, 29, 56, 0.25); animation: alv-pulse 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .alv-tab-dot { animation: none; } }
