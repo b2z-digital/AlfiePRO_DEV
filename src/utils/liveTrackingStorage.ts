@@ -600,6 +600,9 @@ export function subscribeToRaceStatus(
   eventId: string,
   callback: (status: RaceStatus, notes: string | null) => void
 ) {
+  // Status is stored under the series id for series rounds ("<seriesId>-<roundIndex>"),
+  // the same way updateRaceStatus and getRaceStatus look it up.
+  const statusEventId = normalizeEventIdForLiveTracking(eventId);
   const channel = supabase
     .channel(`race_status_${eventId}`)
     .on(
@@ -608,7 +611,7 @@ export function subscribeToRaceStatus(
         event: 'UPDATE',
         schema: 'public',
         table: 'live_tracking_events',
-        filter: `event_id=eq.${eventId}`,
+        filter: `event_id=eq.${statusEventId}`,
       },
       (payload) => {
         const newData = payload.new as any;

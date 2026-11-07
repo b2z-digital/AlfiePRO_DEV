@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { livestreamStorage } from '../../utils/livestreamStorage';
 import { supabase } from '../../utils/supabase';
+import { toLivestreamEventId } from '../../utils/livestreamEventIds';
 import type { LivestreamSession } from '../../types/livestream';
 import type { QuickRace } from '../../types/race';
 
@@ -331,12 +332,15 @@ export function LivestreamSetupWizard({
         'Content-Type': 'application/json',
       };
 
+      // Series rounds are linked as "<seriesId>-<roundIndex>", the id scoring and overlays use
+      const linkedEventId = await toLivestreamEventId(wizardData.eventId);
+
       const sessionData: Partial<LivestreamSession> = {
         club_id: clubId,
         created_by: user.id,
         title: wizardData.title,
         description: wizardData.description,
-        event_id: wizardData.eventId,
+        event_id: linkedEventId,
         event_day: wizardData.eventDay,
         heat_number: wizardData.heatNumber,
         status: wizardData.timing === 'now' ? 'draft' : 'scheduled',
