@@ -2,16 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
-import { Plus, SquarePen as Edit2, Trash2, Youtube, RefreshCw, Search, ExternalLink, CircleCheck as CheckCircle2, Eye, EyeOff, TriangleAlert as AlertTriangle, Star, ListVideo, Globe, ListFilter as Filter } from 'lucide-react';
+import { AlfieIcon } from '../brand/AlfieIcon';
+import { ASwitch } from '../alfie/Kit';
 import { alfieTVStorage, AlfieTVChannel, AlfieTVVideo, AlfieTVYouTubePlaylist } from '../../utils/alfieTVStorage';
 import AddVideoModal from './AddVideoModal';
 import { ConfirmationModal } from '../ConfirmationModal';
 
 interface AlfieTVAdminProps {
   darkMode?: boolean;
+  /** True when shown inside the AlfieTV app, which supplies its own page header. */
+  embedded?: boolean;
 }
 
-export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
+export default function AlfieTVAdmin({ darkMode = false, embedded = false }: AlfieTVAdminProps) {
   const { currentClub, currentOrganization, user, isSuperAdmin, isStateOrgAdmin, isNationalOrgAdmin } = useAuth();
   const { addNotification } = useNotification();
   const navigate = useNavigate();
@@ -356,523 +359,385 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
     general: 'General',
   };
 
-  return (
-    <div>
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-1 border-b border-slate-700/50">
-            <button
-              onClick={() => setActiveTab('channels')}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'channels'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Youtube size={16} />
-                Channels
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('playlists')}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'playlists'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <ListVideo size={16} />
-                Playlists
-                {playlists.filter(p => p.is_featured).length > 0 && (
-                  <span className="px-1.5 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-400">
-                    {playlists.filter(p => p.is_featured).length} featured
-                  </span>
-                )}
-              </span>
-            </button>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setShowAddVideoModal(true)}
-              className="btn-primary-green flex items-center space-x-2 px-4 py-2 rounded-xl text-white transition-colors"
-            >
-              <Youtube className="w-5 h-5" />
-              <span>Add Video URL</span>
-            </button>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn-primary-green flex items-center space-x-2 px-4 py-2 rounded-xl text-white transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Add Channel</span>
-            </button>
-          </div>
-        </div>
+  const categoryLabel = (c?: string | null) =>
+    c === 'rc_yachting' ? 'RC Yachting'
+      : c === 'full_size_yachting' ? 'Full Size Yachting'
+        : c === 'sailing_education' ? 'Sailing Education'
+          : c === 'racing' ? 'Racing' : 'General';
+  const totalVideos = channels.reduce((n, c) => n + (c.video_count || 0), 0);
+  const visibleCount = channels.filter(c => c.is_visible).length;
+  const featuredCount = playlists.filter(p => p.is_featured).length;
+  const autoImportCount = channels.filter(c => c.auto_import).length;
+  const closeChannelSheet = () => {
+    setShowAddModal(false);
+    setEditingChannel(null);
+    setChannelUrl('');
+    setChannelName('');
+    setAutoImport(true);
+    setIsGlobal(false);
+  };
 
-        {activeTab === 'channels' && (
-          <>
-            {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+  return (
+    <div className={`atvm ${embedded ? '' : 'atvm-standalone p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-28 lg:pl-9'}`}>
+      {!embedded && (
+        <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}>
+            <AlfieIcon glyph="video" size={24} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">AlfieTV channels</h1>
+            <p className="a-mute m-0 mt-1 text-[14px]">Add YouTube channels and videos, sync, and choose what shows on AlfieTV.</p>
+          </div>
+          <button type="button" className="a-btn" onClick={() => navigate('/alfie-tv')}>
+            <AlfieIcon glyph="video" size={16} />Open AlfieTV
+          </button>
+        </header>
+      )}
+      {/* Summary */}
+      <div className="atvm-stats">
+        <div className="a-card atvm-stat"><span className="atvm-stat-ic is-b"><AlfieIcon glyph="video" size={18} /></span><div><b>{channels.length}</b><span>Channels</span></div></div>
+        <div className="a-card atvm-stat"><span className="atvm-stat-ic is-p"><AlfieIcon glyph="media" size={18} /></span><div><b>{totalVideos.toLocaleString()}</b><span>Videos</span></div></div>
+        <div className="a-card atvm-stat"><span className="atvm-stat-ic is-g"><AlfieIcon glyph="eye" size={18} /></span><div><b>{visibleCount}</b><span>Showing on AlfieTV</span></div></div>
+        <div className="a-card atvm-stat"><span className="atvm-stat-ic is-a"><AlfieIcon glyph="sync" size={18} /></span><div><b>{autoImportCount}</b><span>Auto-importing</span></div></div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="atvm-bar">
+        <div className="a-seg" role="tablist" aria-label="Manage">
+          <button type="button" role="tab" aria-selected={activeTab === 'channels'} className={`a-seg-i ${activeTab === 'channels' ? 'a-seg-on' : ''}`} onClick={() => setActiveTab('channels')}>
+            <AlfieIcon glyph="video" size={15} />Channels<span className="a-cnt">{channels.length}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab === 'playlists'} className={`a-seg-i ${activeTab === 'playlists' ? 'a-seg-on' : ''}`} onClick={() => setActiveTab('playlists')}>
+            <AlfieIcon glyph="list" size={15} />Playlists
+            {featuredCount > 0 && <span className="a-cnt a-cnt-amber">{featuredCount} featured</span>}
+          </button>
+        </div>
+        <div className="atvm-bar-r">
+          <button onClick={() => setShowAddVideoModal(true)} className="a-btn">
+            <AlfieIcon glyph="link" size={16} />
+            Add Video URL
+          </button>
+          <button onClick={() => setShowAddModal(true)} className="a-btn a-btn-p">
+            <AlfieIcon glyph="plus" size={16} />
+            Add Channel
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'channels' && (
+        loading ? (
+          <div className="a-card atvm-list" aria-busy="true">
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} className="atvm-row">
+                <span className="a-nw-shim" style={{ width: 52, height: 52, borderRadius: 999 }} />
+                <div className="flex-1 min-w-0">
+                  <span className="a-nw-shim a-nw-shim-line" style={{ width: '40%' }} />
+                  <span className="a-nw-shim a-nw-shim-line" style={{ width: '65%', marginTop: 10 }} />
+                </div>
               </div>
-            ) : channels.length === 0 ? (
-              <div className="text-center py-16 rounded-2xl bg-transparent">
-                <Youtube className={`w-16 h-16 mx-auto mb-4 ${lightMode ? 'text-gray-400' : 'text-slate-600'}`} />
-                <h3 className={`text-xl font-semibold mb-2 ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                  No channels yet
-                </h3>
-                <p className={`mb-6 ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                  Add your first YouTube channel to start building your video library
-                </p>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="btn-primary-green px-6 py-3 rounded-xl text-white transition-colors"
-                >
-                  Add Your First Channel
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-6">
-                {channels.map(channel => (
-                  <div
-                    key={channel.id}
-                    className={`rounded-2xl p-6 transition-all ${
-                      lightMode ? 'bg-white shadow-lg' : 'bg-slate-800/60 shadow-xl'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-4 flex-1">
-                        <div className="relative flex-shrink-0">
-                          {channel.channel_thumbnail ? (
-                            <img
-                              src={channel.channel_thumbnail}
-                              alt={channel.channel_name}
-                              className="w-20 h-20 rounded-full object-cover ring-4 ring-white/10"
-                            />
-                          ) : (
-                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center ring-4 ring-white/10">
-                              <Youtube className="w-10 h-10 text-white" />
-                            </div>
-                          )}
-                          {channel.last_sync_error ? (
-                            <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-1 ring-4 ring-white dark:ring-slate-800" title={channel.last_sync_error}>
-                              <AlertTriangle className="w-4 h-4 text-white" />
-                            </div>
-                          ) : channel.last_imported_at && channel.video_count > 0 ? (
-                            <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1 ring-4 ring-white dark:ring-slate-800">
-                              <CheckCircle2 className="w-4 h-4 text-white" />
-                            </div>
-                          ) : null}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className={`text-xl font-bold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                            {channel.channel_name}
-                          </h3>
-                          <a
-                            href={channel.channel_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 mb-2 group"
-                          >
-                            <span className="text-sm truncate max-w-md">{channel.channel_url}</span>
-                            <ExternalLink className="w-4 h-4 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </a>
-                          <div className="flex items-center flex-wrap gap-4">
-                            <div className={`text-sm ${lightMode ? 'text-gray-700' : 'text-slate-300'}`}>
-                              <span className="font-semibold">{channel.video_count || 0}</span> videos
-                            </div>
-                            <div className={`text-sm ${lightMode ? 'text-gray-700' : 'text-slate-300'}`}>
-                              <span className="font-semibold">{(channel.subscriber_count || 0).toLocaleString()}</span> subscribers
-                            </div>
-                            {channel.category && (
-                              <span className="px-2 py-1 rounded-lg text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                                {channel.category === 'rc_yachting' ? 'RC Yachting' :
-                                 channel.category === 'full_size_yachting' ? 'Full Size Yachting' :
-                                 channel.category === 'sailing_education' ? 'Sailing Education' :
-                                 channel.category === 'racing' ? 'Racing' : 'General'}
-                              </span>
-                            )}
-                            {channel.auto_import && (
-                              <span className="px-2 py-1 rounded-lg text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                Auto-import enabled
-                              </span>
-                            )}
-                            {channel.last_imported_at && (
-                              <span className={`text-xs ${lightMode ? 'text-gray-500' : 'text-slate-500'}`}>
-                                Last synced: {new Date(channel.last_imported_at).toLocaleDateString()}
-                              </span>
-                            )}
-                            {channel.last_sync_error && (
-                              <span className="px-2 py-1 rounded-lg text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" title={channel.last_sync_error}>
-                                Sync error
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleToggleVisibility(channel.id, channel.is_visible)}
-                          className={`p-2.5 rounded-xl transition-all ${
-                            channel.is_visible
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
-                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-slate-700/50 dark:text-slate-500 dark:hover:bg-slate-700'
-                          }`}
-                          title={channel.is_visible ? 'Channel visible - Click to hide' : 'Channel hidden - Click to show'}
-                        >
-                          {channel.is_visible ? (
-                            <Eye className="w-5 h-5" />
-                          ) : (
-                            <EyeOff className="w-5 h-5" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleSyncChannel(channel.id)}
-                          disabled={syncingChannels.has(channel.id)}
-                          className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-colors ${
-                            syncingChannels.has(channel.id)
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
-                          }`}
-                          title="Sync videos from YouTube"
-                        >
-                          <RefreshCw className={`w-4 h-4 ${
-                            syncingChannels.has(channel.id) ? 'animate-spin' : ''
-                          }`} />
-                          <span className="text-sm font-medium">
-                            {syncingChannels.has(channel.id) ? 'Syncing...' : 'Sync Videos'}
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => openEditModal(channel)}
-                          className={`p-2 rounded-xl transition-colors ${
-                            lightMode ? 'hover:bg-gray-100 text-gray-600' : 'hover:bg-slate-700/50 text-slate-400'
-                          }`}
-                        >
-                          <Edit2 className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteChannel(channel.id)}
-                          className="p-2 rounded-xl transition-colors text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
+            ))}
+          </div>
+        ) : channels.length === 0 ? (
+          <div className="a-card a-empty py-14 px-6">
+            <span className="a-tile a-tile-lg a-tile-rim"><AlfieIcon glyph="video" size={24} /></span>
+            <h3 className="a-ink m-0 text-[17px] font-semibold">No channels yet</h3>
+            <p className="a-mute m-0 text-[14px]">Add your first YouTube channel to start building your video library</p>
+            <button onClick={() => setShowAddModal(true)} className="a-btn a-btn-p mt-2">
+              <AlfieIcon glyph="plus" size={16} />Add Your First Channel
+            </button>
+          </div>
+        ) : (
+          <div className="a-card atvm-list">
+            {channels.map(channel => {
+              const syncing = syncingChannels.has(channel.id);
+              const synced = !channel.last_sync_error && channel.last_imported_at && channel.video_count > 0;
+              return (
+                <div key={channel.id} className={`atvm-row ${channel.is_visible ? '' : 'is-hidden'}`}>
+                  <div className={`atvm-av ${channel.last_sync_error ? 'is-err' : synced ? 'is-ok' : ''}`}>
+                    {channel.channel_thumbnail ? (
+                      <img src={channel.channel_thumbnail} alt="" referrerPolicy="no-referrer" />
+                    ) : (
+                      <span>{(channel.channel_name || '?').charAt(0).toUpperCase()}</span>
+                    )}
+                    {channel.last_sync_error ? (
+                      <i title={channel.last_sync_error}><AlfieIcon glyph="warn" size={11} strokeWidth={2.4} /></i>
+                    ) : synced ? (
+                      <i><AlfieIcon glyph="check" size={11} strokeWidth={2.8} /></i>
+                    ) : null}
+                  </div>
+
+                  <div className="atvm-row-body">
+                    <div className="atvm-row-name">
+                      <h3>{channel.channel_name}</h3>
+                      {channel.is_global && <span className="atvm-chip is-b"><AlfieIcon glyph="globe" size={11} />Global</span>}
+                      {!channel.is_visible && <span className="atvm-chip">Hidden</span>}
+                    </div>
+                    <a href={channel.channel_url} target="_blank" rel="noopener noreferrer" className="atvm-url">
+                      {channel.channel_url.replace(/^https?:\/\/(www\.)?/, '')}
+                      <AlfieIcon glyph="ext" size={12} />
+                    </a>
+                    <div className="atvm-chips">
+                      <span className="atvm-num"><b>{(channel.video_count || 0).toLocaleString()}</b> videos</span>
+                      <span className="atvm-num"><b>{(channel.subscriber_count || 0).toLocaleString()}</b> subscribers</span>
+                      {channel.category && <span className="atvm-chip is-p">{categoryLabel(channel.category)}</span>}
+                      {channel.auto_import && <span className="atvm-chip is-g">Auto-import</span>}
+                      {channel.last_sync_error && <span className="atvm-chip is-r" title={channel.last_sync_error}>Sync error</span>}
+                      {channel.last_imported_at && (
+                        <span className="atvm-when">Synced {new Date(channel.last_imported_at).toLocaleDateString()}</span>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
 
-        {activeTab === 'playlists' && (
-          <div>
-            <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 p-4 rounded-xl ${
-              lightMode ? 'bg-gray-50 border border-gray-200' : 'bg-slate-800/40 border border-slate-700/50'
-            }`}>
-              <div className="flex items-center gap-2">
-                <Filter size={16} className={lightMode ? 'text-gray-500' : 'text-slate-400'} />
-                <div className="flex items-center gap-1 rounded-lg overflow-hidden border ${lightMode ? 'border-gray-200' : 'border-slate-700'}">
-                  {(['all', 'featured', 'hidden'] as const).map(filter => (
+                  <div className="atvm-acts">
                     <button
-                      key={filter}
-                      onClick={() => setPlaylistFilter(filter)}
-                      className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                        playlistFilter === filter
-                          ? 'bg-blue-600 text-white'
-                          : lightMode
-                            ? 'bg-white text-gray-600 hover:bg-gray-100'
-                            : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
-                      }`}
+                      type="button"
+                      role="switch"
+                      aria-checked={channel.is_visible}
+                      onClick={() => handleToggleVisibility(channel.id, channel.is_visible)}
+                      className={`atvm-vis ${channel.is_visible ? 'is-on' : ''}`}
+                      title={channel.is_visible ? 'Channel visible - Click to hide' : 'Channel hidden - Click to show'}
                     >
-                      {filter === 'all' ? 'All' : filter === 'featured' ? 'Featured' : 'Hidden'}
+                      <AlfieIcon glyph={channel.is_visible ? 'eye' : 'eyeoff'} size={16} />
+                      <span>{channel.is_visible ? 'Visible' : 'Hidden'}</span>
                     </button>
-                  ))}
-                </div>
-              </div>
-              <select
-                value={playlistChannelFilter}
-                onChange={(e) => setPlaylistChannelFilter(e.target.value)}
-                className={`text-sm px-3 py-1.5 rounded-lg border ${
-                  lightMode
-                    ? 'bg-white border-gray-200 text-gray-700'
-                    : 'bg-slate-700/50 border-slate-600 text-slate-300'
-                }`}
-              >
-                <option value="all">All channels</option>
-                {channels.map(ch => (
-                  <option key={ch.id} value={ch.id}>{ch.channel_name}</option>
-                ))}
-              </select>
-            </div>
-
-            {playlistsLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              </div>
-            ) : filteredPlaylists.length === 0 ? (
-              <div className="text-center py-16">
-                <ListVideo className={`w-16 h-16 mx-auto mb-4 ${lightMode ? 'text-gray-400' : 'text-slate-600'}`} />
-                <h3 className={`text-xl font-semibold mb-2 ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                  {playlists.length === 0 ? 'No playlists synced yet' : 'No playlists match your filters'}
-                </h3>
-                <p className={`mb-4 ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                  {playlists.length === 0
-                    ? 'Playlists are imported automatically when you sync a YouTube channel'
-                    : 'Try adjusting your filter criteria'}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {filteredPlaylists.map(playlist => {
-                  const channel = channels.find(c => c.id === playlist.channel_id);
-                  return (
-                    <div
-                      key={playlist.id}
-                      className={`rounded-xl overflow-hidden transition-all ${
-                        lightMode
-                          ? 'bg-white shadow-md hover:shadow-lg border border-gray-100'
-                          : 'bg-slate-800/60 hover:bg-slate-800/80 border border-slate-700/50'
-                      } ${!playlist.is_visible ? 'opacity-60' : ''}`}
+                    <button
+                      onClick={() => handleSyncChannel(channel.id)}
+                      disabled={syncing}
+                      className="a-btn a-btn-sm atvm-sync"
+                      title="Sync videos from YouTube"
                     >
-                      <div className="relative aspect-video bg-slate-900">
-                        {playlist.thumbnail_url ? (
-                          <img
-                            src={playlist.thumbnail_url}
-                            alt={playlist.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex items-center justify-center h-full">
-                            <ListVideo className="w-12 h-12 text-slate-600" />
-                          </div>
-                        )}
-                        <div className="absolute top-2 right-2 flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleTogglePlaylistFeatured(playlist.id, playlist.is_featured)}
-                            className={`p-1.5 rounded-lg backdrop-blur-sm transition-all ${
-                              playlist.is_featured
-                                ? 'bg-amber-500/90 text-white hover:bg-amber-600'
-                                : 'bg-black/50 text-white/70 hover:bg-black/70 hover:text-white'
-                            }`}
-                            title={playlist.is_featured ? 'Remove from featured' : 'Mark as featured'}
-                          >
-                            <Star size={14} className={playlist.is_featured ? 'fill-current' : ''} />
-                          </button>
-                          <button
-                            onClick={() => handleTogglePlaylistVisibility(playlist.id, playlist.is_visible)}
-                            className={`p-1.5 rounded-lg backdrop-blur-sm transition-all ${
-                              playlist.is_visible
-                                ? 'bg-green-500/80 text-white hover:bg-green-600'
-                                : 'bg-black/50 text-white/70 hover:bg-black/70 hover:text-white'
-                            }`}
-                            title={playlist.is_visible ? 'Hide playlist' : 'Show playlist'}
-                          >
-                            {playlist.is_visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                          </button>
-                        </div>
-                        <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/70 text-white text-xs font-medium">
-                          {playlist.video_count} videos
-                        </div>
-                      </div>
-
-                      <div className="p-4">
-                        <h3 className={`font-semibold text-sm mb-2 line-clamp-2 ${
-                          lightMode ? 'text-gray-900' : 'text-white'
-                        }`}>
-                          {playlist.title}
-                        </h3>
-
-                        {channel && (
-                          <div className="flex items-center gap-2 mb-3">
-                            {channel.channel_thumbnail ? (
-                              <img
-                                src={channel.channel_thumbnail}
-                                alt={channel.channel_name}
-                                className="w-5 h-5 rounded-full"
-                              />
-                            ) : (
-                              <Youtube size={14} className="text-red-500" />
-                            )}
-                            <span className={`text-xs ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>
-                              {channel.channel_name}
-                            </span>
-                          </div>
-                        )}
-
-                        <select
-                          value={playlist.playlist_category || 'general'}
-                          onChange={(e) => handleUpdatePlaylistCategory(playlist.id, e.target.value)}
-                          className={`w-full text-xs px-2.5 py-1.5 rounded-lg border ${
-                            lightMode
-                              ? 'bg-gray-50 border-gray-200 text-gray-700'
-                              : 'bg-slate-700/50 border-slate-600 text-slate-300'
-                          }`}
-                        >
-                          {Object.entries(playlistCategoryLabels).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Add Video Modal */}
-        <AddVideoModal
-          isOpen={showAddVideoModal}
-          onClose={() => setShowAddVideoModal(false)}
-          onSuccess={() => {
-            addNotification('success', 'Video added successfully');
-            loadChannels();
-          }}
-          darkMode={darkMode}
-        />
-
-        {/* Add/Edit Channel Modal */}
-        {(showAddModal || editingChannel) && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className={`w-full max-w-2xl rounded-2xl p-6 ${lightMode ? 'bg-white' : 'bg-slate-800'}`}>
-              <h2 className={`text-2xl font-bold mb-6 ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                {editingChannel ? 'Edit Channel' : 'Add New Channel'}
-              </h2>
-
-              <div className="space-y-4">
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${lightMode ? 'text-gray-700' : 'text-slate-300'}`}>
-                    Channel Name
-                  </label>
-                  <input
-                    type="text"
-                    value={channelName}
-                    onChange={(e) => setChannelName(e.target.value)}
-                    placeholder="e.g., RC Sailing Tips"
-                    className={`w-full px-4 py-3 rounded-xl transition-colors ${
-                      lightMode
-                        ? 'bg-gray-50 border border-gray-200 text-gray-900'
-                        : 'bg-slate-700/50 border border-slate-600 text-white'
-                    }`}
-                  />
+                      <AlfieIcon glyph="sync" size={15} className={syncing ? 'atvm-spin' : ''} />
+                      {syncing ? 'Syncing...' : 'Sync'}
+                    </button>
+                    <button type="button" onClick={() => openEditModal(channel)} className="a-ib" aria-label="Edit channel" title="Edit">
+                      <AlfieIcon glyph="pen" size={17} />
+                    </button>
+                    <button type="button" onClick={() => handleDeleteChannel(channel.id)} className="a-ib a-ib-d" aria-label="Delete channel" title="Delete">
+                      <AlfieIcon glyph="trash" size={17} />
+                    </button>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+        )
+      )}
 
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${lightMode ? 'text-gray-700' : 'text-slate-300'}`}>
-                    YouTube Channel URL
-                  </label>
+      {activeTab === 'playlists' && (
+        <div className="flex flex-col gap-4">
+          <div className="atvm-bar atvm-bar-sub">
+            <div className="a-seg" role="group" aria-label="Show">
+              {(['all', 'featured', 'hidden'] as const).map(filter => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setPlaylistFilter(filter)}
+                  className={`a-seg-i ${playlistFilter === filter ? 'a-seg-on' : ''}`}
+                  aria-pressed={playlistFilter === filter}
+                >
+                  {filter === 'all' ? 'All' : filter === 'featured' ? 'Featured' : 'Hidden'}
+                </button>
+              ))}
+            </div>
+            <select
+              value={playlistChannelFilter}
+              onChange={(e) => setPlaylistChannelFilter(e.target.value)}
+              className="a-pick atvm-pick"
+              aria-label="Channel"
+            >
+              <option value="all">All channels</option>
+              {channels.map(ch => (
+                <option key={ch.id} value={ch.id}>{ch.channel_name}</option>
+              ))}
+            </select>
+          </div>
+
+          {playlistsLoading ? (
+            <div className="atvm-pl-grid" aria-busy="true">
+              {[0, 1, 2, 3, 4, 5].map(i => <span key={i} className="a-nw-shim" style={{ height: 260, borderRadius: 18 }} />)}
+            </div>
+          ) : filteredPlaylists.length === 0 ? (
+            <div className="a-card a-empty py-14 px-6">
+              <span className="a-tile a-tile-lg a-tile-rim"><AlfieIcon glyph="list" size={24} /></span>
+              <h3 className="a-ink m-0 text-[17px] font-semibold">
+                {playlists.length === 0 ? 'No playlists synced yet' : 'No playlists match your filters'}
+              </h3>
+              <p className="a-mute m-0 text-[14px]">
+                {playlists.length === 0
+                  ? 'Playlists are imported automatically when you sync a YouTube channel'
+                  : 'Try adjusting your filter criteria'}
+              </p>
+            </div>
+          ) : (
+            <div className="atvm-pl-grid">
+              {filteredPlaylists.map(playlist => {
+                const channel = channels.find(c => c.id === playlist.channel_id);
+                return (
+                  <div key={playlist.id} className={`a-card atvm-pl ${!playlist.is_visible ? 'is-hidden' : ''} ${playlist.is_featured ? 'is-featured' : ''}`}>
+                    <div className="atvm-pl-media">
+                      {playlist.thumbnail_url ? (
+                        <img src={playlist.thumbnail_url} alt="" loading="lazy" />
+                      ) : (
+                        <span className="atvm-pl-ph"><AlfieIcon glyph="list" size={28} /></span>
+                      )}
+                      <div className="atvm-pl-acts">
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePlaylistFeatured(playlist.id, playlist.is_featured)}
+                          className={`atvm-glass ${playlist.is_featured ? 'is-star' : ''}`}
+                          title={playlist.is_featured ? 'Remove from featured' : 'Mark as featured'}
+                          aria-pressed={playlist.is_featured}
+                        >
+                          <AlfieIcon glyph="star" size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePlaylistVisibility(playlist.id, playlist.is_visible)}
+                          className={`atvm-glass ${playlist.is_visible ? 'is-eye' : ''}`}
+                          title={playlist.is_visible ? 'Hide playlist' : 'Show playlist'}
+                          aria-pressed={playlist.is_visible}
+                        >
+                          <AlfieIcon glyph={playlist.is_visible ? 'eye' : 'eyeoff'} size={14} />
+                        </button>
+                      </div>
+                      {playlist.is_featured && <span className="atvm-pl-feat">Featured</span>}
+                      <span className="atvm-pl-count">{playlist.video_count} videos</span>
+                    </div>
+
+                    <div className="atvm-pl-body">
+                      <h3>{playlist.title}</h3>
+                      {channel && (
+                        <div className="atvm-pl-ch">
+                          {channel.channel_thumbnail ? (
+                            <img src={channel.channel_thumbnail} alt="" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span>{channel.channel_name.charAt(0)}</span>
+                          )}
+                          {channel.channel_name}
+                        </div>
+                      )}
+                      <select
+                        value={playlist.playlist_category || 'general'}
+                        onChange={(e) => handleUpdatePlaylistCategory(playlist.id, e.target.value)}
+                        className="a-pick atvm-pick atvm-pick-full"
+                        aria-label="Playlist type"
+                      >
+                        {Object.entries(playlistCategoryLabels).map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Video Modal */}
+      <AddVideoModal
+        isOpen={showAddVideoModal}
+        onClose={() => setShowAddVideoModal(false)}
+        onSuccess={() => {
+          addNotification('success', 'Video added successfully');
+          loadChannels();
+        }}
+        darkMode={darkMode}
+      />
+
+      {/* Add/Edit Channel */}
+      {(showAddModal || editingChannel) && (
+        <div className="fixed inset-0 z-[9990] flex items-center justify-center p-3 sm:p-6 atvm-modal">
+          <div className="a-veil absolute inset-0 backdrop-blur-[2px]" onClick={closeChannelSheet} aria-hidden="true" />
+          <section className="a-sheet relative w-full max-w-xl flex flex-col max-h-[92vh] overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="atvm-ch-title">
+            <header className="a-sheet-head a-md-sheet-head">
+              <span className="atvm-yt" aria-hidden="true"><i /></span>
+              <div className="min-w-0 flex-1">
+                <h2 id="atvm-ch-title" className="a-display a-ink m-0 text-[20px] font-semibold leading-tight">
+                  {editingChannel ? 'Edit Channel' : 'Add New Channel'}
+                </h2>
+                <p className="a-mute m-0 mt-0.5 text-[13.5px]">Videos and playlists are imported from YouTube</p>
+              </div>
+              <button type="button" className="a-ib" onClick={closeChannelSheet} aria-label="Close"><AlfieIcon glyph="x" size={20} /></button>
+            </header>
+
+            <div className="a-md-sheet-body">
+              <label className="a-md-fl">
+                <span>Channel Name</span>
+                <input
+                  type="text"
+                  value={channelName}
+                  onChange={(e) => setChannelName(e.target.value)}
+                  placeholder="e.g., RC Sailing Tips"
+                  className="a-inp"
+                />
+              </label>
+
+              <label className="a-md-fl">
+                <span>YouTube Channel URL</span>
+                <span className="a-field">
+                  <AlfieIcon glyph="link" size={16} />
                   <input
                     type="text"
                     value={channelUrl}
                     onChange={(e) => setChannelUrl(e.target.value)}
                     placeholder="https://www.youtube.com/@channel-name"
-                    className={`w-full px-4 py-3 rounded-xl transition-colors ${
-                      lightMode
-                        ? 'bg-gray-50 border border-gray-200 text-gray-900'
-                        : 'bg-slate-700/50 border border-slate-600 text-white'
-                    }`}
                   />
-                </div>
+                </span>
+              </label>
 
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="auto-import"
-                    checked={autoImport}
-                    onChange={(e) => setAutoImport(e.target.checked)}
-                    className="w-5 h-5 rounded text-blue-600"
-                  />
-                  <label htmlFor="auto-import" className={`text-sm ${lightMode ? 'text-gray-700' : 'text-slate-300'}`}>
-                    Automatically import new videos from this channel
-                  </label>
+              <div className="atvm-opt">
+                <div className="min-w-0 flex-1">
+                  <b>Auto-import</b>
+                  <span>Automatically import new videos from this channel</span>
                 </div>
+                <ASwitch checked={autoImport} onChange={setAutoImport} label="Automatically import new videos from this channel" />
+              </div>
 
-                {canCreateGlobalChannels && (
-                  <div className={`p-4 rounded-xl border ${
-                    isGlobal
-                      ? 'bg-blue-50 border-blue-200'
-                      : lightMode
-                        ? 'bg-gray-50 border-gray-200'
-                        : 'bg-slate-700/30 border-slate-600'
-                  }`}>
-                    <div className="flex items-start space-x-3">
-                      <input
-                        type="checkbox"
-                        id="is-global"
-                        checked={isGlobal}
-                        onChange={(e) => setIsGlobal(e.target.checked)}
-                        className="w-5 h-5 rounded text-blue-600 mt-0.5"
-                        disabled={isAssociation}
-                      />
-                      <div className="flex-1">
-                        <label htmlFor="is-global" className={`text-sm font-medium block mb-1 ${
-                          isGlobal ? 'text-blue-700' : lightMode ? 'text-gray-700' : 'text-slate-300'
-                        }`}>
-                          {isAssociation ? 'Global Channel' : 'Make this a Global Channel'}
-                        </label>
-                        <p className={`text-xs ${
-                          isGlobal ? 'text-blue-600' : lightMode ? 'text-gray-500' : 'text-slate-400'
-                        }`}>
-                          {isAssociation
-                            ? '✓ Association channels are always global and visible to all users'
-                            : isGlobal
-                              ? '✓ This channel will be visible to all users across all clubs and associations'
-                              : 'This channel will only be visible to members of the selected club'}
-                        </p>
-                      </div>
-                    </div>
+              {canCreateGlobalChannels && (
+                <div className={`atvm-opt ${isGlobal ? 'is-on' : ''}`}>
+                  <span className="atvm-opt-ic"><AlfieIcon glyph="globe" size={18} /></span>
+                  <div className="min-w-0 flex-1">
+                    <b>{isAssociation ? 'Global Channel' : 'Make this a Global Channel'}</b>
+                    <span>
+                      {isAssociation
+                        ? 'Association channels are always global and visible to all users'
+                        : isGlobal
+                          ? 'This channel will be visible to all users across all clubs and associations'
+                          : 'This channel will only be visible to members of the selected club'}
+                    </span>
                   </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setEditingChannel(null);
-                    setChannelUrl('');
-                    setChannelName('');
-                    setAutoImport(true);
-                    setIsGlobal(false);
-                  }}
-                  className={`px-6 py-3 rounded-xl transition-colors ${
-                    lightMode ? 'hover:bg-gray-100 text-gray-700' : 'hover:bg-slate-700/50 text-slate-300'
-                  }`}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={editingChannel ? handleUpdateChannel : handleAddChannel}
-                  className="px-6 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                >
-                  {editingChannel ? 'Update Channel' : 'Add Channel'}
-                </button>
-              </div>
+                  <ASwitch checked={isGlobal} onChange={setIsGlobal} label="Global channel" disabled={isAssociation} />
+                </div>
+              )}
             </div>
-          </div>
-        )}
 
-        <ConfirmationModal
-          isOpen={deleteConfirmOpen}
-          onClose={() => {
-            setDeleteConfirmOpen(false);
-            setChannelToDelete(null);
-          }}
-          onConfirm={confirmDeleteChannel}
-          title="Delete Channel"
-          message="Are you sure you want to delete this channel? All videos from this channel will also be deleted."
-          confirmText="Delete"
-          cancelText="Cancel"
-          darkMode={darkMode}
-          variant="danger"
-        />
-      </div>
+            <footer className="a-sheet-foot a-md-sheet-foot">
+              <button onClick={closeChannelSheet} className="a-btn a-btn-q">Cancel</button>
+              <button onClick={editingChannel ? handleUpdateChannel : handleAddChannel} className="a-btn a-btn-p">
+                <AlfieIcon glyph={editingChannel ? 'save' : 'plus'} size={16} />
+                {editingChannel ? 'Update Channel' : 'Add Channel'}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      <ConfirmationModal
+        isOpen={deleteConfirmOpen}
+        onClose={() => {
+          setDeleteConfirmOpen(false);
+          setChannelToDelete(null);
+        }}
+        onConfirm={confirmDeleteChannel}
+        title="Delete Channel"
+        message="Are you sure you want to delete this channel? All videos from this channel will also be deleted."
+        confirmText="Delete"
+        cancelText="Cancel"
+        darkMode={darkMode}
+        variant="danger"
+      />
     </div>
   );
 }
