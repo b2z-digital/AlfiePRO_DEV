@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Video, Play, Square, Settings, Eye, EyeOff, Calendar, Camera, Layers, Loader as Loader2, X, Smartphone, RefreshCw, ChevronDown, ChevronRight, Monitor, Radio, Maximize2, Minimize2, ChartBar as BarChart3, Clock, Wifi, Users, MessageSquare, Plus, Trash2, CircleStop as StopCircle, Cloud, CloudOff, Copy, ExternalLink, Signal, Zap, Activity, CircleDot, Disc, Pause, FlaskConical } from 'lucide-react';
 import { TestBroadcastLinkModal } from './TestBroadcastLinkModal';
+import type { OnAirSnapshot, OnAirControls } from './onAirTypes';
 import { useAuth } from '../../contexts/AuthContext';
 import { livestreamStorage } from '../../utils/livestreamStorage';
 import type { LivestreamSession, LivestreamCamera } from '../../types/livestream';
@@ -31,6 +32,9 @@ interface LivestreamControlPanelProps {
   clubId: string;
   sessionId?: string;
   autoCreateForEvent?: AutoCreateEventInfo;
+  /** Compact on-air controls (scoring dock) listen to the studio through these */
+  onSnapshot?: (snapshot: OnAirSnapshot) => void;
+  controlsRef?: React.MutableRefObject<OnAirControls | null>;
 }
 
 interface SessionWithVenue extends LivestreamSession {
@@ -38,7 +42,7 @@ interface SessionWithVenue extends LivestreamSession {
   venueName?: string;
 }
 
-export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }: LivestreamControlPanelProps) {
+export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, onSnapshot, controlsRef }: LivestreamControlPanelProps) {
   const { user } = useAuth();
   const { addNotification } = useNotification();
   const [activeSession, setActiveSession] = useState<LivestreamSession | null>(null);
@@ -1586,6 +1590,44 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent }
   };
 
   const primaryCamera = cameras.find(c => c.is_primary);
+
+  // Report to compact on-air controls (scoring dock) and let them act on the studio
+  if (controlsRef) {
+    controlsRef.current = {
+      hold: pauseBroadcast,
+      resume: resumeBroadcast,
+      cutTo: handleSwitchCamera,
+      showTitle: () => setTitleCardTrigger(prev => prev + 1),
+    };
+  }
+  useEffect(() => {
+    if (!onSnapshot) return;
+    onSnapshot({
+      sessionId: activeSession?.id ?? null,
+      title: activeSession?.title ?? null,
+      status: streamStatus,
+      isPaused,
+      isTest: activeSession?.is_public === false,
+      startedAt: activeSession?.actual_start_time ?? null,
+      viewerCount,
+      link: whipStatus,
+      programStream: (isCompositing && compositedStream) ? compositedStream : (activePreviewStream || mediaStream),
+      cameras: cameras.map(c => ({
+        id: c.id,
+        name: c.camera_name,
+        type: c.camera_type,
+        status: c.status,
+        isProgram: !!c.is_primary,
+        stream: c.camera_type === 'laptop' ? mediaStream : (remoteStreams[c.id] ?? null),
+      })),
+      autoRecord: autoSegmentEnabled,
+      recordingRace: currentSegment?.race_number ?? null,
+      recordingSince: currentSegment?.segment_start_time ?? null,
+      uploading: segmentProcessing,
+    });
+  }, [onSnapshot, activeSession?.id, activeSession?.title, activeSession?.is_public, activeSession?.actual_start_time,
+      streamStatus, isPaused, viewerCount, whipStatus, isCompositing, compositedStream, activePreviewStream, mediaStream,
+      cameras, remoteStreams, autoSegmentEnabled, currentSegment, segmentProcessing]);
 
   if (loading) {
     return (

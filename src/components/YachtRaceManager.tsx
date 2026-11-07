@@ -43,6 +43,7 @@ import { StartBoxModal } from './start-box/StartBoxModal';
 import { AAvatar } from './alfie/Kit';
 import { ScoringTopBar } from './scoring/ScoringTopBar';
 import { LiveStatusControl } from './LiveStatusControl';
+import { ScoringOnAir } from './livestream/ScoringOnAir';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
 import { updateRaceStatus } from '../utils/liveTrackingStorage';
@@ -4040,7 +4041,16 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             </div>
           )}
 
-          <div className={useAlfieTopBar && isFullscreenScoring ? 'flex-1 min-h-0 overflow-auto' : useAlfieTopBar ? '' : 'mt-6'}>
+          <div className={`alv-onair-host ${useAlfieTopBar && isFullscreenScoring ? 'flex-1 min-h-0 overflow-auto' : useAlfieTopBar ? '' : 'mt-6'}`}>
+            {/* Livestream on-air tab, dock and console, shared by every scoring mode so
+                switching modes never interrupts a broadcast */}
+            {currentEvent?.enableLiveStream && currentEvent?.clubId && (
+              <ScoringOnAir
+                clubId={currentEvent.clubId}
+                eventId={currentEvent.id}
+                eventName={currentEvent.eventName}
+              />
+            )}
             {showHandicapOptions && (
               <div className="flex justify-center gap-4 mb-8">
                 <button

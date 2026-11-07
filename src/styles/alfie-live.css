@@ -1,0 +1,132 @@
+/* AlfiePRO Live: broadcast surfaces (livestream design board).
+   Always dark, like a control room, whatever the app theme. */
+
+.alv {
+  --alv-bg: #060B16;
+  --alv-panel: #0A0F1C;
+  --alv-raised: #0E1426;
+  --alv-ink: #F4F6FB;
+  --alv-mute: rgba(235, 240, 255, 0.72);
+  --alv-dim: rgba(235, 240, 255, 0.5);
+  --alv-line: rgba(255, 255, 255, 0.08);
+  --alv-fill: rgba(255, 255, 255, 0.05);
+  --alv-live: #E11D38;
+  --alv-live-ink: #FF8796;
+  --alv-amber: #FFB224;
+  --alv-green: #30D158;
+  --alv-blue: #2A93FF;
+  --alv-violet: #D5C2FF;
+  font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  color: var(--alv-ink);
+}
+.alv-disp { font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; letter-spacing: -0.02em; }
+.alv-mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+.alv-mute { color: var(--alv-mute); }
+.alv-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(235, 240, 255, 0.64); }
+
+.alv-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 42px; padding: 0 14px; border-radius: 12px;
+  font: 600 14px 'Instrument Sans', system-ui, sans-serif; color: #F1F4FA;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer; white-space: nowrap; text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.alv-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.alv-btn:focus-visible, .alv-qa:focus-visible, .alv-cam:focus-visible, .alv-tab:focus-visible {
+  outline: 2px solid var(--alv-blue); outline-offset: 2px;
+}
+.alv-btn.is-small { height: 36px; padding: 0 12px; border-radius: 10px; font-size: 13px; }
+
+.alv-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+  border-radius: 999px; background: var(--alv-fill); font-size: 12.5px; font-weight: 600; white-space: nowrap;
+}
+.alv-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--alv-green); }
+.alv-chip.is-warn .dot { background: var(--alv-amber); }
+.alv-chip.is-bad .dot { background: var(--alv-live); }
+.alv-chip.is-mode { background: rgba(138, 77, 255, 0.16); color: var(--alv-violet); }
+.alv-chip.is-test { background: rgba(255, 178, 36, 0.14); color: #FFD27A; }
+
+.alv-live-badge {
+  display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 6px;
+  background: var(--alv-live); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: 0.08em;
+}
+.alv-live-badge.is-preview { background: #B7791F; }
+.alv-live-badge .pulse { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: alv-pulse 1.6s ease-in-out infinite; }
+@keyframes alv-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .alv-live-badge .pulse { animation: none; } }
+
+/* Program picture */
+.alv-program { position: relative; overflow: hidden; border-radius: 12px; background: #000; border: 2px solid var(--alv-live); }
+.alv-program.is-preview { border-color: #B7791F; }
+.alv-program video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.alv-program .alv-live-badge { position: absolute; left: 8px; top: 8px; }
+.alv-program-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--alv-dim); font-size: 12px; }
+
+/* ── Scoring: collapsed On-air tab ── */
+/* Sits just above the scoring Standings/Handicaps edge tab (centred on the right edge),
+   clear of the Ask Alfie button in the bottom corner */
+.alv-tab {
+  position: fixed; right: 0; bottom: calc(50% + 96px); z-index: 40;
+  width: 84px; box-sizing: border-box; padding: 14px 10px 16px;
+  border-radius: 22px 0 0 22px; background: var(--alv-raised);
+  border: 1px solid rgba(255, 90, 110, 0.45); border-right: 0;
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.45);
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  color: var(--alv-ink); cursor: pointer; font: inherit;
+}
+.alv-tab.is-preview { border-color: rgba(255, 178, 36, 0.5); }
+.alv-tab .thumb { position: relative; width: 58px; height: 78px; border-radius: 10px; overflow: hidden; border: 2px solid var(--alv-live); background: #0B1220; }
+.alv-tab.is-preview .thumb { border-color: #B7791F; }
+.alv-tab .thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.alv-tab .time { font-size: 14px; font-weight: 600; }
+.alv-tab .mode { font-size: 11.5px; font-weight: 700; color: var(--alv-violet); text-align: center; line-height: 1.3; }
+.alv-tab .foot { margin-top: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; color: var(--alv-mute); }
+@media (max-height: 860px) { .alv-tab .thumb { display: none; } .alv-tab { gap: 8px; padding: 12px 8px 12px; } }
+.alv-stream-tab { bottom: calc(50% + 96px); color: #FF8796; }
+.alv-stream-tab .a-edge-tab-l { color: inherit; }
+
+/* ── Scoring: expanded On-air dock ── */
+.alv-dock {
+  position: fixed; right: 0; bottom: 0; z-index: 9990; width: 360px; max-width: 100vw;
+  box-sizing: border-box; background: var(--alv-panel); border-left: 1px solid var(--alv-line);
+  box-shadow: -18px 0 50px rgba(0, 0, 0, 0.4);
+  padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto;
+}
+.alv-qa {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  height: 64px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.04);
+  color: var(--alv-ink); font: 600 13px 'Instrument Sans', system-ui, sans-serif; cursor: pointer;
+}
+.alv-qa:hover { background: rgba(255, 255, 255, 0.08); }
+.alv-qa.is-hold { border-color: rgba(255, 178, 36, 0.45); background: rgba(255, 178, 36, 0.1); color: #FFD27A; }
+.alv-qa:disabled { opacity: 0.45; cursor: not-allowed; }
+.alv-cams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.alv-cam {
+  position: relative; height: 72px; padding: 0; border-radius: 9px; overflow: hidden; cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.08); background: linear-gradient(180deg, #2B4A6B, #142B44);
+}
+.alv-cam.is-program { border-color: #FF3B4E; }
+.alv-cam video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.alv-cam .num {
+  position: absolute; left: 6px; top: 6px; width: 18px; height: 18px; border-radius: 5px;
+  background: rgba(0, 0, 0, 0.65); font-size: 11px; font-weight: 700; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.alv-cam .name {
+  position: absolute; left: 6px; right: 6px; bottom: 5px; font-size: 10.5px; font-weight: 600; color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;
+}
+.alv-note { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); font-size: 13px; }
+
+/* The full studio stays mounted (and on screen, so its camera video keeps playing)
+   but is faded out and inert while the dock or tab is showing. */
+.alv-console-hidden { opacity: 0 !important; pointer-events: none !important; }
+
+/* Scoring makes room for the tab / dock */
+body.alv-onair-tab .alv-onair-host { padding-right: 92px; }
+body.alv-onair-dock .alv-onair-host { padding-right: 368px; }
+@media (max-width: 760px) {
+  body.alv-onair-dock .alv-onair-host { padding-right: 0; }
+}
