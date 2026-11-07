@@ -17,6 +17,7 @@ import './styles/alfie-theme.css';
 import './styles/alfie-ui.css';
 import './styles/alfie-switcher.css';
 import './styles/alfie-screens.css';
+import './styles/alfie-news.css';
 import './styles/animations.css';
 import './styles/article.css';
 

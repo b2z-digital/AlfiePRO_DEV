@@ -1,34 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Newspaper, Search, ListFilter as Filter, Plus, Calendar, User, ChevronRight, SquarePen as Edit2, Trash2, TriangleAlert as AlertTriangle, X, ArrowUpDown, LayoutGrid, List, File as FileEdit } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Plus, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
-import { formatDate } from '../utils/date';
 import { useNavigate } from 'react-router-dom';
 import { getArticles, getDraftArticles, deleteArticle, Article } from '../utils/articleStorage';
 import { useNotifications } from '../contexts/NotificationContext';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { usePermissions } from '../hooks/usePermissions';
+import { AlfieIcon } from '../components/brand/AlfieIcon';
+import { NewsCard, NewsCardSkeleton, NewsFeature, NewsRow } from '../components/news/NewsCard';
+import { NewsTone, sourceOf } from '../components/news/newsUtils';
 
-const DEFAULT_COVER_IMAGE = '/alfie_app_logo.svg';
-const FALLBACK_COVER_IMAGE = '/alfie_app_logo.svg';
-
-const getArticleImageUrl = (coverImage?: string): string => {
-  if (!coverImage) return DEFAULT_COVER_IMAGE;
-
-  if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
-    return coverImage;
-  }
-
-  if (coverImage.startsWith('/')) {
-    return coverImage;
-  }
-
-  const { data } = supabase.storage
-    .from('article-images')
-    .getPublicUrl(coverImage);
-
-  return data.publicUrl || DEFAULT_COVER_IMAGE;
-};
+const SOURCE_LABELS: Record<NewsTone, string> = { club: 'Club', state: 'State', national: 'National' };
 
 const NewsPage: React.FC = () => {
   const { currentClub, currentOrganization, user } = useAuth();
@@ -43,7 +26,6 @@ const NewsPage: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const { addNotification } = useNotifications();
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; articleId: string | null }>({ show: false, articleId: null });
-  const [showHeaderSearch, setShowHeaderSearch] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'date' | 'title'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -53,6 +35,7 @@ const NewsPage: React.FC = () => {
   const [availableYachtClasses, setAvailableYachtClasses] = useState<Array<{ id: string; name: string }>>([]);
   const [viewTab, setViewTab] = useState<'published' | 'drafts'>('published');
   const [draftArticles, setDraftArticles] = useState<Article[]>([]);
+  const [filterSource, setFilterSource] = useState<NewsTone | null>(null);
   
   useEffect(() => {
     const fetchArticles = async () => {
@@ -168,7 +151,8 @@ const NewsPage: React.FC = () => {
                          (article.excerpt && article.excerpt.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesTag = filterTag ? article.tags?.includes(filterTag) : true;
     const matchesYachtClass = filterYachtClass ? (article as any).yacht_classes?.includes(filterYachtClass) : true;
-    return matchesSearch && matchesTag && matchesYachtClass;
+    const matchesSource = filterSource ? sourceOf(article).tone === filterSource : true;
+    return matchesSearch && matchesTag && matchesYachtClass && matchesSource;
   });
 
   const sortedArticles = [...filteredArticles].sort((a, b) => {
@@ -230,75 +214,104 @@ const NewsPage: React.FC = () => {
     }
   };
   
+  const sourcesPresent = useMemo(() => {
+    const set = new Set<NewsTone>();
+    articles.forEach(a => set.add(sourceOf(a).tone));
+    return (['club', 'state', 'national'] as NewsTone[]).filter(t => set.has(t));
+  }, [articles]);
+
+  const filtersActive = !!(searchTerm || filterTag || filterYachtClass || filterSource);
+  const sortLabel = sortBy === 'title' ? 'A–Z' : sortOrder === 'desc' ? 'Newest' : 'Oldest';
+  const showFeature = viewTab === 'published' && viewMode === 'grid' && !filtersActive && sortBy === 'date' && sortOrder === 'desc' && sortedArticles.length >= 2;
+  const lead = showFeature ? sortedArticles[0] : null;
+  const side = showFeature ? sortedArticles.slice(1, 5) : [];
+  const rest = showFeature ? sortedArticles.slice(1 + side.length) : sortedArticles;
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFilterTag(null);
+    setFilterYachtClass(null);
+    setFilterSource(null);
+  };
+
+  const adminProps = (article: Article) =>
+    isAdmin
+      ? {
+          onEdit: (e: React.MouseEvent) => handleEditArticle(article.id, e),
+          onDelete: (e: React.MouseEvent) => handleDeleteArticle(article.id, e),
+        }
+      : {};
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-16">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
-              <Newspaper className="text-white" size={28} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">{pageTitle}</h1>
-              <p className="text-slate-400">
-                {pageSubtitle}
-              </p>
-            </div>
+      <div className="a-nw-page flex flex-col gap-[22px] p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+        {/* Header */}
+        <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}>
+            <AlfieIcon glyph="news" size={24} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">{pageTitle}</h1>
+            {pageSubtitle && <p className="a-mute m-0 mt-1 text-[14px]">{pageSubtitle}</p>}
           </div>
-
-          <div className="flex items-center gap-3">
-            {/* Expandable Search */}
-            <div className="relative">
-              {showHeaderSearch ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search articles..."
-                    className="w-64 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-all"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => {
-                      setShowHeaderSearch(false);
-                      setSearchTerm('');
-                    }}
-                    className="p-2 text-slate-400 hover:text-white transition-colors"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowHeaderSearch(true)}
-                  className="p-2 text-slate-400 hover:text-white transition-colors"
-                  title="Search articles"
-                >
-                  <Search size={20} />
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <label className="a-field a-nw-search">
+              <Search size={16} />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search news"
+                aria-label="Search articles"
+              />
+              {searchTerm && (
+                <button type="button" className="a-nw-clear" onClick={() => setSearchTerm('')} aria-label="Clear search">
+                  <X size={14} />
                 </button>
               )}
+            </label>
+            {can('articles.create') && (
+              <button onClick={handleNewArticle} className="a-btn a-btn-p a-nw-newbtn whitespace-nowrap" aria-label="New article">
+                <Plus size={17} />
+                <span className="a-nw-newbtn-lbl">New article</span>
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Toolbar */}
+        <div className="a-nw-toolbar">
+          {isAdmin && draftArticles.length > 0 && (
+            <div className="a-seg" role="tablist" aria-label="Article status">
+              <button role="tab" aria-selected={viewTab === 'published'} className={`a-seg-i ${viewTab === 'published' ? 'a-seg-on' : ''}`} onClick={() => setViewTab('published')}>
+                Published<span className="a-cnt">{articles.length}</span>
+              </button>
+              <button role="tab" aria-selected={viewTab === 'drafts'} className={`a-seg-i ${viewTab === 'drafts' ? 'a-seg-on' : ''}`} onClick={() => setViewTab('drafts')}>
+                Drafts<span className="a-cnt a-cnt-amber">{draftArticles.length}</span>
+              </button>
             </div>
+          )}
 
-            {/* Sort Button */}
-            <button
-              onClick={toggleSort}
-              className="p-2 text-slate-400 hover:text-white transition-colors"
-              title={`Sort by ${sortBy === 'date' ? 'date' : 'title'} (${sortOrder === 'asc' ? 'ascending' : 'descending'})`}
-            >
-              <ArrowUpDown size={20} />
-            </button>
+          {viewTab === 'published' && sourcesPresent.length > 1 && (
+            <div className="a-nw-chips" role="group" aria-label="Filter by source">
+              <button type="button" className={`a-nw-chip ${!filterSource ? 'a-nw-chip-on' : ''}`} onClick={() => setFilterSource(null)}>All news</button>
+              {sourcesPresent.map(t => (
+                <button key={t} type="button" className={`a-nw-chip a-nw-chip-${t} ${filterSource === t ? 'a-nw-chip-on' : ''}`} onClick={() => setFilterSource(filterSource === t ? null : t)}>
+                  <i aria-hidden="true" />{SOURCE_LABELS[t]}
+                </button>
+              ))}
+            </div>
+          )}
 
-            {/* Filter by Yacht Class */}
-            <div className="relative">
-              <Filter size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          {viewTab === 'published' && (
+            <div className="a-nw-tools">
               <select
                 value={filterYachtClass || ''}
                 onChange={(e) => setFilterYachtClass(e.target.value || null)}
-                className="pl-9 pr-2 py-2 bg-slate-800 text-slate-200 rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none transition-all appearance-none cursor-pointer w-10 xl:w-auto xl:pr-8"
-                title="Filter by class"
+                className="a-pick a-nw-pick"
+                aria-label="Filter by class"
               >
-                <option value="">All Classes</option>
+                <option value="">All classes</option>
                 <option value="generic">Generic</option>
                 {availableYachtClasses.map(yachtClass => (
                   <option key={yachtClass.id} value={yachtClass.id}>
@@ -306,420 +319,170 @@ const NewsPage: React.FC = () => {
                   </option>
                 ))}
               </select>
-            </div>
 
-            {/* Filter by Tag */}
-            {allTags.length > 0 && (
-              <div className="relative">
-                <Filter size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              {allTags.length > 0 && (
                 <select
                   value={filterTag || ''}
                   onChange={(e) => setFilterTag(e.target.value || null)}
-                  className="pl-9 pr-8 py-2 bg-slate-800 text-slate-200 rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none transition-all appearance-none cursor-pointer"
+                  className="a-pick a-nw-pick"
+                  aria-label="Filter by tag"
                 >
-                  <option value="">All Tags</option>
+                  <option value="">All tags</option>
                   {allTags.map(tag => (
                     <option key={tag} value={tag}>{tag}</option>
                   ))}
                 </select>
+              )}
+
+              <button
+                type="button"
+                onClick={toggleSort}
+                className="a-btn a-nw-sort"
+                title={`Sort by ${sortBy === 'date' ? 'date' : 'title'} (${sortOrder === 'asc' ? 'ascending' : 'descending'})`}
+              >
+                <AlfieIcon glyph="sort" size={16} />
+                {sortLabel}
+              </button>
+
+              <div className="a-seg" role="group" aria-label="Layout">
+                <button type="button" className={`a-seg-i a-nw-seg-ic ${viewMode === 'grid' ? 'a-seg-on' : ''}`} onClick={() => setViewMode('grid')} title="Grid view" aria-label="Grid view" aria-pressed={viewMode === 'grid'}>
+                  <AlfieIcon glyph="grid" size={16} />
+                </button>
+                <button type="button" className={`a-seg-i a-nw-seg-ic ${viewMode === 'list' ? 'a-seg-on' : ''}`} onClick={() => setViewMode('list')} title="List view" aria-label="List view" aria-pressed={viewMode === 'list'}>
+                  <AlfieIcon glyph="list" size={16} />
+                </button>
               </div>
-            )}
-
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-slate-700 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Grid view"
-              >
-                <LayoutGrid size={18} />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-slate-700 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="List view"
-              >
-                <List size={18} />
-              </button>
             </div>
-
-            {can('articles.create') && (
-              <button
-                onClick={handleNewArticle}
-                className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 animate-pulse whitespace-nowrap"
-              >
-                <Plus size={18} />
-                <span className="xl:hidden">New</span>
-                <span className="hidden xl:inline">New Article</span>
-              </button>
-            )}
-          </div>
+          )}
         </div>
-        
-        {isAdmin && draftArticles.length > 0 && (
-          <div className="flex items-center gap-1 mb-6 bg-slate-800/50 rounded-lg p-1 w-fit">
-            <button
-              onClick={() => setViewTab('published')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                viewTab === 'published'
-                  ? 'bg-slate-700 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Published
-            </button>
-            <button
-              onClick={() => setViewTab('drafts')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                viewTab === 'drafts'
-                  ? 'bg-slate-700 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <FileEdit size={14} />
-              Drafts
-              <span className="px-1.5 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-400">
-                {draftArticles.length}
-              </span>
+
+        {filterTag && viewTab === 'published' && (
+          <div className="a-nw-active">
+            <span className="a-mute">Tagged</span>
+            <button type="button" className="a-nw-chip a-nw-chip-on" onClick={() => setFilterTag(null)}>
+              #{filterTag}<X size={13} />
             </button>
           </div>
         )}
 
+        {/* Content */}
         {viewTab === 'drafts' && isAdmin ? (
           draftArticles.length === 0 ? (
-            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
-              <FileEdit size={48} className="mx-auto mb-4 text-slate-600" />
-              <h3 className="text-lg font-medium text-slate-300 mb-2">No Drafts</h3>
-              <p className="text-slate-400">All articles have been published</p>
+            <div className="a-card a-empty py-14">
+              <span className="a-tile a-tile-lg"><AlfieIcon glyph="doc" size={24} /></span>
+              <h3 className="a-ink m-0 text-[17px] font-semibold">No drafts</h3>
+              <p className="a-mute m-0 text-[14px]">All articles have been published</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {draftArticles.map(article => (
-                <div
+            <div className="a-nw-list">
+              {draftArticles.map((article, i) => (
+                <NewsRow
                   key={article.id}
-                  className="bg-slate-800/50 rounded-xl border border-amber-500/20 overflow-hidden transition-all hover:border-amber-500/40 hover:shadow-lg cursor-pointer"
-                  onClick={() => navigate(`/news/edit/${article.id}`)}
-                >
-                  <div className="flex items-center gap-4 p-4">
-                    <div className="relative w-32 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800">
-                      <img
-                        src={getArticleImageUrl(article.cover_image)}
-                        alt={article.title}
-                        className="w-full h-full object-cover opacity-70"
-                        onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_COVER_IMAGE; }}
-                      />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                          Draft
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          Last edited {article.updated_at ? formatDate(article.updated_at) : 'recently'}
-                        </span>
-                      </div>
-                      <h3 className="text-lg font-semibold text-white mb-1 line-clamp-1">
-                        {article.title || 'Untitled Article'}
-                      </h3>
-                      <p className="text-slate-400 text-sm line-clamp-1">
-                        {article.content?.replace(/<[^>]*>/g, '').substring(0, 120) || 'No content yet'}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm flex items-center gap-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/news/edit/${article.id}`);
-                        }}
-                      >
-                        <Edit2 size={14} />
-                        Edit
-                      </button>
-                      <button
-                        className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-900/20 transition-colors"
-                        onClick={(e) => handleDeleteArticle(article.id, e)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                  article={article}
+                  index={i}
+                  draft
+                  showExcerpt
+                  onOpen={() => navigate(`/news/edit/${article.id}`)}
+                  onEdit={(e) => { e.stopPropagation(); navigate(`/news/edit/${article.id}`); }}
+                  onDelete={(e) => handleDeleteArticle(article.id, e)}
+                />
               ))}
             </div>
           )
         ) : loading ? (
-          <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-slate-400">Loading articles...</p>
+          <div className="a-nw-grid" aria-busy="true" aria-label="Loading articles">
+            {Array.from({ length: 6 }).map((_, i) => <NewsCardSkeleton key={i} index={i} />)}
           </div>
         ) : error ? (
-          <div className="text-center py-12 bg-red-900/10 border border-red-900/20 rounded-lg">
-            <AlertTriangle size={48} className="mx-auto mb-4 text-red-500 opacity-50" />
-            <p className="text-lg font-medium text-red-400 mb-2">Error Loading Articles</p>
-            <p className="text-red-300">{error}</p>
+          <div className="a-card a-empty py-14">
+            <span className="a-tile a-tile-lg a-tile-danger"><AlfieIcon glyph="warn" size={24} /></span>
+            <h3 className="a-ink m-0 text-[17px] font-semibold">Couldn't load the news</h3>
+            <p className="a-mute m-0 text-[14px]">{error}</p>
           </div>
         ) : sortedArticles.length === 0 ? (
-          <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
-            <Newspaper size={48} className="mx-auto mb-4 text-slate-600" />
-            <h3 className="text-lg font-medium text-slate-300 mb-2">No Articles Found</h3>
-            <p className="text-slate-400">
-              {searchTerm || filterTag 
-                ? 'Try adjusting your search or filters' 
+          <div className="a-card a-empty py-14 px-6">
+            <span className="a-tile a-tile-lg a-tile-rim"><AlfieIcon glyph={filtersActive ? 'search' : 'news'} size={24} /></span>
+            <h3 className="a-ink m-0 text-[17px] font-semibold">{filtersActive ? 'No stories match' : 'No news yet'}</h3>
+            <p className="a-mute m-0 text-[14px]">
+              {filtersActive
+                ? 'Try adjusting your search or filters'
                 : 'Be the first to publish news for your club'}
             </p>
-            {isAdmin && (
-              <button
-                onClick={handleNewArticle}
-                className="btn-primary-green mt-4 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200"
-              >
-                Create First Article
+            {filtersActive ? (
+              <button type="button" onClick={clearFilters} className="a-btn mt-2">Clear filters</button>
+            ) : isAdmin && (
+              <button onClick={handleNewArticle} className="a-btn a-btn-p mt-2">
+                <Plus size={17} />
+                Create first article
               </button>
             )}
           </div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortedArticles.map(article => (
-              <div 
-                key={article.id}
-                className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden transition-all hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-900/10 cursor-pointer group h-[500px] flex flex-col"
-                onClick={() => handleReadMore(article.id)}
-              >
-                <div className="relative h-48 overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800">
-                  <img
-                    src={getArticleImageUrl(article.cover_image)}
-                    alt={article.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_COVER_IMAGE; }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
-
-                  {/* Source Label */}
-                  {(article.source_type || article.event_name) && (
-                    <div className="absolute top-3 left-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${
-                        article.event_name && article.event_level === 'national'
-                          ? 'bg-amber-500/90 text-white'
-                          : article.event_name && article.event_level === 'state'
-                          ? 'bg-emerald-500/90 text-white'
-                          : article.source_type === 'national'
-                          ? 'bg-amber-500/90 text-white'
-                          : article.source_type === 'state'
-                          ? 'bg-emerald-500/90 text-white'
-                          : 'bg-blue-500/90 text-white'
-                      }`}>
-                        {article.event_name && article.event_level === 'national'
-                          ? (article.source_name ? `${article.source_name} News` : 'National News')
-                          : article.event_name && article.event_level === 'state'
-                          ? (article.source_name ? `${article.source_name} News` : 'State News')
-                          : article.source_type === 'national'
-                          ? (article.source_name ? `${article.source_name} News` : 'National News')
-                          : article.source_type === 'state'
-                          ? (article.source_name ? `${article.source_name} News` : 'State News')
-                          : 'Club News'}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <div className="flex flex-wrap gap-2">
-                      {article.tags?.map(tag => (
-                        <span
-                          key={tag}
-                          className="px-2 py-0.5 bg-blue-600/80 text-white rounded-full text-xs font-medium backdrop-blur-sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFilterTag(tag);
-                          }}
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-6 flex flex-col flex-1">
-                  <h2 className="text-xl font-bold text-white mb-2 line-clamp-2 group-hover:text-blue-400 transition-colors">
-                    {article.title}
-                  </h2>
-                  
-                  <div className="flex items-center gap-4 text-sm text-slate-400 mb-4 flex-wrap">
-                    <div className="flex items-center gap-1">
-                      <Calendar size={14} />
-                      {article.published_at ? formatDate(article.published_at) : 'Draft'}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <User size={14} />
-                      {article.author_name || 'Unknown Author'}
-                    </div>
-                    {article.event_name && (
-                      <div className="flex items-center gap-1 px-2 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded text-cyan-400">
-                        <Calendar size={14} />
-                        <span className="text-xs font-medium">{article.event_name}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <p className="text-slate-300 mb-4 line-clamp-4 flex-grow">
-                    {article.excerpt || article.content.replace(/<[^>]*>/g, '').substring(0, 150) + '...'}
-                  </p>
-                  
-                  <div className="flex justify-between items-center mt-auto pt-4 border-t border-slate-700/50">
-                    <button 
-                      className="btn-primary-green px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm flex items-center gap-1 group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-indigo-600"
-                    >
-                      Read more <ChevronRight size={16} className="transition-transform group-hover:translate-x-1" />
-                    </button>
-                    
-                    {isAdmin && (
-                      <div className="flex gap-2">
-                        <button 
-                          className="p-2 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 transition-colors"
-                          onClick={(e) => handleEditArticle(article.id, e)}
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button 
-                          className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-900/20 transition-colors"
-                          onClick={(e) => handleDeleteArticle(article.id, e)}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         ) : (
-          <div className="space-y-4">
-            {sortedArticles.map(article => (
-              <div
-                key={article.id}
-                className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden transition-all hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-900/10 cursor-pointer"
-                onClick={() => handleReadMore(article.id)}
-              >
-                <div className="flex items-center gap-4 p-4">
-                  <div className="relative w-48 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800">
-                    <img
-                      src={getArticleImageUrl(article.cover_image)}
-                      alt={article.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_COVER_IMAGE; }}
-                    />
-                    {/* Source Label for List View */}
-                    {(article.source_type || article.event_name) && (
-                      <div className="absolute top-2 left-2">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold backdrop-blur-sm ${
-                          article.event_name && article.event_level === 'national'
-                            ? 'bg-amber-500/90 text-white'
-                            : article.event_name && article.event_level === 'state'
-                            ? 'bg-emerald-500/90 text-white'
-                            : article.source_type === 'national'
-                            ? 'bg-amber-500/90 text-white'
-                            : article.source_type === 'state'
-                            ? 'bg-emerald-500/90 text-white'
-                            : 'bg-blue-500/90 text-white'
-                        }`}>
-                          {article.event_name && article.event_level === 'national'
-                            ? (article.source_name || 'National')
-                            : article.event_name && article.event_level === 'state'
-                            ? (article.source_name || 'State')
-                            : article.source_type === 'national'
-                            ? (article.source_name || 'National')
-                            : article.source_type === 'state'
-                            ? (article.source_name || 'State')
-                            : 'Club'}
-                        </span>
-                      </div>
-                    )}
+          <>
+            {lead && (
+              <section className="a-nw-top" aria-label="Top stories">
+                <NewsFeature
+                  article={lead}
+                  onOpen={() => handleReadMore(lead.id)}
+                  onTag={setFilterTag}
+                  {...adminProps(lead)}
+                />
+                {side.length > 0 && (
+                  <div className="a-nw-side">
+                    <p className="a-cap a-nw-side-cap">Also new</p>
+                    {side.map((article, i) => (
+                      <NewsRow
+                        key={article.id}
+                        article={article}
+                        index={i + 1}
+                        size="sm"
+                        onOpen={() => handleReadMore(article.id)}
+                      />
+                    ))}
                   </div>
+                )}
+              </section>
+            )}
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4 mb-2">
-                      <div className="flex-1 min-w-0">
-                        <h2 className="text-xl font-bold text-white mb-2 line-clamp-1 hover:text-blue-400 transition-colors">
-                          {article.title}
-                        </h2>
-
-                        <div className="flex items-center gap-4 text-sm text-slate-400 mb-2 flex-wrap">
-                          <div className="flex items-center gap-1">
-                            <Calendar size={14} />
-                            {article.published_at ? formatDate(article.published_at) : 'Draft'}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <User size={14} />
-                            {article.author_name || 'Unknown Author'}
-                          </div>
-                          {article.event_name && (
-                            <div className="flex items-center gap-1 px-2 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded text-cyan-400">
-                              <Calendar size={14} />
-                              <span className="text-xs font-medium">{article.event_name}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {article.tags?.map(tag => (
-                            <span
-                              key={tag}
-                              className="px-2 py-0.5 bg-blue-600/80 text-white rounded-full text-xs font-medium"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFilterTag(tag);
-                              }}
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-
-                        <p className="text-slate-300 text-sm line-clamp-2">
-                          {article.excerpt || article.content.replace(/<[^>]*>/g, '').substring(0, 150) + '...'}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm flex items-center gap-1"
-                        >
-                          Read more <ChevronRight size={16} />
-                        </button>
-                        {isAdmin && (
-                          <>
-                            <button
-                              className="p-2 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 transition-colors"
-                              onClick={(e) => handleEditArticle(article.id, e)}
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-900/20 transition-colors"
-                              onClick={(e) => handleDeleteArticle(article.id, e)}
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
+            {rest.length > 0 && (
+              <section className="flex flex-col gap-4" aria-label="Latest stories">
+                {lead && (
+                  <div className="a-nw-sec">
+                    <h2 className="a-display a-ink m-0 text-[20px] font-semibold">More stories</h2>
+                    <span className="a-cnt">{rest.length}</span>
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                )}
+                {viewMode === 'grid' ? (
+                  <div className="a-nw-grid">
+                    {rest.map((article, i) => (
+                      <NewsCard
+                        key={article.id}
+                        article={article}
+                        index={i}
+                        onOpen={() => handleReadMore(article.id)}
+                        onTag={setFilterTag}
+                        {...adminProps(article)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="a-nw-list">
+                    {rest.map((article, i) => (
+                      <NewsRow
+                        key={article.id}
+                        article={article}
+                        index={i}
+                        showExcerpt
+                        onOpen={() => handleReadMore(article.id)}
+                        onTag={setFilterTag}
+                        {...adminProps(article)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+          </>
         )}
       </div>
 
