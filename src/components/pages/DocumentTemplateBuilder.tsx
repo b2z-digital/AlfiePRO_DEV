@@ -83,6 +83,54 @@ const replaceMergeFields = (content: string, useSampleData: boolean): string => 
   return result;
 };
 
+// Outside the builder: declared inside it, every keystroke rebuilt each section (inputs lost focus)
+const SortableSectionWrapper = ({ section, index, onRemove, children }: { section: DocumentSection, index: number, onRemove: (index: number) => void, children: React.ReactNode }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: index.toString() });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="p-6 rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow"
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing p-1 text-gray-400 hover:text-gray-600"
+          >
+            <GripVertical size={16} />
+          </button>
+          <span className="text-sm font-medium text-gray-900">
+            Section {index + 1} - {SECTION_TYPES.find(t => t.value === section.type)?.label}
+          </span>
+        </div>
+        <button
+          onClick={() => onRemove(index)}
+          className="p-1 text-red-500 hover:text-red-700"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+};
+
 export const DocumentTemplateBuilder: React.FC<DocumentTemplateBuilderProps> = ({
   onSuccess
 }) => {
@@ -303,58 +351,11 @@ export const DocumentTemplateBuilder: React.FC<DocumentTemplateBuilderProps> = (
     }
   };
 
-  const SortableSectionWrapper = ({ section, index, children }: { section: DocumentSection, index: number, children: React.ReactNode }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: index.toString() });
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-    };
-
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className="p-6 rounded-lg border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow"
-      >
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <button
-              {...attributes}
-              {...listeners}
-              className="cursor-grab active:cursor-grabbing p-1 text-gray-400 hover:text-gray-600"
-            >
-              <GripVertical size={16} />
-            </button>
-            <span className="text-sm font-medium text-gray-900">
-              Section {index + 1} - {SECTION_TYPES.find(t => t.value === section.type)?.label}
-            </span>
-          </div>
-          <button
-            onClick={() => removeSection(index)}
-            className="p-1 text-red-500 hover:text-red-700"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-        {children}
-      </div>
-    );
-  };
-
   const renderSectionEditor = (section: DocumentSection, index: number) => {
     const selectedForm = availableForms.find(form => form.id === selectedFormId);
 
     return (
-      <SortableSectionWrapper key={section.id} section={section} index={index}>
+      <SortableSectionWrapper key={section.id} section={section} index={index} onRemove={removeSection}>
         <div>
 
         {section.type === 'header_section' && (
