@@ -303,6 +303,124 @@ async function uploadToYouTube(
   return uploadData.id;
 }
 
+// ── Cloud engine (RealtimeKit) race recordings ──────────────────────
+// Recorded per race by live-cloud's race_start; stored in RealtimeKit's bucket and
+// fetched here by download URL once the recording has finished uploading there.
+
+const RTK_APP_ID = Deno.env.get("CF_REALTIME_APP_ID") ?? "";
+const RTK_TOKEN = Deno.env.get("CF_REALTIME_API_TOKEN") ?? "";
+
+interface RtkRecording {
+  id: string;
+  status: string;
+  download_url?: string | null;
+  recording_duration?: number | null;
+  output_file_name?: string | null;
+}
+
+async function getRtkRecording(accountId: string, recordingId: string): Promise<RtkRecording> {
+  if (!RTK_APP_ID || !RTK_TOKEN) throw new Error("Cloud engine secrets are missing (CF_REALTIME_APP_ID / CF_REALTIME_API_TOKEN)");
+  const res = await fetch(`${CF_API_BASE}/accounts/${accountId}/realtime/kit/${RTK_APP_ID}/recordings/${recordingId}`, {
+    headers: { Authorization: `Bearer ${RTK_TOKEN}` },
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok || !body?.data) throw new Error(`RealtimeKit recording lookup failed (${res.status})`);
+  return body.data as RtkRecording;
+}
+
+/** Waits up to ~40 s for RealtimeKit to finish saving the recording; null if it isn't ready yet (the control room asks again). */
+async function waitForRtkRecording(accountId: string, recordingId: string): Promise<RtkRecording | null> {
+  for (let i = 0; i < 4; i++) {
+    const rec = await getRtkRecording(accountId, recordingId);
+    if (rec.status === "UPLOADED" && rec.download_url) return rec;
+    if (rec.status === "ERRORED") throw new Error("The race recording failed in RealtimeKit");
+    if (i < 3) await new Promise((r) => setTimeout(r, 10000));
+  }
+  return null;
+}
+
+/**
+ * Streams a video from a URL to YouTube in 32 MB pieces (resumable upload), so a long
+ * race never has to fit in the function's memory.
+ */
+async function uploadUrlToYouTubeChunked(
+  ytCreds: YouTubeCredentials,
+  url: string,
+  title: string,
+  description: string,
+  privacyStatus: "public" | "unlisted",
+): Promise<string> {
+  const videoRes = await fetch(url);
+  if (!videoRes.ok || !videoRes.body) throw new Error(`Failed to download video: ${videoRes.status}`);
+  const total = Number(videoRes.headers.get("content-length") || 0);
+  const contentType = videoRes.headers.get("content-type")?.startsWith("video/") ? videoRes.headers.get("content-type")! : "video/mp4";
+  if (!total) {
+    // No length to resume against: fall back to the whole-file upload
+    const data = await videoRes.arrayBuffer();
+    return uploadToYouTube(ytCreds, data, title, description, contentType, privacyStatus);
+  }
+  console.log(`[Segment] Streaming ${(total / 1024 / 1024).toFixed(1)}MB to YouTube in pieces`);
+
+  const initRes = await fetch(
+    "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${ytCreds.access_token}`,
+        "Content-Type": "application/json",
+        "X-Upload-Content-Length": String(total),
+        "X-Upload-Content-Type": contentType,
+      },
+      body: JSON.stringify({ snippet: { title, description, categoryId: "17" }, status: { privacyStatus } }),
+    },
+  );
+  if (!initRes.ok) throw new Error(`YouTube upload init failed (${initRes.status}): ${await initRes.text()}`);
+  const uploadUrl = initRes.headers.get("Location");
+  if (!uploadUrl) throw new Error("No upload URL returned from YouTube");
+
+  const CHUNK = 32 * 1024 * 1024; // a multiple of 256 KiB, as YouTube requires
+  const reader = videoRes.body.getReader();
+  let pending: Uint8Array[] = [];
+  let pendingSize = 0;
+  let sent = 0;
+  let done = false;
+
+  const sendPiece = async (final: boolean) => {
+    const size = final ? pendingSize : CHUNK;
+    const piece = new Uint8Array(size);
+    let offset = 0;
+    while (offset < size) {
+      const head = pending[0];
+      const take = Math.min(head.length, size - offset);
+      piece.set(head.subarray(0, take), offset);
+      offset += take;
+      if (take === head.length) pending.shift(); else pending[0] = head.subarray(take);
+    }
+    pendingSize -= size;
+    const res = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": contentType, "Content-Range": `bytes ${sent}-${sent + size - 1}/${total}` },
+      body: piece,
+    });
+    sent += size;
+    if (res.status === 308) { await res.body?.cancel(); return null; }
+    if (!res.ok) throw new Error(`YouTube upload failed (${res.status}): ${await res.text()}`);
+    const data = await res.json();
+    return data.id as string;
+  };
+
+  while (!done) {
+    const { value, done: end } = await reader.read();
+    if (value) { pending.push(value); pendingSize += value.length; }
+    done = end;
+    while (pendingSize >= CHUNK && sent + CHUNK < total) await sendPiece(false);
+  }
+  const id = await sendPiece(true);
+  if (!id) throw new Error("YouTube didn't confirm the upload");
+  console.log(`[Segment] YouTube upload complete. Video ID: ${id}`);
+  return id;
+}
+
 async function addToPlaylist(
   ytCreds: YouTubeCredentials,
   playlistId: string,
@@ -430,19 +548,50 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Another run is already uploading this race (asked twice): don't upload it twice.
+    // A run that died part way frees the race after 10 minutes.
+    if (segment.upload_status === "uploading" && segment.updated_at &&
+        Date.now() - new Date(segment.updated_at).getTime() < 10 * 60 * 1000) {
+      return new Response(
+        JSON.stringify({ success: true, inProgress: true, message: "Already uploading" }),
+        { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     await serviceClient
       .from("livestream_race_segments")
       .update({ upload_status: "uploading", updated_at: new Date().toISOString() })
       .eq("id", segmentId);
 
-    // Determine video source: local recording (browser MediaRecorder) or Cloudflare
+    // Cloud engine race: wait for RealtimeKit to finish its upload; if it isn't ready yet,
+    // leave the race pending so the control room asks again shortly.
+    let rtkRecording: RtkRecording | null = null;
+    if (segment.rtk_recording_id) {
+      const cfCreds = await getCloudflareCredentials(serviceClient);
+      rtkRecording = await waitForRtkRecording(cfCreds.account_id, segment.rtk_recording_id);
+      if (!rtkRecording) {
+        await serviceClient
+          .from("livestream_race_segments")
+          .update({ upload_status: "pending", upload_error: "Waiting for the race recording to finish saving", updated_at: new Date().toISOString() })
+          .eq("id", segmentId);
+        return new Response(
+          JSON.stringify({ success: false, pending: true, message: "Recording not ready yet" }),
+          { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Determine video source: cloud race recording, local recording (browser MediaRecorder) or Cloudflare
     let videoSource: string | ArrayBuffer;
     let contentType = "video/mp4";
     let cfVideoId: string | null = null;
     let duration: number | null = null;
-    const useLocalRecording = !!segment.local_recording_path;
+    const useLocalRecording = !rtkRecording && !!segment.local_recording_path;
 
-    if (useLocalRecording) {
+    if (rtkRecording) {
+      videoSource = rtkRecording.download_url as string;
+      duration = rtkRecording.recording_duration ? Math.round(rtkRecording.recording_duration) : null;
+    } else if (useLocalRecording) {
       console.log(`[Segment] Using local recording: ${segment.local_recording_path}`);
       videoSource = await downloadVideoFromStorage(serviceClient, segment.local_recording_path);
       contentType = segment.local_recording_path.endsWith(".webm") ? "video/webm" : "video/mp4";
@@ -547,14 +696,22 @@ Deno.serve(async (req: Request) => {
     }
 
     const youtubeTitle = isTestBroadcast ? `TEST · ${segment.segment_title}` : segment.segment_title;
-    const youtubeVideoId = await uploadToYouTube(
-      ytCreds,
-      videoSource,
-      youtubeTitle,
-      `${segment.segment_title} - Powered by AlfiePRO`,
-      contentType,
-      isTestBroadcast ? "unlisted" : "public"
-    );
+    const youtubeVideoId = rtkRecording
+      ? await uploadUrlToYouTubeChunked(
+          ytCreds,
+          videoSource as string,
+          youtubeTitle,
+          `${segment.segment_title} - Powered by AlfiePRO`,
+          isTestBroadcast ? "unlisted" : "public"
+        )
+      : await uploadToYouTube(
+          ytCreds,
+          videoSource,
+          youtubeTitle,
+          `${segment.segment_title} - Powered by AlfiePRO`,
+          contentType,
+          isTestBroadcast ? "unlisted" : "public"
+        );
 
     if (playlistId) {
       await addToPlaylist(ytCreds, playlistId, youtubeVideoId, segment.race_number - 1);
@@ -566,6 +723,7 @@ Deno.serve(async (req: Request) => {
         youtube_video_id: youtubeVideoId,
         youtube_playlist_id: playlistId || null,
         upload_status: "uploaded",
+        upload_error: null,
         duration,
         segment_end_time: segment.segment_end_time || new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -623,7 +781,7 @@ Deno.serve(async (req: Request) => {
       })
       .eq("id", segmentId);
 
-    const source = useLocalRecording ? "LocalRec -> YouTube" : "CF -> YouTube";
+    const source = rtkRecording ? "RealtimeKit -> YouTube" : useLocalRecording ? "LocalRec -> YouTube" : "CF -> YouTube";
     console.log(`[Segment] Fully processed segment ${segmentId}: ${source} -> Cleanup`);
 
     return new Response(
@@ -631,7 +789,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         youtubeVideoId,
         playlistId,
-        source: useLocalRecording ? "local_recording" : "cloudflare",
+        source: rtkRecording ? "realtimekit" : useLocalRecording ? "local_recording" : "cloudflare",
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

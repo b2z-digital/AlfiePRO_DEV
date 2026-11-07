@@ -168,7 +168,7 @@ export function NewBroadcastSheet({ clubId, onClose, onCreated }: NewBroadcastSh
                 <button type="button" role="radio" aria-checked={filming === 'cloud'} onClick={() => setFilming('cloud')} style={option(filming === 'cloud')}>
                   <Cloud size={18} aria-hidden="true" />
                   <span style={{ display: 'block', fontWeight: 700, marginTop: 6 }}>Cloud production <span className="alv-chip is-test" style={{ height: 20, marginLeft: 4 }}>Beta</span></span>
-                  <span className="alv-mute" style={{ fontSize: 12.5, lineHeight: 1.45 }}>Phones and iPads join by link with no login; we mix in the cloud, so no device has to stay open.</span>
+                  <span className="alv-mute" style={{ fontSize: 12.5, lineHeight: 1.45 }}>Phones and iPads join by link with no login. The program is mixed in the cloud, so the stream keeps going if your laptop drops out.</span>
                 </button>
               )}
             </div>
