@@ -813,8 +813,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     setError(null);
 
     try {
-      // First, update the member's club if needed
-      if (boatToEdit.club) {
+      // First, update the member's club if it changed (scorers can edit boats but not member records)
+      const currentClub = members.find(m => m.id === boatToEdit.memberId)?.club || '';
+      if (boatToEdit.club && boatToEdit.club !== currentClub) {
         const { data: memberData, error: memberError } = await supabase
           .from('members')
           .update({ club: boatToEdit.club })
