@@ -186,9 +186,14 @@ export interface SmartImageProps {
   eager?: boolean;
   /** Let the box take the image's own shape, kept between these width/height ratios */
   naturalAspect?: [number, number];
+  /** Second image to try when the first fails (or is YouTube's 120×90 "no thumbnail" image) */
+  fallbackSrc?: string | null;
 }
 
-export const SmartImage: React.FC<SmartImageProps> = ({ src, alt, className = '', style, fallback, zoomOnHover, eager, naturalAspect }) => {
+export const SmartImage: React.FC<SmartImageProps> = ({ src: requested, alt, className = '', style, fallback, zoomOnHover, eager, naturalAspect, fallbackSrc }) => {
+  const [useBackup, setUseBackup] = useState(false);
+  useEffect(() => { setUseBackup(false); }, [requested]);
+  const src = useBackup && fallbackSrc ? fallbackSrc : requested;
   const boxRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const srcRef = useRef(src);
@@ -216,7 +221,9 @@ export const SmartImage: React.FC<SmartImageProps> = ({ src, alt, className = ''
     setAnalysis(src ? cache.get(src) || null : null);
   }, [src]);
 
+  const canUseBackup = !!fallbackSrc && !useBackup && fallbackSrc !== requested;
   const handleLoaded = (img: HTMLImageElement) => {
+    if (canUseBackup && img.naturalWidth === 120 && img.naturalHeight === 90) { setUseBackup(true); return; }
     setLoaded(true);
     setNatural({ w: img.naturalWidth, h: img.naturalHeight });
     if (!src) return;
@@ -295,7 +302,7 @@ export const SmartImage: React.FC<SmartImageProps> = ({ src, alt, className = ''
           padding: mode === 'contain' ? '9%' : undefined,
         }}
         onLoad={e => handleLoaded(e.currentTarget)}
-        onError={() => setFailed(true)}
+        onError={() => (canUseBackup ? setUseBackup(true) : setFailed(true))}
       />
     </div>
   );

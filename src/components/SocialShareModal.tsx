@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Share2, Facebook, MessageSquare, Image, Video, Youtube, Send, AlertTriangle, CheckCircle, Globe } from 'lucide-react';
+import { Facebook, MessageSquare } from 'lucide-react';
+import { AlfieIcon } from './brand/AlfieIcon';
+import { MediaThumb } from './media/MediaParts';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { EventMedia } from '../types/media';
@@ -216,257 +218,137 @@ export const SocialShareModal: React.FC<SocialShareModalProps> = ({
   const videos = selectedMedia.filter(item => item.media_type === 'youtube_video');
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`
-        w-full max-w-4xl rounded-xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col
-        ${darkMode ? 'bg-slate-800' : 'bg-white'}
-      `}>
-        <div className={`
-          flex items-center justify-between p-6 border-b
-          ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-        `}>
-          <div className="flex items-center gap-3">
-            <Share2 className="text-blue-400" size={24} />
-            <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-              Share to Social Media
-            </h2>
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center p-3 sm:p-6">
+      <div className="a-veil absolute inset-0 backdrop-blur-[2px]" onClick={() => !loading && onClose()} aria-hidden="true" />
+      <section className="a-sheet a-md-sheet relative w-full max-w-3xl flex flex-col max-h-[92vh] overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="a-md-social-title">
+        <header className="a-sheet-head a-md-sheet-head">
+          <span className="a-tile a-tile-rim" style={{ width: 44, height: 44 }}><AlfieIcon glyph="share" size={20} /></span>
+          <div className="min-w-0 flex-1">
+            <h2 id="a-md-social-title" className="a-display a-ink m-0 text-[20px] font-semibold leading-tight">Share to Social Media</h2>
+            <p className="a-mute m-0 mt-0.5 text-[13.5px]">Post your selected media to your connected accounts</p>
           </div>
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className={`
-              rounded-full p-2 transition-colors
-              ${darkMode 
-                ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700' 
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
-              ${loading ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
-          >
-            <X size={20} />
+          <button type="button" onClick={onClose} disabled={loading} className="a-ib" aria-label="Close">
+            <AlfieIcon glyph="x" size={20} />
           </button>
-        </div>
+        </header>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="a-md-sheet-body">
           {error && (
-            <div className="p-4 rounded-lg bg-red-900/20 border border-red-900/30 flex items-start gap-3">
-              <AlertTriangle className="text-red-400 mt-0.5" size={18} />
-              <div>
-                <h3 className="text-red-400 font-medium">Error</h3>
-                <p className="text-red-300 text-sm">{error}</p>
-              </div>
+            <div className="a-nw-ed-msg a-nw-ed-msg-r" role="alert">
+              <AlfieIcon glyph="warn" size={18} />
+              <p><b>Error</b><br />{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="p-4 rounded-lg bg-green-900/20 border border-green-900/30 flex items-start gap-3">
-              <CheckCircle className="text-green-400 mt-0.5" size={18} />
-              <div>
-                <h3 className="text-green-400 font-medium">Success</h3>
-                <p className="text-green-300 text-sm">{success}</p>
-              </div>
+            <div className="a-nw-ed-msg a-nw-ed-msg-g" role="status">
+              <AlfieIcon glyph="check" size={18} />
+              <p><b>Success</b><br />{success}</p>
             </div>
           )}
 
-          {/* Selected Media Preview */}
-          <div>
-            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-              Selected Media ({selectedMedia.length} items)
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div className="a-md-fl">
+            <span>Selected Media ({selectedMedia.length} items)</span>
+            <div className="a-md-strip">
               {selectedMedia.slice(0, 8).map((item) => (
-                <div key={item.id} className={`
-                  relative aspect-video rounded-lg overflow-hidden
-                  ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}
-                `}>
-                  {item.media_type === 'youtube_video' ? (
-                    <>
-                      <img
-                        src={item.thumbnail_url || `https://img.youtube.com/vi/${getYouTubeVideoId(item.url)}/maxresdefault.jpg`}
-                        alt={item.title || 'Video thumbnail'}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                        <Youtube size={20} className="text-white" />
-                      </div>
-                    </>
-                  ) : (
-                    <img
-                      src={item.url}
-                      alt={item.title || 'Image'}
-                      className="w-full h-full object-cover"
-                    />
+                <span key={item.id} className="a-md-strip-i">
+                  <MediaThumb item={item} />
+                  {item.media_type === 'youtube_video' && (
+                    <span className="a-md-play a-md-play-sm" aria-hidden="true">
+                      <svg width="12" height="12" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor" /></svg>
+                    </span>
                   )}
-                </div>
+                </span>
               ))}
               {selectedMedia.length > 8 && (
-                <div className={`
-                  aspect-video rounded-lg flex items-center justify-center
-                  ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}
-                `}>
-                  <span className="text-sm font-medium">+{selectedMedia.length - 8} more</span>
-                </div>
+                <span className="a-md-strip-i a-md-strip-more">+{selectedMedia.length - 8} more</span>
               )}
             </div>
-            <div className="flex gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <Image size={16} className="text-blue-400" />
-                <span className={darkMode ? 'text-slate-300' : 'text-slate-600'}>
-                  {images.length} image{images.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Video size={16} className="text-red-400" />
-                <span className={darkMode ? 'text-slate-300' : 'text-slate-600'}>
-                  {videos.length} video{videos.length !== 1 ? 's' : ''}
-                </span>
-              </div>
+            <div className="a-md-counts">
+              <span><AlfieIcon glyph="camera" size={14} />{images.length} image{images.length !== 1 ? 's' : ''}</span>
+              <span><AlfieIcon glyph="video" size={14} />{videos.length} video{videos.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
 
-          {/* Platform Selection */}
-          <div>
-            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-              Select Platforms
-            </h3>
-            
+          <div className="a-md-fl">
+            <span>Select Platforms</span>
             {connectedPlatforms.length === 0 ? (
-              <div className={`
-                p-6 rounded-lg border text-center
-                ${darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-200'}
-              `}>
-                <Globe size={48} className="mx-auto mb-4 text-slate-500 opacity-50" />
-                <h4 className={`font-medium mb-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                  No Social Media Platforms Connected
-                </h4>
-                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Connect your social media accounts in Settings &gt; Integrations to share media.
-                </p>
+              <div className="a-md-none">
+                <AlfieIcon glyph="globe" size={26} />
+                <b>No Social Media Platforms Connected</b>
+                <p>Connect your social media accounts in Settings &gt; Integrations to share media.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {connectedPlatforms.map((platform) => (
-                  <div
-                    key={platform.id}
-                    onClick={() => handlePlatformToggle(platform.id)}
-                    className={`
-                      p-4 rounded-lg border cursor-pointer transition-all
-                      ${selectedPlatforms.has(platform.id)
-                        ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-800'
-                        : darkMode
-                          ? 'border-slate-600 hover:border-slate-500'
-                          : 'border-slate-300 hover:border-slate-400'
-                      }
-                      ${darkMode ? 'bg-slate-700' : 'bg-white'}
-                    `}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        {platform.icon}
-                        <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                          {platform.name}
+              <div className="a-md-plat-grid">
+                {connectedPlatforms.map((platform) => {
+                  const on = selectedPlatforms.has(platform.id);
+                  return (
+                    <button
+                      type="button"
+                      key={platform.id}
+                      onClick={() => handlePlatformToggle(platform.id)}
+                      className={`a-md-pick-row a-md-plat ${on ? 'is-on' : ''}`}
+                      aria-pressed={on}
+                    >
+                      <span className="a-md-plat-ic">{platform.icon}</span>
+                      <span className="min-w-0 flex-1 text-left">
+                        <b>{platform.name}</b>
+                        <span>
+                          Max: {platform.maxImages} images, {platform.maxVideos} video
+                          {platform.characterLimit && ` • ${platform.characterLimit} chars`}
                         </span>
-                      </div>
-                      <div className={`
-                        w-5 h-5 rounded-full border-2 transition-colors
-                        ${selectedPlatforms.has(platform.id)
-                          ? 'bg-blue-500 border-blue-500'
-                          : darkMode
-                            ? 'border-slate-400'
-                            : 'border-slate-300'
-                        }
-                      `}>
-                        {selectedPlatforms.has(platform.id) && (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <div className="w-2 h-2 bg-white rounded-full"></div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Max: {platform.maxImages} images, {platform.maxVideos} video
-                      {platform.characterLimit && ` • ${platform.characterLimit} chars`}
-                    </div>
-                  </div>
-                ))}
+                      </span>
+                      <span className={`a-chk ${on ? 'a-chk-on' : ''}`}>{on && <AlfieIcon glyph="check" size={12} strokeWidth={2.6} />}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {/* Share Text */}
           {connectedPlatforms.length > 0 && (
-            <div>
-              <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                Share Message
-              </h3>
+            <label className="a-md-fl">
+              <span>Share Message</span>
               <textarea
                 value={shareText}
                 onChange={(e) => setShareText(e.target.value)}
                 rows={4}
-                className={`
-                  w-full px-3 py-2 rounded-lg border
-                  ${darkMode 
-                    ? 'bg-slate-700 border-slate-600 text-white' 
-                    : 'bg-white border-slate-300 text-slate-900'}
-                `}
+                className="a-inp"
                 placeholder="Write a message to accompany your shared media..."
               />
-              <div className="flex justify-between mt-2">
-                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  This message will be posted with your selected media
-                </p>
-                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {shareText.length} characters
-                </p>
-              </div>
-            </div>
+              <small className="flex justify-between gap-3">
+                <span>This message will be posted with your selected media</span>
+                <span>{shareText.length} characters</span>
+              </small>
+            </label>
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className={`
-          flex justify-end gap-3 p-6 border-t
-          ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-        `}>
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className={`
-              px-4 py-2 rounded-lg font-medium transition-colors
-              ${darkMode
-                ? 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
-                : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'}
-              ${loading ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
-          >
+        <footer className="a-sheet-foot a-md-sheet-foot">
+          <button onClick={onClose} disabled={loading} className="a-btn a-btn-q">
             Cancel
           </button>
-          
           {connectedPlatforms.length > 0 && (
             <button
               onClick={handleShare}
               disabled={loading || selectedPlatforms.size === 0}
-              className={`
-                flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-colors text-white
-                ${loading || selectedPlatforms.size === 0
-                  ? 'opacity-50 cursor-not-allowed bg-slate-600'
-                  : 'bg-blue-600 hover:bg-blue-700'}
-              `}
+              className="a-btn a-btn-p"
             >
               {loading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span className="a-nw-spin" />
                   Sharing...
                 </>
               ) : (
                 <>
-                  <Send size={16} />
+                  <AlfieIcon glyph="send" size={16} />
                   Share to {selectedPlatforms.size} Platform{selectedPlatforms.size !== 1 ? 's' : ''}
                 </>
               )}
             </button>
           )}
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>
   );
 };
