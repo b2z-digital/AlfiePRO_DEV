@@ -77,6 +77,8 @@ export function useCanvasCompositor({
       const scale = Math.min(scaleX, scaleY);
 
       const snapshot = await html2canvas(el, {
+        // Lets overlay CSS correct html2canvas's text placement in the capture only
+        onclone: (doc: Document) => { doc.documentElement.classList.add('alv-h2c'); },
         backgroundColor: null,
         scale,
         useCORS: true,
