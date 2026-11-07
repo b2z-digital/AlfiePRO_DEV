@@ -1755,3 +1755,6 @@ GRANT SELECT ON public.whats_on_settings, public.whats_on_answers, public.whats_
 -- ════════════════════════════════════════════════════════════════════════════
 SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname = 'whats-on-emails';
 SELECT cron.schedule('whats-on-emails', '5 * * * *', $$SELECT public.whats_on_run_due();$$);
+
+-- Make the new functions visible to the API straight away
+NOTIFY pgrst, 'reload schema';
