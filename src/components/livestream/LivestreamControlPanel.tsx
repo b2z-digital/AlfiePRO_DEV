@@ -1,6 +1,6 @@
 // Build: 2026-03-18-fcp-studio-redesign
 import React, { useState, useEffect, useRef } from 'react';
-import { Video, Play, Square, Settings, Eye, EyeOff, Calendar, Camera, Layers, Loader as Loader2, X, Smartphone, RefreshCw, ChevronDown, Monitor, Maximize2, Minimize2, ChartBar as BarChart3, Clock, Wifi, Users, MessageSquare, Trash2, CircleStop as StopCircle, Cloud, CloudOff, Copy, ExternalLink, Signal, Zap, Activity, CircleDot, Disc, Pause, FlaskConical } from 'lucide-react';
+import { Video, Square, Eye, EyeOff, Calendar, Camera, Loader as Loader2, X, Smartphone, RefreshCw, Monitor, Maximize2, Minimize2, ChartBar as BarChart3, Trash2, CircleStop as StopCircle, Copy, ExternalLink, Zap, FlaskConical, ChevronLeft, Plus, Scissors, PanelRight, Link2 } from 'lucide-react';
 import { TestBroadcastLinkModal } from './TestBroadcastLinkModal';
 import { LiveHome } from './LiveHome';
 import { NewBroadcastSheet } from './NewBroadcastSheet';
@@ -17,6 +17,7 @@ import { LivestreamSetupWizard } from './LivestreamSetupWizard';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { OverlaysManager } from './OverlaysManager';
 import { LivestreamOverlayRenderer } from './LivestreamOverlayRenderer';
+import type { OverlayScoringSummary } from './LivestreamOverlayRenderer';
 import { CameraFeedGridRef } from './CameraFeedGrid';
 import { AdvancedStreamConsole } from './AdvancedStreamConsole';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -24,6 +25,9 @@ import { useCanvasCompositor } from '../../hooks/useCanvasCompositor';
 import { subscribeToRaceStatus } from '../../utils/liveTrackingStorage';
 import { getRaceStatusEventId } from '../../utils/livestreamEventIds';
 import type { LivestreamRaceSegment } from '../../types/livestream';
+
+/** Auto director: how long each camera stays on program while racing */
+const AUTO_DIRECTOR_MS = 45000;
 
 interface AutoCreateEventInfo {
   eventId: string;
@@ -53,7 +57,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   const [loading, setLoading] = useState(true);
   const [streamStatus, setStreamStatus] = useState<'offline' | 'connecting' | 'testing' | 'live'>('offline');
   const [viewerCount, setViewerCount] = useState(0);
-  const [inspectorTab, setInspectorTab] = useState<'settings' | 'overlays' | 'output'>('settings');
+  const [inspectorTab, setInspectorTab] = useState<'settings' | 'overlays' | 'output'>('overlays');
   const [showInspector, setShowInspector] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
@@ -92,6 +96,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   const [showTitleCard, setShowTitleCard] = useState(false);
   const [titleCardTrigger, setTitleCardTrigger] = useState(0);
   const whipHealthRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [sendMbps, setSendMbps] = useState<number | null>(null);
   const lastBytesSentRef = useRef<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -133,6 +138,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
 
   useEffect(() => {
     if (whipHealthRef.current) { clearInterval(whipHealthRef.current); whipHealthRef.current = null; }
+    if (streamStatus !== 'live' || whipStatus !== 'connected' || isPaused) setSendMbps(null);
     if (streamStatus === 'live' && whipStatus === 'connected' && whipPeerConnectionRef.current && !isPaused) {
       whipHealthRef.current = setInterval(async () => {
         const pc = whipPeerConnectionRef.current;
@@ -145,6 +151,10 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
               currentBytesSent = report.bytesSent || 0;
             }
           });
+          if (lastBytesSentRef.current > 0 && currentBytesSent > lastBytesSentRef.current) {
+            // Video sent over the last 10 seconds, for the control room's health chip
+            setSendMbps(((currentBytesSent - lastBytesSentRef.current) * 8) / 10 / 1e6);
+          }
           if (lastBytesSentRef.current > 0 && currentBytesSent <= lastBytesSentRef.current) {
             console.warn('[WHIP Health] No video bytes sent in last interval. Connection may be stale.');
             setWhipStatus('error');
@@ -1553,7 +1563,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     lastBytesSentRef.current = 0;
   };
 
-  const handleSwitchCamera = async (cameraId: string) => {
+  const handleSwitchCamera = async (cameraId: string, opts?: { quiet?: boolean }) => {
     if (!activeSession) return;
     try {
       await livestreamStorage.setPrimaryCamera(activeSession.id, cameraId);
@@ -1579,7 +1589,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
       }
 
       await loadCameras(activeSession.id);
-      addNotification('success', 'Camera switched', 2000);
+      if (!opts?.quiet) addNotification('success', 'Camera switched', 2000);
     } catch (error) { console.error('Error switching camera:', error); addNotification('error', 'Failed to switch camera', 3000); }
   };
 
@@ -1631,6 +1641,126 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   }, [onSnapshot, activeSession?.id, activeSession?.title, activeSession?.is_public, activeSession?.actual_start_time,
       streamStatus, isPaused, viewerCount, whipStatus, isCompositing, compositedStream, activePreviewStream, mediaStream,
       cameras, remoteStreams, autoSegmentEnabled, currentSegment, segmentProcessing]);
+
+  // ── Control room (livestream board "Control room") ──
+  const [scoring, setScoring] = useState<OverlayScoringSummary | null>(null);
+  const [resultsTrigger, setResultsTrigger] = useState(0);
+  const [autoDirector, setAutoDirector] = useState(false);
+  const [nextCutAt, setNextCutAt] = useState<number | null>(null);
+  const [raceVideos, setRaceVideos] = useState<LivestreamRaceSegment[]>([]);
+  const controlRoomRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const fullscreenApiRef = useRef(false);
+  // Below 1200px wide (iPad, scoring console) the settings panel opens as a drawer over the program
+  const [roomWidth, setRoomWidth] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    setScoring(null);
+    setAutoDirector(false);
+    setRaceVideos([]);
+  }, [activeSession?.id]);
+
+  // Cameras with a picture right now, in list order, and the one after the program camera
+  const canAir = (camera: LivestreamCamera) =>
+    camera.camera_type === 'laptop' ? !!mediaStream : !!remoteStreams[camera.id];
+  const airCameras = cameras.filter(canAir);
+  const programIndex = airCameras.findIndex(c => c.is_primary);
+  const nextCamera = airCameras.length === 0 || (airCameras.length === 1 && programIndex === 0)
+    ? null
+    : airCameras[(programIndex + 1) % airCameras.length];
+
+  // Auto director: while racing, cut to the next camera every 45 seconds (opt-in, off by default)
+  const racingNow = !activeSession?.event_id || !scoring || scoring.status === 'live' || scoring.status === 'in_progress';
+  const autoDirectorOn = autoDirector && streamStatus === 'live' && !isPaused && racingNow && !!nextCamera;
+  const switchCameraRef = useRef(handleSwitchCamera);
+  switchCameraRef.current = handleSwitchCamera;
+  const nextCameraRef = useRef(nextCamera);
+  nextCameraRef.current = nextCamera;
+  useEffect(() => {
+    if (!autoDirectorOn) { setNextCutAt(null); return; }
+    let due = Date.now() + AUTO_DIRECTOR_MS;
+    setNextCutAt(due);
+    const timer = setInterval(() => {
+      if (Date.now() < due) return;
+      due = Date.now() + AUTO_DIRECTOR_MS;
+      setNextCutAt(due);
+      const next = nextCameraRef.current;
+      if (next) switchCameraRef.current(next.id, { quiet: true });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [autoDirectorOn, primaryCamera?.id]);
+
+  // Race videos for this broadcast (one per race), refreshed while the room is open
+  useEffect(() => {
+    if (!activeSession?.id) return;
+    let cancelled = false;
+    const load = () => livestreamStorage.getSegments(activeSession.id)
+      .then(list => { if (!cancelled) setRaceVideos(list); })
+      .catch(() => {});
+    load();
+    const timer = setInterval(load, 20000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [activeSession?.id, currentSegment?.id, segmentProcessing]);
+
+  useEffect(() => {
+    const el = controlRoomRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => setRoomWidth(Math.round(entry.contentRect.width)));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [activeSession?.id, loading]);
+
+  // Number keys 1-9 cut to that camera, only while this room is on screen and nothing is being typed
+  useEffect(() => {
+    if (!activeSession || streamStatus === 'offline') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || !/^[1-9]$/.test(e.key)) return;
+      const root = controlRoomRef.current;
+      if (!root || root.closest('[inert]') || root.closest('.alv-console-hidden')) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      if (target && target !== document.body && !root.contains(target)) return;
+      const camera = cameras[Number(e.key) - 1];
+      if (!camera || camera.is_primary || !canAir(camera)) return;
+      e.preventDefault();
+      switchCameraRef.current(camera.id);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activeSession?.id, streamStatus, cameras, mediaStream, remoteStreams]);
+
+  // Full screen program: the browser's full screen where it has one, otherwise fill the window
+  useEffect(() => {
+    const onChange = () => {
+      const doc = document as Document & { webkitFullscreenElement?: Element | null };
+      const el = document.fullscreenElement || doc.webkitFullscreenElement || null;
+      if (fullscreenApiRef.current && !el) { fullscreenApiRef.current = false; setIsFullscreen(false); }
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    document.addEventListener('webkitfullscreenchange', onChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      document.removeEventListener('webkitfullscreenchange', onChange);
+    };
+  }, []);
+  const toggleFullscreen = async () => {
+    const doc = document as Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
+    if (isFullscreen) {
+      if (fullscreenApiRef.current && (document.fullscreenElement || doc.webkitFullscreenElement)) {
+        try { if (document.exitFullscreen) await document.exitFullscreen(); else doc.webkitExitFullscreen?.(); } catch { /* already closed */ }
+      }
+      fullscreenApiRef.current = false;
+      setIsFullscreen(false);
+      return;
+    }
+    const el = stageRef.current as (HTMLDivElement & { webkitRequestFullscreen?: () => void }) | null;
+    try {
+      if (el?.requestFullscreen) { await el.requestFullscreen(); fullscreenApiRef.current = true; }
+      else if (el?.webkitRequestFullscreen) { el.webkitRequestFullscreen(); fullscreenApiRef.current = true; }
+    } catch { fullscreenApiRef.current = false; }
+    setIsFullscreen(true);
+  };
 
   if (loading) {
     return (
@@ -1696,7 +1826,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // STUDIO VIEW (active session) - Final Cut Pro Inspired
+  // CONTROL ROOM (active session), livestream board "Control room"
   // ═══════════════════════════════════════════════════════════════
 
   const copyToClipboard = (text: string, field: string) => {
@@ -1705,543 +1835,442 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     setTimeout(() => setCopiedField(null), 2000);
   };
 
+  const venueName = (activeSession as SessionWithVenue).venueName;
+  const venueImage = (activeSession as SessionWithVenue).venueImage;
+  const isEnded = activeSession.status === 'ended';
+  const isOn = streamStatus === 'live' || streamStatus === 'testing';
+  const phoneCount = cameras.filter(c => c.camera_type === 'mobile').length;
+  const hasLaptop = cameras.some(c => c.camera_type === 'laptop');
+  const sourceSummary = activeSession.stream_input_mode === 'rtmp_external'
+    ? 'Streaming encoder'
+    : phoneCount && hasLaptop ? (phoneCount === 1 ? 'Phone and laptop' : 'Phones and laptop')
+    : phoneCount ? (phoneCount === 1 ? 'Phone camera' : `${phoneCount} phone cameras`)
+    : hasLaptop ? 'Laptop camera' : '';
+  const subtitle = [venueName, sourceSummary, isTestBroadcast ? 'Test broadcast' : null].filter(Boolean).join(' · ');
+
+  const relay = activeSession.streaming_mode === 'cloudflare_relay';
+  const health: { tone: string; text: string } | null = streamStatus !== 'live' || !relay ? null
+    : isPaused ? { tone: 'is-warn', text: 'On hold' }
+    : whipStatus === 'connected' ? { tone: '', text: sendMbps ? `Stream healthy · ${sendMbps.toFixed(1)} Mb/s` : 'Stream healthy' }
+    : whipStatus === 'connecting' ? { tone: 'is-warn', text: 'Connecting to AlfieTV' }
+    : { tone: 'is-bad', text: 'Stream dropped, reconnecting' };
+
+  const playlistId = raceVideos.find(v => v.youtube_playlist_id)?.youtube_playlist_id;
+  const nextIndex = nextCamera ? cameras.findIndex(c => c.id === nextCamera.id) + 1 : 0;
+  const nextStream = nextCamera ? (nextCamera.camera_type === 'laptop' ? mediaStream : remoteStreams[nextCamera.id]) : null;
+  const cutIn = nextCutAt ? Math.max(0, Math.ceil((nextCutAt - Date.now()) / 1000)) : null;
+  const overlaysOn = !!activeSession.enable_overlays;
+
+  const drawerMode = roomWidth > 0 && roomWidth <= 1200;
+  const sideOpen = drawerMode ? drawerOpen : showInspector;
+  const toggleSide = () => (drawerMode ? setDrawerOpen(v => !v) : setShowInspector(v => !v));
+
+  const leaveControlRoom = () => {
+    if (streamStatus === 'live' || streamStatus === 'testing') {
+      if (confirm('Stream is active. Close this view? The stream will continue.')) setActiveSession(null);
+    } else setActiveSession(null);
+  };
+  const endBroadcast = () => {
+    if (confirm('End the broadcast? It stops for everyone watching.')) stopStream();
+  };
+
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)] min-h-[500px] bg-slate-900 p-3 gap-2">
-      {/* ── Top Transport Bar ── */}
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-800 border border-slate-700/50 rounded-xl flex-shrink-0">
-        <div className="flex items-center gap-3">
-          {/* Back Button */}
-          <button
-            onClick={() => {
-              if (streamStatus === 'live' || streamStatus === 'testing') {
-                if (confirm('Stream is active. Close this view? The stream will continue.')) setActiveSession(null);
-              } else setActiveSession(null);
-            }}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-            title="Back to sessions"
-          >
-            <X className="w-4 h-4" />
-          </button>
+    <div ref={controlRoomRef} className="alv alv-crq">
+    <div className="alv-cr">
+      {/* ── Top bar: title, on-air state, health, viewers, scoring, actions ── */}
+      <header className="alv-cr-top">
+        <button type="button" className="alv-cr-back" onClick={leaveControlRoom} aria-label="Back to broadcasts" title="Back to broadcasts">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="alv-cr-title">
+          <h2 className="alv-disp" title={activeSession.title}>{activeSession.title}</h2>
+          {subtitle && <p>{subtitle}</p>}
+        </div>
 
-          <div className="w-px h-5 bg-slate-700" />
-
-          {/* Status Indicator */}
+        <div className="alv-cr-state">
           {streamStatus === 'live' ? (
-            <div className="flex items-center gap-2 bg-red-500/15 border border-red-500/30 px-3 py-1.5 rounded-lg">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
-              <span className="text-red-400 font-bold text-xs tracking-widest">{isTestBroadcast ? 'LIVE · TEST' : 'LIVE'}</span>
-            </div>
+            <span className="alv-cr-onair"><span className="pulse" aria-hidden="true" />{isTestBroadcast ? 'LIVE · TEST' : 'LIVE'}<span className="alv-mono">{formatDuration(streamDuration)}</span></span>
           ) : streamStatus === 'testing' ? (
-            <div className="flex items-center gap-2 bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 rounded-lg">
-              <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-              <span className="text-amber-400 font-bold text-xs tracking-widest">PREVIEW</span>
-            </div>
+            <span className="alv-cr-onair is-preview">PREVIEW</span>
           ) : streamStatus === 'connecting' ? (
-            <div className="flex items-center gap-2 bg-blue-500/15 border border-blue-500/30 px-3 py-1.5 rounded-lg">
-              <Loader2 className="w-3 h-3 text-blue-400 animate-spin" />
-              <span className="text-blue-400 font-bold text-xs tracking-widest">CONNECTING</span>
-            </div>
-          ) : activeSession?.status === 'ended' ? (
-            <div className="flex items-center gap-2 bg-slate-700/50 border border-slate-600/30 px-3 py-1.5 rounded-lg">
-              <Square className="w-3 h-3 text-slate-500" />
-              <span className="text-slate-500 font-bold text-xs tracking-widest">ENDED</span>
-            </div>
+            <span className="alv-cr-onair is-connecting"><Loader2 className="w-3.5 h-3.5 animate-spin" />CONNECTING</span>
           ) : (
-            <div className="flex items-center gap-2 bg-slate-700/50 border border-slate-700/50 px-3 py-1.5 rounded-lg">
-              <div className="w-2 h-2 bg-slate-500 rounded-full" />
-              <span className="text-slate-500 font-bold text-xs tracking-widest">STANDBY</span>
-            </div>
+            <span className="alv-cr-onair is-idle">{isEnded ? 'ENDED' : 'STANDBY'}</span>
           )}
-
-          {/* Live Stats */}
-          {(streamStatus === 'live' || streamStatus === 'testing') && (
-            <div className="flex items-center gap-4 text-slate-500 text-xs">
-              <div className="flex items-center gap-1.5 font-mono">
-                <Clock className="w-3 h-3" />
-                <span className="tabular-nums">{formatDuration(streamDuration)}</span>
-              </div>
-              {streamStatus === 'live' && (
-                <div className="flex items-center gap-1.5">
-                  <Eye className="w-3 h-3" />
-                  <span>{viewerCount}</span>
-                </div>
-              )}
-              {activeSession?.streaming_mode === 'cloudflare_relay' && streamStatus === 'live' && (
-                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold ${
-                  isPaused ? 'bg-amber-500/10 text-amber-400' :
-                  whipStatus === 'connected' ? 'bg-green-500/10 text-green-400' :
-                  whipStatus === 'connecting' ? 'bg-amber-500/10 text-amber-400' :
-                  'bg-red-500/10 text-red-400'
-                }`}>
-                  {isPaused ? <Pause className="w-3 h-3" /> :
-                   whipStatus === 'connected' ? <Signal className="w-3 h-3" /> :
-                   whipStatus === 'connecting' ? <Loader2 className="w-3 h-3 animate-spin" /> :
-                   <CloudOff className="w-3 h-3" />}
-                  {isPaused ? 'PAUSED' : whipStatus === 'connected' ? 'CLOUD' : whipStatus === 'connecting' ? 'SYNC' : 'OFFLINE'}
-                </div>
-              )}
-              {isCompositing && (
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/10 text-cyan-400">
-                  <Layers className="w-3 h-3" />
-                  OVERLAY
-                </div>
-              )}
-              {autoSegmentEnabled && currentSegment && streamStatus === 'live' && (
-                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold ${
-                  segmentProcessing ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'
-                }`}>
-                  {segmentProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Disc className="w-3 h-3" />}
-                  {segmentProcessing ? 'SEGMENTING' : `RACE ${currentSegment.race_number}`}
-                </div>
-              )}
-            </div>
+          {health && <span className={`alv-cr-chip ${health.tone}`} title={isCompositing ? 'Overlays are on the stream' : undefined}><span className="dot" />{health.text}</span>}
+          {streamStatus === 'live' && <span className="alv-cr-chip"><Eye className="w-4 h-4" aria-hidden="true" />{viewerCount} watching</span>}
+          {activeSession.event_id && scoring && (
+            <span className="alv-cr-chip is-scoring">Scoring: {scoring.race}{scoring.label ? ` · ${scoring.label.toLowerCase()}` : ''}</span>
           )}
         </div>
 
-        {/* Transport Controls */}
-        <div className="flex items-center gap-2">
-          {activeSession && activeSession.status !== 'ended' && streamStatus !== 'connecting' && (
-            <>
+        <div className="alv-cr-actions">
+          {!isEnded && streamStatus !== 'connecting' && (
+            <button
+              type="button"
+              onClick={toggleTestBroadcast}
+              aria-pressed={isTestBroadcast}
+              title={isTestBroadcast
+                ? 'Test mode is on: hidden from AlfieTV and events, members not notified, race videos unlisted on YouTube. Click to make it public.'
+                : 'Run this broadcast as a test: hidden from AlfieTV and events, watched from its own link.'}
+              className={`alv-btn is-small ${isTestBroadcast ? 'is-test' : ''}`}
+            >
+              <FlaskConical className="w-4 h-4" aria-hidden="true" />
+              {isTestBroadcast ? 'Test on' : 'Test'}
+            </button>
+          )}
+          {!isEnded && isTestBroadcast && (
+            <button type="button" onClick={() => setShowTestLink(true)} title="Link and QR code to watch this test in AlfieTV" className="alv-btn is-small">
+              <ExternalLink className="w-4 h-4" aria-hidden="true" />
+              Watch
+            </button>
+          )}
+          {streamStatus === 'live' && (
+            <span className="alv-cr-auto" title={airCameras.length < 2 ? 'Needs two cameras with a picture' : 'While racing, cut to the next camera every 45 seconds'}>
+              <span id="alv-auto-director">Auto<br />director</span>
               <button
                 type="button"
-                onClick={toggleTestBroadcast}
-                aria-pressed={isTestBroadcast}
-                title={isTestBroadcast
-                  ? 'Test mode is on: hidden from AlfieTV and events, members not notified, race videos unlisted on YouTube. Click to make it public.'
-                  : 'Run this broadcast as a test: hidden from AlfieTV and events, watched from its own link.'}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors border ${
-                  isTestBroadcast
-                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25'
-                    : 'bg-slate-700/60 border-slate-600/40 text-slate-300 hover:bg-slate-600'
-                }`}
-              >
-                <FlaskConical className="w-3.5 h-3.5 flex-shrink-0" />
-                {isTestBroadcast ? 'Test on' : 'Test'}
-              </button>
-              {isTestBroadcast && (
-                <button
-                  type="button"
-                  onClick={() => setShowTestLink(true)}
-                  title="Link and QR code to watch this test in AlfieTV"
-                  className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
-                  Watch
-                </button>
-              )}
-              <div className="w-px h-5 bg-slate-700" />
-            </>
+                role="switch"
+                aria-checked={autoDirector}
+                aria-labelledby="alv-auto-director"
+                className="alv-sw"
+                disabled={airCameras.length < 2 && !autoDirector}
+                onClick={() => setAutoDirector(v => !v)}
+              />
+            </span>
           )}
-          {streamStatus === 'offline' && activeSession?.status === 'ended' && (
-            <>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-700/50 border border-slate-600/30 rounded-lg">
-                <Square className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-xs font-medium text-slate-400">Stream Ended</span>
-              </div>
-              <button
-                onClick={() => { setSessionToDelete(activeSession); setShowDeleteConfirm(true); }}
-                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                title="Delete"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </>
-          )}
-          {streamStatus === 'offline' && activeSession?.status !== 'ended' && (
-            <>
-              <button onClick={startTestStream} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-2 transition-all">
-                <Camera className="w-3.5 h-3.5" />
-                Start Preview
-              </button>
-              <button
-                onClick={() => { setSessionToDelete(activeSession); setShowDeleteConfirm(true); }}
-                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                title="Delete"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </>
+          {streamStatus === 'offline' && !isEnded && (
+            <button type="button" onClick={startTestStream} className="alv-btn is-small alv-btn-p">
+              <Camera className="w-4 h-4" aria-hidden="true" />
+              Start preview
+            </button>
           )}
           {streamStatus === 'testing' && (
             <>
-              <button onClick={stopTesting} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
-                <StopCircle className="w-3.5 h-3.5" />
-                Stop
+              <button type="button" onClick={stopTesting} className="alv-btn is-small">
+                <StopCircle className="w-4 h-4" aria-hidden="true" />
+                Stop preview
               </button>
-              <button onClick={goLive} className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all shadow-lg shadow-red-500/20">
-                <Zap className="w-3.5 h-3.5" />
-                GO LIVE
+              <button type="button" onClick={goLive} className="alv-btn is-small alv-btn-live">
+                <Zap className="w-4 h-4" aria-hidden="true" />
+                Go live
               </button>
             </>
           )}
           {streamStatus === 'live' && (
-            <>
-              {isPaused ? (
-                <button onClick={resumeBroadcast} className="px-4 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-green-500/20 animate-pulse">
-                  <Play className="w-3.5 h-3.5" />
-                  Resume
-                </button>
-              ) : (
-                <button onClick={pauseBroadcast} className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
-                  <Pause className="w-3.5 h-3.5" />
-                  Pause
-                </button>
-              )}
-              <button onClick={stopStream} className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-colors">
-                <Square className="w-3 h-3" />
-                End Stream
-              </button>
-            </>
+            <button type="button" onClick={endBroadcast} className="alv-btn is-small alv-btn-end">
+              <Square className="w-3.5 h-3.5" aria-hidden="true" />
+              End broadcast
+            </button>
           )}
-
-          <div className="w-px h-5 bg-slate-700 mx-1" />
-
-          <button onClick={() => setShowAnalytics(true)} className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-lg transition-colors" title="Analytics">
+          {streamStatus === 'offline' && (
+            <button type="button" className="alv-ib" onClick={() => { setSessionToDelete(activeSession); setShowDeleteConfirm(true); }} aria-label="Delete broadcast" title="Delete broadcast">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          <button type="button" className="alv-ib" onClick={() => setShowAnalytics(true)} aria-label="Analytics" title="Analytics">
             <BarChart3 className="w-4 h-4" />
           </button>
-          <button onClick={() => setShowInspector(!showInspector)} className={`p-1.5 rounded-lg transition-colors ${showInspector ? 'text-blue-400 bg-blue-500/10' : 'text-slate-500 hover:text-white hover:bg-slate-700'}`} title="Toggle Inspector">
-            <Settings className="w-4 h-4" />
+          <button
+            type="button"
+            className={`alv-ib ${sideOpen ? 'is-on' : ''}`}
+            onClick={toggleSide}
+            aria-pressed={sideOpen}
+            aria-label="Overlays, output and details panel"
+            title="Overlays, output and details"
+          >
+            <PanelRight className="w-4 h-4" />
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* ── Main Studio Area ── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/30">
-        {/* Program Monitor + Source Strip */}
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          {/* Program Monitor */}
-          <div className="flex-1 p-4 min-h-0 overflow-hidden flex items-center justify-center">
-            <div className={`relative w-full bg-black rounded-lg overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'aspect-video max-h-full'}`}>
-              <video ref={(el) => { (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el; setVideoElReady(el); }} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
+      <div className={`alv-cr-body ${sideOpen ? '' : 'no-side'}`}>
+        {/* ── Cameras ── */}
+        <aside className="alv-cr-panel alv-cr-cams" aria-label="Cameras">
+          <div className="alv-cr-head">
+            <span className="alv-eyebrow">Cameras · {cameras.length}</span>
+            <div className="flex items-center gap-1">
+              <button type="button" className="alv-ib is-xs" onClick={forceReconnectMobileCameras} aria-label="Reconnect phone cameras" title="Reconnect phone cameras">
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+              {!isEnded && <button
+                type="button"
+                className="alv-btn is-xs"
+                onClick={() => setShowMobileQR(true)}
+                disabled={streamStatus === 'offline'}
+                title={streamStatus === 'offline' ? 'Start the preview first, then add phones' : 'Add a phone or iPad as a camera'}
+                aria-label="Add a camera"
+              >
+                <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                <span className="lbl">Add</span>
+              </button>}
+            </div>
+          </div>
+          <div className="alv-cr-camlist">
+            {cameras.map((camera, index) => {
+              const isProgram = !!camera.is_primary;
+              const ready = canAir(camera);
+              const connected = camera.status === 'connected' || camera.status === 'streaming';
+              const isNext = isOn && !isProgram && nextCamera?.id === camera.id;
+              const isLaptop = camera.camera_type === 'laptop';
+              const stream = isLaptop ? mediaStream : remoteStreams[camera.id];
+              const bars = ready ? 4 : connected ? 2 : 0;
+              return (
+                <div key={camera.id} className={`alv-cr-cam ${isProgram ? 'is-program' : ''} ${isNext ? 'is-next' : ''} ${ready ? '' : 'is-off'}`}>
+                  <button
+                    type="button"
+                    className="th"
+                    onClick={() => ready && !isProgram && handleSwitchCamera(camera.id)}
+                    disabled={!ready || isProgram}
+                    aria-label={isProgram ? `${camera.camera_name} is on program` : ready ? `Cut to ${camera.camera_name}` : `${camera.camera_name} has no picture yet`}
+                  >
+                    {stream ? (
+                      <VideoThumbnail stream={stream} muted={isLaptop} />
+                    ) : (
+                      <span className="empty">{isLaptop ? <Monitor className="w-6 h-6" /> : <Smartphone className="w-6 h-6" />}</span>
+                    )}
+                    <span className="n">{index + 1}</span>
+                    {isProgram ? <span className="alv-tally is-pgm">{streamStatus === 'live' ? 'PROGRAM' : 'ON'}</span>
+                      : isNext ? <span className="alv-tally is-next">NEXT</span>
+                      : !ready ? <span className="alv-tally is-off">{connected ? 'JOINING' : 'OFFLINE'}</span>
+                      : null}
+                  </button>
+                  <div className="meta">
+                    <span className="name" title={camera.camera_name}>{camera.camera_name}</span>
+                    <span className={`alv-bars ${bars === 2 ? 'is-weak' : ''}`} aria-label={ready ? 'Picture coming in' : connected ? 'Joining' : 'Offline'} role="img">
+                      {[0, 1, 2, 3].map(b => <i key={b} className={b < bars ? 'on' : ''} style={{ height: 4 + b * 2.7 }} />)}
+                    </span>
+                    <button
+                      type="button"
+                      className="alv-ib is-xs"
+                      onClick={() => { if (confirm(`Remove "${camera.camera_name}" from this broadcast?`)) removeCamera(camera.id); }}
+                      aria-label={`Remove ${camera.camera_name}`}
+                      title="Remove camera"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {isOn && cameras.length > 0 && airCameras.length < 2 && (
+              <div className="alv-cr-empty">
+                Add a phone or iPad as a second camera to cut between shots.
+              </div>
+            )}
+            {cameras.length === 0 && (
+              <div className="alv-cr-empty">
+                {isEnded
+                  ? 'No cameras on this broadcast.'
+                  : streamStatus === 'offline'
+                  ? 'Start the preview to bring in this device\'s camera, then add phones or iPads.'
+                  : 'No cameras yet. Add a phone or iPad with the QR code.'}
+              </div>
+            )}
+          </div>
+        </aside>
 
-              {activeSession.enable_overlays && streamStatus !== 'offline' && (
-                <LivestreamOverlayRenderer ref={(el: HTMLDivElement | null) => { (overlayRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setOverlayElReady(el); }} session={activeSession} showTitleCard={showTitleCard} titleCardTrigger={titleCardTrigger} venueImage={(activeSession as SessionWithVenue).venueImage} venueName={(activeSession as SessionWithVenue).venueName} />
+        {/* ── Program, scenes, next shot, race videos ── */}
+        <div className="alv-cr-center">
+          <div ref={stageRef} className={`alv-cr-stage ${isFullscreen && !fullscreenApiRef.current ? 'is-full' : ''}`}>
+            <div className={`alv-cr-pgm ${streamStatus === 'live' ? 'is-live' : streamStatus === 'testing' ? 'is-preview' : ''}`}>
+              {isOn && (
+                <span className="alv-cr-pgm-tag">
+                  {streamStatus === 'live' ? 'PROGRAM' : 'PREVIEW'}
+                  {primaryCamera && <span className="cam">{primaryCamera.camera_name}</span>}
+                </span>
+              )}
+              <video ref={(el) => { (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el; setVideoElReady(el); }} autoPlay muted playsInline />
+
+              {overlaysOn && streamStatus !== 'offline' && (
+                <LivestreamOverlayRenderer
+                  ref={(el: HTMLDivElement | null) => { (overlayRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setOverlayElReady(el); }}
+                  session={activeSession}
+                  showTitleCard={showTitleCard}
+                  titleCardTrigger={titleCardTrigger}
+                  resultsTrigger={resultsTrigger}
+                  onScoring={setScoring}
+                  venueImage={venueImage}
+                  venueName={venueName}
+                />
               )}
 
               {isPaused && streamStatus === 'live' && (
-                <div className="absolute inset-0 bg-slate-900/95 flex items-center justify-center z-20">
-                  {(activeSession as SessionWithVenue).venueImage && (
-                    <img
-                      src={(activeSession as SessionWithVenue).venueImage}
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-cover opacity-15"
-                    />
-                  )}
-                  <div className="text-center relative z-10">
-                    <div className="w-20 h-20 bg-slate-800/80 border-2 border-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-5 backdrop-blur-sm">
-                      <Pause className="w-10 h-10 text-slate-400" />
-                    </div>
-                    <h3 className="text-white text-xl font-bold mb-2">Event Pending</h3>
-                    {(activeSession as SessionWithVenue).venueName && (
-                      <p className="text-slate-300 text-sm mb-1">{(activeSession as SessionWithVenue).venueName}</p>
-                    )}
-                    <p className="text-slate-400 text-sm max-w-sm">
-                      The broadcast is temporarily paused. Racing will resume shortly.
-                    </p>
-                    <div className="mt-4 flex items-center justify-center gap-2 text-amber-400 text-xs font-medium">
-                      <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-                      <span>Stream Paused</span>
-                    </div>
+                <div className="alv-cr-card">
+                  {venueImage && <img src={venueImage} alt="" />}
+                  <div>
+                    <span className="chip">ON HOLD</span>
+                    <h3>Racing will resume shortly</h3>
+                    {venueName && <p>{venueName}</p>}
+                    <p>Viewers see the hold screen. Press Racing to go back on air.</p>
                   </div>
                 </div>
               )}
 
-              {streamStatus === 'offline' && activeSession?.status === 'ended' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black">
-                  {(activeSession as SessionWithVenue).venueImage && (
-                    <img
-                      src={(activeSession as SessionWithVenue).venueImage}
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-cover opacity-20"
-                    />
-                  )}
-                  <div className="text-center relative z-10">
-                    <div className="w-16 h-16 bg-slate-800/80 border border-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                      <Square className="w-7 h-7 text-slate-500" />
-                    </div>
-                    <p className="text-slate-400 text-sm font-medium">Stream Completed</p>
-                    {(activeSession as SessionWithVenue).venueName && (
-                      <p className="text-slate-500 text-xs mt-1">{(activeSession as SessionWithVenue).venueName}</p>
-                    )}
-                    <p className="text-slate-600 text-xs mt-1">
+              {streamStatus === 'offline' && isEnded && (
+                <div className="alv-cr-card">
+                  {venueImage && <img src={venueImage} alt="" />}
+                  <div>
+                    <span className="ic"><Square className="w-6 h-6" /></span>
+                    <h3>Broadcast ended</h3>
+                    {venueName && <p>{venueName}</p>}
+                    <p>
                       {activeSession.actual_start_time
                         ? `Streamed on ${new Date(activeSession.actual_start_time).toLocaleDateString()}`
-                        : 'This stream has ended'}
+                        : 'This broadcast has ended'}
+                      {activeSession.end_time && activeSession.actual_start_time
+                        ? ` · ${formatDuration(Math.floor((new Date(activeSession.end_time).getTime() - new Date(activeSession.actual_start_time).getTime()) / 1000))}`
+                        : ''}
                     </p>
-                    {activeSession.end_time && activeSession.actual_start_time && (
-                      <p className="text-slate-600 text-xs mt-0.5">
-                        Duration: {formatDuration(Math.floor((new Date(activeSession.end_time).getTime() - new Date(activeSession.actual_start_time).getTime()) / 1000))}
-                      </p>
-                    )}
                   </div>
                 </div>
               )}
 
-              {streamStatus === 'offline' && activeSession?.status !== 'ended' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black">
-                  {(activeSession as SessionWithVenue).venueImage && (
-                    <img
-                      src={(activeSession as SessionWithVenue).venueImage}
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-cover opacity-30"
-                    />
-                  )}
-                  <div className="text-center relative z-10">
-                    <div className="w-16 h-16 border-2 border-dashed border-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-black/50 backdrop-blur-sm">
-                      <Video className="w-7 h-7 text-slate-600" />
-                    </div>
-                    <p className="text-slate-600 text-sm font-medium">No Signal</p>
-                    {(activeSession as SessionWithVenue).venueName && (
-                      <p className="text-slate-500 text-xs mt-1">{(activeSession as SessionWithVenue).venueName}</p>
-                    )}
-                    <p className="text-slate-700 text-xs mt-1">Click "Start Preview" to begin</p>
+              {streamStatus === 'offline' && !isEnded && (
+                <div className="alv-cr-card">
+                  {venueImage && <img src={venueImage} alt="" />}
+                  <div>
+                    <span className="ic"><Video className="w-6 h-6" /></span>
+                    <h3>No picture yet</h3>
+                    {venueName && <p>{venueName}</p>}
+                    <p>Start the preview to check cameras and overlays before going live.</p>
                   </div>
                 </div>
               )}
-
-              {/* Monitor HUD */}
-              <div className="absolute top-3 left-3 flex items-center gap-2">
-                {streamStatus === 'live' && (
-                  <div className="bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold text-white tracking-wider flex items-center gap-1.5 shadow-lg">
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                    REC
-                  </div>
-                )}
-                {streamStatus === 'testing' && (
-                  <div className="bg-amber-600/80 px-2 py-0.5 rounded text-[10px] font-bold text-white tracking-wider">
-                    PREVIEW
-                  </div>
-                )}
-                {primaryCamera && (
-                  <div className="bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] text-slate-300 font-medium">
-                    {primaryCamera.camera_name}
-                  </div>
-                )}
-              </div>
-
-              {/* Monitor Info Bar */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                <div className="flex items-end justify-between">
-                  <div className="min-w-0">
-                    <h3 className="text-white font-medium text-sm truncate">{activeSession.title}</h3>
-                    {activeSession?.streaming_mode === 'cloudflare_relay' && (
-                      <p className="text-slate-500 text-[10px] mt-0.5">Cloud Relay Mode</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {(streamStatus === 'testing' || streamStatus === 'live') && (
-                      <div className="flex items-center gap-1.5 text-slate-500 text-[10px] font-mono">
-                        <Activity className="w-3 h-3" />
-                        720p 30fps
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
 
               <button
-                onClick={() => setIsFullscreen(!isFullscreen)}
-                className="absolute top-3 right-3 p-1.5 bg-black/50 hover:bg-black/70 backdrop-blur-sm rounded-lg text-slate-400 hover:text-white transition-colors"
+                type="button"
+                className="alv-cr-full"
+                onClick={toggleFullscreen}
+                aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
+                title={isFullscreen ? 'Exit full screen' : 'Full screen'}
               >
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
-          {/* ── Source Strip (Timeline-style) ── */}
-          <div className="flex-shrink-0 bg-slate-900/80 border-t border-slate-700/50">
-            <div className="flex items-center justify-between px-3 py-2">
-              <div className="flex items-center gap-2">
-                <Camera className="w-3.5 h-3.5 text-slate-500" />
-                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Sources</span>
-                <span className="text-[10px] text-slate-600 bg-slate-700/50 px-1.5 py-0.5 rounded">{cameras.length}</span>
+          {/* Scenes */}
+          {!isEnded && (
+          <div className="alv-cr-scenes" role="group" aria-label="Scenes">
+            <button
+              type="button"
+              className="alv-scene"
+              onClick={() => setTitleCardTrigger(prev => prev + 1)}
+              disabled={!isOn || !overlaysOn}
+            >
+              Title card<small>8 seconds</small>
+            </button>
+            <button
+              type="button"
+              className={`alv-scene ${streamStatus === 'live' && !isPaused ? 'is-on' : ''}`}
+              aria-pressed={streamStatus === 'live' && !isPaused}
+              onClick={resumeBroadcast}
+              disabled={streamStatus !== 'live'}
+            >
+              Racing<small>{autoDirectorOn ? 'Auto director' : activeSession.event_id ? 'Scoring linked' : 'On air'}</small>
+            </button>
+            <button
+              type="button"
+              className="alv-scene"
+              onClick={() => setResultsTrigger(prev => prev + 1)}
+              disabled={!isOn || !overlaysOn || !scoring?.hasResults || activeSession.overlay_config?.showStandings === false}
+              title={scoring?.hasResults ? 'Show the last race\'s results for 20 seconds' : 'Available once a race is scored'}
+            >
+              Results<small>{scoring?.hasResults ? '20 seconds' : 'After a race'}</small>
+            </button>
+            <button
+              type="button"
+              className={`alv-scene is-hold ${isPaused ? 'is-on' : ''}`}
+              aria-pressed={isPaused}
+              onClick={() => (isPaused ? resumeBroadcast() : pauseBroadcast())}
+              disabled={streamStatus !== 'live'}
+            >
+              Hold<small>{isPaused ? 'On · tap to resume' : 'Hold screen'}</small>
+            </button>
+          </div>
+          )}
+
+          {/* Next shot */}
+          {isOn && nextCamera && (
+            <div className="alv-cr-panel alv-cr-next">
+              <div className="th">
+                {nextStream && <VideoThumbnail stream={nextStream} muted />}
+                <span className="alv-tally is-next">NEXT</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <button onClick={forceReconnectMobileCameras} className="p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded transition-colors" title="Reconnect">
-                  <RefreshCw className="w-3.5 h-3.5" />
-                </button>
-                {streamStatus !== 'offline' && (
-                  <button onClick={() => setShowMobileQR(true)} className="px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-md text-[10px] font-semibold flex items-center gap-1.5 transition-colors">
-                    <Smartphone className="w-3 h-3" />
-                    Add Phone
-                  </button>
-                )}
+              <div className="txt">
+                <b>{nextCamera.camera_name} is next</b>
+                <span>
+                  {autoDirectorOn && cutIn !== null ? `Auto director cuts in ${cutIn} s. ` : ''}
+                  Press {nextIndex} or Cut. Tap any camera to cut to it.
+                </span>
               </div>
+              <button type="button" className="alv-btn alv-btn-live" onClick={() => handleSwitchCamera(nextCamera.id)}>
+                <Scissors className="w-4 h-4" aria-hidden="true" />
+                Cut
+              </button>
             </div>
+          )}
 
-            <div className="px-3 pb-3">
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {cameras.map((camera) => {
-                  const isActive = camera.is_primary;
-                  const isLaptop = camera.camera_type === 'laptop';
-                  const isMobile = camera.camera_type === 'mobile';
-                  const remoteStream = remoteStreams[camera.id];
-                  const isConnected = camera.status === 'connected' || camera.status === 'streaming';
-                  const hasVideo = (isLaptop && mediaStream) || (isMobile && remoteStream);
-
-                  return (
-                    <div
-                      key={camera.id}
-                      onClick={() => isConnected && !isActive && handleSwitchCamera(camera.id)}
-                      className={`flex-shrink-0 w-36 rounded-lg overflow-hidden transition-all group ${
-                        isActive
-                          ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-slate-900'
-                          : isConnected
-                            ? 'hover:ring-1 hover:ring-slate-500 cursor-pointer'
-                            : 'opacity-40'
-                      }`}
-                    >
-                      <div className="aspect-video bg-slate-950 relative">
-                        {isLaptop && mediaStream ? (
-                          <VideoThumbnail stream={mediaStream} muted />
-                        ) : isMobile && remoteStream ? (
-                          <VideoThumbnail stream={remoteStream} />
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Camera className={`w-5 h-5 ${isConnected ? 'text-green-500/60' : 'text-slate-700'}`} />
-                          </div>
-                        )}
-
-                        {isActive && (
-                          <div className="absolute top-1 left-1 bg-blue-600 px-1.5 py-0.5 rounded text-[8px] font-bold text-white tracking-wider flex items-center gap-1">
-                            <CircleDot className="w-2 h-2" />
-                            PGM
-                          </div>
-                        )}
-
-                        {!isActive && hasVideo && (
-                          <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full shadow-lg" />
-                        )}
-                      </div>
-
-                      <div className="bg-slate-800 px-2 py-1.5 flex items-center justify-between gap-1">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {isLaptop ? <Monitor className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" /> : <Smartphone className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" />}
-                          <span className="text-[10px] text-slate-400 truncate">{camera.camera_name}</span>
-                        </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeCamera(camera.id); }}
-                          className="p-0.5 text-slate-600 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {cameras.length === 0 && (
-                  <div className="flex items-center justify-center w-full py-4 text-slate-600">
-                    <div className="text-center">
-                      <Camera className="w-5 h-5 mx-auto mb-1" />
-                      <p className="text-[10px]">No sources connected</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+          {/* Race videos */}
+          <div className="alv-cr-panel alv-cr-videos">
+            <div className="alv-cr-head">
+              <span className="alv-eyebrow">Race videos · {isTestBroadcast ? 'Unlisted on YouTube (test)' : 'Alfie YouTube playlist'}</span>
+              {playlistId && !isTestBroadcast && (
+                <a className="alv-btn is-xs" href={`https://www.youtube.com/playlist?list=${playlistId}`} target="_blank" rel="noopener noreferrer">Open playlist</a>
+              )}
             </div>
+            {raceVideos.length > 0 ? (
+              <div className="alv-cr-vlist">
+                {raceVideos.map(video => <RaceVideoChip key={video.id} video={video} />)}
+              </div>
+            ) : (
+              <p className="alv-cr-hint">
+                {activeSession.event_id
+                  ? 'Each race records as its own video when scoring starts it, and goes to YouTube when it\'s scored.'
+                  : <>Link a race so each one records as its own YouTube video. <button type="button" className="alv-link" onClick={() => setShowSelectRace(true)}>Link a race</button></>}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* ── Inspector Panel ── */}
-        {showInspector && (
-          <div className="w-72 xl:w-80 flex-shrink-0 bg-slate-800 border-l border-slate-700/50 flex flex-col overflow-hidden">
-            {/* Inspector Tab Bar */}
-            <div className="flex items-center border-b border-slate-700/50 bg-slate-800/80">
-              {(['settings', 'overlays', 'output'] as const).map((tab) => (
+        {/* ── Overlays · Output · Details ── */}
+        {sideOpen && (
+          <aside className="alv-cr-panel alv-cr-side" aria-label="Broadcast settings">
+            <div className="alv-cr-sidehead">
+            <div className="alv-tabs" role="tablist" aria-label="Broadcast settings">
+              {(['overlays', 'output', 'settings'] as const).map((tab) => (
                 <button
                   key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={inspectorTab === tab}
                   onClick={() => setInspectorTab(tab)}
-                  className={`flex-1 py-2.5 text-[10px] font-semibold uppercase tracking-wider transition-colors relative ${
-                    inspectorTab === tab ? 'text-white' : 'text-slate-500 hover:text-slate-300'
-                  }`}
                 >
-                  {tab === 'settings' ? 'Settings' : tab === 'overlays' ? 'Overlays' : 'Output'}
-                  {inspectorTab === tab && <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-500 rounded-full" />}
+                  {tab === 'overlays' ? 'Overlays' : tab === 'output' ? 'Output' : 'Details'}
                 </button>
               ))}
             </div>
+            {drawerMode && (
+              <button type="button" className="alv-ib" onClick={() => setDrawerOpen(false)} aria-label="Close panel" title="Close">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+            </div>
 
-            {/* Inspector Content */}
-            <div className="flex-1 overflow-y-auto">
-              {inspectorTab === 'settings' && (
-                <div className="p-4 space-y-4">
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block mb-1.5">Title</label>
-                    <input
-                      type="text"
-                      value={activeSession.title}
-                      onChange={async (e) => {
-                        const newTitle = e.target.value;
-                        setActiveSession({ ...activeSession, title: newTitle });
-                        await livestreamStorage.updateSession(activeSession.id, { title: newTitle });
-                      }}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700/50 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block mb-1.5">Description</label>
-                    <textarea
-                      value={activeSession.description || ''}
-                      onChange={async (e) => {
-                        const newDesc = e.target.value;
-                        setActiveSession({ ...activeSession, description: newDesc });
-                        await livestreamStorage.updateSession(activeSession.id, { description: newDesc });
-                      }}
-                      rows={3}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700/50 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <ToggleRow
-                      icon={<Layers className="w-3.5 h-3.5" />}
-                      label="Overlays"
-                      checked={activeSession.enable_overlays}
-                      onChange={async (enabled) => {
-                        setActiveSession({ ...activeSession, enable_overlays: enabled });
-                        await livestreamStorage.updateSession(activeSession.id, { enable_overlays: enabled });
-                      }}
-                    />
-                    <ToggleRow
-                      icon={<MessageSquare className="w-3.5 h-3.5" />}
-                      label="Live Chat"
-                      checked={activeSession.enable_chat}
-                      onChange={async (enabled) => {
-                        setActiveSession({ ...activeSession, enable_chat: enabled });
-                        await livestreamStorage.updateSession(activeSession.id, { enable_chat: enabled });
-                      }}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5 pt-1">
-                    <button onClick={() => setShowSelectRace(true)} className="w-full px-3 py-2 bg-slate-900 hover:bg-slate-700/50 border border-slate-700/50 text-slate-300 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors">
-                      <Users className="w-3.5 h-3.5 text-slate-500" />
-                      Link Race/Heat
-                    </button>
-                    <button onClick={() => setShowSchedule(true)} className="w-full px-3 py-2 bg-slate-900 hover:bg-slate-700/50 border border-slate-700/50 text-slate-300 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors">
-                      <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                      Schedule Stream
-                    </button>
-                  </div>
-                </div>
-              )}
-
+            <div className="alv-cr-sidebody" role="tabpanel">
               {inspectorTab === 'overlays' && (
-                <div className="p-4">
-                  <OverlaysManager
-                    session={activeSession}
-                    onUpdate={(updates) => {
-                      setActiveSession({ ...activeSession, ...updates });
-                      livestreamStorage.updateSession(activeSession.id, updates);
-                    }}
-                  />
-                </div>
+                <OverlaysManager
+                  session={activeSession}
+                  onUpdate={(updates) => {
+                    setActiveSession({ ...activeSession, ...updates });
+                    livestreamStorage.updateSession(activeSession.id, updates);
+                  }}
+                />
               )}
 
-              {inspectorTab === 'output' && activeSession && (
-                <div className="p-4">
+              {inspectorTab === 'output' && (
+                <div className="alv-cr-legacy">
                   <AdvancedStreamConsole
                     session={activeSession}
                     streamStatus={streamStatus}
@@ -2253,8 +2282,76 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
                   />
                 </div>
               )}
+
+              {inspectorTab === 'settings' && (
+                <div className="alv-cr-form">
+                  <label className="alv-field">
+                    <span>Title</span>
+                    <input
+                      type="text"
+                      className="alv-input"
+                      value={activeSession.title}
+                      onChange={async (e) => {
+                        const newTitle = e.target.value;
+                        setActiveSession({ ...activeSession, title: newTitle });
+                        await livestreamStorage.updateSession(activeSession.id, { title: newTitle });
+                      }}
+                    />
+                  </label>
+                  <label className="alv-field">
+                    <span>Description</span>
+                    <textarea
+                      className="alv-input"
+                      rows={3}
+                      value={activeSession.description || ''}
+                      onChange={async (e) => {
+                        const newDesc = e.target.value;
+                        setActiveSession({ ...activeSession, description: newDesc });
+                        await livestreamStorage.updateSession(activeSession.id, { description: newDesc });
+                      }}
+                    />
+                  </label>
+                  <div>
+                    <SwitchRow
+                      label="Overlays"
+                      hint="Fleet list, race bar and cards on the picture"
+                      checked={overlaysOn}
+                      onChange={async (enabled) => {
+                        setActiveSession({ ...activeSession, enable_overlays: enabled });
+                        await livestreamStorage.updateSession(activeSession.id, { enable_overlays: enabled });
+                      }}
+                    />
+                    <SwitchRow
+                      label="Live chat"
+                      checked={!!activeSession.enable_chat}
+                      onChange={async (enabled) => {
+                        setActiveSession({ ...activeSession, enable_chat: enabled });
+                        await livestreamStorage.updateSession(activeSession.id, { enable_chat: enabled });
+                      }}
+                    />
+                  </div>
+                  <button type="button" onClick={() => setShowSelectRace(true)} className="alv-btn is-small">
+                    <Link2 className="w-4 h-4" aria-hidden="true" />
+                    {activeSession.event_id ? 'Change linked race or heat' : 'Link race or heat'}
+                  </button>
+                  <button type="button" onClick={() => setShowSchedule(true)} className="alv-btn is-small">
+                    <Calendar className="w-4 h-4" aria-hidden="true" />
+                    Schedule broadcast
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
+
+            {activeSession.event_id && (
+              <div className="alv-cr-scorecard">
+                <b>Scoring runs the broadcast</b>
+                <p>
+                  Each race records as its own video when scoring starts it, and the hold card shows when racing is on hold.
+                  {scoring ? ` Now: ${scoring.race}${scoring.label ? ` · ${scoring.label.toLowerCase()}` : ''}.` : ''}
+                </p>
+              </div>
+            )}
+          </aside>
         )}
       </div>
 
@@ -2288,12 +2385,47 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
         <ConfirmationModal isOpen={true} onClose={() => { setShowDeleteConfirm(false); setSessionToDelete(null); }} onConfirm={async () => { await deleteSession(sessionToDelete); setShowDeleteConfirm(false); setSessionToDelete(null); }} title="Delete Stream" message={`Are you sure you want to delete "${sessionToDelete.title}"?`} confirmText="Delete" confirmStyle="danger" />
       )}
     </div>
+    </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Sub-components
 // ═══════════════════════════════════════════════════════════════
+
+/** One race video: start time, race, and where it is on its way to YouTube */
+function RaceVideoChip({ video }: { video: LivestreamRaceSegment }) {
+  const time = video.segment_start_time
+    ? new Date(video.segment_start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    : '';
+  const label = video.race_number
+    ? `Race ${video.race_number}${video.heat_number ? ` · Heat ${video.heat_number}` : ''}`
+    : video.segment_title || 'Race video';
+  const done = video.upload_status === 'uploaded' || video.upload_status === 'cleanup_complete';
+  const recording = video.upload_status === 'pending' && !video.segment_end_time;
+  const [tone, status] =
+    recording ? ['rec', '● recording'] :
+    video.upload_status === 'pending' ? ['up', 'waiting to upload'] :
+    video.upload_status === 'uploading' ? ['up', 'uploading'] :
+    done ? ['ok', video.youtube_video_id ? '✓ YouTube' : '✓ saved'] :
+    ['bad', 'upload failed'];
+  const body = (
+    <>
+      {time && <span className="t">{time}</span>}
+      <span>{label}</span>
+      <span className={`st ${tone}`}>{status}</span>
+    </>
+  );
+  const cls = `alv-mk ${recording ? 'is-rec' : tone === 'up' ? 'is-up' : ''}`;
+  if (done && video.youtube_video_id) {
+    return (
+      <a className={cls} href={`https://youtu.be/${video.youtube_video_id}`} target="_blank" rel="noopener noreferrer" title="Watch on YouTube">
+        {body}
+      </a>
+    );
+  }
+  return <span className={cls} title={tone === 'bad' ? video.upload_error || 'The upload failed' : undefined}>{body}</span>;
+}
 
 function VideoThumbnail({ stream, muted = false }: { stream: MediaStream; muted?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -2306,17 +2438,15 @@ function VideoThumbnail({ stream, muted = false }: { stream: MediaStream; muted?
   return <video ref={videoRef} autoPlay playsInline muted={muted} className="w-full h-full object-cover" />;
 }
 
-function ToggleRow({ icon, label, checked, onChange }: { icon: React.ReactNode; label: string; checked: boolean; onChange: (v: boolean) => void }) {
+function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+  const id = `alv-sw-${label.toLowerCase().replace(/[^a-z]+/g, '-')}`;
   return (
-    <div className="flex items-center justify-between p-2.5 bg-slate-900 border border-slate-700/50 rounded-lg">
-      <div className="flex items-center gap-2.5">
-        <span className="text-slate-500">{icon}</span>
-        <span className="text-xs text-slate-300">{label}</span>
+    <div className="alv-tg">
+      <div className="min-w-0">
+        <b id={id}>{label}</b>
+        {hint && <span>{hint}</span>}
       </div>
-      <label className="relative inline-flex items-center cursor-pointer">
-        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="sr-only peer" />
-        <div className="w-8 h-4 bg-slate-700 peer-focus:ring-1 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-400 peer-checked:after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600" />
-      </label>
+      <button type="button" role="switch" aria-checked={checked} aria-labelledby={id} className="alv-sw" onClick={() => onChange(!checked)} />
     </div>
   );
 }
