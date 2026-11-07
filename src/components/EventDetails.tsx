@@ -1154,7 +1154,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
 
         const allAttendees = [...formattedAttendees, ...guestRegistrations];
 
-        setAttendees(allAttendees);
+        setAttendees([...allAttendees, ...(await fetchEmailAnswerAttendees())]);
       } else {
         // No member user IDs, but check for guest registrations
         const guestRegistrations = registrationsData
@@ -1166,12 +1166,38 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             avatarUrl: undefined
           }));
 
-        setAttendees(guestRegistrations);
+        setAttendees([...guestRegistrations, ...(await fetchEmailAnswerAttendees())]);
       }
     } catch (err) {
       console.error('Error fetching attendance:', err);
     } finally {
       setLoadingAttendance(false);
+    }
+  };
+
+  // Answers from What's On emails by members who are not on AlfiePRO yet (they have no login,
+  // so they can't be in event_attendance). Missing table or no access: nothing extra is shown.
+  const fetchEmailAnswerAttendees = async (): Promise<{ id: string; name: string; status: 'yes' | 'no' | 'maybe'; avatarUrl?: string }[]> => {
+    try {
+      let q = supabase
+        .from('whats_on_answers')
+        .select('id, status, members(first_name, last_name, avatar_url)');
+      if (event.isSeriesEvent) {
+        const seriesId = event.seriesId ? extractDbId(event.seriesId) : extractDbId(event.id);
+        q = event.roundName ? q.eq('series_id', seriesId).eq('round_name', event.roundName) : q.eq('series_id', seriesId).is('round_name', null);
+      } else {
+        q = q.eq('event_id', extractDbId(event.id));
+      }
+      const { data, error } = await q;
+      if (error || !data) return [];
+      return (data as any[]).map(r => ({
+        id: `wo-${r.id}`,
+        name: `${r.members?.first_name || ''} ${r.members?.last_name || ''}`.trim() || 'Member',
+        status: r.status,
+        avatarUrl: r.members?.avatar_url || undefined,
+      }));
+    } catch {
+      return [];
     }
   };
 

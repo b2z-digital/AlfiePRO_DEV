@@ -4,7 +4,9 @@ import { Logo } from '../Logo';
 import { ArrowLeft, Mail, CircleCheck as CheckCircle } from 'lucide-react';
 
 export const ForgotPassword: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => {
+    try { return (new URLSearchParams(window.location.search).get('email') || '').trim(); } catch { return ''; }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
