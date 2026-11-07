@@ -964,7 +964,7 @@ BEGIN
         || '<br><span style="' || v_disp || 'font-size:18px;color:#0B1220">' || to_char((v_e ->> 'event_date')::date, 'FMDD') || '</span></td>'
         || '<td valign="top" style="padding:12px 0 12px 12px"><div style="font-size:14px;font-weight:600;color:#0B1220">' || public.whats_on_esc(v_e ->> 'title') || '</div>'
         || coalesce('<div style="font-size:12.5px;color:#64748B;margin-top:2px">' || nullif(concat_ws(' · ',
-             public.whats_on_esc(v_e ->> 'venue'),
+             nullif(public.whats_on_esc(v_e ->> 'venue'), ''),
              CASE WHEN v_e ->> 'start_time' IS NOT NULL THEN public.whats_on_esc(v_e ->> 'start_time') END,
              CASE WHEN v_e ->> 'pro_name' IS NOT NULL THEN 'PRO ' || public.whats_on_esc(v_e ->> 'pro_name') END), '') || '</div>', '')
         || '</td></tr></table>';
@@ -1041,7 +1041,7 @@ BEGIN
   -- Footer
   v_footer := '<div style="font-weight:600;color:#334155">' || public.whats_on_esc(p_club ->> 'name') || '</div>'
     || CASE WHEN p_club ->> 'address' IS NOT NULL OR p_club ->> 'email' IS NOT NULL
-            THEN '<div>' || concat_ws(' · ', public.whats_on_esc(p_club ->> 'address'),
+            THEN '<div>' || concat_ws(' · ', nullif(public.whats_on_esc(p_club ->> 'address'), ''),
                    CASE WHEN p_club ->> 'email' IS NOT NULL THEN '<a href="mailto:' || public.whats_on_esc(p_club ->> 'email') || '" style="' || v_link || '">' || public.whats_on_esc(p_club ->> 'email') || '</a>' END) || '</div>'
             ELSE '' END
     || '<p style="margin:10px 0 0">You&#39;re getting this because you&#39;re a ' || public.whats_on_esc(v_abbr) || ' member'
