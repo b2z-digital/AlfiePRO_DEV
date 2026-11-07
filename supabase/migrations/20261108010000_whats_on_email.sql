@@ -798,7 +798,8 @@ BEGIN
   IF coalesce((cfg ->> 'show_rsvp')::boolean, true) THEN
     v_h := v_h || '<div style="' || v_meta || '">'
       || CASE WHEN v_going = 0 THEN 'Nobody has said they''re going yet'
-              ELSE v_going || ' going' || CASE WHEN v_cant > 0 THEN ' · ' || v_cant || ' can&#39;t make it' ELSE ' so far' END END
+              ELSE v_going || ' going' || CASE WHEN v_status = 'yes' THEN ' including you' ELSE '' END
+                   || CASE WHEN v_cant > 0 THEN ' · ' || v_cant || ' can&#39;t make it' WHEN v_status = 'yes' THEN '' ELSE ' so far' END END
       || '</div>';
   END IF;
   IF coalesce((cfg ->> 'show_docs')::boolean, true) AND (e ->> 'nor_url' IS NOT NULL OR e ->> 'si_url' IS NOT NULL) THEN
@@ -813,9 +814,9 @@ BEGIN
   IF coalesce((cfg ->> 'show_rsvp')::boolean, true) THEN
     IF v_status IS NOT NULL THEN
       v_h := v_h || '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;border-collapse:separate"><tr><td style="padding:10px 12px;border-radius:12px;font-size:13.5px;font-weight:500;'
-        || CASE v_status WHEN 'yes' THEN 'background:#EAF8EF;color:#136C34">&#10003;&nbsp; You&#39;re going'
-                         WHEN 'no' THEN 'background:#F1F4F9;color:#475569">You can&#39;t make it'
-                         ELSE 'background:#FFF6E5;color:#8A5300">You said maybe' END
+        || CASE v_status WHEN 'yes' THEN 'background:#EAF8EF;color:#136C34">&#10003;&nbsp; <strong>You&#39;re registered to sail</strong>'
+                         WHEN 'no' THEN 'background:#F1F4F9;color:#475569">You&#39;ve said you can&#39;t make it'
+                         ELSE 'background:#FFF6E5;color:#8A5300">You&#39;ve said maybe' END
         || ' · <a href="' || public.whats_on_esc(coalesce(v_base, '#')) || '" style="color:inherit;font-weight:600">Change</a></td></tr></table>';
     ELSE
       v_h := v_h || '<div style="margin-top:12px">'
@@ -871,6 +872,7 @@ DECLARE
   v_items text[];
   v_preheader text;
   v_all_audience boolean;
+  v_unanswered int := 0;
 BEGIN
   v_all_audience := coalesce(p_cfg ->> 'audience', 'class') = 'all' OR coalesce(p_member ->> 'scope', 'classes') = 'all';
 
@@ -881,6 +883,9 @@ BEGIN
   SELECT coalesce(jsonb_agg(x ORDER BY x ->> 'event_date', x ->> 'title'), '[]'::jsonb) INTO v_next_mine
   FROM jsonb_array_elements(coalesce(p_next, '[]'::jsonb)) x WHERE public.whats_on_is_mine(x, p_member, p_cfg);
   v_count := jsonb_array_length(v_mine);
+  -- Races this member hasn't answered yet (in AlfiePRO, by SMS, by entering, or from an email)
+  SELECT count(*) INTO v_unanswered FROM jsonb_array_elements(v_mine) x
+  WHERE (p_member -> 'answers' ->> (x ->> 'event_key')) IS NULL;
 
   SELECT coalesce(array_agg(DISTINCT b ->> 'class'), ARRAY[]::text[]) INTO v_classes
   FROM jsonb_array_elements(coalesce(p_member -> 'boats', '[]'::jsonb)) b;
@@ -903,7 +908,10 @@ BEGIN
   v_intro := coalesce(nullif(trim(p_cfg ->> 'intro'), ''),
     'Hi {first_name}, here''s what''s on at the club ' || v_period
     || CASE WHEN v_all_audience THEN '.' ELSE ' for your boats.' END
-    || CASE WHEN coalesce((p_cfg ->> 'show_rsvp')::boolean, true) THEN ' Tap Going or Can''t make it so the PRO can plan the starts.' ELSE '' END);
+    || CASE WHEN NOT coalesce((p_cfg ->> 'show_rsvp')::boolean, true) OR v_count = 0 THEN ''
+            WHEN v_unanswered = 0 THEN ' You''ve already let us know for ' || CASE WHEN v_count = 1 THEN 'it' ELSE 'all of them' END || ', thanks.'
+            WHEN v_unanswered < v_count THEN ' Tap Going or Can''t make it on the others so the PRO can plan the starts.'
+            ELSE ' Tap Going or Can''t make it so the PRO can plan the starts.' END);
 
   -- Merge tags
   v_subject := replace(replace(replace(replace(replace(v_subject,
@@ -921,7 +929,7 @@ BEGIN
   v_sub := CASE
     WHEN v_all_audience OR v_class_text = '' THEN 'At ' || public.whats_on_esc(p_club ->> 'name')
     ELSE 'For your ' || public.whats_on_list_text(ARRAY(SELECT '<strong style="color:#FFFFFF;font-weight:600">' || public.whats_on_esc(c) || '</strong>' FROM unnest(v_classes) c)) END
-    || CASE WHEN v_count > 0 AND coalesce((p_cfg ->> 'show_rsvp')::boolean, true) THEN ' · let the PRO know if you&#39;re coming' ELSE '' END;
+    || CASE WHEN v_unanswered > 0 AND coalesce((p_cfg ->> 'show_rsvp')::boolean, true) THEN ' · let the PRO know if you&#39;re coming' ELSE '' END;
 
   -- Links
   IF p_preview OR p_token IS NULL THEN
