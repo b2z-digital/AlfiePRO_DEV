@@ -96,6 +96,7 @@ import MarketingTemplatesPage from '../pages/MarketingTemplatesPage';
 import MarketingTemplateEditorPage from '../pages/MarketingTemplateEditorPage';
 import MarketingAutomationFlowsPage from '../pages/MarketingAutomationFlowsPage';
 import MarketingAutomationFlowEditorPage from '../pages/MarketingAutomationFlowEditorPage';
+const EmailStudio = React.lazy(() => import('./email-studio/EmailStudio'));
 import LivestreamPage from '../pages/LivestreamPage';
 import RaceSimulatorPage from './race-simulator/RaceSimulatorPage';
 import SuperAdminDashboard from '../pages/SuperAdminDashboard';
@@ -1137,10 +1138,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         },
         {
           id: 'marketing',
-          label: 'Marketing',
+          label: clubWebsite ? 'Email studio' : 'Marketing',
           icon: Send,
-          description: 'Email campaigns and automation flows',
-          path: '/marketing',
+          description: clubWebsite ? 'Newsletters, campaigns and automatic emails' : 'Email campaigns and automation flows',
+          path: clubWebsite ? '/email-studio' : '/marketing',
           permission: 'membership.manage',
           featureKey: 'marketing'
         },
@@ -2198,8 +2199,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/resources" element={<AssociationResourcesPage darkMode={darkMode} />} />
               <Route path="/classifieds" element={<ClassifiedsPage />} />
               <Route path="/comms" element={<CommsPage darkMode={darkMode} />} />
-              <Route path="/marketing" element={<MarketingPage darkMode={darkMode} />} />
-              <Route path="/marketing/campaigns" element={<MarketingCampaignsPage darkMode={darkMode} />} />
+              {/* Clubs use Email studio; associations keep the Marketing pages */}
+              <Route path="/email-studio/*" element={clubWebsite ? <React.Suspense fallback={<div className="p-8 text-center text-slate-400">Loading Email studio…</div>}><EmailStudio /></React.Suspense> : <Navigate to="/marketing" replace />} />
+              <Route path="/marketing" element={clubWebsite ? <Navigate to="/email-studio" replace /> : <MarketingPage darkMode={darkMode} />} />
+              <Route path="/marketing/campaigns" element={clubWebsite ? <Navigate to="/email-studio/campaigns" replace /> : <MarketingCampaignsPage darkMode={darkMode} />} />
               <Route path="/marketing/campaigns/:id" element={<MarketingCampaignEditorPage darkMode={darkMode} />} />
               <Route path="/marketing/subscribers" element={<MarketingSubscribersPage darkMode={darkMode} />} />
               <Route path="/marketing/templates" element={<MarketingTemplatesPage darkMode={darkMode} />} />

@@ -69,6 +69,7 @@ import { DelegatedRollCallPage } from './pages/DelegatedRollCallPage';
 import { PublicSharedResultsPage } from './components/public/PublicSharedResultsPage';
 import SignOnKioskPage from './pages/SignOnKioskPage';
 import WhatsOnAnswerPage from './pages/WhatsOnAnswerPage';
+import EmailPreferencesPage from './pages/EmailPreferencesPage';
 import { MobileAppComingSoon } from './components/MobileAppComingSoon';
 import { JoinScoringSessionPage } from './pages/JoinScoringSessionPage';
 import './styles/index.css';
@@ -198,6 +199,7 @@ function App() {
                         window.location.pathname.startsWith('/play/') ||
                         window.location.pathname.startsWith('/reset-password') ||
                         window.location.pathname.startsWith('/whats-on/') ||
+                        window.location.pathname.startsWith('/email/preferences') ||
                         window.location.pathname.startsWith('/forgot-password');
 
   console.log('🔍 App.tsx auth check:', {
@@ -307,6 +309,9 @@ function App() {
 
         {/* What's On email answers (Public, token in the link) */}
         <Route path="/whats-on/answer" element={<WhatsOnAnswerPage />} />
+
+        {/* Email studio preferences and unsubscribe (Public, recipient id in the link) */}
+        <Route path="/email/preferences" element={<EmailPreferencesPage />} />
 
         {/* Self-service Sign On Kiosk (Public) */}
         <Route path="/sign-on/:eventId" element={<SignOnKioskPage />} />
