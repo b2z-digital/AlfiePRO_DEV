@@ -4,6 +4,7 @@ import { Icon, AlfieSails, IconName } from './icons';
 import { useMobile } from './MobileContext';
 import { useAuth } from '../contexts/AuthContext';
 import { MCalendarItem, attendanceKey, parseDay } from './data';
+import { isNative } from '../lib/native/platform';
 
 const AV_COLOURS = ['#2A93FF', '#8A4DFF', '#FF3E9A', '#0F7A5A', '#FF8A2B', '#40C8C0', '#5B2BB5'];
 export const colourFor = (seed: string) => AV_COLOURS[Math.abs([...seed].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7)) % AV_COLOURS.length];
@@ -43,8 +44,10 @@ export const RootHeader: React.FC<{ title?: string; brand?: boolean; right?: Rea
   const { currentClub, currentOrganization } = useAuth();
   const { profile, unread, light } = useMobile();
   const name = `${profile.firstName} ${profile.lastName}`.trim() || 'Me';
-  const orgName = currentClub?.club?.name || currentOrganization?.name || '';
+  const orgName = currentOrganization && currentOrganization.type !== 'club' ? currentOrganization.name : currentClub?.club?.name || currentOrganization?.name || '';
   return (
+    <>
+    {brand && !isNative && <AppBanner />}
     <header className="m-top">
       <div className="m-top-title">
         {brand ? (
@@ -77,6 +80,8 @@ export const RootHeader: React.FC<{ title?: string; brand?: boolean; right?: Rea
         <Avatar name={name} url={profile.avatarUrl} size={36} />
       </button>
     </header>
+    <OfflineBanner />
+    </>
   );
 };
 
@@ -84,6 +89,7 @@ export const RootHeader: React.FC<{ title?: string; brand?: boolean; right?: Rea
 export const SubHeader: React.FC<{ title?: React.ReactNode; sub?: string; right?: React.ReactNode; onBack?: () => void }> = ({ title, sub, right, onBack }) => {
   const navigate = useNavigate();
   return (
+    <>
     <header className="m-top">
       <button className="m-ibtn" aria-label="Back" onClick={() => (onBack ? onBack() : window.history.length > 1 ? navigate(-1) : navigate('/'))}>
         <Icon name="back" />
@@ -94,6 +100,8 @@ export const SubHeader: React.FC<{ title?: React.ReactNode; sub?: string; right?
       </div>
       {right}
     </header>
+    <OfflineBanner />
+    </>
   );
 };
 
@@ -153,10 +161,11 @@ export const LevelPill: React.FC<{ level: string }> = ({ level }) =>
   : null;
 
 export const MyStatusPill: React.FC<{ item: MCalendarItem }> = ({ item }) => {
-  const { attendance } = useMobile();
+  const { attendance, queued } = useMobile();
   const key = attendanceKey(item);
   const s = key ? attendance.mine[key] : undefined;
   if (item.kind !== 'race' || item.completed) return null;
+  if (key && queued[key]) return <span className="m-pill" style={{ background: 'rgba(52,199,89,.16)', color: '#6FE08E' }}><Icon name="clock" size={12} strokeWidth={2.4} />{s === 'yes' ? 'Going' : s === 'no' ? "Can't make it" : 'Maybe'} · sends when online</span>;
   if (s === 'yes') return <span className="m-pill" style={{ background: 'rgba(52,199,89,.16)', color: '#6FE08E' }}><Icon name="check" size={12} strokeWidth={3} />Going</span>;
   if (s === 'no') return <span className="m-pill" style={{ background: 'rgba(255,59,48,.14)', color: '#FF8C82' }}>Can't make it</span>;
   if (s === 'maybe') return <span className="m-pill" style={{ background: 'rgba(255,159,10,.15)', color: '#FFC062' }}>Maybe</span>;
@@ -196,3 +205,42 @@ export const RsvpButtons: React.FC<{ item: MCalendarItem; compact?: boolean }> =
 };
 
 export const Skeleton: React.FC<{ h: number }> = ({ h }) => <div className="m-skel" style={{ height: h }} />;
+
+/* ─────────────── Native board: offline and phone-browser banners ─────────────── */
+
+/** "You're offline. Showing what was saved at 9:12 am." */
+export const OfflineBanner: React.FC = () => {
+  const { online, savedAt, light } = useMobile();
+  if (online) return null;
+  const at = savedAt ? new Date(savedAt).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }) : null;
+  return (
+    <div className="m-offline" role="status">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF9F0A" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 4.2-2.6M9.6 5.2A15 15 0 0 1 22 8.8M5 12.6a10 10 0 0 1 5.3-2.4M16.4 11a10 10 0 0 1 2.6 1.6M8.5 16.4a5 5 0 0 1 7 0M12 20h.01M3 3l18 18" /></svg>
+      <div style={{ flex: 1, fontSize: 13.5 }}>
+        <b style={{ fontWeight: 600, color: light ? '#B26A00' : '#FFD38A' }}>You're offline.</b>{' '}
+        <span className="m-mut">{at ? `Showing what was saved at ${at}.` : 'Showing what was saved on this phone.'}</span>
+      </div>
+    </div>
+  );
+};
+
+const APP_STORE_URL = 'https://apps.apple.com/app/alfiepro/id6759854905';
+const BANNER_KEY = 'alfie-m-app-banner-hidden';
+
+/** Slim "AlfiePRO app" banner for phone browsers (iPhone only until the Android app is released). */
+export const AppBanner: React.FC = () => {
+  const [hidden, setHidden] = React.useState(() => { try { return !!sessionStorage.getItem(BANNER_KEY); } catch { return false; } });
+  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (hidden || !ios) return null;
+  return (
+    <div className="m-appbar">
+      <span className="m-appi" style={{ width: 34, height: 34, borderRadius: 9 }}><AlfieSails size={18} light={false} /></span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>AlfiePRO app</div>
+        <div className="m-dim" style={{ fontSize: 11.5 }}>Push reminders and the Race Timer</div>
+      </div>
+      <a href={APP_STORE_URL} className="m-pill-btn" style={{ height: 30, fontSize: 13, padding: '0 12px' }}>Open</a>
+      <button className="m-ibtn" style={{ width: 28, height: 28, background: 'none', border: 0 }} aria-label="Hide" onClick={() => { setHidden(true); try { sessionStorage.setItem(BANNER_KEY, '1'); } catch { /* ignore */ } }}><Icon name="close" size={16} /></button>
+    </div>
+  );
+};

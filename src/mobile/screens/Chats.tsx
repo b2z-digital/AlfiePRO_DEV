@@ -158,7 +158,7 @@ export const ChatThread: React.FC = () => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { toast, tap, calendar, memberIds, profile } = useMobile();
+  const { toast, tap, calendar, memberIds, profile, requireFinancial } = useMobile();
   const { startCall } = useVoiceCall();
   const [attaching, setAttaching] = useState(false);
   const me = user?.id || '';
@@ -211,6 +211,7 @@ export const ChatThread: React.FC = () => {
   const send = async () => {
     const body = text.trim();
     if (!body || !me || sending) return;
+    if (!requireFinancial()) return;
     setText('');
     setSending(true);
     const temp: MMessage = { id: `temp-${Date.now()}`, conversation_id: convRef.current || '', sender_id: me, content: body, created_at: new Date().toISOString() };

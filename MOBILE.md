@@ -57,12 +57,19 @@ safe-area variables (`--safe-top`, `--safe-bottom` …).
    iOS APNs key uploaded), send by token kind (`platform` = `ios-apns` / `android-fcm` from the new app,
    `ios` from the Expo app), then build with `VITE_NATIVE_PUSH=true`. Android also needs
    `android/app/google-services.json` from Firebase.
-4. **Universal links (optional):** `apple-app-site-association` and `assetlinks.json` on app.alfiepro.com.au,
+4. **Race reminder buttons (lock screen):** send race reminders to the new app with APNs `category: "RACE_REMINDER"`
+   and data `club_id` plus `series_id` + `round_name` (series rounds) or `event_id` (single events). The app shows
+   "I'm going" / "Can't make it" and writes `event_attendance` the same way as the RSVP buttons. Test on a device:
+   iOS only wakes the app briefly for these. Android needs the buttons added in the FCM sender (not done).
+5. **Weather keys:** Wind & tides uses `VITE_WEATHER_API_KEY` (OpenWeatherMap) and `VITE_STORMGLASS_API_KEY`
+   (tides) through `weather_cache`. Without them the screen shows a Windy wind map instead.
+6. **Universal links (optional):** `apple-app-site-association` and `assetlinks.json` on app.alfiepro.com.au,
    plus the Associated Domains entitlement.
 
-## What is not built yet
+## The phone app
 
-The phone experience itself. Until the mobile design board is approved, the apps render the current web
-layout (fine on iPad, cramped on a phone) and phone browsers still see `MobileAppComingSoon`.
-The parity list against the Expo app is in the review doc and `claude/alfie-mobile-app-plan.md` in the
-AlfiePRO project.
+`src/mobile/` holds the phone screens built from the mobile design board (styles in `src/styles/alfie-mobile.css`).
+The apps always show them; phone browsers see them with `?mobile=1` (otherwise `MobileAppComingSoon` until launch).
+First run: Membership due (soft gate, renew via `utils/membershipRenewal.ts`, shared with the desktop screen),
+Choose your club (only with more than one), then "Never miss a start" before the system notification prompt.
+Race Management on the phone is next. Progress and gaps: `claude/alfie-mobile-app-plan.md` in the AlfiePRO project.

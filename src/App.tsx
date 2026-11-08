@@ -232,8 +232,9 @@ function App() {
 
   return (
     <ModalProvider>
-      <ConnectionMonitor />
-      <PWAInstallPrompt />
+      {/* The phone app has its own offline banner and app banner (mobile design board) */}
+      {!(isMobilePhone && (isNative || mobilePreview)) && <ConnectionMonitor />}
+      {!(isMobilePhone && (isNative || mobilePreview)) && <PWAInstallPrompt />}
       <VoiceCallModal />
       <NotificationSystem
         notifications={notifications}
@@ -412,11 +413,12 @@ function App() {
               <AlfieLoader light={!darkMode} />
             ) : userClubs.length === 0 && !onboardingCompleted && !isRaceOfficer ? (
               <Navigate to="/onboarding" />
+            ) : isMobilePhone && (isNative || mobilePreview) ? (
+              // Phone screens from the mobile design board (apps always; phone browsers with ?mobile=1 while it's built).
+              // Unfinancial members get the phone's softer "Membership due" screen instead of the hard block.
+              <Suspense fallback={<AlfieLoader light={!darkMode} />}><MobileApp /></Suspense>
             ) : hasUnfinancialMember && unfinancialMemberData ? (
               <UnfinancialMemberScreen memberData={unfinancialMemberData} darkMode={darkMode} />
-            ) : isMobilePhone && (isNative || mobilePreview) ? (
-              // Phone screens from the mobile design board (apps always; phone browsers with ?mobile=1 while it's built)
-              <Suspense fallback={<AlfieLoader light={!darkMode} />}><MobileApp /></Suspense>
             ) : isMobilePhone ? (
               <MobileAppComingSoon />
             ) : (

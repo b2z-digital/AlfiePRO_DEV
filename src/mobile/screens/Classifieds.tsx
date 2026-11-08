@@ -35,7 +35,7 @@ const Heart: React.FC<{ on: boolean; onClick: (e: React.MouseEvent) => void }> =
 export const ClassifiedsScreen: React.FC = () => {
   const navigate = useNavigate();
   const { user, currentClub } = useAuth();
-  const { toast, tap } = useMobile();
+  const { toast, tap, requireFinancial } = useMobile();
   const [items, setItems] = useState<Classified[] | null>(null);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('all');
@@ -75,7 +75,7 @@ export const ClassifiedsScreen: React.FC = () => {
 
   return (
     <div className="m-stack">
-      <PageHeader title="Classifieds" right={<button className="m-pill-btn" onClick={() => setSelling(true)}><Icon name="camera" size={17} />Sell</button>} />
+      <PageHeader title="Classifieds" right={<button className="m-pill-btn" onClick={() => requireFinancial() && setSelling(true)}><Icon name="camera" size={17} />Sell</button>} />
       <label className="m-search">
         <Icon name="search" size={17} />
         <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }}>Search classifieds</span>

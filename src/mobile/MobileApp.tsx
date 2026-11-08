@@ -1,5 +1,7 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { isNative } from '../lib/native/platform';
 import { useAlfieTheme } from '../hooks/useAlfieTheme';
 import { MobileProvider, useMobile } from './MobileContext';
 import { TabBar } from './ui';
@@ -25,12 +27,15 @@ import { RaceTimerScreen } from './screens/RaceTimer';
 import { WeatherScreen } from './screens/Weather';
 import { TasksScreen } from './screens/Tasks';
 import { FindRacingScreen } from './screens/FindRacing';
+import { ChooseClubScreen, NotificationsPromptScreen, MembershipDueScreen, FIRST_RUN, flag, loadMyAssociations } from './screens/FirstRun';
+import { SettingsScreen } from './screens/Settings';
 import '../styles/alfie-mobile.css';
 
 const AskAlfieChatPanel = lazy(() => import('../components/ask-alfie/AskAlfieChatPanel').then(m => ({ default: m.AskAlfieChatPanel })));
 
 /** Screens that sit outside the tab bar (pushed full screen). */
-const NO_TABS = [/^\/notifications/, /^\/race-timer/, /^\/comms\/chat\//, /^\/classifieds\/[^/]+/, /^\/news\/[^/]+/];
+const FIRST_RUN_PATHS = ['/choose-club', '/welcome-notifications', '/membership-due'];
+const NO_TABS = [/^\/(choose-club|welcome-notifications|membership-due)/, /^\/notifications/, /^\/race-timer/, /^\/comms\/chat\//, /^\/classifieds\/[^/]+/, /^\/news\/[^/]+/];
 
 const AlfieSheet: React.FC<{ onClose: () => void; message?: string }> = ({ onClose, message }) => {
   const { light } = useMobile();
@@ -65,6 +70,7 @@ const Shell: React.FC = () => {
   }, []);
   useAlfieTheme(true, light ? 'light' : 'dark');
   const hideTabs = NO_TABS.some(r => r.test(pathname));
+  useFirstRun(pathname);
 
   // Each screen starts at the top
   useEffect(() => { document.querySelector('.m-scroll')?.scrollTo({ top: 0 }); }, [pathname]);
@@ -104,7 +110,10 @@ const Shell: React.FC = () => {
           <Route path="/race-timer" element={<RaceTimerScreen />} />
           <Route path="/weather" element={<WeatherScreen />} />
           <Route path="/tasks" element={<TasksScreen />} />
-          <Route path="/settings/*" element={<Soon title="Profile & settings" what="Your details, notifications and privacy." />} />
+          <Route path="/settings/*" element={<SettingsScreen />} />
+          <Route path="/choose-club" element={<ChooseClubScreen />} />
+          <Route path="/welcome-notifications" element={<NotificationsPromptScreen />} />
+          <Route path="/membership-due" element={<MembershipDueScreen />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -113,6 +122,31 @@ const Shell: React.FC = () => {
     </div>
   );
 };
+
+const sessionFlag = (k: string) => { try { return sessionStorage.getItem(k); } catch { return null; } };
+
+/**
+ * First run, in order (board "Sign in & first run"): membership due (unless snoozed),
+ * choose your club (only with more than one), then notifications (apps, once).
+ */
+function useFirstRun(pathname: string) {
+  const navigate = useNavigate();
+  const { user, userClubs, hasUnfinancialMember, unfinancialMemberData } = useAuth();
+  const [assocs, setAssocs] = useState<number | null>(null);
+  useEffect(() => { loadMyAssociations(user?.id).then(a => setAssocs(a.length)).catch(() => setAssocs(0)); }, [user?.id]);
+  useEffect(() => {
+    if (FIRST_RUN_PATHS.some(p => pathname.startsWith(p)) || assocs === null) return;
+    if (hasUnfinancialMember && unfinancialMemberData && !sessionFlag(FIRST_RUN.dueSnooze) && Date.now() > Number(flag(FIRST_RUN.dueSnooze) || 0)) {
+      navigate('/membership-due');
+      return;
+    }
+    if (userClubs.length + assocs > 1 && flag(FIRST_RUN.club) !== 'remember' && !sessionFlag(FIRST_RUN.club)) {
+      navigate('/choose-club');
+      return;
+    }
+    if (isNative && !flag(FIRST_RUN.push)) navigate('/welcome-notifications');
+  }, [pathname, assocs, hasUnfinancialMember, unfinancialMemberData, userClubs.length, navigate]);
+}
 
 /** /ask-alfie (links from results and old notifications) opens the sheet over Home. */
 const AskAlfieRoute: React.FC<{ onOpen: () => void }> = ({ onOpen }) => {

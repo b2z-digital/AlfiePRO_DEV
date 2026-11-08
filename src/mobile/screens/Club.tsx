@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobile } from '../MobileContext';
 import { Icon, IconName } from '../icons';
-import { Avatar, Skeleton } from '../ui';
+import { Avatar, OfflineBanner, Skeleton } from '../ui';
 import { timeAgo } from '../data';
 import { MGroup, SocialPost, createPost, loadChats, loadFeed, loadMyGroups, toggleLike } from '../club';
 
@@ -11,13 +11,16 @@ import { MGroup, SocialPost, createPost, loadChats, loadFeed, loadMyGroups, togg
 export const PageHeader: React.FC<{ title: string; right?: React.ReactNode; onBack?: () => void }> = ({ title, right, onBack }) => {
   const navigate = useNavigate();
   return (
-    <header className="m-top">
-      <button className="m-ibtn" aria-label="Back" onClick={() => (onBack ? onBack() : window.history.length > 1 ? navigate(-1) : navigate('/'))}>
-        <Icon name="back" />
-      </button>
-      <h1 className="m-ptitle m-disp">{title}</h1>
-      {right}
-    </header>
+    <>
+      <header className="m-top">
+        <button className="m-ibtn" aria-label="Back" onClick={() => (onBack ? onBack() : window.history.length > 1 ? navigate(-1) : navigate('/'))}>
+          <Icon name="back" />
+        </button>
+        <h1 className="m-ptitle m-disp">{title}</h1>
+        {right}
+      </header>
+      <OfflineBanner />
+    </>
   );
 };
 
@@ -86,7 +89,7 @@ const PostCard: React.FC<{ post: SocialPost; groupName?: string; onLike: (p: Soc
 
 const Composer: React.FC<{ groups: MGroup[]; groupId: string; onClose: () => void; onPosted: () => void }> = ({ groups, groupId, onClose, onPosted }) => {
   const { currentClub } = useAuth();
-  const { profile, toast, tap } = useMobile();
+  const { profile, toast, tap, requireFinancial } = useMobile();
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [target, setTarget] = useState(groupId);
@@ -96,6 +99,7 @@ const Composer: React.FC<{ groups: MGroup[]; groupId: string; onClose: () => voi
   useEffect(() => () => previews.forEach(u => URL.revokeObjectURL(u)), [previews]);
   const post = async () => {
     if (!text.trim() && !files.length) return;
+    if (!requireFinancial()) return;
     setBusy(true);
     try {
       await createPost({ content: text, clubId: currentClub?.clubId, groupId: target || undefined, files });

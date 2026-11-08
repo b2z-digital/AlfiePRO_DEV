@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useMobile } from '../MobileContext';
+import { useMobile, Appearance } from '../MobileContext';
 import { Icon, IconName } from '../icons';
-import { Avatar } from '../ui';
+import { Avatar, OfflineBanner } from '../ui';
 import { setMobilePreview } from '../preview';
 import { isNative } from '../../lib/native/platform';
 import { MBoat, MMembership, computeStats, isCurrent, loadBoats, loadMembership } from '../me';
@@ -20,8 +20,8 @@ const Tile: React.FC<{ icon: IconName; bg: string; fg: string; title: string; su
 
 export const Me: React.FC = () => {
   const navigate = useNavigate();
-  const { user, currentClub, userClubs, signOut } = useAuth();
-  const { profile, light, memberIds, calendar } = useMobile();
+  const { user, currentClub, currentOrganization, userClubs, signOut } = useAuth();
+  const { profile, light, memberIds, calendar, appearance, setAppearance } = useMobile();
   const name = `${profile.firstName} ${profile.lastName}`.trim() || 'Me';
   const [membership, setMembership] = useState<MMembership | null>(null);
   const [boats, setBoats] = useState<MBoat[]>([]);
@@ -32,10 +32,8 @@ export const Me: React.FC = () => {
   const current = membership ? isCurrent(membership) : false;
   const until = membership?.renewalDate ? new Date(membership.renewalDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
-  const toggleLight = () => {
-    try { localStorage.setItem('lightMode', light ? 'false' : 'true'); } catch { /* ignore */ }
-    window.location.reload();
-  };
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const where = currentOrganization && currentOrganization.type !== 'club' ? currentOrganization.name : currentClub?.club?.name;
 
   return (
     <div className="m-stack">
@@ -43,10 +41,13 @@ export const Me: React.FC = () => {
         <Avatar name={name} url={profile.avatarUrl} size={58} ring />
         <div className="m-top-title">
           <div className="m-disp" style={{ fontSize: 22, fontWeight: 700 }}>{name}</div>
-          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--m-blue-ink)' }}>{currentClub?.club?.name || 'No club selected'}{userClubs.length > 1 ? ` · ${userClubs.length} clubs` : ''}</div>
+          <button onClick={() => navigate('/choose-club')} style={{ background: 'none', border: 0, padding: 0, fontSize: 13.5, fontWeight: 600, color: 'var(--m-blue-ink)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            {where || 'Choose a club'}{userClubs.length > 1 && <Icon name="down" size={14} />}
+          </button>
         </div>
         <button className="m-ibtn" aria-label="Edit profile" onClick={() => navigate('/settings')}><Icon name="doc" size={18} /></button>
       </header>
+      <OfflineBanner />
 
       <button className="m-card m-spec" onClick={() => navigate('/my-membership')} style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
         background: light ? undefined : 'linear-gradient(150deg,#0B3E86,#0F1726 75%) padding-box, var(--m-spectrum) border-box' }}>
@@ -73,12 +74,29 @@ export const Me: React.FC = () => {
         <button className="m-li" onClick={() => navigate('/tasks')}><span className="m-tile" style={{ width: 36, height: 36, background: 'rgba(10,132,255,.14)', color: 'var(--m-blue-ink)' }}><Icon name="tasks" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>My tasks</span><Icon name="chevron" size={17} className="m-dim" /></button>
         <button className="m-li" onClick={() => navigate('/notifications')}><span className="m-tile" style={{ width: 36, height: 36, background: 'var(--m-fill)' }}><Icon name="bell" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>Notifications</span><Icon name="chevron" size={17} className="m-dim" /></button>
         <button className="m-li" onClick={() => navigate('/settings')}><span className="m-tile" style={{ width: 36, height: 36, background: 'var(--m-fill)' }}><Icon name="me" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>Privacy &amp; account</span><Icon name="chevron" size={17} className="m-dim" /></button>
-        <button className="m-li" onClick={toggleLight}><span className="m-tile" style={{ width: 36, height: 36, background: 'var(--m-fill)' }}><Icon name="clock" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>Appearance</span><span className="m-dim" style={{ fontSize: 14 }}>{light ? 'Light' : 'Dark'}</span></button>
+        <button className="m-li" onClick={() => setAppearanceOpen(true)}><span className="m-tile" style={{ width: 36, height: 36, background: 'var(--m-fill)' }}><Icon name="clock" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>Appearance</span><span className="m-dim" style={{ fontSize: 14 }}>{appearance === 'system' ? `Match phone · ${light ? 'Light' : 'Dark'}` : light ? 'Light' : 'Dark'}</span></button>
         {!isNative && (
           <button className="m-li" onClick={() => { setMobilePreview(false); window.location.reload(); }}><span className="m-tile" style={{ width: 36, height: 36, background: 'var(--m-fill)' }}><Icon name="tv" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>Leave the phone preview</span></button>
         )}
       </div>
       <button className="m-btn m-btn-g" style={{ color: '#FF8C82' }} onClick={() => signOut()}>Sign out</button>
+      {appearanceOpen && (
+        <>
+          <div className="m-veil" onClick={() => setAppearanceOpen(false)} />
+          <div className="m-sheet" role="dialog" aria-label="Appearance">
+            <span className="m-grab" />
+            <div className="m-disp" style={{ fontSize: 21, fontWeight: 700, marginBottom: 10 }}>Appearance</div>
+            <div className="m-card">
+              {(['system', 'light', 'dark'] as Appearance[]).map(a => (
+                <button key={a} className="m-li" onClick={() => { setAppearance(a); setAppearanceOpen(false); }}>
+                  <span style={{ flex: 1 }}>{a === 'system' ? 'Match my phone' : a === 'light' ? 'Light' : 'Dark'}</span>
+                  {appearance === a && <Icon name="check" className="m-dim" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

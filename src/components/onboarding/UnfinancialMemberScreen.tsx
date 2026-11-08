@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CircleAlert as AlertCircle, CreditCard, LogOut, ArrowRight, Building2, Clock, DollarSign, Loader as Loader2, Check, TriangleAlert as AlertTriangle, Banknote, Gift, Landmark, Copy } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
+import { effectiveRenewalAmount, getClubBankDetails, getPendingRenewalPayment, getRenewalOptions, submitRenewal } from '../../utils/membershipRenewal';
 
 interface UnfinancialMemberData {
   member_id: string;
@@ -69,14 +69,7 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
 
   const fetchBankDetails = async () => {
     try {
-      const { data } = await supabase
-        .from('clubs')
-        .select('bank_name, bsb, account_number')
-        .eq('id', memberData.club_id)
-        .maybeSingle();
-      if (data && (data.bank_name || data.bsb || data.account_number)) {
-        setBankDetails(data);
-      }
+      setBankDetails(await getClubBankDetails(memberData.club_id));
     } catch (err) {
       console.error('Error fetching bank details:', err);
     }
@@ -90,33 +83,8 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
 
   const checkPendingPayments = async () => {
     try {
-      const { data } = await supabase
-        .from('membership_payments')
-        .select('id, amount, payment_method, created_at, membership_type_id')
-        .eq('member_id', memberData.member_id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (data) {
-        let typeName: string | null = null;
-        if (data.membership_type_id) {
-          const { data: typeData } = await supabase
-            .from('membership_types')
-            .select('name')
-            .eq('id', data.membership_type_id)
-            .maybeSingle();
-          typeName = typeData?.name || null;
-        }
-        setPendingPayment({
-          id: data.id,
-          amount: data.amount,
-          payment_method: data.payment_method,
-          created_at: data.created_at,
-          membership_type_name: typeName,
-        });
-      }
+      const pending = await getPendingRenewalPayment(memberData.member_id);
+      if (pending) setPendingPayment(pending);
     } catch (err) {
       console.error('Error checking pending payments:', err);
     }
@@ -125,48 +93,11 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
   const loadMembershipTypes = async () => {
     try {
       setLoading(true);
-      const [typesResult, clubResult] = await Promise.all([
-        supabase
-          .from('membership_types')
-          .select('id, name, amount, currency, description, renewal_period')
-          .eq('club_id', memberData.club_id)
-          .eq('is_active', true)
-          .order('amount'),
-        supabase
-          .from('clubs')
-          .select('stripe_account_id')
-          .eq('id', memberData.club_id)
-          .maybeSingle()
-      ]);
-
-      if (typesResult.data) {
-        setMembershipTypes(typesResult.data);
-        if (memberData.membership_level) {
-          const match = typesResult.data.find(
-            (t: MembershipType) => t.name.toLowerCase() === memberData.membership_level?.toLowerCase()
-          );
-          if (match) setSelectedType(match);
-        }
-      }
-      setClubHasStripe(!!clubResult.data?.stripe_account_id);
-
-      if (!memberData.is_new_member) {
-        const now = new Date();
-        const renewalYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
-        try {
-          const { data: creditData } = await supabase
-            .rpc('get_pending_mid_cycle_credit', {
-              p_member_id: memberData.member_id,
-              p_club_id: memberData.club_id,
-              p_renewal_year: renewalYear
-            });
-          if (creditData && creditData.length > 0) {
-            setMidCycleCredit(creditData[0]);
-          }
-        } catch (err) {
-          console.error('Error checking mid-cycle credit:', err);
-        }
-      }
+      const options = await getRenewalOptions(memberData);
+      setMembershipTypes(options.types);
+      if (options.preselected) setSelectedType(options.preselected);
+      setClubHasStripe(options.clubHasStripe);
+      if (options.midCycleCredit) setMidCycleCredit(options.midCycleCredit);
     } catch (err) {
       console.error('Error loading membership types:', err);
     } finally {
@@ -174,164 +105,33 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
     }
   };
 
-  const getEffectiveAmount = () => {
-    if (!selectedType) return 0;
-    const credit = midCycleCredit?.credit_amount || 0;
-    return Math.max(0, selectedType.amount - credit);
-  };
+  const getEffectiveAmount = () => effectiveRenewalAmount(selectedType, midCycleCredit);
 
   const handlePayment = async () => {
     if (!selectedType) return;
-
-    const effectiveAmount = getEffectiveAmount();
-
     try {
       setProcessing(true);
       setError(null);
-
-      if (paymentMethod === 'stripe' && clubHasStripe && effectiveAmount > 0) {
-        const { data: paymentData, error: paymentError } = await supabase
-          .from('membership_payments')
-          .insert({
-            member_id: memberData.member_id,
-            membership_type_id: selectedType.id,
-            amount: effectiveAmount,
-            currency: selectedType.currency,
-            status: 'pending'
-          })
-          .select()
-          .single();
-
-        if (paymentError) throw paymentError;
-
-        if (midCycleCredit) {
-          await supabase.rpc('apply_mid_cycle_credit', {
-            p_credit_id: midCycleCredit.credit_id,
-            p_applied_remittance_id: null
-          });
-        }
-
-        const { data, error: checkoutError } = await supabase.functions.invoke('create-membership-checkout', {
-          body: {
-            member_id: memberData.member_id,
-            membership_type_id: selectedType.id,
-            payment_id: paymentData.id,
-            success_url: `${window.location.origin}/?payment=success`,
-            cancel_url: `${window.location.origin}/?payment=cancelled`
-          }
-        });
-
-        if (checkoutError) throw checkoutError;
-        if (data?.checkout_url) {
-          window.location.href = data.checkout_url;
-          return;
-        }
-      }
-
-      if (paymentMethod === 'bank_transfer' || effectiveAmount === 0) {
-        const { error: paymentError } = await supabase
-          .from('membership_payments')
-          .insert({
-            member_id: memberData.member_id,
-            membership_type_id: selectedType.id,
-            amount: effectiveAmount,
-            currency: selectedType.currency,
-            status: effectiveAmount === 0 ? 'completed' : 'pending',
-            payment_method: effectiveAmount === 0 ? 'free' : 'bank_transfer'
-          });
-
-        if (paymentError) throw paymentError;
-
-        if (midCycleCredit) {
-          await supabase.rpc('apply_mid_cycle_credit', {
-            p_credit_id: midCycleCredit.credit_id,
-            p_applied_remittance_id: null
-          });
-        }
-
-        if (effectiveAmount === 0) {
-          const renewalDate = new Date();
-          renewalDate.setFullYear(renewalDate.getFullYear() + 1);
-
-          await supabase
-            .from('members')
-            .update({
-              is_financial: true,
-              amount_paid: 0,
-              membership_level: selectedType.name,
-              renewal_date: renewalDate.toISOString().split('T')[0]
-            })
-            .eq('id', memberData.member_id);
-        }
-
-        if (effectiveAmount === 0) {
-          setSuccess(true);
-          setTimeout(() => {
-            window.location.reload();
-          }, 2000);
-        } else {
-          await supabase
-            .from('members')
-            .update({
-              payment_status: 'pending',
-              membership_level: selectedType.name,
-            })
-            .eq('id', memberData.member_id);
-
-          const { data: memberRecord } = await supabase
-            .from('members')
-            .select('first_name, last_name')
-            .eq('id', memberData.member_id)
-            .maybeSingle();
-
-          const memberName = memberRecord
-            ? `${memberRecord.first_name} ${memberRecord.last_name}`
-            : 'Member';
-
-          try {
-            await createMembershipTransaction({
-              clubId: memberData.club_id,
-              memberId: memberData.member_id,
-              memberName,
-              membershipTypeName: selectedType.name,
-              amount: effectiveAmount,
-              paymentMethod: 'bank_transfer',
-            }, 'pending');
-          } catch (finErr) {
-            console.error('Failed to create pending transaction:', finErr);
-          }
-
-          try {
-            const { data: clubAdmins } = await supabase
-              .from('user_clubs')
-              .select('user_id')
-              .eq('club_id', memberData.club_id)
-              .in('role', ['admin', 'owner']);
-
-            if (clubAdmins && clubAdmins.length > 0) {
-              const notifications = clubAdmins.map(admin => ({
-                user_id: admin.user_id,
-                club_id: memberData.club_id,
-                title: 'Membership Renewal Submitted',
-                message: `${memberName} has submitted a membership renewal (${selectedType.name}) with bank transfer payment of $${effectiveAmount.toFixed(2)}. Please confirm payment when received.`,
-                type: 'membership',
-                link_url: '/membership?tab=members',
-              }));
-              await supabase.from('notifications').insert(notifications);
-            }
-          } catch (notifErr) {
-            console.error('Failed to send admin notification:', notifErr);
-          }
-
-          setPendingPayment({
-            id: '',
-            amount: effectiveAmount,
-            payment_method: 'bank_transfer',
-            created_at: new Date().toISOString(),
-            membership_type_name: selectedType.name,
-          });
-        }
+      const result = await submitRenewal({
+        member: memberData,
+        type: selectedType,
+        method: paymentMethod,
+        clubHasStripe,
+        midCycleCredit,
+        successUrl: `${window.location.origin}/?payment=success`,
+        cancelUrl: `${window.location.origin}/?payment=cancelled`,
+      });
+      if (result.kind === 'redirect') {
+        window.location.href = result.url;
         return;
+      }
+      if (result.kind === 'completed') {
+        setSuccess(true);
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else if (result.kind === 'pending') {
+        setPendingPayment(result.pending);
       }
     } catch (err: any) {
       console.error('Error processing payment:', err);

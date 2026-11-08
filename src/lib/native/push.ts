@@ -34,6 +34,12 @@ export async function initNativePush() {
 
   // Tapping a notification opens the route the server attached (Expo-era routes are mapped).
   await PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
+    // Race reminders carry "I'm going" / "Can't make it" (iOS category RACE_REMINDER): answer
+    // straight from the notification, using the same write as the RSVP buttons.
+    if (action.actionId === 'rsvp_yes' || action.actionId === 'rsvp_no') {
+      void answerFromNotification(action.notification.data || {}, action.actionId === 'rsvp_yes' ? 'yes' : 'no');
+      return;
+    }
     const route = (action.notification.data?.route as string | undefined) ?? '/';
     navigateTo(mapAppRoute(route));
   });
@@ -44,8 +50,25 @@ export async function initNativePush() {
     if (event === 'SIGNED_OUT' && currentToken) void deactivateToken(currentToken);
   });
 
+  // The phone app asks first with its own "Never miss a start" screen; only register here
+  // when permission was already given.
   const { data } = await supabase.auth.getSession();
-  if (data.session) await requestAndRegister();
+  if (data.session) {
+    const perm = await PushNotifications.checkPermissions();
+    if (perm.receive === 'granted') await PushNotifications.register();
+  }
+}
+
+/**
+ * Data expected on a race reminder: club_id plus series_id + round_name (series rounds)
+ * or event_id (single events) — the same keys event_attendance uses.
+ */
+async function answerFromNotification(data: Record<string, any>, status: 'yes' | 'no') {
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId || !data.club_id || !(data.event_id || (data.series_id && data.round_name))) return;
+  const { setAttendance } = await import('../../mobile/data');
+  await setAttendance({ seriesId: data.series_id, roundName: data.round_name, eventId: data.event_id } as any, status, userId, data.club_id).catch(() => {});
 }
 
 /** Asks for permission (iOS shows the system prompt once) and registers with APNs/FCM. */

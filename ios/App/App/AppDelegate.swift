@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import UserNotifications
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,7 +8,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Race reminders: answer from the lock screen (phone board "Answer from the lock screen").
+        // The server sends category RACE_REMINDER; the app handles rsvp_yes / rsvp_no in push.ts.
+        let going = UNNotificationAction(identifier: "rsvp_yes", title: "I'm going", options: [])
+        let cant = UNNotificationAction(identifier: "rsvp_no", title: "Can't make it", options: [])
+        let raceReminder = UNNotificationCategory(identifier: "RACE_REMINDER", actions: [going, cant], intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([raceReminder])
         return true
     }
 
