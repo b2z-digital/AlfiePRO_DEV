@@ -125,7 +125,7 @@ async function downloadAndStoreImage(
   imageUrl: string,
   listingExternalId: string,
   imageIndex: number
-): Promise<string | null> {
+): Promise<{ url: string; bytes: number } | null> {
   try {
     const res = await fetch(imageUrl, {
       headers: {
@@ -159,7 +159,9 @@ async function downloadAndStoreImage(
       .from("media")
       .getPublicUrl(storagePath);
 
-    return publicUrlData?.publicUrl || null;
+    return publicUrlData?.publicUrl
+      ? { url: publicUrlData.publicUrl, bytes: arrayBuffer.byteLength }
+      : null;
   } catch (err) {
     console.error(`Failed to download/store image ${imageUrl}:`, err);
     return null;
@@ -563,7 +565,7 @@ Deno.serve(async (req: Request) => {
 
           const { data: existing } = await supabase
             .from("classifieds")
-            .select("id, title, price, description, images, updated_at")
+            .select("id, title, price, description, images, image_meta, updated_at")
             .eq("external_source_id", externalSourceId)
             .eq("is_scraped", true)
             .maybeSingle();
@@ -579,16 +581,35 @@ Deno.serve(async (req: Request) => {
           }
 
           const storedImages: string[] = [];
+          const storedBytes = new Map<string, number>();
           for (let i = 0; i < parsed.images.length; i++) {
-            const storedUrl = await downloadAndStoreImage(
+            const stored = await downloadAndStoreImage(
               supabase,
               parsed.images[i],
               externalSourceId,
               i
             );
-            if (storedUrl) {
-              storedImages.push(storedUrl);
+            if (stored) {
+              storedImages.push(stored.url);
+              storedBytes.set(stored.url, stored.bytes);
             }
+          }
+
+          // Photo display settings (image_meta) belong to the photo that was
+          // checked. If the seller replaced a photo (same slot, different
+          // file), forget its setting so it gets checked again.
+          let imageMetaUpdate: Record<string, unknown> | null = null;
+          if (existing?.image_meta && typeof existing.image_meta === "object") {
+            const metaNow = { ...(existing.image_meta as Record<string, { len?: number }>) };
+            let dropped = false;
+            for (const [url, bytes] of storedBytes) {
+              const len = metaNow[url]?.len;
+              if (len && len !== bytes) {
+                delete metaNow[url];
+                dropped = true;
+              }
+            }
+            if (dropped) imageMetaUpdate = metaNow;
           }
 
           const finalImages = storedImages.length > 0 ? storedImages : parsed.images;
@@ -629,6 +650,7 @@ Deno.serve(async (req: Request) => {
                     contact_email: parsed.contactEmail || "scraped@alfiepro.com",
                     boat_class: parsed.boatClass || undefined,
                     category: parsed.category,
+                    ...(imageMetaUpdate ? { image_meta: imageMetaUpdate } : {}),
                     updated_at: new Date().toISOString(),
                   })
                   .eq("id", existing.id);
@@ -752,6 +774,27 @@ Deno.serve(async (req: Request) => {
           error: msg,
         });
       }
+    }
+
+    // Check new photos (which way is up, where the item is) in the background,
+    // so imported listings show their photos properly. See classified-photo-check.
+    try {
+      const check = fetch(
+        `${Deno.env.get("SUPABASE_URL")}/functions/v1/classified-photo-check`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({ limit: 30 }),
+        }
+      ).catch((e) => console.error("classified-photo-check failed:", e));
+      // deno-lint-ignore no-explicit-any
+      const rt = (globalThis as any).EdgeRuntime;
+      if (rt?.waitUntil) rt.waitUntil(check);
+    } catch (e) {
+      console.error("Could not start classified-photo-check:", e);
     }
 
     return new Response(JSON.stringify({ success: true, results }), {
