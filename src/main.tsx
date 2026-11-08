@@ -11,6 +11,7 @@ import App from './App';
 import MobileStreamPage from './pages/MobileStreamPage';
 import { registerServiceWorker } from './utils/registerServiceWorker';
 import { installBrokenImageFallback } from './lib/brokenImages';
+import { initNative, hideNativeSplash } from './lib/native/bootstrap';
 
 import './index.css';
 import './styles/alfie-theme.css';
@@ -23,6 +24,7 @@ import './styles/alfie-tv.css';
 import './styles/alfie-live.css';
 import './styles/animations.css';
 import './styles/article.css';
+import './styles/alfie-native.css';
 
 window.addEventListener('beforeunload', () => {
   const now = new Date().toISOString();
@@ -38,7 +40,10 @@ if (lastReload) {
 // Broken images: retry external ones without a referrer, then fall back to initials / hide
 installBrokenImageFallback();
 
-// Register service worker only in supported environments
+// Native apps: status bar, keyboard, deep links, back button (no-op in a browser)
+void initNative();
+
+// Register service worker only in supported environments (never in the native apps)
 registerServiceWorker().catch(() => {
   // Silently handle any registration errors
 });
@@ -80,3 +85,5 @@ createRoot(document.getElementById('root')!).render(
     <Root />
   </StrictMode>
 );
+
+hideNativeSplash();

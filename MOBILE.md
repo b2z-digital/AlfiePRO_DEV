@@ -1,0 +1,68 @@
+# AlfiePRO mobile apps (Capacitor)
+
+The iOS and Android apps are built from this web app with [Capacitor](https://capacitorjs.com).
+One codebase serves desktop, phone browsers and both stores. They replace the separate Expo app
+(Bolt project, last store release 1.1.6 / build 76) once the new build matches it feature for feature.
+
+| | Value |
+| --- | --- |
+| Bundle ID / application ID | `com.b2zdigital.alfiepro` (same as the Expo app, so iOS ships as an update to App Store id6759854905) |
+| Version | 2.0.0 (iOS build 1, Android versionCode 8 — the Expo app reached versionCode 7) |
+| Deep-link scheme | `alfiepro://` (same as the Expo app) |
+| Web content | bundled from `dist/`, served from `capacitor://localhost` (iOS) / `https://localhost` (Android) |
+| iOS packages | Swift Package Manager (no CocoaPods) |
+
+## Everyday commands
+
+```bash
+npm run build:native      # vite build + cap sync (copies dist/ and plugins into ios/ and android/)
+npm run cap:ios           # open Xcode
+npm run cap:android       # open Android Studio
+npm run cap:run:ios       # build and run on a simulator or device
+```
+
+Live reload on a phone while developing: run `npm run dev -- --host`, then
+`CAP_SERVER_URL=http://<your-mac-lan-ip>:5173 npx cap run ios`. Don't release a build made with `CAP_SERVER_URL`.
+
+The build needs the usual `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` in `.env`.
+
+Icons and splash screens come from `assets/` (`icon-only.png`, `icon-foreground.png`, `icon-background.png`,
+`splash.png`). After changing them run `npm run cap:assets`.
+
+## How the native layer is organised
+
+Everything native lives in `src/lib/native/` and does nothing in a browser:
+
+| File | What it does |
+| --- | --- |
+| `platform.ts` | `isNative`, `isIOS`, `isAndroid`, `navigateTo()` for navigation from outside React Router, the `X-Client-Info` value |
+| `bootstrap.ts` | Start-up: `html.is-native` class, status bar following the Alfie light/dark class, keyboard height (`--native-keyboard`), deep links, Android back button (`alfie-native-back` event first), resume event (`alfie-native-resume`), splash hide |
+| `deepLinks.ts` | Maps `alfiepro://` links, universal links and the Expo app's old notification routes (`/(tabs)/calendar` …) to web routes |
+| `oauth.ts` | Google sign-in through the system browser sheet and back via `alfiepro://auth/callback`; Sign in with Apple via Supabase ID tokens |
+| `authStorage.ts` | Keeps the Supabase session in Preferences on native, so iOS clearing web storage doesn't sign people out |
+| `push.ts` | APNs / FCM registration into `push_tokens` — **off** until the server side is ready (below) |
+
+Other native-aware changes: the service worker never registers in the apps
+(`utils/registerServiceWorker.ts`); `utils/supabase.ts` uses the native session storage and doesn't read
+sessions from the URL on native; the apps skip `MobileAppComingSoon`; `styles/alfie-native.css` holds the
+safe-area variables (`--safe-top`, `--safe-bottom` …).
+
+## Still to set up before the first TestFlight build
+
+1. **Supabase Auth → URL configuration:** add `alfiepro://auth/callback` to Redirect URLs (Google sign-in in the app).
+2. **Apple Developer:** the App ID `com.b2zdigital.alfiepro` already exists (Expo). Check Push Notifications and
+   Sign in with Apple are enabled on it; Xcode's automatic signing picks up `App/App.entitlements`.
+   Set `aps-environment` to `production` for App Store builds.
+3. **Push (server):** `send-push-notification` only talks to Expo. Add an FCM sender (Firebase project with the
+   iOS APNs key uploaded), send by token kind (`platform` = `ios-apns` / `android-fcm` from the new app,
+   `ios` from the Expo app), then build with `VITE_NATIVE_PUSH=true`. Android also needs
+   `android/app/google-services.json` from Firebase.
+4. **Universal links (optional):** `apple-app-site-association` and `assetlinks.json` on app.alfiepro.com.au,
+   plus the Associated Domains entitlement.
+
+## What is not built yet
+
+The phone experience itself. Until the mobile design board is approved, the apps render the current web
+layout (fine on iPad, cramped on a phone) and phone browsers still see `MobileAppComingSoon`.
+The parity list against the Expo app is in the review doc and `claude/alfie-mobile-app-plan.md` in the
+AlfiePRO project.

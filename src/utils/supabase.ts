@@ -24,14 +24,18 @@ try {
 }
 
 import { createClient } from '@supabase/supabase-js';
+import { isNative, clientInfo } from '../lib/native/platform';
+import { nativeAuthStorage } from '../lib/native/authStorage';
 import type { Database } from '../types/database';
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true,
-    storage: window.localStorage,
+    // Native OAuth returns through alfiepro://auth/callback (lib/native/bootstrap.ts)
+    detectSessionInUrl: !isNative,
+    // Native apps keep the session in Preferences so iOS clearing web storage doesn't sign people out
+    storage: isNative ? nativeAuthStorage : window.localStorage,
     storageKey: 'alfie-pro-auth',
     flowType: 'pkce',
     // CRITICAL: Prevent session conflicts across tabs
@@ -40,7 +44,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     headers: {
-      'X-Client-Info': 'alfie-pro-web'
+      'X-Client-Info': clientInfo
     }
   },
   db: {
