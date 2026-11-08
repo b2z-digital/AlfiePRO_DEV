@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Trophy, Plus, SquarePen as Edit2, CalendarRange, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio, FlaskConical } from 'lucide-react';
 import { RaceType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
-import { getStoredRaceEvents, getStoredRaceSeries, getSimulatedRaceEvents, deleteRaceEvent, deleteSimulatedRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
+import { getStoredRaceEvents, getStoredRaceSeries, getSimulatedRaceEvents, deleteRaceEvent, deleteSimulatedRaceEvent, deleteRaceSeries, setCurrentEvent, renameRaceSeries, renameRaceEvent } from '../../utils/raceStorage';
 import { getStoredVenues } from '../../utils/venueStorage';
 import { Venue } from '../../types/venue';
 import { formatDate } from '../../utils/date';
@@ -78,6 +78,9 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
   const [expandedSeries, setExpandedSeries] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<RaceEvent | null>(null);
   const [showEditModal, setShowEditModal] = useState<'quick' | 'series' | null>(null);
+  // Completed series / scored events can't be fully edited, but their title can still be changed
+  const [renaming, setRenaming] = useState<{ kind: 'series' | 'event'; id: string; name: string; original: string } | null>(null);
+  const [renameSaving, setRenameSaving] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -1050,13 +1053,13 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     if (event.isSeriesEvent && event.seriesId) {
       const seriesItem = series.find(s => s.id === event.seriesId);
       if (seriesItem && isSeriesFullyCompleted(seriesItem)) {
-        addNotification('warning', 'This series cannot be edited because all rounds have been completed or cancelled. You can still delete the series if needed.');
+        setRenaming({ kind: 'series', id: seriesItem.id, name: seriesItem.seriesName, original: seriesItem.seriesName });
         return;
       }
     } else {
       // Single event - check if scoring has started
       if (hasEventStartedScoring(event)) {
-        addNotification('warning', 'This event cannot be edited because scoring has already commenced. You can still delete the event if needed.');
+        setRenaming({ kind: 'event', id: event.id, name: event.eventName || '', original: event.eventName || '' });
         return;
       }
     }
@@ -1066,6 +1069,24 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
       setShowEditModal('series');
     } else {
       setShowEditModal('quick');
+    }
+  };
+
+  const handleRenameSave = async () => {
+    if (!renaming || !renaming.name.trim()) return;
+    if (renaming.name.trim() === renaming.original.trim()) { setRenaming(null); return; }
+    try {
+      setRenameSaving(true);
+      if (renaming.kind === 'series') await renameRaceSeries(renaming.id, renaming.name);
+      else await renameRaceEvent(renaming.id, renaming.name);
+      addNotification('success', `${renaming.kind === 'series' ? 'Series' : 'Event'} renamed`);
+      setRenaming(null);
+      await fetchRaces();
+    } catch (err) {
+      console.error('Rename failed:', err);
+      addNotification('error', `Couldn't rename this ${renaming.kind}. Please try again.`);
+    } finally {
+      setRenameSaving(false);
     }
   };
 
@@ -1430,16 +1451,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                   handleEditClick(race);
                 }}
                 className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${
-                  hasEventStartedScoring(race)
-                    ? darkMode
-                      ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
-                      : 'bg-white/50 text-slate-400 cursor-not-allowed'
-                    : darkMode
-                      ? 'bg-slate-700/90 hover:bg-slate-600 text-slate-300'
-                      : 'bg-white/90 hover:bg-slate-100 text-slate-600'
+                  darkMode
+                    ? 'bg-slate-700/90 hover:bg-slate-600 text-slate-300'
+                    : 'bg-white/90 hover:bg-slate-100 text-slate-600'
                 }`}
-                title={hasEventStartedScoring(race) ? "Cannot edit - scoring has commenced" : "Edit event"}
-                disabled={hasEventStartedScoring(race)}
+                title={hasEventStartedScoring(race) ? 'Rename event (scoring has started, so only the title can change)' : 'Edit event'}
+                aria-label={hasEventStartedScoring(race) ? 'Rename event' : 'Edit event'}
               >
                 <Edit2 size={16} />
               </button>
@@ -1758,10 +1775,9 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                 };
                 handleEditClick(seriesEvent);
               }}
-              className="a-ib disabled:opacity-40 disabled:cursor-not-allowed"
-              title={fullyDone ? 'Cannot edit - all rounds completed' : 'Edit series'}
-              aria-label="Edit series"
-              disabled={fullyDone}
+              className="a-ib"
+              title={fullyDone ? 'Rename series (all rounds are completed, so only the title can change)' : 'Edit series'}
+              aria-label={fullyDone ? 'Rename series' : 'Edit series'}
             >
               <Edit2 size={16} />
             </button>
@@ -2462,6 +2478,39 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           }}
           onSuccess={handleCreateSuccess}
         />
+      )}
+
+      {renaming && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => !renameSaving && setRenaming(null)}>
+          <form
+            className="a-sheet w-full max-w-md"
+            style={{ padding: 22 }}
+            role="dialog" aria-modal="true" aria-labelledby="rename-title"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => { e.preventDefault(); handleRenameSave(); }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <span className="a-tile a-tile-sm"><Edit2 size={16} /></span>
+              <div className="min-w-0">
+                <h3 id="rename-title" className="a-display a-ink text-[18px] font-semibold m-0">Rename {renaming.kind}</h3>
+                <p className="a-mute text-[13px] mt-0.5 mb-0">
+                  {renaming.kind === 'series' ? 'All rounds are completed' : 'Scoring has started'}, so only the title can change. Results stay as they are.
+                </p>
+              </div>
+            </div>
+            <label className="a-cap block mb-2" htmlFor="rename-input">{renaming.kind === 'series' ? 'Series name' : 'Event name'}</label>
+            <div className="a-field">
+              <input id="rename-input" autoFocus value={renaming.name} maxLength={200}
+                onChange={(e) => setRenaming(prev => prev ? { ...prev, name: e.target.value } : prev)} />
+            </div>
+            <div className="flex justify-end gap-2.5 mt-5">
+              <button type="button" className="a-btn a-btn-q" onClick={() => setRenaming(null)} disabled={renameSaving}>Cancel</button>
+              <button type="submit" className="a-btn a-btn-p" disabled={renameSaving || !renaming.name.trim()}>
+                {renameSaving ? 'Saving…' : 'Save name'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {showEditModal === 'quick' && editingEvent && (
