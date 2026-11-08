@@ -46,7 +46,8 @@ export function runOf(event: RaceEvent): ScoringRun {
     raceResults: st.raceResults,
     heatManagement: hm,
     lastCompletedRace: st.lastCompletedRace,
-    numRaces: e.numRaces || 12,
+    // the scoring screen's race count: the event's, never fewer than the races scored plus the next
+    numRaces: e.numRaces ? Math.max(e.numRaces, st.lastCompletedRace + 1) : 12,
     // heat events score by their heat system; others by the event's discards
     dropRules: heats && hm?.configuration?.scoringSystem ? hm.configuration.scoringSystem : (e.dropRules || [4, 8, 16, 24, 32, 40]),
     hasDeterminedInitialHcaps: st.hasDeterminedInitialHcaps,

@@ -479,6 +479,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       console.log('🏁 YachtRaceManager: event.multiDay:', currentEvent.multiDay);
       console.log('🏁 YachtRaceManager: event.dayResults:', Object.keys(currentEvent.dayResults || {}));
       setRaceType(currentEvent.raceFormat);
+      // The race count set in race settings (it was left at 12, and saved over the event's setting)
+      // (never fewer than the races already scored plus the next one)
+      if (currentEvent.numRaces && currentEvent.numRaces > 0) {
+        setCurrentNumRaces(Math.max(currentEvent.numRaces, (currentEvent.lastCompletedRace || 0) + 1));
+      }
 
       if (currentEvent.is_simulated || currentEvent.raceFormat === 'handicap') {
         setScoringMode('touch');
