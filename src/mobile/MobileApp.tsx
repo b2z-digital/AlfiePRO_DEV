@@ -10,14 +10,20 @@ import { EventDetail } from './screens/EventDetail';
 import { Notifications } from './screens/Notifications';
 import { Me } from './screens/Me';
 import { Soon } from './screens/Soon';
+import { ClubHub } from './screens/Club';
+import { ChatsInbox, ChatThread } from './screens/Chats';
+import { SkipperProfile } from './screens/Skipper';
+import { ClassifiedsScreen, ListingScreen } from './screens/Classifieds';
+import { NewsScreen, ArticleScreen } from './screens/News';
+import { MediaScreen } from './screens/Media';
 import '../styles/alfie-mobile.css';
 
 const AskAlfieChatPanel = lazy(() => import('../components/ask-alfie/AskAlfieChatPanel').then(m => ({ default: m.AskAlfieChatPanel })));
 
 /** Screens that sit outside the tab bar (pushed full screen). */
-const NO_TABS = [/^\/notifications/];
+const NO_TABS = [/^\/notifications/, /^\/comms\/chat\//, /^\/classifieds\/[^/]+/, /^\/news\/[^/]+/];
 
-const AlfieSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+const AlfieSheet: React.FC<{ onClose: () => void; message?: string }> = ({ onClose, message }) => {
   const { light } = useMobile();
   useEffect(() => {
     const onBack = (e: Event) => { e.preventDefault(); onClose(); };
@@ -31,7 +37,7 @@ const AlfieSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <Suspense fallback={null}>
-          <AskAlfieChatPanel darkMode={!light} onClose={onClose} embedded />
+          <AskAlfieChatPanel darkMode={!light} onClose={onClose} embedded initialMessage={message} />
         </Suspense>
       </div>
     </div>
@@ -42,6 +48,12 @@ const Shell: React.FC = () => {
   const { pathname } = useLocation();
   const { light } = useMobile();
   const [alfieOpen, setAlfieOpen] = useState(false);
+  const [alfieMessage, setAlfieMessage] = useState<string | undefined>();
+  useEffect(() => {
+    const on = (e: Event) => { setAlfieMessage((e as CustomEvent).detail || undefined); setAlfieOpen(true); };
+    window.addEventListener('m-ask-alfie', on);
+    return () => window.removeEventListener('m-ask-alfie', on);
+  }, []);
   useAlfieTheme(true, light ? 'light' : 'dark');
   const hideTabs = NO_TABS.some(r => r.test(pathname));
 
@@ -64,12 +76,17 @@ const Shell: React.FC = () => {
           <Route path="/find-racing" element={<Soon title="Find racing" what="A map of racing near you from every club and association on AlfiePRO." />} />
           <Route path="/race-desk/*" element={<Soon title="Race desk" what="Sign on, StartBox, finish calling and scoring for Scratch, Handicap, HMS and SHRS, built from the Race Management board." />} />
           <Route path="/calendar/meeting/:id" element={<Soon title="Meeting" what="Agenda, join link and your attendance answer." />} />
-          <Route path="/club" element={<Soon title="Club" what="The community feed, groups, classifieds, news and media in one place." />} />
-          <Route path="/comms/*" element={<Soon title="Chats" what="Direct messages, group chats and classifieds questions in one inbox." />} />
+          <Route path="/club" element={<ClubHub />} />
           <Route path="/community/*" element={<Navigate to="/club" replace />} />
-          <Route path="/news/*" element={<Soon title="News" what="Club, state and national news with a calm reader." />} />
-          <Route path="/classifieds/*" element={<Soon title="Classifieds" what="Buy and sell boats, rigs and parts." />} />
-          <Route path="/media/*" element={<Soon title="Media" what="Every photo and video by month or event." />} />
+          <Route path="/comms" element={<ChatsInbox />} />
+          <Route path="/comms/chat/:userId" element={<ChatThread />} />
+          <Route path="/comms/*" element={<Navigate to="/comms" replace />} />
+          <Route path="/skipper/:id" element={<SkipperProfile />} />
+          <Route path="/classifieds" element={<ClassifiedsScreen />} />
+          <Route path="/classifieds/:id" element={<ListingScreen />} />
+          <Route path="/news" element={<NewsScreen />} />
+          <Route path="/news/:id" element={<ArticleScreen />} />
+          <Route path="/media" element={<MediaScreen />} />
           <Route path="/my-membership" element={<Soon title="Membership" what="Your membership card, renewals and payments." />} />
           <Route path="/my-garage/*" element={<Soon title="Boat shed" what="Boats, rigs, maintenance and performance." />} />
           <Route path="/race-timer" element={<Soon title="Race Timer" what="Your club's start sequences, with sounds, buzzes and the screen kept awake." />} />
@@ -80,7 +97,7 @@ const Shell: React.FC = () => {
         </Routes>
       </main>
       {!hideTabs && <TabBar onAlfie={() => setAlfieOpen(true)} />}
-      {alfieOpen && <AlfieSheet onClose={() => setAlfieOpen(false)} />}
+      {alfieOpen && <AlfieSheet message={alfieMessage} onClose={() => { setAlfieOpen(false); setAlfieMessage(undefined); }} />}
     </div>
   );
 };

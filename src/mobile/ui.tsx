@@ -101,7 +101,7 @@ const TABS: { id: string; label: string; icon: IconName; path: string; match: (p
   { id: 'home', label: 'Home', icon: 'home', path: '/', match: p => p === '/' },
   { id: 'racing', label: 'Racing', icon: 'racing', path: '/calendar', match: p => /^\/(calendar|results|my-results|find-racing|race-desk)/.test(p) },
   { id: 'tv', label: 'AlfieTV', icon: 'tv', path: '/alfie-tv', match: p => p.startsWith('/alfie-tv') },
-  { id: 'me', label: 'Me', icon: 'me', path: '/me', match: p => /^\/(me|my-|settings|tasks|weather|race-timer)/.test(p) && !p.startsWith('/my-results') },
+  { id: 'me', label: 'Me', icon: 'me', path: '/me', match: p => /^\/(me(\/|$)|my-|settings|tasks|weather|race-timer)/.test(p) && !p.startsWith('/my-results') },
 ];
 
 export const TabBar: React.FC<{ onAlfie: () => void }> = ({ onAlfie }) => {
