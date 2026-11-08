@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Users, CircleCheck as CheckCircle, Plus, LogOut, Calendar, Building2, CircleAlert as AlertCircle, Check, ChevronDown, ChevronRight, CreditCard as Edit, Trash2 } from 'lucide-react';
+import { DollarSign, Users, CircleCheck as CheckCircle, Plus, Calendar, Building2, CircleAlert as AlertCircle, Check, ChevronDown, ChevronRight, CreditCard as Edit, Trash2, X } from 'lucide-react';
+import { InlineLoading } from '../association/AssocUI';
 import { supabase } from '../../utils/supabase';
 import { Avatar } from '../ui/Avatar';
 
@@ -571,17 +572,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto mb-4">
-            <div className="absolute inset-0 rounded-full border-4 border-slate-700" />
-            <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" />
-            <DollarSign className="absolute inset-0 m-auto w-6 h-6 text-blue-400" />
-          </div>
-          <p className="text-white font-medium mb-1">Loading Club Payments</p>
-          <p className="text-sm text-slate-400">Fetching payment records and member data...</p>
-        </div>
-      </div>
+      <InlineLoading label="Loading club payments…" />
     );
   }
 
@@ -589,11 +580,11 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <p className="text-red-400 mb-4">{error}</p>
+          <AlertCircle className="w-12 h-12 a-txt-r mx-auto mb-4" />
+          <p className="a-txt-r mb-4">{error}</p>
           <button
             onClick={() => loadData()}
-            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
+            className="a-btn a-btn-p"
           >
             Try Again
           </button>
@@ -609,22 +600,22 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
     <div className="space-y-6">
       {/* Filter Indicator */}
       {selectedClubFilter && selectedClubFilter !== 'all' && (
-        <div className="bg-blue-900/30 border border-blue-500/50 rounded-lg p-4">
+        <div className="a-box a-box-on p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Building2 size={20} className="text-blue-400" />
+              <Building2 size={20} className="a-txt-b" />
               <div>
-                <p className="text-sm font-medium text-white">
+                <p className="text-sm font-medium a-ink">
                   Viewing: {clubGroups.find(g => g.club_id === selectedClubFilter)?.club_name || 'Selected Club'}
                 </p>
-                <p className="text-xs text-slate-400">Members from this club are shown below</p>
+                <p className="text-xs a-mute">Members from this club are shown below</p>
               </div>
             </div>
             <button
               onClick={() => {
                 setClubGroups(prev => prev.map(g => ({ ...g, expanded: false })));
               }}
-              className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+              className="a-btn a-btn-sm"
             >
               Collapse
             </button>
@@ -634,36 +625,36 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-green-900/20 border border-green-600/30 rounded-lg p-4">
+        <div className="a-box a-box-ok p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-600/20">
-              <CheckCircle size={20} className="text-green-400" />
+            <div className="a-tile a-tile-sm">
+              <CheckCircle size={20} className="a-txt-g" />
             </div>
             <div>
-              <p className="text-sm text-slate-400">Payments Received</p>
-              <p className="text-xl font-bold text-white">{payments.filter(p => p.unallocated_amount > 0).length}</p>
+              <p className="text-sm a-mute">Payments Received</p>
+              <p className="text-xl font-bold a-ink">{payments.filter(p => p.unallocated_amount > 0).length}</p>
             </div>
           </div>
         </div>
-        <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-4">
+        <div className="a-box a-box-bad p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-red-600/20">
-              <Users size={20} className="text-red-400" />
+            <div className="a-tile a-tile-sm">
+              <Users size={20} className="a-txt-r" />
             </div>
             <div>
-              <p className="text-sm text-slate-400">Members Pending</p>
-              <p className="text-xl font-bold text-white">{unpaidMembers.length}</p>
+              <p className="text-sm a-mute">Members Pending</p>
+              <p className="text-xl font-bold a-ink">{unpaidMembers.length}</p>
             </div>
           </div>
         </div>
-        <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-4">
+        <div className="a-box a-box-on p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-600/20">
-              <DollarSign size={20} className="text-blue-400" />
+            <div className="a-tile a-tile-sm">
+              <DollarSign size={20} className="a-txt-b" />
             </div>
             <div>
-              <p className="text-sm text-slate-400">Total Outstanding</p>
-              <p className="text-xl font-bold text-white">
+              <p className="text-sm a-mute">Total Outstanding</p>
+              <p className="text-xl font-bold a-ink">
                 ${unpaidMembers.reduce((sum, m) => sum + m.state_contribution, 0).toFixed(2)}
               </p>
             </div>
@@ -674,27 +665,27 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* LEFT: Club Payments Received */}
-        <div className="bg-gradient-to-br from-green-900/10 to-transparent border-2 border-green-600/30 rounded-xl p-5">
+        <div className="a-box p-5">
           <div className="mb-5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-green-600/20">
-                <CheckCircle size={22} className="text-green-400" />
+              <div className="a-tile a-tile-sm">
+                <CheckCircle size={22} className="a-txt-g" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">Club Payments Received</h3>
-                <p className="text-sm text-slate-300">Payments recorded from club remittances</p>
+                <h3 className="text-xl font-bold a-ink">Club Payments Received</h3>
+                <p className="text-sm a-mute">Payments recorded from club remittances</p>
               </div>
             </div>
 
             {/* Instruction Card */}
-            <div className="mt-4 p-3 rounded-lg bg-blue-600/10 border border-blue-600/30">
+            <div className="a-box a-box-on mt-4 p-3">
               <div className="flex items-start gap-3">
-                <div className="p-1.5 rounded-lg bg-blue-600/20 flex-shrink-0">
-                  <DollarSign className="w-4 h-4 text-blue-400" />
+                <div className="a-tile a-tile-sm flex-shrink-0">
+                  <DollarSign className="w-4 h-4 a-txt-b" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-blue-200 font-medium mb-1">How to Reconcile</p>
-                  <p className="text-xs text-blue-300/80">
+                  <p className="text-sm a-txt-b font-medium mb-1">How to Reconcile</p>
+                  <p className="text-xs a-mute">
                     Click any payment below to match it with pending members on the right. The system will suggest which members to reconcile.
                   </p>
                 </div>
@@ -703,13 +694,13 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
           </div>
 
           {payments.filter(p => p.unallocated_amount > 0).length === 0 ? (
-            <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-600/50 rounded-lg bg-slate-800/20">
+            <div className="text-center py-12 a-mute a-box" style={{ borderStyle: 'dashed' }}>
               <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p className="mb-2 font-medium">No payments requiring reconciliation</p>
               <p className="text-sm mb-4">All payments have been fully allocated. Record a new payment in the finance system with "Club Membership Remittances" category</p>
               <button
                 onClick={() => navigate('/finances/invoices?action=create&type=deposit')}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+                className="a-btn a-btn-p"
               >
                 Create a Deposit
               </button>
@@ -720,33 +711,29 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                 <div
                   key={payment.id}
                   onClick={() => payment.unallocated_amount > 0 && openPaymentReconciliation(payment)}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    payment.unallocated_amount > 0
-                      ? 'border-slate-600/70 bg-slate-800/40 cursor-pointer hover:border-green-500/70 hover:bg-slate-700/60 hover:shadow-xl'
-                      : 'border-green-600/50 bg-green-900/20'
-                  }`}
+                  className={`a-card p-4 ${payment.unallocated_amount > 0 ? 'a-hov cursor-pointer' : 'a-box-ok'}`}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-white text-lg">{payment.payment_reference}</p>
+                        <p className="font-semibold a-ink text-lg">{payment.payment_reference}</p>
                         {payment.allocated_amount === payment.total_amount && (
-                          <span className="px-2 py-0.5 bg-green-600/20 text-green-300 text-xs font-medium rounded-full">
+                          <span className="a-lb-fmt a-txt-g">
                             Fully Allocated
                           </span>
                         )}
                         {payment.allocated_amount > 0 && payment.allocated_amount < payment.total_amount && (
-                          <span className="px-2 py-0.5 bg-red-600/20 text-red-300 text-xs font-medium rounded-full">
+                          <span className="a-lb-fmt a-txt-r">
                             Partially Allocated
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-slate-400 mt-1">
+                      <p className="text-sm a-mute mt-1">
                         <Calendar className="w-3 h-3 inline mr-1" />
                         {new Date(payment.payment_date).toLocaleDateString()}
                       </p>
                       {payment.club_name && (
-                        <p className="text-sm text-slate-400 mt-1">
+                        <p className="text-sm a-mute mt-1">
                           <Building2 className="w-3 h-3 inline mr-1" />
                           {payment.club_name}
                         </p>
@@ -754,22 +741,22 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <div className="text-right">
-                        <p className="text-sm text-slate-400">Remaining</p>
-                        <p className="text-2xl font-bold text-white">
+                        <p className="text-sm a-mute">Remaining</p>
+                        <p className="text-2xl font-bold a-ink">
                           ${payment.unallocated_amount.toFixed(2)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => handleEditPayment(payment)}
-                          className="p-1.5 rounded hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"
+                          className="a-ib"
                           title="Edit Payment"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeletingPayment(payment)}
-                          className="p-1.5 rounded hover:bg-red-600/20 text-slate-400 hover:text-red-400 transition-colors"
+                          className="a-ib a-ib-d"
                           title="Delete Payment"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -780,22 +767,19 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
 
                   {payment.allocated_amount > 0 && (
                     <div className="pt-3 border-t border-slate-600/50">
-                      <div className="flex justify-between text-xs text-slate-400">
+                      <div className="flex justify-between text-xs a-mute">
                         <span>Allocated: ${payment.allocated_amount.toFixed(2)}</span>
                         <span>Total: ${payment.total_amount.toFixed(2)}</span>
                       </div>
-                      <div className="mt-2 w-full bg-slate-600 rounded-full h-1.5">
-                        <div
-                          className="h-1.5 rounded-full transition-all"
-                          style={{ width: `${(payment.allocated_amount / payment.total_amount) * 100}%` }}
-                        />
+                      <div className="mt-2 a-progress" style={{ height: 6 }}>
+                        <i style={{ width: `${Math.min(100, (payment.allocated_amount / payment.total_amount) * 100)}%` }} />
                       </div>
                     </div>
                   )}
 
                   {payment.unallocated_amount > 0 && (
                     <div className="mt-3 pt-3 border-t border-slate-600/50">
-                      <p className="text-xs text-blue-400 text-center font-medium">
+                      <p className="text-xs a-txt-b text-center font-medium">
                         Reconcile Club Members →
                       </p>
                     </div>
@@ -807,25 +791,19 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
         </div>
 
         {/* RIGHT: Members Requiring Payment */}
-        <div className={`bg-gradient-to-br ${
-          clubGroups.length === 0
-            ? 'from-green-900/10 to-transparent border-2 border-green-600/30'
-            : 'from-red-900/10 to-transparent border-2 border-red-600/30'
-        } rounded-xl p-5`}>
+        <div className="a-box p-5">
           <div className="mb-5">
             <div className="flex items-center gap-3 mb-2">
-              <div className={`p-2 rounded-lg ${
-                clubGroups.length === 0 ? 'bg-green-600/20' : 'bg-red-600/20'
-              }`}>
+              <div className="a-tile">
                 {clubGroups.length === 0 ? (
-                  <CheckCircle size={22} className="text-green-400" />
+                  <CheckCircle size={22} className="a-txt-g" />
                 ) : (
-                  <AlertCircle size={22} className="text-red-400" />
+                  <AlertCircle size={22} className="a-txt-r" />
                 )}
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">Members Requiring Payment</h3>
-                <p className="text-sm text-slate-300">
+                <h3 className="text-xl font-bold a-ink">Members Requiring Payment</h3>
+                <p className="text-sm a-mute">
                   {clubGroups.length === 0
                     ? 'All remittances reconciled'
                     : 'Outstanding remittances to be reconciled'}
@@ -835,14 +813,14 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
 
             {/* Info Card */}
             {clubGroups.length > 0 && (
-              <div className="mt-4 p-3 rounded-lg bg-red-600/10 border border-red-600/30">
+              <div className="a-box a-box-bad mt-4 p-3">
                 <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-lg bg-red-600/20 flex-shrink-0">
-                    <Users className="w-4 h-4 text-red-400" />
+                  <div className="a-tile a-tile-sm flex-shrink-0">
+                    <Users className="w-4 h-4 a-txt-r" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm text-red-200 font-medium mb-1">Awaiting Reconciliation</p>
-                    <p className="text-xs text-red-300/80">
+                    <p className="text-sm a-txt-r font-medium mb-1">Awaiting Reconciliation</p>
+                    <p className="text-xs a-mute">
                       These members need payment reconciliation. Click a payment on the left to match with these members.
                     </p>
                   </div>
@@ -852,9 +830,9 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
           </div>
 
           {clubGroups.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-600/50 rounded-lg bg-slate-800/20">
-              <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-50 text-green-500" />
-              <p className="font-medium text-white mb-1">All Caught Up!</p>
+            <div className="text-center py-12 a-mute a-box" style={{ borderStyle: 'dashed' }}>
+              <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-50 a-txt-g" />
+              <p className="font-medium a-ink mb-1">All Caught Up!</p>
               <p className="text-sm">No pending members require payment reconciliation</p>
             </div>
           ) : (
@@ -862,16 +840,16 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
               {clubGroups.map(group => (
                 <div
                   key={group.club_id}
-                  className="rounded-lg border-2 border-slate-600/70 bg-slate-800/40 overflow-hidden hover:border-red-500/50 transition-all"
+                  className="a-card a-hov overflow-hidden"
                 >
                   {/* Club Header */}
                   <div
                     onClick={() => toggleClubExpansion(group.club_id)}
-                    className="p-4 cursor-pointer hover:bg-slate-700/50 transition-colors"
+                    className="p-4 cursor-pointer a-hov-row"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <button className="text-slate-400 hover:text-white transition-colors">
+                        <button type="button" className="a-ib" style={{ width: 28, height: 28 }} aria-label={group.expanded ? 'Collapse' : 'Expand'}>
                           {group.expanded ? (
                             <ChevronDown className="w-5 h-5" />
                           ) : (
@@ -879,15 +857,15 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                           )}
                         </button>
                         <div>
-                          <p className="font-medium text-white">{group.club_name}</p>
-                          <p className="text-sm text-slate-400">
+                          <p className="font-medium a-ink">{group.club_name}</p>
+                          <p className="text-sm a-mute">
                             {group.member_count} member{group.member_count !== 1 ? 's' : ''}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-slate-400 mb-1">Outstanding</p>
-                        <p className="text-lg font-semibold text-red-400">
+                        <p className="text-xs a-mute mb-1">Outstanding</p>
+                        <p className="text-lg font-semibold a-txt-r">
                           ${group.total_amount.toFixed(2)}
                         </p>
                       </div>
@@ -896,7 +874,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
 
                   {/* Member List */}
                   {group.expanded && (
-                    <div className="border-t border-slate-600/50 bg-slate-800/30">
+                    <div className="a-grp-rule">
                       {group.members.map(member => (
                         <div
                           key={member.id}
@@ -911,14 +889,14 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                                 size="sm"
                               />
                               <div>
-                                <p className="text-white text-sm font-medium">{member.member_name}</p>
+                                <p className="a-ink text-sm font-medium">{member.member_name}</p>
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-white font-semibold">
+                              <p className="a-ink font-semibold">
                                 ${member.state_contribution.toFixed(2)}
                               </p>
-                              <p className="text-xs text-slate-400 mt-0.5">State fee</p>
+                              <p className="text-xs a-mute mt-0.5">State fee</p>
                             </div>
                           </div>
                         </div>
@@ -934,32 +912,34 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
 
       {/* NEW: Payment Reconciliation Sliding Panel */}
       {activePayment && createPortal(
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-end" onClick={() => setActivePayment(null)}>
+        <div className="a-dlg" onClick={() => setActivePayment(null)}>
           <div
-            className="bg-slate-800 h-full w-full max-w-2xl shadow-2xl border-l border-slate-700 overflow-auto animate-slide-in"
+            className="a-sheet h-full w-full max-w-2xl overflow-auto animate-slide-in" style={{ borderRadius: '22px 0 0 22px' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6 z-10">
+            <div className="sticky top-0 a-sheet-head a-dlg-head flex-col items-stretch p-6 z-10" style={{ background: 'inherit' }}>
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Match Members to Payment</h2>
-                  <p className="text-sm text-slate-400 mt-1">Select members to reconcile against this payment</p>
+                  <h2 className="text-2xl font-bold a-ink">Match Members to Payment</h2>
+                  <p className="text-sm a-mute mt-1">Select members to reconcile against this payment</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setActivePayment(null)}
-                  className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                  className="a-ib"
+                  aria-label="Close"
                 >
-                  <LogOut className="w-5 h-5" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Payment Info Card */}
-              <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600/50">
+              <div className="a-box p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <p className="text-white font-semibold text-lg">{activePayment.payment_reference}</p>
-                    <div className="flex items-center gap-3 mt-1 text-sm text-slate-400">
+                    <p className="a-ink font-semibold text-lg">{activePayment.payment_reference}</p>
+                    <div className="flex items-center gap-3 mt-1 text-sm a-mute">
                       <span>
                         <Calendar className="w-3 h-3 inline mr-1" />
                         {new Date(activePayment.payment_date).toLocaleDateString()}
@@ -973,8 +953,8 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-slate-400">Payment Amount</p>
-                    <p className="text-2xl font-bold text-white">${activePayment.total_amount.toFixed(2)}</p>
+                    <p className="text-sm a-mute">Payment Amount</p>
+                    <p className="text-2xl font-bold a-ink">${activePayment.total_amount.toFixed(2)}</p>
                   </div>
                 </div>
 
@@ -987,31 +967,19 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                   const isOverAllocated = remaining < -0.01;
 
                   return (
-                    <div className={`mt-3 p-3 rounded-lg border ${
-                      isPerfectMatch
-                        ? 'bg-green-600/10 border-green-600/30'
-                        : isOverAllocated
-                        ? 'bg-red-600/10 border-red-600/30'
-                        : 'bg-blue-600/10 border-blue-600/30'
-                    }`}>
+                    <div className={`mt-3 p-3 a-box ${isPerfectMatch ? 'a-box-ok' : isOverAllocated ? 'a-box-bad' : 'a-box-on'}`}>
                       <div className="grid grid-cols-3 gap-4">
                         <div>
-                          <p className="text-xs text-slate-400">Available</p>
-                          <p className="text-lg font-semibold text-white">${activePayment.unallocated_amount.toFixed(2)}</p>
+                          <p className="text-xs a-mute">Available</p>
+                          <p className="text-lg font-semibold a-ink">${activePayment.unallocated_amount.toFixed(2)}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-slate-400">Selected ({reconciliationMembers.size})</p>
-                          <p className="text-lg font-semibold text-white">${selectedTotal.toFixed(2)}</p>
+                          <p className="text-xs a-mute">Selected ({reconciliationMembers.size})</p>
+                          <p className="text-lg font-semibold a-ink">${selectedTotal.toFixed(2)}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-slate-400">Remaining</p>
-                          <p className={`text-lg font-semibold ${
-                            isPerfectMatch
-                              ? 'text-green-400'
-                              : isOverAllocated
-                              ? 'text-red-400'
-                              : 'text-white'
-                          }`}>
+                          <p className="text-xs a-mute">Remaining</p>
+                          <p className={`text-lg font-semibold a-num ${isPerfectMatch ? 'a-txt-g' : isOverAllocated ? 'a-txt-r' : 'a-ink'}`}>
                             ${Math.abs(remaining).toFixed(2)}
                             {isPerfectMatch && ' ✓'}
                             {isOverAllocated && ' !'}
@@ -1019,10 +987,10 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                         </div>
                       </div>
                       {isOverAllocated && (
-                        <p className="text-xs text-red-300 mt-2">⚠️ Selected amount exceeds available balance</p>
+                        <p className="text-xs a-txt-r mt-2">⚠️ Selected amount exceeds available balance</p>
                       )}
                       {isPerfectMatch && (
-                        <p className="text-xs text-green-300 mt-2">✓ Perfect match! Ready to reconcile</p>
+                        <p className="text-xs a-txt-g mt-2">✓ Perfect match! Ready to reconcile</p>
                       )}
                     </div>
                   );
@@ -1031,14 +999,14 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
 
               {/* Auto-selection Banner */}
               {reconciliationMembers.size > 0 && (
-                <div className="mt-4 p-3 rounded-lg bg-green-600/10 border border-green-600/30">
+                <div className="a-box a-box-ok mt-4 p-3">
                   <div className="flex items-start gap-3">
-                    <div className="p-1.5 rounded-lg bg-green-600/20 flex-shrink-0">
-                      <CheckCircle className="w-4 h-4 text-green-400" />
+                    <div className="a-tile a-tile-sm flex-shrink-0">
+                      <CheckCircle className="w-4 h-4 a-txt-g" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm text-green-200 font-medium">Auto-Selected Members</p>
-                      <p className="text-xs text-green-300/80 mt-1">
+                      <p className="text-sm a-txt-g font-medium">Auto-Selected Members</p>
+                      <p className="text-xs a-mute mt-1">
                         {(() => {
                           const selectedMembers = unpaidMembers.filter(m => reconciliationMembers.has(m.id));
                           const hasMatchingRef = selectedMembers.some(m =>
@@ -1069,10 +1037,10 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                 <>
                   <div className="p-6 pt-0">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-white">Pending Members</h3>
+                      <h3 className="text-lg font-semibold a-ink">Pending Members</h3>
                       <button
                         onClick={() => setReconciliationMembers(new Set())}
-                        className="text-sm text-slate-400 hover:text-white transition-colors"
+                        className="a-btn a-btn-q a-btn-sm"
                       >
                         Clear All
                       </button>
@@ -1080,12 +1048,12 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
 
                     <div className="space-y-3">
                       {clubGroups.map(group => (
-                        <div key={group.club_id} className="rounded-lg border border-slate-600/50 bg-slate-700/20 overflow-hidden">
-                          <div className="p-3 bg-slate-700/30 border-b border-slate-600/50">
+                        <div key={group.club_id} className="a-grp">
+                          <div className="p-3 a-grp-head">
                             <div className="flex items-center justify-between">
                               <div>
-                                <p className="font-medium text-white">{group.club_name}</p>
-                                <p className="text-xs text-slate-400">{group.member_count} members - ${group.total_amount.toFixed(2)}</p>
+                                <p className="font-medium a-ink">{group.club_name}</p>
+                                <p className="text-xs a-mute">{group.member_count} members - ${group.total_amount.toFixed(2)}</p>
                               </div>
                               <button
                                 onClick={() => {
@@ -1111,28 +1079,22 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                               </button>
                             </div>
                           </div>
-                          <div className="divide-y divide-slate-600/30">
+                          <div>
                             {group.members.map(member => {
                               const isSelected = reconciliationMembers.has(member.id);
                               return (
                                 <div
                                   key={member.id}
                                   onClick={() => toggleReconciliationMember(member.id)}
-                                  className={`p-3 cursor-pointer transition-all flex items-center justify-between ${
-                                    isSelected && matched
-                                      ? 'bg-green-600/15 hover:bg-green-600/25 border-l-2 border-green-500'
-                                      : isSelected
-                                      ? 'bg-blue-600/15 hover:bg-blue-600/25 border-l-2 border-blue-500'
-                                      : 'hover:bg-slate-700/30 border-l-2 border-transparent'
-                                  }`}
+                                  className={`a-lnk cursor-pointer justify-between ${isSelected ? 'a-lnk-on' : 'a-hov-row'}`}
                                 >
                                   <div className="flex items-center gap-3">
-                                    <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${
+                                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-colors ${
                                       isSelected && matched
                                         ? 'bg-green-500 border-green-500'
                                         : isSelected
                                         ? 'bg-blue-500 border-blue-500'
-                                        : 'border-slate-600 bg-slate-700'
+                                        : 'border-white/20'
                                     }`}>
                                       {isSelected && <Check className="w-3 h-3 text-white" />}
                                     </div>
@@ -1143,12 +1105,12 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                                       size="sm"
                                     />
                                     <div>
-                                      <p className={`text-sm font-medium ${isSelected && matched ? 'text-green-200' : isSelected ? 'text-blue-200' : 'text-white'}`}>
+                                      <p className="text-sm font-medium a-ink">
                                         {member.member_name}
                                       </p>
                                     </div>
                                   </div>
-                                  <p className={`font-semibold ${isSelected && matched ? 'text-green-300' : isSelected ? 'text-blue-300' : 'text-white'}`}>
+                                  <p className={`font-semibold a-num ${isSelected && matched ? 'a-txt-g' : isSelected ? 'a-txt-b' : 'a-ink'}`}>
                                     ${member.state_contribution.toFixed(2)}
                                   </p>
                                 </div>
@@ -1160,22 +1122,18 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                     </div>
                   </div>
 
-                  <div className="sticky bottom-0 bg-slate-800 border-t border-slate-700 p-6">
+                  <div className="sticky bottom-0 a-dlg-foot p-6" style={{ background: 'inherit' }}>
                     <div className="flex gap-3">
                       <button
                         onClick={() => setActivePayment(null)}
-                        className="px-6 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+                        className="a-btn"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={completePaymentReconciliation}
                         disabled={processing || reconciliationMembers.size === 0}
-                        className={`flex-1 px-6 py-3 rounded-lg text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                          matched
-                            ? 'bg-green-600 hover:bg-green-700'
-                            : 'bg-blue-600 hover:bg-blue-700'
-                        }`}
+                        className="a-btn a-btn-p flex-1"
                       >
                         {processing ? 'Processing...' : `Reconcile ${reconciliationMembers.size} Member${reconciliationMembers.size !== 1 ? 's' : ''}`}
                       </button>
@@ -1191,28 +1149,24 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
 
       {/* Reconciliation Modal */}
       {showReconcileModal && createPortal(
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full border border-slate-700">
+        <div className="a-dlg">
+          <div className="a-sheet max-w-2xl">
             <div className="p-6 border-b border-slate-700">
-              <h3 className="text-xl font-bold text-white">Reconcile {selectedMembers.size} Member{selectedMembers.size !== 1 ? 's' : ''}</h3>
-              <p className="text-sm text-slate-400 mt-1">Total: ${selectedTotal.toFixed(2)}</p>
+              <h3 className="text-xl font-bold a-ink">Reconcile {selectedMembers.size} Member{selectedMembers.size !== 1 ? 's' : ''}</h3>
+              <p className="text-sm a-mute mt-1">Total: ${selectedTotal.toFixed(2)}</p>
             </div>
 
             <div className="p-6 space-y-6">
               {/* Option Selection */}
               <div className="space-y-3">
-                <label className="block text-sm font-medium text-slate-300 mb-3">
+                <label className="block text-sm font-medium a-mute mb-3">
                   Choose reconciliation method:
                 </label>
 
                 {/* Match to Existing Payment */}
                 <div
                   onClick={() => setReconcileOption('existing')}
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    reconcileOption === 'existing'
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-slate-600 hover:border-slate-500'
-                  }`}
+                  className={`a-box p-4 cursor-pointer ${reconcileOption === 'existing' ? 'a-box-on' : 'a-hov-row'}`}
                 >
                   <div className="flex items-start gap-3">
                     <input
@@ -1222,8 +1176,8 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                       className="mt-1"
                     />
                     <div className="flex-1">
-                      <p className="text-white font-medium">Match to Existing Payment</p>
-                      <p className="text-sm text-slate-400 mt-1">
+                      <p className="a-ink font-medium">Match to Existing Payment</p>
+                      <p className="text-sm a-mute mt-1">
                         Select from {payments.length} available payment{payments.length !== 1 ? 's' : ''}
                       </p>
                     </div>
@@ -1232,8 +1186,8 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                   {reconcileOption === 'existing' && (
                     <div className="mt-4">
                       {payments.length === 0 ? (
-                        <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
-                          <p className="text-sm text-red-300">
+                        <div className="a-box a-box-bad p-4">
+                          <p className="text-sm a-txt-r">
                             No payments available. Please create a new payment instead.
                           </p>
                         </div>
@@ -1241,7 +1195,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                         <select
                           value={selectedPaymentId}
                           onChange={(e) => setSelectedPaymentId(e.target.value)}
-                          className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="a-inp"
                         >
                           <option value="">Select payment...</option>
                           {payments.map(payment => (
@@ -1258,11 +1212,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                 {/* Create New Payment */}
                 <div
                   onClick={() => setReconcileOption('new')}
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    reconcileOption === 'new'
-                      ? 'border-green-500 bg-green-500/10'
-                      : 'border-slate-600 hover:border-slate-500'
-                  }`}
+                  className={`a-box p-4 cursor-pointer ${reconcileOption === 'new' ? 'a-box-on' : 'a-hov-row'}`}
                 >
                   <div className="flex items-start gap-3">
                     <input
@@ -1272,8 +1222,8 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                       className="mt-1"
                     />
                     <div className="flex-1">
-                      <p className="text-white font-medium">Create New Payment</p>
-                      <p className="text-sm text-slate-400 mt-1">
+                      <p className="a-ink font-medium">Create New Payment</p>
+                      <p className="text-sm a-mute mt-1">
                         Record a new payment from the club
                       </p>
                     </div>
@@ -1282,7 +1232,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                   {reconcileOption === 'new' && (
                     <div className="mt-4 space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                        <label className="block text-sm font-medium a-mute mb-2">
                           Payment Reference
                         </label>
                         <input
@@ -1290,12 +1240,12 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                           value={newPaymentData.reference}
                           onChange={(e) => setNewPaymentData({ ...newPaymentData, reference: e.target.value })}
                           placeholder="e.g., CLUB-001"
-                          className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                          className="a-inp"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                          <label className="block text-sm font-medium a-mute mb-2">
                             Amount
                           </label>
                           <input
@@ -1303,18 +1253,18 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                             step="0.01"
                             value={newPaymentData.amount}
                             onChange={(e) => setNewPaymentData({ ...newPaymentData, amount: e.target.value })}
-                            className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                            className="a-inp"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                          <label className="block text-sm font-medium a-mute mb-2">
                             Date
                           </label>
                           <input
                             type="date"
                             value={newPaymentData.date}
                             onChange={(e) => setNewPaymentData({ ...newPaymentData, date: e.target.value })}
-                            className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                            className="a-inp"
                           />
                         </div>
                       </div>
@@ -1324,18 +1274,18 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-700 flex gap-3">
+            <div className="a-dlg-foot gap-3">
               <button
                 onClick={handleReconcile}
                 disabled={processing || !reconcileOption || (reconcileOption === 'existing' && !selectedPaymentId)}
-                className="flex-1 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="a-btn a-btn-p flex-1"
               >
                 {processing ? 'Processing...' : 'Complete Reconciliation'}
               </button>
               <button
                 onClick={() => setShowReconcileModal(false)}
                 disabled={processing}
-                className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
+                className="a-btn"
               >
                 Cancel
               </button>
@@ -1347,25 +1297,25 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
 
       {/* Edit Payment Modal */}
       {editingPayment && createPortal(
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl shadow-2xl max-w-md w-full border border-slate-700">
+        <div className="a-dlg">
+          <div className="a-sheet max-w-md">
             <div className="p-6 border-b border-slate-700">
-              <h3 className="text-xl font-bold text-white">Edit Payment</h3>
+              <h3 className="text-xl font-bold a-ink">Edit Payment</h3>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium a-mute mb-2">
                   Payment Reference
                 </label>
                 <input
                   type="text"
                   value={editData.reference}
                   onChange={(e) => setEditData({ ...editData, reference: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="a-inp"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium a-mute mb-2">
                   Amount
                 </label>
                 <input
@@ -1373,31 +1323,31 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                   step="0.01"
                   value={editData.amount}
                   onChange={(e) => setEditData({ ...editData, amount: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="a-inp"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium a-mute mb-2">
                   Date
                 </label>
                 <input
                   type="date"
                   value={editData.date}
                   onChange={(e) => setEditData({ ...editData, date: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="a-inp"
                 />
               </div>
             </div>
-            <div className="p-6 border-t border-slate-700 flex gap-3">
+            <div className="a-dlg-foot gap-3">
               <button
                 onClick={handleSaveEdit}
-                className="flex-1 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
+                className="a-btn a-btn-p flex-1"
               >
                 Save Changes
               </button>
               <button
                 onClick={() => setEditingPayment(null)}
-                className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
+                className="a-btn"
               >
                 Cancel
               </button>
@@ -1409,50 +1359,50 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
 
       {/* Delete Confirmation Modal */}
       {deletingPayment && createPortal(
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl shadow-2xl max-w-md w-full border border-slate-700">
+        <div className="a-dlg">
+          <div className="a-sheet max-w-md">
             <div className="p-6 border-b border-slate-700">
-              <h3 className="text-xl font-bold text-white">Delete Payment</h3>
+              <h3 className="text-xl font-bold a-ink">Delete Payment</h3>
             </div>
             <div className="p-6">
               <div className="flex items-start gap-4 mb-4">
-                <div className="p-3 rounded-full bg-red-500/20">
-                  <AlertCircle className="w-6 h-6 text-red-400" />
+                <div className="a-tile a-txt-r">
+                  <AlertCircle className="w-6 h-6 a-txt-r" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-white mb-2">
+                  <p className="a-ink mb-2">
                     Are you sure you want to delete payment <strong>{deletingPayment.payment_reference}</strong>?
                   </p>
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm a-mute">
                     Amount: ${deletingPayment.total_amount.toFixed(2)}
                   </p>
                   {deletingPayment.allocated_amount > 0 && (
-                    <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
-                      <p className="text-sm text-red-300">
+                    <div className="a-box a-box-bad mt-3 p-3">
+                      <p className="text-sm a-txt-r">
                         This payment has ${deletingPayment.allocated_amount.toFixed(2)} allocated.
                         You cannot delete it until you remove all allocations.
                       </p>
                     </div>
                   )}
                   {deletingPayment.allocated_amount === 0 && (
-                    <p className="text-sm text-slate-400 mt-2">
+                    <p className="text-sm a-mute mt-2">
                       This action cannot be undone.
                     </p>
                   )}
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-700 flex gap-3">
+            <div className="a-dlg-foot gap-3">
               <button
                 onClick={handleDeletePayment}
                 disabled={deletingPayment.allocated_amount > 0}
-                className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="a-btn a-btn-d flex-1"
               >
                 Delete Payment
               </button>
               <button
                 onClick={() => setDeletingPayment(null)}
-                className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
+                className="a-btn"
               >
                 Cancel
               </button>

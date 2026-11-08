@@ -28,7 +28,6 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
   onSuccess,
   nationalAssociationId,
   editingAssociation,
-  darkMode
 }) => {
   const [mode, setMode] = useState<'select' | 'create' | 'edit'>('select');
   const [allAssociations, setAllAssociations] = useState<StateAssociation[]>([]);
@@ -316,32 +315,26 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`w-full max-w-2xl max-h-[90vh] rounded-xl shadow-2xl overflow-hidden ${
-        darkMode ? 'bg-slate-800' : 'bg-white'
-      }`}>
+    <div className="a-dlg">
+      <div className="a-sheet max-w-2xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className={`flex items-center justify-between p-6 border-b ${
-          darkMode ? 'border-slate-700' : 'border-slate-200'
-        }`}>
+        <div className="a-dlg-head justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-600/20">
-              <Building2 className="text-blue-400" size={24} />
+            <div className="a-tile a-tile-sm">
+              <Building2 className="a-txt-b" size={24} />
             </div>
             <div>
-              <h2 className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+              <h2 className="text-2xl font-bold a-ink">
                 {mode === 'edit' ? 'Edit State Association' : 'Add State Association'}
               </h2>
-              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              <p className="text-sm a-mute">
                 {mode === 'edit' ? 'Update association details and status' : 'Link an existing state association or create a new one'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
-            }`}
+            className="p-2 rounded-lg transition-colors hover:bg-slate-700 text-slate-400"
           >
             <X size={20} />
           </button>
@@ -349,15 +342,13 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
 
         {/* Mode Selector (hide in edit mode) */}
         {mode !== 'edit' && (
-          <div className={`flex gap-2 p-4 border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+          <div className="flex gap-2 p-4 border-b border-slate-700">
             <button
               onClick={() => setMode('select')}
               className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
                 mode === 'select'
                   ? 'bg-blue-600 text-white'
-                  : darkMode
-                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
               }`}
             >
               Link Existing Association
@@ -367,9 +358,7 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
               className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
                 mode === 'create'
                   ? 'bg-blue-600 text-white'
-                  : darkMode
-                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
               }`}
             >
               Create New Association
@@ -384,17 +373,13 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
               {/* Search */}
               <div className="mb-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 a-mute" size={20} />
                   <input
                     type="text"
                     placeholder="Search state associations..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className={`w-full pl-10 pr-4 py-2.5 rounded-lg border ${
-                      darkMode
-                        ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-500'
-                        : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -403,17 +388,17 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
               {loading ? (
                 <div className="text-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className={`mt-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <p className="mt-4 a-mute">
                     Loading state associations...
                   </p>
                 </div>
               ) : filteredAssociations.length === 0 ? (
                 <div className="text-center py-12">
-                  <Building2 size={48} className={darkMode ? 'text-slate-600 mx-auto mb-4' : 'text-slate-300 mx-auto mb-4'} />
-                  <p className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <Building2 size={48} className="a-dim mx-auto mb-4" />
+                  <p className="font-medium a-mute">
                     {searchQuery ? 'No state associations found' : 'No available state associations'}
                   </p>
-                  <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <p className="text-sm mt-1 a-mute">
                     {searchQuery ? 'Try a different search term' : 'Create a new state association instead'}
                   </p>
                 </div>
@@ -422,35 +407,29 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
                   {filteredAssociations.map((assoc) => (
                     <div
                       key={assoc.id}
-                      className={`p-4 rounded-lg border transition-colors ${
-                        darkMode
-                          ? 'bg-slate-700/50 border-slate-600 hover:bg-slate-700'
-                          : 'bg-slate-50 border-slate-200 hover:bg-white'
-                      }`}
+                      className="a-box p-4"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           {assoc.logo_url ? (
                             <img src={assoc.logo_url} alt={assoc.name} className="w-10 h-10 rounded-lg object-cover" />
                           ) : (
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                              darkMode ? 'bg-slate-600' : 'bg-slate-200'
-                            }`}>
-                              <Building2 size={20} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-slate-600">
+                              <Building2 size={20} className="a-mute" />
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <h3 className={`font-semibold truncate ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                            <h3 className="font-semibold truncate a-ink">
                               {assoc.name}
                             </h3>
                             <div className="flex items-center gap-1 mt-1">
-                              <Flag size={12} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
-                              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                              <Flag size={12} className="a-dim" />
+                              <p className="text-xs a-mute">
                                 {assoc.state}
                               </p>
                             </div>
                             {assoc.national_association_id && (
-                              <p className={`text-xs mt-1 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+                              <p className="text-xs mt-1 a-txt-a">
                                 Currently linked to another national association
                               </p>
                             )}
@@ -459,7 +438,7 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
                         <button
                           onClick={() => handleLinkAssociation(assoc.id)}
                           disabled={creating}
-                          className="ml-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                          className="a-btn a-btn-p"
                         >
                           Link
                         </button>
@@ -474,7 +453,7 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
             <form onSubmit={handleUpdateAssociation} className="space-y-4">
               {/* Logo Upload */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className="block text-sm font-medium mb-2 a-mute">
                   Logo
                 </label>
                 <div
@@ -484,9 +463,7 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
                   className={`relative border-2 border-dashed rounded-lg transition-colors ${
                     isDraggingLogo
                       ? 'border-blue-500 bg-blue-500/10'
-                      : darkMode
-                        ? 'border-slate-600 hover:border-slate-500'
-                        : 'border-slate-300 hover:border-slate-400'
+                      : 'border-slate-600 hover:border-slate-500'
                   }`}
                 >
                   {logoPreview ? (
@@ -499,18 +476,18 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
                       <button
                         type="button"
                         onClick={handleRemoveLogo}
-                        className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                        className="a-btn a-btn-d"
                       >
                         <X size={16} />
                       </button>
                     </div>
                   ) : (
                     <div className="p-6 text-center">
-                      <ImageIcon size={32} className={`mx-auto mb-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
-                      <p className={`text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <ImageIcon size={32} className="mx-auto mb-2 a-dim" />
+                      <p className="text-sm mb-1 a-mute">
                         Drop logo here or click to upload
                       </p>
-                      <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                      <p className="text-xs a-dim">
                         PNG, JPG up to 1MB
                       </p>
                     </div>
@@ -526,71 +503,55 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Association Name <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium mb-2 a-mute">
+                  Association Name <span className="a-txt-r">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${
-                    darkMode
-                      ? 'bg-slate-700 border-slate-600 text-slate-100'
-                      : 'bg-white border-slate-200 text-slate-900'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className="a-inp"
                   placeholder="Enter association name"
                   required
                 />
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className="block text-sm font-medium mb-2 a-mute">
                   Abbreviation
                 </label>
                 <input
                   type="text"
                   value={formData.short_name}
                   onChange={(e) => setFormData({ ...formData, short_name: e.target.value })}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${
-                    darkMode
-                      ? 'bg-slate-700 border-slate-600 text-slate-100'
-                      : 'bg-white border-slate-200 text-slate-900'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className="a-inp"
                   placeholder="e.g., NSWRYA"
                 />
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className="block text-sm font-medium mb-2 a-mute">
                   <Flag size={14} className="inline mr-1" />
-                  State/Territory <span className="text-red-500">*</span>
+                  State/Territory <span className="a-txt-r">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.state}
                   onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${
-                    darkMode
-                      ? 'bg-slate-700 border-slate-600 text-slate-100'
-                      : 'bg-white border-slate-200 text-slate-900'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className="a-inp"
                   placeholder="e.g., New South Wales, NSW"
                   required
                 />
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Status <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium mb-2 a-mute">
+                  Status <span className="a-txt-r">*</span>
                 </label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${
-                    darkMode
-                      ? 'bg-slate-700 border-slate-600 text-slate-100'
-                      : 'bg-white border-slate-200 text-slate-900'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className="a-inp"
                   required
                 >
                   <option value="pending">Pending</option>
@@ -603,18 +564,14 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
                 <button
                   type="button"
                   onClick={onClose}
-                  className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-colors ${
-                    darkMode
-                      ? 'bg-slate-700 hover:bg-slate-600 text-slate-200'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
+                  className="a-btn flex-1"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating}
-                  className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="a-btn a-btn-p flex-1 justify-center"
                 >
                   {creating ? (
                     <>
@@ -632,7 +589,7 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
             <form onSubmit={handleCreateAssociation} className="space-y-4">
               {/* Logo Upload */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className="block text-sm font-medium mb-2 a-mute">
                   Logo
                 </label>
                 <div
@@ -642,9 +599,7 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
                   className={`relative border-2 border-dashed rounded-lg transition-colors ${
                     isDraggingLogo
                       ? 'border-blue-500 bg-blue-500/10'
-                      : darkMode
-                        ? 'border-slate-600 hover:border-slate-500'
-                        : 'border-slate-300 hover:border-slate-400'
+                      : 'border-slate-600 hover:border-slate-500'
                   }`}
                 >
                   {logoPreview ? (
@@ -657,18 +612,18 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
                       <button
                         type="button"
                         onClick={handleRemoveLogo}
-                        className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                        className="a-btn a-btn-d"
                       >
                         <X size={16} />
                       </button>
                     </div>
                   ) : (
                     <div className="p-6 text-center">
-                      <ImageIcon size={32} className={`mx-auto mb-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
-                      <p className={`text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <ImageIcon size={32} className="mx-auto mb-2 a-dim" />
+                      <p className="text-sm mb-1 a-mute">
                         Drop logo here or click to upload
                       </p>
-                      <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                      <p className="text-xs a-dim">
                         PNG, JPG up to 1MB
                       </p>
                     </div>
@@ -684,54 +639,42 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Association Name <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium mb-2 a-mute">
+                  Association Name <span className="a-txt-r">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${
-                    darkMode
-                      ? 'bg-slate-700 border-slate-600 text-slate-100'
-                      : 'bg-white border-slate-200 text-slate-900'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className="a-inp"
                   placeholder="Enter association name"
                   required
                 />
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className="block text-sm font-medium mb-2 a-mute">
                   Abbreviation
                 </label>
                 <input
                   type="text"
                   value={formData.short_name}
                   onChange={(e) => setFormData({ ...formData, short_name: e.target.value })}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${
-                    darkMode
-                      ? 'bg-slate-700 border-slate-600 text-slate-100'
-                      : 'bg-white border-slate-200 text-slate-900'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className="a-inp"
                   placeholder="e.g., NSWRYA"
                 />
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className="block text-sm font-medium mb-2 a-mute">
                   <Flag size={14} className="inline mr-1" />
-                  State/Territory <span className="text-red-500">*</span>
+                  State/Territory <span className="a-txt-r">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.state}
                   onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${
-                    darkMode
-                      ? 'bg-slate-700 border-slate-600 text-slate-100'
-                      : 'bg-white border-slate-200 text-slate-900'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className="a-inp"
                   placeholder="e.g., New South Wales, NSW"
                   required
                 />
@@ -741,18 +684,14 @@ export const AddStateAssociationModal: React.FC<AddStateAssociationModalProps> =
                 <button
                   type="button"
                   onClick={onClose}
-                  className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-colors ${
-                    darkMode
-                      ? 'bg-slate-700 hover:bg-slate-600 text-slate-200'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
+                  className="a-btn flex-1"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating}
-                  className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="a-btn a-btn-p flex-1 justify-center"
                 >
                   {creating ? (
                     <>
