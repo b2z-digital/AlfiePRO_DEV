@@ -42,7 +42,10 @@ export const EventDetail: React.FC = () => {
       <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 'calc(var(--m-safe-top) + 230px)', zIndex: -1,
         background: 'linear-gradient(180deg, rgba(6,11,22,0) 35%, var(--m-bg) 100%), linear-gradient(125deg,#0A3D7A 0%,#1C6FC2 50%,#9DD2FF 100%)' }} />
       <SubHeader right={
-        <button className="m-ibtn" aria-label="Share" onClick={() => share(item)}><Icon name="share" size={19} /></button>
+        <span className="m-row" style={{ gap: 8 }}>
+          {item.event && <button className="m-ibtn" aria-label="Add to calendar" onClick={() => addToCalendar(item)}><Icon name="calendar" size={19} /></button>}
+          <button className="m-ibtn" aria-label="Share" onClick={() => share(item)}><Icon name="share" size={19} /></button>
+        </span>
       } />
       <div style={{ height: 56 }} />
       <div className="m-row" style={{ gap: 6, flexWrap: 'wrap' }}>
@@ -182,6 +185,13 @@ const ResultsTable: React.FC<{ item: MCalendarItem }> = ({ item }) => {
     </>
   );
 };
+
+async function addToCalendar(item: MCalendarItem) {
+  if (!item.event) return;
+  const { generateICalFile, downloadICalFile } = await import('../../utils/calendarSync');
+  const ics = generateICalFile([item.event], item.clubName || 'AlfiePRO');
+  downloadICalFile(ics, `${item.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`);
+}
 
 async function share(item: MCalendarItem) {
   const url = `${window.location.origin}/calendar`;

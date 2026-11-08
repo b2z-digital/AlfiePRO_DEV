@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useMobile } from '../MobileContext';
@@ -60,12 +60,15 @@ const AgendaRow: React.FC<{ item: MCalendarItem }> = ({ item }) => {
 };
 
 
-type CalFilter = 'all' | 'club' | 'state' | 'national' | 'meetings';
+type CalFilter = 'mine' | 'all' | 'club' | 'state' | 'national';
 
 export const CalendarScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { calendar, calendarLoading } = useMobile();
-  const [filter, setFilter] = useState<CalFilter>('all');
+  const { calendar, calendarLoading, myClasses } = useMobile();
+  const [filter, setFilter] = useState<CalFilter>(myClasses.length ? 'mine' : 'all');
+  const sameClass = (a?: string) => !!a && myClasses.some(c => c.toLowerCase() === a.toLowerCase());
+  const touched = useRef(false);
+  useEffect(() => { if (!touched.current && myClasses.length) setFilter('mine'); }, [myClasses.length]);
   const today = todayISO();
   const [weekStart, setWeekStart] = useState(() => {
     const d = parseDay(today); const dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dow); return d;
@@ -77,10 +80,10 @@ export const CalendarScreen: React.FC = () => {
 
   const list = useMemo(() => calendar.filter(i => {
     if (i.date < iso(weekStart)) return false;
-    if (filter === 'meetings') return i.kind === 'meeting';
     if (filter === 'all') return true;
+    if (filter === 'mine') return i.kind === 'meeting' || sameClass(i.raceClass);
     return i.kind === 'race' && i.level === filter;
-  }), [calendar, filter, weekStart]);
+  }), [calendar, filter, weekStart, myClasses]);
 
   const groups = useMemo(() => {
     const g: { date: string; items: MCalendarItem[] }[] = [];
@@ -120,9 +123,9 @@ export const CalendarScreen: React.FC = () => {
         })}
       </div>
       <div className="m-chips">
-        {(['all', 'club', 'state', 'national', 'meetings'] as CalFilter[]).map(f => (
-          <button key={f} className={`m-chip ${filter === f ? 'm-chip-on' : ''}`} onClick={() => setFilter(f)}>
-            {f === 'all' ? 'All' : f === 'meetings' ? 'Meetings' : f[0].toUpperCase() + f.slice(1)}
+        {((myClasses.length ? ['mine', 'all', 'club', 'state', 'national'] : ['all', 'club', 'state', 'national']) as CalFilter[]).map(f => (
+          <button key={f} className={`m-chip ${filter === f ? 'm-chip-on' : ''}`} onClick={() => { touched.current = true; setFilter(f); }}>
+            {f === 'all' ? 'All' : f === 'mine' ? 'My classes' : f[0].toUpperCase() + f.slice(1)}
           </button>
         ))}
       </div>
@@ -144,8 +147,10 @@ export const CalendarScreen: React.FC = () => {
 
 export const ResultsScreen: React.FC<{ mineOnly?: boolean }> = ({ mineOnly }) => {
   const navigate = useNavigate();
-  const { calendar, calendarLoading, memberIds, profile } = useMobile();
-  const [filter, setFilter] = useState<'mine' | 'all' | 'club' | 'state' | 'national'>(mineOnly ? 'mine' : 'all');
+  const { calendar, calendarLoading, memberIds, profile, myClasses } = useMobile();
+  const [filter, setFilter] = useState<string>(mineOnly || memberIds.length ? 'mine' : 'all');
+  const touched = useRef(false);
+  useEffect(() => { if (!touched.current && memberIds.length) setFilter('mine'); }, [memberIds.length]);
   const fullName = `${profile.firstName} ${profile.lastName}`.trim();
   const today = todayISO();
 
@@ -155,7 +160,7 @@ export const ResultsScreen: React.FC<{ mineOnly?: boolean }> = ({ mineOnly }) =>
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 60)
       .map(i => ({ item: i, mine: myResultFor(i, memberIds, fullName), top: podium(i) }))
-      .filter(r => filter === 'all' ? true : filter === 'mine' ? !!r.mine : r.item.level === filter);
+      .filter(r => filter === 'all' ? true : filter === 'mine' ? !!r.mine : filter.startsWith('class:') ? r.item.raceClass?.toLowerCase() === filter.slice(6).toLowerCase() : r.item.level === filter);
   }, [calendar, memberIds, fullName, filter, today]);
 
   const groups = useMemo(() => {
@@ -173,9 +178,9 @@ export const ResultsScreen: React.FC<{ mineOnly?: boolean }> = ({ mineOnly }) =>
       <RootHeader title="Racing" />
       <RacingNav />
       <div className="m-chips">
-        {(['all', 'mine', 'club', 'state', 'national'] as const).map(f => (
-          <button key={f} className={`m-chip ${filter === f ? 'm-chip-on' : ''}`} onClick={() => setFilter(f)}>
-            {f === 'mine' ? 'I sailed' : f === 'all' ? 'All' : f[0].toUpperCase() + f.slice(1)}
+        {['mine', 'all', 'club', 'state', 'national', ...myClasses.map(c => `class:${c}`)].map(f => (
+          <button key={f} className={`m-chip ${filter === f ? 'm-chip-on' : ''}`} onClick={() => { touched.current = true; setFilter(f); }}>
+            {f === 'mine' ? 'I sailed' : f === 'all' ? 'All' : f.startsWith('class:') ? f.slice(6) : f[0].toUpperCase() + f.slice(1)}
           </button>
         ))}
       </div>

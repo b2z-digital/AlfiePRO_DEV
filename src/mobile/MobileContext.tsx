@@ -12,6 +12,7 @@ interface MobileState {
   calendarLoading: boolean;
   attendance: AttendanceIndex;
   memberIds: string[];
+  myClasses: string[];
   profile: { firstName: string; lastName: string; avatarUrl: string | null };
   unread: number;
   light: boolean;
@@ -36,6 +37,7 @@ export const MobileProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [calendarLoading, setCalendarLoading] = useState(true);
   const [attendance, setAttendanceIdx] = useState<AttendanceIndex>({ mine: {}, going: {} });
   const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [myClasses, setMyClasses] = useState<string[]>([]);
   const [profile, setProfile] = useState({ firstName: user?.firstName || '', lastName: user?.lastName || '', avatarUrl: null as string | null });
   const [unread, setUnread] = useState(0);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -61,7 +63,14 @@ export const MobileProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const refreshUnread = useCallback(() => { unreadNotificationCount(user?.id).then(setUnread).catch(() => {}); }, [user?.id]);
 
   useEffect(() => { void refresh(); }, [refresh]);
-  useEffect(() => { loadMyMemberIds(user?.id).then(setMemberIds).catch(() => {}); }, [user?.id]);
+  useEffect(() => {
+    loadMyMemberIds(user?.id).then(async ids => {
+      setMemberIds(ids);
+      if (!ids.length) return;
+      const { data } = await supabase.from('member_boats').select('boat_type').in('member_id', ids);
+      setMyClasses([...new Set((data || []).map((b: any) => b.boat_type).filter(Boolean))] as string[]);
+    }).catch(() => {});
+  }, [user?.id]);
   useEffect(() => {
     if (!user?.id) return;
     supabase.from('profiles').select('first_name, last_name, avatar_url').eq('id', user.id).maybeSingle().then(({ data }) => {
@@ -128,9 +137,9 @@ export const MobileProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [user?.id, clubId, attendance, profile, tap, toast]);
 
   const value = useMemo<MobileState>(() => ({
-    calendar, calendarLoading, attendance, memberIds, profile, unread, light,
+    calendar, calendarLoading, attendance, memberIds, myClasses, profile, unread, light,
     refresh, refreshUnread, answer, toast, tap,
-  }), [calendar, calendarLoading, attendance, memberIds, profile, unread, light, refresh, refreshUnread, answer, toast, tap]);
+  }), [calendar, calendarLoading, attendance, memberIds, myClasses, profile, unread, light, refresh, refreshUnread, answer, toast, tap]);
 
   return (
     <Ctx.Provider value={value}>
