@@ -7,6 +7,10 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { useModalFocus } from '../../hooks/useModalFocus';
 import { computeTax, rateOf, TaxType } from '../../utils/financeTax';
 import { TransactionAttachments } from './TransactionAttachments';
+import { TransactionApprovalPanel } from './TransactionApprovalPanel';
+import {
+  ApprovalSetup, ApprovalStatus, ApprovalSummary, approvalErrorMessage, getApprovalSetup, latestApprovals, sendForApproval,
+} from '../../utils/expenseApprovals';
 
 interface Transaction {
   id: string;
@@ -27,6 +31,7 @@ interface Transaction {
   tax_amount?: number | string | null;
   tax_rate_id?: string | null;
   tax_type?: TaxType | null;
+  approval_status?: ApprovalStatus | null;
 }
 
 interface TaxRate {
@@ -78,8 +83,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   associationId,
   associationType
 }) => {
-  const { currentClub } = useAuth();
+  const { currentClub, currentOrganization } = useAuth();
   const isAssociation = !!associationId && !!associationType;
+  const txTable = isAssociation ? 'association_transactions' : 'transactions';
+  const isExpense = initialTransaction.type === 'expense';
+  const orgName = isAssociation ? currentOrganization?.name : (currentClub?.club as any)?.name;
+  const [approvalSetup, setApprovalSetup] = useState<ApprovalSetup | null>(null);
+  const [latestApproval, setLatestApproval] = useState<ApprovalSummary | null>(null);
+  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>(initialTransaction.approval_status || 'not_required');
   const { addNotification } = useNotifications();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -88,6 +99,21 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   const [members, setMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
+
+  // Expense approvals: settings, and the latest request for this expense
+  const loadApproval = async () => {
+    const [setup, latest] = await Promise.all([
+      getApprovalSetup(isAssociation ? { associationId, associationType } : { clubId: currentClub?.clubId }),
+      latestApprovals(txTable, [initialTransaction.id]),
+    ]);
+    setApprovalSetup(setup);
+    setLatestApproval(latest[initialTransaction.id] || null);
+  };
+  useEffect(() => {
+    setApprovalStatus(initialTransaction.approval_status || 'not_required');
+    if (isExpense) loadApproval();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTransaction.id]);
   const sheetRef = useRef<HTMLElement>(null);
   const taxSelectionFor = (t: Transaction) =>
     t.tax_type && t.tax_type !== 'none' ? `${t.tax_rate_id || NO_RATE}|${t.tax_type}` : '';
@@ -274,13 +300,30 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
       if (error) throw error;
 
       setFormData(prev => ({ ...prev, amount: taxPreview.total }));
+
+      // Changing the amount of an approved (or waiting) expense sends it back to the same approver
+      const amountChanged = Math.abs(taxPreview.total - Number(initialTransaction.amount)) > 0.004;
+      if (isExpense && amountChanged && approvalSetup?.enabled && latestApproval
+          && (approvalStatus === 'approved' || approvalStatus === 'pending')
+          && latestApproval.approver_user_id !== approvalSetup.me) {
+        try {
+          const r = await sendForApproval(txTable, initialTransaction.id, latestApproval.approver_user_id, orgName);
+          addNotification('success', `Saved. The amount changed, so it has gone back to ${r.approver_name} for approval.`);
+        } catch (e) {
+          addNotification('error', `Saved, but it couldn't be sent back for approval: ${approvalErrorMessage(e)}`);
+        }
+        setIsEditing(false);
+        onUpdate();
+        onClose();
+        return;
+      }
       addNotification('success', 'Transaction updated successfully');
       setIsEditing(false);
       onUpdate();
       onClose();
     } catch (err) {
       console.error('Error updating transaction:', err);
-      addNotification('error', err instanceof Error ? err.message : 'Failed to update transaction');
+      addNotification('error', approvalErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -306,7 +349,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
       onUpdate();
     } catch (err) {
       console.error('Error updating status:', err);
-      addNotification('error', err instanceof Error ? err.message : 'Failed to update status');
+      addNotification('error', approvalErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -358,6 +401,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
   const inc = initialTransaction.type === 'deposit' || initialTransaction.type === 'income';
   const paid = formData.payment_status === 'paid' || formData.payment_status === 'completed';
+  // An expense waiting for (or refused) approval can't be marked paid
+  const approvalLocked = isExpense && !paid && (approvalStatus === 'pending' || approvalStatus === 'declined');
 
   const modalContent = (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
@@ -410,7 +455,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                   id="tx-status"
                   value={formData.payment_status}
                   onChange={(e) => handleQuickStatusUpdate(e.target.value)}
-                  disabled={loading}
+                  disabled={loading || approvalLocked}
+                  title={approvalLocked ? 'Needs approval before it can be marked paid' : undefined}
                   className="a-pick"
                   style={{ height: 36, borderRadius: 11, paddingLeft: 30 }}
                 >
@@ -516,6 +562,26 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                   ) : <div className="a-lnk a-mute text-sm">No members found</div>
                 )}
               </div>
+            )}
+
+            {isExpense && (
+              <TransactionApprovalPanel
+                table={txTable}
+                transactionId={initialTransaction.id}
+                approvalStatus={approvalStatus}
+                isPaid={paid}
+                setup={approvalSetup}
+                latest={latestApproval}
+                orgName={orgName}
+                onSent={(name) => {
+                  addNotification('success', `Sent to ${name} for approval`);
+                  setApprovalStatus('pending');
+                  setFormData(prev => ({ ...prev, payment_status: isAssociation ? 'pending' : 'awaiting_payment' }));
+                  loadApproval();
+                  onUpdate();
+                }}
+                onError={(m) => addNotification('error', m)}
+              />
             )}
 
             <TransactionAttachments
