@@ -6,6 +6,11 @@ import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { TransactionAttachments } from './TransactionAttachments';
 import { uploadAttachments } from '../../utils/financeAttachments';
+import {
+  ApprovalSetup, ApprovalSummary, approvalErrorMessage, approverChoices, getApprovalSetup, latestApprovals,
+  sendForApproval, suggestedApprover,
+} from '../../utils/expenseApprovals';
+import { ShieldCheck } from 'lucide-react';
 
 interface TaxRate {
   id: string;
@@ -51,13 +56,51 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
   associationId,
   associationType
 }) => {
-  const { currentClub } = useAuth();
+  const { currentClub, currentOrganization } = useAuth();
   const isAssociation = !!associationId && !!associationType;
+  const orgName = isAssociation ? currentOrganization?.name : (currentClub?.club as any)?.name;
   const navigate = useNavigate();
   const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+
+  // Expense approvals (when the club/association has them on)
+  const [approvalSetup, setApprovalSetup] = useState<ApprovalSetup | null>(null);
+  const [latestApproval, setLatestApproval] = useState<ApprovalSummary | null>(null);
+  const [approverId, setApproverId] = useState('');
+  const editingApproval: string = editingExpense?.approval_status || 'not_required';
+  const approvalsOn = !!approvalSetup?.enabled;
+  // New expenses wait for approval; so do ones already waiting or declined
+  const statusLocked = (!editingExpense && approvalsOn) || editingApproval === 'pending' || editingApproval === 'declined';
+  // Who it goes to: new expenses, and declined ones being sent again
+  const showApproverPicker = approvalsOn && (!editingExpense || editingApproval === 'declined');
+  const approverOptions = approverChoices(approvalSetup);
+
+  useEffect(() => {
+    if (!isAssociation && !currentClub?.clubId) return;
+    let live = true;
+    (async () => {
+      const table = isAssociation ? 'association_transactions' : 'transactions';
+      const [setup, latest] = await Promise.all([
+        getApprovalSetup(isAssociation ? { associationId, associationType } : { clubId: currentClub?.clubId }),
+        editingExpense?.id ? latestApprovals(table, [editingExpense.id]) : Promise.resolve({} as Record<string, ApprovalSummary>),
+      ]);
+      if (!live) return;
+      setApprovalSetup(setup);
+      const last = editingExpense?.id ? latest[editingExpense.id] || null : null;
+      setLatestApproval(last);
+      const choices = approverChoices(setup);
+      const keep = last && choices.some((c) => c.user_id === last.approver_user_id) ? last.approver_user_id : '';
+      setApproverId(keep || suggestedApprover(setup)?.user_id || '');
+    })();
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentClub?.clubId, associationId, associationType, editingExpense?.id]);
+
+  useEffect(() => {
+    if (statusLocked) setPaymentStatus('awaiting_payment');
+  }, [statusLocked]);
   
   // Form state
   const [payee, setPayee] = useState('');
@@ -371,6 +414,13 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
       setError(null);
       console.log('handleSave called - isAssociation:', isAssociation, 'associationId:', associationId, 'associationType:', associationType);
 
+      if (showApproverPicker && !approverId) {
+        setError(approverOptions.length
+          ? 'Choose who should approve this expense'
+          : 'Expenses need approval, but no one else on the committee has an AlfiePRO account. Add them in Settings › Committee, or turn approvals off in Settings › Expense approvals.');
+        return;
+      }
+
       if (!payee.trim()) {
         setError('Payee is required');
         return;
@@ -414,6 +464,22 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
           .eq('id', editingExpense.id);
 
         if (transactionError) throw transactionError;
+
+        // Declined: send it again. Waiting/approved and the amount changed: back to the same approver.
+        const amountChanged = Math.abs(updateData.amount - Number(editingExpense.amount)) > 0.004;
+        const resendTo = editingApproval === 'declined' && approvalsOn
+          ? approverId
+          : approvalsOn && amountChanged && (editingApproval === 'pending' || editingApproval === 'approved')
+            ? latestApproval?.approver_user_id
+            : '';
+        if (resendTo && resendTo !== approvalSetup?.me) {
+          try {
+            const r = await sendForApproval(tableName, editingExpense.id, resendTo, orgName);
+            addNotification('success', `Saved and sent to ${r.approver_name} for approval`);
+          } catch (e) {
+            addNotification('error', `Saved, but it couldn't be sent for approval: ${approvalErrorMessage(e)}`);
+          }
+        }
 
         if (onExpenseCreated) {
           onExpenseCreated();
@@ -471,6 +537,15 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
           }
         }
 
+        if (approvalsOn && approverId && transaction?.id) {
+          try {
+            const r = await sendForApproval(tableName, transaction.id, approverId, orgName);
+            addNotification('success', `Expense saved and sent to ${r.approver_name} for approval`);
+          } catch (e) {
+            addNotification('error', `Expense saved, but it couldn't be sent for approval: ${approvalErrorMessage(e)}. Open it in Transactions to send it.`);
+          }
+        }
+
         if (onExpenseCreated) {
           onExpenseCreated();
         }
@@ -479,7 +554,7 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
       onBack();
     } catch (err) {
       console.error('Error saving expense:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save expense');
+      setError(err instanceof Error ? err.message : approvalErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -566,13 +641,52 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
               <select
                 value={paymentStatus}
                 onChange={(e) => setPaymentStatus(e.target.value as 'paid' | 'awaiting_payment')}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                disabled={statusLocked}
+                title={statusLocked ? 'Needs approval before it can be marked paid' : undefined}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white disabled:opacity-70"
               >
                 <option value="paid">Paid</option>
                 <option value="awaiting_payment">Awaiting Payment</option>
               </select>
             </div>
           </div>
+
+          {/* Approval (when the club/association requires it) */}
+          {(showApproverPicker || (approvalsOn && editingExpense && editingApproval !== 'not_required')) && (
+            <div className="flex flex-wrap items-center gap-3 p-4 rounded-lg bg-slate-700/40 border border-slate-600/60">
+              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-blue-500/15 text-blue-300 flex-shrink-0"><ShieldCheck size={18} /></span>
+              <div className="flex-1 min-w-[220px]">
+                <div className="text-sm font-medium text-white">
+                  {!editingExpense ? 'Needs approval before it can be paid'
+                    : editingApproval === 'declined' ? `Declined by ${latestApproval?.approver_name || 'the approver'}`
+                    : editingApproval === 'approved' ? `Approved by ${latestApproval?.approver_name || 'the approver'}`
+                    : `Waiting for ${latestApproval?.approver_name || 'approval'}`}
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  {!editingExpense ? 'It is saved as Awaiting Payment and sent for approval.'
+                    : editingApproval === 'declined' ? (latestApproval?.comment ? `“${latestApproval.comment}” Saving sends it again.` : 'Saving sends it again.')
+                    : 'Changing the amount sends it back for approval.'}
+                </div>
+              </div>
+              {showApproverPicker && (
+                approverOptions.length ? (
+                  <label className="flex items-center gap-2 text-sm text-slate-300">
+                    <span>Send to</span>
+                    <select
+                      value={approverId}
+                      onChange={(e) => setApproverId(e.target.value)}
+                      className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+                      aria-label="Approver"
+                    >
+                      {approverOptions.map((a) => <option key={a.user_id} value={a.user_id}>{a.position_title} · {a.name}</option>)}
+                    </select>
+                  </label>
+                ) : (
+                  <span className="text-xs text-amber-300">No one else on the committee can approve yet. Add them in Settings › Committee.</span>
+                )
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">

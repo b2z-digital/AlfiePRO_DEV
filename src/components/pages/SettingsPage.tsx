@@ -16,6 +16,7 @@ import { CommitteeManagement } from './CommitteeManagement';
 import { DashboardTemplateManager } from './DashboardTemplateManager';
 import { IntegrationsPage } from './IntegrationsPage';
 import { FinanceSettingsPage } from './FinanceSettingsPage';
+import { ExpenseApprovalSettings } from '../finances/ExpenseApprovalSettings';
 import { MembershipSettingsPage } from './MembershipSettingsPage';
 import { SubscriptionManagement } from './SubscriptionManagement';
 import { RaceDocumentsPage } from './RaceDocumentsPage';
@@ -45,7 +46,7 @@ interface SettingsPageProps {
 }
 
 type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'club-features' | 'team' | 'team-access' | 'subscriptions' | 'integrations' |
-  'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' | 'finance-payment-settings' | 'finance-opening-balance' |
+  'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' | 'finance-payment-settings' | 'finance-opening-balance' | 'finance-approvals' |
   'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' |
   'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system' | 'handicap-rules' | 'email-logs' | 'club-email-logs';
 
@@ -657,6 +658,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
               { id: 'finance-payment', title: 'Bank details', desc: 'Account shown on invoices and renewals', glyph: 'bank', show: true, open: open('finance-payment') },
               { id: 'finance-payment-settings', title: 'Payments', desc: 'Card and online payment settings', glyph: 'card', show: true, open: open('finance-payment-settings') },
               { id: 'finance-opening-balance', title: 'Opening balance', desc: 'Starting balance for your books', glyph: 'wallet', show: true, open: open('finance-opening-balance') },
+              { id: 'finance-approvals', title: 'Expense approvals', desc: 'Someone else approves expenses before they are paid', glyph: 'check', show: true, open: open('finance-approvals') },
             ] : [] },
             { id: 'membership', title: 'Membership', dot: '#8A4DFF', items: can('settings.membership') ? [
               { id: 'membership-types', title: 'Membership types', desc: 'Fees and categories of membership', glyph: 'card', show: true, open: open('membership-types') },
@@ -1045,6 +1047,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
           {activeTab === 'finance-opening-balance' && (
             <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="opening-balance" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
+          )}
+
+          {activeTab === 'finance-approvals' && (
+            <ExpenseApprovalSettings
+              associationId={currentOrganization && currentOrganization.type !== 'club' ? currentOrganization.id : undefined}
+              associationType={currentOrganization && currentOrganization.type !== 'club' ? currentOrganization.type as 'state' | 'national' : undefined}
+              onOpenCommittee={() => setActiveTab('team')}
+            />
           )}
 
           {activeTab === 'membership-types' && (
