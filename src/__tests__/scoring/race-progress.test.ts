@@ -27,12 +27,12 @@ describe('handicap each boat sails on', () => {
     });
   }
 
-  it('groups boats by handicap, scratch first, highest last', () => {
+  it('groups boats by head start, biggest first, scratch boats last', () => {
     const e = real.find(x => x.raceFormat === 'handicap')!;
     const race = e.lastCompletedRace + 1;
     const groups = handicapGroups({ ...e, numRaces: race + 2 }, race, e.skippers.map((_, i) => i));
     const hcaps = groups.map(g => g.hcap);
-    expect(hcaps).toEqual([...hcaps].sort((a, b) => a - b));
+    expect(hcaps).toEqual([...hcaps].sort((a, b) => b - a));
     expect(groups.flatMap(g => g.skipperIndices).sort((a, b) => a - b)).toEqual(e.skippers.map((_, i) => i));
     for (const g of groups) for (const i of g.skipperIndices) expect(handicapForRace(e.skippers, e.raceResults, race, i)).toBe(g.hcap);
   });

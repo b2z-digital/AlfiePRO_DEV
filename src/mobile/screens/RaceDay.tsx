@@ -24,7 +24,7 @@ import { SOUND, SoundSheet, StartDial, playSystemSound, readVolume, useKeepAwake
 import { HEAT_COLOURS, Loading, Missing } from './RaceSetup';
 
 const seqKey = (format?: string) => `alfie-m-startbox-seq:${format === 'handicap' ? 'handicap' : 'scratch'}`;
-const offLabel = (h: number) => (h === 0 ? 'Scratch' : `+${h} s`);
+const offLabel = (h: number) => (h === 0 ? 'Scratch' : `${h} s`);
 
 /* ─────────────── pieces ─────────────── */
 
@@ -38,13 +38,16 @@ const RacePill: React.FC<{ up: NextUp; extra?: string }> = ({ up, extra }) => (
 
 const ordinal = (n: number) => (n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`);
 
-/** Handicap start list: who goes when after the gun. */
-const GroupList: React.FC<{ groups: HandicapGroup[]; skippers: Skipper[]; elapsed: number | null; you: string[] }> = ({ groups, skippers, elapsed, you }) => {
-  const next = elapsed === null ? -1 : groups.findIndex(g => g.hcap * 1000 > elapsed);
+/**
+ * Handicap start list: biggest head start first, scratch boats last at the gun. A group goes
+ * when the countdown to the gun reaches its head start (remaining is null before the sequence runs).
+ */
+const GroupList: React.FC<{ groups: HandicapGroup[]; skippers: Skipper[]; remaining: number | null; you: string[] }> = ({ groups, skippers, remaining, you }) => {
+  const next = remaining === null ? -1 : groups.findIndex(g => g.hcap * 1000 < remaining);
   return (
     <div className="m-card" style={{ overflow: 'hidden' }}>
       {groups.map((g, i) => {
-        const started = elapsed !== null && g.hcap * 1000 <= elapsed;
+        const started = remaining !== null && g.hcap * 1000 >= remaining;
         const isNext = i === next;
         const names = g.skipperIndices.map(x => (you.includes(skippers[x]?.memberId || '') ? 'You' : (skippers[x]?.name || '').split(' ')[0])).join(', ');
         return (
@@ -56,7 +59,7 @@ const GroupList: React.FC<{ groups: HandicapGroup[]; skippers: Skipper[]; elapse
             </span>
             <span style={{ flex: 1, minWidth: 0, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{names}</span>
             <span style={{ fontSize: 12, fontWeight: 600, color: started ? 'var(--m-green-ink)' : isNext ? 'var(--m-amber-ink)' : 'var(--m-dim)' }}>
-              {started ? 'Started' : elapsed === null ? (g.hcap === 0 ? 'at the gun' : `${g.hcap} s after`) : countdown(g.hcap * 1000 - elapsed)}
+              {started ? 'Started' : remaining === null ? (g.hcap === 0 ? 'at the gun' : `${g.hcap} s before`) : countdown(remaining - g.hcap * 1000)}
             </span>
           </div>
         );
@@ -274,25 +277,25 @@ export const RaceScreen: React.FC = () => {
   }, [gunAt]);
   useKeepAwake(running || !!gunAt);
 
-  /* Handicap starts: beep down each group's start when no recording is calling them */
+  /* Handicap starts: beep each group away when no recording is calling the head starts */
   const groups = useMemo(() => (event && up?.handicap ? handicapGroups(event, up.race, up.skipperIndices) : []), [event, up]);
   const beeped = useRef(new Set<string>());
   useEffect(() => {
-    if (!gunAt || !groups.length) return;
-    const el = now - gunAt;
+    if (state !== 'running' || !groups.length) return;
     for (const g of groups) {
-      if (g.hcap === 0) continue;
+      if (g.hcap === 0) continue; // scratch boats go on the sequence's own start signal
       for (const t of [3, 2, 1, 0]) {
-        const k = `${gunAt}-${g.hcap}-${t}`;
-        const at = g.hcap * 1000 - t * 1000;
-        if (el >= at && el < at + 1000 && !beeped.current.has(k)) {
+        const k = `${seq?.id}-${g.hcap}-${t}`;
+        const at = (g.hcap + t) * 1000;
+        if (remaining <= at && remaining > at - 1000 && !beeped.current.has(k)) {
           beeped.current.add(k);
           if (t === 0) tap('medium');
-          if (!engine.isCountdownAudioPlaying()) void engine.playSynthBeep(t === 0 ? 1000 : 880, t === 0 ? 500 : 150);
+          if (!engine.isCountdownAudioPlaying() && !seq?.audio_file_url) void engine.playSynthBeep(t === 0 ? 1000 : 880, t === 0 ? 500 : 150);
         }
       }
     }
-  }, [now, gunAt, groups, engine, tap]);
+  }, [remaining, state, groups, engine, tap, seq]);
+  useEffect(() => { if (state === 'armed' || state === 'idle') beeped.current.clear(); }, [state]);
 
   if (item === undefined || (item && !event)) return <Loading />;
   if (!item || !event || !up || !session) return <Missing />;
@@ -344,8 +347,6 @@ export const RaceScreen: React.FC = () => {
   /* ── Racing ── */
   if (gunAt) {
     const elapsed = now - gunAt;
-    const nextGroup = groups.find(g => g.hcap * 1000 > elapsed);
-    const lastGroup = groups[groups.length - 1];
     return (
       <div className="m-stack m-racing">
         <header className="m-top">
@@ -356,18 +357,8 @@ export const RaceScreen: React.FC = () => {
         <div style={{ textAlign: 'center', padding: '8px 0 2px' }}>
           <span className="m-racing-pill">RACING</span>
           <div className="m-disp m-num" style={{ fontSize: 72, fontWeight: 700, lineHeight: 1.05, marginTop: 8 }} role="timer" aria-label={`${clock(elapsed)} since the gun`}>{clock(elapsed)}</div>
-          <div className="m-mut" style={{ fontSize: 14 }}>since the gun · {up.skipperIndices.length} boats{session.recalls ? ` · ${session.recalls} recall${session.recalls > 1 ? 's' : ''}` : ''}</div>
+          <div className="m-mut" style={{ fontSize: 14 }}>{up.handicap ? 'since scratch boats started' : 'since the gun'} · {up.skipperIndices.length} boats{session.recalls ? ` · ${session.recalls} recall${session.recalls > 1 ? 's' : ''}` : ''}</div>
         </div>
-        {up.handicap && nextGroup && (
-          <>
-            <div style={{ textAlign: 'center' }}>
-              <div className="m-lb" style={{ color: 'var(--m-amber-ink)' }}>Next off · <span style={{ textTransform: 'none' }}>{offLabel(nextGroup.hcap)}</span></div>
-              <div className="m-disp m-num" style={{ fontSize: 44, fontWeight: 700, lineHeight: 1.05 }}>{countdown(nextGroup.hcap * 1000 - elapsed)}</div>
-              {lastGroup !== nextGroup && <div className="m-mut" style={{ fontSize: 13 }}>Last boats go in {countdown(lastGroup.hcap * 1000 - elapsed)}</div>}
-            </div>
-            <GroupList groups={groups} skippers={skippers} elapsed={elapsed} you={memberIds} />
-          </>
-        )}
         <button className="m-btn m-btn-p" style={{ height: 64, fontSize: 18, borderRadius: 18 }} onClick={openSheet} disabled={opening}>
           <Icon name="racing" size={22} />{opening ? 'Loading…' : 'Score the finishes'}
         </button>
@@ -402,6 +393,8 @@ export const RaceScreen: React.FC = () => {
   /* ── StartBox ── */
   const progress = total ? remaining / total : 1;
   const sub = flash || seq?.name || 'Choose a start sequence';
+  const nextHcap = groups.find(g => g.hcap * 1000 < remaining)?.hcap ?? null;
+  const tooEarly = groups.filter(g => g.hcap * 1000 > total).reduce((n, g) => n + g.skipperIndices.length, 0);
   return (
     <div className="m-stack m-startbox" style={{ alignItems: 'center', minHeight: 'calc(100dvh - var(--m-safe-top) - var(--m-safe-bottom) - 40px)' }}>
       <header className="m-top" style={{ alignSelf: 'stretch' }}>
@@ -411,21 +404,37 @@ export const RaceScreen: React.FC = () => {
       </header>
       {nothing ? <div style={{ alignSelf: 'stretch' }}><NothingToStart up={up} event={event} onSheet={openSheet} busy={opening} /></div> : (
         <>
-          <div style={{ marginTop: 10 }}>
-            <StartDial size={270} progress={progress} animate={state === 'running'} label={`${countdown(remaining)} to the start`}>
-              <span className="m-lb" style={{ color: 'var(--m-pink-ink)' }}>{state === 'paused' ? 'Paused' : 'Start in'}</span>
-              <span className="m-disp m-num" style={{ fontSize: 'min(84px, 22vw)', fontWeight: 700, lineHeight: 1 }}>{countdown(remaining)}</span>
-              <button className="m-mut" disabled={running} onClick={() => setSheet('seq')} style={{ fontSize: 13.5, background: 'none', border: 0, padding: '2px 4px', color: 'var(--m-mut)', display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 20 }}>
-                {sub}{!running && !flash && <Icon name="down" size={14} />}
-              </button>
-            </StartDial>
-          </div>
-          {up.handicap
-            ? <div style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <GroupList groups={groups} skippers={skippers} elapsed={null} you={memberIds} />
-                <div className="m-dim" style={{ fontSize: 12.5, lineHeight: 1.4 }}>Each boat starts its handicap in seconds after the gun: scratch boats first, the highest handicap last. First across the line wins.</div>
+          {up.handicap ? (
+            <div style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ textAlign: 'center', paddingTop: 4 }} role="timer" aria-label={`${countdown(remaining)} to the start`}>
+                <div className="m-lb" style={{ color: 'var(--m-amber-ink)' }}>
+                  {state === 'paused' ? 'Paused' : running && nextHcap !== null ? <>Next off · <span style={{ textTransform: 'none' }}>{nextHcap ? `${nextHcap} s head start` : 'scratch boats'}</span></> : 'Start in'}
+                </div>
+                <div className="m-disp m-num" style={{ fontSize: 76, fontWeight: 700, lineHeight: 1.05 }}>{countdown(running && nextHcap !== null ? remaining - nextHcap * 1000 : remaining)}</div>
+                {running && nextHcap ? <div className="m-mut" style={{ fontSize: 13.5 }}>Scratch boats go in {countdown(remaining)}</div> : (
+                  <button className="m-mut" disabled={running} onClick={() => setSheet('seq')} style={{ fontSize: 13.5, background: 'none', border: 0, padding: '2px 4px', color: 'var(--m-mut)', display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 20 }}>
+                    {sub}{!running && !flash && <Icon name="down" size={14} />}
+                  </button>
+                )}
               </div>
-            : <BoatsCard up={up} skippers={skippers} roll={roll} onRoll={r => setSession({ ...session, rollCall: r })} title={up.heat ? 'In this heat' : 'Racing'} />}
+              <GroupList groups={groups} skippers={skippers} remaining={running ? remaining : null} you={memberIds} />
+              {tooEarly > 0 && <div className="m-card" style={{ padding: '10px 14px', fontSize: 13, color: 'var(--m-amber-ink)' }}>{tooEarly} boat{tooEarly > 1 ? 's have' : ' has'} more head start than this {countdown(total)} sequence. Choose a longer one, or start {tooEarly > 1 ? 'them' : 'it'} by hand.</div>}
+              <div className="m-dim" style={{ fontSize: 12.5, lineHeight: 1.4 }}>Head starts come from each boat's handicap after the last race. The biggest head start goes first, scratch boats last on the gun. First across the line wins; the finish pad works the same as scratch.</div>
+            </div>
+          ) : (
+            <>
+              <div style={{ marginTop: 10 }}>
+                <StartDial size={270} progress={progress} animate={state === 'running'} label={`${countdown(remaining)} to the start`}>
+                  <span className="m-lb" style={{ color: 'var(--m-pink-ink)' }}>{state === 'paused' ? 'Paused' : 'Start in'}</span>
+                  <span className="m-disp m-num" style={{ fontSize: 'min(84px, 22vw)', fontWeight: 700, lineHeight: 1 }}>{countdown(remaining)}</span>
+                  <button className="m-mut" disabled={running} onClick={() => setSheet('seq')} style={{ fontSize: 13.5, background: 'none', border: 0, padding: '2px 4px', color: 'var(--m-mut)', display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 20 }}>
+                    {sub}{!running && !flash && <Icon name="down" size={14} />}
+                  </button>
+                </StartDial>
+              </div>
+              <BoatsCard up={up} skippers={skippers} roll={roll} onRoll={r => setSession({ ...session, rollCall: r })} title={up.heat ? 'In this heat' : 'Racing'} />
+            </>
+          )}
           {up.handicap && roll && <BoatsCard up={up} skippers={skippers} roll={roll} onRoll={r => setSession({ ...session, rollCall: r })} title="Roll call" />}
           <div style={{ flex: 1, minHeight: 16 }} />
           <div className="m-row" style={{ gap: 22 }}>

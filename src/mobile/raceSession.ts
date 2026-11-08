@@ -119,8 +119,9 @@ function nextHeatUp(e: RaceEvent, hm: HeatManagement, raceResults: any[], handic
 export interface HandicapGroup { hcap: number; skipperIndices: number[] }
 
 /**
- * Handicap starts: each boat starts its handicap in seconds after the gun (scratch boats on 0
- * at the gun, highest handicap last), with the handicap the scoring screen uses for this race.
+ * Handicap starts: a handicap is a head start in seconds (handicapCalculator: 1st −30, race 1
+ * seeding 0/10/20…), so the biggest head start goes first and scratch boats (0) go last, on the
+ * gun. Uses the handicap the scoring screen uses for this race.
  */
 export function handicapGroups(event: RaceEvent, race: number, indices: number[]): HandicapGroup[] {
   const e = forScoring(event);
@@ -130,7 +131,7 @@ export function handicapGroups(event: RaceEvent, race: number, indices: number[]
     const h = handicapForRace(st.skippers, st.raceResults, race, i);
     by.set(h, [...(by.get(h) || []), i]);
   }
-  return [...by.entries()].sort((a, b) => a[0] - b[0]).map(([hcap, skipperIndices]) => ({ hcap, skipperIndices }));
+  return [...by.entries()].sort((a, b) => b[0] - a[0]).map(([hcap, skipperIndices]) => ({ hcap, skipperIndices }));
 }
 
 /* ─────────────── kept on this phone ─────────────── */
