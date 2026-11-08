@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { NewTransactionModal } from './NewTransactionModal';
 import { TransactionDetailModal } from './TransactionDetailModal';
+import { removeAllAttachmentFiles } from '../../utils/financeAttachments';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { CategoryCreationModal } from './CategoryCreationModal';
 import { TransactionImportModal } from './TransactionImportModal';
@@ -28,6 +29,9 @@ interface Transaction {
   line_items?: TransactionLineItem[];
   linked_entity_type?: string;
   linked_entity_id?: string;
+  tax_amount?: number | null;
+  tax_rate_id?: string | null;
+  tax_type?: 'none' | 'included' | 'excluded' | null;
 }
 
 interface TransactionLineItem {
@@ -172,6 +176,7 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const loadedOnceRef = useRef(false);
 
   // Summary calculations
   const totalIncome = transactions
@@ -187,13 +192,14 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
   useEffect(() => {
     console.log('FinancesTransactions useEffect - isAssociation:', isAssociation, 'currentClub:', currentClub?.clubId);
     if (isAssociation || currentClub?.clubId) {
+      loadedOnceRef.current = false; // a different club or association: show the loader again
       loadTransactions();
       loadCategories();
     } else {
       console.log('FinancesTransactions: No association or club, setting loading to false');
       setLoading(false);
     }
-  }, [currentClub, associationId, associationType]);
+  }, [currentClub?.clubId, associationId, associationType]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -295,6 +301,7 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
 
         setTransactions(formattedTransactions);
         console.log('FinancesTransactions: Setting loading to false (association)');
+        loadedOnceRef.current = true;
         setLoading(false);
         return;
       }
@@ -309,6 +316,9 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
           amount,
           date,
           category_id,
+          tax_amount,
+          tax_rate_id,
+          tax_type,
           payer,
           payee,
           reference,
@@ -406,6 +416,9 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
           notes: transaction.notes,
           payment_method: transaction.payment_method,
           payment_status: transaction.payment_status,
+          tax_amount: transaction.tax_amount,
+          tax_rate_id: transaction.tax_rate_id,
+          tax_type: transaction.tax_type,
           line_items: lineItems,
           linked_entity_type: transaction.linked_entity_type,
           linked_entity_id: transaction.linked_entity_id
@@ -413,6 +426,7 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
       }) || [];
 
       setTransactions(processedTransactions);
+      loadedOnceRef.current = true;
     } catch (err) {
       console.error('Error loading transactions:', err);
       setError(err instanceof Error ? err.message : 'Failed to load transactions');
@@ -431,6 +445,8 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
 
     try {
       const tableName = isAssociation ? 'association_transactions' : 'transactions';
+      // Files first: their rows go with the transaction, and then the paths are gone
+      await removeAllAttachmentFiles(tableName, transactionToDelete);
       let query = supabase
         .from(tableName)
         .delete()
@@ -481,7 +497,9 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
   };
 
 
-  if (loading) {
+  // Only the first load replaces the page; later refreshes (after an edit or a
+  // status change) keep the list and any open transaction sheet on screen
+  if (loading && !loadedOnceRef.current) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/10 border-t-[#0A84FF]"></div>

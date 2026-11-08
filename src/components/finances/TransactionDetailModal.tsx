@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, FileText, User, CreditCard, Tag, MessageSquare, Users, Receipt, SquarePen as Edit2 } from 'lucide-react';
+import { X, Calendar, FileText, User, CreditCard, Tag, MessageSquare, Users, Receipt, Percent, SquarePen as Edit2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useModalFocus } from '../../hooks/useModalFocus';
+import { computeTax, rateOf, TaxType } from '../../utils/financeTax';
+import { TransactionAttachments } from './TransactionAttachments';
 
 interface Transaction {
   id: string;
@@ -21,7 +24,29 @@ interface Transaction {
   payment_status: string;
   linked_entity_type?: string;
   linked_entity_id?: string;
+  tax_amount?: number | string | null;
+  tax_rate_id?: string | null;
+  tax_type?: TaxType | null;
 }
+
+interface TaxRate {
+  id: string;
+  name: string;
+  rate: number | string;
+  is_default?: boolean | null;
+}
+
+// Club transactions only accept these; association ones also hold the older values
+const CLUB_METHODS: [string, string][] = [['cash', 'Cash'], ['card', 'Card'], ['cheque', 'Cheque'], ['bank', 'Bank transfer'], ['other', 'Other']];
+const ASSOC_METHODS: [string, string][] = [['cash', 'Cash'], ['stripe', 'Stripe'], ['bank_transfer', 'Bank transfer'], ['cheque', 'Cheque'], ['credit_card', 'Credit card'], ['debit_card', 'Debit card'], ['other', 'Other']];
+const NO_RATE = '__gst10__'; // used when no tax rates are set up: 10% GST, saved without a rate id
+
+/** What the amount field shows when editing: the total, or (GST added on top) the amount before GST */
+const enteredAmount = (t: Transaction) => {
+  const amount = Number(t.amount) || 0;
+  const tax = Number(t.tax_amount) || 0;
+  return t.tax_type === 'excluded' ? Math.round((amount - tax) * 100) / 100 : amount;
+};
 
 interface BudgetCategory {
   id: string;
@@ -62,9 +87,15 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   const [showMembers, setShowMembers] = useState(false);
   const [members, setMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
+  const sheetRef = useRef<HTMLElement>(null);
+  const taxSelectionFor = (t: Transaction) =>
+    t.tax_type && t.tax_type !== 'none' ? `${t.tax_rate_id || NO_RATE}|${t.tax_type}` : '';
   const [formData, setFormData] = useState({
     description: initialTransaction.description,
     amount: initialTransaction.amount,
+    amount_input: String(enteredAmount(initialTransaction)),
+    tax_selection: taxSelectionFor(initialTransaction),
     date: initialTransaction.date,
     category_id: initialTransaction.category_id || '',
     payer: initialTransaction.payer || '',
@@ -79,6 +110,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     setFormData({
       description: initialTransaction.description,
       amount: initialTransaction.amount,
+      amount_input: String(enteredAmount(initialTransaction)),
+      tax_selection: taxSelectionFor(initialTransaction),
       date: initialTransaction.date,
       category_id: initialTransaction.category_id || '',
       payer: initialTransaction.payer || '',
@@ -94,8 +127,50 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   useEffect(() => {
     if (currentClub?.clubId || isAssociation) {
       loadCategories();
+      loadTaxRates();
     }
-  }, [currentClub, isAssociation]);
+  }, [currentClub?.clubId, isAssociation]);
+
+  const loadTaxRates = async () => {
+    try {
+      const q = isAssociation
+        ? supabase.from('association_tax_rates').select('id, name, rate, is_default')
+            .eq('association_id', associationId).eq('association_type', associationType)
+        : supabase.from('tax_rates').select('id, name, rate, is_default').eq('club_id', currentClub?.clubId);
+      const { data } = await q.eq('is_active', true);
+      setTaxRates((data as TaxRate[]) || []);
+    } catch (err) {
+      console.error('Error loading tax rates:', err);
+    }
+  };
+
+  // GST options for the Edit sheet; falls back to 10% GST when no rates are set up
+  const taxOptions = useMemo(() => {
+    const rates = taxRates.length ? taxRates : [{ id: NO_RATE, name: 'GST', rate: 0.1 }];
+    const opts: { value: string; label: string; rate: number }[] = [];
+    rates.forEach((r) => {
+      const pct = `${Math.round(rateOf(r) * 1000) / 10}%`;
+      opts.push({ value: `${r.id}|included`, label: `${r.name} ${pct} included in amount`, rate: rateOf(r) });
+      opts.push({ value: `${r.id}|excluded`, label: `${r.name} ${pct} added on top`, rate: rateOf(r) });
+    });
+    // A saved rate that has since been switched off still shows
+    const sel = formData.tax_selection;
+    if (sel && !opts.some((o) => o.value === sel)) {
+      const [, type] = sel.split('|');
+      opts.push({ value: sel, label: type === 'excluded' ? 'GST added on top' : 'GST included in amount', rate: 0.1 });
+    }
+    return opts;
+  }, [taxRates, formData.tax_selection]);
+
+  const taxPreview = useMemo(() => {
+    const entered = parseFloat(formData.amount_input);
+    const amount = Number.isFinite(entered) ? entered : 0;
+    if (!formData.tax_selection) return { total: Math.round(amount * 100) / 100, tax: 0, type: 'none' as TaxType, rateId: null as string | null };
+    const [rateId, type] = formData.tax_selection.split('|') as [string, TaxType];
+    const rate = taxOptions.find((o) => o.value === formData.tax_selection)?.rate || 0.1;
+    const { total, tax } = computeTax(amount, type, rate);
+    return { total, tax, type, rateId: rateId === NO_RATE ? null : rateId };
+  }, [formData.amount_input, formData.tax_selection, taxOptions]);
 
   const loadRemittanceMembers = async () => {
     if (!isAssociation || initialTransaction.linked_entity_type !== 'club') return;
@@ -164,6 +239,15 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   };
 
   const handleSave = async () => {
+    const entered = parseFloat(formData.amount_input);
+    if (!Number.isFinite(entered) || entered <= 0) {
+      addNotification('error', 'Please enter an amount greater than 0');
+      return;
+    }
+    if (!formData.description?.trim()) {
+      addNotification('error', 'Please enter a description');
+      return;
+    }
     try {
       setLoading(true);
       const tableName = isAssociation ? 'association_transactions' : 'transactions';
@@ -171,9 +255,12 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
         .from(tableName as any)
         .update({
           description: formData.description,
-          amount: formData.amount,
+          amount: taxPreview.total,
+          tax_amount: taxPreview.tax,
+          tax_type: taxPreview.type,
+          tax_rate_id: taxPreview.rateId,
           date: formData.date,
-          category_id: formData.category_id,
+          category_id: formData.category_id || null,
           payer: formData.payer,
           payee: formData.payee,
           reference: formData.reference,
@@ -186,6 +273,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
       if (error) throw error;
 
+      setFormData(prev => ({ ...prev, amount: taxPreview.total }));
       addNotification('success', 'Transaction updated successfully');
       setIsEditing(false);
       onUpdate();
@@ -232,14 +320,48 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   };
 
 
+  const cancelEdit = () => {
+    setFormData(prev => ({
+      ...prev,
+      description: initialTransaction.description,
+      amount: initialTransaction.amount,
+      amount_input: String(enteredAmount(initialTransaction)),
+      tax_selection: taxSelectionFor(initialTransaction),
+      date: initialTransaction.date,
+      category_id: initialTransaction.category_id || '',
+      payer: initialTransaction.payer || '',
+      payee: initialTransaction.payee || '',
+      reference: initialTransaction.reference || '',
+      notes: initialTransaction.notes || '',
+      payment_method: initialTransaction.payment_method,
+    }));
+    setIsEditing(false);
+  };
+
+  // Keep keyboard focus in the sheet (page behind is inert); Esc cancels an edit, then closes
+  useModalFocus(sheetRef, isOpen, () => {
+    if (loading) return;
+    if (isEditing) cancelEdit(); else onClose();
+  });
+
   if (!isOpen) return null;
+
+  const methodOptions = (() => {
+    const base = isAssociation ? ASSOC_METHODS : CLUB_METHODS;
+    const cur = formData.payment_method;
+    return cur && !base.some(([v]) => v === cur) ? [...base, [cur, cur.replace(/_/g, ' ')] as [string, string]] : base;
+  })();
+  const methodLabel = methodOptions.find(([v]) => v === formData.payment_method)?.[1] || (formData.payment_method || '').replace(/_/g, ' ');
+  const savedTax = Number(initialTransaction.tax_amount) || 0;
+  const savedTaxType = initialTransaction.tax_type || 'none';
+  const showTaxRow = isEditing || savedTax > 0 || savedTaxType !== 'none' || taxRates.length > 0;
 
   const inc = initialTransaction.type === 'deposit' || initialTransaction.type === 'income';
   const paid = formData.payment_status === 'paid' || formData.payment_status === 'completed';
 
   const modalContent = (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-      <section className="a-msheet" style={{ width: 600 }} role="dialog" aria-modal="true" aria-label="Transaction details">
+      <section ref={sheetRef} tabIndex={-1} className="a-msheet outline-none" style={{ width: 600 }} role="dialog" aria-modal="true" aria-label={isEditing ? 'Edit transaction' : 'Transaction details'}>
         <div className="flex items-center gap-3 flex-shrink-0" style={{ padding: '18px 18px 0 22px' }}>
           <span className="a-tile"><Receipt size={19} /></span>
           <div className="flex-1 min-w-0">
@@ -261,14 +383,24 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.amount}
-                  onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) }))}
+                  min="0"
+                  inputMode="decimal"
+                  value={formData.amount_input}
+                  onChange={(e) => setFormData(prev => ({ ...prev, amount_input: e.target.value }))}
+                  onWheel={(e) => (e.currentTarget as HTMLInputElement).blur()}
                   className={`a-big a-amt-inp ${inc ? 'a-txt-g' : 'a-txt-r'}`}
                   style={{ fontSize: 40 }}
                 />
               </label>
             ) : (
               <div className={`a-big mt-3.5 ${inc ? 'a-txt-g' : 'a-txt-r'}`} style={{ fontSize: 54 }}>{inc ? '+' : '−'}{formatCurrency(formData.amount)}</div>
+            )}
+            {isEditing && taxPreview.type !== 'none' && (
+              <div className="a-dim text-xs mt-2 a-num">
+                {taxPreview.type === 'excluded'
+                  ? <>Total {formatCurrency(taxPreview.total)} · includes {formatCurrency(taxPreview.tax)} GST added on top</>
+                  : <>Includes {formatCurrency(taxPreview.tax)} GST</>}
+              </div>
             )}
             {!isEditing && (
               <div className="inline-flex mt-4 relative">
@@ -296,7 +428,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             <div className="a-grp">
               {isEditing && (
                 <Row icon={<FileText size={15} />} label="Description">
-                  <input className="a-bare" type="text" value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} aria-label="Description" />
+                  <input autoFocus className="a-bare" type="text" value={formData.description} onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))} aria-label="Description" />
                 </Row>
               )}
               <Row icon={<Calendar size={15} />} label="Date">
@@ -325,17 +457,26 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               </Row>
               <Row icon={<CreditCard size={15} />} label="Payment">
                 {isEditing ? (
-                  <select className="a-bare" value={formData.payment_method} onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value }))} aria-label="Payment method">
-                    <option value="cash">Cash</option>
-                    <option value="stripe">Stripe</option>
-                    <option value="bank_transfer">Bank transfer</option>
-                    <option value="cheque">Cheque</option>
-                    <option value="credit_card">Credit card</option>
-                    <option value="debit_card">Debit card</option>
-                    <option value="other">Other</option>
+                  <select className="a-bare" value={formData.payment_method || ''} onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value }))} aria-label="Payment method">
+                    {!formData.payment_method && <option value="">Select method</option>}
+                    {methodOptions.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
-                ) : <span className="capitalize">{formData.payment_method.replace('_', ' ')}</span>}
+                ) : <span className="capitalize">{methodLabel || <span className="a-dim">—</span>}</span>}
               </Row>
+              {showTaxRow && (
+                <Row icon={<Percent size={15} />} label="Tax">
+                  {isEditing ? (
+                    <select className="a-bare" value={formData.tax_selection} onChange={(e) => setFormData(prev => ({ ...prev, tax_selection: e.target.value }))} aria-label="Tax">
+                      <option value="">No tax</option>
+                      {taxOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  ) : savedTaxType === 'none' || savedTax === 0 ? (
+                    <span className="a-dim">No tax</span>
+                  ) : (
+                    <span className="a-num">{formatCurrency(savedTax)} GST {savedTaxType === 'excluded' ? 'added on top' : 'included'}</span>
+                  )}
+                </Row>
+              )}
               {formData.reference && (
                 <Row icon={<Receipt size={15} />} label="Reference"><span className="a-mono a-mute">{formData.reference}</span></Row>
               )}
@@ -377,6 +518,12 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               </div>
             )}
 
+            <TransactionAttachments
+              variant="sheet"
+              table={isAssociation ? 'association_transactions' : 'transactions'}
+              transactionId={initialTransaction.id}
+            />
+
             {initialTransaction.linked_entity_type === 'event_registration' && (
               <div className="a-note">
                 <span className="a-txt-b flex"><Calendar size={17} /></span>
@@ -389,7 +536,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
         <div className="flex gap-2.5 flex-shrink-0 a-panel-foot" style={{ padding: '16px 22px', justifyContent: 'stretch' }}>
           {isEditing ? (
             <>
-              <button onClick={() => setIsEditing(false)} disabled={loading} className="a-btn flex-1" style={{ height: 46 }}>Cancel</button>
+              <button onClick={cancelEdit} disabled={loading} className="a-btn flex-1" style={{ height: 46 }}>Cancel</button>
               <button onClick={handleSave} disabled={loading} className="a-btn a-btn-p" style={{ height: 46, flex: 1.4 }}>{loading ? 'Saving…' : 'Save changes'}</button>
             </>
           ) : (

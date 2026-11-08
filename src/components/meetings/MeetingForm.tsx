@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, TriangleAlert as AlertTriangle, Users, Shield, Repeat, Info, ChevronDown, Check, GripVertical } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, TriangleAlert as AlertTriangle, Users, Shield, Repeat, Info, ChevronDown, Check, GripVertical, ChevronUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting, MeetingFormData, MeetingCategory, RecurrenceType } from '../../types/meeting';
 import { createMeeting, updateMeeting } from '../../utils/meetingStorage';
@@ -7,6 +7,7 @@ import { supabase } from '../../utils/supabase';
 import { Member } from '../../types/member';
 import { MemberSelect } from '../ui/MemberSelect';
 import { loadGoogleMaps } from '../../utils/googleMaps';
+import { generateRecurringDates } from '../../utils/recurrenceDates';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const NTH_LABELS = ['1st', '2nd', '3rd', '4th', 'Last'];
@@ -186,11 +187,11 @@ const RecurrenceSelector: React.FC<{
             <div className="p-3 rounded-lg bg-slate-700/50 border border-slate-600/50">
               <div className="flex flex-wrap gap-1.5">
                 <span className="px-2 py-0.5 rounded text-xs bg-blue-600/30 text-blue-300 border border-blue-500/30">
-                  {new Date(formData.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {new Date(formData.date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
                 {recurrencePreviewDates.slice(0, 11).map((date, i) => (
                   <span key={i} className="px-2 py-0.5 rounded text-xs bg-slate-600/50 text-slate-300">
-                    {new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 ))}
                 {recurrencePreviewDates.length > 11 && (
@@ -663,17 +664,43 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
 
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  // A card only becomes draggable while its handle is held, so text in its
+  // fields can still be selected and the inputs behave normally
+  const [armedIndex, setArmedIndex] = useState<number | null>(null);
 
-  const handleAgendaDragStart = (index: number) => {
+  const handleAgendaDragStart = (e: React.DragEvent, index: number) => {
+    // Firefox won't start a drag without data
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', String(index)); } catch { /* ignore */ }
     setDragIndex(index);
   };
 
+  useEffect(() => {
+    if (armedIndex === null) return;
+    const disarm = () => { if (dragIndex === null) setArmedIndex(null); };
+    window.addEventListener('mouseup', disarm);
+    return () => window.removeEventListener('mouseup', disarm);
+  }, [armedIndex, dragIndex]);
+
+  const moveAgendaItem = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= agendaItems.length) return;
+    setAgendaItems(prev => {
+      const items = [...prev];
+      [items[index], items[target]] = [items[target], items[index]];
+      return items.map((item, i) => ({ ...item, item_number: i + 1 }));
+    });
+  };
+
   const handleAgendaDragOver = (e: React.DragEvent, index: number) => {
+    if (dragIndex === null) return;
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     setDragOverIndex(index);
   };
 
-  const handleAgendaDrop = (targetIndex: number) => {
+  const handleAgendaDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
     if (dragIndex === null || dragIndex === targetIndex) {
       setDragIndex(null);
       setDragOverIndex(null);
@@ -692,6 +719,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
   const handleAgendaDragEnd = () => {
     setDragIndex(null);
     setDragOverIndex(null);
+    setArmedIndex(null);
   };
 
   const handleRemoveAgendaItem = (index: number) => {
@@ -791,57 +819,14 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
 
   const recurrencePreviewDates = useMemo(() => {
     if (formData.recurrence_type === 'none' || !formData.date || !formData.recurrence_end_date) return [];
-    const start = new Date(formData.date);
-    const end = new Date(formData.recurrence_end_date);
-    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return [];
-
-    if (formData.recurrence_type === 'monthly_nth' && formData.recurrence_nth_week != null && formData.recurrence_nth_day != null) {
-      const dates: string[] = [];
-      let month = start.getMonth() + 1;
-      let year = start.getFullYear();
-      if (month > 11) { month = 0; year++; }
-      while (year - start.getFullYear() < 10 && dates.length < 52) {
-        const first = new Date(year, month, 1);
-        let date: Date | null;
-        if (formData.recurrence_nth_week === 5) {
-          const lastDay = new Date(year, month + 1, 0);
-          const diff = (lastDay.getDay() - formData.recurrence_nth_day + 7) % 7;
-          date = new Date(year, month, lastDay.getDate() - diff);
-        } else {
-          const firstOcc = 1 + ((formData.recurrence_nth_day - first.getDay() + 7) % 7);
-          const day = firstOcc + (formData.recurrence_nth_week - 1) * 7;
-          date = new Date(year, month, day);
-          if (date.getMonth() !== month) date = null;
-        }
-        if (date && date > start && date <= end) {
-          dates.push(date.toISOString().split('T')[0]);
-        } else if (date && date > end) {
-          break;
-        }
-        month++;
-        if (month > 11) { month = 0; year++; }
-      }
-      return dates;
-    }
-
-    const dates: string[] = [];
-    let current = new Date(start);
-    const advance = () => {
-      switch (formData.recurrence_type) {
-        case 'weekly': current.setDate(current.getDate() + 7); break;
-        case 'fortnightly': current.setDate(current.getDate() + 14); break;
-        case 'monthly': current.setMonth(current.getMonth() + 1); break;
-        case 'quarterly': current.setMonth(current.getMonth() + 3); break;
-        case 'yearly': current.setFullYear(current.getFullYear() + 1); break;
-      }
-    };
-
-    advance();
-    while (current <= end && dates.length < 52) {
-      dates.push(current.toISOString().split('T')[0]);
-      advance();
-    }
-    return dates;
+    return generateRecurringDates(
+      formData.date,
+      formData.recurrence_type,
+      formData.recurrence_end_date,
+      formData.recurrence_nth_week,
+      formData.recurrence_nth_day,
+      52
+    );
   }, [formData.recurrence_type, formData.date, formData.recurrence_end_date, formData.recurrence_nth_week, formData.recurrence_nth_day]);
 
   const nthWeekdayInfo = useMemo(() => getWeekdayOccurrence(formData.date), [formData.date]);
@@ -1292,10 +1277,10 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
               {agendaItems.map((item, index) => (
                 <div
                   key={item.item_number + '-' + index}
-                  draggable
-                  onDragStart={() => handleAgendaDragStart(index)}
+                  draggable={armedIndex === index}
+                  onDragStart={(e) => handleAgendaDragStart(e, index)}
                   onDragOver={(e) => handleAgendaDragOver(e, index)}
-                  onDrop={() => handleAgendaDrop(index)}
+                  onDrop={(e) => handleAgendaDrop(e, index)}
                   onDragEnd={handleAgendaDragEnd}
                   className={`p-4 rounded-lg bg-slate-700/50 border transition-all duration-150 ${
                     dragIndex === index
@@ -1308,23 +1293,50 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-2">
                       <div
-                        className="cursor-grab active:cursor-grabbing p-0.5 rounded text-slate-500 hover:text-slate-300 transition-colors"
+                        className="cursor-grab active:cursor-grabbing flex items-center justify-center w-8 h-8 -ml-1 rounded-lg text-slate-300 bg-slate-600/40 hover:text-white hover:bg-slate-600/70 transition-colors select-none"
                         title="Drag to reorder"
+                        aria-hidden="true"
+                        onMouseDown={() => setArmedIndex(index)}
+                        onMouseUp={() => setArmedIndex(null)}
                       >
-                        <GripVertical size={16} />
+                        <GripVertical size={18} />
                       </div>
                       <span className="w-6 h-6 flex items-center justify-center bg-slate-600 text-white rounded-full text-xs">
                         {item.item_number}
                       </span>
                       <h4 className="text-sm font-medium text-slate-200">Agenda Item</h4>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAgendaItem(index)}
-                      className="p-1 rounded-full text-slate-400 hover:text-red-400 hover:bg-red-900/20"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => moveAgendaItem(index, -1)}
+                        disabled={index === 0}
+                        className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-600/60 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        title="Move up"
+                        aria-label={`Move item ${item.item_number} up`}
+                      >
+                        <ChevronUp size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveAgendaItem(index, 1)}
+                        disabled={index === agendaItems.length - 1}
+                        className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-600/60 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        title="Move down"
+                        aria-label={`Move item ${item.item_number} down`}
+                      >
+                        <ChevronDown size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAgendaItem(index)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-900/20"
+                        title="Remove item"
+                        aria-label={`Remove item ${item.item_number}`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -1404,7 +1416,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
             </div>
 
             <div className="mt-4 text-xs text-slate-400">
-              <p>Drag the handle on the left of each item to reorder your agenda.</p>
+              <p>To reorder, drag an item by the <GripVertical size={12} className="inline -mt-0.5" /> handle on its left, or use the up and down arrows on its right.</p>
             </div>
           </div>
         
