@@ -45,15 +45,15 @@ interface PhotoMeta {
 }
 
 // The model is shown the photo four times, turned 0°, 90°, 180° and 270°
-// clockwise, and picks the one that is the right way up. (Asked directly
-// "which edge is the top?", models mix up left and right.)
-const PROMPT = `This picture shows ONE photo four times, each copy turned a different way:
-1 = top-left, 2 = top-right, 3 = bottom-left, 4 = bottom-right.
+// clockwise, as separate labelled images, and picks the one that is the
+// right way up. (Asked directly "which edge is the top?", models mix up left
+// and right.)
+const PROMPT = `You will see FOUR copies of ONE photo, labelled Copy 1 to Copy 4. Each copy is turned a different way.
 The photo is from a classifieds listing for radio-controlled model yachts and sailing gear.
 
 Which copy shows the scene the right way up, as the photographer saw it?
-Clues: writing and sail numbers read normally (not sideways or upside down); floors, ground, grass, gravel and water are at the bottom; sky, ceilings and tree tops are at the top; people, furniture, stands and tables stand upright; a boat on its stand has its mast pointing up.
-A boat lying on its side on a table or floor, or photographed from straight above, can look right in more than one copy: then prefer copy 1 unless the surroundings clearly show it is turned.
+Clues: writing and sail numbers read normally (not sideways or upside down); floors, ground, grass, gravel and water are at the bottom; sky, ceilings and tree tops are at the top; people, furniture, stands and tables stand upright; a boat on its stand has its mast pointing up and its keel pointing down.
+A boat lying on its side on a table or floor, or photographed from straight above, can look right in more than one copy: then answer 1 unless the surroundings clearly show it is turned.
 
 Reply with JSON only: {"clues": "a few words", "upright": 1|2|3|4, "confidence": 0.0-1.0}`;
 
@@ -133,28 +133,28 @@ function turnClockwise(src: Image, times: number): Image {
   return img;
 }
 
-/** One JPEG with the photo turned 0/90/180/270° in a 2×2 grid, as a data URL */
-async function fourWays(url: string): Promise<string> {
+/** The photo turned 0/90/180/270° clockwise, as four small JPEG data URLs */
+async function fourWays(url: string): Promise<string[]> {
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`Photo ${res.status}`);
   const decoded = await Image.decode(new Uint8Array(await res.arrayBuffer()));
   const scale = 300 / Math.max(decoded.width, decoded.height);
   const base = scale < 1 ? decoded.resize(Math.round(decoded.width * scale), Math.round(decoded.height * scale)) : decoded;
-  const cell = 316;
-  const grid = new Image(cell * 2, cell * 2);
-  grid.fill(0xffffffff);
+  const out: string[] = [];
   for (let k = 0; k < 4; k++) {
-    const c = turnClockwise(base, k);
-    const x = (k % 2) * cell + Math.round((cell - c.width) / 2);
-    const y = Math.floor(k / 2) * cell + Math.round((cell - c.height) / 2);
-    grid.composite(c, x, y);
+    const jpg = await turnClockwise(base, k).encodeJPEG(82);
+    out.push(`data:image/jpeg;base64,${encodeBase64(jpg)}`);
   }
-  const jpg = await grid.encodeJPEG(82);
-  return `data:image/jpeg;base64,${encodeBase64(jpg)}`;
+  return out;
 }
 
 async function checkPhoto(url: string, apiKey: string) {
-  const gridUrl = await fourWays(url);
+  const copies = await fourWays(url);
+  const content: Array<Record<string, unknown>> = [{ type: "text", text: PROMPT }];
+  copies.forEach((u, k) => {
+    content.push({ type: "text", text: `Copy ${k + 1}:` });
+    content.push({ type: "image_url", image_url: { url: u, detail: "low" } });
+  });
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -165,13 +165,7 @@ async function checkPhoto(url: string, apiKey: string) {
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: "You check photos for a sailing marketplace. You answer with JSON only." },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: PROMPT },
-            { type: "image_url", image_url: { url: gridUrl, detail: "high" } },
-          ],
-        },
+        { role: "user", content },
       ],
     }),
     signal: AbortSignal.timeout(45000),
@@ -186,8 +180,12 @@ async function checkPhoto(url: string, apiKey: string) {
   const pick = Math.round(Number(out.upright));
   const confidence = Math.min(1, Math.max(0, Number(out.confidence) || 0));
   const turn = pick >= 1 && pick <= 4 ? COPY_TURN[pick - 1] : 0;
+  // Photos that lose their orientation come out sideways; upside-down ones
+  // are rare and the model sometimes calls an upright photo upside down, so
+  // only a sideways turn is applied automatically.
+  const sideways = turn === 90 || turn === 270;
   return {
-    r: confidence >= MIN_CONFIDENCE ? turn : 0,
+    r: confidence >= MIN_CONFIDENCE && sideways ? turn : 0,
     suggested: turn,
     confidence,
     x: 50,
