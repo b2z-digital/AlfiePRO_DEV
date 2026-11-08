@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark, Flag, SlidersHorizontal, Share2, Search, X, ChevronRight } from 'lucide-react';
+import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark, Flag, SlidersHorizontal, Share2, Search, X, ChevronRight, Camera, ImagePlus, Lock, Table2, Hand, Grid3x3 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { updateUserProfile } from '../../utils/auth';
@@ -102,6 +102,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const { userClubs, refreshUserClubs } = useAuth();
   const [defaultClubId, setDefaultClubId] = useState<string>('');
   const [scoringMode, setScoringMode] = useState<'pro' | 'touch' | 'spreadsheet'>('pro');
+  // What's saved, so the profile can show a save bar only when something has changed
+  const [savedProfile, setSavedProfile] = useState<{
+    firstName: string; lastName: string; defaultClubId: string; scoringMode: 'pro' | 'touch' | 'spreadsheet'; avatarUrl: string | null;
+  } | null>(null);
 
   // PWA Install state
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -158,6 +162,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
     if (user && currentClub?.clubId && isValidUUID(currentClub.clubId)) {
       checkMembershipStatus();
+    }
+    if (user) {
       fetchUserProfile();
     }
 
@@ -215,18 +221,33 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
       if (profileError) throw profileError;
 
       if (profileData) {
-        setAvatarUrl(profileData.avatar_url);
-        // Use profile data which is synced from members table
-        setFirstName(profileData.first_name || user?.user_metadata?.first_name || '');
-        setLastName(profileData.last_name || user?.user_metadata?.last_name || '');
-        setDefaultClubId(profileData.default_club_id || '');
-        setScoringMode((profileData.scoring_mode_preference as 'pro' | 'touch' | 'spreadsheet') || 'pro');
+        const loaded = {
+          // Use profile data which is synced from members table
+          firstName: profileData.first_name || user?.user_metadata?.first_name || '',
+          lastName: profileData.last_name || user?.user_metadata?.last_name || '',
+          defaultClubId: profileData.default_club_id || '',
+          scoringMode: (profileData.scoring_mode_preference as 'pro' | 'touch' | 'spreadsheet') || 'pro',
+          avatarUrl: profileData.avatar_url as string | null,
+        };
+        setAvatarUrl(loaded.avatarUrl);
+        setFirstName(loaded.firstName);
+        setLastName(loaded.lastName);
+        setDefaultClubId(loaded.defaultClubId);
+        setScoringMode(loaded.scoringMode);
+        setSavedProfile(loaded);
       }
     } catch (err) {
       console.error('Error fetching user profile:', err);
       // Fallback to user metadata
       setFirstName(user?.user_metadata?.first_name || '');
       setLastName(user?.user_metadata?.last_name || '');
+      setSavedProfile((prev) => prev ?? {
+        firstName: user?.user_metadata?.first_name || '',
+        lastName: user?.user_metadata?.last_name || '',
+        defaultClubId,
+        scoringMode,
+        avatarUrl,
+      });
     }
   };
 
@@ -365,6 +386,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
       });
       
       setAvatarUrl(null);
+      setAvatarFile(null);
+      setSavedProfile((prev) => (prev ? { ...prev, avatarUrl: null } : prev));
     } catch (err) {
       console.error('Error removing avatar:', err);
       setError(err instanceof Error ? err.message : 'Failed to remove avatar');
@@ -721,346 +744,240 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
         {/* Content - only show when a tab is selected */}
         {activeTab && (
           <div>
-            {activeTab === 'profile' && (
-            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
-              <h2 className="text-xl font-semibold text-white mb-6">Profile Settings</h2>
-              
-              {/* Organization Type Badge */}
-              {currentClub?.club?.organization_type && (
-                <div className="mb-6 p-4 rounded-lg bg-blue-900/20 border border-blue-600/30">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-600/20">
-                      {currentClub.club.organization_type === 'club' ? (
-                        <Building size={20} className="text-blue-400" />
-                      ) : currentClub.club.organization_type === 'state_association' ? (
-                        <Users size={20} className="text-blue-400" />
-                      ) : (
-                        <Globe size={20} className="text-blue-400" />
+            {activeTab === 'profile' && (() => {
+              const fullName = [firstName, lastName].filter(Boolean).join(' ');
+              const initials = `${(firstName || '?')[0] || ''}${(lastName || '')[0] || ''}`.toUpperCase();
+              const club = currentClub?.club as any;
+              const orgName = currentOrganization?.name || club?.name;
+              const orgLogo = !currentOrganization ? club?.logo : (currentOrganization as any)?.logo_url;
+              const role = (currentOrganization?.role || currentClub?.role || '').replace(/_/g, ' ');
+              const orgKind = currentOrganization
+                ? (currentOrganization.type === 'state' ? 'State association' : 'National association')
+                : club?.organization_type === 'state_association' ? 'State association'
+                : club?.organization_type === 'national_association' ? 'National association' : 'Club';
+              const dirty = !!savedProfile && (
+                firstName !== savedProfile.firstName ||
+                lastName !== savedProfile.lastName ||
+                defaultClubId !== savedProfile.defaultClubId ||
+                scoringMode !== savedProfile.scoringMode ||
+                !!avatarFile
+              );
+              const discard = () => {
+                if (!savedProfile) return;
+                setFirstName(savedProfile.firstName);
+                setLastName(savedProfile.lastName);
+                setDefaultClubId(savedProfile.defaultClubId);
+                setScoringMode(savedProfile.scoringMode);
+                setAvatarFile(null);
+                setAvatarUrl(savedProfile.avatarUrl);
+                setError(null);
+              };
+              const modes: { id: 'pro' | 'touch' | 'spreadsheet'; title: string; desc: string; Icon: typeof Table2 }[] = [
+                { id: 'pro', title: 'Pro', desc: 'Full results table with every detail. Best on a laptop.', Icon: Table2 },
+                { id: 'touch', title: 'Touch', desc: 'Big sail numbers you tap or drag. Made for tablets.', Icon: Hand },
+                { id: 'spreadsheet', title: 'Spreadsheet', desc: 'Type sail numbers into finishing places.', Icon: Grid3x3 },
+              ];
+              return (
+                <form onSubmit={handleSubmit} className="a-prof">
+                  {/* Who you are */}
+                  <section className="a-prof-hero">
+                    <div className="a-prof-av">
+                      {avatarUrl ? <img src={avatarUrl} alt="" /> : <span className="a-prof-av-in a-display">{initials}</span>}
+                      {isUploadingAvatar && (
+                        <span className="a-prof-busy"><span className="w-7 h-7 border-2 border-white border-t-transparent rounded-full animate-spin" /></span>
                       )}
+                      <label className="a-prof-cam" title="Change photo">
+                        <Camera size={16} />
+                        <span className="sr-only">Change photo</span>
+                        <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" disabled={isUploadingAvatar || loading} />
+                      </label>
                     </div>
-                    <div>
-                      <h3 className="text-blue-400 font-medium">
-                        {currentClub.club.organization_type === 'club' 
-                          ? 'Yacht Club' 
-                          : currentClub.club.organization_type === 'state_association'
-                            ? 'State Association'
-                            : 'National Association'}
-                      </h3>
-                      <p className="text-blue-300 text-sm">
-                        You have {currentClub.role} access to this organization
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Membership Status Card */}
-              {membershipStatus !== 'none' && (
-                <div className={`
-                  mb-8 p-6 rounded-xl border backdrop-blur-sm
-                  ${membershipStatus === 'active'
-                    ? 'bg-green-900/10 border-green-900/30'
-                    : 'bg-red-900/10 border-red-900/30'}
-                `}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`
-                        p-3 rounded-lg
-                        ${membershipStatus === 'active' ? 'bg-green-900/30' : 'bg-red-900/30'}
-                      `}>
-                        <CreditCard size={24} className={membershipStatus === 'active' ? 'text-green-400' : 'text-red-400'} />
+                    <div className="a-prof-who">
+                      <h2 className="a-prof-name a-display a-ink">{fullName || 'Your profile'}</h2>
+                      <p className="a-prof-mail a-mute">{email}</p>
+                      <div className="a-prof-chips">
+                        {orgName && (
+                          <span className="a-prof-chip">
+                            <span className="a-prof-chip-logo">{orgLogo ? <img src={orgLogo} alt="" /> : <Building size={13} />}</span>
+                            <span className="truncate">{orgName}</span>
+                          </span>
+                        )}
+                        {role && <span className="a-prof-chip a-prof-chip-plain capitalize">{orgKind} · {role}</span>}
                       </div>
-                      <div>
-                        <h2 className="text-xl font-semibold text-white">
-                          {membershipStatus === 'active' ? 'Active Membership' : 'Membership Expired'}
-                        </h2>
-                        <p className={`text-sm ${membershipStatus === 'active' ? 'text-green-300' : 'text-red-300'}`}>
+                      <div className="a-prof-photo">
+                        <label className="a-btn a-btn-sm cursor-pointer">
+                          <ImagePlus size={15} />
+                          {avatarUrl ? 'Change photo' : 'Add a photo'}
+                          <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" disabled={isUploadingAvatar || loading} />
+                        </label>
+                        {avatarUrl && !avatarFile && (
+                          <button type="button" className="a-btn a-btn-sm a-btn-q a-prof-remove" onClick={handleRemoveAvatar} disabled={isUploadingAvatar || loading}>
+                            <Trash2 size={15} />
+                            Remove
+                          </button>
+                        )}
+                        <span className="a-dim text-[12px]">{avatarFile ? 'New photo: save to keep it' : 'Square photo, up to 2 MB'}</span>
+                      </div>
+                    </div>
+                  </section>
+
+                  {error && (
+                    <div className="a-prof-alert" role="alert">
+                      <AlertTriangle size={18} />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  {/* Membership of this club */}
+                  {membershipStatus !== 'none' && (
+                    <section className="a-card a-prof-mem">
+                      <span className={`a-prof-mem-ic ${membershipStatus === 'active' ? 'is-ok' : 'is-bad'}`}><CreditCard size={20} /></span>
+                      <div className="flex-1 min-w-0">
+                        <div className="a-ink text-[15px] font-semibold truncate">
+                          {membershipStatus === 'active' ? 'Membership active' : 'Membership expired'}
+                          {club?.name ? <span className="a-mute font-normal"> · {club.abbreviation || club.name}</span> : null}
+                        </div>
+                        <div className="a-st mt-1 a-mute">
+                          <span className={`a-light ${membershipStatus === 'active' ? 'a-light-g' : 'a-light-r'}`} />
                           {membershipStatus === 'active'
-                            ? `Your membership is active until ${formatDate(renewalDate)}`
-                            : 'Your membership has expired and needs renewal'}
-                        </p>
+                            ? (renewalDate ? `Active until ${formatDate(renewalDate)}` : 'Active')
+                            : 'Renew to keep racing and receiving club news'}
+                        </div>
                       </div>
-                    </div>
-                    
-                    <a
-                      href={`/membership/${currentClub?.clubId}`}
-                      className={`
-                        px-4 py-2 rounded-lg font-medium transition-colors
-                        ${membershipStatus === 'active'
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : 'bg-red-600 text-white hover:bg-red-700'}
-                      `}
-                    >
-                      {membershipStatus === 'active' ? 'View Membership' : 'Renew Now'}
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* Join Club Card - for non-members */}
-              {membershipStatus === 'none' && currentClub?.club && (
-                <div className="mb-8 p-6 rounded-xl border border-blue-900/30 bg-blue-900/10 backdrop-blur-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-lg bg-blue-900/30">
-                        <Users size={24} className="text-blue-400" />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-semibold text-white">
-                          Join {currentClub.club.name}
-                        </h2>
-                        <p className="text-sm text-blue-300">
-                          Become a member to participate in club events and races
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <button
-                      onClick={() => setShowMembershipModal(true)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
-                    >
-                      Apply for Membership
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              {error && (
-                <div className="mb-4 p-4 rounded-md bg-red-900/20 border border-red-900/30">
-                  <div className="flex">
-                    <div className="flex-shrink-0">
-                      <AlertTriangle className="h-5 w-5 text-red-400" aria-hidden="true" />
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-red-300">
-                        {error}
-                      </h3>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {success && (
-                <div className="mb-4 p-4 rounded-md bg-green-900/20 border border-green-900/30">
-                  <div className="flex">
-                    <div className="flex-shrink-0">
-                      <Check className="h-5 w-5 text-green-400" aria-hidden="true" />
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-green-300">
-                        Profile updated successfully
-                      </h3>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="first-name" className="block text-sm font-medium text-slate-300 mb-1">
-                      First name
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <input
-                        id="first-name"
-                        name="first-name"
-                        type="text"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        className="block w-full pl-10 pr-3 py-2 border border-slate-600 rounded-lg shadow-sm bg-slate-700 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="John"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="last-name" className="block text-sm font-medium text-slate-300 mb-1">
-                      Last name
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <input
-                        id="last-name"
-                        name="last-name"
-                        type="text"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        className="block w-full pl-10 pr-3 py-2 border border-slate-600 rounded-lg shadow-sm bg-slate-700 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Doe"
-                      />
-                    </div>
-                  </div>
-                </div>
-              {/* Avatar Upload Section */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-300 mb-3">
-                  Profile Picture
-                </label>
-                <div className="flex items-center gap-6">
-                  <div className="relative">
-                    {avatarUrl ? (
-                      <img 
-                        src={avatarUrl} 
-                        alt="Profile" 
-                        className="w-24 h-24 rounded-full object-cover border-2 border-slate-600"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 rounded-full bg-slate-700 flex items-center justify-center">
-                        <User size={40} className="text-slate-400" />
-                      </div>
-                    )}
-                    
-                    {isUploadingAvatar && (
-                      <div className="absolute inset-0 bg-slate-900/70 rounded-full flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-colors">
-                      <Upload size={16} />
-                      <span>Upload Image</span>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleAvatarChange} 
-                        className="hidden" 
-                        disabled={isUploadingAvatar || loading}
-                      />
-                    </label>
-                    
-                    {avatarUrl && (
                       <button
                         type="button"
-                        onClick={handleRemoveAvatar}
-                        disabled={isUploadingAvatar || loading}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 rounded-lg hover:bg-red-600/30 transition-colors"
+                        className={`a-btn ${membershipStatus === 'active' ? '' : 'a-btn-p'}`}
+                        onClick={() => navigate(`/membership/${currentClub?.clubId}`)}
                       >
-                        <Trash2 size={16} />
-                        <span>Remove</span>
+                        {membershipStatus === 'active' ? 'View membership' : 'Renew now'}
+                        <ChevronRight size={16} />
                       </button>
+                    </section>
+                  )}
+                  {membershipStatus === 'none' && currentClub?.club && (
+                    <section className="a-card a-prof-mem">
+                      <span className="a-prof-mem-ic is-join"><Users size={20} /></span>
+                      <div className="flex-1 min-w-0">
+                        <div className="a-ink text-[15px] font-semibold truncate">Join {currentClub.club.name}</div>
+                        <div className="a-mute text-[13px] mt-0.5">Become a member to take part in club events and races</div>
+                      </div>
+                      <button type="button" className="a-btn a-btn-p" onClick={() => setShowMembershipModal(true)}>
+                        Apply for membership
+                      </button>
+                    </section>
+                  )}
+
+                  {/* Personal details */}
+                  <section className="a-card a-prof-sec">
+                    <header className="a-prof-sh">
+                      <span className="a-tile a-tile-sm"><User size={16} /></span>
+                      <div>
+                        <h3 className="a-display a-ink">Personal details</h3>
+                        <p className="a-dim">How you appear to your club and in results</p>
+                      </div>
+                    </header>
+                    <div className="a-prof-grid">
+                      <label className="a-prof-f">
+                        <span className="a-prof-lbl">First name</span>
+                        <span className="a-field">
+                          <input id="first-name" name="first-name" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" autoComplete="given-name" />
+                        </span>
+                      </label>
+                      <label className="a-prof-f">
+                        <span className="a-prof-lbl">Last name</span>
+                        <span className="a-field">
+                          <input id="last-name" name="last-name" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" autoComplete="family-name" />
+                        </span>
+                      </label>
+                      <div className="a-prof-f a-prof-wide">
+                        <span className="a-prof-lbl">Email</span>
+                        <span className="a-field a-prof-ro" aria-readonly="true">
+                          <Mail size={17} />
+                          <input id="email" name="email" type="email" value={email} disabled />
+                          <span className="a-prof-lock"><Lock size={13} /> Sign-in email</span>
+                        </span>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Preferences */}
+                  <section className="a-card a-prof-sec">
+                    <header className="a-prof-sh">
+                      <span className="a-tile a-tile-sm"><SlidersHorizontal size={16} /></span>
+                      <div>
+                        <h3 className="a-display a-ink">Preferences</h3>
+                        <p className="a-dim">How AlfiePRO opens and scores for you</p>
+                      </div>
+                    </header>
+
+                    {userClubs && userClubs.length > 1 && (
+                      <label className="a-prof-f">
+                        <span className="a-prof-lbl">Open this club when I sign in</span>
+                        <span className="a-field a-prof-sel">
+                          <Building size={17} />
+                          <select id="default-club" name="default-club" value={defaultClubId} onChange={(e) => setDefaultClubId(e.target.value)}>
+                            <option value="">Ask me each time</option>
+                            {userClubs.map((userClub) => (
+                              <option key={userClub.clubId} value={userClub.clubId}>
+                                {userClub.club?.name || 'Unnamed Club'}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown size={16} />
+                        </span>
+                      </label>
                     )}
-                    
-                    <p className="text-xs text-slate-400">
-                      Recommended: Square image, max 2MB
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
 
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
-                    Email address
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      disabled
-                      value={email}
-                      className="block w-full pl-10 pr-3 py-2 border border-slate-600 rounded-lg shadow-sm bg-slate-700 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-70 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-slate-400">
-                    Email address cannot be changed
-                  </p>
-                </div>
-
-                {/* Default Club Selector */}
-                {userClubs && userClubs.length > 1 && (
-                  <div>
-                    <label htmlFor="default-club" className="block text-sm font-medium text-slate-300 mb-1">
-                      Default Club
-                    </label>
-                    <div className="relative">
-                      <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <select
-                        id="default-club"
-                        name="default-club"
-                        value={defaultClubId}
-                        onChange={(e) => setDefaultClubId(e.target.value)}
-                        className="block w-full pl-10 pr-3 py-2 border border-slate-600 rounded-lg shadow-sm bg-slate-700 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer"
-                      >
-                        <option value="">No default (manual selection)</option>
-                        {userClubs.map((userClub) => (
-                          <option key={userClub.clubId} value={userClub.clubId}>
-                            {userClub.club?.name || 'Unnamed Club'}
-                          </option>
+                    <div className="a-prof-f">
+                      <span className="a-prof-lbl" id="scoring-mode-label">Race scoring screen</span>
+                      <div className="a-prof-modes" role="radiogroup" aria-labelledby="scoring-mode-label">
+                        {modes.map(({ id, title, desc, Icon }) => (
+                          <button
+                            key={id}
+                            type="button"
+                            role="radio"
+                            aria-checked={scoringMode === id}
+                            className={`a-prof-mode ${scoringMode === id ? 'is-on' : ''}`}
+                            onClick={() => setScoringMode(id)}
+                          >
+                            <span className="a-prof-mode-top">
+                              <span className="a-prof-mode-ic"><Icon size={20} /></span>
+                              <span className={`a-prof-radio ${scoringMode === id ? 'is-on' : ''}`} />
+                            </span>
+                            <span className="a-prof-mode-t">{title}</span>
+                            <span className="a-prof-mode-d">{desc}</span>
+                          </button>
                         ))}
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                        </svg>
                       </div>
+                      <p className="a-dim text-[12.5px] mt-2">You can still switch screens while scoring.</p>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400">
-                      This club will open automatically when you log in
-                    </p>
-                  </div>
-                )}
+                  </section>
 
-                {/* Scoring Mode Preference */}
-                <div>
-                  <label htmlFor="scoring-mode" className="block text-sm font-medium text-slate-300 mb-1">
-                    Race Scoring Mode
-                  </label>
-                  <div className="relative">
-                    <Sailboat className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <select
-                      id="scoring-mode"
-                      name="scoring-mode"
-                      value={scoringMode}
-                      onChange={(e) => setScoringMode(e.target.value as 'pro' | 'touch' | 'spreadsheet')}
-                      className="block w-full pl-10 pr-3 py-2 border border-slate-600 rounded-lg shadow-sm bg-slate-700 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer"
-                    >
-                      <option value="pro">Pro Mode - Full table with all details</option>
-                      <option value="touch">Touch Mode - Simplified tablet-optimized scoring</option>
-                      <option value="spreadsheet">Spreadsheet Mode - Type sail numbers into positions</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {scoringMode === 'pro'
-                      ? 'Pro Mode: Best for desktop scoring with full table view and all race details'
-                      : scoringMode === 'touch'
-                      ? 'Touch Mode: Optimized for tablets with large sail numbers and drag-and-drop interface'
-                      : 'Spreadsheet Mode: Traditional entry - type sail numbers into finishing positions'}
-                  </p>
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  {/* Save bar: comes up when something has changed */}
+                  <div
+                    className={`a-prof-save ${dirty || loading || success ? 'is-on' : ''} ${success && !dirty && !loading ? 'is-done' : ''}`}
+                    aria-hidden={!(dirty || loading || success)}
+                    role="status"
                   >
-                    {loading ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Saving...
-                      </div>
+                    {success && !dirty && !loading ? (
+                      <span className="a-prof-save-t"><Check size={16} className="text-[#30D158]" /> Profile saved</span>
                     ) : (
                       <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Changes
+                        <span className="a-prof-save-t"><span className="a-light a-light-a" /> Unsaved changes</span>
+                        <button type="button" className="a-btn a-btn-q" onClick={discard} disabled={loading} tabIndex={dirty ? 0 : -1}>Discard</button>
+                        <button type="submit" className="a-btn a-btn-p" disabled={loading} tabIndex={dirty || loading ? 0 : -1}>
+                          {loading ? (
+                            <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving…</>
+                          ) : (
+                            <><Save size={16} /> Save changes</>
+                          )}
+                        </button>
                       </>
                     )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
+                  </div>
+                </form>
+              );
+            })()}
 
           {activeTab === 'club' && (
             <ClubProfileSettings darkMode={darkMode} />
