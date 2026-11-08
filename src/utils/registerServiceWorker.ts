@@ -1,4 +1,10 @@
+import { isNative } from '../lib/native/platform';
+
 function isServiceWorkerSupported(): boolean {
+  // Native apps (Capacitor) bundle their files; the web service worker would cache stale
+  // copies and WKWebView only partly supports service workers.
+  if (isNative) return false;
+
   // Check if service workers are supported at all
   if (!('serviceWorker' in navigator)) {
     return false;

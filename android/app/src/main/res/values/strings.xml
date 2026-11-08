@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AlfiePRO</string>
+    <string name="title_activity_main">AlfiePRO</string>
+    <string name="package_name">com.b2zdigital.alfiepro</string>
+    <string name="custom_url_scheme">com.b2zdigital.alfiepro</string>
+</resources>

@@ -71,6 +71,7 @@ import WhatsOnAnswerPage from './pages/WhatsOnAnswerPage';
 import { MobileAppComingSoon } from './components/MobileAppComingSoon';
 import { JoinScoringSessionPage } from './pages/JoinScoringSessionPage';
 import './styles/index.css';
+import { isNative } from './lib/native/platform';
 
 function useIsMobilePhone() {
   const [isMobile, setIsMobile] = useState(false);
@@ -408,7 +409,9 @@ function App() {
               <Navigate to="/onboarding" />
             ) : hasUnfinancialMember && unfinancialMemberData ? (
               <UnfinancialMemberScreen memberData={unfinancialMemberData} darkMode={darkMode} />
-            ) : isMobilePhone ? (
+            ) : isMobilePhone && !isNative ? (
+              // Phone browsers: replaced by the phone shell once the mobile design board is approved.
+              // The native apps skip this screen (it sends people to the App Store).
               <MobileAppComingSoon />
             ) : (
               <DashboardLayout

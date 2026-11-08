@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { signInWithOAuthProvider } from '../../lib/native/oauth';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { Logo } from '../Logo';
@@ -125,14 +126,12 @@ export const Register: React.FC = () => {
 
     try {
       const redirectPath = mode === 'club' ? '/register-club' : '/';
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}${redirectPath}`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
+      // Web: full-page redirect. Native apps: system browser sheet, back via alfiepro://auth/callback
+      const { error } = await signInWithOAuthProvider('google', {
+        webRedirectPath: redirectPath,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
         },
       });
 
