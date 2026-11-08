@@ -510,9 +510,16 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
     }, 300000);
   };
 
+  // Status of the Alfie address on its own (shown next to it)
+  const dnsOnlyStatus = !dnsRecord ? 'draft'
+    : dnsRecord.status === 'active' && (!dnsRecord.ssl_status || dnsRecord.ssl_status === 'active') ? 'live'
+    : dnsRecord.status === 'failed' ? 'error' : 'pending';
+
   const getWebsiteStatus = () => {
     if (!dnsRecord && !amplifyDomain) return 'draft';
     if (!isPublished) return 'draft';
+    // A working Alfie address keeps the site live even while a custom domain is failing or still setting up
+    if (entityType === 'club' && dnsOnlyStatus === 'live' && amplifyDomain && amplifyDomain.domain_status !== 'AVAILABLE') return 'live';
     if (amplifyDomain && amplifyDomain.domain_status === 'AVAILABLE') return 'live';
     if (amplifyDomain && amplifyDomain.domain_status === 'failed') return 'error';
     if (amplifyDomain && amplifyDomain.domain_status !== 'AVAILABLE') return 'pending';
@@ -597,9 +604,9 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
                 Current Domain
               </span>
               <div className="flex items-center gap-2">
-                {statusConfig.icon}
-                <span className={`text-sm font-medium ${statusConfig.color}`}>
-                  {statusConfig.label}
+                {(entityType === 'club' && amplifyDomain ? getStatusConfig(dnsOnlyStatus) : statusConfig).icon}
+                <span className={`text-sm font-medium ${(entityType === 'club' && amplifyDomain ? getStatusConfig(dnsOnlyStatus) : statusConfig).color}`}>
+                  {(entityType === 'club' && amplifyDomain ? getStatusConfig(dnsOnlyStatus) : statusConfig).label}
                 </span>
               </div>
             </div>
@@ -619,6 +626,22 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
                 Verified {new Date(dnsRecord.verified_at).toLocaleDateString()}
               </p>
             )}
+          </div>
+        )}
+
+        {entityType === 'club' && amplifyDomain && amplifyDomain.domain_status === 'failed' && (
+          <div className={`mb-6 p-4 rounded-lg border ${darkMode ? 'bg-red-950/20 border-red-900/40' : 'bg-red-50 border-red-200'}`}>
+            <div className="flex items-center justify-between mb-2 gap-3">
+              <span className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Your own domain</span>
+              <div className="flex items-center gap-2">
+                <XCircle size={16} className="text-red-400" />
+                <span className="text-sm font-medium text-red-400">Not connected</span>
+              </div>
+            </div>
+            <div className={`text-sm font-mono ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{amplifyDomain.domain_name}</div>
+            <p className={`text-xs mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              {amplifyDomain.status_reason ? `${amplifyDomain.status_reason}. ` : ''}Check the DNS records where you bought the domain, then press Verify.{dnsOnlyStatus === 'live' ? ` Your site still works at ${dnsRecord?.full_domain}.` : ''}
+            </p>
           </div>
         )}
 

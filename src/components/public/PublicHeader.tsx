@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { Club } from '../../types/club';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
+import { usePublishedPageSlugs, useSiteTheme, useSiteVisit } from '../../hooks/usePublicSite';
+import { resolveMenu } from '../../utils/publicSite';
+import { PublicSiteMenu } from './PublicSiteMenu';
 
 interface PublicHeaderProps {
   club: Club | null;
@@ -16,6 +19,10 @@ const getClubInitials = (clubName: string): string => {
 export const PublicHeader: React.FC<PublicHeaderProps> = ({ club, activePage = '' }) => {
   const { buildPublicUrl } = usePublicNavigation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const site = useSiteTheme(club?.website_theme);
+  useSiteVisit(club?.id);
+  const menuItems = resolveMenu(site.menu !== undefined ? site.menu : club?.website_menu);
+  const publishedSlugs = usePublishedPageSlugs(club?.id, menuItems.some(i => i.kind === 'page' || i.children?.some(c => c.kind === 'page')));
 
   if (!club) return null;
 
@@ -66,7 +73,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({ club, activePage = '
               href="https://alfiepro.com.au"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-6 py-2.5 text-white font-semibold rounded-lg transition-colors text-sm tracking-wide"
+              className="site-btn site-btn-p px-6 py-2.5 text-white font-semibold rounded-lg transition-colors text-sm tracking-wide"
             >
               MEMBERS
             </a>
@@ -81,7 +88,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({ club, activePage = '
         )}
 
         <div
-          className={`fixed top-0 left-0 h-full w-[420px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+          className={`fixed top-0 left-0 h-full w-[420px] max-w-full overflow-y-auto bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -94,73 +101,13 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({ club, activePage = '
             </button>
           </div>
 
-          <nav className="space-y-0">
-            <Link
-              to={buildPublicUrl('/')}
-              className={`block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200 ${activePage === 'home' ? 'bg-gray-50' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              HOME
-            </Link>
-            <a
-              href="https://alfiepro.com.au/register"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              MEMBERSHIP
-            </a>
-            <Link
-              to={buildPublicUrl('/race-calendar')}
-              className={`block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200 ${activePage === 'race-calendar' ? 'bg-gray-50' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              RACE CALENDAR
-            </Link>
-            <Link
-              to={buildPublicUrl('/yacht-classes')}
-              className={`block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200 ${activePage === 'yacht-classes' ? 'bg-gray-50' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              YACHT CLASSES
-            </Link>
-            <Link
-              to={buildPublicUrl('/results')}
-              className={`block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200 ${activePage === 'results' ? 'bg-gray-50' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              RESULTS
-            </Link>
-            <Link
-              to={buildPublicUrl('/venues')}
-              className={`block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200 ${activePage === 'venues' ? 'bg-gray-50' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              VENUES
-            </Link>
-            <Link
-              to={buildPublicUrl('/news')}
-              className={`block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200 ${activePage === 'news' ? 'bg-gray-50' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              LATEST NEWS
-            </Link>
-            <Link
-              to={buildPublicUrl('/classifieds')}
-              className={`block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200 ${activePage === 'classifieds' ? 'bg-gray-50' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              CLASSIFIEDS
-            </Link>
-            <Link
-              to={buildPublicUrl('/contact')}
-              className={`block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200 ${activePage === 'contact' ? 'bg-gray-50' : ''}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              CONTACT US
-            </Link>
-          </nav>
+          <PublicSiteMenu
+            items={menuItems}
+            publishedSlugs={publishedSlugs}
+            activePage={activePage}
+            buildPublicUrl={buildPublicUrl}
+            onNavigate={() => setMobileMenuOpen(false)}
+          />
         </div>
       </nav>
     </>

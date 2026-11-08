@@ -65,7 +65,7 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({ club: propClub, club
   if (!club) return null;
 
   return (
-    <footer className="bg-gray-900 text-white py-12 px-4">
+    <footer className="site-footer bg-gray-900 text-white py-12 px-4">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           <div>
@@ -77,7 +77,7 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({ club: propClub, club
               href="https://alfiepro.com.au"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors text-sm"
+              className="site-btn site-btn-p inline-block px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors text-sm"
             >
               Become a Member
             </a>
