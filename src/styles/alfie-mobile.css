@@ -530,3 +530,48 @@ button.m-sail.m-sail-off, button.m-sail.m-sail-ocs { color: var(--m-red-ink); }
 .m-sync-row { display: flex; align-items: center; gap: 10px; }
 .m-sync-dot { width: 8px; height: 8px; border-radius: 8px; flex-shrink: 0; background: #FF9F0A; }
 .m-offline-bar { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 12px; background: rgba(255, 159, 10, .12); color: var(--m-amber-ink); font-size: 13px; font-weight: 600; border: 0; width: 100%; text-align: left; }
+
+/* Race Management · landscape (board "Turn the phone for two-thumb finishing and the full sheet") */
+.m-land {
+  position: fixed; inset: 0; z-index: 30; display: flex; gap: 12px; background: var(--m-bg);
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) calc(env(safe-area-inset-right, 0px) + 12px) calc(env(safe-area-inset-bottom, 0px) + 10px) calc(env(safe-area-inset-left, 0px) + 12px);
+}
+.m-land-side { width: 216px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.m-land-order { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 16px; background: var(--m-card); border: 1px solid var(--m-card-b); }
+.m-land-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 10px; flex-shrink: 0; }
+.m-land-new { background: rgba(10, 132, 255, .18); }
+.m-land-next { border: 1.5px dashed rgba(77, 163, 255, .55); }
+.m-land-pl { width: 22px; text-align: center; font: 700 15px 'Bricolage Grotesque', 'Instrument Sans', sans-serif; font-variant-numeric: tabular-nums; }
+.m-land-nm { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-land-keys { flex: 1; min-width: 0; display: grid; gap: 8px; align-content: stretch; grid-auto-rows: minmax(56px, 1fr); overflow-y: auto; }
+.m-land-keys .m-key { height: auto; min-height: 56px; }
+.m-land-keys .m-key b { font-size: 26px; }
+.m-land-conflict { max-height: 60%; overflow-y: auto; }
+.m-land-conflict .m-conflict { font-size: 13px; }
+
+.m-sheetx { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; gap: 10px; background: var(--m-bg);
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) calc(env(safe-area-inset-right, 0px) + 14px) calc(env(safe-area-inset-bottom, 0px) + 10px) calc(env(safe-area-inset-left, 0px) + 14px); }
+.m-sheetx-wrap { flex: 1; min-height: 0; overflow: auto; border-radius: 16px; background: var(--m-card); border: 1px solid var(--m-card-b); }
+.m-xt { border-collapse: separate; border-spacing: 0; font-size: 13.5px; font-variant-numeric: tabular-nums; min-width: 100%; }
+.m-xt th { position: sticky; top: 0; z-index: 2; background: var(--m-sheet); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--m-dim); padding: 10px 8px; text-align: center; white-space: nowrap; border-bottom: 1px solid var(--m-line); }
+.m-xt td { padding: 0; text-align: center; border-bottom: 1px solid var(--m-line); white-space: nowrap; }
+.m-xt td > span, .m-xt td > button { display: flex; align-items: center; justify-content: center; min-width: 40px; height: 40px; padding: 0 8px; }
+.m-xt td > button { width: 100%; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.m-xt td > button:active { background: rgba(10, 132, 255, .18); }
+.m-xt .m-xt-nm { position: sticky; left: 0; z-index: 1; background: var(--m-sheet); text-align: left; }
+.m-xt th.m-xt-nm { z-index: 3; }
+.m-xt .m-xt-nm > span { justify-content: flex-start; font-weight: 600; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.m-xt .m-xt-drop { color: var(--m-dim); text-decoration: line-through; }
+.m-xt .m-xt-ls { color: var(--m-red-ink); font-weight: 700; font-size: 12px; }
+.m-xt .m-xt-tot { font-weight: 700; }
+.m-xt .m-xt-nett { font-weight: 700; color: var(--m-blue-ink); }
+.m-xt .m-xt-you td { background: rgba(10, 132, 255, .10); }
+.m-xt .m-xt-future { color: var(--m-dim); opacity: .6; }
+.m-xt .m-xt-heat { display: inline-flex; width: 18px; height: 18px; border-radius: 5px; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; margin-right: 4px; }
+.m-land-side { width: 236px; }
+.m-land-side .m-rp { padding: 0 10px 0 6px; gap: 6px; }
+@media (orientation: landscape) and (max-height: 540px) {
+  .m-app .m-sheet { left: 0; right: 0; margin: 0 auto; width: min(620px, 100vw); max-height: 96dvh; padding-left: 16px; padding-right: 16px; }
+  .m-app .m-sheet .m-lsg { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .m-app .m-sheet .m-ls { height: 46px; }
+}

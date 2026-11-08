@@ -20,6 +20,7 @@ import { NextUp, RaceSession, SESSION_EVENT, clock, forScoring, nextUp, sailOf, 
 import { PadBoats, keypadMatches, keypadPick, matchCalls, ordinal, padBoats, parseSpoken, readBack, registerPad, resolveConflict, shortName, startingOrder } from '../finishPad';
 import { ConflictCard, useTogether } from './ScoreTogether';
 import { OfflineBar } from './Sync';
+import { useAllowLandscape, useLandscape } from '../orientation';
 import { listen, speechKind, type Listening, type SpeechKind } from '../speech';
 import { useKeepAwake } from '../startBoxParts';
 import { HEAT_COLOURS, Loading, Missing } from './RaceSetup';
@@ -354,6 +355,8 @@ export const FinishPadScreen: React.FC = () => {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
   useKeepAwake(true);
+  useAllowLandscape();
+  const landscape = useLandscape();
 
   const [letter, setLetter] = useState<LetterTarget | null>(null);
   const [typed, setTyped] = useState('');
@@ -537,6 +540,60 @@ export const FinishPadScreen: React.FC = () => {
     finishBoat(i); setTyped('');
   };
   const prev = letter ? previousResultsFor(boats.results as any, up.race, letter.index) : [];
+  const letterSheet = letter && (
+    <LetterSheet target={letter} skipper={skippers[letter.index]} race={up.race} raceLabel={up.raceLabel} heatLabel={heats ? up.heatLabel : ''}
+      heatSize={total} entrants={(st.skippers || []).length} prev={prev} shrs={shrs} heats={heats}
+      multiDay={!!event.multiDay} numberOfDays={event.numberOfDays} currentDay={e.currentDay}
+      onApply={(c, p) => applyLetter(c, p)} onClear={() => applyLetter(null)} onClose={() => setLetter(null)} />
+  );
+  const review = () => { stopListening(); navigate(`/race-desk/event/${key}/confirm`); };
+  const holdKey = (i: number) => { tap('medium'); setLetter({ index: i, current: entryOf(i) }); };
+  const conflictCard = (session.conflicts || []).slice(0, 1).map(c => session.pad && (
+    <ConflictCard key={c.id} conflict={c} pad={session.pad} onKeep={w => {
+      const r = resolveConflict(sessionRef.current!, c.id, w);
+      setOrder(r.finish || [], r.added, { conflicts: r.conflicts });
+      tap('success');
+    }} />
+  ));
+
+  /* ── Sideways: every boat on screen, the finish order on the left (board "Finish pad, sideways") ── */
+  if (landscape) {
+    const finishersList = order.filter(x => !x.letterScore);
+    return (
+      <div className="m-land">
+        <aside className="m-land-side">
+          <div className="m-row" style={{ gap: 6 }}>
+            <button className="m-ibtn m-ibtn-s" aria-label="Back to the race" onClick={backToRace}><Icon name="back" size={18} /></button>
+            <div className="m-rp" style={{ flex: 1, height: 36, minWidth: 0 }}>
+              {up.heat && <span className="m-hp" style={{ background: HEAT_COLOURS[up.heatIndex % HEAT_COLOURS.length], width: 24, height: 24, fontSize: 12 }}>{up.heatLabel}</span>}
+              <span style={{ fontWeight: 600, fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>{up.raceLabel}</span>
+              {gunAt && <span className="m-dim m-num" style={{ fontSize: 12.5, flexShrink: 0 }}>{clock(now - gunAt)}</span>}
+            </div>
+            <button className="m-ibtn m-ibtn-s" aria-label="Undo the last finish" onClick={undoLast} disabled={!(session.added || []).length}><Icon name="undo" size={18} /></button>
+          </div>
+          {conflictCard.length ? <div className="m-land-conflict">{conflictCard}</div> : null}
+          <div className="m-land-order" aria-label="Finish order">
+            {finishersList.map(x => (
+              <div key={x.skipperIndex} className={`m-land-row ${x.skipperIndex === last ? 'm-land-new' : ''}`}>
+                <span className="m-land-pl">{x.position}</span>
+                <span className="m-sail" style={{ minWidth: 38, height: 28, fontSize: 13 }}>{sailOf(skippers[x.skipperIndex])}</span>
+                <span className="m-land-nm">{isYou(x.skipperIndex) ? 'You' : shortName(skippers[x.skipperIndex])}</span>
+              </div>
+            ))}
+            {left > 0 && <div className="m-land-row m-land-next"><span className="m-land-pl">{finishersList.length + 1}</span><span className="m-sail" style={{ minWidth: 38, height: 28, opacity: 0.5 }}>?</span></div>}
+          </div>
+          <div className="m-dim" style={{ fontSize: 11.5, textAlign: 'center' }}>{finishers} of {total} finished{left ? ` · ${left} racing` : ''}</div>
+          <button className={`m-btn ${left === 0 ? 'm-btn-p' : 'm-btn-g'}`} style={{ height: 40 }} onClick={review}>Review</button>
+        </aside>
+        <div className="m-land-keys" style={{ gridTemplateColumns: `repeat(${Math.min(7, Math.max(4, Math.ceil(total / (total > 14 ? 3 : 2))))}, minmax(0, 1fr))` }}>
+          {sailSortedIndices(skippers).map(i => (
+            <PadKey key={i} skipper={skippers[i]} entry={entryOf(i)} absent={absentLocal.includes(i)} you={isYou(i)} onTap={() => tapKey(i)} onHold={() => holdKey(i)} />
+          ))}
+        </div>
+        {letterSheet}
+      </div>
+    );
+  }
 
   return (
     <div className={`m-stack m-finish ${mode === 'voice' ? 'm-finish-voice' : ''}`} style={{ minHeight: 'calc(100dvh - var(--m-safe-top) - var(--m-safe-bottom) - 40px)', gap: 10 }}>
@@ -545,20 +602,14 @@ export const FinishPadScreen: React.FC = () => {
       {together.hosting && (
         <div className="m-together-bar"><Icon name="people" size={16} />{together.spotters.length ? `${together.spotters.map(p => p.name.split(' ')[0]).join(', ')} calling with you` : 'Waiting for spotters to join'}</div>
       )}
-      {(session.conflicts || []).slice(0, 1).map(c => session.pad && (
-        <ConflictCard key={c.id} conflict={c} pad={session.pad} onKeep={w => {
-          const r = resolveConflict(sessionRef.current!, c.id, w);
-          setOrder(r.finish || [], r.added, { conflicts: r.conflicts });
-          tap('success');
-        }} />
-      ))}
+      {conflictCard}
       <Modes mode={mode} onMode={m => { if (m !== 'voice') stopListening(); setMode(m); }} />
       {mode !== 'voice' && <Strip order={order} skippers={skippers} last={last} left={left} total={total} showLeft={mode === 'keypad'} />}
       {mode === 'tap' && (
         <>
           <div className="m-keys">
             {sailSortedIndices(skippers).map(i => (
-              <PadKey key={i} skipper={skippers[i]} entry={entryOf(i)} absent={absentLocal.includes(i)} you={isYou(i)} onTap={() => tapKey(i)} onHold={() => { tap('medium'); setLetter({ index: i, current: entryOf(i) }); }} />
+              <PadKey key={i} skipper={skippers[i]} entry={entryOf(i)} absent={absentLocal.includes(i)} you={isYou(i)} onTap={() => tapKey(i)} onHold={() => holdKey(i)} />
             ))}
           </div>
           <div className="m-dim" style={{ fontSize: 12, textAlign: 'center' }}>Tap a finished boat to take it out · hold for a letter score</div>
@@ -575,14 +626,10 @@ export const FinishPadScreen: React.FC = () => {
       <div className="m-dim" style={{ fontSize: 12.5, textAlign: 'center' }} aria-live="polite">
         {finishers} of {total} finished{ocs ? ` · ${ocs} OCS` : ''}{letters.length - ocs ? ` · ${letters.length - ocs} letter score${letters.length - ocs > 1 ? 's' : ''}` : ''}{left > 0 ? ` · ${left} racing` : ''}
       </div>
-      <button className={`m-btn ${left === 0 ? 'm-btn-p' : 'm-btn-g'}`} style={{ height: 50 }} onClick={() => { stopListening(); navigate(`/race-desk/event/${key}/confirm`); }}>Review finish order</button>
+      <button className={`m-btn ${left === 0 ? 'm-btn-p' : 'm-btn-g'}`} style={{ height: 50 }} onClick={review}>Review finish order</button>
+      {mode === 'tap' && <div className="m-dim m-row" style={{ fontSize: 12, justifyContent: 'center', gap: 6 }}><Icon name="phone" size={14} />Turn your phone to see every boat at once</div>}
 
-      {letter && (
-        <LetterSheet target={letter} skipper={skippers[letter.index]} race={up.race} raceLabel={up.raceLabel} heatLabel={heats ? up.heatLabel : ''}
-          heatSize={total} entrants={(st.skippers || []).length} prev={prev} shrs={shrs} heats={heats}
-          multiDay={!!event.multiDay} numberOfDays={event.numberOfDays} currentDay={e.currentDay}
-          onApply={(c, p) => applyLetter(c, p)} onClear={() => applyLetter(null)} onClose={() => setLetter(null)} />
-      )}
+      {letterSheet}
     </div>
   );
 };

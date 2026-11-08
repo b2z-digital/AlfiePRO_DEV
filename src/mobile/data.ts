@@ -264,7 +264,7 @@ export interface MyResult {
  * place, total and dropped race on the phone matches the desktop results page exactly.
  */
 export interface MStandings {
-  rows: { index: number; name: string; sailNo?: string; memberId?: string; net: number; netLabel: string }[];
+  rows: { index: number; name: string; sailNo?: string; memberId?: string; net: number; netLabel: string; gross: number; grossLabel: string }[];
   races: number[];
   isDropped: (skipperIndex: number, race: number) => boolean;
   cell: (skipperIndex: number, race: number) => string;
@@ -279,7 +279,8 @@ export function eventStandings(src?: RaceEvent | null): MStandings | null {
   return {
     rows: (r.displaySkippers as any[]).map(s => {
       const net = r.totals[s.index]?.net || 0;
-      return { index: s.index, name: s.name, sailNo: s.sailNo, memberId: s.memberId, net, netLabel: net ? label(net) : '0' };
+      const gross = r.totals[s.index]?.gross || 0;
+      return { index: s.index, name: s.name, sailNo: s.sailNo, memberId: s.memberId, net, netLabel: net ? label(net) : '0', gross, grossLabel: gross ? label(gross) : '0' };
     }),
     races: r.raceNumbers,
     isDropped: (i, race) => !!r.drops[`${i}-${race}`],

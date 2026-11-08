@@ -11,7 +11,7 @@ import { loadFinishOrder, addFinish, type FinishingEntry } from '../../utils/fin
 import { buildHeatSetup } from '../../utils/heatSetup';
 import { heatSailingOrder } from '../../utils/raceProgress';
 import { DEFAULT_HANDICAP_SETTINGS, advanceToNextRoundIn, confirmTouchRace, handicapsFor, overrideHandicapIn } from '../../utils/scoringConfirm';
-import { applyHeatFinish, applyRaceFinish, confirmHeat, confirmRace, handicapChanges, heatMoves, type ScoringRun } from '../../mobile/confirmRace';
+import { applyHeatFinish, applyRaceFinish, confirmHeat, confirmRace, editCell, handicapChanges, heatMoves, type ScoringRun } from '../../mobile/confirmRace';
 
 const real = events as unknown as RaceEvent[];
 const strip = (rs: any[]) => rs.map(r => ({ skipperIndex: r.skipperIndex, position: r.position ?? null, letterScore: r.letterScore || undefined })).sort((a, b) => a.skipperIndex - b.skipperIndex);
@@ -131,5 +131,28 @@ describe('HMS heat by heat', () => {
     expect(moves.map(m => m.place)).toEqual([1, 2, 3, 4]);
     expect(new Set(moves.map(m => m.to)).size).toBe(1);
     expect(c.roundCompleted).toBe(false);
+  });
+});
+
+describe('correcting a result on the full sheet', () => {
+  const runOfReal = (e: RaceEvent): ScoringRun => ({ skippers: e.skippers, raceResults: e.raceResults as any[], heatManagement: null, lastCompletedRace: e.lastCompletedRace, numRaces: 12, dropRules: [4, 8, 16, 24, 32, 40], hasDeterminedInitialHcaps: true, isManualHandicaps: !!e.isManualHandicaps, currentDay: 1, raceType: e.raceFormat });
+
+  it('changing a place and changing it back leaves every result as it was', () => {
+    for (const e of real) {
+      const run = runOfReal(e);
+      const r = (e.raceResults as any[]).find(x => x.race === 2 && x.position && !x.letterScore);
+      const changed = editCell(run, 2, r.skipperIndex, null, 'DNF', undefined, DEFAULT_HANDICAP_SETTINGS).run;
+      expect(changed.raceResults.find(x => x.race === 2 && x.skipperIndex === r.skipperIndex)).toMatchObject({ position: null, letterScore: 'DNF' });
+      const back = editCell(changed, 2, r.skipperIndex, r.position, undefined, undefined, DEFAULT_HANDICAP_SETTINGS).run;
+      expect(strip(back.raceResults.filter(x => x.race === 2))).toEqual(strip((e.raceResults as any[]).filter(x => x.race === 2)));
+      expect(back.lastCompletedRace).toBe(e.lastCompletedRace);
+    }
+  });
+
+  it('correcting race 1 of a handicap round later keeps the races already scored', () => {
+    const e = real.find(x => x.raceFormat === 'handicap')!;
+    const r1 = (e.raceResults as any[]).find(x => x.race === 1 && x.position)!;
+    const after = editCell(runOfReal(e), 1, r1.skipperIndex, r1.position, undefined, undefined, DEFAULT_HANDICAP_SETTINGS).run;
+    expect(after.lastCompletedRace).toBe(e.lastCompletedRace);
   });
 });

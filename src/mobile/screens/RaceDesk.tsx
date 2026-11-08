@@ -232,7 +232,8 @@ export const DeskEventScreen: React.FC = () => {
         <div className="m-li"><span className="m-mut" style={{ flex: 1, fontSize: 14 }}>Drops</span><span style={{ fontSize: 14, fontWeight: 600 }}>{dropsLabel(e)}</span></div>
         <div className="m-li"><span className="m-mut" style={{ flex: 1, fontSize: 14 }}>Heats</span><span style={{ fontSize: 14, fontWeight: 600 }}>{heatsLabel(e)}</span></div>
         {item.state !== 'cancelled' && <button className="m-li" style={{ color: 'var(--m-blue-ink)' }} onClick={() => navigate(`/race-desk/event/${item.key}/settings`)}><span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Race settings</span><Icon name="chevron" size={16} /></button>}
-        {item.state !== 'cancelled' && item.state !== 'done' && <button className="m-li" style={{ color: 'var(--m-blue-ink)' }} onClick={() => sheet(item)} disabled={busy === item.key}><span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Scoring sheet</span><span className="m-dim" style={{ fontSize: 12.5, fontWeight: 400 }}>every race, letter scores</span><Icon name="chevron" size={16} /></button>}
+        {item.state !== 'cancelled' && <button className="m-li" style={{ color: 'var(--m-blue-ink)' }} onClick={() => navigate(`/race-desk/event/${item.key}/sheet`)}><span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Full sheet</span><span className="m-dim" style={{ fontSize: 12.5, fontWeight: 400 }}>every race and total · corrections</span><Icon name="chevron" size={16} /></button>}
+        {item.state !== 'cancelled' && item.state !== 'done' && <button className="m-li" style={{ color: 'var(--m-blue-ink)' }} onClick={() => sheet(item)} disabled={busy === item.key}><span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Scoring sheet</span><span className="m-dim" style={{ fontSize: 12.5, fontWeight: 400 }}>the desktop sheet</span><Icon name="chevron" size={16} /></button>}
       </div>
       {(item.proName || item.proMemberId) && (
         <>

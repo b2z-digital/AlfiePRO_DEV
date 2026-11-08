@@ -16,7 +16,7 @@ import { getCurrentEvent, setCurrentEvent, updateEventResults } from '../utils/r
 import { heatManagementOf, scoringStateOf } from '../utils/raceSetup';
 import { createCheckpoint } from '../utils/scoringCheckpoints';
 import {
-  DEFAULT_HANDICAP_SETTINGS, completeHeatIn, confirmTouchRace, handicapsFor, heatManagementAfterResult, loadHandicapSettings,
+  DEFAULT_HANDICAP_SETTINGS, completeHeatIn, editRaceResultIn, confirmTouchRace, handicapsFor, heatManagementAfterResult, loadHandicapSettings,
   mergeCompletedRoundResults, overrideHandicapIn, replaceRaceResultsForSkippersIn, skippersAfterHeatResult, updateMemberHandicapsFor, type HandicapSettings,
 } from '../utils/scoringConfirm';
 import { supabase } from '../utils/supabase';
@@ -289,4 +289,28 @@ export function handicapChanges(run: ScoringRun, race: number): HandicapChange[]
     .filter(r => r.race === race)
     .map(r => ({ skipperIndex: r.skipperIndex, position: r.position ?? null, letterScore: r.letterScore || undefined, from: r.handicap ?? 0, to: r.adjustedHcap ?? r.handicap ?? 0, overridden: !!r.handicapOverride }))
     .sort((a, b) => (a.letterScore ? 1 : 0) - (b.letterScore ? 1 : 0) || (a.position ?? 999) - (b.position ?? 999));
+}
+
+/**
+ * Correcting one boat's result in one race (the scoring screen's cell edit, as in Pro mode and
+ * the spreadsheet), followed by the scoring screen's handicap recalculation.
+ */
+export function editCell(run: ScoringRun, race: number, skipperIndex: number, position: number | null, letterScore: string | undefined, customPoints: number | undefined, settings: HandicapSettings): { run: ScoringRun; memberHandicapRace?: number } {
+  const edit = editRaceResultIn({
+    skippers: run.skippers, raceResults: run.raceResults, raceType: run.raceType, isManualHandicaps: run.isManualHandicaps,
+    hasDeterminedInitialHcaps: run.hasDeterminedInitialHcaps, lastCompletedRace: run.lastCompletedRace, currentNumRaces: run.numRaces, scoringMode: 'pro',
+  }, race, skipperIndex, position, letterScore, customPoints);
+  let after: ScoringRun = {
+    ...run,
+    raceResults: edit.raceResults,
+    skippers: edit.skippers ?? run.skippers,
+    isManualHandicaps: edit.isManualHandicaps ?? run.isManualHandicaps,
+    hasDeterminedInitialHcaps: edit.hasDeterminedInitialHcaps ?? run.hasDeterminedInitialHcaps,
+    lastCompletedRace: edit.lastCompletedRace ?? run.lastCompletedRace,
+  };
+  if (after.raceType === 'handicap' && !heatsOn(after) && after.skippers.length > 0 && after.raceResults.length > 0) {
+    const { updatedSkippers, updatedResults } = handicapsFor(after.skippers, after.raceResults, after.numRaces, settings, after.isManualHandicaps);
+    after = { ...after, skippers: updatedSkippers, raceResults: updatedResults };
+  }
+  return { run: after, memberHandicapRace: edit.raceCompleted ? edit.memberHandicapRace : undefined };
 }

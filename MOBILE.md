@@ -102,6 +102,13 @@ and call finishes. Calls travel on the realtime channel `score-together:<session
 BroadcastChannel); the scorer's phone applies them to the race session with the finish order rules
 (`applyRemoteCall`), sends the order back, and asks when two phones record different boats for one place
 (`resolveConflict`). Confirming waits until every disputed place is decided.
+Landscape (`mobile/orientation.ts`): the app is held upright (@capacitor/screen-orientation) except the finish pad
+and the full sheet, which follow the phone. App.tsx treats a phone on its side (short side under 500px) as a phone.
+The sideways finish pad shows every boat with the finish order on the left. The full sheet
+(`screens/FullSheet.tsx`, `/race-desk/event/:key/sheet`) shows every race, total and nett from the results engine,
+drops struck through; tapping a cell runs the scoring screen's cell edit (`editRaceResultIn` in
+`utils/scoringConfirm.ts`, moved out of YachtRaceManager.updateRaceResults). Heat and multi-day events are
+corrected on the desktop sheet for now.
 No signal (`mobile/outbox.ts`, `screens/Sync.tsx`): taps and the finish order always live on the phone; a confirmed
 race or heat that can't be saved is kept with the event as it now stands (the race desk uses it), and sent in order
 when signal returns. The club's handicap rules are kept on the phone for confirming offline.

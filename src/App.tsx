@@ -84,7 +84,8 @@ function useIsMobilePhone() {
   useEffect(() => {
     const check = () => {
       const width = window.innerWidth;
-      const isMobileWidth = width < 768;
+      // a phone turned on its side is still a phone (its short side stays under 500px)
+      const isMobileWidth = width < 768 || Math.min(width, window.innerHeight) < 500;
       const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
       setIsMobile(isMobileWidth && hasTouchScreen);
     };

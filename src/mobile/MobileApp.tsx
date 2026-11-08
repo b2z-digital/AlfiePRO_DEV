@@ -18,7 +18,9 @@ import { RaceScreen } from './screens/RaceDay';
 import { FinishPadScreen } from './screens/FinishPad';
 import { ConfirmRaceScreen } from './screens/ConfirmRace';
 import { SyncScreen } from './screens/Sync';
+import { FullSheetScreen } from './screens/FullSheet';
 import { startOutbox } from './outbox';
+import { lockPortrait } from './orientation';
 import { ClubHub } from './screens/Club';
 import { ChatsInbox, ChatThread } from './screens/Chats';
 import { SkipperProfile } from './screens/Skipper';
@@ -43,7 +45,7 @@ const AskAlfieChatPanel = lazy(() => import('../components/ask-alfie/AskAlfieCha
 
 /** Screens that sit outside the tab bar (pushed full screen). */
 const FIRST_RUN_PATHS = ['/choose-club', '/welcome-notifications', '/membership-due'];
-const NO_TABS = [/^\/(choose-club|welcome-notifications|membership-due)/, /^\/notifications/, /^\/race-timer/, /^\/race-desk\/event\/[^/]+\/(race|finish|confirm)$/, /^\/comms\/chat\//, /^\/classifieds\/[^/]+/, /^\/news\/[^/]+/];
+const NO_TABS = [/^\/(choose-club|welcome-notifications|membership-due)/, /^\/notifications/, /^\/race-timer/, /^\/race-desk\/event\/[^/]+\/(race|finish|confirm|sheet)$/, /^\/comms\/chat\//, /^\/classifieds\/[^/]+/, /^\/news\/[^/]+/];
 
 const AlfieSheet: React.FC<{ onClose: () => void; message?: string }> = ({ onClose, message }) => {
   const { light } = useMobile();
@@ -77,6 +79,8 @@ const Shell: React.FC = () => {
     return () => window.removeEventListener('m-ask-alfie', on);
   }, []);
   useAlfieTheme(true, light ? 'light' : 'dark');
+  // Upright, except the finish pad and full sheet (they allow turning the phone)
+  useEffect(() => { lockPortrait(); }, []);
   // Results confirmed with no signal send themselves when it's back
   useEffect(() => startOutbox(), []);
   // Score together keeps running for events this phone is scoring with spotters
@@ -118,6 +122,7 @@ const Shell: React.FC = () => {
           <Route path="/race-desk/event/:key/finish" element={<FinishPadScreen />} />
           <Route path="/race-desk/event/:key/confirm" element={<ConfirmRaceScreen />} />
           <Route path="/race-desk/sync" element={<SyncScreen />} />
+          <Route path="/race-desk/event/:key/sheet" element={<FullSheetScreen />} />
           <Route path="/club" element={<ClubHub />} />
           <Route path="/community/*" element={<Navigate to="/club" replace />} />
           <Route path="/comms" element={<ChatsInbox />} />

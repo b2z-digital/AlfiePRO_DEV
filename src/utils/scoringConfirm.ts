@@ -11,6 +11,7 @@ import { calculateHandicaps } from './handicapCalculator';
 import { calculateHandicapsWithRuleset, loadRulesetById, loadRulesetForClub, type LoadedRuleset } from './rulesetHandicapCalculator';
 import { completeHeat, convertHeatResultsToRaceResults, updateHeatResult } from './heatUtils';
 import { generateNextRoundAssignments } from '../types/heat';
+import { handicapForRace } from './raceProgress';
 import { supabase } from './supabase';
 
 /* ─────────────── handicaps ─────────────── */
@@ -504,4 +505,250 @@ export function advanceToNextRoundIn(prevHM: HeatManagement, heatOrRound: HeatDe
 
       const convertedResults = convertHeatResultsToRaceResults(result, skippers);
       return { heatManagement: result, convertedResults, lastCompletedRace: convertedResults.length > 0 ? targetRoundNumber - 1 : null };
+}
+
+
+export interface CellEditContext {
+  skippers: Skipper[];
+  raceResults: any[];
+  raceType: string | undefined;
+  isManualHandicaps: boolean;
+  hasDeterminedInitialHcaps: boolean;
+  lastCompletedRace: number;
+  currentNumRaces: number;
+  /** Touch mode waits for Confirm before a race counts as complete. */
+  scoringMode: 'pro' | 'touch' | 'spreadsheet' | string;
+}
+
+export interface CellEdit {
+  raceResults: any[];
+  /** Set when the edit changes the skippers (re-entry, race-1 seeding). */
+  skippers?: Skipper[];
+  isManualHandicaps?: boolean;
+  hasDeterminedInitialHcaps?: boolean;
+  /** Set when the last completed race changes. */
+  lastCompletedRace?: number;
+  /** The race is complete and the results are saved straight away (not in Touch mode). */
+  raceCompleted?: { highestConsecutiveRace: number };
+  /** Handicap races: this race's new handicaps go to the members' boats. */
+  memberHandicapRace?: number;
+}
+
+/**
+ * YachtRaceManager.updateRaceResults (Pro mode and the spreadsheet): one boat's result in one
+ * race set or corrected, with its handicap for the race, withdrawals and WDN, race-1 handicap
+ * seeding, and the race counted complete once every boat has a result.
+ */
+export function editRaceResultIn(ctx: CellEditContext, race: number, skipperIndex: number, position: number | null, letterScore?: any, customPoints?: number, hmsHeat?: string, hmsPosition?: number): CellEdit {
+    const { skippers, raceResults, raceType, isManualHandicaps, hasDeterminedInitialHcaps, lastCompletedRace, currentNumRaces, scoringMode } = ctx;
+    const out: CellEdit = { raceResults };
+    const newResults = [...raceResults];
+    const resultIndex = hmsHeat !== undefined
+      ? newResults.findIndex(
+          r => r.race === race && r.skipperIndex === skipperIndex && r.hmsHeat === hmsHeat
+        )
+      : newResults.findIndex(
+          r => r.race === race && r.skipperIndex === skipperIndex
+        );
+
+    // Get the handicap for this race - use previous race's adjusted handicap or starting handicap
+    const getCurrentHandicapForRace = (raceNum: number, skipIdx: number): number => handicapForRace(skippers, newResults, raceNum, skipIdx);
+
+    const currentHandicap = getCurrentHandicapForRace(race, skipperIndex);
+
+    const skipperSailNo = (() => {
+      const s = skippers[skipperIndex];
+      return s ? String(s.sailNumber || s.sailNo || s.boat_sail_number || '').trim() : '';
+    })();
+
+    if (resultIndex >= 0) {
+      const { handicapOverride: _ho, ...existingWithoutOverride } = newResults[resultIndex];
+      newResults[resultIndex] = {
+        ...existingWithoutOverride,
+        position,
+        letterScore,
+        customPoints,
+        handicap: currentHandicap,
+        adjustedHcap: currentHandicap,
+        ...(hmsHeat !== undefined && { hmsHeat }),
+        ...(hmsPosition !== undefined && { hmsPosition }),
+        ...(hmsHeat !== undefined && skipperSailNo && { hmsSailNumber: skipperSailNo }),
+      };
+    } else {
+      newResults.push({
+        race,
+        skipperIndex,
+        position,
+        letterScore,
+        customPoints,
+        handicap: currentHandicap,
+        adjustedHcap: currentHandicap,
+        ...(hmsHeat !== undefined && { hmsHeat }),
+        ...(hmsPosition !== undefined && { hmsPosition }),
+        ...(hmsHeat !== undefined && skipperSailNo && { hmsSailNumber: skipperSailNo }),
+      });
+    }
+
+    // Clear handicapOverride flags on later races so recalculation cascades properly
+    for (let i = 0; i < newResults.length; i++) {
+      if (newResults[i].race > race && newResults[i].handicapOverride) {
+        const { handicapOverride: _ho2, ...rest } = newResults[i];
+        newResults[i] = rest;
+      }
+    }
+
+    // Re-entry: if a withdrawn skipper gets an actual finishing position,
+    // clear their withdrawal flag - they're back in the competition
+    if (position !== null && letterScore !== 'WDN' && letterScore !== 'DNC') {
+      const skipper = skippers[skipperIndex];
+      if (skipper?.withdrawnFromRace != null && race >= skipper.withdrawnFromRace) {
+        const newSkippers = [...skippers];
+        newSkippers[skipperIndex] = { ...newSkippers[skipperIndex], withdrawnFromRace: undefined };
+        out.skippers = newSkippers;
+        // Remove any auto-generated WDN results for this skipper in this and future races
+        const filteredResults = newResults.filter(r => {
+          if (r.skipperIndex !== skipperIndex) return true;
+          if (r.race < race) return true;
+          if (r.race === race) return true; // keep the current result we just set
+          // Remove future WDN results (they were auto-generated)
+          return r.letterScore !== 'WDN';
+        });
+        newResults.length = 0;
+        newResults.push(...filteredResults);
+      }
+    }
+
+    // Check if this is the first NON-WITHDRAWN result being entered for this race
+    // If so, auto-score any withdrawn skippers
+    // Only count actual skipper results, not withdrawn skippers (WDN)
+    const existingNonWithdrawnResults = newResults.filter(r =>
+      r.race === race && r.letterScore !== 'WDN'
+    );
+    const isFirstResultForRace = existingNonWithdrawnResults.length === 1 && resultIndex < 0;
+
+    if (isFirstResultForRace) {
+      skippers.forEach((skipper, index) => {
+        // Check if skipper is withdrawn for this race
+        if (skipper.withdrawnFromRace && race >= skipper.withdrawnFromRace) {
+          // Check if they don't already have a result for this race
+          const hasResult = newResults.some(r => r.race === race && r.skipperIndex === index);
+          if (!hasResult) {
+            // Get handicap from previous race if available (for handicap racing)
+            let handicap = skipper.startHcap || 0;
+            if (race > 1 && raceType !== 'scratch') {
+              const prevResult = newResults.find(r => r.race === race - 1 && r.skipperIndex === index);
+              if (prevResult && prevResult.adjustedHcap !== undefined) {
+                handicap = prevResult.adjustedHcap;
+              }
+            }
+
+            // Create race result for withdrawn skipper
+            newResults.push({
+              race: race,
+              skipperIndex: index,
+              position: null,
+              letterScore: 'WDN',
+              customPoints: skippers.length + 1,
+              handicap: raceType !== 'scratch' ? handicap : undefined,
+              adjustedHcap: raceType !== 'scratch' ? handicap : undefined
+            });
+          }
+        }
+      });
+    }
+
+    const race1Complete = race === 1 && skippers.every((_, index) => {
+      const result = newResults.find(r => r.race === 1 && r.skipperIndex === index);
+      return result && (result.position !== null || result.letterScore);
+    });
+
+    if (race === 1 && race1Complete && raceType === 'handicap') {
+      const hasPresetHandicaps = skippers.some(s => s.startHcap > 0);
+      if (!isManualHandicaps && !hasDeterminedInitialHcaps && !hasPresetHandicaps) {
+        const step = 10;
+        const ranking = skippers.map((_, idx) => ({
+          idx,
+          pos: newResults.find(r => r.race === 1 && r.skipperIndex === idx)?.position || 0
+        })).sort((a, b) => a.pos - b.pos);
+
+        const updatedSkippers = [...skippers];
+        ranking.forEach((r, rank) => {
+          const handicap = rank * step;
+          updatedSkippers[r.idx] = { ...updatedSkippers[r.idx], startHcap: handicap };
+        });
+
+        out.skippers = updatedSkippers;
+      } else if (hasPresetHandicaps && !isManualHandicaps) {
+        out.isManualHandicaps = true;
+      }
+      out.hasDeterminedInitialHcaps = true;
+      // (correcting race 1 later used to set the last completed race back to 1)
+      if (lastCompletedRace < 1) out.lastCompletedRace = 1;
+    }
+    
+    // Only update the race completion status when all skippers have results
+    // This prevents premature sorting of skippers during race entry
+    const raceComplete = skippers.every((skipper, index) => {
+      // Check if skipper has a result
+      const result = newResults.find(r => r.race === race && r.skipperIndex === index);
+      if (result && (result.position !== null || result.letterScore)) {
+        return true;
+      }
+
+      // Check if skipper is withdrawn for this race
+      if (skipper.withdrawnFromRace && race >= skipper.withdrawnFromRace) {
+        return true;
+      }
+
+      return false;
+    });
+
+    // In touch mode, don't auto-advance to next race until user confirms
+    // This prevents the race from jumping forward before the confirm button can be clicked
+    if (raceComplete && scoringMode !== 'touch') {
+      // Find the highest consecutive completed race starting from race 1
+      let highestConsecutiveRace = 0;
+      for (let r = 1; r <= currentNumRaces; r++) {
+        const isComplete = skippers.every((skipper, index) => {
+          // Check if skipper has a result
+          const result = newResults.find(res => res.race === r && res.skipperIndex === index);
+          if (result && (result.position !== null || result.letterScore)) {
+            return true;
+          }
+
+          // Check if skipper is withdrawn for this race
+          if (skipper.withdrawnFromRace && r >= skipper.withdrawnFromRace) {
+            return true;
+          }
+
+          return false;
+        });
+        if (isComplete) {
+          highestConsecutiveRace = r;
+        } else {
+          // For handicap races, also accept a race as complete if it has results
+          // with positions for at least half the skippers (handles late-added skippers)
+          if (raceType === 'handicap') {
+            const raceResultsForR = newResults.filter(res => res.race === r && (res.position !== null || res.letterScore));
+            if (raceResultsForR.length >= Math.ceil(skippers.length * 0.5) && raceResultsForR.length >= 2) {
+              highestConsecutiveRace = r;
+              continue;
+            }
+          }
+          break;
+        }
+      }
+
+      if (highestConsecutiveRace > lastCompletedRace) {
+        out.lastCompletedRace = highestConsecutiveRace;
+      }
+      out.raceCompleted = { highestConsecutiveRace };
+
+      if (raceType === 'handicap') {
+        out.memberHandicapRace = race;
+      }
+    }
+
+    out.raceResults = newResults;
+    return out;
 }
