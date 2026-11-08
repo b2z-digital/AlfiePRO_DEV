@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Globe, TrendingUp, CircleCheck as CheckCircle, Download, RefreshCw, ChartBar as BarChart3, DollarSign, Check, X, SquareCheck as CheckSquare, Square, Plus, Receipt, ChevronDown, Calendar } from 'lucide-react';
+import { Globe, TrendingUp, Download, RefreshCw, ChartBar as BarChart3, DollarSign, Check, X, SquareCheck as CheckSquare, Square, Plus, Receipt, ChevronDown, Calendar } from 'lucide-react';
+import { InlineLoading, KpiCard, OrgLogo, PageHead } from '../association/AssocUI';
 import { supabase } from '../../utils/supabase';
 import { AssociationPaymentReconciliationModal } from './AssociationPaymentReconciliationModal';
 import {
@@ -70,48 +71,42 @@ const NatAppDropdown: React.FC<{
         ref={btnRef}
         type="button"
         onClick={() => setOpen(!open)}
-        className={`
-          flex items-center justify-between gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
-          bg-slate-800/80 text-slate-200 border border-slate-700/60
-          ${open ? 'ring-2 ring-blue-500/40 border-blue-500/50' : 'hover:bg-slate-700/80 hover:border-slate-600'}
-          cursor-pointer
-        `}
+        className="a-pick justify-between"
         style={{ minWidth }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
-        <div className="flex items-center gap-2">
-          {icon && <span className="text-slate-400 flex-shrink-0">{icon}</span>}
-          <span className={selected ? 'text-slate-200' : 'text-slate-500'}>
+        <span className="flex items-center gap-2 min-w-0">
+          {icon && <span className="a-dim flex flex-shrink-0">{icon}</span>}
+          <span className={`truncate ${selected ? '' : 'a-dim'}`}>
             {selected ? selected.label : placeholder}
           </span>
-        </div>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+        </span>
+        <ChevronDown size={14} className={`a-dim transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && createPortal(
         <div
           ref={menuRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999 }}
-          className="rounded-xl shadow-2xl border bg-slate-800 border-slate-700 shadow-black/50"
+          className="a-pop"
+          role="listbox"
         >
-          <div className="py-1 max-h-[280px] overflow-y-auto overscroll-contain rounded-xl
-            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
-            [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/50"
-          >
+          <div className="p-1.5 max-h-[280px] overflow-y-auto overscroll-contain flex flex-col gap-0.5">
             {options.map(opt => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => { onChange(opt.value); setOpen(false); }}
-                className={`
-                  w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors text-left
-                  ${value === opt.value ? 'bg-blue-500/15 text-blue-400' : 'text-slate-300 hover:bg-slate-700/80'}
-                `}
+                role="option"
+                aria-selected={value === opt.value}
+                className={`a-pop-item justify-between ${value === opt.value ? 'a-pop-item-on' : ''}`}
               >
-                <div className="flex items-center gap-2.5">
-                  {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
-                  <span>{opt.label}</span>
-                </div>
-                {value === opt.value && <Check size={14} className="text-blue-400 flex-shrink-0" />}
+                <span className="flex items-center gap-2.5 min-w-0">
+                  {opt.icon && <span className="flex flex-shrink-0 a-dim">{opt.icon}</span>}
+                  <span className="truncate">{opt.label}</span>
+                </span>
+                {value === opt.value && <Check size={14} className="a-txt-b flex-shrink-0" />}
               </button>
             ))}
           </div>
@@ -134,7 +129,6 @@ interface StateStats {
 }
 
 export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardProps> = ({
-  darkMode,
   nationalAssociationId
 }) => {
   const [loading, setLoading] = useState(true);
@@ -317,277 +311,136 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
 
   if (loading) {
     return (
-      <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
-        <div className="flex items-center justify-center py-12">
-          <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
-          <span className={`ml-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            Loading national association data...
-          </span>
-        </div>
+      <div className="flex flex-col gap-[22px]">
+        <PageHead icon={<DollarSign size={24} />} title="Remittances" sub="Membership contributions from your state associations" />
+        <InlineLoading label="Loading national association data…" />
       </div>
     );
   }
 
+  const collectionRate = totalMembers > 0 && (totalRevenue + totalOutstanding) > 0
+    ? ((totalRevenue / (totalRevenue + totalOutstanding)) * 100).toFixed(1)
+    : '0';
+  const pendingCount = remittances.filter(r => r.state_to_national_status === 'pending').length;
+  const YEAR_OPTIONS = [
+                    { value: 'all', label: 'All Years', icon: <Calendar size={14} /> },
+                    ...availableYears.map(year => ({
+                      value: String(year),
+                      label: String(year),
+                      icon: <Calendar size={14} />
+                    }))
+                  ];
+  const tabs: { id: typeof selectedTab; label: string; count?: number }[] = [
+    { id: 'overview', label: 'State overview', count: stateStats.length },
+    { id: 'remittances', label: 'All remittances', count: remittances.length },
+    { id: 'payments', label: 'Payment history', count: payments.length },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Summary Card - Slate Styling */}
-      <div className={`bg-slate-800/50 backdrop-blur-sm rounded-xl border ${
-        totalOutstanding > 0 ? 'border-orange-500/50' : 'border-green-500/50'
-      } overflow-hidden`}>
-        <div className="p-6">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <div className="p-3 rounded-xl bg-gradient-to-br">
-                  <DollarSign className="text-white" size={28} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">
-                    Remittances
-                  </h3>
-                  <p className="text-sm text-slate-400 mt-0.5">
-                    Track membership contributions from state associations
-                  </p>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 transition-colors"
-            >
-              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
+    <div className="flex flex-col gap-[22px]">
+      <PageHead
+        icon={<DollarSign size={24} />}
+        title="Remittances"
+        sub="Membership contributions from your state associations"
+      >
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="a-btn"
+          title="Refresh"
+        >
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          Refresh
+        </button>
+      </PageHead>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <Globe className="w-5 h-5 text-blue-400" />
-                <span className="text-sm font-medium text-blue-300">
-                  Total Members
-                </span>
-              </div>
-              <p className="text-3xl font-bold text-white">
-                {totalMembers}
-              </p>
-              <p className="text-xs text-blue-300/60 mt-1">
-                Across {stateStats.length} state associations
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-5 h-5 text-emerald-400" />
-                <span className="text-sm font-medium text-emerald-300">
-                  Total Revenue
-                </span>
-              </div>
-              <p className="text-3xl font-bold text-white">
-                ${totalRevenue.toFixed(2)}
-              </p>
-              <p className="text-xs text-emerald-300/60 mt-1">
-                Received from states
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-5 h-5 text-orange-400" />
-                <span className="text-sm font-medium text-orange-300">
-                  Outstanding
-                </span>
-              </div>
-              <p className="text-3xl font-bold text-white">
-                ${totalOutstanding.toFixed(2)}
-              </p>
-              <p className="text-xs text-orange-300/60 mt-1">
-                Pending from states
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <BarChart3 className="w-5 h-5 text-purple-400" />
-                <span className="text-sm font-medium text-purple-300">
-                  Collection Rate
-                </span>
-              </div>
-              <p className="text-3xl font-bold text-white">
-                {totalMembers > 0 ? ((totalRevenue / (totalRevenue + totalOutstanding)) * 100).toFixed(1) : '0'}%
-              </p>
-              <p className="text-xs text-purple-300/60 mt-1">
-                Of total expected revenue
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        <KpiCard cap="Total members" value={totalMembers} sub={`Across ${stateStats.length} state association${stateStats.length === 1 ? '' : 's'}`} icon={<Globe size={18} />} />
+        <KpiCard cap="Received" value={`$${totalRevenue.toFixed(2)}`} sub="Paid on by the states" icon={<DollarSign size={18} />} tone={totalRevenue > 0 ? 'green' : undefined} />
+        <KpiCard cap="Outstanding" value={`$${totalOutstanding.toFixed(2)}`} sub="Still to come from the states" icon={<TrendingUp size={18} />} tone={totalOutstanding > 0 ? 'amber' : undefined} />
+        <KpiCard cap="Collection rate" value={`${collectionRate}%`} sub="Of the total expected" icon={<BarChart3 size={18} />} />
       </div>
 
       {/* Tabs */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
-        <div className="border-b border-slate-700">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => setSelectedTab('overview')}
-              className={`px-6 py-4 font-medium transition-colors ${
-                selectedTab === 'overview'
-                  ? 'bg-slate-700/50 text-blue-400 border-b-2 border-blue-400'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              State Overview
-            </button>
-            <button
-              onClick={() => setSelectedTab('remittances')}
-              className={`px-6 py-4 font-medium transition-colors ${
-                selectedTab === 'remittances'
-                  ? 'bg-slate-700/50 text-blue-400 border-b-2 border-blue-400'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              All Remittances ({remittances.length})
-            </button>
-            <button
-              onClick={() => setSelectedTab('payments')}
-              className={`px-6 py-4 font-medium transition-colors ${
-                selectedTab === 'payments'
-                  ? 'bg-slate-700/50 text-blue-400 border-b-2 border-blue-400'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              Payment History ({payments.length})
-            </button>
-          </nav>
-        </div>
+      <div className="a-seg self-start max-w-full overflow-x-auto" role="tablist" aria-label="Remittances">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={selectedTab === t.id}
+            onClick={() => setSelectedTab(t.id)}
+            className={`a-seg-i ${selectedTab === t.id ? 'a-seg-on' : ''}`}
+          >
+            {t.label}
+            {t.count !== undefined && <span className="a-cnt">{t.count}</span>}
+          </button>
+        ))}
+      </div>
 
-        <div className="p-6">
+      <div className="a-card overflow-hidden">
+        <div className="p-4 sm:p-6">
           {/* State Overview Tab */}
           {selectedTab === 'overview' && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex justify-between items-center gap-3 flex-wrap mb-4">
                 <NatAppDropdown
                   value={String(selectedYear)}
                   onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
                   icon={<Calendar size={15} />}
-                  options={[
-                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
-                    ...availableYears.map(year => ({
-                      value: String(year),
-                      label: String(year),
-                      icon: <Calendar size={14} className="text-blue-400" />
-                    }))
-                  ]}
+                  options={YEAR_OPTIONS}
                   minWidth={160}
                 />
 
                 <button
+                  type="button"
                   onClick={() => exportRemittancesToCSV(remittances, `national-remittances-${selectedYear === 'all' ? 'all-years' : selectedYear}.csv`)}
                   disabled={remittances.length === 0}
-                  className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2 border ${
-                    remittances.length === 0
-                      ? 'bg-slate-800/80 border-slate-700/60 text-slate-500 cursor-not-allowed'
-                      : 'bg-slate-800/80 border-slate-700/60 hover:bg-slate-700/80 hover:border-slate-600 text-slate-300 hover:text-white'
-                  }`}
+                  className="a-btn"
                 >
                   <Download className="w-4 h-4" />
-                  Export Overview
+                  Export overview
                 </button>
               </div>
 
               {stateStats.length === 0 ? (
-                <div className="text-center py-12">
-                  <CheckCircle className={`w-12 h-12 mx-auto mb-3 text-green-500`} />
-                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    No state remittance data for selected year
-                  </p>
+                <div className="a-empty py-12">
+                  <span className="a-tile" style={{ width: 56, height: 56 }}><Globe size={24} /></span>
+                  <p className="a-mute text-sm m-0">No state remittance data for the selected year</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {stateStats.map((state) => (
-                    <div
-                      key={state.stateId}
-                      className="p-4 rounded-lg bg-slate-700/30 border border-slate-600/50 hover:border-slate-500/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-3">
+                  {stateStats.map((state) => {
+                    const pct = state.totalOwed > 0 ? (state.totalPaid / state.totalOwed) * 100 : 0;
+                    return (
+                      <article key={state.stateId} className="a-card a-clubcard">
                         <div className="flex items-center gap-3">
-                          {state.logoUrl ? (
-                            <img
-                              src={state.logoUrl}
-                              alt={state.stateName}
-                              className="w-10 h-10 rounded-lg object-cover bg-white/5"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-slate-600/50 flex items-center justify-center">
-                              <span className="text-slate-400 text-xs font-bold">
-                                {state.stateName.substring(0, 2).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-                          <h4 className="font-semibold text-white">
-                            {state.stateName}
-                          </h4>
+                          <OrgLogo src={state.logoUrl} name={state.stateName} />
+                          <h4 className="flex-1 min-w-0 a-ink font-semibold text-[15.5px] m-0 truncate">{state.stateName}</h4>
+                          <span className={`a-lb-fmt ${state.pendingMembers === 0 ? 'a-txt-g' : 'a-txt-a'}`}>
+                            <span className={`a-light ${state.pendingMembers === 0 ? 'a-light-g' : 'a-light-a'}`} />
+                            {state.pendingMembers === 0 ? 'Paid' : `${state.pendingMembers} pending`}
+                          </span>
                         </div>
-                        <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                          state.pendingMembers === 0
-                            ? 'bg-green-500/20 text-green-300'
-                            : 'bg-orange-500/20 text-orange-300'
-                        }`}>
-                          {state.pendingMembers === 0 ? 'Paid' : `${state.pendingMembers} pending`}
-                        </span>
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-xs text-slate-400">
-                            Total Members
-                          </p>
-                          <p className="text-lg font-semibold text-white">
-                            {state.totalMembers}
-                          </p>
+                        <div className="a-wells" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
+                          <div className="a-well"><span className="a-well-n">{state.totalMembers}</span><span className="a-well-l">Members</span></div>
+                          <div className="a-well"><span className={`a-well-n ${state.paidMembers === 0 ? 'is-zero' : ''}`}>{state.paidMembers}</span><span className="a-well-l">Paid</span></div>
+                          <div className="a-well"><span className="a-well-n" style={{ fontSize: 17 }}>${state.totalOwed.toFixed(0)}</span><span className="a-well-l">Owed</span></div>
+                          <div className="a-well"><span className="a-well-n a-txt-g" style={{ fontSize: 17 }}>${state.totalPaid.toFixed(0)}</span><span className="a-well-l">Received</span></div>
                         </div>
-                        <div>
-                          <p className="text-xs text-slate-400">
-                            Paid Members
-                          </p>
-                          <p className="text-lg font-semibold text-green-400">
-                            {state.paidMembers}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400">
-                            Total Owed
-                          </p>
-                          <p className="text-lg font-semibold text-white">
-                            ${state.totalOwed.toFixed(2)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400">
-                            Total Paid
-                          </p>
-                          <p className="text-lg font-semibold text-green-400">
-                            ${state.totalPaid.toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
 
-                      {/* Progress Bar */}
-                      <div className="mt-3">
-                        <div className="h-2 rounded-full bg-slate-600 overflow-hidden">
-                          <div
-                            className="h-full transition-all duration-300"
-                            style={{
-                              width: `${state.totalOwed > 0 ? (state.totalPaid / state.totalOwed) * 100 : 0}%`
-                            }}
-                          />
+                        <div>
+                          <div className="a-progress" style={{ height: 6 }}>
+                            <i style={{ width: `${Math.min(100, pct)}%` }} />
+                          </div>
+                          <p className="text-xs mt-2 a-mute m-0">{pct.toFixed(1)}% collected · ${state.totalOwed.toFixed(2)} owed, ${state.totalPaid.toFixed(2)} received</p>
                         </div>
-                        <p className="text-xs mt-1 text-slate-400">
-                          {state.totalOwed > 0 ? ((state.totalPaid / state.totalOwed) * 100).toFixed(1) : '0'}% collected
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -598,28 +451,30 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
             <div>
               {/* Bulk Actions Toolbar */}
               {selectedIds.size > 0 && (
-                <div className="bg-blue-500/10 backdrop-blur-sm rounded-xl border border-blue-500/30 p-4 mb-4">
-                  <div className="flex items-center justify-between">
+                <div className="a-bulkbar mb-4">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-3">
-                      <CheckSquare className="w-5 h-5 text-blue-400" />
-                      <span className="text-white font-medium">
+                      <CheckSquare className="w-5 h-5 a-txt-b" />
+                      <span className="a-ink font-semibold text-sm">
                         {selectedIds.size} selected
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
+                        type="button"
                         onClick={handleBulkMarkPaid}
                         disabled={bulkActionInProgress}
-                        className="btn-primary-green px-4 py-2 rounded-lg text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="a-btn a-btn-g a-btn-sm"
                       >
-                        <Check size={18} />
-                        Mark Paid
+                        <Check size={16} />
+                        Mark paid
                       </button>
                       <button
+                        type="button"
                         onClick={() => setSelectedIds(new Set())}
-                        className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors flex items-center gap-2"
+                        className="a-btn a-btn-q a-btn-sm"
                       >
-                        <X size={18} />
+                        <X size={16} />
                         Clear
                       </button>
                     </div>
@@ -628,79 +483,72 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
               )}
 
               {/* Filters */}
-              <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center gap-3 mb-5 flex-wrap">
                 <NatAppDropdown
                   value={String(selectedYear)}
                   onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
                   icon={<Calendar size={15} />}
-                  options={[
-                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
-                    ...availableYears.map(year => ({
-                      value: String(year),
-                      label: String(year),
-                      icon: <Calendar size={14} className="text-blue-400" />
-                    }))
-                  ]}
+                  options={YEAR_OPTIONS}
                   minWidth={160}
                 />
                 <button
+                  type="button"
                   onClick={toggleSelectAll}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700/60 hover:border-slate-600 text-sm font-medium transition-all flex items-center gap-2"
+                  className="a-btn"
+                  disabled={pendingCount === 0}
                 >
-                  <CheckSquare size={15} className="text-slate-400" />
-                  {selectedIds.size === remittances.filter(r => r.state_to_national_status === 'pending').length ? 'Deselect All' : 'Select All Pending'}
+                  <CheckSquare size={15} className="a-mute" />
+                  {selectedIds.size === pendingCount && pendingCount > 0 ? 'Deselect all' : 'Select all pending'}
                 </button>
               </div>
 
               {/* Table */}
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full a-atable">
                   <thead>
-                    <tr className="border-b border-slate-700">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-300">Member</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-300">State</th>
-                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">Year</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-slate-300">National Amount</th>
-                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">Status</th>
-                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">Paid Date</th>
-                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">Actions</th>
-                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">Select</th>
+                    <tr>
+                      <th className="text-left py-3 px-4">Member</th>
+                      <th className="text-left py-3 px-4">State</th>
+                      <th className="text-center py-3 px-4">Year</th>
+                      <th className="text-right py-3 px-4">National amount</th>
+                      <th className="text-center py-3 px-4">Status</th>
+                      <th className="text-center py-3 px-4">Paid date</th>
+                      <th className="text-center py-3 px-4">Actions</th>
+                      <th className="text-center py-3 px-4">Select</th>
                     </tr>
                   </thead>
                   <tbody>
                     {remittances.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="text-center py-12">
-                          <p className="text-slate-400">No remittances found</p>
+                          <p className="a-mute text-sm m-0">No remittances found</p>
                         </td>
                       </tr>
                     ) : (
                       remittances.map((remittance) => {
                         const isPending = remittance.state_to_national_status === 'pending';
+                        const isSel = selectedIds.has(remittance.id);
                         return (
-                          <tr key={remittance.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
-                            <td className="py-3 px-4 text-white">
+                          <tr key={remittance.id} className={isSel ? 'is-sel' : ''}>
+                            <td className="py-3 px-4 a-ink font-medium whitespace-nowrap">
                               {remittance.member ? `${remittance.member.first_name} ${remittance.member.last_name}` : 'Unknown'}
                             </td>
-                            <td className="py-3 px-4 text-slate-300">
+                            <td className="py-3 px-4 a-mute">
                               {(remittance as any).state_name || '-'}
                             </td>
-                            <td className="py-3 px-4 text-center text-slate-300">
+                            <td className="py-3 px-4 text-center a-mute a-num">
                               {remittance.membership_year}
                             </td>
-                            <td className="py-3 px-4 text-right text-white">
+                            <td className="py-3 px-4 text-right a-ink a-num">
                               ${remittance.national_contribution_amount.toFixed(2)}
                             </td>
                             <td className="py-3 px-4 text-center">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                remittance.state_to_national_status === 'paid'
-                                  ? 'bg-green-500/20 text-green-300'
-                                  : 'bg-orange-500/20 text-orange-300'
-                              }`}>
+                              <span className={`a-lb-fmt ${remittance.state_to_national_status === 'paid' ? 'a-txt-g' : 'a-txt-a'}`}>
+                                <span className={`a-light ${remittance.state_to_national_status === 'paid' ? 'a-light-g' : 'a-light-a'}`} />
                                 {remittance.state_to_national_status === 'paid' ? 'Paid' : 'Pending'}
                               </span>
                             </td>
-                            <td className="py-3 px-4 text-center text-slate-300">
+                            <td className="py-3 px-4 text-center a-mute whitespace-nowrap">
                               {remittance.state_to_national_paid_date
                                 ? new Date(remittance.state_to_national_paid_date).toLocaleDateString()
                                 : '-'}
@@ -708,23 +556,26 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
                             <td className="py-3 px-4 text-center">
                               {isPending && (
                                 <button
+                                  type="button"
                                   onClick={() => handleMarkPaid(remittance.id)}
-                                  className="btn-primary-green px-3 py-1 rounded-lg text-white text-xs font-medium transition-colors"
+                                  className="a-btn a-btn-g a-btn-sm"
                                 >
-                                  Mark Paid
+                                  Mark paid
                                 </button>
                               )}
                             </td>
                             <td className="py-3 px-4 text-center">
                               {isPending && (
                                 <button
+                                  type="button"
                                   onClick={() => toggleSelection(remittance.id)}
                                   className="p-1"
+                                  aria-label={isSel ? 'Deselect' : 'Select'}
                                 >
-                                  {selectedIds.has(remittance.id) ? (
-                                    <CheckSquare className="w-5 h-5 text-blue-400" />
+                                  {isSel ? (
+                                    <CheckSquare className="w-5 h-5 a-txt-b" />
                                   ) : (
-                                    <Square className="w-5 h-5 text-slate-500" />
+                                    <Square className="w-5 h-5 a-dim" />
                                   )}
                                 </button>
                               )}
@@ -744,87 +595,70 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
             <div>
               <div className="mb-4 flex justify-end">
                 <button
+                  type="button"
                   onClick={() => exportPaymentsToCSV(payments, `national-payments-${selectedYear === 'all' ? 'all-years' : selectedYear}.csv`)}
                   disabled={payments.length === 0}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                    darkMode
-                      ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                  } ${payments.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className="a-btn"
                 >
                   <Download className="w-4 h-4" />
-                  Export Payments
+                  Export payments
                 </button>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className={darkMode ? 'bg-gray-700' : 'bg-gray-50'}>
+                <table className="w-full a-atable">
+                  <thead>
                     <tr>
-                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        darkMode ? 'text-gray-300' : 'text-gray-500'
-                      }`}>
-                        Date
-                      </th>
-                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        darkMode ? 'text-gray-300' : 'text-gray-500'
-                      }`}>
-                        From
-                      </th>
-                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        darkMode ? 'text-gray-300' : 'text-gray-500'
-                      }`}>
-                        Type
-                      </th>
-                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        darkMode ? 'text-gray-300' : 'text-gray-500'
-                      }`}>
-                        Amount
-                      </th>
-                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        darkMode ? 'text-gray-300' : 'text-gray-500'
-                      }`}>
-                        Reference
-                      </th>
-                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        darkMode ? 'text-gray-300' : 'text-gray-500'
-                      }`}>
-                        Status
-                      </th>
+                      <th className="px-4 py-3 text-left">Date</th>
+                      <th className="px-4 py-3 text-left">From</th>
+                      <th className="px-4 py-3 text-left">Type</th>
+                      <th className="px-4 py-3 text-left">Amount</th>
+                      <th className="px-4 py-3 text-left">Reference</th>
+                      <th className="px-4 py-3 text-left">Status</th>
                     </tr>
                   </thead>
-                  <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                  <tbody>
+                    {payments.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-12">
+                          <p className="a-mute text-sm m-0">No payments recorded yet</p>
+                        </td>
+                      </tr>
+                    )}
                     {payments.map((payment) => (
-                      <tr key={payment.id} className={darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={`px-6 py-4 whitespace-nowrap ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                      <tr key={payment.id}>
+                        <td className="px-4 py-3 whitespace-nowrap a-ink">
                           {new Date(payment.payment_date).toLocaleDateString()}
                         </td>
-                        <td className={`px-6 py-4 whitespace-nowrap ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                        <td className="px-4 py-3 whitespace-nowrap a-mute capitalize">
                           {payment.from_entity_type}
                         </td>
-                        <td className={`px-6 py-4 whitespace-nowrap ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            payment.payment_type === 'bulk'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`a-lb-fmt capitalize ${payment.payment_type === 'bulk' ? 'a-txt-b' : ''}`}>
                             {payment.payment_type}
                           </span>
                         </td>
-                        <td className={`px-6 py-4 whitespace-nowrap font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        <td className="px-4 py-3 whitespace-nowrap font-semibold a-ink a-num">
                           ${payment.amount.toFixed(2)}
                         </td>
-                        <td className={`px-6 py-4 whitespace-nowrap ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        <td className="px-4 py-3 whitespace-nowrap a-mute">
                           {payment.payment_reference || '-'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`a-lb-fmt capitalize ${
                             payment.reconciliation_status === 'reconciled'
-                              ? 'bg-green-100 text-green-800'
+                              ? 'a-txt-g'
                               : payment.reconciliation_status === 'disputed'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
+                              ? 'a-txt-r'
+                              : 'a-txt-a'
                           }`}>
+                            <span className={`a-light ${
+                              payment.reconciliation_status === 'reconciled'
+                                ? 'a-light-g'
+                                : payment.reconciliation_status === 'disputed'
+                                ? 'a-light-r'
+                                : 'a-light-a'
+                            }`} />
                             {payment.reconciliation_status}
                           </span>
                         </td>

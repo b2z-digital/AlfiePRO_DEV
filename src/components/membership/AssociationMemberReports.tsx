@@ -6,6 +6,7 @@ import {
   ChevronDown, FileText, Plus
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { InlineLoading, KpiCard, PageHead } from '../association/AssocUI';
 import { supabase } from '../../utils/supabase';
 import {
   Chart as ChartJS,
@@ -508,159 +509,86 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+      <div className="h-full overflow-y-auto">
+        <div className="a-apage">
+          <PageHead icon={<BarChart3 size={24} />} title="Member reports" sub="Analytics and insights across your member base" />
+          <InlineLoading label="Crunching member numbers…" />
+        </div>
       </div>
     );
   }
 
+  const reportTabs: { id: typeof activeTab; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'trends', label: 'Trends' },
+    { id: 'clubs', label: 'Club performance' },
+    { id: 'custom', label: 'Custom reports' },
+  ];
+  const financialRate = metrics.totalMembers > 0 ? (metrics.financialMembers / metrics.totalMembers) * 100 : 0;
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-4 sm:p-8 lg:p-16">
+      <div className="a-apage">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
-                <BarChart3 className="text-white" size={28} />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-white">
-                  Member Reports
-                </h1>
-                <p className="text-sm text-slate-400">
-                  Analytics and insights across your member base
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowCustomReportBuilder(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition-colors"
-              >
-                <Plus size={18} />
-                Custom Report
-              </button>
-              <button
-                onClick={exportToPDF}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-              >
-                <Download size={18} />
-                Export PDF
-              </button>
-            </div>
-          </div>
-
-          {/* Tab Navigation */}
-          <div className="flex gap-2">
+        <PageHead icon={<BarChart3 size={24} />} title="Member reports" sub="Analytics and insights across your member base">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => setActiveTab('overview')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'overview'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/50'
-              }`}
+              type="button"
+              onClick={() => setShowCustomReportBuilder(true)}
+              className="a-btn"
             >
-              Overview
+              <Plus size={16} />
+              Custom report
             </button>
             <button
-              onClick={() => setActiveTab('trends')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'trends'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/50'
-              }`}
+              type="button"
+              onClick={exportToPDF}
+              className="a-btn a-btn-p"
             >
-              Trends
-            </button>
-            <button
-              onClick={() => setActiveTab('clubs')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'clubs'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/50'
-              }`}
-            >
-              Club Performance
-            </button>
-            <button
-              onClick={() => setActiveTab('custom')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'custom'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/50'
-              }`}
-            >
-              Custom Reports
+              <Download size={16} />
+              Export PDF
             </button>
           </div>
+        </PageHead>
+
+        {/* Tab Navigation */}
+        <div className="a-seg self-start max-w-full overflow-x-auto" role="tablist" aria-label="Report views">
+          {reportTabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`a-seg-i ${activeTab === t.id ? 'a-seg-on' : ''}`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="p-6 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-600/10 border border-blue-500/20">
-                <div className="flex items-center justify-between mb-4">
-                  <Users className="text-blue-400" size={24} />
-                  <span className="text-xs text-blue-400 font-medium">TOTAL</span>
-                </div>
-                <div className="text-3xl font-bold text-white mb-1">
-                  {metrics.totalMembers}
-                </div>
-                <div className="text-sm text-slate-400">Total Members</div>
-              </div>
-
-              <div className="p-6 rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-600/10 border border-emerald-500/20">
-                <div className="flex items-center justify-between mb-4">
-                  <Target className="text-emerald-400" size={24} />
-                  <span className="text-xs text-emerald-400 font-medium">FINANCIAL</span>
-                </div>
-                <div className="text-3xl font-bold text-white mb-1">
-                  {metrics.financialMembers}
-                </div>
-                <div className="text-sm text-slate-400">
-                  {((metrics.financialMembers / metrics.totalMembers) * 100).toFixed(1)}% financial rate
-                </div>
-              </div>
-
-              <div className="p-6 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-600/10 border border-purple-500/20">
-                <div className="flex items-center justify-between mb-4">
-                  <Sparkles className="text-purple-400" size={24} />
-                  {metrics.growthRate >= 0 ? (
-                    <TrendingUp className="text-purple-400" size={20} />
-                  ) : (
-                    <TrendingDown className="text-purple-400" size={20} />
-                  )}
-                </div>
-                <div className="text-3xl font-bold text-white mb-1">
-                  {metrics.newMembersThisYear}
-                </div>
-                <div className="text-sm text-slate-400">
-                  New this year ({metrics.growthRate.toFixed(1)}% growth)
-                </div>
-              </div>
-
-              <div className="p-6 rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-600/10 border border-amber-500/20">
-                <div className="flex items-center justify-between mb-4">
-                  <Crown className="text-amber-400" size={24} />
-                  <span className="text-xs text-amber-400 font-medium">RETENTION</span>
-                </div>
-                <div className="text-3xl font-bold text-white mb-1">
-                  {metrics.retentionRate.toFixed(1)}%
-                </div>
-                <div className="text-sm text-slate-400">Member retention rate</div>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+              <KpiCard cap="Total members" value={metrics.totalMembers} sub="Across all member clubs" icon={<Users size={18} />} />
+              <KpiCard cap="Financial" value={metrics.financialMembers} sub={`${financialRate.toFixed(1)}% financial rate`} icon={<Target size={18} />} tone={metrics.financialMembers > 0 ? 'green' : undefined} />
+              <KpiCard
+                cap="New this year"
+                value={metrics.newMembersThisYear}
+                sub={<span className="inline-flex items-center gap-1.5">{metrics.growthRate >= 0 ? <TrendingUp size={14} className="a-txt-g" /> : <TrendingDown size={14} className="a-txt-r" />}{metrics.growthRate.toFixed(1)}% growth</span>}
+                icon={<Sparkles size={18} />}
+              />
+              <KpiCard cap="Retention" value={`${metrics.retentionRate.toFixed(1)}%`} sub="Members who renewed" icon={<Crown size={18} />} />
             </div>
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Membership Type Breakdown */}
-              <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <PieChartIcon size={20} className="text-blue-400" />
+              <div className="a-card p-6">
+                <h3 className="text-lg font-semibold a-ink mb-4 flex items-center gap-2">
+                  <PieChartIcon size={20} className="a-txt-b" />
                   Membership Type Breakdown
                 </h3>
                 <div style={{ height: '300px' }}>
@@ -669,9 +597,9 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
               </div>
 
               {/* Monthly Growth Trend */}
-              <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <LineChartIcon size={20} className="text-emerald-400" />
+              <div className="a-card p-6">
+                <h3 className="text-lg font-semibold a-ink mb-4 flex items-center gap-2">
+                  <LineChartIcon size={20} className="a-txt-g" />
                   Growth Overview
                 </h3>
                 <div style={{ height: '300px' }}>
@@ -685,33 +613,33 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
         {/* Trends Tab */}
         {activeTab === 'trends' && (
           <div className="space-y-6">
-            <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white mb-4">Membership Trends</h3>
+            <div className="a-card p-6">
+              <h3 className="text-lg font-semibold a-ink mb-4">Membership Trends</h3>
               <div style={{ height: '400px' }}>
                 <Line data={membershipTrendChartData} options={chartOptions} />
               </div>
             </div>
 
             {/* Monthly Breakdown Table */}
-            <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white mb-4">Monthly Breakdown</h3>
+            <div className="a-card p-6">
+              <h3 className="text-lg font-semibold a-ink mb-4">Monthly Breakdown</h3>
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-700/50">
+                <table className="w-full a-atable">
+                  <thead>
                     <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Month</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">New Members</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Renewals</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Total</th>
+                      <th className="px-4 py-3 text-left">Month</th>
+                      <th className="px-4 py-3 text-right">New Members</th>
+                      <th className="px-4 py-3 text-right">Renewals</th>
+                      <th className="px-4 py-3 text-right">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/50">
+                  <tbody>
                     {monthlyTrends.map((month) => (
-                      <tr key={month.month} className="hover:bg-slate-700/30">
-                        <td className="px-4 py-3 text-white">{month.month}</td>
-                        <td className="px-4 py-3 text-right text-emerald-400">{month.newMembers}</td>
-                        <td className="px-4 py-3 text-right text-blue-400">{month.renewals}</td>
-                        <td className="px-4 py-3 text-right text-white font-medium">{month.total}</td>
+                      <tr key={month.month}>
+                        <td className="px-4 py-3 a-ink">{month.month}</td>
+                        <td className="px-4 py-3 text-right a-txt-g">{month.newMembers}</td>
+                        <td className="px-4 py-3 text-right a-txt-b">{month.renewals}</td>
+                        <td className="px-4 py-3 text-right a-ink font-medium">{month.total}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -724,41 +652,41 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
         {/* Clubs Tab */}
         {activeTab === 'clubs' && (
           <div className="space-y-6">
-            <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white mb-4">Club Performance Comparison</h3>
+            <div className="a-card p-6">
+              <h3 className="text-lg font-semibold a-ink mb-4">Club Performance Comparison</h3>
               <div style={{ height: '400px' }}>
                 <Bar data={clubPerformanceChartData} options={chartOptions} />
               </div>
             </div>
 
             {/* Club Metrics Table */}
-            <div className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white mb-4">Detailed Club Metrics</h3>
+            <div className="a-card p-6">
+              <h3 className="text-lg font-semibold a-ink mb-4">Detailed Club Metrics</h3>
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-700/50">
+                <table className="w-full a-atable">
+                  <thead>
                     <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Club</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Total Members</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Financial Members</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">New Members</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Retention Rate</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Member Growth</th>
+                      <th className="px-4 py-3 text-left">Club</th>
+                      <th className="px-4 py-3 text-right">Total Members</th>
+                      <th className="px-4 py-3 text-right">Financial Members</th>
+                      <th className="px-4 py-3 text-right">New Members</th>
+                      <th className="px-4 py-3 text-right">Retention Rate</th>
+                      <th className="px-4 py-3 text-right">Member Growth</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/50">
+                  <tbody>
                     {clubMetrics.map((club) => (
-                      <tr key={club.clubId} className="hover:bg-slate-700/30">
-                        <td className="px-4 py-3 text-white">{club.clubName}</td>
-                        <td className="px-4 py-3 text-right text-white">{club.memberCount}</td>
-                        <td className="px-4 py-3 text-right text-emerald-400">
+                      <tr key={club.clubId}>
+                        <td className="px-4 py-3 a-ink">{club.clubName}</td>
+                        <td className="px-4 py-3 text-right a-ink">{club.memberCount}</td>
+                        <td className="px-4 py-3 text-right a-txt-g">
                           {club.financialCount}
-                          <span className="text-slate-500 text-xs ml-1">
+                          <span className="a-dim text-xs ml-1">
                             ({club.memberCount > 0 ? ((club.financialCount / club.memberCount) * 100).toFixed(0) : 0}%)
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right text-blue-400">{club.newMembersThisYear}</td>
-                        <td className="px-4 py-3 text-right text-purple-400">
+                        <td className="px-4 py-3 text-right a-txt-b">{club.newMembersThisYear}</td>
+                        <td className="px-4 py-3 text-right a-txt-b">
                           {club.retentionRate.toFixed(1)}%
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -779,20 +707,20 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
         {/* Custom Reports Tab */}
         {activeTab === 'custom' && (
           <div className="space-y-6">
-            <div className="p-12 rounded-xl bg-slate-800/30 border border-slate-700/50 text-center">
+            <div className="a-card p-12 text-center">
               <div className="max-w-2xl mx-auto">
-                <div className="w-20 h-20 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-6">
-                  <FileText className="text-purple-400" size={32} />
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-3">
+                <span className="a-tile a-tile-rim mx-auto mb-6" style={{ width: 64, height: 64 }}>
+                  <FileText size={28} />
+                </span>
+                <h3 className="text-2xl font-bold a-ink mb-3">
                   Custom Report Builder
                 </h3>
-                <p className="text-slate-400 mb-6">
+                <p className="a-mute mb-6">
                   Create custom reports with specific metrics, filters, and visualizations tailored to your needs.
                 </p>
                 <button
                   onClick={() => setShowCustomReportBuilder(true)}
-                  className="px-6 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors"
+                  className="a-btn a-btn-p"
                 >
                   Build Custom Report
                 </button>

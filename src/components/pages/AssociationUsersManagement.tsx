@@ -246,22 +246,22 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
   });
 
   return (
-    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-6">
+    <div className="a-box p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-blue-500/20">
-            <Users size={22} className="text-blue-400" />
+          <div className="a-tile a-tile-sm">
+            <Users size={22} className="a-txt-b" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Association Users</h2>
-            <p className="text-sm text-slate-400">
+            <h2 className="text-xl font-semibold a-ink">Association Users</h2>
+            <p className="text-sm a-mute">
               Manage who has access to this {currentOrganization?.type === 'state' ? 'state' : 'national'} association dashboard
             </p>
           </div>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          className="a-btn a-btn-p"
         >
           <UserPlus size={16} />
           Add User
@@ -270,7 +270,7 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
 
       {users.length > 3 && (
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 a-mute" size={16} />
           <input
             type="text"
             placeholder="Search users..."
@@ -287,8 +287,8 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
         </div>
       ) : filteredUsers.length === 0 ? (
         <div className="text-center py-12">
-          <Users size={40} className="mx-auto text-slate-500 mb-3" />
-          <p className="text-slate-400 text-sm">
+          <Users size={40} className="mx-auto a-dim mb-3" />
+          <p className="a-mute text-sm">
             {searchQuery ? 'No users match your search' : 'No users have been added yet'}
           </p>
         </div>
@@ -297,7 +297,7 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
           {filteredUsers.map(assocUser => (
             <div
               key={assocUser.id}
-              className="flex items-center justify-between p-4 rounded-lg bg-slate-700/30 border border-slate-700/50 hover:bg-slate-700/50 transition-colors"
+              className="a-box flex items-center justify-between p-4"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar
@@ -307,7 +307,7 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
                 />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-white font-medium truncate">
+                    <span className="a-ink font-medium truncate">
                       {assocUser.first_name} {assocUser.last_name}
                     </span>
                     {assocUser.user_id === user?.id && (
@@ -316,10 +316,10 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {assocUser.email && (
-                      <p className="text-xs text-slate-400 truncate">{assocUser.email}</p>
+                      <p className="text-xs a-mute truncate">{assocUser.email}</p>
                     )}
                     {assocUser.club_name && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
+                      <span className="inline-flex items-center gap-1 text-[10px] a-dim">
                         <Building size={10} />
                         {assocUser.club_name}
                       </span>
@@ -344,14 +344,14 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setEditingUser(assocUser)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-600/50 transition-colors"
+                    className="a-ib"
                     title="Edit role"
                   >
                     <Edit3 size={14} />
                   </button>
                   <button
                     onClick={() => handleRemoveUser(assocUser)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    className="a-ib a-ib-d"
                     title="Remove user"
                   >
                     <Trash2 size={14} />
@@ -657,27 +657,27 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
 
   const modalContent = (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+      className="a-dlg"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-lg shadow-2xl">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
+      <div className="a-sheet max-w-lg">
+        <div className="a-dlg-head justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/20">
-              <UserPlus size={20} className="text-blue-400" />
+            <div className="a-tile a-tile-sm">
+              <UserPlus size={20} className="a-txt-b" />
             </div>
-            <h3 className="text-lg font-semibold text-white">Add User</h3>
+            <h3 className="text-lg font-semibold a-ink">Add User</h3>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+          <button onClick={onClose} className="a-ib" aria-label="Close">
             <X size={20} />
           </button>
         </div>
 
         <div className="p-6 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Email Address</label>
+            <label className="block text-sm font-medium a-mute mb-1.5">Email Address</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 a-mute" size={16} />
               <input
                 type="email"
                 value={emailInput}
@@ -692,7 +692,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
                 </div>
               )}
             </div>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs a-dim">
               Search by email to find existing users or invite new ones
             </p>
           </div>
@@ -700,10 +700,10 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
           {searchDone && matchedUser && (
             <div className="animate-in fade-in duration-200">
               {matchedUser.has_account && matchedUser.user_id ? (
-                <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+                <div className="a-box a-box-ok p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <CheckCircle size={16} className="text-green-400" />
-                    <span className="text-sm font-medium text-green-400">Account Found</span>
+                    <CheckCircle size={16} className="a-txt-g" />
+                    <span className="text-sm font-medium a-txt-g">Account Found</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Avatar
@@ -712,24 +712,24 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
                       size="md"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-white font-medium truncate">
+                      <p className="a-ink font-medium truncate">
                         {matchedUser.first_name} {matchedUser.last_name}
                       </p>
-                      <p className="text-xs text-slate-400 truncate">{matchedUser.email}</p>
+                      <p className="text-xs a-mute truncate">{matchedUser.email}</p>
                       {matchedUser.club_name && (
                         <div className="flex items-center gap-1 mt-1">
-                          <Building size={11} className="text-slate-500" />
-                          <span className="text-xs text-slate-500">Member of {matchedUser.club_name}</span>
+                          <Building size={11} className="a-dim" />
+                          <span className="text-xs a-dim">Member of {matchedUser.club_name}</span>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
               ) : matchedUser.source === 'member' && !matchedUser.has_account ? (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+                <div className="a-box a-box-warn p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <AlertCircle size={16} className="text-amber-400" />
-                    <span className="text-sm font-medium text-amber-400">Member Found - No Account</span>
+                    <AlertCircle size={16} className="a-txt-a" />
+                    <span className="text-sm font-medium a-txt-a">Member Found - No Account</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Avatar
@@ -738,16 +738,16 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
                       size="md"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-white font-medium truncate">
+                      <p className="a-ink font-medium truncate">
                         {matchedUser.first_name} {matchedUser.last_name}
                       </p>
                       {matchedUser.club_name && (
                         <div className="flex items-center gap-1 mt-0.5">
-                          <Building size={11} className="text-slate-500" />
-                          <span className="text-xs text-slate-500">Member of {matchedUser.club_name}</span>
+                          <Building size={11} className="a-dim" />
+                          <span className="text-xs a-dim">Member of {matchedUser.club_name}</span>
                         </div>
                       )}
-                      <p className="text-xs text-amber-400/80 mt-1">
+                      <p className="text-xs a-mute mt-1">
                         This person is a club member but hasn't created an Alfie PRO account yet.
                         Send them an invitation to sign up.
                       </p>
@@ -755,12 +755,12 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="rounded-lg border border-slate-600/50 bg-slate-700/30 p-4">
+                <div className="a-box p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <User size={16} className="text-slate-400" />
-                    <span className="text-sm font-medium text-slate-300">No Account Found</span>
+                    <User size={16} className="a-mute" />
+                    <span className="text-sm font-medium a-mute">No Account Found</span>
                   </div>
-                  <p className="text-xs text-slate-400 leading-relaxed">
+                  <p className="text-xs a-mute leading-relaxed">
                     No Alfie PRO account exists for this email. You can send an invitation
                     to create an account, then add them once they've signed up.
                   </p>
@@ -771,7 +771,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
 
           {(!searchDone || (matchedUser && matchedUser.has_account)) && (
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Role</label>
+              <label className="block text-sm font-medium a-mute mb-1.5">Role</label>
               <div className="space-y-2">
                 {ROLE_OPTIONS.map(option => (
                   <label
@@ -792,7 +792,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
                     />
                     <div>
                       <span className={`text-sm font-medium ${option.color}`}>{option.label}</span>
-                      <p className="text-xs text-slate-400 mt-0.5">{option.description}</p>
+                      <p className="text-xs a-mute mt-0.5">{option.description}</p>
                     </div>
                   </label>
                 ))}
@@ -804,7 +804,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
         <div className="flex gap-3 p-6 pt-0">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
+            className="a-btn flex-1"
           >
             Cancel
           </button>
@@ -813,7 +813,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
             <button
               onClick={handleAddExistingUser}
               disabled={addingUser}
-              className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="a-btn a-btn-p flex-1 justify-center"
             >
               {addingUser ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -828,7 +828,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
             <button
               onClick={handleSendInvitation}
               disabled={sendingInvite}
-              className="flex-1 px-4 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="a-btn a-btn-a flex-1 justify-center"
             >
               {sendingInvite ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -842,7 +842,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
           ) : (
             <button
               disabled
-              className="flex-1 px-4 py-2.5 bg-blue-600/50 text-white/50 rounded-lg text-sm font-medium cursor-not-allowed flex items-center justify-center gap-2"
+              className="a-btn a-btn-p flex-1 justify-center"
             >
               <UserPlus size={16} />
               Add User
@@ -887,13 +887,13 @@ const EditRoleModal: React.FC<EditRoleModalProps> = ({ user: assocUser, onClose,
 
   const modalContent = (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+      className="a-dlg"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md p-6 shadow-2xl">
+      <div className="a-sheet max-w-md">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-white">Edit Role</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+          <h3 className="text-lg font-semibold a-ink">Edit Role</h3>
+          <button onClick={onClose} className="a-ib" aria-label="Close">
             <X size={20} />
           </button>
         </div>
@@ -905,8 +905,8 @@ const EditRoleModal: React.FC<EditRoleModalProps> = ({ user: assocUser, onClose,
             size="md"
           />
           <div>
-            <p className="text-white font-medium">{assocUser.first_name} {assocUser.last_name}</p>
-            {assocUser.email && <p className="text-xs text-slate-400">{assocUser.email}</p>}
+            <p className="a-ink font-medium">{assocUser.first_name} {assocUser.last_name}</p>
+            {assocUser.email && <p className="text-xs a-mute">{assocUser.email}</p>}
           </div>
         </div>
 
@@ -935,7 +935,7 @@ const EditRoleModal: React.FC<EditRoleModalProps> = ({ user: assocUser, onClose,
               </div>
               <div>
                 <span className={`text-sm font-medium ${option.color}`}>{option.label}</span>
-                <p className="text-xs text-slate-400 mt-0.5">{option.description}</p>
+                <p className="text-xs a-mute mt-0.5">{option.description}</p>
               </div>
             </button>
           ))}
@@ -943,7 +943,7 @@ const EditRoleModal: React.FC<EditRoleModalProps> = ({ user: assocUser, onClose,
 
         <button
           onClick={onClose}
-          className="w-full px-4 py-2.5 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
+          className="a-btn w-full"
         >
           Done
         </button>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, DollarSign, Check, CircleAlert as AlertCircle, ArrowRight, Search, ListFilter as Filter, Calendar, Zap } from 'lucide-react';
+import { DollarSign, Check, CircleAlert as AlertCircle, ArrowRight, Search, ListFilter as Filter, Calendar, Zap, X } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 
 interface RemittancePayment {
@@ -42,7 +42,6 @@ interface AssociationPaymentReconciliationModalProps {
 }
 
 export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentReconciliationModalProps> = ({
-  darkMode,
   payment,
   associationId,
   associationType,
@@ -256,24 +255,25 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col`}>
+    <div className="a-dlg">
+      <div className="a-sheet max-w-6xl" role="dialog" aria-modal="true" aria-label="Reconcile payment">
         {/* Header */}
         <div className="p-6 border-b border-slate-700">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-1">
+              <h2 className="text-2xl font-bold a-ink mb-1">
                 Reconcile Payment
               </h2>
-              <p className="text-slate-400">
+              <p className="a-mute">
                 Match this payment to member remittances
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              className="a-ib"
+              aria-label="Close"
             >
-              <LogOut className="w-5 h-5 text-slate-400" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -281,43 +281,40 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
           <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-xl p-6 border border-blue-500/30">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div>
-                <p className="text-sm text-blue-300 mb-1">Payment Reference</p>
-                <p className="text-lg font-semibold text-white">{payment.payment_reference}</p>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-sm a-txt-b mb-1">Payment Reference</p>
+                <p className="text-lg font-semibold a-ink">{payment.payment_reference}</p>
+                <p className="text-xs a-mute mt-1">
                   {new Date(payment.payment_date).toLocaleDateString()}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-blue-300 mb-1">Total Amount</p>
-                <p className="text-2xl font-bold text-white">${payment.total_amount.toFixed(2)}</p>
+                <p className="text-sm a-txt-b mb-1">Total Amount</p>
+                <p className="text-2xl font-bold a-ink">${payment.total_amount.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-sm text-green-300 mb-1">Allocated</p>
-                <p className="text-2xl font-bold text-green-400">${payment.allocated_amount.toFixed(2)}</p>
+                <p className="text-sm a-txt-g mb-1">Allocated</p>
+                <p className="text-2xl font-bold a-txt-g">${payment.allocated_amount.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-sm text-orange-300 mb-1">Remaining</p>
-                <p className="text-2xl font-bold text-orange-400">${payment.unallocated_amount.toFixed(2)}</p>
+                <p className="text-sm a-txt-a mb-1">Remaining</p>
+                <p className="text-2xl font-bold a-txt-a">${payment.unallocated_amount.toFixed(2)}</p>
               </div>
             </div>
 
             {/* Progress Bar */}
             <div className="mt-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-slate-400">Reconciliation Progress</span>
-                <span className="text-xs font-medium text-white">{getProgressPercentage().toFixed(0)}%</span>
+                <span className="text-xs a-mute">Reconciliation Progress</span>
+                <span className="text-xs font-medium a-ink">{getProgressPercentage().toFixed(0)}%</span>
               </div>
-              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full transition-all duration-300"
-                  style={{ width: `${getProgressPercentage()}%` }}
-                />
+              <div className="a-progress" style={{ height: 8 }}>
+                <i style={{ width: `${Math.min(100, getProgressPercentage())}%` }} />
               </div>
             </div>
 
             {payment.notes && (
               <div className="mt-3 pt-3 border-t border-blue-500/20">
-                <p className="text-xs text-slate-400">{payment.notes}</p>
+                <p className="text-xs a-mute">{payment.notes}</p>
               </div>
             )}
           </div>
@@ -326,20 +323,20 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
         {/* Current Allocation Summary (if items selected) */}
         {selectedRemittances.size > 0 && (
           <div className="px-6 pt-4">
-            <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+            <div className="a-box a-box-ok p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-green-300 mb-1">Current Selection</p>
-                  <p className="text-lg font-semibold text-white">
+                  <p className="text-sm a-txt-g mb-1">Current Selection</p>
+                  <p className="text-lg font-semibold a-ink">
                     {selectedRemittances.size} member{selectedRemittances.size !== 1 ? 's' : ''} selected
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-green-300 mb-1">To Allocate</p>
-                  <p className="text-2xl font-bold text-white">${getTotalAllocated().toFixed(2)}</p>
+                  <p className="text-sm a-txt-g mb-1">To Allocate</p>
+                  <p className="text-2xl font-bold a-ink">${getTotalAllocated().toFixed(2)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm text-slate-400 mb-1">Remaining</p>
+                  <p className="text-sm a-mute mb-1">Remaining</p>
                   <p className={`text-2xl font-bold ${getRemainingAmount() < 0 ? 'text-red-400' : 'text-slate-300'}`}>
                     ${getRemainingAmount().toFixed(2)}
                   </p>
@@ -347,7 +344,7 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
               </div>
 
               {getRemainingAmount() < 0 && (
-                <div className="mt-3 flex items-center gap-2 text-red-400 text-sm">
+                <div className="mt-3 flex items-center gap-2 a-txt-r text-sm">
                   <AlertCircle className="w-4 h-4" />
                   <span>Warning: Allocation exceeds payment amount</span>
                 </div>
@@ -360,7 +357,7 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
         <div className="px-6 pt-4 pb-3 border-b border-slate-700">
           <div className="flex items-center gap-3 mb-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 a-mute" />
               <input
                 type="text"
                 placeholder="Search by member or club name..."
@@ -380,7 +377,7 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
             </select>
             <button
               onClick={handleAutoMatch}
-              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors flex items-center gap-2"
+              className="a-btn a-btn-p"
             >
               <Zap className="w-4 h-4" />
               Auto Match
@@ -396,8 +393,8 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
             </div>
           ) : filteredRemittances.length === 0 ? (
             <div className="text-center py-12">
-              <AlertCircle className="mx-auto mb-4 text-slate-600" size={48} />
-              <p className="text-lg text-slate-400">No members found</p>
+              <AlertCircle className="mx-auto mb-4 a-dim" size={48} />
+              <p className="text-lg a-mute">No members found</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -410,12 +407,12 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
                 return (
                   <div
                     key={remittance.id}
-                    className={`p-4 rounded-lg border transition-all ${
+                    className={`a-box p-4 transition-colors ${
                       isAllocated
-                        ? 'bg-green-500/5 border-green-500/30 opacity-50'
+                        ? 'a-box-ok opacity-50'
                         : isSelected
-                        ? 'bg-blue-500/10 border-blue-500/50 shadow-lg'
-                        : 'bg-slate-700/30 border-slate-600/50 hover:border-slate-500/50'
+                        ? 'a-box-on'
+                        : 'a-hov-row'
                     }`}
                   >
                     <div className="flex items-center gap-4">
@@ -444,8 +441,8 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
                           className="w-10 h-10 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center">
-                          <span className="text-white text-sm font-semibold">
+                        <div className="w-10 h-10 rounded-full a-tile" style={{ borderRadius: 999 }}>
+                          <span className="a-ink text-sm font-semibold">
                             {remittance.member_name.split(' ').map(n => n[0]).join('').toUpperCase()}
                           </span>
                         </div>
@@ -453,14 +450,14 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
 
                       {/* Member Info */}
                       <div className="flex-1">
-                        <p className="font-medium text-white">{remittance.member_name}</p>
-                        <p className="text-sm text-slate-400">{remittance.club_name}</p>
+                        <p className="font-medium a-ink">{remittance.member_name}</p>
+                        <p className="text-sm a-mute">{remittance.club_name}</p>
                       </div>
 
                       {/* Amount Input */}
                       {isSelected && !isAllocated && (
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-slate-400">$</span>
+                          <span className="text-sm a-mute">$</span>
                           <input
                             type="number"
                             step="0.01"
@@ -474,9 +471,9 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
                       {/* Expected Amount */}
                       {!isSelected && (
                         <div className="text-right">
-                          <p className="text-lg font-semibold text-white">${expectedAmount.toFixed(2)}</p>
+                          <p className="text-lg font-semibold a-ink">${expectedAmount.toFixed(2)}</p>
                           {isAllocated && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300">
+                            <span className="a-lb-fmt a-txt-g">
                               Allocated
                             </span>
                           )}
@@ -485,7 +482,7 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
 
                       {/* Arrow */}
                       {isSelected && !isAllocated && (
-                        <ArrowRight className="w-5 h-5 text-blue-400" />
+                        <ArrowRight className="w-5 h-5 a-txt-b" />
                       )}
                     </div>
                   </div>
@@ -496,10 +493,10 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-slate-700 bg-slate-800/50">
+        <div className="p-6 a-grp-rule">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm a-mute">
                 {selectedRemittances.size > 0
                   ? `${selectedRemittances.size} member${selectedRemittances.size !== 1 ? 's' : ''} selected`
                   : 'Select members to allocate this payment'}
@@ -508,14 +505,14 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="px-6 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+                className="a-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAllocate}
                 disabled={selectedRemittances.size === 0 || getRemainingAmount() < 0 || processing}
-                className="btn-primary-green px-6 py-2 rounded-lg text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="a-btn a-btn-p"
               >
                 {processing ? (
                   <>
