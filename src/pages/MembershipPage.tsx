@@ -5,6 +5,7 @@ import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { MembershipForm } from '../components/membership/MembershipForm';
+import { AlfieLoader } from '../components/brand/AlfieLoader';
 
 export const MembershipPage: React.FC = () => {
   const { clubId, memberId: routeMemberId } = useParams<{ clubId: string; memberId?: string }>();
@@ -84,9 +85,7 @@ export const MembershipPage: React.FC = () => {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
+      <AlfieLoader variant="page" />
     );
   }
   
