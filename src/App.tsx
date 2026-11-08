@@ -308,10 +308,12 @@ function App() {
         {/* Public Video Player (used by native mobile app for AlfieTV) */}
         <Route path="/play/:videoId" element={<PublicVideoPlayer />} />
 
-        {/* AlfieTV Full-Screen Route */}
-        <Route path="/alfie-tv" element={
-          isAuthenticated ? <AlfieTVPage darkMode={darkMode} /> : <Navigate to="/login" />
-        } />
+        {/* AlfieTV Full-Screen Route (the phone app has its own AlfieTV tab) */}
+        {!(isMobilePhone && (isNative || mobilePreview)) && (
+          <Route path="/alfie-tv" element={
+            isAuthenticated ? <AlfieTVPage darkMode={darkMode} /> : <Navigate to="/login" />
+          } />
+        )}
 
         {/* Event Command Center Route */}
         <Route path="/event-command-center/:eventId" element={

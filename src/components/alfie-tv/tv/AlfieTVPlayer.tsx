@@ -55,9 +55,15 @@ interface AlfieTVPlayerProps {
   videoId: string;
   title: string;
   onClose: () => void;
+  /** Seconds to start from (Continue watching) */
+  start?: number;
+  /** Position and length while playing, for watch history */
+  onProgress?: (time: number, duration: number) => void;
 }
 
-export const AlfieTVPlayer: React.FC<AlfieTVPlayerProps> = ({ videoId, title, onClose }) => {
+export const AlfieTVPlayer: React.FC<AlfieTVPlayerProps> = ({ videoId, title, onClose, start, onProgress }) => {
+  const onProgressRef = useRef(onProgress);
+  onProgressRef.current = onProgress;
   const rootRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
@@ -111,6 +117,7 @@ export const AlfieTVPlayer: React.FC<AlfieTVPlayerProps> = ({ videoId, title, on
           playerVars: {
             autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, iv_load_policy: 3,
             modestbranding: 1, playsinline: 1, cc_load_policy: 0, origin: window.location.origin,
+            ...(start && start > 5 ? { start: Math.floor(start) } : {}),
           },
           events: {
             onReady: (e: any) => {
@@ -167,6 +174,7 @@ export const AlfieTVPlayer: React.FC<AlfieTVPlayerProps> = ({ videoId, title, on
         setLoaded(p.getVideoLoadedFraction?.() || 0);
         const d = p.getDuration?.();
         if (d) setDuration(d);
+        onProgressRef.current?.(p.getCurrentTime() || 0, d || 0);
         setMuted(p.isMuted());
         setVolume(p.getVolume());
       } catch { /* between states */ }

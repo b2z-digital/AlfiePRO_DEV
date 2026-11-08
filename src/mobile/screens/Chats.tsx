@@ -88,7 +88,7 @@ export const ChatsInbox: React.FC = () => {
 
 /* ─────────────── New chat: club members and connections ─────────────── */
 
-const PeoplePicker: React.FC<{ onClose: () => void; onPick: (userId: string) => void }> = ({ onClose, onPick }) => {
+export const PeoplePicker: React.FC<{ onClose: () => void; onPick: (userId: string) => void; title?: string }> = ({ onClose, onPick, title = 'New chat' }) => {
   const { user, currentClub } = useAuth();
   const [q, setQ] = useState('');
   const [people, setPeople] = useState<{ id: string; name: string; avatar?: string; online: boolean }[] | null>(null);
@@ -115,10 +115,10 @@ const PeoplePicker: React.FC<{ onClose: () => void; onPick: (userId: string) => 
   return (
     <>
       <div className="m-veil" onClick={onClose} />
-      <div className="m-sheet" role="dialog" aria-label="New chat" style={{ height: '82dvh' }}>
+      <div className="m-sheet" role="dialog" aria-label={title} style={{ height: '82dvh' }}>
         <span className="m-grab" />
         <div className="m-row" style={{ marginBottom: 10 }}>
-          <div className="m-disp" style={{ flex: 1, fontSize: 21, fontWeight: 700 }}>New chat</div>
+          <div className="m-disp" style={{ flex: 1, fontSize: 21, fontWeight: 700 }}>{title}</div>
           <button className="m-ibtn" aria-label="Close" onClick={onClose}><Icon name="close" /></button>
         </div>
         <label className="m-search" style={{ marginBottom: 10 }}>

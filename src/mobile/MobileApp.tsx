@@ -16,6 +16,10 @@ import { SkipperProfile } from './screens/Skipper';
 import { ClassifiedsScreen, ListingScreen } from './screens/Classifieds';
 import { NewsScreen, ArticleScreen } from './screens/News';
 import { MediaScreen } from './screens/Media';
+import { TVScreen } from './screens/TV';
+import { MembershipScreen } from './screens/Membership';
+import { BoatShedScreen, BoatScreen } from './screens/BoatShed';
+import { StatsScreen } from './screens/Stats';
 import '../styles/alfie-mobile.css';
 
 const AskAlfieChatPanel = lazy(() => import('../components/ask-alfie/AskAlfieChatPanel').then(m => ({ default: m.AskAlfieChatPanel })));
@@ -61,7 +65,7 @@ const Shell: React.FC = () => {
   useEffect(() => { document.querySelector('.m-scroll')?.scrollTo({ top: 0 }); }, [pathname]);
 
   return (
-    <div className={`m-app ${light ? 'm-light' : ''}`}>
+    <div className={`m-app ${light && !pathname.startsWith('/alfie-tv') ? 'm-light' : ''}`}>
       <main className={`m-scroll ${hideTabs ? 'm-no-tabs' : ''}`} style={{ position: 'relative' }}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -87,8 +91,11 @@ const Shell: React.FC = () => {
           <Route path="/news" element={<NewsScreen />} />
           <Route path="/news/:id" element={<ArticleScreen />} />
           <Route path="/media" element={<MediaScreen />} />
-          <Route path="/my-membership" element={<Soon title="Membership" what="Your membership card, renewals and payments." />} />
-          <Route path="/my-garage/*" element={<Soon title="Boat shed" what="Boats, rigs, maintenance and performance." />} />
+          <Route path="/alfie-tv/*" element={<TVScreen />} />
+          <Route path="/my-membership" element={<MembershipScreen />} />
+          <Route path="/my-garage" element={<BoatShedScreen />} />
+          <Route path="/my-garage/:boatId" element={<BoatScreen />} />
+          <Route path="/my-stats" element={<StatsScreen />} />
           <Route path="/race-timer" element={<Soon title="Race Timer" what="Your club's start sequences, with sounds, buzzes and the screen kept awake." />} />
           <Route path="/weather" element={<Soon title="Wind & tides" what="Wind, temperature and tide forecasts for your venues." />} />
           <Route path="/tasks" element={<Soon title="Tasks" what="Jobs from the club and your own, ticked off as you go." />} />
