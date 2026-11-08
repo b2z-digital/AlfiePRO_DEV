@@ -1113,6 +1113,66 @@ export const storeRaceSeries = async (series: RaceSeries): Promise<void> => {
   }
 };
 
+/**
+ * Changes only the title of a series. Safe on completed series: rounds and results are not touched,
+ * unlike storeRaceSeries which rewrites every round.
+ */
+export const renameRaceSeries = async (seriesId: string, newName: string): Promise<void> => {
+  const name = newName.trim();
+  if (!name) throw new Error('Series name is required');
+
+  const { error } = await supabase
+    .from('race_series')
+    .update({ series_name: name, updated_at: new Date().toISOString() })
+    .eq('id', seriesId);
+  if (error) throw error;
+
+  try {
+    const stored = localStorage.getItem(RACE_SERIES_KEY);
+    if (stored) {
+      const all = JSON.parse(stored);
+      all.forEach((s: RaceSeries) => { if (s.id === seriesId) s.seriesName = name; });
+      localStorage.setItem(RACE_SERIES_KEY, JSON.stringify(all));
+    }
+  } catch { /* cache only */ }
+
+  // Keep a linked PRO roster's name in step
+  const { data: rounds } = await supabase
+    .from('race_series_rounds')
+    .select('round_name, round_index, date, cancelled')
+    .eq('series_id', seriesId)
+    .order('round_index', { ascending: true });
+  syncRostersForSeries({
+    id: seriesId,
+    seriesName: name,
+    rounds: (rounds || []).map((r: any) => ({ name: r.round_name, date: r.date, cancelled: r.cancelled })),
+  } as unknown as RaceSeries).catch(err => console.warn('PRO roster sync skipped:', err));
+};
+
+/** Changes only the title of a single event. Safe on scored events: results are not touched. */
+export const renameRaceEvent = async (eventId: string, newName: string): Promise<void> => {
+  const name = newName.trim();
+  if (!name) throw new Error('Event name is required');
+
+  const { data, error } = await supabase
+    .from('quick_races')
+    .update({ event_name: name })
+    .eq('id', eventId)
+    .select('id, race_date')
+    .maybeSingle();
+  if (error) throw error;
+
+  try {
+    const cached = (await offlineStorage.getEvents()).find(e => e.id === eventId);
+    if (cached) await offlineStorage.saveEvent({ ...cached, eventName: name }, true);
+  } catch { /* cache only */ }
+
+  if (data?.race_date) {
+    syncRostersForEvent({ id: eventId, eventName: name, date: data.race_date } as RaceEvent)
+      .catch(err => console.warn('PRO roster sync skipped:', err));
+  }
+};
+
 // Delete a race series
 export const deleteRaceSeries = async (id: string): Promise<boolean> => {
   try {
