@@ -1156,3 +1156,43 @@ html.alfie-light .a-hc-chg-up { background: rgba(229, 72, 77, 0.12); color: #C83
 html.alfie-light .a-hc-row-on { background: rgba(10, 132, 255, 0.07); }
 .a-hc-inp { -moz-appearance: textfield; appearance: textfield; }
 .a-hc-inp::-webkit-outer-spin-button, .a-hc-inp::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ── Dashboard home: full-bleed club cover that fades into the page ─────────
+   The page's scroll box reaches back under the floating menu (--alfie-rail is set
+   by DashboardLayout on the content wrapper), so the photo runs edge to edge
+   behind the frosted menu while the content keeps its usual place. */
+.alfie-dash { position: relative; margin-left: calc(-1 * var(--alfie-rail, 0px)); width: calc(100% + var(--alfie-rail, 0px)); }
+.alfie-dash-hero { position: relative; z-index: 1; display: flex; align-items: flex-end; min-height: 360px; }
+.alfie-dash-hero-media { position: absolute; left: 0; right: 0; top: 0; height: 540px; overflow: hidden; pointer-events: none; display: flex; align-items: center; justify-content: center;
+  -webkit-mask-image: linear-gradient(180deg, #000 42%, transparent 100%); mask-image: linear-gradient(180deg, #000 42%, transparent 100%); }
+.alfie-dash-hero-media img { position: absolute; min-width: 100%; min-height: 100%; object-fit: cover; }
+.alfie-dash-hero-scrim { position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(6, 11, 22, 0.5) 0%, rgba(6, 11, 22, 0) 24%, rgba(6, 11, 22, 0) 40%, rgba(6, 11, 22, 0.6) 78%),
+    linear-gradient(90deg, rgba(6, 11, 22, 0.6) 0%, rgba(6, 11, 22, 0.18) 18%, rgba(6, 11, 22, 0) 42%); }
+html.alfie-light .alfie-dash-hero-scrim {
+  background: linear-gradient(180deg, rgba(6, 11, 22, 0.45) 0%, rgba(6, 11, 22, 0) 24%, rgba(6, 11, 22, 0.1) 40%, rgba(6, 11, 22, 0.35) 62%, rgba(6, 11, 22, 0) 100%),
+    linear-gradient(90deg, rgba(6, 11, 22, 0.5) 0%, rgba(6, 11, 22, 0.15) 18%, rgba(6, 11, 22, 0) 42%); }
+.alfie-dash-hero-body { position: relative; display: flex; align-items: center; gap: 20px; box-sizing: border-box; width: calc(100% - var(--alfie-rail, 0px)); margin-left: var(--alfie-rail, 0px); padding-top: 120px; padding-bottom: 40px; }
+.alfie-dash-avatar { flex-shrink: 0; width: 76px; height: 76px; border-radius: 999px; object-fit: cover; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85), 0 10px 30px rgba(0, 0, 0, 0.45); }
+.alfie-dash-title { margin: 0; font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-optical-sizing: auto; font-size: clamp(24px, 2.6vw, 38px); font-weight: 700; letter-spacing: -0.025em; line-height: 1.1; color: #fff !important; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.45); }
+.alfie-dash-sub { margin: 8px 0 0; font-size: clamp(14px, 1.15vw, 16px); color: rgba(255, 255, 255, 0.88) !important; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.55); }
+.alfie-dash-body { position: relative; z-index: 2; margin-left: var(--alfie-rail, 0px); }
+.alfie-dash-tools { position: absolute; top: 24px; right: 32px; z-index: 3; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 14px; background: rgba(10, 15, 26, 0.42); border: 1px solid rgba(255, 255, 255, 0.16); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+.alfie-dash-tools button { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background .15s ease; }
+.alfie-dash-tools button:hover { background: rgba(255, 255, 255, 0.14); }
+.alfie-dash-tools button:focus-visible { outline: 2px solid rgba(10, 132, 255, 0.85); outline-offset: 1px; }
+.alfie-dash-tools-sep { width: 1px; height: 20px; background: rgba(255, 255, 255, 0.18); }
+@media (max-width: 760px) {
+  .alfie-dash-hero { min-height: 300px; }
+  .alfie-dash-hero-body { padding-top: 96px; padding-bottom: 28px; }
+  .alfie-dash-avatar { width: 56px; height: 56px; }
+  .alfie-dash-tools { top: 14px; right: 14px; }
+  .alfie-dash-tools button span { display: none; }
+}
+
+/* Menu expand/collapse: lives inside the floating menu, at the bottom */
+.alfie-rail-toggle { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 12px; border: 0; border-radius: 12px; background: rgba(255, 255, 255, 0.06); color: rgba(235, 240, 255, 0.82); font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.alfie-rail-toggle:hover { background: rgba(255, 255, 255, 0.11); color: #fff; }
+.alfie-rail-toggle.is-icon { width: 46px; padding: 0; justify-content: center; }
+.alfie-rail-toggle.is-light { background: rgba(15, 23, 42, 0.05); color: #334155; }
+.alfie-rail-toggle.is-light:hover { background: rgba(15, 23, 42, 0.09); color: #0B1220; }

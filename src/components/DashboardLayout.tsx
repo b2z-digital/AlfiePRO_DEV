@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay, Radio, ClipboardList } from 'lucide-react';
+import { PanelLeftOpen, PanelLeftClose } from 'lucide-react';
+import { Trophy, Building, Calendar, CalendarDays, Users, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay, Radio, ClipboardList } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -1214,16 +1215,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               )}
             </div>
             
-            {/* Collapse/Expand Button - Only show on desktop (>= 1280px) */}
-            {isDesktop && (
-              <button
-                onClick={toggleSidebar}
-                className={`${(collapsed && !isHoveringNav) ? 'absolute -right-3 top-5 bg-slate-700 rounded-full p-1 shadow-md text-slate-300' : 'p-1 rounded-full text-slate-400 hover:text-slate-300 hover:bg-slate-700'}`}
-                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              >
-                {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-              </button>
-            )}
           </div>
 
           {/* Navigation Items */}
@@ -1394,6 +1385,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             </nav>
           </div>
 
+
+          {/* Expand / collapse the menu - desktop only (>= 1280px); tablets stay collapsed */}
+          {isDesktop && (
+            <div className={`px-3 pb-2 ${(collapsed && !isHoveringNav) ? 'flex justify-center' : ''}`}>
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className={`alfie-rail-toggle ${(collapsed && !isHoveringNav) ? 'is-icon' : ''} ${lightMode ? 'is-light' : ''}`}
+                title={collapsed ? 'Expand menu' : 'Collapse menu'}
+                aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
+                aria-expanded={!collapsed}
+              >
+                {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+                {!(collapsed && !isHoveringNav) && <span>{collapsed ? 'Keep menu open' : 'Collapse menu'}</span>}
+              </button>
+            </div>
+          )}
 
           {/* Club Switcher */}
           <div className={`px-3 py-3 border-t ${lightMode ? 'border-gray-200/50' : 'border-slate-700/50'} ${(collapsed && !isHoveringNav) ? 'flex flex-col items-center' : ''}`}>
@@ -1847,7 +1855,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       )}
 
       {/* Main Content */}
-      <div className={`transition-all duration-300 ${isPageEditor ? '' : (collapsed ? 'ml-[92px]' : 'ml-64')} ${isImpersonating ? 'pt-[44px]' : ''}`}>
+      <div
+        className={`transition-all duration-300 ${isPageEditor ? '' : (collapsed ? 'ml-[92px]' : 'ml-64')} ${isImpersonating ? 'pt-[44px]' : ''}`}
+        style={{ ['--alfie-rail' as string]: isPageEditor ? '0px' : (collapsed ? '92px' : '16rem') }}
+      >
         <div className="h-full">
           <div className={`h-full transition-opacity duration-150 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
             <Routes>
