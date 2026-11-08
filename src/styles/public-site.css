@@ -1,0 +1,55 @@
+/* Club public website: applies a saved Website › Design theme.
+   Every rule is scoped to body[data-site-theme], which is only set when a club has saved a theme,
+   so sites without one look exactly as before. */
+
+body[data-site-theme] { font-family: var(--site-body-font), ui-sans-serif, system-ui, sans-serif; }
+body[data-site-theme] h1,
+body[data-site-theme] h2,
+body[data-site-theme] h3,
+body[data-site-theme] .site-head { font-family: var(--site-head-font), ui-sans-serif, system-ui, sans-serif; }
+
+/* Main colour: the blues used across the public pages */
+body[data-site-theme] .bg-blue-500,
+body[data-site-theme] .bg-blue-600,
+body[data-site-theme] .bg-blue-700 { background-color: var(--site-p); }
+body[data-site-theme] .hover\:bg-blue-600:hover,
+body[data-site-theme] .hover\:bg-blue-700:hover,
+body[data-site-theme] .hover\:bg-blue-800:hover { background-color: var(--site-p-hover); }
+body[data-site-theme] .bg-blue-50,
+body[data-site-theme] .bg-blue-100 { background-color: var(--site-p-soft); }
+body[data-site-theme] .text-blue-500,
+body[data-site-theme] .text-blue-600,
+body[data-site-theme] .text-blue-700,
+body[data-site-theme] .text-blue-800,
+body[data-site-theme] .hover\:text-blue-600:hover,
+body[data-site-theme] .hover\:text-blue-700:hover { color: var(--site-p); }
+body[data-site-theme] .border-blue-500,
+body[data-site-theme] .border-blue-600 { border-color: var(--site-p); }
+body[data-site-theme] .ring-blue-500,
+body[data-site-theme] .focus\:ring-blue-500:focus { --tw-ring-color: var(--site-p); }
+body[data-site-theme] .bg-gradient-to-br.from-blue-600,
+body[data-site-theme] .bg-gradient-to-r.from-blue-600 { background-image: linear-gradient(135deg, var(--site-p), var(--site-dark)); }
+
+/* Dark colour: footers and dark bands */
+body[data-site-theme] .site-footer { background-color: var(--site-dark) !important; }
+body[data-site-theme] .site-footer .border-gray-800 { border-color: rgba(255, 255, 255, 0.12); }
+
+/* Accent: small labels on slides */
+body[data-site-theme] .site-label { background-color: var(--site-accent); color: var(--site-accent-ink); }
+
+/* Buttons the theme styles (corners and solid/outline) */
+body[data-site-theme] .site-btn { border-radius: var(--site-radius); }
+body[data-site-theme] .site-btn-p { background-color: var(--site-p); color: var(--site-p-ink); }
+body[data-site-theme] .site-btn-p:hover { background-color: var(--site-p-hover); }
+body[data-site-theme][data-site-buttons="outline"] .site-btn-p { background-color: transparent; color: var(--site-p); box-shadow: inset 0 0 0 2px var(--site-p); }
+body[data-site-theme][data-site-buttons="outline"] .site-btn-p:hover { background-color: var(--site-p-soft); }
+body[data-site-theme][data-site-buttons="outline"] .site-footer .site-btn-p { color: #fff; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85); }
+body[data-site-theme] .site-card { border-radius: var(--site-card-radius); }
+
+/* Slide label when no theme is saved */
+.site-label { display: inline-flex; align-items: center; height: 26px; padding: 0 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+
+/* Sub-items in the slide-out menu */
+.site-menu-sub { display: block; padding: 11px 0; text-align: center; color: #4b5563; font-size: 0.8rem; letter-spacing: 0.12em; border-bottom: 1px solid #f3f4f6; }
+.site-menu-sub:hover { color: #111827; background: #f9fafb; }
+.site-menu-group { display: block; padding: 16px 0 6px; text-align: center; color: #6b7280; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.2em; }

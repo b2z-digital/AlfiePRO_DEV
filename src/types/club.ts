@@ -19,6 +19,10 @@ export interface Club {
   featured_image_url?: string;
   cover_image_url?: string;
   google_analytics_id?: string | null;
+  /** Public website settings (Website hub); null = defaults */
+  website_theme?: unknown;
+  website_menu?: unknown;
+  website_layout?: unknown;
 }
 
 export interface ClubFormData {
