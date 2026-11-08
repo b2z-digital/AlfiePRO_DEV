@@ -132,6 +132,26 @@ user_article_bookmarks; stories saved on the phone before are moved across once)
 community guidelines (`screens/Terms.tsx`, terms_acceptance 'v1', the same record the old app kept; terms text from
 global_legal_pages).
 
+## TestFlight
+
+`.github/workflows/ios-testflight.yml` builds the iOS app on GitHub's Mac runners and uploads it to TestFlight.
+Run it from GitHub (Actions → iOS TestFlight → Run workflow, normally on `dev`) or push to the `testflight` branch.
+Build numbers are the run number (2.0.0 (1), (2) …). It never submits to the App Store.
+
+One-off set-up, in the repo's Settings → Secrets and variables → Actions:
+
+| Name | Kind | Where it comes from |
+| --- | --- | --- |
+| `APPLE_TEAM_ID` | variable | developer.apple.com → Membership details → Team ID |
+| `ASC_KEY_ID`, `ASC_ISSUER_ID` | secrets | App Store Connect → Users and Access → Integrations → App Store Connect API → new **Team key** with the **Admin** role (Admin lets Xcode create the distribution certificate and profile itself) |
+| `ASC_KEY_P8` | secret | the contents of the downloaded `AuthKey_XXXX.p8` (it can only be downloaded once) |
+| `VITE_GOOGLE_MAPS_API_KEY`, `VITE_GOOGLE_CLIENT_ID`, `VITE_WEATHER_API_KEY`, `VITE_OPENWEATHER_API_KEY`, `VITE_STORMGLASS_API_KEY` | secrets (optional) | same values as the website's hosting settings; without them Find racing's map and Wind & tides fall back |
+
+Also: Supabase → Auth → URL configuration → add `alfiepro://auth/callback` (Google sign-in); if the Google Maps key
+is limited to websites, add `capacitor://localhost` to its allowed referrers. In App Store Connect → TestFlight,
+make an internal group (App Store Connect users, no review) or an external group (anyone by email or public link;
+the first build of a version needs Apple's beta review, usually under a day).
+
 ## Scoring tests
 
 `npm test` runs Vitest. `src/__tests__/scoring/` replays real completed rounds (skipper names anonymised, in
