@@ -75,6 +75,7 @@ import './styles/index.css';
 import { isNative } from './lib/native/platform';
 import { readMobilePreviewFlag } from './mobile/preview';
 const MobileApp = lazy(() => import('./mobile/MobileApp'));
+const SpotterApp = lazy(() => import('./mobile/screens/ScoreTogether'));
 const mobilePreview = readMobilePreviewFlag();
 
 function useIsMobilePhone() {
@@ -294,7 +295,8 @@ function App() {
         <Route path="/live/:token/pro-broadcast" element={<ProBroadcastView />} />
 
         {/* Join Scoring Session Route */}
-        <Route path="/join-scoring/:pin?" element={<JoinScoringSessionPage />} />
+        {/* Phones get the spotter's finish pad (join by PIN, no account); computers the scoring sheet join */}
+        <Route path="/join-scoring/:pin?" element={isMobilePhone ? <Suspense fallback={<AlfieLoader light={!darkMode} />}><SpotterApp /></Suspense> : <JoinScoringSessionPage />} />
 
         {/* Public Shared Results Route */}
         <Route path="/results/shared/:shareToken" element={<PublicSharedResultsPage />} />

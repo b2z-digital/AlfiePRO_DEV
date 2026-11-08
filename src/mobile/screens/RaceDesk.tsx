@@ -9,6 +9,7 @@ import { Avatar, RootHeader, Skeleton, fmtDay } from '../ui';
 import { RacingNav } from './Racing';
 import { parseDay, todayISO } from '../data';
 import { nextUp, runningSession } from '../raceSession';
+import { OfflineBar } from './Sync';
 import {
   DESK_FORMAT, DeskItem, DeskSeries, addSeriesRound, createSingleEvent, dropsLabel, heatsLabel, loadDesk, signedOnCount, startScoring,
 } from '../raceDesk';
@@ -97,6 +98,7 @@ export const RaceDeskScreen: React.FC = () => {
     <div className="m-stack">
       <RootHeader title="Racing" right={<RoleChip />} hideActions />
       <RacingNav />
+      <OfflineBar />
       {data === null ? <><Skeleton h={240} /><Skeleton h={140} /></> : (
         <>
           {lead ? (

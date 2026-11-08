@@ -18,10 +18,13 @@ import { Icon } from '../icons';
 import { startScoring } from '../raceDesk';
 import { useSetupEvent } from '../raceSetupData';
 import {
-  HandicapGroup, NextUp, RaceSession, clearSession, clock, countdown, handicapGroups, loadSession, nextUp, sailOf, saveSession,
+  HandicapGroup, NextUp, RaceSession, SESSION_EVENT, clearSession, clock, countdown, handicapGroups, nextUp, sailOf, saveSession,
 } from '../raceSession';
 import { applyLetterScore } from '../../utils/finishOrder';
-import { padBoats } from '../finishPad';
+import { padBoats, registerPad, startingOrder } from '../finishPad';
+import { ScoreTogetherSheet, useTogether } from './ScoreTogether';
+import { OfflineBar } from './Sync';
+import { handicapSettingsFor } from '../confirmRace';
 import { SOUND, SoundSheet, StartDial, playSystemSound, readVolume, useKeepAwake } from '../startBoxParts';
 import { HEAT_COLOURS, Loading, Missing } from './RaceSetup';
 
@@ -205,15 +208,31 @@ export const RaceScreen: React.FC = () => {
   const { key = '' } = useParams();
   const navigate = useNavigate();
   const { currentClub } = useAuth();
-  const { tap, toast, memberIds } = useMobile();
+  const { tap, toast, memberIds, profile } = useMobile();
   const { item, event } = useSetupEvent(key);
   const engine = useRef(getStartBoxEngine()).current;
 
   const up = useMemo(() => (event ? nextUp(event) : null), [event]);
+  const eventRef = useRef(event); eventRef.current = event;
+  const upRef = useRef(up); upRef.current = up;
   const [session, setSessionState] = useState<RaceSession | null>(null);
   const sessionRef = useRef<RaceSession | null>(null);
   const setSession = useCallback((s: RaceSession) => { sessionRef.current = s; setSessionState(s); saveSession(s); }, []);
-  useEffect(() => { if (event && up) { const s = loadSession(event.id, up); sessionRef.current = s; setSessionState(s); } }, [event?.id, up?.race, up?.heat]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (event && up) { const s = registerPad(event, up); sessionRef.current = s; setSessionState(s); } }, [event?.id, up?.race, up?.heat]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Spotters' calls (Score together) update the race session while this screen is open
+  useEffect(() => {
+    if (!event || !up) return;
+    const on = (ev: Event) => {
+      const s = (ev as CustomEvent).detail as RaceSession;
+      if (!s || s.eventId !== event.id || s === sessionRef.current || s.race !== up.race || (s.heat || null) !== (up.heat || null)) return;
+      sessionRef.current = s; setSessionState(s);
+    };
+    window.addEventListener(SESSION_EVENT, on);
+    return () => window.removeEventListener(SESSION_EVENT, on);
+  }, [event?.id, up?.race, up?.heat]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the handicap rules are kept on the phone in case there's no signal at confirm time
+  useEffect(() => { if (event?.raceFormat === 'handicap') void handicapSettingsFor(event); }, [event?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const together = useTogether(event?.id, e => { tap('light'); toast(e.kind === 'conflict' ? `${e.who} called a different boat for the same place` : `${e.who} called a finish`); });
 
   const [sequences, setSequences] = useState<StartSequence[]>([]);
   const [seq, setSeq] = useState<StartSequence | null>(null);
@@ -223,7 +242,7 @@ export const RaceScreen: React.FC = () => {
   const [flash, setFlash] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [volume, setVolume] = useState(readVolume);
-  const [sheet, setSheet] = useState<null | 'seq' | 'sound' | 'ocs' | 'recall' | 'abandon'>(null);
+  const [sheet, setSheet] = useState<null | 'seq' | 'sound' | 'ocs' | 'recall' | 'abandon' | 'together'>(null);
   const [opening, setOpening] = useState(false);
 
   const gunAt = session?.gunAt || null;
@@ -257,7 +276,10 @@ export const RaceScreen: React.FC = () => {
   const markGun = useCallback((at: number) => {
     const s = sessionRef.current;
     if (!s || s.gunAt) return;
-    setSession({ ...s, gunAt: at, sequenceId: engine.getCurrentSequence()?.id || s.sequenceId || null });
+    // the finish order starts now (OCS marks go in as they're made), ready for spotters' calls
+    const e = eventRef.current, u = upRef.current;
+    const finish = s.finish || (e && u ? startingOrder(padBoats(e, u), u.race, s) : s.finish);
+    setSession({ ...s, finish, gunAt: at, sequenceId: engine.getCurrentSequence()?.id || s.sequenceId || null });
     tap('success');
   }, [engine, setSession, tap]);
 
@@ -328,7 +350,7 @@ export const RaceScreen: React.FC = () => {
     void playSystemSound(engine, SOUND.doubleHorn, 440, 900);
     engine.stop(); if (seq) engine.arm(seq);
     beeped.current.clear();
-    setSession({ ...session, gunAt: null, marks: [], finish: null, added: [], recalls: (session.recalls || 0) + 1 });
+    setSession({ ...session, gunAt: null, marks: [], finish: null, added: [], callers: {}, conflicts: [], recalls: (session.recalls || 0) + 1 });
     toast('General recall. Start the sequence again.');
   };
   const abandon = () => {
@@ -365,6 +387,7 @@ export const RaceScreen: React.FC = () => {
           <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center' }}><RacePill up={up} /></div>
           <button className="m-ibtn" aria-label="Sound" onClick={() => setSheet('sound')}><Icon name="sound" /></button>
         </header>
+        <OfflineBar />
         <div style={{ textAlign: 'center', padding: '8px 0 2px' }}>
           <span className="m-racing-pill">RACING</span>
           <div className="m-disp m-num" style={{ fontSize: 72, fontWeight: 700, lineHeight: 1.05, marginTop: 8 }} role="timer" aria-label={`${clock(elapsed)} since the gun`}>{clock(elapsed)}</div>
@@ -392,8 +415,17 @@ export const RaceScreen: React.FC = () => {
           </div>
         )}
         <NextCard up={up} />
+        <button className="m-card m-li" style={{ gap: 12 }} onClick={() => setSheet('together')}>
+          <span className="m-tile" style={{ background: 'rgba(10,132,255,.14)', color: 'var(--m-blue-ink)', width: 40, minHeight: 40, padding: 0 }}><Icon name="people" /></span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontWeight: 600, fontSize: 14.5 }}>Score together</span>
+            <span className="m-dim" style={{ display: 'block', fontSize: 12.5 }}>{together.hosting ? (together.spotters.length ? `${together.spotters.map(p => p.name.split(' ')[0]).join(', ')} calling finishes` : 'Session open · no spotters yet') : 'Invite a spotter to call finishes'}</span>
+          </span>
+          <Icon name="chevron" className="m-dim" />
+        </button>
         {live && <LiveStatusRow eventId={event.id} />}
         {sheet === 'sound' && <SoundSheet engine={engine} volume={volume} onVolume={setVolume} onClose={() => setSheet(null)} horns />}
+        {sheet === 'together' && <ScoreTogetherSheet event={event} clubId={currentClub?.clubId} hostName={`${profile.firstName} ${profile.lastName ? `${profile.lastName[0]}.` : ''}`.trim() || 'Scorer'} toast={toast} onClose={() => setSheet(null)} />}
         {sheet === 'ocs' && <OcsSheet up={up} skippers={skippers} marked={session.marks.filter(m => m.code === 'OCS').map(m => m.skipperIndex)} onToggle={toggleOcs} onClose={() => setSheet(null)} />}
         {sheet === 'recall' && <Confirm title="General recall" body={`Sounds two horns and takes ${up.raceLabel}${up.heat ? ` · Heat ${up.heatLabel}` : ''} back to the start sequence. OCS marks and any finishes called for this start are cleared.`} action="Recall and restart" onYes={recall} onClose={() => setSheet(null)} />}
         {sheet === 'abandon' && <Confirm title={`Abandon ${up.raceLabel}?`} body="Nothing is scored for this start, and the race is sailed again later." action="Abandon the race" danger onYes={abandon} onClose={() => setSheet(null)} />}

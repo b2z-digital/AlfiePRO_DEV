@@ -95,6 +95,16 @@ the club ruleset, heat results and withdrawals, completing a heat, Touch confirm
 members' boat handicaps, handicap override), and saves with updateEventResults, a checkpoint and the live status, as
 the scoring screen does. Multi-day events still confirm on the scoring sheet: the order is handed over in
 `utils/finishHandoff.ts` and Touch mode saves it through its own handlers.
+Score together (`screens/ScoreTogether.tsx`, `mobile/scoreTogether.ts`): the scorer's phone opens the desktop's
+scoring session (`utils/scoringSessions.ts`, shared with ShareScoringSessionModal; PIN + QR). Spotters open
+`/join-scoring/:pin` on a phone (no account; `App.tsx` gives phones the spotter pad, computers the old join page)
+and call finishes. Calls travel on the realtime channel `score-together:<session id>` (plus a same-browser
+BroadcastChannel); the scorer's phone applies them to the race session with the finish order rules
+(`applyRemoteCall`), sends the order back, and asks when two phones record different boats for one place
+(`resolveConflict`). Confirming waits until every disputed place is decided.
+No signal (`mobile/outbox.ts`, `screens/Sync.tsx`): taps and the finish order always live on the phone; a confirmed
+race or heat that can't be saved is kept with the event as it now stands (the race desk uses it), and sent in order
+when signal returns. The club's handicap rules are kept on the phone for confirming offline.
 Voice: `mobile/speech.ts` uses the in-repo plugin `native/alfie-speech` (Apple Speech on iOS with the race's sail
 numbers as hints, Android SpeechRecognizer), installed as the `alfie-speech` dependency, so `npx cap sync` adds it
 to `ios/App/CapApp-SPM` and Android. Phone browsers use the Web Speech API where they have it. iOS needs
@@ -108,7 +118,8 @@ once and try holding the voice button before TestFlight.
 plus locked snapshots of HMS and SHRS heat sizes and schedules, the heat sailing order, and the handicap each boat
 sails on (checked against the handicaps the desktop recorded in the real rounds), the finish order (every real race
 read back through Touch mode's finish order unchanged), confirming (every real race replayed and confirmed race by
-race; handicaps against the desktop; an HMS event heat by heat with promotions) and the keypad and voice matching. Any change to scoring must
+race; handicaps against the desktop; an HMS event heat by heat with promotions), spotters' calls and disagreements,
+sending results kept offline in order, and the keypad and voice matching. Any change to scoring must
 keep these passing.
 
 Progress and gaps: `claude/alfie-mobile-app-plan.md` in the AlfiePRO project.

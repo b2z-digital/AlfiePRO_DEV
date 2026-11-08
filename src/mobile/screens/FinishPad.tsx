@@ -10,14 +10,16 @@ import type { Skipper } from '../../types';
 import type { LetterScore } from '../../types/letterScores';
 import {
   REDRESS_AVERAGE_ALL, REDRESS_AVERAGE_PENULTIMATE, REDRESS_AVERAGE_SERIES, ROD_POINTS_FLAG,
-  POSITION_PRESERVING_SCORES, addFinish, applyLetterScore, moveFinish, previousResultsFor, redressAverage, removeFinish, sailSortedIndices, sortFinishOrder, type FinishingEntry,
+  addFinish, applyLetterScore, moveFinish, previousResultsFor, redressAverage, removeFinish, sailSortedIndices, type FinishingEntry,
 } from '../../utils/finishOrder';
 import { heatManagementOf, scoringStateOf } from '../../utils/raceSetup';
 import { useMobile } from '../MobileContext';
 import { Icon } from '../icons';
 import { useSetupEvent } from '../raceSetupData';
-import { NextUp, RaceSession, clock, forScoring, loadSession, nextUp, sailOf, saveSession } from '../raceSession';
-import { PadBoats, keypadMatches, keypadPick, matchCalls, ordinal, padBoats, parseSpoken, shortName, startingOrder } from '../finishPad';
+import { NextUp, RaceSession, SESSION_EVENT, clock, forScoring, nextUp, sailOf, saveSession } from '../raceSession';
+import { PadBoats, keypadMatches, keypadPick, matchCalls, ordinal, padBoats, parseSpoken, readBack, registerPad, resolveConflict, shortName, startingOrder } from '../finishPad';
+import { ConflictCard, useTogether } from './ScoreTogether';
+import { OfflineBar } from './Sync';
 import { listen, speechKind, type Listening, type SpeechKind } from '../speech';
 import { useKeepAwake } from '../startBoxParts';
 import { HEAT_COLOURS, Loading, Missing } from './RaceSetup';
@@ -301,20 +303,38 @@ export const FinishPadScreen: React.FC = () => {
   const [last, setLast] = useState<number | null>(null);
   useEffect(() => {
     if (!event || !up || !boats) return;
-    const s = loadSession(event.id, up);
+    const s = registerPad(event, up);
     const o = s.finish || startingOrder(boats, up.race, s);
     sessionRef.current = s; orderRef.current = o;
     setSessionState(s); setOrderState(o);
   }, [event?.id, up?.race, up?.heat, boats]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const setOrder = useCallback((changed: FinishingEntry[], added?: number[]) => {
+  // Finishes called on spotters' phones (Score together) land in the same race session
+  useEffect(() => {
+    if (!event || !up) return;
+    const on = (ev: Event) => {
+      const s = (ev as CustomEvent).detail as RaceSession;
+      if (!s || s.eventId !== event.id || s === sessionRef.current || s.race !== up.race || (s.heat || null) !== (up.heat || null)) return;
+      sessionRef.current = s;
+      setSessionState(s);
+      if (s.finish) { orderRef.current = s.finish; setOrderState(s.finish); }
+    };
+    window.addEventListener(SESSION_EVENT, on);
+    return () => window.removeEventListener(SESSION_EVENT, on);
+  }, [event?.id, up?.race, up?.heat]); // eslint-disable-line react-hooks/exhaustive-deps
+  const together = useTogether(event?.id, e => {
+    tap(e.kind === 'conflict' ? 'medium' : 'light');
+    if (e.kind === 'conflict') toast(`${e.who} called a different boat for the same place`);
+  });
+
+  const setOrder = useCallback((changed: FinishingEntry[], added?: number[], extra?: Partial<RaceSession>) => {
     // as Touch mode does once the change is saved and read back
-    const o = sortFinishOrder(changed.map(x => ({ ...x, position: x.letterScore && !POSITION_PRESERVING_SCORES.has(x.letterScore) ? 999 : x.position })));
+    const o = readBack(changed);
     orderRef.current = o;
     setOrderState(o);
     const s = sessionRef.current;
     if (!s) return;
-    const next: RaceSession = { ...s, finish: o, added: added ?? (s.added || []).filter(i => o.some(e => e.skipperIndex === i)) };
+    const next: RaceSession = { ...s, ...extra, finish: o, added: added ?? (s.added || []).filter(i => o.some(e => e.skipperIndex === i)) };
     sessionRef.current = next;
     setSessionState(next);
     saveSession(next);
@@ -365,7 +385,7 @@ export const FinishPadScreen: React.FC = () => {
       const target = o.findIndex(e => !e.letterScore && e.position === atPlace);
       if (target >= 0 && target < o.length - 1) o = moveFinish(o, o.length - 1, target);
     }
-    setOrder(o, [...(sessionRef.current?.added || []), i]);
+    setOrder(o, [...(sessionRef.current?.added || []), i], { callers: { ...(sessionRef.current?.callers || {}), [i]: { who: 'You', at: Date.now() } } });
     setLast(i);
     tap('success');
     return o.find(e => e.skipperIndex === i)?.position ?? null;
@@ -521,6 +541,17 @@ export const FinishPadScreen: React.FC = () => {
   return (
     <div className={`m-stack m-finish ${mode === 'voice' ? 'm-finish-voice' : ''}`} style={{ minHeight: 'calc(100dvh - var(--m-safe-top) - var(--m-safe-bottom) - 40px)', gap: 10 }}>
       <Header up={up} elapsed={gunAt ? now - gunAt : null} onBack={backToRace} onUndo={mode !== 'voice' ? undoLast : undefined} canUndo={(session.added || []).length > 0} />
+      <OfflineBar />
+      {together.hosting && (
+        <div className="m-together-bar"><Icon name="people" size={16} />{together.spotters.length ? `${together.spotters.map(p => p.name.split(' ')[0]).join(', ')} calling with you` : 'Waiting for spotters to join'}</div>
+      )}
+      {(session.conflicts || []).slice(0, 1).map(c => session.pad && (
+        <ConflictCard key={c.id} conflict={c} pad={session.pad} onKeep={w => {
+          const r = resolveConflict(sessionRef.current!, c.id, w);
+          setOrder(r.finish || [], r.added, { conflicts: r.conflicts });
+          tap('success');
+        }} />
+      ))}
       <Modes mode={mode} onMode={m => { if (m !== 'voice') stopListening(); setMode(m); }} />
       {mode !== 'voice' && <Strip order={order} skippers={skippers} last={last} left={left} total={total} showLeft={mode === 'keypad'} />}
       {mode === 'tap' && (

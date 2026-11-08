@@ -17,6 +17,8 @@ import { HeatsScreen, RaceSettingsScreen, SignOnScreen, SkippersScreen } from '.
 import { RaceScreen } from './screens/RaceDay';
 import { FinishPadScreen } from './screens/FinishPad';
 import { ConfirmRaceScreen } from './screens/ConfirmRace';
+import { SyncScreen } from './screens/Sync';
+import { startOutbox } from './outbox';
 import { ClubHub } from './screens/Club';
 import { ChatsInbox, ChatThread } from './screens/Chats';
 import { SkipperProfile } from './screens/Skipper';
@@ -34,6 +36,7 @@ import { TasksScreen } from './screens/Tasks';
 import { FindRacingScreen } from './screens/FindRacing';
 import { ChooseClubScreen, NotificationsPromptScreen, MembershipDueScreen, FIRST_RUN, flag, loadMyAssociations } from './screens/FirstRun';
 import { SettingsScreen } from './screens/Settings';
+import { hostFor } from './scoreTogether';
 import '../styles/alfie-mobile.css';
 
 const AskAlfieChatPanel = lazy(() => import('../components/ask-alfie/AskAlfieChatPanel').then(m => ({ default: m.AskAlfieChatPanel })));
@@ -74,6 +77,17 @@ const Shell: React.FC = () => {
     return () => window.removeEventListener('m-ask-alfie', on);
   }, []);
   useAlfieTheme(true, light ? 'light' : 'dark');
+  // Results confirmed with no signal send themselves when it's back
+  useEffect(() => startOutbox(), []);
+  // Score together keeps running for events this phone is scoring with spotters
+  useEffect(() => {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith('alfie-m-together:')) hostFor(k.slice('alfie-m-together:'.length));
+      }
+    } catch { /* private mode */ }
+  }, []);
   const hideTabs = NO_TABS.some(r => r.test(pathname));
   useFirstRun(pathname);
 
@@ -103,6 +117,7 @@ const Shell: React.FC = () => {
           <Route path="/race-desk/event/:key/race" element={<RaceScreen />} />
           <Route path="/race-desk/event/:key/finish" element={<FinishPadScreen />} />
           <Route path="/race-desk/event/:key/confirm" element={<ConfirmRaceScreen />} />
+          <Route path="/race-desk/sync" element={<SyncScreen />} />
           <Route path="/club" element={<ClubHub />} />
           <Route path="/community/*" element={<Navigate to="/club" replace />} />
           <Route path="/comms" element={<ChatsInbox />} />

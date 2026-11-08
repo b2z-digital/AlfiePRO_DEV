@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Copy, Check, Users, QrCode, RefreshCw, UserMinus, Clock } from 'lucide-react';
 import QRCode from 'qrcode';
 import { supabase } from '../../utils/supabase';
+import { createOrFetchSession as createOrFetchSessionRow, endScoringSession, fetchParticipants as fetchSessionParticipants, generatePin, joinUrlFor } from '../../utils/scoringSessions';
 
 interface ShareScoringSessionModalProps {
   isOpen: boolean;
@@ -34,68 +35,18 @@ export const ShareScoringSessionModal: React.FC<ShareScoringSessionModalProps> =
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generatePin = (): string => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
-
   const createOrFetchSession = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Check for existing active session
-      const { data: existing } = await supabase
-        .from('scoring_sessions')
-        .select('*')
-        .eq('event_id', eventId)
-        .eq('club_id', clubId)
-        .eq('created_by', user.id)
-        .eq('is_active', true)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle();
-
-      if (existing) {
-        setSession(existing);
-        await generateQR(existing.pin_code);
-        await fetchParticipants(existing.id);
-        return;
-      }
-
-      // Create new session with unique PIN
-      let pin = generatePin();
-      let attempts = 0;
-      let created = false;
-
-      while (!created && attempts < 5) {
-        const { data, error: insertError } = await supabase
-          .from('scoring_sessions')
-          .insert({
-            club_id: clubId,
-            event_id: eventId,
-            event_name: eventName,
-            pin_code: pin,
-            created_by: user.id,
-          })
-          .select()
-          .maybeSingle();
-
-        if (insertError?.code === '23505') {
-          pin = generatePin();
-          attempts++;
-        } else if (insertError) {
-          throw insertError;
-        } else {
-          setSession(data);
-          await generateQR(pin);
-          created = true;
-        }
-      }
-
-      if (!created) {
-        setError('Could not generate a unique PIN. Please try again.');
+      const { session: found, error: createError } = await createOrFetchSessionRow(eventId, clubId, eventName);
+      if (found) {
+        setSession(found);
+        await generateQR(found.pin_code);
+        await fetchParticipants(found.id);
+      } else if (createError) {
+        setError(createError);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to create scoring session');
@@ -105,7 +56,7 @@ export const ShareScoringSessionModal: React.FC<ShareScoringSessionModalProps> =
   }, [eventId, clubId, eventName]);
 
   const generateQR = async (pin: string) => {
-    const joinUrl = `${window.location.origin}/join-scoring/${pin}`;
+    const joinUrl = joinUrlFor(pin);
     try {
       const url = await QRCode.toDataURL(joinUrl, {
         width: 256,
@@ -119,13 +70,7 @@ export const ShareScoringSessionModal: React.FC<ShareScoringSessionModalProps> =
   };
 
   const fetchParticipants = async (sessionId: string) => {
-    const { data } = await supabase
-      .from('scoring_session_participants')
-      .select('*')
-      .eq('session_id', sessionId)
-      .eq('is_active', true)
-      .order('joined_at', { ascending: true });
-
+    const data = await fetchSessionParticipants(sessionId);
     if (data) setParticipants(data);
   };
 
@@ -141,10 +86,7 @@ export const ShareScoringSessionModal: React.FC<ShareScoringSessionModalProps> =
   const endSession = async () => {
     if (!session) return;
 
-    await supabase
-      .from('scoring_sessions')
-      .update({ is_active: false })
-      .eq('id', session.id);
+    await endScoringSession(session.id);
 
     setSession(null);
     setParticipants([]);
@@ -176,7 +118,7 @@ export const ShareScoringSessionModal: React.FC<ShareScoringSessionModalProps> =
 
   const copyLink = () => {
     if (!session) return;
-    const joinUrl = `${window.location.origin}/join-scoring/${session.pin_code}`;
+    const joinUrl = joinUrlFor(session.pin_code);
     navigator.clipboard.writeText(joinUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);

@@ -31,6 +31,29 @@ export interface RaceSession {
   finish?: FinishingEntry[] | null;
   /** Boats in the order they were called, for "undo the last finish". */
   added?: number[];
+  /** The finish pad's boats (pad index → event skipper, sail, name), so spotters' calls can be applied anywhere in the app. */
+  pad?: PadInfo;
+  /** Who called each finish (pad index), shown when two phones disagree. */
+  callers?: Record<number, { who: string; at: number }>;
+  /** Places two phones recorded differently, waiting for the scorer to decide. */
+  conflicts?: FinishConflict[];
+}
+
+export interface PadInfo {
+  globalOf: number[];
+  boats: { sail: string; name: string }[];
+  raceLabel: string;
+  heatLabel: string;
+  heatIndex: number;
+}
+
+export interface FinishConflict {
+  id: string;
+  place: number;
+  /** The boat recorded first for the place (pad index), and who recorded it. */
+  a: number; aWho: string; aAt: number;
+  /** The other phone's boat for the same place, now one place lower until decided. */
+  b: number; bWho: string; bAt: number;
 }
 
 export interface NextHeat { heat: HeatDesignation; label: string; boats: number; promoted: number; from: string }
@@ -157,8 +180,17 @@ export function loadSession(eventId: string, up: Pick<NextUp, 'race' | 'heat'>):
   }
 }
 
+export const SESSION_EVENT = 'alfie-race-session';
+
+/** Saves the race session; screens and Score together hear about it (alfie-race-session). */
 export function saveSession(s: RaceSession) {
   try { localStorage.setItem(KEY(s.eventId), JSON.stringify(s)); } catch { /* private mode: kept for this visit only */ }
+  try { window.dispatchEvent(new CustomEvent(SESSION_EVENT, { detail: s })); } catch { /* no window */ }
+}
+
+/** The race session as stored, whatever race is up (Score together applies calls to it). */
+export function storedSession(eventId: string): RaceSession | null {
+  try { const raw = localStorage.getItem(KEY(eventId)); return raw ? JSON.parse(raw) as RaceSession : null; } catch { return null; }
 }
 
 export function clearSession(eventId: string) {

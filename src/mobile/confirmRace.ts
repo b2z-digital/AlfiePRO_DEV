@@ -60,8 +60,23 @@ export function runOf(event: RaceEvent): ScoringRun {
 /** Multi-day events keep each day's results apart; they're confirmed on the scoring sheet for now. */
 export const confirmsOnPhone = (event: RaceEvent) => !event.multiDay;
 
-export const handicapSettingsFor = (event: RaceEvent): Promise<HandicapSettings> =>
-  event.raceFormat === 'handicap' ? loadHandicapSettings(event as any).catch(() => DEFAULT_HANDICAP_SETTINGS) : Promise.resolve(DEFAULT_HANDICAP_SETTINGS);
+const HCAP_KEY = (eventId: string) => `alfie-m-hcap-settings:${eventId}`;
+
+/**
+ * The handicap rules for an event (the club's ruleset, else the AlfiePRO rules). Kept on the phone
+ * once loaded, so a race confirmed with no signal uses the same rules.
+ */
+export async function handicapSettingsFor(event: RaceEvent): Promise<HandicapSettings> {
+  if (event.raceFormat !== 'handicap') return DEFAULT_HANDICAP_SETTINGS;
+  try {
+    const hs = await loadHandicapSettings(event as any);
+    try { localStorage.setItem(HCAP_KEY(event.id), JSON.stringify(hs)); } catch { /* storage full */ }
+    return hs;
+  } catch {
+    try { const raw = localStorage.getItem(HCAP_KEY(event.id)); if (raw) return JSON.parse(raw); } catch { /* ignore */ }
+    return DEFAULT_HANDICAP_SETTINGS;
+  }
+}
 
 const heatsOn = (run: ScoringRun) => !!run.heatManagement?.configuration?.enabled;
 

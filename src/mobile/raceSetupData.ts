@@ -12,6 +12,7 @@ import {
   RaceSettingsInput, dedupeSkippers, heatManagementOf, normalizeHeatManagementForSave, persistRaceSettings, persistSkippers, scoringStateOf,
 } from '../utils/raceSetup';
 import { DeskItem, loadDesk } from './raceDesk';
+import { localEvent } from './outbox';
 
 /** Opens an event for set-up the way the scoring screen does: it becomes the current event, fresh from the database. */
 export async function openForSetup(event: RaceEvent): Promise<RaceEvent> {
@@ -72,7 +73,13 @@ export function useSetupEvent(key: string) {
     const d = await loadDesk().catch(() => null);
     const it = d?.items.find(i => i.key === key) || null;
     setItem(it);
-    if (it) setEvent(await openForSetup(it.event));
+    if (it) {
+      const e = await openForSetup(it.event);
+      // changes made with no signal stay on this phone until they're sent
+      const local = localEvent(e.id);
+      if (local) setCurrentEvent(local);
+      setEvent(local || e);
+    }
   }, [key]);
   useEffect(() => { void reload(); }, [reload]);
   return { item, event, setEvent, reload };

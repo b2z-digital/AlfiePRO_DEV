@@ -11,7 +11,7 @@ import type { Skipper } from '../../types';
 import type { LetterScore } from '../../types/letterScores';
 import type { RaceEvent } from '../../types/race';
 import {
-  POSITION_PRESERVING_SCORES, addFinish, applyLetterScore, moveFinish, previousResultsFor, sailSortedIndices, sortFinishOrder, type FinishingEntry,
+  addFinish, applyLetterScore, moveFinish, previousResultsFor, sailSortedIndices, type FinishingEntry,
 } from '../../utils/finishOrder';
 import { setFinishHandoff } from '../../utils/finishHandoff';
 import type { HandicapSettings } from '../../utils/scoringConfirm';
@@ -21,8 +21,9 @@ import { useMobile } from '../MobileContext';
 import { Icon } from '../icons';
 import { startScoring } from '../raceDesk';
 import { useSetupEvent } from '../raceSetupData';
-import { NextUp, RaceSession, clearSession, forScoring, loadSession, nextUp, sailOf, saveSession } from '../raceSession';
-import { PadBoats, ordinal, padBoats, startingOrder } from '../finishPad';
+import { NextUp, RaceSession, SESSION_EVENT, clearSession, forScoring, nextUp, sailOf, saveSession } from '../raceSession';
+import { PadBoats, ordinal, padBoats, readBack, registerPad, resolveConflict, startingOrder } from '../finishPad';
+import { ConflictCard } from './ScoreTogether';
 import {
   HandicapChange, HeatConfirmation, RaceConfirmation, applyHeatFinish, applyRaceFinish, confirmHeat, confirmRace, confirmsOnPhone,
   handicapChanges, handicapSettingsFor, heatMoves, overrideHandicap, runOf, saveConfirmation, saveRun,
@@ -30,6 +31,8 @@ import {
 import { advanceToNextRoundIn } from '../../utils/scoringConfirm';
 import { heatSailingOrder } from '../../utils/raceProgress';
 import { HEAT_COLOURS, Loading, Missing } from './RaceSetup';
+import { sendOrKeep } from '../outbox';
+import { OfflineBar } from './Sync';
 import { LetterSheet, type LetterTarget } from './FinishPad';
 
 const heatColour = (h: string) => HEAT_COLOURS[(h.charCodeAt(0) - 65) % HEAT_COLOURS.length];
@@ -168,7 +171,7 @@ const Standings: React.FC<{ event: RaceEvent; you: (memberId?: string) => boolea
 /* ─────────────── screen ─────────────── */
 
 type Step = 'review' | 'moves' | 'handicaps' | 'published';
-interface Done { c: RaceConfirmation | HeatConfirmation; event: RaceEvent; up: NextUp; settings: HandicapSettings }
+interface Done { c: RaceConfirmation | HeatConfirmation; event: RaceEvent; up: NextUp; settings: HandicapSettings; kept?: boolean }
 
 export const ConfirmRaceScreen: React.FC = () => {
   const { key = '' } = useParams();
@@ -187,17 +190,32 @@ export const ConfirmRaceScreen: React.FC = () => {
   const [letter, setLetter] = useState<LetterTarget | null>(null);
   const [override, setOverride] = useState<HandicapChange | null>(null);
 
+  const sessionRef = useRef<RaceSession | null>(null);
   useEffect(() => {
     if (!event || !up || !boats || done) return;
-    const s = loadSession(event.id, up);
+    const s = registerPad(event, up);
+    sessionRef.current = s;
     setSession(s);
     setOrderState(s.finish || startingOrder(boats, up.race, s));
   }, [event?.id, up?.race, up?.heat, boats]); // eslint-disable-line react-hooks/exhaustive-deps
+  // spotters may still be calling while this is reviewed
+  useEffect(() => {
+    if (!event || !up || done) return;
+    const on = (ev: Event) => {
+      const s = (ev as CustomEvent).detail as RaceSession;
+      if (!s || s.eventId !== event.id || s === sessionRef.current || s.race !== up.race || (s.heat || null) !== (up.heat || null)) return;
+      sessionRef.current = s; setSession(s);
+      if (s.finish) setOrderState(s.finish);
+    };
+    window.addEventListener(SESSION_EVENT, on);
+    return () => window.removeEventListener(SESSION_EVENT, on);
+  }, [event?.id, up?.race, up?.heat, done]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const setOrder = (changed: FinishingEntry[]) => {
-    const o = sortFinishOrder(changed.map(x => ({ ...x, position: x.letterScore && !POSITION_PRESERVING_SCORES.has(x.letterScore) ? 999 : x.position })));
+  const setOrder = (changed: FinishingEntry[], extra?: Partial<RaceSession>) => {
+    const o = readBack(changed);
     setOrderState(o);
-    if (session) { const next = { ...session, finish: o }; setSession(next); saveSession(next); }
+    const cur = sessionRef.current;
+    if (cur) { const next = { ...cur, ...extra, finish: o }; sessionRef.current = next; setSession(next); saveSession(next); }
   };
 
   if (!done && (item === undefined || (item && !event))) return <Loading />;
@@ -220,15 +238,16 @@ export const ConfirmRaceScreen: React.FC = () => {
     const upAfterAdvance = advance && advance.heatManagement.currentRound > hmNow!.currentRound ? nextUp({ ...ev, heatManagement: advance.heatManagement }) : null;
     const nextUpShown = upAfterAdvance || after;
     const nextLabel = after.allDone || (after.roundComplete && !upAfterAdvance) ? 'Back to the event'
-      : `${nextUpShown.race !== was.race ? `${nextUpShown.raceLabel} · ` : ''}start ${nextUpShown.heat ? `Heat ${nextUpShown.heatLabel}` : nextUpShown.raceLabel}`;
+      : nextUpShown.race !== was.race ? `${nextUpShown.raceLabel} · start ${nextUpShown.heat ? `Heat ${nextUpShown.heatLabel}` : ''}`.trim() : `Start ${nextUpShown.heat ? `Heat ${nextUpShown.heatLabel}` : nextUpShown.raceLabel}`;
     const goNext = async () => {
       if (after.allDone || (after.roundComplete && !upAfterAdvance)) { navigate(`/race-desk/event/${key}`, { replace: true }); return; }
       if (advance && upAfterAdvance) {
         setBusy(true);
         try {
           const run = { ...c.after, heatManagement: advance.heatManagement, ...(advance.convertedResults.length ? { raceResults: advance.convertedResults, lastCompletedRace: advance.lastCompletedRace! } : {}) };
-          await saveRun(ev, run);
-        } catch { toast("Couldn't move on to the next race. Check your connection and try again."); setBusy(false); return; }
+          const r = await sendOrKeep({ eventId: ev.id, kind: 'save', event: ev, run, label: `${nextUpShown.raceLabel} heats` }, () => saveRun(ev, run));
+          if (r.kept) toast("No signal. Saved on this phone; it sends by itself when you're back online.");
+        } catch { toast("Couldn't move on to the next race. Try again."); setBusy(false); return; }
         setBusy(false);
       }
       startNext();
@@ -316,10 +335,11 @@ export const ConfirmRaceScreen: React.FC = () => {
               setOverride(null);
               setBusy(true);
               try {
-                const saved = await saveRun(ev, run);
-                setDone({ ...done, c: { ...c, after: run }, event: saved });
+                const r = await sendOrKeep({ eventId: ev.id, kind: 'save', event: ev, run, label: `${sailOf(skippers[override.skipperIndex])} handicap set to ${v}` }, () => saveRun(ev, run));
+                setDone({ ...done, c: { ...c, after: run }, event: r.event, kept: done.kept || r.kept });
                 tap('success');
-              } catch { toast("Couldn't save the handicap. Check your connection and try again."); }
+                if (r.kept) toast("No signal. Saved on this phone; it sends by itself when you're back online.");
+              } catch { toast("Couldn't save the handicap. Try again."); }
               setBusy(false);
             }} />
           )}
@@ -340,15 +360,24 @@ export const ConfirmRaceScreen: React.FC = () => {
       <div className="m-stack m-published" style={{ minHeight: 'calc(100dvh - var(--m-safe-top) - var(--m-safe-bottom) - 40px)' }}>
         <div style={{ textAlign: 'center', padding: '14px 0 4px' }}>
           <span className="m-pub-tick"><Icon name="check" size={30} strokeWidth={2.6} /></span>
+          {done.kept ? (
+            <>
+              <div className="m-disp" style={{ fontSize: 24, fontWeight: 700, marginTop: 12 }}>Saved on this phone</div>
+              <div className="m-mut" style={{ fontSize: 13.5, marginTop: 4 }}>Publishing waits for signal. Members get the results as soon as it's back.</div>
+            </>
+          ) : (<>
           <div className="m-disp" style={{ fontSize: 26, fontWeight: 700, marginTop: 12 }}>{roundDone ? `${c.kind === 'heat' ? was.raceLabel : `Race ${raceNo}`} is live` : `Heat ${was.heatLabel} is in`}</div>
           <div className="m-mut" style={{ fontSize: 13.5, marginTop: 4 }}>Members see it in Results now{live ? ' · and on the live page' : ''}</div>
+          </>)}
         </div>
+        {!roundDone ? <div className="m-card m-empty">Standings update when every heat of {was.raceLabel} is in.</div> : (<>
         <div className="m-row" style={{ padding: '0 2px' }}>
           <span className="m-lb m-dim" style={{ flex: 1 }}>Standings after {c.after.lastCompletedRace} race{c.after.lastCompletedRace === 1 ? '' : 's'}</span>
           {drops.length > 0 && <span className="m-dim" style={{ fontSize: 12 }}>{dropsNow ? `${dropsNow} drop${dropsNow > 1 ? 's' : ''}` : 'No drops yet'}{nextDrop ? ` · ${dropsNow ? 'next' : '1st'} after R${nextDrop}` : ''}</span>}
         </div>
         <Standings event={ev} you={isYou} />
-        {c.kind === 'heat' && <div className="m-dim" style={{ fontSize: 12.5 }}>Heat positions are converted to overall race points by the same {c.after.heatManagement?.configuration.scoringSystem === 'shrs' ? 'SHRS' : 'HMS'} rules desktop uses.</div>}
+        </>)}
+        {c.kind === 'heat' && roundDone && <div className="m-dim" style={{ fontSize: 12.5 }}>Heat positions are converted to overall race points by the same {c.after.heatManagement?.configuration.scoringSystem === 'shrs' ? 'SHRS' : 'HMS'} rules desktop uses.</div>}
         {moves && moves.nextRound && moves.next.length > 0 && (
           <div className="m-card" style={{ overflow: 'hidden' }}>
             <div className="m-li m-li-head"><span className="m-lb m-dim" style={{ flex: 1 }}>Heat moves for Race {moves.nextRound}</span></div>
@@ -391,8 +420,9 @@ export const ConfirmRaceScreen: React.FC = () => {
   const entrants = (st.skippers || []).length;
   const backToPad = () => navigate(`/race-desk/event/${key}/finish`, { replace: true });
 
+  const conflicts = s.conflicts || [];
   const confirm = async () => {
-    if (out.length) return;
+    if (out.length || conflicts.length) return;
     setBusy(true);
     try {
       if (!onPhone) {
@@ -408,14 +438,16 @@ export const ConfirmRaceScreen: React.FC = () => {
       let c: RaceConfirmation | HeatConfirmation;
       if (heats && u.heat) c = confirmHeat(applyHeatFinish(run, u.heat, b.globalOf, global), u.heat);
       else c = confirmRace(applyRaceFinish(run, u.race, order, settings), u.race, settings);
-      const saved = await saveConfirmation(ev, c, settings);
+      const label = `${u.raceLabel}${u.heat ? ` · Heat ${u.heatLabel}` : ''} confirmed · ${order.length} boats`;
+      const r = await sendOrKeep({ eventId: ev.id, kind: 'confirm', event: ev, confirmation: c, settings, label }, () => saveConfirmation(ev, c, settings));
       clearSession(ev.id);
       tap('success');
-      setDone({ c, event: saved, up: u, settings });
+      if (r.kept) toast("No signal. Saved on this phone; it sends by itself when you're back online.");
+      setDone({ c, event: r.event, up: u, settings, kept: r.kept });
       setStep(c.kind === 'heat' && !c.roundCompleted ? 'moves' : c.kind === 'race' && ev.raceFormat === 'handicap' ? 'handicaps' : 'published');
     } catch (err) {
       console.error('Confirm failed', err);
-      toast("Couldn't save the results. Nothing was lost: check your connection and confirm again.");
+      toast("Couldn't save the results. Nothing was lost: try confirming again.");
     }
     setBusy(false);
   };
@@ -423,6 +455,14 @@ export const ConfirmRaceScreen: React.FC = () => {
   return (
     <div className="m-stack" style={{ minHeight: 'calc(100dvh - var(--m-safe-top) - var(--m-safe-bottom) - 40px)' }}>
       <TitleBar up={u} sub={`${skippers.length} boats · ${shrs ? 'SHRS' : heats ? 'HMS' : ev.raceFormat === 'handicap' ? 'handicap' : 'scratch'}`} onBack={backToPad} />
+      <OfflineBar />
+      {conflicts.slice(0, 1).map(c => s.pad && (
+        <ConflictCard key={c.id} conflict={c} pad={s.pad} onKeep={w => {
+          const r = resolveConflict(s, c.id, w);
+          setOrder(r.finish || [], { conflicts: r.conflicts });
+          tap('success');
+        }} />
+      ))}
       {order.length === 0 ? <div className="m-card m-empty">No finishes called yet. Go back to the finish pad to call them.</div> : (
         <OrderList order={order} skippers={skippers} you={isYouIdx(skippers)} heatSize={skippers.length} entrants={entrants}
           onMove={(a, z) => { setOrder(moveFinish(order, a, z)); tap('light'); }}
@@ -443,8 +483,9 @@ export const ConfirmRaceScreen: React.FC = () => {
       )}
       <div style={{ flex: 1 }} />
       {!onPhone && <div className="m-dim" style={{ fontSize: 12.5, textAlign: 'center' }}>Multi-day events are confirmed on the scoring sheet for now; it opens with this order.</div>}
+      {conflicts.length > 0 && <div className="m-dim" style={{ fontSize: 12.5, textAlign: 'center' }}>Two phones called {ordinal(conflicts[0].place)} differently. Decide who finished there first.</div>}
       {out.length > 0 && <div className="m-dim" style={{ fontSize: 12.5, textAlign: 'center' }}>Every boat needs a finish or a letter score before the {u.heat ? 'heat' : 'race'} can be confirmed.</div>}
-      <button className="m-btn m-btn-p" style={{ height: 54 }} disabled={busy || out.length > 0 || order.length === 0} onClick={confirm}>
+      <button className="m-btn m-btn-p" style={{ height: 54 }} disabled={busy || out.length > 0 || conflicts.length > 0 || order.length === 0} onClick={confirm}>
         {busy ? 'Saving…' : !onPhone ? 'Confirm on the scoring sheet' : `Confirm ${u.heat ? `Heat ${u.heatLabel}` : u.raceLabel}`}
       </button>
       {letter && (

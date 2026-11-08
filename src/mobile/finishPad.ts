@@ -6,10 +6,10 @@
 import type { Skipper } from '../types';
 import type { RaceEvent } from '../types/race';
 import type { HeatDesignation } from '../types/heat';
-import { applyLetterScore, loadFinishOrder, sortFinishOrder, type FinishingEntry, type RaceResult } from '../utils/finishOrder';
+import { POSITION_PRESERVING_SCORES, addFinish, applyLetterScore, loadFinishOrder, moveFinish, sortFinishOrder, type FinishingEntry, type RaceResult } from '../utils/finishOrder';
 import { heatRaceResultsFor, skippersScoredInOtherHeats } from '../utils/raceProgress';
 import { heatManagementOf, scoringStateOf } from '../utils/raceSetup';
-import { forScoring, sailOf, type NextUp, type RaceSession } from './raceSession';
+import { forScoring, loadSession, sailOf, saveSession, type NextUp, type PadInfo, type RaceSession } from './raceSession';
 
 export interface PadBoats {
   /** The boats as Touch mode receives them: the heat's boats for heats, else every skipper. */
@@ -172,7 +172,8 @@ export function matchCalls(heard: Heard[], skippers: Skipper[], indices: number[
     if (h.kind === 'undo') { out.push(h); k++; continue; }
     // longest run of neighbouring numbers that is a sail number here
     let best = -1, bestSaid = '', bestIdx = -1;
-    let joined = '', said: string[] = [];
+    let joined = '';
+    const said: string[] = [];
     for (let j = k; j < heard.length && heard[j].kind === 'number' && j - k < 4; j++) {
       const hj = heard[j] as Extract<Heard, { kind: 'number' }>;
       joined += hj.value; said.push(hj.said);
@@ -193,4 +194,89 @@ export function matchCalls(heard: Heard[], skippers: Skipper[], indices: number[
     k++;
   }
   return out;
+}
+
+/* ─────────────── the shared finish order (Score together) ─────────────── */
+
+/** The order as Touch mode shows it once a change is saved and read back. */
+export function readBack(changed: FinishingEntry[]): FinishingEntry[] {
+  return sortFinishOrder(changed.map(x => ({ ...x, position: x.letterScore && !POSITION_PRESERVING_SCORES.has(x.letterScore) ? 999 : x.position })));
+}
+
+export function padInfoOf(boats: PadBoats, up: NextUp): PadInfo {
+  return {
+    globalOf: boats.globalOf,
+    boats: boats.skippers.map(s => ({ sail: sailOf(s), name: s?.name || '' })),
+    raceLabel: up.raceLabel,
+    heatLabel: up.heat ? up.heatLabel : '',
+    heatIndex: up.heatIndex,
+  };
+}
+
+/** Enough of each boat for the finish order rules (sail number and name). */
+export const padSkippers = (pad: PadInfo): Skipper[] => pad.boats.map(b => ({ name: b.name, sailNo: b.sail } as Skipper));
+
+export interface RemoteCall { id: string; g: number; place: number; who: string; at: number }
+
+/**
+ * A finish called on another phone: the boat takes the next place. If that phone meant a place
+ * this phone has already given to another boat, the place is in dispute until the scorer decides
+ * (the new boat sits one place lower meanwhile). Boats already in the order are left alone.
+ */
+export function applyRemoteCall(s: RaceSession, call: RemoteCall): { session: RaceSession; outcome: 'added' | 'already' | 'conflict' | 'unknown' } {
+  const pad = s.pad;
+  if (!pad) return { session: s, outcome: 'unknown' };
+  const local = pad.globalOf.indexOf(call.g);
+  if (local < 0) return { session: s, outcome: 'unknown' };
+  // before the finish pad was opened: start from the boats marked OCS at the start
+  let order = s.finish || [];
+  if (!s.finish) {
+    for (const m of s.marks || []) {
+      const i = pad.globalOf.indexOf(m.skipperIndex);
+      if (i >= 0 && !order.some(e => e.skipperIndex === i)) order = applyLetterScore(order, padSkippers(pad), i, 'OCS');
+    }
+  }
+  if (order.some(e => e.skipperIndex === local)) return { session: s, outcome: 'already' };
+  const added = addFinish(order, padSkippers(pad), local);
+  if (!added) return { session: s, outcome: 'already' };
+  const next = readBack(added);
+  const callers = { ...(s.callers || {}), [local]: { who: call.who, at: call.at } };
+  const myPlace = next.find(e => e.skipperIndex === local)!.position;
+  let conflicts = s.conflicts || [];
+  let outcome: 'added' | 'conflict' = 'added';
+  if (call.place < myPlace) {
+    const occupant = next.find(e => !e.letterScore && e.position === call.place);
+    if (occupant && !conflicts.some(c => c.place === call.place)) {
+      const oc = callers[occupant.skipperIndex];
+      conflicts = [...conflicts, { id: call.id, place: call.place, a: occupant.skipperIndex, aWho: oc?.who || 'You', aAt: oc?.at || 0, b: local, bWho: call.who, bAt: call.at }];
+      outcome = 'conflict';
+    }
+  }
+  return { session: { ...s, finish: next, callers, conflicts, added: [...(s.added || []), local] }, outcome };
+}
+
+/** The scorer decides who finished in the disputed place; the other boat goes one place lower. */
+export function resolveConflict(s: RaceSession, conflictId: string, winner: number): RaceSession {
+  const c = (s.conflicts || []).find(x => x.id === conflictId);
+  if (!c) return s;
+  let order = s.finish || [];
+  if (winner === c.b) {
+    const target = order.findIndex(e => !e.letterScore && e.position === c.place);
+    const from = order.findIndex(e => e.skipperIndex === c.b);
+    if (target >= 0 && from >= 0 && from !== target && !order[from].letterScore) order = readBack(moveFinish(order, from, target));
+  }
+  return { ...s, finish: order, conflicts: (s.conflicts || []).filter(x => x.id !== conflictId) };
+}
+
+/**
+ * Keeps the race session ready for calls from other phones: the boats of the race or heat, and
+ * (once the gun has gone) the finish order the finish pad starts from.
+ */
+export function registerPad(event: RaceEvent, up: NextUp): RaceSession {
+  const s0 = loadSession(event.id, up);
+  const boats = padBoats(event, up);
+  const pad = padInfoOf(boats, up);
+  const s: RaceSession = { ...s0, pad, finish: s0.finish || (s0.gunAt ? startingOrder(boats, up.race, s0) : s0.finish) };
+  if (JSON.stringify(s.pad) !== JSON.stringify(s0.pad) || s.finish !== s0.finish) saveSession(s);
+  return s;
 }
