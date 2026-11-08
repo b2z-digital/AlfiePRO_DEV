@@ -4,6 +4,7 @@ import { Clock, Building, CircleCheck as CheckCircle, Circle as XCircle } from '
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { Logo } from '../Logo';
+import { AlfieLoader } from '../brand/AlfieLoader';
 
 interface ClubApplicationPendingScreenProps {
   darkMode: boolean;
@@ -79,9 +80,7 @@ export const ClubApplicationPendingScreen: React.FC<ClubApplicationPendingScreen
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500" />
-      </div>
+      <AlfieLoader light={false} />
     );
   }
 

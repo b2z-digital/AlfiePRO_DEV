@@ -47,6 +47,63 @@
     <meta property="og:description" content="Ultimate Principal Race Officer & Club Management Tool" />
     <meta property="og:type" content="website" />
 
+    <!-- AlfiePRO preloader (first paint). The app renders the same markup: src/components/brand/AlfieLoader.tsx -->
+    <style id="alf-splash-css">
+      .alf-splash{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;overflow:hidden;
+        background:radial-gradient(130% 90% at 50% 40%,#14254d 0%,#0b1328 52%,#070d1f 100%);color:#eaf1ff;
+        font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+        -webkit-font-smoothing:antialiased;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom)}
+      .alf-splash[hidden]{display:none!important}
+      .alf-splash.is-light{background:radial-gradient(130% 90% at 50% 40%,#ffffff 0%,#eef3fb 58%,#e3eaf5 100%);color:#0b1328}
+      .alf-splash.is-page{position:relative;inset:auto;z-index:auto;min-height:60vh;background:transparent;padding:48px 16px}
+      .alf-splash.is-page .alf-splash__inner{margin-top:0}
+      .alf-splash__inner{display:flex;flex-direction:column;align-items:center;margin-top:-4vh;animation:alf-in .45s .12s cubic-bezier(.2,.7,.2,1) both}
+      .alf-splash.no-intro .alf-splash__inner{animation:none}
+      
+      .alf-splash__boat{position:relative;width:104px;height:112px;display:flex;justify-content:center}
+      .alf-splash__glow{position:absolute;left:50%;top:46%;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;
+        background:radial-gradient(circle,rgba(1,162,233,.30) 0%,rgba(0,102,180,.12) 42%,rgba(0,102,180,0) 70%);
+        animation:alf-glow 3.6s ease-in-out infinite;animation-delay:var(--alf-t,0s)}
+      .alf-splash.is-light .alf-splash__glow{background:radial-gradient(circle,rgba(1,162,233,.20) 0%,rgba(0,102,180,.07) 45%,rgba(0,102,180,0) 70%)}
+      .alf-splash__mark{position:relative;height:96px;width:auto;margin-top:2px;transform-origin:50% 96%;overflow:visible;
+        animation:alf-heel 3.6s ease-in-out infinite;animation-delay:var(--alf-t,0s);filter:drop-shadow(0 6px 18px rgba(0,102,180,.35))}
+      .alf-splash.is-light .alf-splash__mark{filter:drop-shadow(0 6px 16px rgba(0,102,180,.18))}
+      .alf-sail{transform-box:fill-box;transform-origin:50% 100%;animation:alf-hoist .75s cubic-bezier(.2,.8,.2,1) both}
+      .alf-sail--main{animation-delay:.16s}
+      .alf-sail--jib{animation-delay:.3s}
+      .alf-splash.no-intro .alf-sail{animation:none}
+      .alf-splash__water{position:absolute;left:4px;right:4px;bottom:4px;height:12px;width:96px;overflow:hidden;
+        -webkit-mask-image:linear-gradient(90deg,transparent,#000 28%,#000 72%,transparent);mask-image:linear-gradient(90deg,transparent,#000 28%,#000 72%,transparent)}
+      .alf-splash__water path{fill:none;stroke:#01a2e9;stroke-opacity:.55;stroke-width:1.6;stroke-linecap:round;animation:alf-wave 2.4s linear infinite;animation-delay:var(--alf-t,0s)}
+      .alf-splash.is-light .alf-splash__water path{stroke:#0066b4;stroke-opacity:.4}
+      
+      .alf-splash__word{margin-top:14px;font-size:26px;line-height:1;letter-spacing:.01em;white-space:nowrap}
+      .alf-splash__word span{font-weight:200}
+      .alf-splash__word b{font-weight:700}
+      .alf-splash__bar{position:relative;margin-top:26px;width:132px;height:3px;border-radius:3px;overflow:hidden;background:rgba(234,241,255,.10)}
+      .alf-splash.is-light .alf-splash__bar{background:rgba(11,19,40,.08)}
+      .alf-splash__bar i{position:absolute;top:0;bottom:0;left:0;width:42%;border-radius:3px;
+        background:linear-gradient(90deg,rgba(1,162,233,0),#01a2e9 35%,#6ccbff 60%,rgba(108,203,255,0));
+        animation:alf-bar 1.5s cubic-bezier(.65,0,.35,1) infinite;animation-delay:var(--alf-t,0s)}
+      .alf-splash__msg{margin-top:14px;min-height:18px;font-size:13px;line-height:18px;color:rgba(214,226,250,.62);text-align:center}
+      .alf-splash.is-light .alf-splash__msg{color:#5b6b8c}
+      .alf-splash.is-plain .alf-splash__boat,.alf-splash.is-plain .alf-splash__word{display:none}
+      .alf-splash.is-plain .alf-splash__bar{margin-top:0}
+      .alf-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+      
+      @keyframes alf-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+      @keyframes alf-hoist{from{opacity:0;transform:scaleY(.55)}to{opacity:1;transform:none}}
+      @keyframes alf-heel{0%,100%{transform:rotate(-3deg) translateY(0)}50%{transform:rotate(2.5deg) translateY(-3px)}}
+      @keyframes alf-glow{0%,100%{opacity:.75;transform:scale(.94)}50%{opacity:1;transform:scale(1.04)}}
+      @keyframes alf-wave{to{transform:translateX(-48px)}}
+      @keyframes alf-bar{0%{transform:translateX(-100%)}100%{transform:translateX(240%)}}
+      @media (prefers-reduced-motion:reduce){
+        .alf-splash__inner,.alf-sail,.alf-splash__mark,.alf-splash__glow,.alf-splash__water path{animation:none}
+        .alf-splash__bar i{width:100%;animation:alf-pulse 1.6s ease-in-out infinite}
+      }
+      @keyframes alf-pulse{0%,100%{opacity:.35}50%{opacity:1}}
+    </style>
+
     <title>AlfiePRO - RC Yacht Management Software</title>
 
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5596134126559334"
@@ -126,7 +183,27 @@
         }catch(e){}
       })();
     </script>
-    <div id="root"></div>
+    <div id="root"><div id="alf-boot" class="alf-splash" role="status" hidden><div class="alf-splash__inner"><div class="alf-splash__boat"><div class="alf-splash__glow"></div><svg class="alf-splash__mark" viewBox="0 0 129.34 201.37" aria-hidden="true"><path class="alf-sail alf-sail--main" fill="#0066b4" d="M92.55,0s-33.42,35.95-46.9,76.95-17.97,123.01-17.97,123.01c53.92-26.12,87.06-5.06,101.66,1.42C75.98,145.19,92.55,0,92.55,0Z"/><path class="alf-sail alf-sail--jib" fill="#01a2e9" d="M45.37,35.39s-23.87,31.11-37.35,61.22c-13.48,30.11-5.9,88.18-5.9,88.18,22.19-23.87,68.8-19.1,68.8-19.1C33.86,122.72,45.37,35.39,45.37,35.39Z"/></svg><svg class="alf-splash__water" viewBox="0 0 96 12" aria-hidden="true"><path d="M0 6Q12 1 24 6T48 6T72 6T96 6T120 6T144 6"/></svg></div><div class="alf-splash__word"><span>Alfie</span><b>PRO</b></div><div class="alf-splash__bar"><i></i></div><div class="alf-splash__msg"></div><span class="alf-sr">Loading AlfiePRO</span></div></div></div>
+    <script>
+      // Show the preloader before the app's code arrives. Not on the live recorder/camera
+      // pages or embeds, and unbranded on club and association websites.
+      (function(){
+        try{
+          var el=document.getElementById('alf-boot');
+          if(!el)return;
+          var p=location.pathname,h=location.hostname;
+          if(/^\/(live|play|mobile-stream|embed)\//.test(p))return;
+          if(sessionStorage.getItem('impersonation_preloader_active')==='true')return;
+          var alf=h==='alfiepro.com.au'||/\.alfiepro\.com\.au$/.test(h);
+          var main=/^(www\.|app\.)?alfiepro\.com\.au$/.test(h);
+          var dev=h==='localhost'||/^\d+\.\d+\.\d+\.\d+$/.test(h)||/webcontainer|bolt\.new|stackblitz\.io|amplifyapp\.com/.test(h);
+          if((alf&&!main)||(!alf&&!dev))el.className+=' is-plain';
+          if(localStorage.getItem('lightMode')==='true')el.className+=' is-light';
+          el.hidden=false;
+          window.__alfBootAt=performance.now();
+        }catch(e){}
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

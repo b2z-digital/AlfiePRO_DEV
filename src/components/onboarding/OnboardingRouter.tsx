@@ -4,6 +4,7 @@ import { OnboardingChoiceScreen } from './OnboardingChoiceScreen';
 import { OnboardingWizard } from './OnboardingWizard';
 import { ClubSetupWizard } from './ClubSetupWizard';
 import { RaceManagementOnboarding } from './RaceManagementOnboarding';
+import { AlfieLoader } from '../brand/AlfieLoader';
 import { CircleCheck as CheckCircle2, Building2, ArrowRight, CircleAlert as AlertCircle, UserCheck, X, Mail, Loader as Loader2 } from 'lucide-react';
 
 interface OnboardingRouterProps {
@@ -242,9 +243,7 @@ export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
+      <AlfieLoader light={!darkMode} />
     );
   }
 
