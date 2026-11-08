@@ -4,7 +4,7 @@
   "description": "Ultimate Principal Race Officer & Club Management Tool for yacht racing clubs",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
+  "background_color": "#0b1328",
   "theme_color": "#3b82f6",
   "orientation": "any",
   "scope": "/",
