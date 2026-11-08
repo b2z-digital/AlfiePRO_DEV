@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { Image } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
+import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 
 /**
  * Checks classifieds photos and works out how to show them:
@@ -14,7 +16,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
  *
  * POST body (all optional):
  *   classifiedId  check one listing (otherwise: imported listings)
- *   limit         most photos to check in this call (default 24, max 60)
+ *   limit         most photos to check in this call (default 6, max 8)
  *   force         check again even if Alfie already checked it
  *   dryRun        work it out but don't save (returns the results)
  */
@@ -42,35 +44,117 @@ interface PhotoMeta {
   c?: number;
 }
 
-const PROMPT = `This photo is from a classifieds listing for radio-controlled model yachts and sailing gear.
+// The model is shown the photo four times, turned 0°, 90°, 180° and 270°
+// clockwise, and picks the one that is the right way up. (Asked directly
+// "which edge is the top?", models mix up left and right.)
+const PROMPT = `This picture shows ONE photo four times, each copy turned a different way:
+1 = top-left, 2 = top-right, 3 = bottom-left, 4 = bottom-right.
+The photo is from a classifieds listing for radio-controlled model yachts and sailing gear.
 
-1. Photos are often saved sideways or upside down. Look for clues: writing and sail numbers should read normally; floors, ground, grass, gravel and water belong at the bottom; sky, ceilings and trees' tops at the top; people, furniture, stands and tables stand upright; masts on a boat sitting on its stand point up.
-   Which edge of this image is the real TOP of the scene: "top", "right", "bottom" or "left"?
-   A boat lying on its side on a table or the floor, or photographed from straight above, is not a rotated photo: answer "top" unless the surroundings show the photo itself is turned. If you can't tell, answer "top".
+Which copy shows the scene the right way up, as the photographer saw it?
+Clues: writing and sail numbers read normally (not sideways or upside down); floors, ground, grass, gravel and water are at the bottom; sky, ceilings and tree tops are at the top; people, furniture, stands and tables stand upright; a boat on its stand has its mast pointing up.
+A boat lying on its side on a table or floor, or photographed from straight above, can look right in more than one copy: then prefer copy 1 unless the surroundings clearly show it is turned.
 
-2. Where is the centre of the main item for sale (usually the boat, otherwise the gear), as percentages of this image exactly as you see it now: x from the left edge, y from the top edge?
+Reply with JSON only: {"clues": "a few words", "upright": 1|2|3|4, "confidence": 0.0-1.0}`;
 
-Reply with JSON only:
-{"clues": "a few words", "up": "top|right|bottom|left", "confidence": 0.0-1.0, "x": 0-100, "y": 0-100}`;
+const COPY_TURN = [0, 90, 180, 270];
 
-const UP_TO_TURN: Record<string, number> = { top: 0, left: 90, bottom: 180, right: 270 };
-
-const clampPct = (v: unknown) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? Math.round(Math.min(100, Math.max(0, n))) : 50;
-};
-
-async function photoSize(url: string): Promise<number | undefined> {
+/**
+ * Reads the start of a JPEG: its stored orientation flag (EXIF 0x0112, which
+ * browsers apply when they show the photo), its pixel size and the file size.
+ */
+async function photoInfo(url: string): Promise<{ len?: number; orientation: number; w?: number; h?: number }> {
   try {
-    const res = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(10000) });
-    const n = Number(res.headers.get("content-length"));
-    return Number.isFinite(n) && n > 0 ? n : undefined;
+    const res = await fetch(url, { headers: { Range: "bytes=0-262143" }, signal: AbortSignal.timeout(15000) });
+    const total = (res.headers.get("content-range") || "").split("/")[1];
+    const lenHeader = Number(total || res.headers.get("content-length"));
+    const b = new Uint8Array(await res.arrayBuffer());
+    const len = Number.isFinite(lenHeader) && lenHeader > 0 ? lenHeader : undefined;
+    let orientation = 1;
+    let w: number | undefined;
+    let h: number | undefined;
+    if (b[0] === 0xff && b[1] === 0xd8) {
+      let i = 2;
+      while (i + 9 < b.length) {
+        if (b[i] !== 0xff) { i++; continue; }
+        const marker = b[i + 1];
+        if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0xff) { i += marker === 0xff ? 1 : 2; continue; }
+        const segLen = (b[i + 2] << 8) | b[i + 3];
+        if (marker === 0xe1 && b[i + 4] === 0x45 && b[i + 5] === 0x78 && b[i + 6] === 0x69 && b[i + 7] === 0x66) {
+          const t = i + 10;
+          const le = b[t] === 0x49;
+          const r16 = (o: number) => (le ? b[o] | (b[o + 1] << 8) : (b[o] << 8) | b[o + 1]);
+          const r32 = (o: number) => (le
+            ? (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0
+            : ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0);
+          const ifd = t + r32(t + 4);
+          if (ifd + 2 < b.length) {
+            const n = r16(ifd);
+            for (let k = 0; k < n && ifd + 2 + k * 12 + 10 < b.length; k++) {
+              const e = ifd + 2 + k * 12;
+              if (r16(e) === 0x0112) orientation = r16(e + 8) || 1;
+            }
+          }
+        }
+        const isSof = (marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) || (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf);
+        if (isSof) {
+          h = (b[i + 5] << 8) | b[i + 6];
+          w = (b[i + 7] << 8) | b[i + 8];
+          break;
+        }
+        i += 2 + segLen;
+      }
+    }
+    return { len, orientation, w, h };
   } catch {
-    return undefined;
+    return { orientation: 1 };
   }
 }
 
+/** Turn an image 90° clockwise, `times` times */
+function turnClockwise(src: Image, times: number): Image {
+  let img = src;
+  for (let t = 0; t < times; t++) {
+    const w = img.width;
+    const h = img.height;
+    const out = new Image(h, w);
+    const a = img.bitmap;
+    const o = out.bitmap;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        // (x, y) -> (h - 1 - y, x)
+        const si = (y * w + x) * 4;
+        const di = (x * h + (h - 1 - y)) * 4;
+        o[di] = a[si]; o[di + 1] = a[si + 1]; o[di + 2] = a[si + 2]; o[di + 3] = a[si + 3];
+      }
+    }
+    img = out;
+  }
+  return img;
+}
+
+/** One JPEG with the photo turned 0/90/180/270° in a 2×2 grid, as a data URL */
+async function fourWays(url: string): Promise<string> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`Photo ${res.status}`);
+  const decoded = await Image.decode(new Uint8Array(await res.arrayBuffer()));
+  const scale = 300 / Math.max(decoded.width, decoded.height);
+  const base = scale < 1 ? decoded.resize(Math.round(decoded.width * scale), Math.round(decoded.height * scale)) : decoded;
+  const cell = 316;
+  const grid = new Image(cell * 2, cell * 2);
+  grid.fill(0xffffffff);
+  for (let k = 0; k < 4; k++) {
+    const c = turnClockwise(base, k);
+    const x = (k % 2) * cell + Math.round((cell - c.width) / 2);
+    const y = Math.floor(k / 2) * cell + Math.round((cell - c.height) / 2);
+    grid.composite(c, x, y);
+  }
+  const jpg = await grid.encodeJPEG(82);
+  return `data:image/jpeg;base64,${encodeBase64(jpg)}`;
+}
+
 async function checkPhoto(url: string, apiKey: string) {
+  const gridUrl = await fourWays(url);
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -85,7 +169,7 @@ async function checkPhoto(url: string, apiKey: string) {
           role: "user",
           content: [
             { type: "text", text: PROMPT },
-            { type: "image_url", image_url: { url, detail: "high" } },
+            { type: "image_url", image_url: { url: gridUrl, detail: "high" } },
           ],
         },
       ],
@@ -99,15 +183,15 @@ async function checkPhoto(url: string, apiKey: string) {
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content || "{}";
   const out = JSON.parse(text);
-  const up = String(out.up || "top").toLowerCase();
+  const pick = Math.round(Number(out.upright));
   const confidence = Math.min(1, Math.max(0, Number(out.confidence) || 0));
-  const turn = UP_TO_TURN[up] ?? 0;
+  const turn = pick >= 1 && pick <= 4 ? COPY_TURN[pick - 1] : 0;
   return {
     r: confidence >= MIN_CONFIDENCE ? turn : 0,
     suggested: turn,
     confidence,
-    x: clampPct(out.x),
-    y: clampPct(out.y),
+    x: 50,
+    y: 50,
     clues: String(out.clues || "").slice(0, 160),
   };
 }
@@ -159,10 +243,14 @@ Deno.serve(async (req: Request) => {
     limit?: number;
     force?: boolean;
     dryRun?: boolean;
+    probeOnly?: boolean;
   };
-  const limit = Math.min(60, Math.max(1, Number(body.limit) || 24));
+  const probeOnly = !!body.probeOnly;
+  const dryRun = !!body.dryRun || probeOnly;
   const force = !!body.force;
-  const dryRun = !!body.dryRun;
+  // Turning photos costs CPU time, which edge functions have little of: check
+  // a few per call (the import calls this every run, so the rest follow).
+  const limit = Math.min(probeOnly ? 60 : 8, Math.max(1, Number(body.limit) || 6));
 
   let q = supabase
     .from("classifieds")
@@ -193,9 +281,15 @@ Deno.serve(async (req: Request) => {
   const results: Array<Record<string, unknown>> = [];
   const byListing = new Map<string, Record<string, PhotoMeta>>();
 
-  await pool(jobs, 4, async (job) => {
+  await pool(jobs, 2, async (job) => {
     try {
-      const [check, len] = await Promise.all([checkPhoto(job.url, apiKey), photoSize(job.url)]);
+      const info = await photoInfo(job.url);
+      if (probeOnly) {
+        results.push({ id: job.id, url: job.url, ...info });
+        return;
+      }
+      const check = await checkPhoto(job.url, apiKey);
+      const len = info.len;
       const m: PhotoMeta = {
         r: check.r,
         x: check.x,
@@ -208,7 +302,7 @@ Deno.serve(async (req: Request) => {
       };
       if (!byListing.has(job.id)) byListing.set(job.id, {});
       byListing.get(job.id)![job.url] = m;
-      results.push({ id: job.id, url: job.url, ...m, suggested: check.suggested, clues: check.clues });
+      results.push({ id: job.id, url: job.url, ...m, suggested: check.suggested, clues: check.clues, exif: info.orientation, w: info.w, h: info.h });
     } catch (err) {
       results.push({ id: job.id, url: job.url, error: err instanceof Error ? err.message : String(err) });
     }
