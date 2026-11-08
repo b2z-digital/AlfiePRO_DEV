@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ClipboardList, Plus, Calendar, Trash2, Pencil, Play, ChevronRight, CircleCheck as CheckCircle2, Clock, UserCheck, ListFilter as Filter, Search, Layers, CalendarDays, ChevronDown, ChevronUp, Users, Anchor, ListChecks, FileText, Grid3x2 as Grid3X3, List, Download } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { ClipboardList, Plus, Calendar, Trash2, Pencil, Play, ChevronRight, CircleCheck as CheckCircle2, Clock, UserCheck, ListFilter as Filter, Search, Layers, CalendarDays, ChevronDown, ChevronUp, Users, Anchor, ListChecks, FileText, Grid3x2 as Grid3X3, List, Download, TriangleAlert, CalendarPlus } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { getRosters, deleteRoster, getRosterWithDetails, activateRoster, createTasksForAssignments, updateAssignmentStatus, ensureTasksForRoster, getRosterAssignmentSummaries, sendProRosterReminderEmails } from '../../utils/proRosterStorage';
 import type { RosterAssignmentSummary } from '../../utils/proRosterStorage';
@@ -14,6 +14,21 @@ import { AAvatar } from '../alfie/Kit';
 import { RosterGridView } from './RosterGridView';
 import { RosterListView } from './RosterListView';
 import { RosterCalendarView } from './RosterCalendarView';
+import { getStoredRaceSeries, getStoredRaceEvents } from '../../utils/raceStorage';
+import { syncClubRosters, findSeriesWithoutRoster, removeRosterRoundWithTask } from '../../utils/proRosterSync';
+import type { RosterSyncIssue } from '../../utils/proRosterSync';
+import type { RaceSeries } from '../../types/race';
+
+const DISMISSED_KEY = 'alfie.proRoster.dismissedIssues';
+const readDismissed = (): Set<string> => {
+  try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]')); } catch { return new Set(); }
+};
+const writeDismissed = (ids: Set<string>) => {
+  try { localStorage.setItem(DISMISSED_KEY, JSON.stringify(Array.from(ids))); } catch { /* per-viewer convenience only */ }
+};
+// "International One Metre (IOM)" → "IOM", so the class pill fits its column
+const shortClass = (boatClass: string) => boatClass.match(/\(([^)]+)\)\s*$/)?.[1] || boatClass;
+const fmtDay = (date: string) => new Date(`${date}T00:00:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
 interface ProRosteringPageProps {
   clubId: string;
@@ -47,6 +62,12 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
   const [pendingActivationRosterId, setPendingActivationRosterId] = useState<string | null>(null);
   const [pendingDeleteRosterId, setPendingDeleteRosterId] = useState<string | null>(null);
   const [summaries, setSummaries] = useState<Map<string, RosterAssignmentSummary>>(new Map());
+  const [seriesList, setSeriesList] = useState<RaceSeries[]>([]);
+  const [syncIssues, setSyncIssues] = useState<RosterSyncIssue[]>([]);
+  const [dismissedIssues, setDismissedIssues] = useState<Set<string>>(() => readDismissed());
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [prefillSeriesId, setPrefillSeriesId] = useState<string | null>(null);
+  const syncedOnce = useRef(false);
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -71,6 +92,66 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
   }, [clubId, addNotification]);
 
   useEffect(() => { fetchRosters(); fetchMembers(); }, [fetchRosters, fetchMembers]);
+
+  // Bring rosters up to date with Race Events & Series once per visit. Never changes who is rostered.
+  const runSeriesSync = useCallback(async (current: ProRoster[], notify: boolean) => {
+    const [series, events] = await Promise.all([
+      getStoredRaceSeries().catch(() => [] as RaceSeries[]),
+      current.some(r => r.event_id) ? getStoredRaceEvents().catch(() => []) : Promise.resolve([]),
+    ]);
+    setSeriesList(series);
+    const results = await syncClubRosters(current, series, events);
+    setSyncIssues(results.flatMap(r => r.issues));
+    const renamed = results.filter(r => r.renamed).length;
+    const moved = results.reduce((n, r) => n + r.moved, 0);
+    const added = results.reduce((n, r) => n + r.added, 0);
+    if (renamed || moved || added) {
+      setRosters(await getRosters(clubId));
+      if (notify) {
+        const parts = [
+          renamed ? `${renamed} renamed` : '',
+          moved ? `${moved} day${moved > 1 ? 's' : ''} moved` : '',
+          added ? `${added} new day${added > 1 ? 's' : ''} added` : '',
+        ].filter(Boolean);
+        addNotification('info', `Rosters updated from Race Events & Series: ${parts.join(', ')}. Rostered PROs are unchanged.`);
+      }
+    }
+  }, [clubId, addNotification]);
+
+  useEffect(() => {
+    if (loading || syncedOnce.current) return;
+    syncedOnce.current = true;
+    runSeriesSync(rosters, true).catch(err => console.error('PRO roster sync failed:', err));
+  }, [loading, rosters, runSeriesSync]);
+
+  const seriesWithoutRoster = useMemo(() => findSeriesWithoutRoster(rosters, seriesList), [rosters, seriesList]);
+  const seriesNameById = useMemo(() => new Map(seriesList.map(s => [s.id, s.seriesName])), [seriesList]);
+  const visibleIssues = syncIssues.filter(i => !dismissedIssues.has(i.roundId));
+
+  const dismissIssue = (roundId: string) => {
+    const next = new Set(dismissedIssues); next.add(roundId);
+    setDismissedIssues(next); writeDismissed(next);
+  };
+
+  const handleRemoveIssueRound = async (issue: RosterSyncIssue) => {
+    try {
+      await removeRosterRoundWithTask(issue.roundId);
+      setSyncIssues(prev => prev.filter(i => i.roundId !== issue.roundId));
+      setConfirmRemoveId(null);
+      const latest = await getRosters(clubId);
+      setRosters(latest);
+      addNotification('success', `Removed ${fmtDay(issue.date)} from ${issue.rosterName}`);
+    } catch (err) {
+      console.error('Error removing roster day:', err);
+      addNotification('error', 'Failed to remove that day from the roster');
+    }
+  };
+
+  const memberName = (id: string | null) => {
+    if (!id) return null;
+    const m = members.find(mem => mem.id === id);
+    return m ? `${m.first_name} ${m.last_name}` : 'A member';
+  };
 
   useEffect(() => {
     if (rosters.length > 0 && members.length > 0) {
@@ -144,6 +225,7 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
   const handleRosterCreated = async () => {
     setShowBuilder(false);
     setEditingRoster(null);
+    setPrefillSeriesId(null);
     await fetchRosters();
     const latestRosters = await getRosters(clubId);
     const newestDraft = latestRosters.find(r => r.status === 'draft');
@@ -189,13 +271,13 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
     const groups: RosterGroup[] = [];
     for (const [seriesId, groupRosters] of Array.from(seriesMap.entries())) {
       const sortedRosters = groupRosters.sort((a, b) => a.boat_class.localeCompare(b.boat_class) || a.name.localeCompare(b.name));
-      const seriesName = extractSeriesName(sortedRosters);
+      const seriesName = seriesNameById.get(seriesId) || extractSeriesName(sortedRosters);
       groups.push({ label: seriesName, icon: <Layers size={16} className="text-cyan-400" />, rosters: sortedRosters, seriesId, boatClass: sortedRosters.map(r => r.boat_class).join(', ') });
     }
     groups.sort((a, b) => a.label.localeCompare(b.label));
     singles.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
     return { seriesGroups: groups, singleEventRosters: singles };
-  }, [filteredRosters]);
+  }, [filteredRosters, seriesNameById]);
 
   const toggleGroupCollapse = (groupKey: string) => {
     setCollapsedGroups(prev => {
@@ -302,7 +384,8 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
   if (showBuilder || editingRoster) {
     return (
       <RosterBuilder clubId={clubId} clubName={clubName} members={members} existingRoster={editingRoster}
-        onComplete={handleRosterCreated} onCancel={() => { setShowBuilder(false); setEditingRoster(null); }} darkMode={darkMode} />
+        initialSeriesId={editingRoster ? null : prefillSeriesId}
+        onComplete={handleRosterCreated} onCancel={() => { setShowBuilder(false); setEditingRoster(null); setPrefillSeriesId(null); }} darkMode={darkMode} />
     );
   }
 
@@ -395,6 +478,56 @@ export const ProRosteringPage: React.FC<ProRosteringPageProps> = ({ clubId, club
         <StatCard label="Draft" value={draftCount} icon={<Clock size={18} />} color="" />
         <StatCard label="Members rostered" value={new Set(Array.from(summaries.values()).flatMap(s => s.member_ids)).size} icon={<Users size={18} />} color="" />
       </div>
+
+      {(seriesWithoutRoster.length > 0 || visibleIssues.length > 0) && (
+        <section className="a-card overflow-hidden" aria-label="Rosters needing attention">
+          <div className="a-row" style={{ paddingTop: 16, paddingBottom: 12 }}>
+            <p className="a-cap flex-1">Needs attention</p>
+            <span className="a-dim text-[12.5px]">Kept in step with Race Events &amp; Series</span>
+          </div>
+          {seriesWithoutRoster.map(series => {
+            const upcoming = (series.rounds || []).filter(r => !r.cancelled && r.date).map(r => r.date.slice(0, 10)).sort();
+            return (
+              <div key={series.id} className="a-row flex-wrap">
+                <span className="a-tile a-tile-sm"><CalendarPlus size={16} /></span>
+                <div className="flex-1 min-w-[220px]">
+                  <div className="a-ink text-[14.5px] font-semibold">{series.seriesName}</div>
+                  <div className="a-mute text-[13px] mt-0.5">No PRO roster yet · {upcoming.length} round{upcoming.length !== 1 ? 's' : ''}{upcoming[0] ? ` from ${fmtDay(upcoming[0])}` : ''}</div>
+                </div>
+                <button className="a-btn a-btn-p a-btn-sm" onClick={() => { setPrefillSeriesId(series.id); setShowBuilder(true); }}>
+                  <Plus size={15} /> Create roster
+                </button>
+              </div>
+            );
+          })}
+          {visibleIssues.map(issue => {
+            const who = memberName(issue.memberId);
+            const confirming = confirmRemoveId === issue.roundId;
+            return (
+              <div key={issue.roundId} className="a-row flex-wrap">
+                <span className="a-tile a-tile-sm a-txt-a"><TriangleAlert size={16} /></span>
+                <div className="flex-1 min-w-[220px]">
+                  <div className="a-ink text-[14.5px] font-semibold">{fmtDay(issue.date)} · {issue.rosterName}</div>
+                  <div className="a-mute text-[13px] mt-0.5">
+                    {issue.reason === 'cancelled' ? 'This round was cancelled in the series' : 'This day is no longer in the series'}
+                    {' · '}{who ? <><span className="a-ink">{who}</span> is rostered</> : 'no PRO assigned'}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className="a-btn a-btn-q a-btn-sm" onClick={() => { dismissIssue(issue.roundId); setConfirmRemoveId(null); }}>Keep</button>
+                  {confirming ? (
+                    <button className="a-btn a-btn-d a-btn-sm" onClick={() => handleRemoveIssueRound(issue)}>
+                      <Trash2 size={14} /> {who ? 'Remove day and duty' : 'Remove day'}
+                    </button>
+                  ) : (
+                    <button className="a-btn a-btn-sm" onClick={() => setConfirmRemoveId(issue.roundId)}>Remove from roster</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
 
       {/* View Toggle & Filters */}
       <div className="flex flex-wrap items-center gap-2.5">
@@ -745,7 +878,7 @@ function RosterListDashboard({
                         <div className="a-dim text-[12px] mt-0.5">{roster.series_id || (summary && summary.total_rounds > 1) ? 'Series' : 'One-off'}{summary ? ` · ${summary.total_rounds} round${summary.total_rounds !== 1 ? 's' : ''}` : ''}</div>
                       </div>
                     </div>
-                    <span><span className="a-lb-cls"><svg width="9" height="11" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M1 .75v10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M1.75 1.25h6.5L1.75 5.5z" fill="currentColor" /></svg>{roster.boat_class}</span></span>
+                    <span className="min-w-0"><span className="a-lb-cls max-w-full" title={roster.boat_class}><svg width="9" height="11" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M1 .75v10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><path d="M1.75 1.25h6.5L1.75 5.5z" fill="currentColor" /></svg><span className="truncate">{shortClass(roster.boat_class)}</span></span></span>
                     <span className="a-mute a-num text-[13px]" style={{ letterSpacing: 0 }}>{sameDay ? fmt(roster.start_date, true) : `${fmt(roster.start_date, new Date(roster.start_date).getFullYear() !== new Date(roster.end_date).getFullYear())} – ${fmt(roster.end_date, true)}`}</span>
                     <div>
                       {summary && summary.member_ids.length > 0 ? (
