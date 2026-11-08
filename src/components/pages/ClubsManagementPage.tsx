@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building, Plus, Users, CircleCheck as CheckCircle, Grid2x2 as Grid, List, Eye, UserPlus, DollarSign, CircleAlert as AlertCircle, MapPin as MapPinIcon, Pencil, Trash2, EllipsisVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, Circle as XCircle, Check, X, Shield } from 'lucide-react';
+import { Building, Plus, Users, CircleCheck as CheckCircle, Grid2x2 as Grid, List, Eye, UserPlus, DollarSign, CircleAlert as AlertCircle, MapPin as MapPinIcon, Pencil, Trash2, EllipsisVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, Circle as XCircle, Check, X, Shield, Search } from 'lucide-react';
+import { InlineLoading, KpiCard, OrgLogo, PageHead } from '../association/AssocUI';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { ClubOnboardingWizard } from './ClubOnboardingWizard';
@@ -737,705 +738,301 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
   if (loading) {
     return (
       <div className="h-full overflow-y-auto">
-        <div className="p-4 sm:p-6 lg:p-16">
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
-            <p className={`mt-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Loading clubs...
-            </p>
-          </div>
+        <div className="a-apage">
+          <PageHead icon={<Building size={24} />} title="Member clubs" sub="Loading clubs…" />
+          <InlineLoading label="Loading clubs…" />
         </div>
       </div>
     );
   }
 
+  const totalMembers = clubs.reduce((sum, c) => sum + (c.member_count || 0), 0);
+
+  const clubMenu = (club: Club) => (
+    <div className="relative flex-shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpenMenuId(openMenuId === club.id ? null : club.id)}
+        className="a-ib"
+        aria-label={`More for ${club.name}`}
+        aria-haspopup="menu"
+        aria-expanded={openMenuId === club.id}
+      >
+        <EllipsisVertical size={18} />
+      </button>
+      {openMenuId === club.id && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+          <div className="a-pop absolute right-0 top-full mt-1 w-52 z-20 p-1.5 flex flex-col gap-0.5" role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              className="a-pop-item"
+              onClick={() => {
+                setManageAdminsClub({ id: club.id, name: club.name });
+                setOpenMenuId(null);
+              }}
+            >
+              <Shield size={15} className="a-txt-a" />
+              Manage access
+            </button>
+            <button type="button" role="menuitem" className="a-pop-item" onClick={() => handleEditClub(club.id)}>
+              <Pencil size={15} />
+              Edit club
+            </button>
+            <div className="a-pop-rule" />
+            <button type="button" role="menuitem" className="a-pop-item a-pop-danger" onClick={() => handleDeleteClub(club)}>
+              <Trash2 size={15} />
+              Delete club
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-4 sm:p-6 lg:p-16">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 rounded-xl bg-emerald-600/20">
-              <Building className="text-emerald-400" size={28} />
-            </div>
-            <div>
-              <h1 className={`text-3xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                Member Clubs
-              </h1>
-              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Manage all clubs in your state association
-              </p>
-            </div>
-          </div>
-
-          {/* Search and Actions */}
-          <div className="flex flex-wrap gap-4 items-center justify-between">
+      <div className="a-apage">
+        <PageHead
+          icon={<Building size={24} />}
+          title="Member clubs"
+          sub={`${clubs.length} club${clubs.length === 1 ? '' : 's'} in ${currentOrganization?.name || 'your state association'}`}
+        >
+          <label className="a-field" style={{ width: 260 }}>
+            <Search size={16} />
             <input
               type="text"
-              placeholder="Search clubs..."
+              placeholder="Search clubs"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`flex-1 min-w-[300px] px-4 py-2.5 rounded-lg border ${
-                darkMode
-                  ? 'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500'
-                  : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
-              } focus:outline-none focus:ring-2 focus:ring-emerald-500`}
+              aria-label="Search clubs"
             />
-            <div className="flex items-center gap-3">
-              {/* View Mode Toggle */}
-              <div className="flex items-center gap-2 p-1 rounded-lg bg-slate-700/30 border border-slate-600/50">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded transition-all ${
-                    viewMode === 'grid'
-                      ? 'bg-emerald-500 text-white'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="Grid view"
-                >
-                  <Grid size={16} />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded transition-all ${
-                    viewMode === 'list'
-                      ? 'bg-emerald-500 text-white'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="List view"
-                >
-                  <List size={16} />
-                </button>
-                <button
-                  onClick={() => setViewMode('map')}
-                  className={`p-2 rounded transition-all ${
-                    viewMode === 'map'
-                      ? 'bg-emerald-500 text-white'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="Map view"
-                >
-                  <MapPinIcon size={16} />
-                </button>
-              </div>
+          </label>
+          <div className="a-seg a-seg-ic" role="radiogroup" aria-label="View">
+            {([
+              ['grid', <Grid size={16} key="g" />, 'Cards'],
+              ['list', <List size={16} key="l" />, 'List'],
+              ['map', <MapPinIcon size={16} key="m" />, 'Map'],
+            ] as const).map(([mode, icon, label]) => (
               <button
-                onClick={() => setShowAddClubModal(true)}
-                className="btn-primary-green flex items-center gap-2 px-4 py-2.5 text-white rounded-lg font-medium transition-colors"
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={viewMode === mode}
+                aria-label={label}
+                title={`${label} view`}
+                onClick={() => setViewMode(mode)}
+                className={`a-seg-i ${viewMode === mode ? 'a-seg-on' : ''}`}
               >
-                <Plus size={20} />
-                Add Club
+                {icon}
               </button>
-            </div>
+            ))}
           </div>
-        </div>
+          <button type="button" onClick={() => setShowAddClubModal(true)} className="a-btn a-btn-p">
+            <Plus size={18} />
+            Add club
+          </button>
+        </PageHead>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className={`p-6 rounded-xl border backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white/10 border-slate-200/20'}`}>
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-lg bg-emerald-600/20">
-                <Building className="text-emerald-400" size={24} />
-              </div>
-              <div>
-                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Total Clubs
-                </p>
-                <p className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                  {clubs.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className={`p-6 rounded-xl border backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white/10 border-slate-200/20'}`}>
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-lg bg-amber-600/20">
-                <Clock className="text-amber-400" size={24} />
-              </div>
-              <div>
-                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Pending Approvals
-                </p>
-                <p className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                  {pendingClubs.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className={`p-6 rounded-xl border backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white/10 border-slate-200/20'}`}>
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-lg bg-purple-600/20">
-                <Users className="text-purple-400" size={24} />
-              </div>
-              <div>
-                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Total Members
-                </p>
-                <p className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                  {clubs.reduce((sum, c) => sum + (c.member_count || 0), 0)}
-                </p>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <KpiCard cap="Clubs" value={clubs.length} sub="Member clubs in the association" icon={<Building size={18} />} />
+          <KpiCard
+            cap="Waiting for approval"
+            value={pendingClubs.length}
+            sub={pendingClubs.length ? 'New club registrations to review' : 'No registrations waiting'}
+            icon={<Clock size={18} />}
+            tone={pendingClubs.length ? 'amber' : undefined}
+          />
+          <KpiCard cap="Members" value={totalMembers} sub="Across all member clubs" icon={<Users size={18} />} />
         </div>
 
         {/* Pending Club Approvals */}
         {pendingClubs.length > 0 && (
-          <div className={`mb-8 rounded-xl border ${darkMode ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
-            <div className="p-5 border-b border-amber-500/20">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-amber-500/20">
-                  <Clock className="text-amber-400" size={20} />
+          <section className="a-grp" aria-label="Pending club registrations">
+            <div className="a-lnk a-grp-head">
+              <span className="a-tile a-tile-sm a-txt-a"><Clock size={16} /></span>
+              <span className="flex-1 min-w-0">
+                <span className="block a-ink text-[15px] font-semibold">Pending club registrations</span>
+                <span className="block a-dim text-xs mt-0.5">{pendingClubs.length} club{pendingClubs.length !== 1 ? 's' : ''} waiting for your approval</span>
+              </span>
+              <span className="a-cnt a-cnt-amber">{pendingClubs.length}</span>
+            </div>
+            {pendingClubs.map((club) => (
+              <div key={club.id} className="a-lnk items-start flex-wrap">
+                <OrgLogo name={club.name} small />
+                <div className="flex-1 min-w-[220px]">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="a-ink text-[14.5px] font-semibold">{club.name}</span>
+                    {club.abbreviation && <span className="a-lb-fmt">{club.abbreviation}</span>}
+                  </div>
+                  {club.club_introduction && (
+                    <p className="a-mute text-[13px] line-clamp-2 mt-1">{club.club_introduction}</p>
+                  )}
+                  <div className="a-meta-row mt-1.5">
+                    {club.location && <span><MapPinIcon size={12} />{club.location}</span>}
+                    {club.registrant_email && <span>Registered by {club.registrant_email}</span>}
+                    <span>{new Date(club.created_at).toLocaleDateString('en-AU', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                  </div>
                 </div>
-                <div>
-                  <h3 className={`text-lg font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                    Pending Club Registrations
-                  </h3>
-                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    {pendingClubs.length} club{pendingClubs.length !== 1 ? 's' : ''} awaiting your approval
-                  </p>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button type="button" onClick={() => handleRejectClub(club.id)} className="a-btn a-btn-d a-btn-sm">
+                    <X size={14} />
+                    Reject
+                  </button>
+                  <button type="button" onClick={() => handleApproveClub(club.id)} className="a-btn a-btn-p a-btn-sm">
+                    <Check size={14} />
+                    Approve
+                  </button>
                 </div>
               </div>
-            </div>
-            <div className="divide-y divide-amber-500/10">
-              {pendingClubs.map((club) => (
-                <div key={club.id} className="p-5 flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        darkMode ? 'bg-slate-700' : 'bg-slate-100'
-                      }`}>
-                        <Building className={darkMode ? 'text-slate-400' : 'text-slate-500'} size={20} />
-                      </div>
-                      <div>
-                        <h4 className={`font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                          {club.name}
-                        </h4>
-                        <div className="flex items-center gap-3 text-xs">
-                          {club.abbreviation && (
-                            <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>{club.abbreviation}</span>
-                          )}
-                          {club.location && (
-                            <span className={`flex items-center gap-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                              <MapPinIcon size={10} /> {club.location}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {club.club_introduction && (
-                      <p className={`text-sm line-clamp-2 mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {club.club_introduction}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-4 text-xs">
-                      {club.registrant_email && (
-                        <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>
-                          Registered by: {club.registrant_email}
-                        </span>
-                      )}
-                      <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>
-                        {new Date(club.created_at).toLocaleDateString('en-AU', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => handleRejectClub(club.id)}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        darkMode
-                          ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20'
-                          : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
-                      }`}
-                    >
-                      <X size={14} />
-                      Reject
-                    </button>
-                    <button
-                      onClick={() => handleApproveClub(club.id)}
-                      className="btn-primary-green flex items-center gap-1.5 px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors"
-                    >
-                      <Check size={14} />
-                      Approve
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+            ))}
+          </section>
         )}
 
         {/* Clubs Display */}
         {filteredClubs.length === 0 ? (
-          <div className={`text-center py-16 rounded-xl border backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white/10 border-slate-200/20'}`}>
-            <Building size={64} className={`mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
-            <h3 className={`text-xl font-semibold mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              {searchQuery ? 'No clubs found' : 'No clubs yet'}
-            </h3>
-            <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-              {searchQuery ? 'Try a different search term' : 'Get started by adding your first club'}
-            </p>
+          <div className="a-card a-empty py-16 px-6">
+            <span className="a-tile" style={{ width: 56, height: 56 }}><Building size={24} /></span>
+            <div className="a-display a-ink text-lg font-semibold">{searchQuery ? 'No clubs found' : 'No clubs yet'}</div>
+            <p className="a-mute m-0 text-sm">{searchQuery ? 'Try a different search.' : 'Add your first member club to get started.'}</p>
           </div>
         ) : viewMode === 'map' ? (
-          <div className="relative w-full rounded-xl overflow-hidden border border-slate-700/50 shadow-2xl" style={{ height: 'calc(100vh - 450px)', minHeight: '500px' }}>
+          <div className="a-card relative w-full overflow-hidden" style={{ height: 'calc(100vh - 420px)', minHeight: 500 }}>
             <div ref={mapRef} className="w-full h-full" />
             {!mapLoaded && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-800/90 backdrop-blur-sm">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-                  <p className="text-slate-300 font-medium">Loading map...</p>
-                </div>
-              </div>
+              <div className="absolute inset-0"><InlineLoading label="Loading map…" /></div>
             )}
             {mapLoaded && filteredClubs.filter(c => c.default_venue).length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-800/90 backdrop-blur-sm pointer-events-none">
-                <div className="text-center px-4">
-                  <MapPinIcon size={64} className="mx-auto mb-4 text-slate-600" />
-                  <h3 className="text-xl font-semibold mb-2 text-slate-300">No Club Locations</h3>
-                  <p className="text-slate-400">
-                    Clubs need to set a default venue to appear on the map
-                  </p>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ background: 'rgba(6,11,22,0.72)' }}>
+                <div className="a-empty px-6">
+                  <span className="a-tile" style={{ width: 56, height: 56 }}><MapPinIcon size={24} /></span>
+                  <div className="a-display a-ink text-lg font-semibold">No club locations yet</div>
+                  <p className="a-mute m-0 text-sm">Clubs appear on the map once they set a default venue.</p>
                 </div>
               </div>
             )}
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {filteredClubs.map((club) => (
-              <div
-                key={club.id}
-                className={`group flex flex-col p-6 rounded-xl border backdrop-blur-sm transition-all hover:shadow-lg ${
-                  darkMode
-                    ? 'bg-slate-800/30 border-slate-700/50 hover:border-emerald-500/50'
-                    : 'bg-white/10 border-slate-200/20 hover:border-emerald-300'
-                }`}
-              >
+              <article key={club.id} className="a-card a-clubcard">
                 {/* Header with Logo */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {club.logo ? (
-                      <img
-                        src={club.logo}
-                        alt={club.name}
-                        className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        darkMode ? 'bg-slate-700' : 'bg-slate-100'
-                      }`}>
-                        <Building className={darkMode ? 'text-slate-500' : 'text-slate-400'} size={24} />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold text-lg truncate ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                        {club.name}
-                      </h3>
-                      {club.abbreviation && (
-                        <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          {club.abbreviation}
-                        </p>
-                      )}
-                    </div>
+                <div className="flex items-start gap-3">
+                  <OrgLogo src={club.logo} name={club.name} />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="a-ink text-[16px] font-semibold leading-snug truncate" title={club.name}>{club.name}</h3>
+                    {club.abbreviation && <p className="a-dim text-[13px] mt-0.5">{club.abbreviation}</p>}
                   </div>
-                  <div className="relative flex-shrink-0">
-                    <button
-                      onClick={() => setOpenMenuId(openMenuId === club.id ? null : club.id)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        darkMode
-                          ? 'hover:bg-slate-700 text-slate-400 hover:text-slate-200'
-                          : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <EllipsisVertical size={18} />
-                    </button>
-                    {openMenuId === club.id && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-10"
-                          onClick={() => setOpenMenuId(null)}
-                        />
-                        <div className={`absolute right-0 top-full mt-1 w-48 rounded-lg border shadow-lg z-20 ${
-                          darkMode
-                            ? 'bg-slate-800 border-slate-700'
-                            : 'bg-white border-slate-200'
-                        }`}>
-                          <button
-                            onClick={() => {
-                              setManageAdminsClub({ id: club.id, name: club.name });
-                              setOpenMenuId(null);
-                            }}
-                            className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
-                              darkMode
-                                ? 'text-amber-300 hover:bg-slate-700'
-                                : 'text-amber-700 hover:bg-amber-50'
-                            }`}
-                          >
-                            <Shield size={14} />
-                            Manage Access
-                          </button>
-                          <button
-                            onClick={() => handleEditClub(club.id)}
-                            className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
-                              darkMode
-                                ? 'text-slate-300 hover:bg-slate-700'
-                                : 'text-slate-700 hover:bg-slate-50'
-                            }`}
-                          >
-                            <Pencil size={14} />
-                            Edit Club
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClub(club)}
-                            className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors text-red-400 ${
-                              darkMode ? 'hover:bg-slate-700' : 'hover:bg-red-50'
-                            }`}
-                          >
-                            <Trash2 size={14} />
-                            Delete Club
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  {clubMenu(club)}
                 </div>
 
-                {/* Sailing Days - fixed height area */}
-                <div className="mb-3 min-h-[40px]">
+                {/* Sailing days */}
+                <div className="a-clubcard-sec">
+                  <p className="a-cap flex items-center gap-1.5"><Calendar size={12} />Regular sailing</p>
                   {club.sailing_days && club.sailing_days.length > 0 ? (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Calendar size={14} className="text-blue-400" />
-                        <span className="text-xs font-medium text-blue-400">REGULAR SAILING</span>
-                      </div>
+                    <>
                       {club.sailing_days.slice(0, 3).map((day) => (
-                        <div key={day.id} className="flex items-center gap-2 text-xs flex-wrap">
-                          <Clock size={12} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
-                          <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            {day.day_of_week}
-                          </span>
+                        <div key={day.id} className="a-sail">
+                          <span className="a-sail-day">{day.day_of_week}</span>
                           {day.frequency && day.frequency !== 'every_week' && (
-                            <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 text-xs">
-                              {day.frequency === 'week_a' ? 'Wk A' : 'Wk B'}
-                            </span>
+                            <span className="a-wk">{day.frequency === 'week_a' ? 'Wk A' : 'Wk B'}</span>
                           )}
-                          <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                            {day.start_time.substring(0, 5)} - {day.end_time.substring(0, 5)}
-                          </span>
-                          {day.boat_class_name && (
-                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-xs">
-                              {day.boat_class_name}
-                            </span>
-                          )}
+                          <span className="a-dim a-num">{day.start_time.substring(0, 5)} – {day.end_time.substring(0, 5)}</span>
+                          {day.boat_class_name && <span className="a-lb-fmt" style={{ height: 22, fontSize: 11.5 }}>{day.boat_class_name}</span>}
                         </div>
                       ))}
-                      {club.sailing_days.length > 3 && (
-                        <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                          +{club.sailing_days.length - 3} more
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Clock size={14} className={darkMode ? 'text-slate-600' : 'text-slate-400'} />
-                      <p className={`text-xs italic ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
-                        No sailing days defined
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Boat Classes - fixed height area */}
-                <div className="mb-4 min-h-[52px]">
-                  {club.boat_classes && club.boat_classes.length > 0 ? (
-                    <>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Anchor size={14} className={darkMode ? 'text-sky-400' : 'text-sky-600'} />
-                        <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Classes Sailed
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {club.boat_classes.slice(0, 4).map((boatClass, index) => (
-                          <span
-                            key={index}
-                            className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                              darkMode
-                                ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
-                                : 'bg-sky-100 text-sky-700 border border-sky-200'
-                            }`}
-                          >
-                            {boatClass}
-                          </span>
-                        ))}
-                        {club.boat_classes.length > 4 && (
-                          <span
-                            className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                              darkMode
-                                ? 'bg-slate-700 text-slate-400'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            +{club.boat_classes.length - 4}
-                          </span>
-                        )}
-                      </div>
+                      {club.sailing_days.length > 3 && <span className="a-dim text-xs">+{club.sailing_days.length - 3} more</span>}
                     </>
                   ) : (
-                    <div className="flex items-center gap-1.5">
-                      <Anchor size={14} className={darkMode ? 'text-slate-600' : 'text-slate-400'} />
-                      <span className={`text-xs italic ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
-                        No classes recorded
-                      </span>
-                    </div>
+                    <span className="a-dim text-[13px]">No sailing days set</span>
                   )}
                 </div>
 
-                {/* Bottom section - pushed to bottom */}
-                <div className="mt-auto space-y-3">
-                  {/* Activity Stats Grid */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className={`p-3 rounded-lg border ${
-                      darkMode
-                        ? 'bg-slate-700/30 border-slate-600/50'
-                        : 'bg-slate-50 border-slate-200'
-                    }`}>
-                      <div className="flex items-center justify-center mb-1">
-                        <Calendar size={18} className={darkMode ? 'text-blue-400' : 'text-blue-600'} />
-                      </div>
-                      <div className={`text-lg font-bold text-center ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                        {club.upcoming_events || 0}
-                      </div>
-                      <div className={`text-xs text-center ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Events
-                      </div>
+                {/* Boat classes */}
+                <div className="a-clubcard-sec">
+                  <p className="a-cap flex items-center gap-1.5"><Anchor size={12} />Classes sailed</p>
+                  {club.boat_classes && club.boat_classes.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {club.boat_classes.slice(0, 4).map((boatClass, index) => (
+                        <span key={index} className="a-lb-cls" title={boatClass}>{boatClass}</span>
+                      ))}
+                      {club.boat_classes.length > 4 && <span className="a-lb-fmt">+{club.boat_classes.length - 4}</span>}
                     </div>
+                  ) : (
+                    <span className="a-dim text-[13px]">No classes recorded</span>
+                  )}
+                </div>
 
-                    <div className={`p-3 rounded-lg border ${
-                      darkMode
-                        ? 'bg-slate-700/30 border-slate-600/50'
-                        : 'bg-slate-50 border-slate-200'
-                    }`}>
-                      <div className="flex items-center justify-center mb-1">
-                        <Trophy size={18} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+                {/* Bottom section */}
+                <div className="mt-auto flex flex-col gap-3">
+                  <div className="a-wells">
+                    {([
+                      [<Calendar size={15} key="e" />, club.upcoming_events || 0, 'Events'],
+                      [<Trophy size={15} key="r" />, club.recent_results || 0, 'Results'],
+                      [<Users size={15} key="m" />, club.member_count || 0, 'Members'],
+                    ] as const).map(([icon, n, label]) => (
+                      <div key={label} className="a-well">
+                        {icon}
+                        <span className={`a-well-n ${n ? '' : 'is-zero'}`}>{n}</span>
+                        <span className="a-well-l">{label}</span>
                       </div>
-                      <div className={`text-lg font-bold text-center ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                        {club.recent_results || 0}
-                      </div>
-                      <div className={`text-xs text-center ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Results
-                      </div>
-                    </div>
-
-                    <div className={`p-3 rounded-lg border ${
-                      darkMode
-                        ? 'bg-slate-700/30 border-slate-600/50'
-                        : 'bg-slate-50 border-slate-200'
-                    }`}>
-                      <div className="flex items-center justify-center mb-1">
-                        <Users size={18} className={darkMode ? 'text-emerald-400' : 'text-emerald-600'} />
-                      </div>
-                      <div className={`text-lg font-bold text-center ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                        {club.member_count || 0}
-                      </div>
-                      <div className={`text-xs text-center ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Members
-                      </div>
-                    </div>
+                    ))}
                   </div>
 
                   {(club.pending_payments || 0) > 0 && (
-                    <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${
-                      darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
-                    }`}>
-                      <span className={`flex items-center gap-1.5 ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
-                        <DollarSign size={14} />
-                        Pending Payments
-                      </span>
-                      <span className={`font-bold ${darkMode ? 'text-red-200' : 'text-red-800'}`}>
-                        ${(club.pending_payments || 0).toFixed(2)}
-                      </span>
+                    <div className="a-due">
+                      <DollarSign size={15} />
+                      Payments due to the association
+                      <b>${(club.pending_payments || 0).toFixed(2)}</b>
                     </div>
                   )}
 
-                  {/* Actions - always at very bottom */}
-                  <button
-                    onClick={() => handleViewClub(club.id)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg font-medium transition-all"
-                  >
+                  <button type="button" onClick={() => handleViewClub(club.id)} className="a-btn w-full justify-center">
                     <Eye size={16} />
-                    View Members
+                    View members
                   </button>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="a-card overflow-visible">
             {filteredClubs.map((club) => (
-              <div
-                key={club.id}
-                className={`p-4 rounded-xl border backdrop-blur-sm transition-all ${
-                  darkMode
-                    ? 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-700/50'
-                    : 'bg-white/10 border-slate-200/20 hover:bg-white/10'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1">
-                    {club.logo ? (
-                      <img
-                        src={club.logo}
-                        alt={club.name}
-                        className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        darkMode ? 'bg-slate-700' : 'bg-slate-100'
-                      }`}>
-                        <Building className={darkMode ? 'text-slate-500' : 'text-slate-400'} size={24} />
-                      </div>
+              <div key={club.id} className="a-clubrow">
+                <OrgLogo src={club.logo} name={club.name} />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="a-ink text-[15px] font-semibold truncate">{club.name}</span>
+                    {club.abbreviation && <span className="a-lb-fmt">{club.abbreviation}</span>}
+                  </div>
+                  {club.boat_classes && club.boat_classes.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {club.boat_classes.slice(0, 3).map((boatClass, index) => (
+                        <span key={index} className="a-lb-cls">{boatClass}</span>
+                      ))}
+                      {club.boat_classes.length > 3 && <span className="a-lb-fmt">+{club.boat_classes.length - 3}</span>}
+                    </div>
+                  )}
+                  <div className="a-meta-row mt-2">
+                    <span><Users size={12} />{club.member_count || 0} members</span>
+                    <span><Calendar size={12} />{club.upcoming_events || 0} events</span>
+                    <span><Trophy size={12} />{club.recent_results || 0} results</span>
+                    {(club.pending_applications || 0) > 0 && (
+                      <span className="a-txt-a"><AlertCircle size={12} />{club.pending_applications} pending</span>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className={`font-semibold text-lg ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                          {club.name}
-                        </h3>
-                        {club.abbreviation && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {club.abbreviation}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Boat Classes */}
-                      {club.boat_classes && club.boat_classes.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-2">
-                          {club.boat_classes.slice(0, 3).map((boatClass, index) => (
-                            <span
-                              key={index}
-                              className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                                darkMode
-                                  ? 'bg-sky-500/20 text-sky-300'
-                                  : 'bg-sky-100 text-sky-700'
-                              }`}
-                            >
-                              {boatClass}
-                            </span>
-                          ))}
-                          {club.boat_classes.length > 3 && (
-                            <span className={`px-2 py-0.5 text-xs rounded-full ${
-                              darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              +{club.boat_classes.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-6 text-xs flex-wrap">
-                        <span className={`flex items-center gap-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          <Users size={12} />
-                          {club.member_count || 0} members
-                        </span>
-                        <span className={`flex items-center gap-1 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                          <Calendar size={12} />
-                          {club.upcoming_events || 0} events
-                        </span>
-                        <span className={`flex items-center gap-1 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
-                          <Trophy size={12} />
-                          {club.recent_results || 0} results
-                        </span>
-                        {(club.pending_applications || 0) > 0 && (
-                          <span className="flex items-center gap-1 text-orange-400">
-                            <AlertCircle size={12} />
-                            {club.pending_applications} pending
-                          </span>
-                        )}
-                        {(club.pending_payments || 0) > 0 && (
-                          <span className="flex items-center gap-1 text-red-400">
-                            <DollarSign size={12} />
-                            ${(club.pending_payments || 0).toFixed(2)} pending
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    {(club.pending_payments || 0) > 0 && (
+                      <span className="a-txt-r"><DollarSign size={12} />${(club.pending_payments || 0).toFixed(2)} due</span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleViewClub(club.id)}
-                      className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg font-medium transition-all flex items-center gap-2 text-sm"
-                    >
-                      <Eye size={14} />
-                      View Members
-                    </button>
-                    <div className="relative">
-                      <button
-                        onClick={() => setOpenMenuId(openMenuId === club.id ? null : club.id)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          darkMode
-                            ? 'hover:bg-slate-700 text-slate-400 hover:text-slate-200'
-                            : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        <EllipsisVertical size={18} />
-                      </button>
-                      {openMenuId === club.id && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setOpenMenuId(null)}
-                          />
-                          <div className={`absolute right-0 top-full mt-1 w-48 rounded-lg border shadow-lg z-20 ${
-                            darkMode
-                              ? 'bg-slate-800 border-slate-700'
-                              : 'bg-white border-slate-200'
-                          }`}>
-                            <button
-                              onClick={() => {
-                                setManageAdminsClub({ id: club.id, name: club.name });
-                                setOpenMenuId(null);
-                              }}
-                              className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
-                                darkMode
-                                  ? 'text-amber-300 hover:bg-slate-700'
-                                  : 'text-amber-700 hover:bg-amber-50'
-                              }`}
-                            >
-                              <Shield size={14} />
-                              Manage Access
-                            </button>
-                            <button
-                              onClick={() => handleEditClub(club.id)}
-                              className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
-                                darkMode
-                                  ? 'text-slate-300 hover:bg-slate-700'
-                                  : 'text-slate-700 hover:bg-slate-50'
-                              }`}
-                            >
-                              <Pencil size={14} />
-                              Edit Club
-                            </button>
-                            <button
-                              onClick={() => handleDeleteClub(club)}
-                              className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors text-red-400 ${
-                                darkMode ? 'hover:bg-slate-700' : 'hover:bg-red-50'
-                              }`}
-                            >
-                              <Trash2 size={14} />
-                              Delete Club
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button type="button" onClick={() => handleViewClub(club.id)} className="a-btn a-btn-sm">
+                    <Eye size={14} />
+                    View members
+                  </button>
+                  {clubMenu(club)}
                 </div>
               </div>
             ))}
@@ -1475,7 +1072,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
         />
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Manage club admins */}
       {manageAdminsClub && (
         <ManageClubAdminsModal
           isOpen={!!manageAdminsClub}
@@ -1486,52 +1083,36 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
         />
       )}
 
+      {/* Delete Confirmation */}
       {showDeleteConfirm && clubToDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`w-full max-w-md rounded-xl shadow-2xl ${
-            darkMode ? 'bg-slate-800' : 'bg-white'
-          }`}>
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-3 rounded-lg bg-red-500/20">
-                  <Trash2 className="text-red-400" size={24} />
-                </div>
-                <div>
-                  <h3 className={`text-lg font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                    Delete Club
-                  </h3>
-                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    This action cannot be undone
-                  </p>
-                </div>
+        <div className="a-confirm a-veil backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Delete club">
+          <div className="a-sheet">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="a-tile a-txt-r" style={{ width: 46, height: 46 }}><Trash2 size={20} /></span>
+              <div>
+                <h3 className="a-display a-ink text-lg font-semibold">Delete club</h3>
+                <p className="a-dim text-[13px]">This can't be undone</p>
               </div>
-
-              <p className={`mb-6 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                Are you sure you want to delete <strong>{clubToDelete.name}</strong>?
-                This will permanently remove the club and all associated data.
-              </p>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowDeleteConfirm(false);
-                    setClubToDelete(null);
-                  }}
-                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
-                    darkMode
-                      ? 'bg-slate-700 hover:bg-slate-600 text-slate-100'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-900'
-                  }`}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDeleteClub}
-                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
-                >
-                  Delete Club
-                </button>
-              </div>
+            </div>
+            <p className="a-mute text-[14px] mb-6">
+              Are you sure you want to delete <strong className="a-ink">{clubToDelete.name}</strong>?
+              This permanently removes the club and all its data.
+            </p>
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setClubToDelete(null);
+                }}
+                className="a-btn flex-1"
+                style={{ height: 44 }}
+              >
+                Cancel
+              </button>
+              <button type="button" onClick={confirmDeleteClub} className="a-btn a-btn-d flex-1" style={{ height: 44 }}>
+                Delete club
+              </button>
             </div>
           </div>
         </div>

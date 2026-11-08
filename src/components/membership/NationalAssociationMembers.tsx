@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { Users, Search, Download, Mail, Phone, Building2, CircleCheck as CheckCircle2, ArrowUpRight, MapPin, Upload, Eye, UserPlus, DollarSign, Trash2, X, Pencil, Smartphone, Loader as Loader2, Hop as Home } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
+import { Avatar } from '../ui/Avatar';
+import { InlineLoading, KpiCard, PageHead } from '../association/AssocUI';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
 import Papa from 'papaparse';
@@ -457,9 +459,10 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+      <div className="h-full overflow-y-auto">
+        <div className="a-apage">
+          <PageHead icon={<Users size={24} />} title="Members" sub="Loading members…" />
+          <InlineLoading label="Loading members…" />
         </div>
       </div>
     );
@@ -467,198 +470,99 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
 
   if (error) {
     return (
-      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} p-8`}>
-        <div className={`p-4 rounded-lg ${darkMode ? 'bg-red-900/20 text-red-400' : 'bg-red-50 text-red-600'}`}>
-          <p>Error loading members: {error}</p>
+      <div className="h-full overflow-y-auto">
+        <div className="a-apage">
+          <PageHead icon={<Users size={24} />} title="Members" />
+          <div className="a-note a-note-r"><span className="text-sm">Error loading members: {error}</span></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} p-8`}>
-      {/* Page Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-2">
-          <div className={`p-3 rounded-xl ${darkMode ? 'bg-blue-600' : 'bg-blue-500'}`}>
-            <Users className="text-white" size={28} />
-          </div>
-          <div>
-            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              Members
-            </h1>
-            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              {stats.totalMembers} total members across {stats.totalStates} state associations and {stats.totalClubs} clubs
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-        <div className={`p-6 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Members</p>
-              <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mt-2`}>
-                {stats.totalMembers}
-              </p>
-            </div>
-            <Users className={`${darkMode ? 'text-blue-400' : 'text-blue-500'}`} size={32} />
-          </div>
-        </div>
-
-        <div className={`p-6 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Financial</p>
-              <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mt-2`}>
-                {stats.financialMembers}
-              </p>
-            </div>
-            <Users className="text-green-500" size={32} />
-          </div>
-        </div>
-
-        <div className={`p-6 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>State Assocs</p>
-              <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mt-2`}>
-                {stats.totalStates}
-              </p>
-            </div>
-            <MapPin className={`${darkMode ? 'text-purple-400' : 'text-purple-500'}`} size={32} />
-          </div>
-        </div>
-
-        <div className={`p-6 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Member Clubs</p>
-              <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mt-2`}>
-                {stats.totalClubs}
-              </p>
-            </div>
-            <Building2 className={`${darkMode ? 'text-indigo-400' : 'text-indigo-500'}`} size={32} />
-          </div>
-        </div>
-
-        <div className={`p-6 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Filtered</p>
-              <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mt-2`}>
-                {stats.filteredCount}
-              </p>
-            </div>
-            <Search className={`${darkMode ? 'text-orange-400' : 'text-orange-500'}`} size={32} />
-          </div>
-        </div>
-      </div>
-
-      {/* Search and Filters */}
-      <div className={`p-6 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm border ${darkMode ? 'border-gray-700' : 'border-gray-200'} mb-6`}>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="md:col-span-2">
-            <div className="relative">
-              <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} size={20} />
-              <input
-                type="text"
-                placeholder="Search members..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2 rounded-lg border ${
-                  darkMode
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-              />
-            </div>
-          </div>
-
-          <select
-            value={selectedState}
-            onChange={(e) => {
-              setSelectedState(e.target.value);
-              setSelectedClub('all');
-            }}
-            className={`px-4 py-2 rounded-lg border ${
-              darkMode
-                ? 'bg-gray-700 border-gray-600 text-white'
-                : 'bg-white border-gray-300 text-gray-900'
-            } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-          >
-            <option value="all">All States</option>
-            {stateAssociations.map((state) => (
-              <option key={state.id} value={state.id}>
-                {state.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedClub}
-            onChange={(e) => setSelectedClub(e.target.value)}
-            className={`px-4 py-2 rounded-lg border ${
-              darkMode
-                ? 'bg-gray-700 border-gray-600 text-white'
-                : 'bg-white border-gray-300 text-gray-900'
-            } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-          >
-            <option value="all">All Clubs</option>
-            {availableClubs.map((club) => (
-              <option key={club.id} value={club.id}>
-                {club.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className={`px-4 py-2 rounded-lg border ${
-              darkMode
-                ? 'bg-gray-700 border-gray-600 text-white'
-                : 'bg-white border-gray-300 text-gray-900'
-            } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-          >
-            <option value="all">All Status</option>
-            <option value="financial">Financial</option>
-            <option value="unfinancial">Unfinancial</option>
-          </select>
-        </div>
-
-        <div className="flex justify-end mt-4 gap-2">
-          <button
-            onClick={() => setShowImportModal(true)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-              darkMode
-                ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                : 'bg-slate-200 hover:bg-slate-300 text-gray-900'
-            } transition-colors`}
-          >
-            <Upload size={18} />
-            Import Members
+    <div className="h-full overflow-y-auto">
+    <div className="a-apage">
+      <PageHead
+        icon={<Users size={24} />}
+        title="Members"
+        sub={`${stats.totalMembers} members across ${stats.totalStates} state associations and ${stats.totalClubs} clubs`}
+      >
+        <div className="flex items-center gap-2 flex-wrap">
+          <button type="button" onClick={() => setShowImportModal(true)} className="a-btn">
+            <Upload size={17} />
+            Import
           </button>
-          <button
-            onClick={exportToCSV}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-              darkMode
-                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-blue-500 hover:bg-blue-600 text-white'
-            } transition-colors`}
-          >
-            <Download size={18} />
+          <button type="button" onClick={exportToCSV} className="a-btn a-btn-p">
+            <Download size={17} />
             Export CSV
           </button>
         </div>
+      </PageHead>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        <KpiCard cap="Members" value={stats.totalMembers} sub="Across all state associations" icon={<Users size={18} />} />
+        <KpiCard cap="Financial" value={stats.financialMembers} sub={`${stats.totalMembers ? Math.round((stats.financialMembers / stats.totalMembers) * 100) : 0}% of members`} icon={<CheckCircle2 size={18} />} tone="green" />
+        <KpiCard cap="State associations" value={stats.totalStates} sub={`${stats.totalClubs} member clubs`} icon={<MapPin size={18} />} />
+        <KpiCard cap="Showing" value={stats.filteredCount} sub="Match your search and filters" icon={<Search size={18} />} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2.5">
+        <label className="a-field flex-1 min-w-[240px]">
+          <Search size={17} />
+          <input
+            type="text"
+            placeholder="Search members"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Search members"
+          />
+        </label>
+        <select
+          value={selectedState}
+          onChange={(e) => {
+            setSelectedState(e.target.value);
+            setSelectedClub('all');
+          }}
+          className="a-pick"
+          aria-label="State association"
+        >
+          <option value="all">All states</option>
+          {stateAssociations.map((state) => (
+            <option key={state.id} value={state.id}>
+              {state.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={selectedClub}
+          onChange={(e) => setSelectedClub(e.target.value)}
+          className="a-pick"
+          style={{ maxWidth: 280 }}
+          aria-label="Club"
+        >
+          <option value="all">All clubs</option>
+          {availableClubs.map((club) => (
+            <option key={club.id} value={club.id}>
+              {club.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={selectedStatus}
+          onChange={(e) => setSelectedStatus(e.target.value)}
+          className="a-pick"
+          aria-label="Status"
+        >
+          <option value="all">All statuses</option>
+          <option value="financial">Financial</option>
+          <option value="unfinancial">Unfinancial</option>
+        </select>
       </div>
 
       {selectedMemberIds.size > 0 && (
-        <div className="mb-4 p-4 rounded-xl bg-blue-600/10 border border-blue-500/30">
+        <div className="a-bulkbar">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <span className="text-sm text-blue-300 font-medium">
+            <span className="a-ink text-sm font-semibold">
               {selectedMemberIds.size} member{selectedMemberIds.size !== 1 ? 's' : ''} selected
             </span>
             <div className="flex items-center gap-2 flex-wrap">
@@ -676,7 +580,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                           setShowDefaultClubModal(true);
                         }}
                         disabled={bulkProcessing}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
+                        className="a-btn a-btn-sm"
                       >
                         <Home size={15} />
                         Set Default Club
@@ -685,7 +589,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                     <button
                       onClick={() => setShowAddToClubModal(true)}
                       disabled={bulkProcessing}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
+                      className="a-btn a-btn-sm"
                     >
                       <UserPlus size={15} />
                       Add to Club
@@ -694,7 +598,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                       <button
                         onClick={handleBulkActivate}
                         disabled={bulkProcessing || activating}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium transition disabled:opacity-50"
+                        className="a-btn a-btn-sm"
                       >
                         {activating ? <Loader2 size={15} className="animate-spin" /> : <Smartphone size={15} />}
                         Activate for App
@@ -706,7 +610,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
               <button
                 onClick={() => handleBulkSetFinancial(true)}
                 disabled={bulkProcessing}
-                className="btn-primary-green flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-sm font-medium transition disabled:opacity-50"
+                className="a-btn a-btn-g a-btn-sm"
               >
                 <DollarSign size={15} />
                 Set Financial
@@ -714,7 +618,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
               <button
                 onClick={() => handleBulkSetFinancial(false)}
                 disabled={bulkProcessing}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium transition disabled:opacity-50"
+                className="a-btn a-btn-a a-btn-sm"
               >
                 <DollarSign size={15} />
                 Set Unfinancial
@@ -722,14 +626,14 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
               <button
                 onClick={handleBulkDelete}
                 disabled={bulkProcessing}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition disabled:opacity-50"
+                className="a-btn a-btn-d a-btn-sm"
               >
                 <Trash2 size={15} />
                 Delete
               </button>
               <button
                 onClick={() => setSelectedMemberIds(new Set())}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition"
+                className="a-btn a-btn-q a-btn-sm"
               >
                 <X size={15} />
                 Clear
@@ -740,89 +644,78 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
       )}
 
       {/* Members Table */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
+      <div className="a-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-700/50">
+          <table className="w-full a-atable">
+            <thead>
               <tr>
                 <th className="px-3 py-3 text-left w-10">
                   <input
                     type="checkbox"
                     checked={filteredMembers.length > 0 && selectedMemberIds.size === filteredMembers.length}
                     onChange={toggleSelectAll}
-                    className="rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                    className="rounded"
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-left">
                   Member
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-left">
                   State
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-left">
                   Club
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-left">
                   Contact
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-left">
                   Financial Status
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-left">
                   Dates
                 </th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-slate-300 w-16">
-                </th>
+                <th className="px-4 py-3 text-right w-16"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody>
               {filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
-                    No members found
+                  <td colSpan={9} className="px-4 py-12 text-center a-mute">
+                    No members match your search and filters
                   </td>
                 </tr>
               ) : (
                 filteredMembers.map((member) => (
-                  <tr key={member.id} className={`hover:bg-slate-700/30 ${selectedMemberIds.has(member.id) ? 'bg-blue-900/20' : ''}`}>
+                  <tr key={member.id} className={selectedMemberIds.has(member.id) ? 'is-sel' : ''}>
                     <td className="px-3 py-4">
                       <input
                         type="checkbox"
                         checked={selectedMemberIds.has(member.id)}
                         onChange={() => toggleMemberSelection(member.id)}
-                        className="rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                        className="rounded"
                       />
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
-                        {member.avatar_url ? (
-                          <img
-                            src={member.avatar_url}
-                            alt={`${member.first_name} ${member.last_name}`}
-                            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                            {member.first_name?.[0]}{member.last_name?.[0]}
-                          </div>
-                        )}
-                        <span className="text-white font-medium">
+                        <Avatar firstName={member.first_name} lastName={member.last_name} src={member.avatar_url || undefined} size="md" />
+                        <span className="a-ink font-semibold whitespace-nowrap">
                           {member.first_name} {member.last_name}
                         </span>
                       </div>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
-                        <MapPin size={16} className="text-slate-400" />
-                        <span className="text-sm text-slate-300">
+                        <MapPin size={15} className="a-dim flex-shrink-0" />
+                        <span className="text-sm a-mute truncate max-w-[190px]" title={member.state_association_name}>
                           {member.state_association_name}
                         </span>
                       </div>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
-                        <Building2 size={16} className="text-slate-400" />
-                        <span className="text-sm text-slate-300">
+                        <Building2 size={15} className="a-dim flex-shrink-0" />
+                        <span className="text-sm a-mute truncate max-w-[210px]" title={member.club_name}>
                           {member.club_name}
                         </span>
                       </div>
@@ -830,14 +723,14 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                     <td className="px-4 py-4">
                       <div className="space-y-1">
                         {member.email && (
-                          <div className="flex items-center gap-2 text-sm text-slate-300">
-                            <Mail size={14} className="text-slate-400" />
+                          <div className="flex items-center gap-2 text-sm a-mute">
+                            <Mail size={14} className="a-dim" />
                             {member.email}
                           </div>
                         )}
                         {member.phone && (
-                          <div className="flex items-center gap-2 text-sm text-slate-300">
-                            <Phone size={14} className="text-slate-400" />
+                          <div className="flex items-center gap-2 text-sm a-mute">
+                            <Phone size={14} className="a-dim" />
                             {member.phone}
                           </div>
                         )}
@@ -845,26 +738,23 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          member.is_financial
-                            ? 'bg-green-900/30 text-green-400'
-                            : 'bg-red-900/30 text-red-400'
-                        }`}>
+                        <span className={`a-st ${member.is_financial ? 'a-ink' : 'a-txt-r'}`}>
+                          <span className={`a-light ${member.is_financial ? 'a-light-g' : 'a-light-r'}`} />
                           {member.is_financial ? 'Financial' : 'Unfinancial'}
                         </span>
                         {/* State Remittance Status */}
                         {member.is_financial && memberRemittanceStatus[member.id]?.statePaid && (
                           <div
-                            className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400"
-                            title="State Paid"
+                            className="a-ib a-txt-b" style={{ width: 28, height: 28, cursor: 'default' }}
+                            title="Paid to the state association"
                           >
                             <CheckCircle2 size={14} />
                           </div>
                         )}
                         {member.is_financial && !memberRemittanceStatus[member.id]?.statePaid && memberRemittanceStatus[member.id] && (
                           <div
-                            className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400 animate-pulse"
-                            title="State Pending"
+                            className="a-ib a-txt-a" style={{ width: 28, height: 28, cursor: 'default' }}
+                            title="Payment to the state association pending"
                           >
                             <ArrowUpRight size={14} />
                           </div>
@@ -872,8 +762,8 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                         {/* National Remittance Status */}
                         {member.is_financial && memberRemittanceStatus[member.id]?.nationalPaid && (
                           <div
-                            className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400"
-                            title="National Paid"
+                            className="a-ib a-txt-g" style={{ width: 28, height: 28, cursor: 'default' }}
+                            title="Paid to the national association"
                           >
                             <CheckCircle2 size={14} />
                           </div>
@@ -883,13 +773,13 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                     <td className="px-4 py-4">
                       <div className="space-y-1 text-sm">
                         {member.date_joined && (
-                          <div className="text-slate-400">
-                            <span className="text-slate-500">Joined</span> {formatDate(member.date_joined)}
+                          <div className="a-mute whitespace-nowrap">
+                            <span className="a-dim">Joined</span> {formatDate(member.date_joined)}
                           </div>
                         )}
                         {member.renewal_date && (
-                          <div className="text-slate-400">
-                            <span className="text-slate-500">Renewal</span> {formatDate(member.renewal_date)}
+                          <div className="a-mute whitespace-nowrap">
+                            <span className="a-dim">Renews</span> {formatDate(member.renewal_date)}
                           </div>
                         )}
                       </div>
@@ -899,7 +789,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                         {!isImpersonating && member.user_id && (
                           <button
                             onClick={() => startImpersonation(member.id)}
-                            className="p-2 rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 transition"
+                            className="a-ib"
                             title={`View as ${member.first_name} ${member.last_name}`}
                           >
                             <Eye size={16} />
@@ -910,14 +800,14 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                             setEditingMemberId(member.id);
                             setEditingMemberClubId(member.club_id || '');
                           }}
-                          className="p-2 rounded-lg hover:bg-slate-600/50 text-slate-400 hover:text-white transition"
+                          className="a-ib"
                           title="Edit member"
                         >
                           <Pencil size={16} />
                         </button>
                           <button
                             onClick={() => setDeletingMember(member)}
-                            className="p-2 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition"
+                            className="a-ib a-ib-d"
                             title="Delete member"
                           >
                             <Trash2 size={16} />
@@ -975,12 +865,12 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
       )}
 
       {showActivateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-lg w-full">
+        <div className="a-dlg">
+          <div className="a-sheet max-w-lg">
             <div className="p-6 border-b border-slate-700">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center">
+                  <div className="a-tile">
                     <Smartphone size={20} className="text-sky-400" />
                   </div>
                   <div>
@@ -1000,7 +890,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                     setMembersToActivate([]);
                     setActivationResults(null);
                   }}
-                  className="text-slate-400 hover:text-slate-300 transition-colors"
+                  className="a-ib"
                 >
                   <X size={20} />
                 </button>
@@ -1107,14 +997,14 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                       setShowActivateModal(false);
                       setMembersToActivate([]);
                     }}
-                    className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+                    className="a-btn a-btn-q"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleConfirmActivation}
                     disabled={activating}
-                    className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50"
+                    className="a-btn a-btn-p"
                   >
                     {activating ? (
                       <>
@@ -1136,7 +1026,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                     setMembersToActivate([]);
                     setActivationResults(null);
                   }}
-                  className="px-5 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 font-medium transition-colors"
+                  className="a-btn"
                 >
                   Done
                 </button>
@@ -1147,12 +1037,12 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
       )}
 
       {showDefaultClubModal && defaultClubMember && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full">
+        <div className="a-dlg">
+          <div className="a-sheet max-w-md">
             <div className="p-6 border-b border-slate-700">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <div className="a-tile">
                     <Home size={20} className="text-blue-400" />
                   </div>
                   <div>
@@ -1167,7 +1057,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                     setShowDefaultClubModal(false);
                     setDefaultClubMember(null);
                   }}
-                  className="text-slate-400 hover:text-slate-300 transition-colors"
+                  className="a-ib"
                 >
                   <X size={20} />
                 </button>
@@ -1212,14 +1102,14 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                   setShowDefaultClubModal(false);
                   setDefaultClubMember(null);
                 }}
-                className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+                className="a-btn a-btn-q"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSetDefaultClub}
                 disabled={!selectedDefaultClubId || settingDefaultClub}
-                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50"
+                className="a-btn a-btn-p"
               >
                 {settingDefaultClub ? (
                   <>
@@ -1239,11 +1129,11 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
       )}
 
       {deletingMember && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full">
+        <div className="a-dlg">
+          <div className="a-sheet max-w-md">
             <div className="p-6 border-b border-slate-700">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                <div className="a-tile">
                   <Trash2 size={20} className="text-red-400" />
                 </div>
                 <div>
@@ -1272,14 +1162,14 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
               <button
                 onClick={() => setDeletingMember(null)}
                 disabled={deleteProcessing}
-                className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+                className="a-btn a-btn-q"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSingleDelete}
                 disabled={deleteProcessing}
-                className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors disabled:opacity-50"
+                className="a-btn a-btn-d"
               >
                 {deleteProcessing ? (
                   <>
@@ -1297,6 +1187,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };

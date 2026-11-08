@@ -1178,16 +1178,20 @@ html.alfie-light .alfie-dash-hero-scrim {
 .alfie-dash-sub { margin: 8px 0 0; font-size: clamp(14px, 1.15vw, 16px); color: rgba(255, 255, 255, 0.88) !important; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.55); }
 .alfie-dash-body { position: relative; z-index: 2; margin-left: var(--alfie-rail, 0px); }
 .alfie-dash-tools { position: absolute; top: 24px; right: 32px; z-index: 3; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 14px; background: rgba(10, 15, 26, 0.42); border: 1px solid rgba(255, 255, 255, 0.16); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
-.alfie-dash-tools button { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background .15s ease; }
-.alfie-dash-tools button:hover { background: rgba(255, 255, 255, 0.14); }
-.alfie-dash-tools button:focus-visible { outline: 2px solid rgba(10, 132, 255, 0.85); outline-offset: 1px; }
+.alfie-dash-tools :is(button, a) { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer; text-decoration: none; transition: background .15s ease; }
+.alfie-dash-tools :is(button, a):hover { background: rgba(255, 255, 255, 0.14); }
+.alfie-dash-tools :is(button, a):focus-visible { outline: 2px solid rgba(10, 132, 255, 0.85); outline-offset: 1px; }
+/* Association dashboards: the association's logo in place of the member's photo */
+.alfie-dash-logo { flex-shrink: 0; width: 76px; height: 76px; border-radius: 20px; object-fit: contain; padding: 8px; background: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 10px 30px rgba(0, 0, 0, 0.45); }
+.alfie-dash-logo-ph { display: inline-flex; align-items: center; justify-content: center; padding: 0; background: rgba(10, 15, 26, 0.5); color: #fff; font: 700 24px 'Bricolage Grotesque', 'Instrument Sans', sans-serif; letter-spacing: -0.02em; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 10px 30px rgba(0, 0, 0, 0.45); }
 .alfie-dash-tools-sep { width: 1px; height: 20px; background: rgba(255, 255, 255, 0.18); }
 @media (max-width: 760px) {
   .alfie-dash-hero { min-height: 300px; }
   .alfie-dash-hero-body { padding-top: 96px; padding-bottom: 28px; }
   .alfie-dash-avatar { width: 56px; height: 56px; }
   .alfie-dash-tools { top: 14px; right: 14px; }
-  .alfie-dash-tools button span { display: none; }
+  .alfie-dash-tools :is(button, a) span { display: none; }
+  .alfie-dash-logo { width: 56px; height: 56px; border-radius: 16px; padding: 6px; }
 }
 
 /* Menu expand/collapse: lives inside the floating menu, at the bottom */
