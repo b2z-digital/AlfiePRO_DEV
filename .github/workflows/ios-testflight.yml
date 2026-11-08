@@ -4,7 +4,7 @@
 # TestFlight only, and testers get them once they've finished processing (10–30 minutes).
 #
 # One-off set-up (Settings → Secrets and variables → Actions), see MOBILE.md "TestFlight":
-#   Variables: APPLE_TEAM_ID
+#   APPLE_TEAM_ID (variable or secret)
 #   Secrets:   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (App Store Connect API key, Admin role)
 #              VITE_GOOGLE_MAPS_API_KEY, VITE_GOOGLE_CLIENT_ID, VITE_WEATHER_API_KEY,
 #              VITE_OPENWEATHER_API_KEY, VITE_STORMGLASS_API_KEY (same values as the website; optional)
@@ -33,7 +33,7 @@ jobs:
       VITE_WEATHER_API_KEY: ${{ secrets.VITE_WEATHER_API_KEY }}
       VITE_OPENWEATHER_API_KEY: ${{ secrets.VITE_OPENWEATHER_API_KEY }}
       VITE_STORMGLASS_API_KEY: ${{ secrets.VITE_STORMGLASS_API_KEY }}
-      TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      TEAM_ID: ${{ vars.APPLE_TEAM_ID || secrets.APPLE_TEAM_ID }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       # Build numbers only have to go up within 2.0.0; the run number does that
@@ -44,7 +44,7 @@ jobs:
           ASC_KEY_P8_SET: ${{ secrets.ASC_KEY_P8 != '' }}
         run: |
           missing=""
-          [ -n "$TEAM_ID" ] || missing="$missing APPLE_TEAM_ID(variable)"
+          [ -n "$TEAM_ID" ] || missing="$missing APPLE_TEAM_ID"
           [ -n "$ASC_KEY_ID" ] || missing="$missing ASC_KEY_ID"
           [ -n "$ASC_ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID"
           [ "$ASC_KEY_P8_SET" = "true" ] || missing="$missing ASC_KEY_P8"
