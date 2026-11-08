@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Menu, X, MapPin, ChevronLeft, ChevronRight, Calendar, Clock, Award, Flag } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
+import { AlfieLoader } from '../brand/AlfieLoader';
 
 interface NationalAssociation {
   id: string;
@@ -212,9 +213,7 @@ export const PublicNationalAssociationHomepage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
+      <AlfieLoader light={false} />
     );
   }
 

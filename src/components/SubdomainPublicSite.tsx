@@ -14,6 +14,7 @@ import { PublicResultsPage } from './public/PublicResultsPage';
 import { PublicResultsListPage } from './public/PublicResultsListPage';
 import { PublicEventWebsitePage } from './public/PublicEventWebsitePage';
 import { PublicSiteErrorBoundary } from './public/PublicSiteErrorBoundary';
+import { AlfieLoader } from './brand/AlfieLoader';
 
 interface SubdomainPublicSiteProps {
   subdomain: string;
@@ -113,9 +114,7 @@ export const SubdomainPublicSite: React.FC<SubdomainPublicSiteProps> = ({ subdom
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
+      <AlfieLoader light={false} />
     );
   }
 
