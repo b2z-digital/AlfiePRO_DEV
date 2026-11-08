@@ -20,12 +20,17 @@ import { TVScreen } from './screens/TV';
 import { MembershipScreen } from './screens/Membership';
 import { BoatShedScreen, BoatScreen } from './screens/BoatShed';
 import { StatsScreen } from './screens/Stats';
+import { MeetingScreen } from './screens/Meeting';
+import { RaceTimerScreen } from './screens/RaceTimer';
+import { WeatherScreen } from './screens/Weather';
+import { TasksScreen } from './screens/Tasks';
+import { FindRacingScreen } from './screens/FindRacing';
 import '../styles/alfie-mobile.css';
 
 const AskAlfieChatPanel = lazy(() => import('../components/ask-alfie/AskAlfieChatPanel').then(m => ({ default: m.AskAlfieChatPanel })));
 
 /** Screens that sit outside the tab bar (pushed full screen). */
-const NO_TABS = [/^\/notifications/, /^\/comms\/chat\//, /^\/classifieds\/[^/]+/, /^\/news\/[^/]+/];
+const NO_TABS = [/^\/notifications/, /^\/race-timer/, /^\/comms\/chat\//, /^\/classifieds\/[^/]+/, /^\/news\/[^/]+/];
 
 const AlfieSheet: React.FC<{ onClose: () => void; message?: string }> = ({ onClose, message }) => {
   const { light } = useMobile();
@@ -65,7 +70,7 @@ const Shell: React.FC = () => {
   useEffect(() => { document.querySelector('.m-scroll')?.scrollTo({ top: 0 }); }, [pathname]);
 
   return (
-    <div className={`m-app ${light && !pathname.startsWith('/alfie-tv') ? 'm-light' : ''}`}>
+    <div className={`m-app ${light && !pathname.startsWith('/alfie-tv') && !pathname.startsWith('/race-timer') ? 'm-light' : ''}`}>
       <main className={`m-scroll ${hideTabs ? 'm-no-tabs' : ''}`} style={{ position: 'relative' }}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -77,9 +82,7 @@ const Shell: React.FC = () => {
           <Route path="/me" element={<Me />} />
           <Route path="/ask-alfie" element={<AskAlfieRoute onOpen={() => setAlfieOpen(true)} />} />
 
-          <Route path="/find-racing" element={<Soon title="Find racing" what="A map of racing near you from every club and association on AlfiePRO." />} />
           <Route path="/race-desk/*" element={<Soon title="Race desk" what="Sign on, StartBox, finish calling and scoring for Scratch, Handicap, HMS and SHRS, built from the Race Management board." />} />
-          <Route path="/calendar/meeting/:id" element={<Soon title="Meeting" what="Agenda, join link and your attendance answer." />} />
           <Route path="/club" element={<ClubHub />} />
           <Route path="/community/*" element={<Navigate to="/club" replace />} />
           <Route path="/comms" element={<ChatsInbox />} />
@@ -96,9 +99,11 @@ const Shell: React.FC = () => {
           <Route path="/my-garage" element={<BoatShedScreen />} />
           <Route path="/my-garage/:boatId" element={<BoatScreen />} />
           <Route path="/my-stats" element={<StatsScreen />} />
-          <Route path="/race-timer" element={<Soon title="Race Timer" what="Your club's start sequences, with sounds, buzzes and the screen kept awake." />} />
-          <Route path="/weather" element={<Soon title="Wind & tides" what="Wind, temperature and tide forecasts for your venues." />} />
-          <Route path="/tasks" element={<Soon title="Tasks" what="Jobs from the club and your own, ticked off as you go." />} />
+          <Route path="/calendar/meeting/:id" element={<MeetingScreen />} />
+          <Route path="/find-racing" element={<FindRacingScreen />} />
+          <Route path="/race-timer" element={<RaceTimerScreen />} />
+          <Route path="/weather" element={<WeatherScreen />} />
+          <Route path="/tasks" element={<TasksScreen />} />
           <Route path="/settings/*" element={<Soon title="Profile & settings" what="Your details, notifications and privacy." />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

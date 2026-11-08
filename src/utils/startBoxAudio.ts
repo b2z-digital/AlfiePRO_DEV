@@ -275,6 +275,20 @@ class StartBoxAudioEngine {
     }
   }
 
+  /**
+   * Snap the countdown to the nearest whole minute (pressed as a flag goes up or down).
+   * Signals that were skipped don't fire; the next ones fire on time.
+   */
+  syncToMinute(): void {
+    if (this.currentState !== 'running' && this.currentState !== 'paused') return;
+    if (this.currentSequence?.use_audio_only || this.currentSequence?.audio_file_url) return;
+    const snapped = Math.round(this.getRemainingMs() / 60000) * 60000;
+    const elapsed = Math.max(0, Math.min(this.totalDurationMs, this.totalDurationMs - snapped));
+    if (this.currentState === 'running') this.startTimestamp = performance.now() - elapsed;
+    else this.pausedElapsedMs = elapsed;
+    this.emitTick();
+  }
+
   setVolume(vol: number): void {
     this.volume = Math.max(0, Math.min(1, vol));
     if (this.gainNode) {
