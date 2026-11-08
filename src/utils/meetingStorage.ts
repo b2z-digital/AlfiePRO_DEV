@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
-import { Meeting, MeetingAgendaItem, MeetingFormData, MeetingAttendee, MeetingGuest, MeetingCategory, RecurrenceType } from '../types/meeting';
+import { Meeting, MeetingAgendaItem, MeetingFormData, MeetingAttendee, MeetingGuest, MeetingCategory } from '../types/meeting';
+import { generateRecurringDates } from './recurrenceDates';
 
 // Get all meetings for a club or association
 export const getMeetings = async (
@@ -62,69 +63,7 @@ export const getMeetingById = async (meetingId: string): Promise<Meeting | null>
   }
 };
 
-function getNthWeekdayOfMonth(year: number, month: number, dayOfWeek: number, nth: number): Date | null {
-  if (nth === 5) {
-    const lastDay = new Date(year, month + 1, 0);
-    const diff = (lastDay.getDay() - dayOfWeek + 7) % 7;
-    return new Date(year, month, lastDay.getDate() - diff);
-  }
-  const first = new Date(year, month, 1);
-  const firstOccurrence = 1 + ((dayOfWeek - first.getDay() + 7) % 7);
-  const day = firstOccurrence + (nth - 1) * 7;
-  const result = new Date(year, month, day);
-  if (result.getMonth() !== month) return null;
-  return result;
-}
-
-function generateRecurringDates(
-  startDate: string,
-  recurrenceType: RecurrenceType,
-  endDate: string,
-  nthWeek?: number,
-  nthDay?: number
-): string[] {
-  const dates: string[] = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-
-  if (recurrenceType === 'monthly_nth' && nthWeek != null && nthDay != null) {
-    let month = start.getMonth() + 1;
-    let year = start.getFullYear();
-    if (month > 11) { month = 0; year++; }
-    while (year - start.getFullYear() < 10) {
-      const date = getNthWeekdayOfMonth(year, month, nthDay, nthWeek);
-      if (date && date > start && date <= end) {
-        dates.push(date.toISOString().split('T')[0]);
-      } else if (date && date > end) {
-        break;
-      }
-      month++;
-      if (month > 11) { month = 0; year++; }
-    }
-    return dates;
-  }
-
-  let current = new Date(start);
-  const advance = (d: Date): Date => {
-    const next = new Date(d);
-    switch (recurrenceType) {
-      case 'weekly': next.setDate(next.getDate() + 7); break;
-      case 'fortnightly': next.setDate(next.getDate() + 14); break;
-      case 'monthly': next.setMonth(next.getMonth() + 1); break;
-      case 'quarterly': next.setMonth(next.getMonth() + 3); break;
-      case 'yearly': next.setFullYear(next.getFullYear() + 1); break;
-      default: return next;
-    }
-    return next;
-  };
-
-  current = advance(current);
-  while (current <= end) {
-    dates.push(current.toISOString().split('T')[0]);
-    current = advance(current);
-  }
-  return dates;
-}
+// Repeat dates come from utils/recurrenceDates (calendar-date maths, no time-zone drift)
 
 export const createMeeting = async (
   clubId: string | undefined,

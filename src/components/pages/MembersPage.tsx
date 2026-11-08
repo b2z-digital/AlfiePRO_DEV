@@ -57,6 +57,14 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [memberToArchive, setMemberToArchive] = useState<Member | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  // Sort and show the list by first name or by surname (remembered on this device)
+  const [nameSort, setNameSort] = useState<'first' | 'last'>(() => {
+    try { return localStorage.getItem('alfie-members-name-sort') === 'last' ? 'last' : 'first'; } catch { return 'first'; }
+  });
+  const changeNameSort = (value: 'first' | 'last') => {
+    setNameSort(value);
+    try { localStorage.setItem('alfie-members-name-sort', value); } catch { /* private mode */ }
+  };
   const [showInviteConfirmModal, setShowInviteConfirmModal] = useState(false);
   const [memberToInvite, setMemberToInvite] = useState<Member | null>(null);
   const [memberRemittanceStatus, setMemberRemittanceStatus] = useState<Record<string, 'paid' | 'pending' | 'none'>>({});
@@ -542,14 +550,17 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       return matchesSearch;
     });
 
-    // Step 4: Sort by first name
+    // Step 4: Sort by first name or surname (then the other)
     return filtered.sort((a, b) => {
-      const firstNameCompare = (a.first_name || '').localeCompare(b.first_name || '');
-      if (firstNameCompare !== 0) {
-        return sortDirection === 'asc' ? firstNameCompare : -firstNameCompare;
+      const primary = nameSort === 'last' ? 'last_name' : 'first_name';
+      const secondary = nameSort === 'last' ? 'first_name' : 'last_name';
+      const opts = { sensitivity: 'base' } as const;
+      const primaryCompare = (a[primary] || '').trim().localeCompare((b[primary] || '').trim(), undefined, opts);
+      if (primaryCompare !== 0) {
+        return sortDirection === 'asc' ? primaryCompare : -primaryCompare;
       }
-      const lastNameCompare = (a.last_name || '').localeCompare(b.last_name || '');
-      return sortDirection === 'asc' ? lastNameCompare : -lastNameCompare;
+      const secondaryCompare = (a[secondary] || '').trim().localeCompare((b[secondary] || '').trim(), undefined, opts);
+      return sortDirection === 'asc' ? secondaryCompare : -secondaryCompare;
     });
   })();
 
@@ -1382,13 +1393,20 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
-                  <button
-                    onClick={toggleSort}
-                    className="flex items-center gap-2 hover:text-white transition-colors"
-                  >
-                    Member
-                    <ArrowUpDown size={14} className="text-slate-400" />
-                  </button>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                      onClick={toggleSort}
+                      className="flex items-center gap-2 hover:text-white transition-colors"
+                      title={sortDirection === 'asc' ? 'Sorted A–Z (click for Z–A)' : 'Sorted Z–A (click for A–Z)'}
+                    >
+                      Member
+                      <ArrowUpDown size={14} className="text-slate-400" />
+                    </button>
+                    <div className="a-seg normal-case tracking-normal" role="radiogroup" aria-label="Sort members by" style={{ padding: 2, borderRadius: 10 }}>
+                      <button type="button" role="radio" aria-checked={nameSort === 'first'} onClick={() => changeNameSort('first')} className={`a-seg-i ${nameSort === 'first' ? 'a-seg-on' : ''}`} style={{ height: 26, fontSize: 12, padding: '0 10px', borderRadius: 8 }}>First name</button>
+                      <button type="button" role="radio" aria-checked={nameSort === 'last'} onClick={() => changeNameSort('last')} className={`a-seg-i ${nameSort === 'last' ? 'a-seg-on' : ''}`} style={{ height: 26, fontSize: 12, padding: '0 10px', borderRadius: 8 }}>Surname</button>
+                    </div>
+                  </div>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Boats</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Type</th>
@@ -1462,7 +1480,9 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                           </div>
                           <div className="min-w-0">
                             <div className="text-white font-semibold truncate">
-                              {member.first_name} {member.last_name}
+                              {nameSort === 'last' && member.last_name
+                                ? `${member.last_name}${member.first_name ? `, ${member.first_name}` : ''}`
+                                : `${member.first_name || ''} ${member.last_name || ''}`.trim()}
                             </div>
                             {(member.email || member.phone) && (
                               <div className="a-dim text-[13px] truncate">
