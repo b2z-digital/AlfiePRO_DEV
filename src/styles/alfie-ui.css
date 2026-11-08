@@ -1195,8 +1195,8 @@ html.alfie-light .alfie-dash-hero-scrim {
 }
 
 /* Menu expand/collapse: lives inside the floating menu, at the bottom */
-.alfie-rail-toggle { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 12px; border: 0; border-radius: 12px; background: rgba(255, 255, 255, 0.06); color: rgba(235, 240, 255, 0.82); font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.alfie-rail-toggle { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 12px 0 17px; border: 0; border-radius: 12px; background: rgba(255, 255, 255, 0.06); color: rgba(235, 240, 255, 0.82); font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; cursor: pointer; transition: background .15s ease, color .15s ease; }
 .alfie-rail-toggle:hover { background: rgba(255, 255, 255, 0.11); color: #fff; }
-.alfie-rail-toggle.is-icon { width: 46px; padding: 0; justify-content: center; }
+.alfie-rail-toggle.is-icon { width: 44px; padding: 0; justify-content: center; }
 .alfie-rail-toggle.is-light { background: rgba(15, 23, 42, 0.05); color: #334155; }
 .alfie-rail-toggle.is-light:hover { background: rgba(15, 23, 42, 0.09); color: #0B1220; }
