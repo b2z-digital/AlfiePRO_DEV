@@ -7,6 +7,9 @@ import { Club } from '../../types/club';
 import { formatDate } from '../../utils/date';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
 import { GoogleAnalytics } from '../GoogleAnalytics';
+import { usePublishedPageSlugs, useSiteTheme, useSiteVisit } from '../../hooks/usePublicSite';
+import { HomeSectionId, resolveHomeSections, resolveMenu, SiteTheme } from '../../utils/publicSite';
+import { PublicSiteMenu } from './PublicSiteMenu';
 
 interface HomepageSlide {
   id: string;
@@ -16,7 +19,16 @@ interface HomepageSlide {
   button_text: string;
   button_url: string;
   display_order: number;
+  label?: string | null;
+  show_from?: string | null;
+  show_until?: string | null;
 }
+
+/** Local date as YYYY-MM-DD, to compare with a slide's show dates. */
+const todayLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 interface HomepageTile {
   id: string;
@@ -128,6 +140,10 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const site = useSiteTheme(club?.website_theme);
+  useSiteVisit(club?.id);
+  const siteMenu = resolveMenu(site.menu !== undefined ? site.menu : club?.website_menu);
+  const publishedSlugs = usePublishedPageSlugs(club?.id, siteMenu.some(i => i.kind === 'page' || i.children?.some(c => c.kind === 'page')));
 
   useEffect(() => {
     loadClubData();
@@ -172,7 +188,12 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
 
       if (slidesError) throw slidesError;
 
-      if (!slidesData || slidesData.length === 0) {
+      // Slides with show dates only appear between them
+      const slideDay = todayLocal();
+      const showingSlides = ((slidesData || []) as HomepageSlide[]).filter(sl =>
+        (!sl.show_from || sl.show_from <= slideDay) && (!sl.show_until || sl.show_until >= slideDay));
+
+      if (showingSlides.length === 0) {
         if (clubData?.cover_image_url) {
           setSlides([{
             id: 'default',
@@ -185,7 +206,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
           }]);
         }
       } else {
-        setSlides(slidesData);
+        setSlides(showingSlides);
       }
 
       const { data: tilesData, error: tilesError } = await supabase
@@ -535,6 +556,355 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
   // Limit to 6 tiles maximum
   const displayTiles = tiles.length > 0 ? tiles.slice(0, 6) : DEFAULT_TILES;
   const clubInitials = getClubInitials(club.name);
+  const homeSections = resolveHomeSections(site.layout !== undefined ? site.layout : club.website_layout);
+  const logoDark = (site.theme as SiteTheme | null)?.logoDark || null;
+
+  const renderSection = (id: HomeSectionId) => {
+    switch (id) {
+      case 'hero': return (
+        <>
+            {/* Hero Carousel */}
+            {slides.length > 0 && (
+              <section className="relative h-[320px] md:h-[400px] lg:h-[500px] overflow-hidden">
+                {slides.map((slide, index) => (
+                  <div
+                    key={slide.id}
+                    className={`absolute inset-0 transition-opacity duration-[1500ms] ease-in-out ${
+                      index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+                    }`}
+                  >
+                    <img
+                      src={slide.image_url}
+                      alt={slide.title}
+                      className="w-full h-full object-cover"
+                    />
+                    {(slide.label || slide.title || slide.subtitle || slide.button_text) && (
+                      <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+                        <div className="text-center text-white px-4">
+                          {slide.label && <span className="site-label">{slide.label}</span>}
+                          {slide.title && (
+                            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">
+                              {slide.title}
+                            </h1>
+                          )}
+                          {slide.subtitle && (
+                            <p className="text-base md:text-lg lg:text-xl mb-4 max-w-2xl mx-auto">
+                              {slide.subtitle}
+                            </p>
+                          )}
+                          {slide.button_text && slide.button_url && (
+                            slide.button_url.startsWith('/') ? (
+                              <Link
+                                to={buildPublicUrl(slide.button_url)}
+                                className="site-btn site-btn-p inline-block px-6 py-2.5 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+                              >
+                                {slide.button_text}
+                              </Link>
+                            ) : (
+                              <a
+                                href={slide.button_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="site-btn site-btn-p inline-block px-6 py-2.5 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+                              >
+                                {slide.button_text}
+                              </a>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {slides.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevSlide}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/30 hover:bg-white/60 backdrop-blur-sm rounded-full transition-all"
+                    >
+                      <ChevronLeft className="w-6 h-6 text-white drop-shadow-md" />
+                    </button>
+                    <button
+                      onClick={nextSlide}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/30 hover:bg-white/60 backdrop-blur-sm rounded-full transition-all"
+                    >
+                      <ChevronRight className="w-6 h-6 text-white drop-shadow-md" />
+                    </button>
+
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                      {slides.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentSlide(index)}
+                          className={`h-2 rounded-full transition-all ${
+                            index === currentSlide
+                              ? 'bg-white w-6'
+                              : 'bg-white/50 hover:bg-white/75 w-2'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </section>
+            )}
+        </>
+      );
+      case 'welcome': return (
+        <>
+            {/* Welcome Section */}
+            <section id="about" className="py-16 px-4 bg-white">
+              <div className="max-w-5xl mx-auto">
+                <h2 className="text-2xl md:text-3xl text-gray-900 mb-6 text-center" style={{ fontSize: '2rem' }}>
+                  <span className="font-extrabold">Welcome to </span>
+                  <span className="font-normal">{club.name}</span>
+                </h2>
+                <div
+                  className="text-base md:text-lg text-gray-700 leading-relaxed prose prose-lg max-w-none whitespace-pre-wrap text-center"
+                >
+                  {(club.club_introduction || club.description || `Welcome to ${club.name}. Join us for an amazing experience.`).split('\n').map((line: string, i: number) => (
+                    <span key={i}>{i > 0 && <br />}{line}</span>
+                  ))}
+                </div>
+              </div>
+            </section>
+        </>
+      );
+      case 'tiles': return (
+        <>
+            {/* Quick Link Tiles */}
+            <section className="py-8 bg-gray-50">
+              <div className="max-w-7xl mx-auto px-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {displayTiles.map((tile) => {
+                    const isInternal = tile.link_url.startsWith('/');
+                    const tileContent = (
+                      <>
+                        <img
+                          src={tile.image_url}
+                          alt={tile.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+                        <div className="absolute inset-0 flex flex-col justify-end p-6">
+                          <h3 className="text-white text-2xl font-bold mb-2">
+                            {tile.title}
+                          </h3>
+                          {tile.description && (
+                            <p className="text-white/90 text-sm mb-4">
+                              {tile.description}
+                            </p>
+                          )}
+                          <div className="flex items-center text-white text-sm font-semibold">
+                            Learn More
+                            <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                        </div>
+                      </>
+                    );
+                    return isInternal ? (
+                      <Link
+                        key={tile.id}
+                        to={buildPublicUrl(tile.link_url)}
+                        className="site-card group relative h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
+                      >
+                        {tileContent}
+                      </Link>
+                    ) : (
+                      <a
+                        key={tile.id}
+                        href={tile.link_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="site-card group relative h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
+                      >
+                        {tileContent}
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+        </>
+      );
+      case 'events': return (
+        <>
+            {/* Upcoming Events & Latest Results */}
+            <section className="py-16 px-4 bg-white">
+              <div className="max-w-7xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                  {/* Upcoming Events */}
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Upcoming Events</h2>
+                    {upcomingEvents.length > 0 ? (
+                      <div className="space-y-3">
+                        {upcomingEvents.map((event) => (
+                          <div
+                            key={event.id}
+                            className="bg-gray-50 rounded-lg p-3 hover:shadow-md transition-shadow min-h-[110px] flex flex-col"
+                          >
+                            <h3 className="font-semibold text-gray-900 mb-1.5 text-sm">{event.name}</h3>
+                            <div className="space-y-1 text-xs text-gray-600">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-3.5 h-3.5" />
+                                <span>{formatDate(event.date)}</span>
+                              </div>
+                              {event.venue && (
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-3.5 h-3.5" />
+                                  <span>{event.venue}</span>
+                                </div>
+                              )}
+                              {event.race_class && (
+                                <div className="text-gray-500">
+                                  Class: {event.race_class}
+                                </div>
+                              )}
+                              {event.pro_name && (
+                                <div className="flex items-center gap-2">
+                                  <Award className="w-3.5 h-3.5" />
+                                  <span><span className="font-semibold text-gray-700">PRO</span> {event.pro_name}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 rounded-lg p-12 text-center">
+                        <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                        <p className="text-gray-500">No upcoming events scheduled</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Latest Results */}
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Latest Results</h2>
+                    {latestResults.length > 0 ? (
+                      <div className="space-y-3">
+                        {latestResults.map((result) => (
+                          <Link
+                            key={result.id}
+                            to={buildPublicUrl(`/results/${result.id}`)}
+                            className="block bg-gray-50 rounded-lg p-3 hover:shadow-md hover:bg-gray-100 transition-all min-h-[110px] flex flex-col"
+                          >
+                            <h3 className="font-semibold text-gray-900 mb-1.5 text-sm">{result.name}</h3>
+                            <div className="space-y-1 text-xs text-gray-600">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-3.5 h-3.5" />
+                                <span>{formatDate(result.date)}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Award className="w-3.5 h-3.5 text-yellow-600" />
+                                <span className="font-medium">Winner: {result.winner}</span>
+                              </div>
+                              {result.race_class && (
+                                <div className="flex items-center justify-between">
+                                  <div className="text-gray-500">
+                                    Class: {result.race_class}
+                                  </div>
+                                  <div className="text-xs text-blue-600 font-medium flex items-center gap-1">
+                                    View Full Results
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 rounded-lg p-12 text-center">
+                        <Award className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                        <p className="text-gray-500">No results available yet</p>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            </section>
+        </>
+      );
+      case 'news': return (
+        <>
+            {/* Latest News */}
+            {newsArticles.length > 0 && (
+              <section id="news" className="py-16 px-4 bg-gray-50">
+                <div className="max-w-7xl mx-auto">
+                  <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-10 text-center tracking-wider">
+                    LATEST NEWS
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {newsArticles.map((article) => (
+                      <div
+                        key={article.id}
+                        className="bg-white rounded-sm overflow-hidden shadow-md hover:shadow-xl transition-shadow"
+                      >
+                        <div className="relative h-56 overflow-hidden">
+                          <img
+                            src={article.cover_image || '/RC-Yachts-image-custom_crop.jpg'}
+                            alt={article.title}
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                          />
+                        </div>
+                        <div className="p-6">
+                          <h3 className="text-lg font-bold text-gray-900 mb-3 uppercase tracking-wide line-clamp-2">
+                            {article.title}
+                          </h3>
+                          <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                            {article.excerpt}
+                          </p>
+                          <Link
+                            to={buildPublicUrl(`/news/${article.id}`)}
+                            className="site-btn inline-block px-5 py-2 bg-black text-white text-xs font-semibold rounded hover:bg-gray-800 transition-colors uppercase tracking-wider"
+                          >
+                            Read More
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
+        </>
+      );
+      case 'map': return (
+        <>
+            {/* Map Section */}
+            {defaultVenueAddress && (
+              <section id="contact" className="bg-white">
+                <div className="w-full">
+                  <div className="h-[500px] bg-gray-300 overflow-hidden relative">
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      frameBorder="0"
+                      style={{ border: 0, filter: 'grayscale(100%) contrast(1.2) brightness(0.95)' }}
+                      src={defaultVenueCoords
+                        ? `https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${defaultVenueCoords.lat},${defaultVenueCoords.lng}&zoom=14`
+                        : `https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(
+                            defaultVenueAddress
+                          )}&zoom=14`
+                      }
+                      allowFullScreen
+                      title="Club Location"
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
+        </>
+      );
+      default: return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -581,7 +951,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
               href="https://alfiepro.com.au"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-6 py-2.5 text-white font-semibold rounded-lg transition-colors text-sm tracking-wide"
+              className="site-btn site-btn-p px-6 py-2.5 text-white font-semibold rounded-lg transition-colors text-sm tracking-wide"
             >
               MEMBERS
             </a>
@@ -598,7 +968,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
 
         {/* Slide-out Mobile Menu */}
         <div
-          className={`fixed top-0 left-0 h-full w-[420px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+          className={`fixed top-0 left-0 h-full w-[420px] max-w-full overflow-y-auto bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -611,403 +981,31 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             </button>
           </div>
 
-          <nav className="space-y-0">
-            <a
-              href="#"
-              className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              HOME
-            </a>
-            <a
-              href="#membership"
-              className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              MEMBERSHIP
-            </a>
-            <Link
-              to={buildPublicUrl('/race-calendar')}
-              className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              RACE CALENDAR
-            </Link>
-            <Link
-              to={buildPublicUrl('/yacht-classes')}
-              className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              YACHT CLASSES
-            </Link>
-            <a
-              href="#results"
-              className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              RESULTS
-            </a>
-            <Link
-              to={buildPublicUrl('/venues')}
-              className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              VENUES
-            </Link>
-            <Link
-              to={buildPublicUrl('/news')}
-              className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              LATEST NEWS
-            </Link>
-            <Link
-              to={buildPublicUrl('/classifieds')}
-              className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              CLASSIFIEDS
-            </Link>
-            <Link
-              to={buildPublicUrl('/contact')}
-              className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              CONTACT US
-            </Link>
-          </nav>
+          <PublicSiteMenu
+            items={siteMenu}
+            publishedSlugs={publishedSlugs}
+            activePage="home"
+            buildPublicUrl={buildPublicUrl}
+            onNavigate={() => setMobileMenuOpen(false)}
+          />
         </div>
       </nav>
 
       <div className="pt-20">
-        {/* Hero Carousel */}
-        {slides.length > 0 && (
-          <section className="relative h-[320px] md:h-[400px] lg:h-[500px] overflow-hidden">
-            {slides.map((slide, index) => (
-              <div
-                key={slide.id}
-                className={`absolute inset-0 transition-opacity duration-[1500ms] ease-in-out ${
-                  index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-                }`}
-              >
-                <img
-                  src={slide.image_url}
-                  alt={slide.title}
-                  className="w-full h-full object-cover"
-                />
-                {(slide.title || slide.subtitle || slide.button_text) && (
-                  <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-                    <div className="text-center text-white px-4">
-                      {slide.title && (
-                        <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">
-                          {slide.title}
-                        </h1>
-                      )}
-                      {slide.subtitle && (
-                        <p className="text-base md:text-lg lg:text-xl mb-4 max-w-2xl mx-auto">
-                          {slide.subtitle}
-                        </p>
-                      )}
-                      {slide.button_text && slide.button_url && (
-                        slide.button_url.startsWith('/') ? (
-                          <Link
-                            to={buildPublicUrl(slide.button_url)}
-                            className="inline-block px-6 py-2.5 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
-                          >
-                            {slide.button_text}
-                          </Link>
-                        ) : (
-                          <a
-                            href={slide.button_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block px-6 py-2.5 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
-                          >
-                            {slide.button_text}
-                          </a>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {slides.length > 1 && (
-              <>
-                <button
-                  onClick={prevSlide}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/30 hover:bg-white/60 backdrop-blur-sm rounded-full transition-all"
-                >
-                  <ChevronLeft className="w-6 h-6 text-white drop-shadow-md" />
-                </button>
-                <button
-                  onClick={nextSlide}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/30 hover:bg-white/60 backdrop-blur-sm rounded-full transition-all"
-                >
-                  <ChevronRight className="w-6 h-6 text-white drop-shadow-md" />
-                </button>
-
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-                  {slides.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setCurrentSlide(index)}
-                      className={`h-2 rounded-full transition-all ${
-                        index === currentSlide
-                          ? 'bg-white w-6'
-                          : 'bg-white/50 hover:bg-white/75 w-2'
-                      }`}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </section>
-        )}
-
-        {/* Welcome Section */}
-        <section id="about" className="py-16 px-4 bg-white">
-          <div className="max-w-5xl mx-auto">
-            <h2 className="text-2xl md:text-3xl text-gray-900 mb-6 text-center" style={{ fontSize: '2rem' }}>
-              <span className="font-extrabold">Welcome to </span>
-              <span className="font-normal">{club.name}</span>
-            </h2>
-            <div
-              className="text-base md:text-lg text-gray-700 leading-relaxed prose prose-lg max-w-none whitespace-pre-wrap text-center"
-            >
-              {(club.club_introduction || club.description || `Welcome to ${club.name}. Join us for an amazing experience.`).split('\n').map((line: string, i: number) => (
-                <span key={i}>{i > 0 && <br />}{line}</span>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Quick Link Tiles */}
-        <section className="py-8 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayTiles.map((tile) => {
-                const isInternal = tile.link_url.startsWith('/');
-                const tileContent = (
-                  <>
-                    <img
-                      src={tile.image_url}
-                      alt={tile.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
-                    <div className="absolute inset-0 flex flex-col justify-end p-6">
-                      <h3 className="text-white text-2xl font-bold mb-2">
-                        {tile.title}
-                      </h3>
-                      {tile.description && (
-                        <p className="text-white/90 text-sm mb-4">
-                          {tile.description}
-                        </p>
-                      )}
-                      <div className="flex items-center text-white text-sm font-semibold">
-                        Learn More
-                        <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </div>
-                  </>
-                );
-                return isInternal ? (
-                  <Link
-                    key={tile.id}
-                    to={buildPublicUrl(tile.link_url)}
-                    className="group relative h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
-                  >
-                    {tileContent}
-                  </Link>
-                ) : (
-                  <a
-                    key={tile.id}
-                    href={tile.link_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group relative h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
-                  >
-                    {tileContent}
-                  </a>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* Upcoming Events & Latest Results */}
-        <section className="py-16 px-4 bg-white">
-          <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-
-              {/* Upcoming Events */}
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Upcoming Events</h2>
-                {upcomingEvents.length > 0 ? (
-                  <div className="space-y-3">
-                    {upcomingEvents.map((event) => (
-                      <div
-                        key={event.id}
-                        className="bg-gray-50 rounded-lg p-3 hover:shadow-md transition-shadow min-h-[110px] flex flex-col"
-                      >
-                        <h3 className="font-semibold text-gray-900 mb-1.5 text-sm">{event.name}</h3>
-                        <div className="space-y-1 text-xs text-gray-600">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>{formatDate(event.date)}</span>
-                          </div>
-                          {event.venue && (
-                            <div className="flex items-center gap-2">
-                              <MapPin className="w-3.5 h-3.5" />
-                              <span>{event.venue}</span>
-                            </div>
-                          )}
-                          {event.race_class && (
-                            <div className="text-gray-500">
-                              Class: {event.race_class}
-                            </div>
-                          )}
-                          {event.pro_name && (
-                            <div className="flex items-center gap-2">
-                              <Award className="w-3.5 h-3.5" />
-                              <span><span className="font-semibold text-gray-700">PRO</span> {event.pro_name}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 rounded-lg p-12 text-center">
-                    <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                    <p className="text-gray-500">No upcoming events scheduled</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Latest Results */}
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Latest Results</h2>
-                {latestResults.length > 0 ? (
-                  <div className="space-y-3">
-                    {latestResults.map((result) => (
-                      <Link
-                        key={result.id}
-                        to={buildPublicUrl(`/results/${result.id}`)}
-                        className="block bg-gray-50 rounded-lg p-3 hover:shadow-md hover:bg-gray-100 transition-all min-h-[110px] flex flex-col"
-                      >
-                        <h3 className="font-semibold text-gray-900 mb-1.5 text-sm">{result.name}</h3>
-                        <div className="space-y-1 text-xs text-gray-600">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>{formatDate(result.date)}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Award className="w-3.5 h-3.5 text-yellow-600" />
-                            <span className="font-medium">Winner: {result.winner}</span>
-                          </div>
-                          {result.race_class && (
-                            <div className="flex items-center justify-between">
-                              <div className="text-gray-500">
-                                Class: {result.race_class}
-                              </div>
-                              <div className="text-xs text-blue-600 font-medium flex items-center gap-1">
-                                View Full Results
-                                <ChevronRight className="w-3.5 h-3.5" />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 rounded-lg p-12 text-center">
-                    <Award className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                    <p className="text-gray-500">No results available yet</p>
-                  </div>
-                )}
-              </div>
-
-            </div>
-          </div>
-        </section>
-
-        {/* Latest News */}
-        {newsArticles.length > 0 && (
-          <section id="news" className="py-16 px-4 bg-gray-50">
-            <div className="max-w-7xl mx-auto">
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-10 text-center tracking-wider">
-                LATEST NEWS
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {newsArticles.map((article) => (
-                  <div
-                    key={article.id}
-                    className="bg-white rounded-sm overflow-hidden shadow-md hover:shadow-xl transition-shadow"
-                  >
-                    <div className="relative h-56 overflow-hidden">
-                      <img
-                        src={article.cover_image || '/RC-Yachts-image-custom_crop.jpg'}
-                        alt={article.title}
-                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                    <div className="p-6">
-                      <h3 className="text-lg font-bold text-gray-900 mb-3 uppercase tracking-wide line-clamp-2">
-                        {article.title}
-                      </h3>
-                      <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                        {article.excerpt}
-                      </p>
-                      <Link
-                        to={buildPublicUrl(`/news/${article.id}`)}
-                        className="inline-block px-5 py-2 bg-black text-white text-xs font-semibold rounded hover:bg-gray-800 transition-colors uppercase tracking-wider"
-                      >
-                        Read More
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Map Section */}
-        {defaultVenueAddress && (
-          <section id="contact" className="bg-white">
-            <div className="w-full">
-              <div className="h-[500px] bg-gray-300 overflow-hidden relative">
-                <iframe
-                  width="100%"
-                  height="100%"
-                  frameBorder="0"
-                  style={{ border: 0, filter: 'grayscale(100%) contrast(1.2) brightness(0.95)' }}
-                  src={defaultVenueCoords
-                    ? `https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${defaultVenueCoords.lat},${defaultVenueCoords.lng}&zoom=14`
-                    : `https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(
-                        defaultVenueAddress
-                      )}&zoom=14`
-                  }
-                  allowFullScreen
-                  title="Club Location"
-                />
-              </div>
-            </div>
-          </section>
-        )}
+        {homeSections.filter(sec => sec.on).map(sec => (
+          <React.Fragment key={sec.id}>{renderSection(sec.id)}</React.Fragment>
+        ))}
 
         {/* Footer */}
-        <footer className="bg-gray-900 text-white py-12 px-4">
+        <footer className="site-footer bg-gray-900 text-white py-12 px-4">
           <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
               <div>
-                <h3 className="text-lg font-bold mb-4">{club.name}</h3>
+                {logoDark ? (
+                  <img src={logoDark} alt={club.name} className="h-12 w-auto object-contain mb-4" />
+                ) : (
+                  <h3 className="text-lg font-bold mb-4">{club.name}</h3>
+                )}
                 <p className="text-gray-400 text-sm mb-4 line-clamp-3">
                   {club.club_introduction || club.description}
                 </p>
@@ -1015,7 +1013,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
                   href="https://alfiepro.com.au"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors text-sm"
+                  className="site-btn site-btn-p inline-block px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors text-sm"
                 >
                   Become a Member
                 </a>

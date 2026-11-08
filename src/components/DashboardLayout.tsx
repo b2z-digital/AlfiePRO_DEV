@@ -64,6 +64,7 @@ import { EventWebsiteManagement } from './pages/EventWebsiteManagement';
 import { EventWebsiteDashboard } from './pages/EventWebsiteDashboard';
 import ClubWebsiteAnalytics from './pages/ClubWebsiteAnalytics';
 import { WebsiteHomepageManager } from './pages/WebsiteHomepageManager';
+import { WebsiteHub } from './website/WebsiteHub';
 import MediaPage from '../pages/MediaPage';
 import AlfieTVPage from '../pages/AlfieTVPage';
 import AlfieTVAdmin from './alfie-tv/AlfieTVAdmin';
@@ -245,6 +246,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const { addNotification } = useNotifications();
 
   const orgType = currentOrganization?.type === 'national' ? 'national' : currentOrganization?.type === 'state' ? 'state' : null;
+  // Clubs get the Website hub; associations keep their existing website screens
+  const clubWebsite = !currentOrganization && !!currentClub?.clubId;
   const { trackPageView } = usePlatformTracking(
     currentClub?.clubId || null,
     currentOrganization?.id || null,
@@ -2212,10 +2215,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/livestream" element={<LivestreamPage />} />
 
               {/* Website Routes */}
-              <Route path="/website" element={<WebsiteOverview darkMode={darkMode} />} />
-              <Route path="/website/homepage" element={<WebsiteHomepageManager />} />
+              <Route path="/website" element={clubWebsite ? <WebsiteHub tab="overview" /> : <WebsiteOverview darkMode={darkMode} />} />
+              <Route path="/website/homepage" element={clubWebsite ? <WebsiteHub tab="homepage" /> : <WebsiteHomepageManager />} />
               <Route path="/website/pages" element={
-                currentClub?.club?.id ? (
+                clubWebsite ? (
+                  <WebsiteHub tab="pages" />
+                ) : currentClub?.club?.id ? (
                   <OrganizationPageManager
                     organizationType="club"
                     organizationId={currentClub.club.id}
@@ -2239,14 +2244,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <WebsitePageEditorSimple onBack={() => navigate('/website/pages')} />
                 )
               } />
-              <Route path="/website/navigation" element={<WebsiteNavigation darkMode={darkMode} onBack={() => navigate('/website')} />} />
-              <Route path="/website/theme" element={<WebsiteTheme darkMode={darkMode} />} />
-              <Route path="/website/analytics" element={<ClubWebsiteAnalytics darkMode={darkMode} onBack={() => navigate('/website')} />} />
-              <Route path="/website/event-websites-management" element={<EventWebsiteManagement darkMode={darkMode} />} />
+              <Route path="/website/navigation" element={clubWebsite ? <Navigate to="/website/pages" replace /> : <WebsiteNavigation darkMode={darkMode} onBack={() => navigate('/website')} />} />
+              <Route path="/website/theme" element={clubWebsite ? <WebsiteHub tab="design" /> : <WebsiteTheme darkMode={darkMode} />} />
+              <Route path="/website/analytics" element={clubWebsite ? <WebsiteHub tab="analytics" /> : <ClubWebsiteAnalytics darkMode={darkMode} onBack={() => navigate('/website')} />} />
+              <Route path="/website/event-websites-management" element={clubWebsite ? <WebsiteHub tab="events" /> : <EventWebsiteManagement darkMode={darkMode} />} />
               <Route path="/website/event-websites/:websiteId" element={<EventWebsiteDashboard darkMode={darkMode} />} />
               <Route path="/event-websites" element={<EventWebsiteManagement darkMode={darkMode} />} />
               <Route path="/event-websites/:websiteId" element={<EventWebsiteDashboard darkMode={darkMode} />} />
-              <Route path="/website/settings" element={<WebsiteSettings darkMode={darkMode} />} />
+              <Route path="/website/settings" element={clubWebsite ? <WebsiteHub tab="domain" /> : <WebsiteSettings darkMode={darkMode} />} />
               
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>

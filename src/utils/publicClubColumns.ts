@@ -29,6 +29,9 @@ export const PUBLIC_CLUB_COLUMNS = [
   'default_share_description',
   'facebook_pixel_id',
   'twitter_handle',
+  'website_theme',
+  'website_menu',
+  'website_layout',
   'created_at',
   'updated_at',
 ].join(', ');
