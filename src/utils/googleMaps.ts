@@ -9,17 +9,35 @@ export const loadGoogleMaps = (callback: () => void) => {
     return;
   }
 
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  if (!apiKey) {
-    console.warn('Google Maps API key is not configured');
-    return;
-  }
-
   callbacks.push(callback);
 
   if (isLoading) return;
 
   isLoading = true;
+  // Builds without the key (the phone apps) get it from the app-services function (Supabase secrets)
+  const buildKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+  (buildKey ? Promise.resolve(buildKey) : fetchMapsKey()).then(apiKey => {
+    if (!apiKey) {
+      console.warn('Google Maps API key is not configured');
+      isLoading = false;
+      callbacks.length = 0;
+      return;
+    }
+    injectScript(apiKey);
+  });
+};
+
+async function fetchMapsKey(): Promise<string | null> {
+  try {
+    const { supabase } = await import('./supabase');
+    const { data, error } = await supabase.functions.invoke('app-services', { body: { action: 'maps-key' } });
+    return error ? null : (data?.key || null);
+  } catch {
+    return null;
+  }
+}
+
+function injectScript(apiKey: string) {
   const script = document.createElement('script');
   script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
   script.async = true;
@@ -39,4 +57,4 @@ export const loadGoogleMaps = (callback: () => void) => {
   };
 
   document.head.appendChild(script);
-};
+}

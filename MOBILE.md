@@ -145,7 +145,12 @@ One-off set-up, in the repo's Settings → Secrets and variables → Actions:
 | `APPLE_TEAM_ID` | variable or secret | developer.apple.com → Membership details → Team ID |
 | `ASC_KEY_ID`, `ASC_ISSUER_ID` | secrets | App Store Connect → Users and Access → Integrations → App Store Connect API → new **Team key** with the **Admin** role (Admin lets Xcode create the distribution certificate and profile itself) |
 | `ASC_KEY_P8` | secret | the contents of the downloaded `AuthKey_XXXX.p8` (it can only be downloaded once) |
-| `VITE_GOOGLE_MAPS_API_KEY`, `VITE_GOOGLE_CLIENT_ID`, `VITE_WEATHER_API_KEY`, `VITE_OPENWEATHER_API_KEY`, `VITE_STORMGLASS_API_KEY` | secrets (optional) | same values as the website's hosting settings; without them Find racing's map and Wind & tides fall back |
+
+Maps and weather keys aren't built into the app: the `app-services` Supabase function (`supabase/functions/app-services`)
+reads them from Supabase → Edge Functions → Secrets (`GOOGLE_MAPS_API_KEY`, `OPENWEATHER_API_KEY`,
+`STORMGLASS_API_KEY`; a few other common names are accepted too), calls OpenWeatherMap and Stormglass for the app,
+and hands the Maps JavaScript key to signed-in members. `utils/weatherAPI.ts` and `utils/googleMaps.ts` use it
+whenever the build has no `VITE_` key, so the website keeps working as before.
 
 Also: Supabase → Auth → URL configuration → add `alfiepro://auth/callback` (Google sign-in); if the Google Maps key
 is limited to websites, add `capacitor://localhost` to its allowed referrers. In App Store Connect → TestFlight,

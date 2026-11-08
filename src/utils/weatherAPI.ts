@@ -8,6 +8,31 @@ const WEATHER_API_BASE = 'https://api.openweathermap.org/data/2.5';
 const MARINE_API_BASE = 'https://api.stormglass.io/v2';
 const MARINE_API_KEY = import.meta.env.VITE_STORMGLASS_API_KEY || '';
 
+// Without keys in this build (the phone apps), the app-services function calls the weather
+// services with the keys kept in Supabase secrets.
+async function viaServices(body: Record<string, unknown>): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('app-services', { body });
+  if (error) throw error;
+  return data;
+}
+
+async function openWeather(kind: 'weather' | 'forecast', lat: number, lon: number): Promise<any> {
+  if (!WEATHER_API_KEY) return viaServices({ action: 'weather', kind, lat, lon });
+  const response = await fetch(`${WEATHER_API_BASE}/${kind}?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric`);
+  if (!response.ok) throw new Error('Failed to fetch weather data');
+  return response.json();
+}
+
+async function stormglass(kind: 'point' | 'tides', lat: number, lon: number, start?: number, end?: number): Promise<any> {
+  if (!MARINE_API_KEY) return viaServices({ action: 'marine', kind, lat, lon, start, end });
+  const url = kind === 'tides'
+    ? `${MARINE_API_BASE}/tide/extremes/point?lat=${lat}&lng=${lon}`
+    : `${MARINE_API_BASE}/weather/point?lat=${lat}&lng=${lon}&params=waterTemperature,waveHeight,waveDirection,wavePeriod&start=${start}&end=${end}`;
+  const response = await fetch(url, { headers: { 'Authorization': MARINE_API_KEY } });
+  if (!response.ok) throw new Error('Failed to fetch marine data');
+  return response.json();
+}
+
 // Cache durations in milliseconds
 const CACHE_DURATION = {
   CURRENT: 60 * 60 * 1000, // 1 hour
@@ -182,11 +207,6 @@ const updateWeatherCache = async (
 
 // Fetch current weather data (with caching)
 export const getCurrentWeather = async (lat: number, lon: number, locationName: string = 'Unknown'): Promise<WeatherData | null> => {
-  if (!WEATHER_API_KEY) {
-    console.error('Weather API key not configured');
-    return null;
-  }
-
   try {
     // Check cache first
     const cache = await getWeatherCache(lat, lon, locationName);
@@ -198,15 +218,7 @@ export const getCurrentWeather = async (lat: number, lon: number, locationName: 
 
     // Fetch fresh data
     console.log('Fetching fresh weather data from API');
-    const response = await fetch(
-      `${WEATHER_API_BASE}/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric`
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch weather data');
-    }
-
-    const data = await response.json();
+    const data = await openWeather('weather', lat, lon);
 
     const weatherData: WeatherData = {
       temperature: Math.round(data.main.temp),
@@ -284,7 +296,7 @@ export const getAllWeatherData = async (lat: number, lon: number, locationName: 
       if (dailyData) updates.daily_forecast = dailyData;
     }
 
-    if (marineStale && MARINE_API_KEY) {
+    if (marineStale) {
       const marineData = await fetchMarineDataFromAPI(lat, lon);
       if (marineData) updates.marine_data = marineData;
     }
@@ -316,16 +328,8 @@ export const getAllWeatherData = async (lat: number, lon: number, locationName: 
 
 // Internal API fetch functions (not exported)
 const fetchCurrentWeatherFromAPI = async (lat: number, lon: number): Promise<WeatherData | null> => {
-  if (!WEATHER_API_KEY) return null;
-
   try {
-    const response = await fetch(
-      `${WEATHER_API_BASE}/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric`
-    );
-
-    if (!response.ok) throw new Error('Failed to fetch weather data');
-
-    const data = await response.json();
+    const data = await openWeather('weather', lat, lon);
 
     return {
       temperature: Math.round(data.main.temp),
@@ -350,16 +354,8 @@ const fetchCurrentWeatherFromAPI = async (lat: number, lon: number): Promise<Wea
 };
 
 const fetchHourlyForecastFromAPI = async (lat: number, lon: number): Promise<WindForecast[] | null> => {
-  if (!WEATHER_API_KEY) return null;
-
   try {
-    const response = await fetch(
-      `${WEATHER_API_BASE}/forecast?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric`
-    );
-
-    if (!response.ok) throw new Error('Failed to fetch forecast data');
-
-    const data = await response.json();
+    const data = await openWeather('forecast', lat, lon);
 
     return data.list.slice(0, 8).map((item: any) => ({
       time: item.dt_txt,
@@ -374,16 +370,8 @@ const fetchHourlyForecastFromAPI = async (lat: number, lon: number): Promise<Win
 };
 
 const fetchDailyForecastFromAPI = async (lat: number, lon: number): Promise<DailyForecast[] | null> => {
-  if (!WEATHER_API_KEY) return null;
-
   try {
-    const forecastResponse = await fetch(
-      `${WEATHER_API_BASE}/forecast?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric`
-    );
-
-    if (!forecastResponse.ok) throw new Error('Failed to fetch daily forecast');
-
-    const forecastData = await forecastResponse.json();
+    const forecastData = await openWeather('forecast', lat, lon);
 
     const dailyData: { [key: string]: any[] } = {};
     forecastData.list.forEach((item: any) => {
@@ -416,28 +404,14 @@ const fetchDailyForecastFromAPI = async (lat: number, lon: number): Promise<Dail
 };
 
 const fetchMarineDataFromAPI = async (lat: number, lon: number): Promise<MarineData | null> => {
-  if (!MARINE_API_KEY) return null;
-
   try {
     const end = Math.floor(Date.now() / 1000) + 86400;
     const start = Math.floor(Date.now() / 1000);
 
-    const response = await fetch(
-      `${MARINE_API_BASE}/weather/point?lat=${lat}&lng=${lon}&params=waterTemperature,waveHeight,waveDirection,wavePeriod&start=${start}&end=${end}`,
-      { headers: { 'Authorization': MARINE_API_KEY } }
-    );
-
-    if (!response.ok) throw new Error('Failed to fetch marine data');
-
-    const data = await response.json();
+    const data = await stormglass('point', lat, lon, start, end);
     const current = data.hours[0];
 
-    const tideResponse = await fetch(
-      `${MARINE_API_BASE}/tide/extremes/point?lat=${lat}&lng=${lon}`,
-      { headers: { 'Authorization': MARINE_API_KEY } }
-    );
-
-    const tideData = await tideResponse.json();
+    const tideData = await stormglass('tides', lat, lon);
     const tides: TideData[] = tideData.data.slice(0, 4).map((tide: any) => ({
       time: tide.time,
       height: tide.height,
