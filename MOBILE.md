@@ -79,11 +79,19 @@ the same code as the desktop results table (dashboards and live pages use it too
 Race day set-up (`screens/RaceSetup.tsx`, data in `mobile/raceSetupData.ts`): Sign on, Skippers, Heats and Race settings.
 Saves go through code shared with the desktop scoring screen: `utils/raceSetup.ts` (settings save, skipper list,
 member boats, discards) and `utils/heatSetup.ts` (the heat wizard's seeding and the manual / ranking confirm).
+Starting and racing (`screens/RaceDay.tsx`, route `/race-desk/event/:key/race`, data in `mobile/raceSession.ts`):
+StartBox for the race or heat that sails next, then the race clock, OCS marks, general recall and abandon. What sails
+next and each boat's handicap come from `utils/raceProgress.ts`, shared with HeatScoringTable and YachtRaceManager.
+Sound is the desktop StartBox engine (`utils/startBoxAudio.ts`); the dial, sound sheet and keep-awake are in
+`mobile/startBoxParts.tsx`, also used by the Race Timer. The start time, roll call and marks stay on the phone
+(localStorage `alfie-m-race:<eventId>`) until the finish pad records results; "Score the finishes" opens the scoring
+sheet for now.
 
 ## Scoring tests
 
 `npm test` runs Vitest. `src/__tests__/scoring/` replays real completed rounds (skipper names anonymised, in
 `src/__tests__/fixtures/real-events.json`) through the desktop results engine and checks the phone standings match,
-plus locked snapshots of HMS and SHRS heat sizes and schedules. Any change to scoring must keep these passing.
+plus locked snapshots of HMS and SHRS heat sizes and schedules, the heat sailing order, and the handicap each boat
+sails on (checked against the handicaps the desktop recorded in the real rounds). Any change to scoring must keep these passing.
 
 Progress and gaps: `claude/alfie-mobile-app-plan.md` in the AlfiePRO project.

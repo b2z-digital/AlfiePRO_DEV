@@ -41,6 +41,7 @@ import { calculateScratchResults } from '../utils/scratchCalculations';
 import { RaceSettingsModal } from './RaceSettingsModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
+import { handicapForRace } from '../utils/raceProgress';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { AAvatar } from './alfie/Kit';
 import { ScoringTopBar } from './scoring/ScoringTopBar';
@@ -1845,26 +1846,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         );
 
     // Get the handicap for this race - use previous race's adjusted handicap or starting handicap
-    const getCurrentHandicapForRace = (raceNum: number, skipIdx: number): number => {
-      // Bounds check to prevent crashes from invalid skipperIndex
-      if (skipIdx < 0 || skipIdx >= skippers.length) {
-        console.error(`❌ Invalid skipperIndex ${skipIdx} - skippers array has ${skippers.length} entries (indices 0-${skippers.length - 1})`);
-        console.error('Stack trace:', new Error().stack);
-        return 0; // Return default handicap instead of crashing
-      }
-
-      if (raceNum === 1) {
-        return skippers[skipIdx].startHcap || 0;
-      }
-      // Find the most recent previous race result with an adjusted handicap
-      for (let prevRace = raceNum - 1; prevRace >= 1; prevRace--) {
-        const prevResult = newResults.find(r => r.race === prevRace && r.skipperIndex === skipIdx);
-        if (prevResult && prevResult.adjustedHcap !== undefined && prevResult.adjustedHcap !== null) {
-          return prevResult.adjustedHcap;
-        }
-      }
-      return skippers[skipIdx].startHcap || 0;
-    };
+    // Shared with the phone StartBox (utils/raceProgress)
+    const getCurrentHandicapForRace = (raceNum: number, skipIdx: number): number => handicapForRace(skippers, newResults, raceNum, skipIdx);
 
     const currentHandicap = getCurrentHandicapForRace(race, skipperIndex);
 

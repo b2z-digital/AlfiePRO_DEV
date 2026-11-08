@@ -4,13 +4,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { StartSequence, StartBoxState } from '../../types/startBox';
 import { getStartBoxEngine, destroyStartBoxEngine } from '../../utils/startBoxAudio';
 import { getSequences } from '../../utils/startBoxStorage';
-import { isNative } from '../../lib/native/platform';
+import { SoundSheet, StartDial, readVolume, useKeepAwake } from '../startBoxParts';
 import { useMobile } from '../MobileContext';
 import { Icon } from '../icons';
 
 const SEQ_KEY = 'alfie-m-race-timer-seq';
-const VOL_KEY = 'startbox-volume';
-const R = 136, C = 2 * Math.PI * R;
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -19,23 +17,6 @@ const elapsedStr = (ms: number) => {
   const s = Math.floor(ms / 1000), h = Math.floor(s / 3600);
   return h ? `${h}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
-
-/** Keep the screen on while the timer runs (native plugin in the apps, Wake Lock in browsers). */
-function useKeepAwake(on: boolean) {
-  useEffect(() => {
-    if (!on) return;
-    let lock: any = null;
-    if (isNative) {
-      import('@capacitor-community/keep-awake').then(({ KeepAwake }) => KeepAwake.keepAwake()).catch(() => {});
-    } else {
-      (navigator as any).wakeLock?.request('screen').then((l: any) => { lock = l; }).catch(() => {});
-    }
-    return () => {
-      if (isNative) import('@capacitor-community/keep-awake').then(({ KeepAwake }) => KeepAwake.allowSleep()).catch(() => {});
-      else lock?.release?.().catch(() => {});
-    };
-  }, [on]);
-}
 
 /**
  * The stand-alone Race Timer: the club's start sequences played by the same StartBox
@@ -56,7 +37,7 @@ export const RaceTimerScreen: React.FC = () => {
   const [now, setNow] = useState(Date.now());
   const [picking, setPicking] = useState(false);
   const [settings, setSettings] = useState(false);
-  const [volume, setVolume] = useState(() => { try { return Number(localStorage.getItem(VOL_KEY) || 0.8); } catch { return 0.8; } });
+  const [volume, setVolume] = useState(readVolume);
   const [flash, setFlash] = useState<string | null>(null);
 
   useEffect(() => {
@@ -132,18 +113,12 @@ export const RaceTimerScreen: React.FC = () => {
         </button>
       </header>
 
-      <div style={{ position: 'relative', width: 300, height: 300, maxWidth: '82vw', maxHeight: '82vw', marginTop: 22 }} role="timer" aria-live="off" aria-label={doneAt ? `Racing ${elapsedStr(now - doneAt)}` : `${mmss(remaining)} to the start`}>
-        <svg width="100%" height="100%" viewBox="0 0 300 300" aria-hidden="true" style={{ position: 'absolute', inset: 0 }}>
-          <defs><linearGradient id="m-spec" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#2E7BFF" /><stop offset=".4" stopColor="#8A4DFF" /><stop offset=".7" stopColor="#FF3E9A" /><stop offset="1" stopColor="#FF8A2B" /></linearGradient></defs>
-          <circle cx="150" cy="150" r={R} fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="14" />
-          <circle cx="150" cy="150" r={R} fill="none" stroke={doneAt ? '#34C759' : 'url(#m-spec)'} strokeWidth="14" strokeLinecap="round"
-            strokeDasharray={C} strokeDashoffset={doneAt ? 0 : C * (1 - progress)} transform="rotate(-90 150 150)" style={{ transition: running ? 'stroke-dashoffset .1s linear' : undefined }} />
-        </svg>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, textAlign: 'center', padding: '0 30px' }}>
+      <div style={{ marginTop: 22 }}>
+        <StartDial size={300} progress={progress} racing={!!doneAt} animate={running} label={doneAt ? `Racing ${elapsedStr(now - doneAt)}` : `${mmss(remaining)} to the start`}>
           <span className="m-lb" style={{ color: doneAt ? '#7DE39A' : '#FF8DC2' }}>{doneAt ? 'Racing' : 'To the start'}</span>
           <span className="m-disp m-num" style={{ fontSize: 'min(92px, 24vw)', fontWeight: 700, lineHeight: 1 }}>{doneAt ? elapsedStr(now - doneAt) : mmss(remaining)}</span>
           <span className="m-mut" style={{ fontSize: 14, minHeight: 20 }}>{doneAt ? 'Started' : phase}</span>
-        </div>
+        </StartDial>
       </div>
 
       {signals.length > 0 && !doneAt && (
@@ -200,23 +175,7 @@ export const RaceTimerScreen: React.FC = () => {
           </div>
         </>
       )}
-      {settings && (
-        <>
-          <div className="m-veil" onClick={() => setSettings(false)} />
-          <div className="m-sheet" role="dialog" aria-label="Sound">
-            <span className="m-grab" />
-            <div className="m-disp" style={{ fontSize: 21, fontWeight: 700, marginBottom: 14 }}>Sound</div>
-            <label className="m-row" style={{ gap: 12 }}>
-              <span className="m-mut" style={{ width: 60 }}>Volume</span>
-              <input type="range" min={0} max={1} step={0.05} value={volume} style={{ flex: 1, accentColor: '#0A84FF' }}
-                onChange={e => { const v = Number(e.target.value); setVolume(v); engine.setVolume(v); try { localStorage.setItem(VOL_KEY, String(v)); } catch { /* ignore */ } }} />
-              <span className="m-num" style={{ width: 36, textAlign: 'right' }}>{Math.round(volume * 100)}</span>
-            </label>
-            <button className="m-btn m-btn-g" style={{ width: '100%', marginTop: 16 }} onClick={async () => { await engine.initialize(); engine.playSynthBeep(1000, 200); }}>Test sound</button>
-            <div className="m-dim" style={{ fontSize: 12.5, marginTop: 10 }}>Turn the ringer on: some phones mute app sounds in silent mode.</div>
-          </div>
-        </>
-      )}
+      {settings && <SoundSheet engine={engine} volume={volume} onVolume={setVolume} onClose={() => setSettings(false)} />}
     </div>
   );
 };

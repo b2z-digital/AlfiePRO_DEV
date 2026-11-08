@@ -18,7 +18,7 @@ type AudioEndedCallback = () => void;
 
 const TICK_INTERVAL = 50;
 
-class StartBoxAudioEngine {
+export class StartBoxAudioEngine {
   private audioContext: AudioContext | null = null;
   private gainNode: GainNode | null = null;
   private audioBuffers: Map<string, AudioBuffer> = new Map();

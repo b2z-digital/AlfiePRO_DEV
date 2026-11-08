@@ -8,6 +8,7 @@ import { Icon, IconName } from '../icons';
 import { Avatar, RootHeader, Skeleton, fmtDay } from '../ui';
 import { RacingNav } from './Racing';
 import { parseDay, todayISO } from '../data';
+import { nextUp, runningSession } from '../raceSession';
 import {
   DESK_FORMAT, DeskItem, DeskSeries, addSeriesRound, createSingleEvent, dropsLabel, heatsLabel, loadDesk, signedOnCount, startScoring,
 } from '../raceDesk';
@@ -38,15 +39,31 @@ const heatSizes = (it: DeskItem) => {
 const useStart = () => {
   const { currentClub } = useAuth();
   const { toast, tap } = useMobile();
+  const navigate = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
-  const start = async (it: DeskItem) => {
+  /** The full scoring sheet (desktop scoring screen). */
+  const sheet = async (it: DeskItem) => {
     setBusy(it.key);
     tap('medium');
     const err = await startScoring(it.event, currentClub?.clubId || it.event.clubId);
     setBusy(null);
     if (err) toast(err);
   };
-  return { start, busy };
+  /** Start scoring: StartBox for the next race or heat (scored events re-open on the sheet). */
+  const start = async (it: DeskItem) => {
+    if (it.state === 'done') return sheet(it);
+    tap('medium');
+    navigate(`/race-desk/event/${it.key}/race`);
+  };
+  return { start, sheet, busy };
+};
+
+/** "Start scoring", "Continue scoring", or the race on the water. */
+const startLabel = (it: DeskItem) => {
+  if (it.state === 'done') return 'Re-open scoring';
+  const r = runningSession(it.event);
+  if (r) return `Racing · ${nextUp(it.event).raceLabel}`;
+  return it.racesDone > 0 ? 'Continue scoring' : 'Start scoring';
 };
 
 /* ─────────────── Race desk ─────────────── */
@@ -96,7 +113,7 @@ export const RaceDeskScreen: React.FC = () => {
                 <Check done={lead.racesDone > 0} label={lead.racesDone > 0 ? `Race ${lead.racesDone} scored` : 'Start Race 1'} value={lead.racesPlanned ? `${lead.racesDone} of ${lead.racesPlanned}` : undefined} />
               </div>
               <button className="m-btn m-btn-p" style={{ height: 50, fontSize: 16 }} onClick={() => start(lead)} disabled={busy === lead.key}>
-                <Icon name="racing" />{busy === lead.key ? 'Loading the latest results…' : lead.racesDone > 0 ? 'Continue scoring' : 'Start scoring'}
+                <Icon name="racing" />{busy === lead.key ? 'Loading the latest results…' : startLabel(lead)}
               </button>
             </div>
           ) : (
@@ -162,7 +179,7 @@ export const DeskEventScreen: React.FC = () => {
   const { memberIds, toast } = useMobile();
   const [item, setItem] = useState<DeskItem | null | undefined>(undefined);
   const [signedOn, setSignedOn] = useState<number | null>(null);
-  const { start, busy } = useStart();
+  const { start, sheet, busy } = useStart();
   useEffect(() => { loadDesk().then(d => setItem(d.items.find(i => i.key === key) || null)).catch(() => setItem(null)); }, [key]);
   useEffect(() => { if (item) signedOnCount(item.event).then(setSignedOn); }, [item?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -204,7 +221,7 @@ export const DeskEventScreen: React.FC = () => {
           <Action icon="check" label="Sign on" onClick={() => navigate(`/race-desk/event/${item.key}/sign-on`)} />
           <Action icon="club" label="Skippers" onClick={() => navigate(`/race-desk/event/${item.key}/skippers`)} />
           <Action icon="tasks" label="Heats" onClick={() => navigate(`/race-desk/event/${item.key}/heats`)} />
-          <Action icon="racing" label={busy === item.key ? 'Loading…' : item.state === 'done' ? 'Re-open scoring' : item.racesDone > 0 ? 'Continue scoring' : 'Start scoring'} primary onClick={() => start(item)} disabled={busy === item.key} />
+          <Action icon="racing" label={busy === item.key ? 'Loading…' : startLabel(item)} primary onClick={() => start(item)} disabled={busy === item.key} />
         </div>
       )}
       <p className="m-lb m-dim" style={{ margin: '4px 0 0' }}>How it's scored</p>
@@ -213,6 +230,7 @@ export const DeskEventScreen: React.FC = () => {
         <div className="m-li"><span className="m-mut" style={{ flex: 1, fontSize: 14 }}>Drops</span><span style={{ fontSize: 14, fontWeight: 600 }}>{dropsLabel(e)}</span></div>
         <div className="m-li"><span className="m-mut" style={{ flex: 1, fontSize: 14 }}>Heats</span><span style={{ fontSize: 14, fontWeight: 600 }}>{heatsLabel(e)}</span></div>
         {item.state !== 'cancelled' && <button className="m-li" style={{ color: 'var(--m-blue-ink)' }} onClick={() => navigate(`/race-desk/event/${item.key}/settings`)}><span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Race settings</span><Icon name="chevron" size={16} /></button>}
+        {item.state !== 'cancelled' && item.state !== 'done' && <button className="m-li" style={{ color: 'var(--m-blue-ink)' }} onClick={() => sheet(item)} disabled={busy === item.key}><span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Scoring sheet</span><span className="m-dim" style={{ fontSize: 12.5, fontWeight: 400 }}>every race, letter scores</span><Icon name="chevron" size={16} /></button>}
       </div>
       {(item.proName || item.proMemberId) && (
         <>

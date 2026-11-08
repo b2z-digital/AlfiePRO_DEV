@@ -36,11 +36,11 @@ const Stepper: React.FC<{ value: number; min?: number; max?: number; step?: numb
 
 const Locked: React.FC = () => <span className="m-pill" style={{ background: 'var(--m-fill)', color: 'var(--m-dim)' }}>Locked</span>;
 
-const Loading: React.FC = () => (
+export const Loading: React.FC = () => (
   <div className="m-stack"><SubHeader title="" /><Skeleton h={120} /><Skeleton h={300} /></div>
 );
 
-const Missing: React.FC = () => (
+export const Missing: React.FC = () => (
   <div className="m-stack"><SubHeader title="" /><div className="m-card m-empty">This event isn't available.</div></div>
 );
 
@@ -450,7 +450,7 @@ const DEFAULT_CHOICES = (e: RaceEvent, hm: HeatManagement | null): HeatSetupChoi
   };
 };
 
-const HEAT_COLOURS = ['#2E7BFF', '#8A4DFF', '#FF3E9A', '#FF8A2B', '#34C759', '#40C8C0'];
+export const HEAT_COLOURS = ['#2E7BFF', '#8A4DFF', '#FF3E9A', '#FF8A2B', '#34C759', '#40C8C0'];
 
 export const HeatsScreen: React.FC = () => {
   const { key = '' } = useParams();

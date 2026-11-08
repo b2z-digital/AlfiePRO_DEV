@@ -40,6 +40,10 @@ const P: Record<string, string> = {
   camera: 'M4 8a2 2 0 0 1 2-2h2l2-2h4l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
   play: 'M7 4.5v15l12-7.5z',
   mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
+  pause: 'M7 5h3.5v14H7zM13.5 5H17v14h-3.5z',
+  recall: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5',
+  sound: 'M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13',
+  stopwatch: 'M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16M12 10v4l2 2M9 2h6M12 2v4',
 };
 
 export type IconName = keyof typeof P;
