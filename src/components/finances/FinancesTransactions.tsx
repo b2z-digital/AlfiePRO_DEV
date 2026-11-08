@@ -32,6 +32,7 @@ interface Transaction {
   tax_amount?: number | null;
   tax_rate_id?: string | null;
   tax_type?: 'none' | 'included' | 'excluded' | null;
+  approval_status?: 'not_required' | 'pending' | 'approved' | 'declined' | null;
 }
 
 interface TransactionLineItem {
@@ -270,6 +271,7 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
             tax_amount,
             tax_rate_id,
             tax_type,
+            approval_status,
             payer,
             payee,
             reference,
@@ -319,6 +321,7 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
           tax_amount,
           tax_rate_id,
           tax_type,
+          approval_status,
           payer,
           payee,
           reference,
@@ -419,6 +422,7 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
           tax_amount: transaction.tax_amount,
           tax_rate_id: transaction.tax_rate_id,
           tax_type: transaction.tax_type,
+          approval_status: transaction.approval_status,
           line_items: lineItems,
           linked_entity_type: transaction.linked_entity_type,
           linked_entity_id: transaction.linked_entity_id
@@ -637,7 +641,11 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
                   {t.category_name
                     ? <span className="a-lb-fmt justify-self-start max-w-full"><span className="a-light" style={{ background: inc ? '#30D158' : '#FF6B6B', boxShadow: 'none' }} /><span className="truncate">{t.category_name}</span></span>
                     : <span />}
-                  <span className="a-st text-[12.5px]"><span className={`a-light ${isPaid(t) ? 'a-light-g' : 'a-light-a'}`} />{isPaid(t) ? 'Paid' : 'Awaiting'}</span>
+                  {!isPaid(t) && t.approval_status === 'pending'
+                    ? <span className="a-st text-[12.5px]" title="Waiting for approval"><span className="a-light a-light-b" />For approval</span>
+                    : !isPaid(t) && t.approval_status === 'declined'
+                      ? <span className="a-st text-[12.5px]" title="Approval declined"><span className="a-light a-light-r" />Declined</span>
+                      : <span className="a-st text-[12.5px]"><span className={`a-light ${isPaid(t) ? 'a-light-g' : 'a-light-a'}`} />{isPaid(t) ? 'Paid' : 'Awaiting'}</span>}
                   <span className={`a-num text-right text-[15.5px] font-semibold ${inc ? 'a-txt-g' : 'a-txt-r'}`}>{inc ? '+' : '−'}{formatCurrency(t.amount)}</span>
                   <div className="flex justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
                     <button onClick={open} className="a-ib" aria-label="View or edit" title="View or edit"><Edit size={16} /></button>
