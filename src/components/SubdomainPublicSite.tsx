@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { PublicClubPage } from './public/PublicClubPage';
 import { supabase } from '../utils/supabase';
 import { SubdomainProvider } from '../contexts/SubdomainContext';
 import { PublicClubHomepageNew } from './public/PublicClubHomepageNew';
@@ -155,6 +156,7 @@ export const SubdomainPublicSite: React.FC<SubdomainPublicSiteProps> = ({ subdom
           <Route path="/race-calendar" element={<PublicRaceCalendarPage />} />
           <Route path="/results" element={<PublicResultsListPage />} />
           <Route path="/results/:eventId" element={<PublicResultsPage />} />
+          <Route path="/:pageSlug" element={<PublicClubPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </PublicSiteErrorBoundary>

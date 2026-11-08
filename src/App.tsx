@@ -26,6 +26,7 @@ import { UnfinancialMemberScreen } from './components/onboarding/UnfinancialMemb
 import { ClubSelfRegistration } from './components/auth/ClubSelfRegistration';
 import { ClubApplicationPendingScreen } from './components/auth/ClubApplicationPendingScreen';
 import { PublicClubHomepageNew } from './components/public/PublicClubHomepageNew';
+import { PublicClubPage } from './components/public/PublicClubPage';
 import { PublicStateAssociationHomepage } from './components/public/PublicStateAssociationHomepage';
 import { PublicNationalAssociationHomepage } from './components/public/PublicNationalAssociationHomepage';
 import { PublicResultsPage } from './components/public/PublicResultsPage';
@@ -257,6 +258,7 @@ function App() {
           <Route path="/club/:clubId/public/race-calendar" element={<PublicRaceCalendarPage />} />
           <Route path="/club/:clubId/public/results" element={<PublicResultsListPage />} />
           <Route path="/club/:clubId/public/results/:eventId" element={<PublicResultsPage />} />
+          <Route path="/club/:clubId/public/:pageSlug" element={<PublicClubPage />} />
 
         {/* Global Public Legal Pages - no club context required */}
         <Route path="/privacy-policy" element={<PublicPrivacyPolicyPage />} />
