@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Users, Calendar, ChevronRight, MapPin, Clock, TrendingUp, Award, UserCheck, Medal, Zap, Target, Globe, SquareCheck as CheckSquare, Camera, DollarSign, CircleAlert as AlertCircle, Wind, CloudRain, Droplets, Mail, MessageSquare, Bell, Plus, FileText, CreditCard, UserPlus, Send } from 'lucide-react';
+import { Trophy, Users, Calendar, ChevronRight, MapPin, Clock, TrendingUp, Award, UserCheck, Medal, Zap, Target, Globe, SquareCheck as CheckSquare, Camera, LayoutGrid, DollarSign, CircleAlert as AlertCircle, Wind, CloudRain, Droplets, Mail, MessageSquare, Bell, Plus, FileText, CreditCard, UserPlus, Send } from 'lucide-react';
 import { getStoredRaceEvents, getStoredRaceSeries, combineAllDayResults } from '../utils/raceStorage';
 import { getTopFinishers } from '../utils/standingsCalculator';
 import { getStoredMembers } from '../utils/storage';
@@ -60,7 +60,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [coverImagePosition, setCoverImagePosition] = useState({ x: 0, y: 0, scale: 1 });
   const [showCoverImageModal, setShowCoverImageModal] = useState(false);
-  const { isAdmin } = usePermissions();
+  const { isAdmin, canEditDashboard } = usePermissions();
   const [financialData, setFinancialData] = useState<any>(null);
   const [weatherData, setWeatherData] = useState<any>(null);
   const [membershipData, setMembershipData] = useState<any>(null);
@@ -1389,68 +1389,55 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const clubName = currentClub?.club?.name || 'your yacht club';
 
   return (
-    <div className={`h-full overflow-y-auto ${darkMode ? '' : 'bg-gradient-to-br from-slate-50 to-slate-100'}`}>
-      {/* Cover Image Section */}
-      <div className="relative w-full h-[300px] bg-slate-800 overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center">
+    <div className={`alfie-dash h-full overflow-y-auto ${darkMode ? '' : 'bg-gradient-to-br from-slate-50 to-slate-100'}`}>
+      {/* Club cover: runs edge to edge under the floating menu and fades into the page */}
+      <section className="alfie-dash-hero">
+        <div className="alfie-dash-hero-media" aria-hidden="true">
           <img
             src={coverImageUrl || '/lmryc_slide.jpeg'}
-            alt="Club cover"
-            className="absolute min-w-full min-h-full object-cover"
+            alt=""
             style={coverImageUrl ? {
               transform: `translate(${coverImagePosition.x}px, ${coverImagePosition.y}px) scale(${coverImagePosition.scale})`,
               transformOrigin: 'center',
             } : undefined}
           />
+          <div className="alfie-dash-hero-scrim" />
         </div>
-        <div className="absolute inset-0 bg-black opacity-10 pointer-events-none" />
 
-        {isAdmin && !isImpersonating && (
-          <button
-            onClick={() => setShowCoverImageModal(true)}
-            className="absolute top-4 right-4 p-3 bg-slate-900 bg-opacity-30 hover:bg-opacity-50 text-white rounded-lg backdrop-blur-sm transition-all flex items-center gap-2"
-            title={coverImageUrl ? 'Change Cover' : 'Add Cover'}
-          >
-            <Camera className="w-5 h-5" />
-          </button>
+        {((isAdmin && !isImpersonating) || canEditDashboard) && (
+          <div className="alfie-dash-tools" role="toolbar" aria-label="Dashboard tools">
+            {isAdmin && !isImpersonating && (
+              <button type="button" onClick={() => setShowCoverImageModal(true)} title={coverImageUrl ? 'Change the cover photo' : 'Add a cover photo'}>
+                <Camera size={17} />
+                <span>Cover photo</span>
+              </button>
+            )}
+            {isAdmin && !isImpersonating && canEditDashboard && <span className="alfie-dash-tools-sep" />}
+            {canEditDashboard && (
+              <button type="button" onClick={() => window.dispatchEvent(new Event('alfie-dashboard-edit'))} title="Customise your dashboard">
+                <LayoutGrid size={17} />
+                <span>Customise</span>
+              </button>
+            )}
+          </div>
         )}
 
-        {/* Welcome Header Overlay */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/90 via-slate-900/70 to-transparent p-4 sm:p-8 lg:p-16">
-          <div className="flex items-center gap-3 sm:gap-4">
-            {userAvatarUrl && (
-              <img
-                src={userAvatarUrl}
-                alt={firstName || 'User'}
-                className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border border-white/30"
-              />
-            )}
-            <div>
-              <h1
-                className="text-xl sm:text-2xl lg:text-3xl font-bold"
-                style={{
-                  color: '#ffffff',
-                  textShadow: '0 2px 8px rgba(0, 0, 0, 0.8), 0 4px 16px rgba(0, 0, 0, 0.6)'
-                }}
-              >
-                Welcome to Alfie Pro{firstName ? `, ${firstName}` : ''}!
-              </h1>
-              <p
-                className="text-sm sm:text-base mt-1"
-                style={{
-                  color: '#ffffff',
-                  opacity: 0.95,
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.7)'
-                }}
-              >
-                The Ultimate Principal Race Officer & Club Mgt Tool for {clubName}.
-              </p>
-            </div>
+        <div className="alfie-dash-hero-body px-4 sm:px-6 lg:px-16">
+          {userAvatarUrl && (
+            <img src={userAvatarUrl} alt={firstName || 'User'} className="alfie-dash-avatar" />
+          )}
+          <div className="min-w-0">
+            <h1 className="alfie-dash-title">
+              Welcome to Alfie Pro{firstName ? `, ${firstName}` : ''}!
+            </h1>
+            <p className="alfie-dash-sub">
+              The Ultimate Principal Race Officer & Club Mgt Tool for {clubName}.
+            </p>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="p-4 sm:p-6 lg:p-16 lg:pt-8">
+      <div className="alfie-dash-body p-4 sm:p-6 lg:p-16 lg:pt-2">
         {/* Trial Status Banner */}
         <TrialStatusBanner />
 
@@ -1461,7 +1448,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         <ProfileCompletionBanner />
 
         {/* Customizable Dashboard - Full Widget System (includes all widgets) */}
-        <CustomizableDashboard />
+        <CustomizableDashboard hideEditButton />
       </div>
 
       {/* Cover Image Upload Modal */}
