@@ -20,6 +20,7 @@ import LiveTrackingQRCodeModal from '../live-tracking/LiveTrackingQRCodeModal';
 import { EventWebsiteSettingsModal } from '../events/EventWebsiteSettingsModal';
 import { EventWebsiteDashboard } from '../events/EventWebsiteDashboard';
 import { supabase } from '../../utils/supabase';
+import { useLiveEventIds } from '../../utils/liveBroadcasts';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { getPublicEvents, convertToRaceEvent } from '../../utils/publicEventStorage';
@@ -43,6 +44,8 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { currentClub, currentOrganization, user, isRaceOfficer } = useAuth();
+  // Events with a public broadcast live now get a LIVE badge (livestream board "Event Live")
+  const liveEventIds = useLiveEventIds(currentClub?.clubId);
   const { addNotification } = useNotifications();
 
   // DIAGNOSTIC: Log when component mounts
@@ -1391,7 +1394,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
 
             {/* Status Badge */}
             <div className="absolute top-3 right-3">
-              {race.completed ? (
+              {liveEventIds.has(race.id) ? (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#E11D38] text-white text-xs font-bold tracking-wider shadow-lg" title="Live now: open the event and choose Live">
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" aria-hidden="true" />
+                  LIVE
+                </div>
+              ) : race.completed ? (
                 <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-green-500/90 backdrop-blur-sm text-white text-xs font-medium">
                   <CheckCircle2 size={14} className="text-white" />
                   <span className="text-white">Completed</span>
@@ -1469,6 +1477,13 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                       : 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
                   }`}>
                     {race.eventLevel === 'state' ? 'State Event' : 'National Event'}
+                  </div>
+                )}
+                {/* LIVE badge for cards without images */}
+                {!venueImage && liveEventIds.has(race.id) && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E11D38] text-white text-xs font-bold tracking-wider" title="Live now: open the event and choose Live">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" aria-hidden="true" />
+                    LIVE
                   </div>
                 )}
                 {/* Completion badge for cards without images */}

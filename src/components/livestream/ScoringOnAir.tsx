@@ -279,7 +279,7 @@ export function ScoringOnAir({ clubId, eventId, eventName }: ScoringOnAirProps) 
                 <Video size={18} className="text-red-400" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-white">Livestream Console</h3>
+                <h3 className="text-base font-semibold text-white">Control room</h3>
                 <p className="text-xs text-slate-400">{eventName || 'Live Broadcast'}</p>
               </div>
             </div>

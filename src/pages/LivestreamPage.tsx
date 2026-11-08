@@ -25,14 +25,14 @@ export default function LivestreamPage() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-sm flex-shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 px-5 py-3 border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-sm flex-shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
             <Video className="w-4 h-4 text-red-400" />
           </div>
           <div>
             <h1 className="text-lg font-semibold text-white leading-tight">Live</h1>
-            <p className="text-xs text-slate-500">Broadcast your racing live in AlfieTV; every race goes to YouTube</p>
+            <p className="text-xs text-slate-500 hidden sm:block">Broadcast your racing live in AlfieTV; every race goes to YouTube</p>
           </div>
         </div>
 

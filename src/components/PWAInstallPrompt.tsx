@@ -20,7 +20,10 @@ const PWAInstallPrompt: React.FC = () => {
     setIsIOS(isIOSDevice);
     setIsStandalone(isInStandaloneMode);
 
-    const isPublicPage = window.location.pathname.includes('/public/');
+    const isPublicPage = window.location.pathname.includes('/public/') ||
+                         // Live camera, program recorder and test bench: a banner would cover the
+                         // camera controls and end up in the broadcast picture
+                         window.location.pathname.startsWith('/live/');
     const isAuthPage = window.location.pathname === '/login' ||
                        window.location.pathname === '/register' ||
                        window.location.pathname === '/forgot-password' ||

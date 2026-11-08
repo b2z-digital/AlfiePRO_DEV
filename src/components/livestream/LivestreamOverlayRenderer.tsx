@@ -13,9 +13,49 @@ interface LivestreamOverlayRendererProps {
   titleCardTrigger?: number;
   venueImage?: string;
   venueName?: string;
+  /** Show the last scored race's results card again (Results scene in the control room) */
+  resultsTrigger?: number;
+  /** Tells the control room what scoring is doing (race, status, whether results exist) */
+  onScoring?: (summary: OverlayScoringSummary | null) => void;
+  /**
+   * Where the race data comes from when this page can't read it itself: the cloud
+   * program page runs signed out, so it gets the same rows from the live-cloud function.
+   */
+  loadSource?: () => Promise<OverlaySource | null>;
+  /** Time zone for the race bar clock (the cloud recorder runs in UTC) */
+  timeZone?: string;
 }
 
-export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, LivestreamOverlayRendererProps>(function LivestreamOverlayRenderer({ session, raceData, weatherData, showTitleCard, titleCardTrigger = 0, venueImage, venueName }, ref) {
+/** The rows the overlays are built from: the race (quick race shape), its public event and race status */
+export interface OverlaySource {
+  race: any;
+  event: any;
+  status: { status: string; lastUpdate: string | null; notes: string | null; day: number | null } | null;
+}
+
+export interface OverlayScoringSummary {
+  race: string;
+  status: string;
+  label: string;
+  hasResults: boolean;
+}
+
+/** Race word and status label as the overlay race bar shows them */
+export function describeScoring(data: any, sessionHeat?: number | null) {
+  const race = data?.heat_label
+    ? String(data.heat_label)
+    : `${data?.race_type === 'heat' ? 'Heat' : 'Race'} ${data?.heat_number || data?.race_number || sessionHeat || 1}`;
+  const raw = String(data?.status || '');
+  const [label, tone] =
+    raw === 'live' || raw === 'in_progress' ? ['Racing', 'is-racing'] :
+    raw === 'on_hold' ? ['On hold', 'is-hold'] :
+    raw === 'completed_for_day' ? ['Done for today', 'is-done'] :
+    raw === 'event_complete' || raw === 'completed' ? ['Finished', 'is-done'] :
+    raw === 'preparing' ? ['Getting ready', 'is-done'] : ['', ''];
+  return { race, raw, label, tone };
+}
+
+export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, LivestreamOverlayRendererProps>(function LivestreamOverlayRenderer({ session, raceData, weatherData, showTitleCard, titleCardTrigger = 0, venueImage, venueName, resultsTrigger = 0, onScoring, loadSource, timeZone }, ref) {
   const [overlays, setOverlays] = useState<LivestreamOverlay[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [liveTrackingData, setLiveTrackingData] = useState<any>(null);
@@ -112,8 +152,13 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
       let error = null;
       // Race status is looked up under this id (series rounds linked by round id use the series id)
       let statusEventId = session.event_id;
+      // Rows handed in by the page (cloud program page) instead of read here
+      const external = loadSource ? await loadSource().catch(() => null) : null;
+      if (loadSource && !external) return;
 
-      if (isSeriesRound) {
+      if (external) {
+        quickRaces = external.race;
+      } else if (isSeriesRound) {
         // Extract series ID and day number
         const parts = session.event_id.split('-');
         const dayNumber = parseInt(parts[parts.length - 1]);
@@ -235,8 +280,8 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
       console.log('[Overlay Debug] Quick race data:', quickRaces, error);
 
       // Get the public event details if we have a public_event_id
-      let eventData = null;
-      if (quickRaces?.public_event_id) {
+      let eventData = external ? external.event : null;
+      if (!external && quickRaces?.public_event_id) {
         const { data, error: eventError } = await supabase
           .from('public_events')
           .select('id, event_name, date, end_date')
@@ -248,7 +293,7 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
       }
 
       // Get race status
-      const raceStatusData = await getRaceStatus(statusEventId);
+      const raceStatusData = external ? (external.status as Awaited<ReturnType<typeof getRaceStatus>>) : await getRaceStatus(statusEventId);
       console.log('[Overlay Debug] Race status data:', raceStatusData);
 
       if (error) {
@@ -503,6 +548,23 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
   const displayData = liveTrackingData || raceData;
   const displaySkippers = liveSkippers.length > 0 ? liveSkippers : (raceData?.skippers || []);
 
+  // Results scene: bring the last scored race's results back for 20 seconds
+  useEffect(() => {
+    if (resultsTrigger > 0 && lastRaceResultsRef.current?.rows.length) {
+      setResultsUntil(Date.now() + 20000);
+    }
+  }, [resultsTrigger]);
+
+  const scoringKey = displayData?.status
+    ? `${describeScoring(displayData, session.heat_number).race}|${displayData.status}|${lastRaceResultsRef.current?.rows.length ? 1 : 0}`
+    : '';
+  useEffect(() => {
+    if (!onScoring) return;
+    if (!scoringKey) { onScoring(null); return; }
+    const d = describeScoring(displayData, session.heat_number);
+    onScoring({ race: d.race, status: d.raw, label: d.label, hasResults: !!lastRaceResultsRef.current?.rows.length });
+  }, [scoringKey]);
+
   if (!session.enable_overlays) {
     return null;
   }
@@ -520,18 +582,13 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
   const finishedCount = fleetRows.filter((s: any) => s.racePosition).length;
   const compactFleet = fleetRows.length > 14;
   const fleetMax = 22;
-  const raceWord = displayData?.heat_label
-    ? String(displayData.heat_label).toUpperCase()
-    : `${displayData?.race_type === 'heat' ? 'HEAT' : 'RACE'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || 1}`;
+  const scoringNow = describeScoring(displayData, session.heat_number);
+  const raceWord = scoringNow.race.toUpperCase();
   const fleetHeading = `${raceWord} · ${fleetRows.length} BOATS`;
-  const rawStatus = String(displayData?.status || '');
+  const rawStatus = scoringNow.raw;
   const isOnHold = rawStatus === 'on_hold';
-  const [statusLabel, statusTone] =
-    rawStatus === 'live' || rawStatus === 'in_progress' ? ['Racing', 'is-racing'] :
-    rawStatus === 'on_hold' ? ['On hold', 'is-hold'] :
-    rawStatus === 'completed_for_day' ? ['Done for today', 'is-done'] :
-    rawStatus === 'event_complete' || rawStatus === 'completed' ? ['Finished', 'is-done'] :
-    rawStatus === 'preparing' ? ['Getting ready', 'is-done'] : ['', ''];
+  const statusLabel = scoringNow.label;
+  const statusTone = scoringNow.tone;
   const showResults = resultsUntil > currentTime.getTime();
   // The stream capture can't ellipsize, so long names are shortened up front
   const clip = (text: string, max: number) => (text && text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
@@ -631,7 +688,10 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
         {statusLabel && (
           <span className={`status ${statusTone}`}><span className="dot" />{statusLabel}</span>
         )}
-        <span className="clock">{currentTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+        <span className="clock">{(() => {
+          try { return currentTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', ...(timeZone ? { timeZone } : {}) }); }
+          catch { return currentTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+        })()}</span>
         {config.showWeather && weatherData?.windSpeed ? (
           <span className="wind">Wind {weatherData.windDirection ? `${weatherData.windDirection}° ` : ''}{weatherData.windSpeed} kn</span>
         ) : null}

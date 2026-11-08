@@ -32,3 +32,11 @@ export type RtkMeeting = Awaited<ReturnType<Awaited<ReturnType<typeof loadRealti
 
 export const CAMERA_PRESET = 'alfie_camera';
 export const PROGRAM_MESSAGE = 'alfie-program';
+/** A note from the control room to one camera ({ to: participantId }) or all of them ({ to: 'all' }) */
+export const NOTE_MESSAGE = 'alfie-note';
+/** The broadcast has ended: cameras stop sending and say so */
+export const ENDED_MESSAGE = 'alfie-ended';
+/** Control room → program page: show the title card / the last race's results / hold on or off */
+export const TITLE_MESSAGE = 'alfie-title';
+export const RESULTS_MESSAGE = 'alfie-results';
+export const HOLD_MESSAGE = 'alfie-hold';
