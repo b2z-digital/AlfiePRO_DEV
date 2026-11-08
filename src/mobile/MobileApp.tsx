@@ -16,6 +16,7 @@ import { DeskEventScreen, RaceDeskScreen, SeasonScreen } from './screens/RaceDes
 import { HeatsScreen, RaceSettingsScreen, SignOnScreen, SkippersScreen } from './screens/RaceSetup';
 import { RaceScreen } from './screens/RaceDay';
 import { FinishPadScreen } from './screens/FinishPad';
+import { ConfirmRaceScreen } from './screens/ConfirmRace';
 import { ClubHub } from './screens/Club';
 import { ChatsInbox, ChatThread } from './screens/Chats';
 import { SkipperProfile } from './screens/Skipper';
@@ -39,7 +40,7 @@ const AskAlfieChatPanel = lazy(() => import('../components/ask-alfie/AskAlfieCha
 
 /** Screens that sit outside the tab bar (pushed full screen). */
 const FIRST_RUN_PATHS = ['/choose-club', '/welcome-notifications', '/membership-due'];
-const NO_TABS = [/^\/(choose-club|welcome-notifications|membership-due)/, /^\/notifications/, /^\/race-timer/, /^\/race-desk\/event\/[^/]+\/(race|finish)$/, /^\/comms\/chat\//, /^\/classifieds\/[^/]+/, /^\/news\/[^/]+/];
+const NO_TABS = [/^\/(choose-club|welcome-notifications|membership-due)/, /^\/notifications/, /^\/race-timer/, /^\/race-desk\/event\/[^/]+\/(race|finish|confirm)$/, /^\/comms\/chat\//, /^\/classifieds\/[^/]+/, /^\/news\/[^/]+/];
 
 const AlfieSheet: React.FC<{ onClose: () => void; message?: string }> = ({ onClose, message }) => {
   const { light } = useMobile();
@@ -101,6 +102,7 @@ const Shell: React.FC = () => {
           <Route path="/race-desk/event/:key/settings" element={<RaceSettingsScreen />} />
           <Route path="/race-desk/event/:key/race" element={<RaceScreen />} />
           <Route path="/race-desk/event/:key/finish" element={<FinishPadScreen />} />
+          <Route path="/race-desk/event/:key/confirm" element={<ConfirmRaceScreen />} />
           <Route path="/club" element={<ClubHub />} />
           <Route path="/community/*" element={<Navigate to="/club" replace />} />
           <Route path="/comms" element={<ChatsInbox />} />

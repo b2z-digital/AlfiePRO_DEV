@@ -21,6 +21,7 @@ import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { LiveStatusControl } from './LiveStatusControl';
 import { addFinish, applyLetterScore, previousResultsFor, finishOrderToResults, loadFinishOrder, moveFinish, removeFinish, sailSortedIndices, type FinishingEntry } from '../utils/finishOrder';
 import { peekFinishHandoff, takeFinishHandoff } from '../utils/finishHandoff';
+import { overrideHandicapIn } from '../utils/scoringConfirm';
 
 
 
@@ -805,18 +806,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   };
 
   const handleOverrideHandicap = (skipperIndex: number, value: number) => {
-    const latestRace = Math.max(
-      ...raceResults
-        .filter(r => r.skipperIndex === skipperIndex && r.adjustedHcap !== undefined)
-        .map(r => r.race),
-      0
-    );
-    if (latestRace === 0) return;
-    const updatedResults = raceResults.map(r =>
-      r.race === latestRace && r.skipperIndex === skipperIndex
-        ? { ...r, adjustedHcap: value, handicapOverride: true }
-        : r
-    );
+    const updatedResults = overrideHandicapIn(raceResults, skipperIndex, value);
+    if (!updatedResults) return;
     updateRaceResults(updatedResults);
   };
 

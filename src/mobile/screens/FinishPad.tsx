@@ -6,18 +6,15 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 import type { Skipper } from '../../types';
 import type { LetterScore } from '../../types/letterScores';
 import {
   REDRESS_AVERAGE_ALL, REDRESS_AVERAGE_PENULTIMATE, REDRESS_AVERAGE_SERIES, ROD_POINTS_FLAG,
   POSITION_PRESERVING_SCORES, addFinish, applyLetterScore, moveFinish, previousResultsFor, redressAverage, removeFinish, sailSortedIndices, sortFinishOrder, type FinishingEntry,
 } from '../../utils/finishOrder';
-import { setFinishHandoff } from '../../utils/finishHandoff';
 import { heatManagementOf, scoringStateOf } from '../../utils/raceSetup';
 import { useMobile } from '../MobileContext';
 import { Icon } from '../icons';
-import { startScoring } from '../raceDesk';
 import { useSetupEvent } from '../raceSetupData';
 import { NextUp, RaceSession, clock, forScoring, loadSession, nextUp, sailOf, saveSession } from '../raceSession';
 import { PadBoats, keypadMatches, keypadPick, matchCalls, ordinal, padBoats, parseSpoken, shortName, startingOrder } from '../finishPad';
@@ -37,9 +34,9 @@ const COMMITTEE: [LetterScore, string][] = [['RDG', 'Redress'], ['DPI', 'Penalty
 
 type Redress = 'avg_event' | 'avg_penultimate' | 'avg_series' | 'manual';
 
-interface LetterTarget { index: number; current?: FinishingEntry }
+export interface LetterTarget { index: number; current?: FinishingEntry }
 
-const LetterSheet: React.FC<{
+export const LetterSheet: React.FC<{
   target: LetterTarget; skipper?: Skipper; race: number; raceLabel: string; heatLabel: string; heatSize: number; entrants: number;
   prev: ReturnType<typeof previousResultsFor>; shrs: boolean; heats: boolean; multiDay: boolean; numberOfDays?: number; currentDay?: number;
   onApply: (code: LetterScore, points?: number) => void; onClear: () => void; onClose: () => void;
@@ -287,71 +284,11 @@ const KeypadPad: React.FC<{ boats: PadBoats; open: number[]; typed: string; lett
   );
 };
 
-/* ─────────────── review ─────────────── */
-
-const ReviewSheet: React.FC<{
-  order: FinishingEntry[]; boats: PadBoats; missing: number[]; absentMissing: number[]; busy: boolean; you: string[];
-  onMove: (from: number, to: number) => void; onRow: (e: FinishingEntry) => void; onRemove: (e: FinishingEntry) => void;
-  onBulk: (indices: number[], code: LetterScore) => void; onSend: () => void; onClose: () => void;
-}> = ({ order, boats, missing, absentMissing, busy, you, onMove, onRow, onRemove, onBulk, onSend, onClose }) => {
-  const done = missing.length === 0;
-  const lastFinisher = order.filter(e => !e.letterScore).length - 1;
-  const name = (i: number) => (you.includes(boats.skippers[i]?.memberId || '') ? 'You' : boats.skippers[i]?.name || '');
-  return (
-    <>
-      <div className="m-veil" onClick={onClose} />
-      <div className="m-sheet" role="dialog" aria-label="Finish order">
-        <span className="m-grab" />
-        <div className="m-row">
-          <div className="m-disp" style={{ flex: 1, fontSize: 21, fontWeight: 700 }}>Finish order</div>
-          <button className="m-link" onClick={onClose}>Done</button>
-        </div>
-        <p className="m-mut" style={{ fontSize: 13.5, margin: '4px 0 10px' }}>Move a boat with the arrows; tap one for a letter score.</p>
-        {order.length === 0 ? <div className="m-empty">No finishes called yet.</div> : (
-          <div className="m-card">
-            {order.map((e, k) => (
-              <div key={e.skipperIndex} className="m-li" style={{ gap: 8 }}>
-                <span className="m-disp" style={{ width: 40, fontWeight: 700, fontSize: e.letterScore ? 13 : 16, color: e.letterScore ? 'var(--m-red-ink)' : undefined }}>{e.letterScore || ordinal(e.position)}</span>
-                <button className="m-row" style={{ flex: 1, minWidth: 0, gap: 10, background: 'none', border: 0, padding: 0, textAlign: 'left' }} onClick={() => onRow(e)} aria-label={`Letter score for ${sailOf(boats.skippers[e.skipperIndex])}`}>
-                  <span className={`m-sail ${e.letterScore ? 'm-sail-ocs' : ''}`}>{sailOf(boats.skippers[e.skipperIndex]) || '–'}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name(e.skipperIndex)}</span>
-                </button>
-                {!e.letterScore && <button className="m-ibtn m-ibtn-s" aria-label="Move up" disabled={k === 0} onClick={() => onMove(k, k - 1)}><Icon name="up" size={18} /></button>}
-                {!e.letterScore && <button className="m-ibtn m-ibtn-s" aria-label="Move down" disabled={k >= lastFinisher} onClick={() => onMove(k, k + 1)}><Icon name="down" size={18} /></button>}
-                <button className="m-ibtn m-ibtn-s" aria-label="Take out of the order" onClick={() => onRemove(e)}><Icon name="close" size={16} /></button>
-              </div>
-            ))}
-          </div>
-        )}
-        {missing.length > 0 && (
-          <div className="m-card" style={{ padding: '12px 14px', marginTop: 10 }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{missing.length} boat{missing.length > 1 ? 's have' : ' has'} no finish yet</div>
-            <div className="m-row" style={{ flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-              {missing.map(i => <span key={i} className="m-sail">{sailOf(boats.skippers[i]) || '–'}</span>)}
-            </div>
-            <div className="m-row" style={{ gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              {absentMissing.length > 0 && <button className="m-btn m-btn-g" style={{ height: 40 }} onClick={() => onBulk(absentMissing, 'DNS')}>Absent boats DNS ({absentMissing.length})</button>}
-              <button className="m-btn m-btn-g" style={{ height: 40 }} onClick={() => onBulk(missing, 'DNF')}>Mark {missing.length > 1 ? 'them' : 'it'} DNF</button>
-            </div>
-          </div>
-        )}
-        <button className="m-btn m-btn-p" style={{ width: '100%', height: 54, marginTop: 14 }} disabled={busy || order.length === 0} onClick={onSend}>
-          {busy ? 'Opening…' : done ? 'Confirm on the scoring sheet' : 'Continue on the scoring sheet'}
-        </button>
-        <div className="m-dim" style={{ fontSize: 12.5, marginTop: 8, textAlign: 'center' }}>
-          {done ? 'The sheet saves this order, works out handicaps and heats, and you confirm the race there.' : 'Every boat needs a finish or a letter score before the race can be confirmed.'}
-        </div>
-      </div>
-    </>
-  );
-};
-
 /* ─────────────── screen ─────────────── */
 
 export const FinishPadScreen: React.FC = () => {
   const { key = '' } = useParams();
   const navigate = useNavigate();
-  const { currentClub } = useAuth();
   const { tap, toast, memberIds } = useMobile();
   const { item, event } = useSetupEvent(key);
   const up = useMemo(() => (event ? nextUp(event) : null), [event]);
@@ -399,8 +336,6 @@ export const FinishPadScreen: React.FC = () => {
   useKeepAwake(true);
 
   const [letter, setLetter] = useState<LetterTarget | null>(null);
-  const [review, setReview] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [typed, setTyped] = useState('');
   const [letterMode, setLetterMode] = useState(false);
 
@@ -541,7 +476,6 @@ export const FinishPadScreen: React.FC = () => {
   const left = total - order.length;
   const open = sailSortedIndices(skippers).filter(i => !finished.has(i));
   const absentLocal = (session.rollCall?.absent || []).map(g => boats.globalOf.indexOf(g)).filter(i => i >= 0);
-  const missing = sailSortedIndices(skippers).filter(i => !finished.has(i));
   const isYou = (i: number) => memberIds.includes(skippers[i]?.memberId || '');
 
   const e = forScoring(event);
@@ -582,18 +516,6 @@ export const FinishPadScreen: React.FC = () => {
     if (letterMode) { setLetter({ index: i, current: entryOf(i) }); setLetterMode(false); setTyped(''); return; }
     finishBoat(i); setTyped('');
   };
-  const send = async () => {
-    setBusy(true);
-    setFinishHandoff({
-      eventId: event.id,
-      race: up.race,
-      heat: up.heat,
-      entries: orderRef.current.map(x => ({ ...x, skipperIndex: boats.globalOf[x.skipperIndex] })),
-    });
-    const err = await startScoring(event, currentClub?.clubId || event.clubId);
-    setBusy(false);
-    if (err) toast(err);
-  };
   const prev = letter ? previousResultsFor(boats.results as any, up.race, letter.index) : [];
 
   return (
@@ -622,21 +544,13 @@ export const FinishPadScreen: React.FC = () => {
       <div className="m-dim" style={{ fontSize: 12.5, textAlign: 'center' }} aria-live="polite">
         {finishers} of {total} finished{ocs ? ` · ${ocs} OCS` : ''}{letters.length - ocs ? ` · ${letters.length - ocs} letter score${letters.length - ocs > 1 ? 's' : ''}` : ''}{left > 0 ? ` · ${left} racing` : ''}
       </div>
-      <button className={`m-btn ${left === 0 ? 'm-btn-p' : 'm-btn-g'}`} style={{ height: 50 }} onClick={() => { stopListening(); setReview(true); }}>Review finish order</button>
+      <button className={`m-btn ${left === 0 ? 'm-btn-p' : 'm-btn-g'}`} style={{ height: 50 }} onClick={() => { stopListening(); navigate(`/race-desk/event/${key}/confirm`); }}>Review finish order</button>
 
       {letter && (
         <LetterSheet target={letter} skipper={skippers[letter.index]} race={up.race} raceLabel={up.raceLabel} heatLabel={heats ? up.heatLabel : ''}
           heatSize={total} entrants={(st.skippers || []).length} prev={prev} shrs={shrs} heats={heats}
           multiDay={!!event.multiDay} numberOfDays={event.numberOfDays} currentDay={e.currentDay}
           onApply={(c, p) => applyLetter(c, p)} onClear={() => applyLetter(null)} onClose={() => setLetter(null)} />
-      )}
-      {review && !letter && (
-        <ReviewSheet order={order} boats={boats} missing={missing} absentMissing={absentLocal.filter(i => !finished.has(i))} busy={busy} you={memberIds}
-          onMove={(a, b) => { setOrder(moveFinish(orderRef.current, a, b)); tap('light'); }}
-          onRow={en => setLetter({ index: en.skipperIndex, current: en })}
-          onRemove={en => { setOrder(en.letterScore ? applyLetterScore(orderRef.current, skippers, en.skipperIndex, null) : removeFinish(orderRef.current, en.skipperIndex)); tap('light'); }}
-          onBulk={(list, code) => { let o = orderRef.current; for (const i of list) o = applyLetterScore(o, skippers, i, code); setOrder(o); tap('medium'); }}
-          onSend={send} onClose={() => setReview(false)} />
       )}
     </div>
   );

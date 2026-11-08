@@ -42,6 +42,7 @@ import { RaceSettingsModal } from './RaceSettingsModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
 import { peekFinishHandoff } from '../utils/finishHandoff';
+import { advanceToNextRoundIn, completeHeatIn, confirmTouchRace, handicapsFor, heatManagementAfterResult, loadHandicapSettings, mergeCompletedRoundResults, replaceRaceResultsForSkippersIn, skippersAfterHeatResult, updateMemberHandicapsFor } from '../utils/scoringConfirm';
 import { handicapForRace } from '../utils/raceProgress';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { AAvatar } from './alfie/Kit';
@@ -488,21 +489,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         setRulesetLoading(true);
         (async () => {
           try {
-            if (currentEvent.handicap_ruleset_id) {
-              const rs = await loadRulesetById(currentEvent.handicap_ruleset_id);
-              if (rs) {
-                setActiveRuleset(rs);
-                setEventRulesetId(currentEvent.handicap_ruleset_id);
-                setCapLimit(rs.config.cap_limit);
-                setLastPlaceBonus(rs.config.last_place_bonus_enabled);
-                return;
-              }
-            }
-            const rs = await loadRulesetForClub(currentEvent.clubId);
-            if (rs) {
-              setActiveRuleset(rs);
-              setCapLimit(rs.config.cap_limit);
-              setLastPlaceBonus(rs.config.last_place_bonus_enabled);
+            const hs = await loadHandicapSettings(currentEvent);
+            if (hs.ruleset) {
+              setActiveRuleset(hs.ruleset);
+              if (hs.eventRulesetId) setEventRulesetId(hs.eventRulesetId);
+              setCapLimit(hs.capLimit);
+              setLastPlaceBonus(hs.lastPlaceBonus);
             }
           } catch (err) {
             console.error('Failed to load handicap ruleset:', err);
@@ -1294,9 +1286,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     // Must wait for skippers: running against an empty list wipes the loaded skippers when the ruleset loads first
     if (isDataFullyLoaded && skippers.length > 0 && raceResults.length > 0 && raceType === 'handicap' && !heatManagement?.configuration.enabled && !rulesetLoading) {
       try {
-        const { updatedSkippers, updatedResults } = activeRuleset
-          ? calculateHandicapsWithRuleset(skippers, raceResults, currentNumRaces, activeRuleset, isManualHandicaps)
-          : calculateHandicaps(skippers, raceResults, currentNumRaces, capLimit, lastPlaceBonus, isManualHandicaps);
+        const { updatedSkippers, updatedResults } = handicapsFor(skippers, raceResults, currentNumRaces, { ruleset: activeRuleset, capLimit, lastPlaceBonus }, isManualHandicaps);
 
         const hasResultChanges = raceResults.some((r, i) => {
           const u = updatedResults[i];
@@ -1731,55 +1721,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   };
 
   const updateMemberHandicaps = async (race: number, results: any[]) => {
-    if (activeRuleset && activeRuleset.config.persist_handicaps === false) {
-      return;
-    }
-    try {
-      const handicapUpdates = skippers
-        .map((skipper, index) => {
-          const result = results.find(r => r.race === race && r.skipperIndex === index);
-          if (result && result.adjustedHcap !== undefined && skipper.boatId) {
-            return {
-              boatId: skipper.boatId,
-              memberId: skipper.memberId,
-              handicap: result.adjustedHcap
-            };
-          }
-          return null;
-        })
-        .filter((update): update is { boatId: string; memberId?: string; handicap: number } => update !== null);
-
-      for (const update of handicapUpdates) {
-        const { error } = await supabase
-          .from('member_boats')
-          .update({ handicap: update.handicap })
-          .eq('id', update.boatId);
-
-        if (error) {
-          console.error(`Error updating handicap for boat ${update.boatId}:`, error);
-          continue;
-        }
-
-        if (update.memberId) {
-          const { data: thisBoat } = await supabase
-            .from('member_boats')
-            .select('boat_type, member_id')
-            .eq('id', update.boatId)
-            .maybeSingle();
-
-          if (thisBoat?.boat_type) {
-            await supabase
-              .from('member_boats')
-              .update({ handicap: update.handicap })
-              .eq('member_id', thisBoat.member_id)
-              .eq('boat_type', thisBoat.boat_type)
-              .neq('id', update.boatId);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error updating boat handicaps:', error);
-    }
+    await updateMemberHandicapsFor(skippers, race, results, activeRuleset);
   };
 
   const updateRaceResults = (race: number, skipperIndex: number, position: number | null, letterScore?: LetterScore, customPoints?: number, hmsHeat?: string, hmsPosition?: number) => {
@@ -2206,50 +2148,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   ) => {
     console.log('🔄 Replacing race', race, 'results for', skipperIndices.length, 'skippers with', newEntries.length, 'entries');
 
-    setRaceResults(prevResults => {
-      const skipperSet = new Set(skipperIndices);
-
-      // First, filter out all old results for this race and these skippers
-      const filteredResults = prevResults.filter(
-        r => !(r.race === race && skipperSet.has(r.skipperIndex))
-      );
-
-      console.log('📊 Removed old results, count:', prevResults.length, '->', filteredResults.length);
-
-      // Then add the new entries
-      const updatedResults = [...filteredResults];
-      newEntries.forEach(entry => {
-        const currentHandicap = (() => {
-          if (entry.skipperIndex < 0 || entry.skipperIndex >= skippers.length) {
-            return 0;
-          }
-          if (race === 1) {
-            return skippers[entry.skipperIndex].startHcap || 0;
-          }
-          for (let prevRace = race - 1; prevRace >= 1; prevRace--) {
-            const prevResult = filteredResults.find(r => r.race === prevRace && r.skipperIndex === entry.skipperIndex);
-            if (prevResult && prevResult.adjustedHcap !== undefined && prevResult.adjustedHcap !== null) {
-              return prevResult.adjustedHcap;
-            }
-          }
-          return skippers[entry.skipperIndex].startHcap || 0;
-        })();
-
-        updatedResults.push({
-          race,
-          skipperIndex: entry.skipperIndex,
-          position: entry.position,
-          letterScore: entry.letterScore,
-          customPoints: entry.customPoints,
-          handicap: currentHandicap,
-          adjustedHcap: currentHandicap
-        });
-      });
-
-      console.log('➕ Added new entries, final count:', updatedResults.length);
-
-      return updatedResults;
-    });
+    setRaceResults(prevResults => replaceRaceResultsForSkippersIn(prevResults, skippers, race, skipperIndices, newEntries));
   };
 
   const enableRaceEditing = async (raceNum: number | null) => {
@@ -2946,81 +2845,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   };
 
   const handleUpdateHeatResult = (result: HeatResult) => {
-    // If WDN letter score, mark skipper as withdrawn from this round onwards
-    if (result.letterScore === 'WDN') {
-      const skipperIdx = result.skipperIndex;
-      const withdrawRound = result.round;
-      if (skippers[skipperIdx] && !skippers[skipperIdx].withdrawnFromRace) {
-        const newSkippers = [...skippers];
-        newSkippers[skipperIdx] = { ...newSkippers[skipperIdx], withdrawnFromRace: withdrawRound };
-        setSkippers(newSkippers);
-      }
-    } else if (result.position !== null || (result.letterScore && result.letterScore !== 'DNC')) {
-      // Re-entry: if a withdrawn skipper gets a finishing position or non-DNC score,
-      // clear their withdrawal - they're back in the competition
-      const skipperIdx = result.skipperIndex;
-      if (skippers[skipperIdx]?.withdrawnFromRace != null && result.round >= skippers[skipperIdx].withdrawnFromRace!) {
-        const newSkippers = [...skippers];
-        newSkippers[skipperIdx] = { ...newSkippers[skipperIdx], withdrawnFromRace: undefined };
-        setSkippers(newSkippers);
-      }
-    }
+    // WDN withdraws the skipper from this round on; a finish brings a withdrawn skipper back
+    const newSkippers = skippersAfterHeatResult(skippers, result);
+    if (newSkippers) setSkippers(newSkippers);
 
     setHeatManagement(prevHM => {
       if (!prevHM) return prevHM;
-      let updated = updateHeatResult(prevHM, result);
-
-      // Auto-DNC for withdrawn skipper in all subsequent existing rounds
-      if (result.letterScore === 'WDN') {
-        const withdrawRound = result.round;
-        const heatSize = updated.configuration?.heatsPerRound || 1;
-        const maxSkippersInHeat = Math.max(
-          ...updated.rounds.flatMap(r => r.heatAssignments.map(a => a.skipperIndices.length)),
-          1
-        );
-
-        for (const round of updated.rounds) {
-          if (round.round <= withdrawRound) continue;
-          // Check if skipper already has a result in this round
-          const hasResult = round.results.some(
-            r => r.skipperIndex === result.skipperIndex
-          );
-          if (!hasResult) {
-            // Find which heat assignment (if any) this skipper is in for this round
-            const assignment = round.heatAssignments.find(a =>
-              a.skipperIndices.includes(result.skipperIndex)
-            );
-            const heatDes = assignment?.heatDesignation || result.heatDesignation;
-
-            const dncResult: HeatResult = {
-              skipperIndex: result.skipperIndex,
-              position: null,
-              letterScore: 'DNC',
-              customPoints: maxSkippersInHeat + 1,
-              heatDesignation: heatDes,
-              race: 1,
-              round: round.round
-            };
-            updated = updateHeatResult(updated, dncResult);
-          }
-        }
-      } else if (result.position !== null && result.letterScore !== 'DNC') {
-        // Re-entry: clear any auto-DNC results for subsequent rounds
-        // since skipper is back in the competition
-        const skipperIdx = result.skipperIndex;
-        const skipper = skippers[skipperIdx];
-        if (skipper?.withdrawnFromRace != null && result.round >= skipper.withdrawnFromRace) {
-          for (const round of updated.rounds) {
-            if (round.round <= result.round) continue;
-            // Remove auto-DNC results for this skipper in future rounds
-            round.results = round.results.filter(
-              r => !(r.skipperIndex === skipperIdx && r.letterScore === 'DNC')
-            );
-          }
-        }
-      }
-
-      return updated;
+      return heatManagementAfterResult(prevHM, skippers, result);
     });
   };
 
@@ -3250,52 +3081,14 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       if (!prevHM) return prevHM;
       console.log(`handleCompleteHeat updater: prevHM round=${prevHM.currentRound}, total results in current round=${prevHM.rounds.find(r => r.round === prevHM.currentRound)?.results.length}`);
 
-      let updatedHeatManagement = completeHeat(prevHM, heat, currentDropRules);
-      console.log(`handleCompleteHeat: after completeHeat, roundJustCompleted=${updatedHeatManagement.roundJustCompleted}, currentRound completed=${updatedHeatManagement.rounds.find(r => r.round === updatedHeatManagement.currentRound)?.completed}`);
+      const done = completeHeatIn(prevHM, heat, currentDropRules, skippers);
+      const updatedHeatManagement = done.heatManagement;
+      console.log(`handleCompleteHeat: after completeHeat, roundJustCompleted=${updatedHeatManagement.roundJustCompleted}, currentRound completed=${done.roundCompleted}`);
 
-      // Auto-DNC withdrawn skippers in newly created rounds
-      const withdrawnSkippers = skippers
-        .map((s, i) => ({ index: i, withdrawnFromRace: s.withdrawnFromRace }))
-        .filter(s => s.withdrawnFromRace != null);
+      if (done.convertedResults.length > 0) {
+        setRaceResults(prevResults => mergeCompletedRoundResults(prevResults, done.convertedResults, done.completedRoundNumbers));
 
-      if (withdrawnSkippers.length > 0) {
-        const maxHeatSize = Math.max(
-          ...updatedHeatManagement.rounds.flatMap(r => r.heatAssignments.map(a => a.skipperIndices.length)),
-          1
-        );
-        for (const ws of withdrawnSkippers) {
-          for (const round of updatedHeatManagement.rounds) {
-            if (round.round < ws.withdrawnFromRace!) continue;
-            const hasResult = round.results.some(r => r.skipperIndex === ws.index);
-            if (!hasResult) {
-              const assignment = round.heatAssignments.find(a => a.skipperIndices.includes(ws.index));
-              const heatDes = assignment?.heatDesignation || 'A' as HeatDesignation;
-              updatedHeatManagement = updateHeatResult(updatedHeatManagement, {
-                skipperIndex: ws.index,
-                position: null,
-                letterScore: 'DNC',
-                customPoints: maxHeatSize + 1,
-                heatDesignation: heatDes,
-                race: 1,
-                round: round.round
-              });
-            }
-          }
-        }
-      }
-
-      const convertedResults = convertHeatResultsToRaceResults(updatedHeatManagement, skippers);
-      if (convertedResults.length > 0) {
-        const completedRoundNumbers = new Set(
-          updatedHeatManagement.rounds.filter(r => r.completed).map(r => r.round)
-        );
-        setRaceResults(prevResults => {
-          const inProgressResults = prevResults.filter(r => !completedRoundNumbers.has(r.race));
-          return [...convertedResults, ...inProgressResults];
-        });
-
-        const currentRoundData = updatedHeatManagement.rounds.find(r => r.round === updatedHeatManagement.currentRound);
-        if (currentRoundData?.completed) {
+        if (done.roundCompleted) {
           console.log('Round', updatedHeatManagement.currentRound, 'completed - updating lastCompletedRace');
           setLastCompletedRace(updatedHeatManagement.currentRound);
 
@@ -3311,11 +3104,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             ).catch(() => {});
           }
         } else {
-          const completedRounds = updatedHeatManagement.rounds.filter(r => r.completed);
-          const highestCompletedRound = completedRounds.length > 0
-            ? Math.max(...completedRounds.map(r => r.round))
-            : 0;
-          setLastCompletedRace(highestCompletedRound);
+          setLastCompletedRace(done.lastCompletedRace);
         }
       }
 
@@ -3347,68 +3136,16 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     setHeatManagement(prevHM => {
       if (!prevHM) return prevHM;
 
-      let updatedHM = prevHM;
-
-      const isHeatDesignation = typeof heatOrRound === 'string' && ['A', 'B', 'C', 'D', 'E', 'F'].includes(heatOrRound);
-
-      if (isHeatDesignation) {
-        updatedHM = completeHeat(prevHM, heatOrRound as HeatDesignation, currentDropRules);
-      }
-
-      const currentRoundData = updatedHM.rounds.find(r => r.round === updatedHM.currentRound);
-      const isCurrentRoundComplete = currentRoundData?.completed;
-
-      let targetRoundNumber: number;
-      if (typeof heatOrRound === 'number') {
-        targetRoundNumber = heatOrRound;
-      } else {
-        targetRoundNumber = updatedHM.currentRound + (isCurrentRoundComplete ? 1 : 0);
-      }
-
-      let targetRoundExists = updatedHM.rounds.some(r => r.round === targetRoundNumber);
-
-      if (!targetRoundExists) {
-        // If the current round is complete, create the next round dynamically
-        const currentRd = updatedHM.rounds.find(r => r.round === updatedHM.currentRound);
-        if (currentRd?.completed && targetRoundNumber === updatedHM.currentRound + 1) {
-          try {
-            const nextRoundAssignments = generateNextRoundAssignments(currentRd, updatedHM);
-            updatedHM = {
-              ...updatedHM,
-              rounds: [...updatedHM.rounds, {
-                round: targetRoundNumber,
-                heatAssignments: nextRoundAssignments,
-                results: [],
-                completed: false
-              }]
-            };
-            targetRoundExists = true;
-          } catch (e) {
-            console.error('Failed to create next round:', e);
-          }
-        }
-
-        if (!targetRoundExists) {
-          console.error('Target round', targetRoundNumber, 'does not exist');
-          return updatedHM;
-        }
-      }
-
-      const result = {
-        ...updatedHM,
-        currentRound: targetRoundNumber,
-        roundJustCompleted: undefined
-      };
-
-      const convertedResults = convertHeatResultsToRaceResults(result, skippers);
+      const advanced = advanceToNextRoundIn(prevHM, heatOrRound, currentDropRules, skippers);
+      const convertedResults = advanced.convertedResults;
       if (convertedResults.length > 0) {
         setTimeout(() => {
           setRaceResults(convertedResults);
-          setLastCompletedRace(targetRoundNumber - 1);
+          setLastCompletedRace(advanced.lastCompletedRace!);
         }, 0);
       }
 
-      return result;
+      return advanced.heatManagement;
     });
   };
 
@@ -4251,9 +3988,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 updateRaceResults={(results: RaceResult[]) => {
                   if (raceType === 'handicap' && !heatManagement?.configuration.enabled && !rulesetLoading && results.length > 0) {
                     try {
-                      const { updatedSkippers: newSkippers, updatedResults: newResults } = activeRuleset
-                        ? calculateHandicapsWithRuleset(skippers, results, currentNumRaces, activeRuleset, isManualHandicaps)
-                        : calculateHandicaps(skippers, results, currentNumRaces, capLimit, lastPlaceBonus, isManualHandicaps);
+                      const { updatedSkippers: newSkippers, updatedResults: newResults } = handicapsFor(skippers, results, currentNumRaces, { ruleset: activeRuleset, capLimit, lastPlaceBonus }, isManualHandicaps);
                       setSkippers(newSkippers);
                       setRaceResults(newResults);
                       setLastUpdateTime(new Date());
@@ -4269,75 +4004,31 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   console.log('✅ Touch mode: User confirmed results, marking race as complete');
 
                   setRaceResults(latestResults => {
-                    let highestConsecutiveRace = 0;
-                    for (let r = 1; r <= currentNumRaces; r++) {
-                      const isComplete = skippers.every((skipper, index) => {
-                        const result = latestResults.find(res => res.race === r && res.skipperIndex === index);
-                        if (result && (result.position !== null || result.letterScore)) {
-                          return true;
-                        }
-                        if (skipper.withdrawnFromRace && r >= skipper.withdrawnFromRace) {
-                          return true;
-                        }
-                        return false;
-                      });
-                      if (isComplete) {
-                        highestConsecutiveRace = r;
-                      } else {
-                        // For handicap races, accept if at least half the skippers have results
-                        if (raceType === 'handicap') {
-                          const raceResultsForR = latestResults.filter(res => res.race === r && (res.position !== null || res.letterScore));
-                          if (raceResultsForR.length >= Math.ceil(skippers.length * 0.5) && raceResultsForR.length >= 2) {
-                            highestConsecutiveRace = r;
-                            continue;
-                          }
-                        }
-                        break;
-                      }
-                    }
+                    const confirmed = confirmTouchRace(latestResults, {
+                      skippers,
+                      numRaces: currentNumRaces,
+                      lastCompletedRace,
+                      raceType,
+                      isManualHandicaps,
+                      hasDeterminedInitialHcaps,
+                    });
+                    const highestConsecutiveRace = confirmed.highestConsecutiveRace;
+                    const newLastCompleted = confirmed.newLastCompleted;
 
-                    const newLastCompleted = Math.max(highestConsecutiveRace, lastCompletedRace);
-
-                    if (highestConsecutiveRace > lastCompletedRace) {
+                    if (confirmed.advanced) {
                       setLastCompletedRace(highestConsecutiveRace);
                       setEditingRace(null);
 
-                      if (highestConsecutiveRace >= currentNumRaces) {
-                        const newNumRaces = currentNumRaces + 1;
-                        setCurrentNumRaces(newNumRaces);
+                      if (confirmed.numRaces !== currentNumRaces) {
+                        setCurrentNumRaces(confirmed.numRaces);
                       }
 
-                      if (raceType === 'handicap') {
-                        const race1Complete = highestConsecutiveRace >= 1 && skippers.every((_, index) => {
-                          const result = latestResults.find(r => r.race === 1 && r.skipperIndex === index);
-                          return result && (result.position !== null || result.letterScore);
-                        });
+                      if (confirmed.skippers !== skippers) setSkippers(confirmed.skippers);
+                      if (confirmed.isManualHandicaps !== isManualHandicaps) setIsManualHandicaps(confirmed.isManualHandicaps);
+                      if (confirmed.hasDeterminedInitialHcaps !== hasDeterminedInitialHcaps) setHasDeterminedInitialHcaps(confirmed.hasDeterminedInitialHcaps);
 
-                        if (race1Complete && !isManualHandicaps && !hasDeterminedInitialHcaps) {
-                          const hasPresetHandicaps = skippers.some(s => s.startHcap > 0);
-                          if (!hasPresetHandicaps) {
-                            const step = 10;
-                            const ranking = skippers.map((_, idx) => ({
-                              idx,
-                              pos: latestResults.find(r => r.race === 1 && r.skipperIndex === idx)?.position || 0
-                            })).sort((a, b) => a.pos - b.pos);
-
-                            const updatedSkippers = [...skippers];
-                            ranking.forEach((r, rank) => {
-                              const handicap = rank * step;
-                              updatedSkippers[r.idx] = { ...updatedSkippers[r.idx], startHcap: handicap };
-                            });
-
-                            setSkippers(updatedSkippers);
-                          } else {
-                            setIsManualHandicaps(true);
-                          }
-                          setHasDeterminedInitialHcaps(true);
-                        }
-
-                        for (let r = lastCompletedRace + 1; r <= highestConsecutiveRace; r++) {
-                          updateMemberHandicaps(r, latestResults);
-                        }
+                      for (const r of confirmed.memberHandicapRaces) {
+                        updateMemberHandicaps(r, latestResults);
                       }
                     }
 
