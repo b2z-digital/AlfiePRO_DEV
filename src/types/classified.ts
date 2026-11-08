@@ -1,3 +1,20 @@
+/**
+ * How to show one photo: turn it upright and frame it on the item.
+ * Kept per photo URL in classifieds.image_meta; the photo file is unchanged.
+ */
+export interface ClassifiedImageMeta {
+  /** Clockwise turn needed to stand the photo upright: 0, 90, 180 or 270 */
+  r?: number;
+  /** Where the item is, in % of the photo as stored (before turning) */
+  x?: number;
+  y?: number;
+  /** 'ai' = set automatically on import, 'manual' = set by a person (never overwritten) */
+  by?: 'ai' | 'manual';
+  /** File size when it was checked, so a replaced photo gets checked again */
+  len?: number;
+  at?: string;
+}
+
 export interface Classified {
   id: string;
   title: string;
@@ -7,6 +24,7 @@ export interface Classified {
   category: string;
   condition: 'new' | 'like new' | 'good' | 'fair' | 'used';
   images: string[];
+  image_meta?: Record<string, ClassifiedImageMeta> | null;
   contact_email: string;
   contact_phone?: string;
   user_id: string;
@@ -89,6 +107,7 @@ export interface ClassifiedFormData {
   category: string;
   condition: string;
   images: string[];
+  image_meta?: Record<string, ClassifiedImageMeta>;
   contact_email: string;
   contact_phone?: string;
   club_id?: string;

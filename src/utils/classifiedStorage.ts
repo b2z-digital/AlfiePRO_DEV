@@ -222,6 +222,7 @@ export async function createClassified(classifiedData: ClassifiedFormData, userI
     };
 
     if (classifiedData.boat_class) cleanData.boat_class = classifiedData.boat_class;
+    if (classifiedData.image_meta && Object.keys(classifiedData.image_meta).length > 0) cleanData.image_meta = classifiedData.image_meta;
 
     if (isExternal) {
       cleanData.created_by_user_id = userId;
