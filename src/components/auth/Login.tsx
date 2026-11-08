@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { signInWithOAuthProvider } from '../../lib/native/oauth';
+import { isNative } from '../../lib/native/platform';
+import { readMobilePreviewFlag } from '../../mobile/preview';
+import { MobileWelcome } from '../../mobile/screens/Welcome';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { sanitizePassword } from '../../utils/password';
@@ -118,6 +121,11 @@ export const Login: React.FC = () => {
       setGoogleLoading(false);
     }
   };
+
+  // Apps and the phone preview get the branded phone sign-in (mobile design board)
+  if (isMobile && (isNative || readMobilePreviewFlag())) {
+    return <MobileWelcome />;
+  }
 
   if (isMobile && !showLogin) {
     return (

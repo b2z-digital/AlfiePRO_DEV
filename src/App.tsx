@@ -72,6 +72,9 @@ import { MobileAppComingSoon } from './components/MobileAppComingSoon';
 import { JoinScoringSessionPage } from './pages/JoinScoringSessionPage';
 import './styles/index.css';
 import { isNative } from './lib/native/platform';
+import { readMobilePreviewFlag } from './mobile/preview';
+const MobileApp = lazy(() => import('./mobile/MobileApp'));
+const mobilePreview = readMobilePreviewFlag();
 
 function useIsMobilePhone() {
   const [isMobile, setIsMobile] = useState(false);
@@ -409,9 +412,10 @@ function App() {
               <Navigate to="/onboarding" />
             ) : hasUnfinancialMember && unfinancialMemberData ? (
               <UnfinancialMemberScreen memberData={unfinancialMemberData} darkMode={darkMode} />
-            ) : isMobilePhone && !isNative ? (
-              // Phone browsers: replaced by the phone shell once the mobile design board is approved.
-              // The native apps skip this screen (it sends people to the App Store).
+            ) : isMobilePhone && (isNative || mobilePreview) ? (
+              // Phone screens from the mobile design board (apps always; phone browsers with ?mobile=1 while it's built)
+              <Suspense fallback={<AlfieLoader light={!darkMode} />}><MobileApp /></Suspense>
+            ) : isMobilePhone ? (
               <MobileAppComingSoon />
             ) : (
               <DashboardLayout
