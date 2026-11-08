@@ -395,14 +395,16 @@ Deno.serve(async req => {
       return json({ ok: true });
     }
 
-    if (!who.userId) return json({ error: 'Please sign in again' }, 401);
+    if (!who.userId && !who.service) return json({ error: 'Please sign in again' }, 401);
+    // The server itself (service key) may build feeds and send tests, e.g. for checks after a deploy.
+    const allowed = async (clubId: string) => who.service || (await canManage(who.userId, clubId));
 
     if (action === 'feed') {
       const clubId = String(body.club_id || '');
-      if (!(await canManage(who.userId, clubId))) return json({ error: 'Not allowed' }, 403);
+      if (!(await allowed(clubId))) return json({ error: 'Not allowed' }, 403);
       const ctx = await loadClub(clubId);
       let memberId: string | null = body.member_id || null;
-      if (!memberId) {
+      if (!memberId && who.userId) {
         const { data: me } = await db.from('members').select('id').eq('club_id', clubId).eq('user_id', who.userId).limit(1).maybeSingle();
         memberId = me?.id ?? null;
       }
@@ -412,14 +414,14 @@ Deno.serve(async req => {
 
     if (action === 'test') {
       const clubId = String(body.club_id || '');
-      if (!(await canManage(who.userId, clubId))) return json({ error: 'Not allowed' }, 403);
+      if (!(await allowed(clubId))) return json({ error: 'Not allowed' }, 403);
       const to: string[] = Array.from(new Set((Array.isArray(body.to) ? body.to : []).map((e: unknown) => String(e || '').trim().toLowerCase()).filter((e: string) => EMAIL_RE.test(e)))).slice(0, 10) as string[];
       if (!to.length) return json({ error: 'Add an email address to send the test to' }, 400);
       const ctx = await loadClub(clubId);
       const doc = normaliseDoc(body.doc);
       if (!doc.blocks.length) return json({ error: 'The email is empty' }, 400);
       let testMember: string | null = body.member_id || null;
-      if (!testMember) {
+      if (!testMember && who.userId) {
         const { data: me } = await db.from('members').select('id').eq('club_id', clubId).eq('user_id', who.userId).limit(1).maybeSingle();
         testMember = me?.id ?? null;
       }
