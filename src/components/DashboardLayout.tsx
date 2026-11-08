@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { PanelLeftOpen, PanelLeftClose } from 'lucide-react';
+import { PanelLeftOpen, PanelLeftClose, ShieldCheck } from 'lucide-react';
 import { Trophy, Building, Calendar, CalendarDays, Users, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay, Radio, ClipboardList } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -34,6 +34,7 @@ import ArticleDetailPage from '../pages/ArticleDetailPage';
 import ArticleEditorPage from '../pages/ArticleEditorPage';
 import { FinancesPage } from '../pages/FinancesPage';
 import { MeetingsPage } from './pages/MeetingsPage';
+import { ApprovalsPage } from './pages/ApprovalsPage';
 import { RankingsManagement } from './pages/RankingsManagement';
 import { NameMappingManager } from './pages/NameMappingManager';
 import { TasksPage } from './tasks/TasksPage';
@@ -258,6 +259,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [unreadTasksCount, setUnreadTasksCount] = useState(0);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [membershipActionCount, setMembershipActionCount] = useState(0);
   const [unreadConversationsCount, setUnreadConversationsCount] = useState(0);
   const [unreadCommunityCount, setUnreadCommunityCount] = useState(0);
@@ -388,8 +390,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     fetchUnreadCommunityCount();
   }, [currentClub]);
 
+  // Expenses waiting for this person's approval (shows "Approvals" in My Stuff)
+  const fetchPendingApprovalsCount = async () => {
+    if (!effectiveUserId || !navigator.onLine) return;
+    const { count, error } = await supabase
+      .from('finance_approvals')
+      .select('id', { count: 'exact', head: true })
+      .eq('approver_user_id', effectiveUserId)
+      .eq('status', 'pending');
+    setPendingApprovalsCount(error ? 0 : count || 0);
+  };
+
   useEffect(() => {
     // Refresh counts when navigating between pages
+    fetchPendingApprovalsCount();
     fetchUnreadNotificationsCount();
     fetchUnreadTasksCount();
     fetchUnreadConversationsCount();
@@ -924,6 +938,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       collapsible: true,
       icon: FolderOpen,
       items: [
+        ...(pendingApprovalsCount > 0 || location.pathname.startsWith('/approvals') ? [{
+          id: 'approvals',
+          label: 'Approvals',
+          icon: ShieldCheck,
+          description: 'Expenses waiting for your approval',
+          path: '/approvals'
+        }] : []),
         ...(!isMember ? [{
           id: 'my-membership',
           label: 'My Membership',
@@ -1388,6 +1409,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                               {item.id === 'tasks' && unreadTasksCount > 0 && (
                                 <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
                                   {unreadTasksCount}
+                                </div>
+                              )}
+                              {item.id === 'approvals' && pendingApprovalsCount > 0 && (
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                                  {pendingApprovalsCount}
                                 </div>
                               )}
                               {item.id === 'membership-dashboard' && membershipActionCount > 0 && (
@@ -1856,6 +1882,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                                   {unreadTasksCount}
                                 </div>
                               )}
+                              {item.id === 'approvals' && pendingApprovalsCount > 0 && (
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                                  {pendingApprovalsCount}
+                                </div>
+                              )}
                               {item.id === 'membership-dashboard' && membershipActionCount > 0 && (
                                 <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
                                   {membershipActionCount}
@@ -2158,6 +2189,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/news/new" element={<ArticleEditorPage />} />
               <Route path="/news/edit/:id" element={<ArticleEditorPage />} />
               <Route path="/meetings" element={<MeetingsPage darkMode={darkMode} />} />
+              <Route path="/approvals" element={<ApprovalsPage />} />
+              <Route path="/approvals/:approvalId" element={<ApprovalsPage />} />
               <Route path="/tasks" element={<TasksPage darkMode={darkMode} />} />
               <Route path="/resources" element={<AssociationResourcesPage darkMode={darkMode} />} />
               <Route path="/classifieds" element={<ClassifiedsPage />} />

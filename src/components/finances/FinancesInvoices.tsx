@@ -159,6 +159,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
             tax_amount,
             tax_rate_id,
             tax_type,
+            approval_status,
             payer,
             payee,
             reference,
@@ -212,6 +213,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
             tax_amount,
             tax_rate_id,
             tax_type,
+            approval_status,
             payer,
             payee,
             reference,
@@ -712,7 +714,11 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
               <span className="a-mute text-[13.5px] truncate">{expense.payee || '—'}</span>
               <span className="a-mute a-num text-[13px]" style={{ letterSpacing: 0 }}>{shortDate(expense.date)}</span>
               <span className="a-num a-ink text-right text-[15px] font-semibold">{formatCurrency(parseFloat(expense.amount))}</span>
-              <span className="a-st text-[12.5px]"><span className={`a-light ${statusTone(expense.payment_status)}`} />{statusText(expense.payment_status)}</span>
+              {(expense as any).approval_status === 'pending' && !['paid', 'completed'].includes(expense.payment_status)
+                ? <span className="a-st text-[12.5px]" title="Waiting for approval"><span className="a-light a-light-b" />For approval</span>
+                : (expense as any).approval_status === 'declined' && !['paid', 'completed'].includes(expense.payment_status)
+                  ? <span className="a-st text-[12.5px]" title="Approval declined"><span className="a-light a-light-r" />Declined</span>
+                  : <span className="a-st text-[12.5px]"><span className={`a-light ${statusTone(expense.payment_status)}`} />{statusText(expense.payment_status)}</span>}
               <div className="flex justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
                 <button onClick={() => handleEditExpense(expense)} className="a-ib" aria-label="Edit expense" title="Edit expense"><Edit size={16} /></button>
                 <button onClick={() => handleDeleteTransactionClick(expense)} className="a-ib a-ib-d" aria-label="Delete expense" title="Delete expense"><Trash2 size={16} /></button>
