@@ -4,6 +4,7 @@ import { X, Upload, FileSpreadsheet, CircleCheck as CheckCircle, CircleAlert as 
 import Papa from 'papaparse';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { computeTax, normalisePaymentMethod, parseImportDate, parseTaxCell, pickDefaultRate, rateOf, TaxRateLike } from '../../utils/financeTax';
 
 interface TransactionImportModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ const ALFIE_FIELDS = [
   { value: 'date', label: 'Date *', required: true },
   { value: 'description', label: 'Description *', required: true },
   { value: 'amount', label: 'Amount *', required: true },
+  { value: 'tax', label: 'Tax (GST)', required: false },
   { value: 'type', label: 'Type (income/expense) *', required: true },
   { value: 'category', label: 'Category', required: false },
   { value: 'payment_method', label: 'Payment Method', required: false },
@@ -58,6 +60,7 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [taxRates, setTaxRates] = useState<TaxRateLike[]>([]);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, errors: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -69,6 +72,8 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
     const mappings: ColumnMapping[] = [];
 
     const patterns: Record<string, RegExp[]> = {
+      // Checked first: "Tax Amount" / "Tax Type" would otherwise land on Amount / Type
+      tax: [/^\s*(tax|gst|vat)(\s*(type|code|status|treatment|amount|rate|\(.*\)))?\s*$/i, /^\s*(tax|gst)\s*(incl|excl)/i],
       date: [/date/i, /when/i, /timestamp/i, /time/i],
       description: [/description/i, /detail/i, /particulars/i, /memo/i, /narrative/i],
       amount: [/amount/i, /value/i, /sum/i, /total/i, /price/i, /\$/],
@@ -113,6 +118,13 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
         if (!error && data) {
           setCategories(data);
         }
+        const { data: rates } = await supabase
+          .from('association_tax_rates')
+          .select('id, name, rate, is_default')
+          .eq('association_id', associationId)
+          .eq('association_type', associationType)
+          .eq('is_active', true);
+        setTaxRates(rates || []);
       } else if (clubId) {
         const { data, error } = await supabase
           .from('budget_categories')
@@ -124,6 +136,12 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
         if (!error && data) {
           setCategories(data);
         }
+        const { data: rates } = await supabase
+          .from('tax_rates')
+          .select('id, name, rate, is_default')
+          .eq('club_id', clubId)
+          .eq('is_active', true);
+        setTaxRates(rates || []);
       }
     } catch (err) {
       console.error('Error loading categories:', err);
@@ -251,14 +269,22 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
 
         // Validate date
         if (mapping.alfieField === 'date' && value) {
-          const dateValue = new Date(value);
-          if (isNaN(dateValue.getTime())) {
+          if (!parseImportDate(value)) {
             errors.push({
               row: index + 1,
               field: 'date',
-              error: 'Invalid date format'
+              error: 'Invalid date format (use YYYY-MM-DD or DD/MM/YYYY)'
             });
           }
+        }
+
+        // Validate tax
+        if (mapping.alfieField === 'tax' && !parseTaxCell(value)) {
+          errors.push({
+            row: index + 1,
+            field: 'tax',
+            error: 'Tax must be "Tax Included", "Tax Excluded", "No Tax" or a GST amount'
+          });
         }
       });
     });
@@ -281,9 +307,20 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
           mapped[mapping.alfieField] = row[mapping.csvColumn];
         }
       });
+      if ('tax' in mapped) {
+        const t = parseTaxCell(mapped.tax);
+        const amount = parseFloat(String(mapped.amount ?? '').replace(/[^0-9.-]/g, '')) || 0;
+        const rate = rateOf(pickDefaultRate(taxRates)) || 0.1;
+        if (!t) mapped.tax = `${mapped.tax} (not recognised)`;
+        else if (t.type === 'none') mapped.tax = 'No tax';
+        else {
+          const gst = t.amount ?? computeTax(amount, t.type, rate).tax;
+          mapped.tax = t.type === 'included' ? `Incl. GST $${gst.toFixed(2)}` : `+ GST $${gst.toFixed(2)}`;
+        }
+      }
       return mapped;
     });
-  }, [csvData, columnMappings]);
+  }, [csvData, columnMappings, taxRates]);
 
   // Import transactions
   const importTransactions = useCallback(async () => {
@@ -297,6 +334,7 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
       try {
         const row = csvData[i];
         const transaction: any = {};
+        let taxCell: ReturnType<typeof parseTaxCell> | undefined;
 
         // Map columns
         columnMappings.forEach(mapping => {
@@ -310,7 +348,12 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
               const normalizedType = value.toString().toLowerCase().trim();
               value = ['income', 'in', 'credit'].includes(normalizedType) ? 'income' : 'expense';
             } else if (mapping.alfieField === 'date') {
-              value = new Date(value).toISOString().split('T')[0];
+              value = parseImportDate(value);
+            } else if (mapping.alfieField === 'payment_method') {
+              value = normalisePaymentMethod(value, isAssociation);
+            } else if (mapping.alfieField === 'tax') {
+              taxCell = parseTaxCell(value);
+              value = undefined; // Turned into tax_type / tax_amount below
             } else if (mapping.alfieField === 'category') {
               // Try to match category by name
               const matchedCategory = categories.find(c =>
@@ -322,11 +365,26 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
               value = undefined; // Don't set category as a direct field
             }
 
-            if (value !== undefined && mapping.alfieField !== 'category') {
+            if (value !== undefined && mapping.alfieField !== 'category' && mapping.alfieField !== 'tax') {
               transaction[mapping.alfieField] = value;
             }
           }
         });
+
+        // GST: "Tax Included" works out the GST inside the amount; "Tax Excluded"
+        // adds it on top (the saved amount is the total, as on the expense page)
+        if (taxCell && taxCell.type !== 'none') {
+          const rateRow = pickDefaultRate(taxRates);
+          const rate = rateOf(rateRow) || 0.1;
+          const { total, tax } = computeTax(transaction.amount, taxCell.type, rate);
+          transaction.amount = total;
+          transaction.tax_amount = taxCell.amount ?? tax;
+          transaction.tax_type = taxCell.type;
+          transaction.tax_rate_id = rateRow?.id || null;
+        } else if (taxCell) {
+          transaction.tax_type = 'none';
+          transaction.tax_amount = 0;
+        }
 
         // Add organization context
         if (isAssociation) {
@@ -335,7 +393,8 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
           transaction.payment_status = 'completed';
         } else {
           transaction.club_id = clubId;
-          transaction.payment_status = 'completed';
+          // Club transactions keep 'paid' / 'awaiting_payment'
+          transaction.payment_status = 'paid';
         }
 
         // Insert transaction
@@ -369,14 +428,14 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
     } else {
       addNotification('error', 'Failed to import transactions');
     }
-  }, [csvData, columnMappings, categories, clubId, associationId, associationType, isAssociation, addNotification, onImportComplete]);
+  }, [csvData, columnMappings, categories, taxRates, clubId, associationId, associationType, isAssociation, addNotification, onImportComplete]);
 
   // Download template
   const downloadTemplate = () => {
-    const template = 'Date,Description,Amount,Type,Category,Payment Method,Reference,Notes\n' +
-      '2024-01-15,Membership Fee,100.00,income,Membership,card,INV-001,\n' +
-      '2024-01-16,Office Supplies,45.50,expense,Supplies,cash,REF-002,\n' +
-      '2024-01-17,Event Registration,250.00,income,Events,bank_transfer,REG-003,';
+    const template = 'Date,Description,Amount,Type,Tax,Category,Payment Method,Reference,Notes\n' +
+      '2026-01-15,Membership Fee,100.00,income,No Tax,Membership,card,INV-001,\n' +
+      '2026-01-16,Supplier invoice - trophies,540.00,expense,Tax Included,Trophies,bank,REF-002,GST of $49.09 is worked out from the amount\n' +
+      '2026-01-17,Event Registration,250.00,income,Tax Excluded,Events,bank,REG-003,GST is added on top: saved as $275.00';
 
     const blob = new Blob([template], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -500,6 +559,11 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
                   Use our template to format your data correctly
                 </p>
               </div>
+              <p className={`text-xs leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                <strong className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Tax column:</strong> use <em>Tax Included</em> (GST is inside the amount),
+                {' '}<em>Tax Excluded</em> (GST is added on top) or <em>No Tax</em>. A GST dollar amount also works and is taken as included in the Amount.
+                Your default tax rate is used (10% GST if none is set up).
+              </p>
             </div>
           )}
 

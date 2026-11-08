@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Paperclip } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { TransactionAttachments } from './TransactionAttachments';
+import { uploadAttachments } from '../../utils/financeAttachments';
 
 interface TaxRate {
   id: string;
@@ -25,6 +28,12 @@ interface LineItem {
   taxType: 'none' | 'included' | 'excluded';
 }
 
+// Association transactions keep 'completed'/'pending'; club transactions keep 'paid'/'awaiting_payment'
+const toFormStatus = (s?: string | null): 'paid' | 'awaiting_payment' =>
+  s === 'awaiting_payment' || s === 'pending' ? 'awaiting_payment' : 'paid';
+const toDbStatus = (s: 'paid' | 'awaiting_payment', isAssociation: boolean) =>
+  isAssociation ? (s === 'paid' ? 'completed' : 'pending') : s;
+
 interface ExpenseCreationPageProps {
   darkMode: boolean;
   onBack: () => void;
@@ -45,8 +54,10 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
   const { currentClub } = useAuth();
   const isAssociation = !!associationId && !!associationType;
   const navigate = useNavigate();
+  const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   
   // Form state
   const [payee, setPayee] = useState('');
@@ -89,15 +100,18 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
       setDate(editingExpense.date || new Date().toISOString().split('T')[0]);
       setReference(editingExpense.reference || '');
       setNotes(editingExpense.notes || '');
-      setPaymentStatus(editingExpense.payment_status || 'paid');
+      setPaymentStatus(toFormStatus(editingExpense.payment_status));
       setPaymentMethod(editingExpense.payment_method || 'cash');
       setExpenseNumber(editingExpense.expense_number || '');
 
-      // Set line item from the transaction amount
+      // Set line item from the transaction amount (the saved amount already has
+      // GST added when it was entered "excluding" tax, so take it back off)
       if (editingExpense.amount) {
+        const savedAmount = parseFloat(editingExpense.amount);
+        const savedTax = parseFloat(editingExpense.tax_amount) || 0;
         setLineItems([{
           description: editingExpense.description || '',
-          amount: parseFloat(editingExpense.amount),
+          amount: editingExpense.tax_type === 'excluded' ? Math.round((savedAmount - savedTax) * 100) / 100 : savedAmount,
           categoryId: editingExpense.category_id || '',
           taxRateId: editingExpense.tax_rate_id || '',
           taxType: editingExpense.tax_type || 'none'
@@ -381,15 +395,16 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
         const tableName = isAssociation ? 'association_transactions' : 'transactions';
         const updateData: any = {
           description: lineItems[0]?.description || `Expense from ${payee}`,
-          amount: totals.total,
-          tax_amount: totals.tax,
+          amount: Math.round(totals.total * 100) / 100,
+          tax_amount: Math.round(totals.tax * 100) / 100,
           tax_rate_id: lineItems[0]?.taxRateId || null,
           date,
           payee,
           reference,
           notes,
           payment_method: paymentMethod,
-          payment_status: paymentStatus,
+          payment_status: toDbStatus(paymentStatus, isAssociation),
+          tax_type: lineItems[0]?.taxRateId ? lineItems[0].taxType : 'none',
           category_id: lineItems[0]?.categoryId || null
         };
 
@@ -409,15 +424,16 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
         const insertData: any = {
           type: 'expense',
           description: lineItems[0]?.description || `Expense from ${payee}`,
-          amount: totals.total,
-          tax_amount: totals.tax,
+          amount: Math.round(totals.total * 100) / 100,
+          tax_amount: Math.round(totals.tax * 100) / 100,
           tax_rate_id: lineItems[0]?.taxRateId || null,
           date,
           payee,
           reference,
           notes,
           payment_method: paymentMethod,
-          payment_status: paymentStatus,
+          payment_status: toDbStatus(paymentStatus, isAssociation),
+          tax_type: lineItems[0]?.taxRateId ? lineItems[0].taxType : 'none',
           category_id: lineItems[0]?.categoryId || null
         };
 
@@ -446,6 +462,13 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
           console.error('Error details:', transactionError.details);
           console.error('Error hint:', transactionError.hint);
           throw new Error(`Database error: ${transactionError.message} (Code: ${transactionError.code})`);
+        }
+
+        if (pendingFiles.length && transaction?.id) {
+          const { failed } = await uploadAttachments(tableName, transaction.id, pendingFiles);
+          if (failed.length) {
+            addNotification('error', `Expense saved, but ${failed.length === 1 ? `${failed[0]} couldn't be attached` : `${failed.length} files couldn't be attached`}. Open the transaction to try again.`);
+          }
         }
 
         if (onExpenseCreated) {
@@ -685,16 +708,14 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
             />
           </div>
 
-          {/* Add Attachment Button */}
-          <div>
-            <button
-              type="button"
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
-            >
-              <Paperclip size={16} />
-              Add Attachment
-            </button>
-          </div>
+          {/* Attachments (supplier invoice, receipt) */}
+          <TransactionAttachments
+            variant="page"
+            table={isAssociation ? 'association_transactions' : 'transactions'}
+            transactionId={editingExpense?.id || null}
+            pendingFiles={pendingFiles}
+            onPendingChange={setPendingFiles}
+          />
 
           {/* Totals */}
           <div className="flex justify-end">

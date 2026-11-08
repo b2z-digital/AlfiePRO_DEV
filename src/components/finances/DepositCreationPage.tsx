@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Paperclip } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { TransactionAttachments } from './TransactionAttachments';
+import { uploadAttachments } from '../../utils/financeAttachments';
 
 interface LineItem {
   description: string;
@@ -25,6 +28,12 @@ interface BudgetCategory {
   type: 'income' | 'expense';
 }
 
+// Association transactions keep 'completed'/'pending'; club transactions keep 'paid'/'awaiting_payment'
+const toFormStatus = (s?: string | null): 'paid' | 'awaiting_payment' =>
+  s === 'awaiting_payment' || s === 'pending' ? 'awaiting_payment' : 'paid';
+const toDbStatus = (s: 'paid' | 'awaiting_payment', isAssociation: boolean) =>
+  isAssociation ? (s === 'paid' ? 'completed' : 'pending') : s;
+
 interface DepositCreationPageProps {
   darkMode: boolean;
   onBack: () => void;
@@ -45,8 +54,10 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
   const { currentClub } = useAuth();
   const isAssociation = !!associationId && !!associationType;
   const navigate = useNavigate();
+  const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   
   // Form state
   const [payer, setPayer] = useState('');
@@ -96,14 +107,17 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
       setDate(editingDeposit.date || new Date().toISOString().split('T')[0]);
       setReference(editingDeposit.reference || '');
       setNotes(editingDeposit.notes || '');
-      setPaymentStatus(editingDeposit.payment_status || 'paid');
+      setPaymentStatus(toFormStatus(editingDeposit.payment_status));
       setTransactionReference(editingDeposit.reference || '');
 
       // Set line item from the transaction amount
+      // (an amount entered "excluding" GST was saved with the GST added, so take it back off)
       if (editingDeposit.amount) {
+        const savedAmount = parseFloat(editingDeposit.amount);
+        const savedTax = parseFloat(editingDeposit.tax_amount) || 0;
         setLineItems([{
           description: editingDeposit.description || '',
-          amount: editingDeposit.amount.toString(),
+          amount: (editingDeposit.tax_type === 'excluded' ? Math.round((savedAmount - savedTax) * 100) / 100 : savedAmount).toString(),
           categoryId: editingDeposit.category_id || '',
           taxRateId: editingDeposit.tax_rate_id || '',
           taxType: editingDeposit.tax_type || 'none'
@@ -358,14 +372,15 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
         const tableName = isAssociation ? 'association_transactions' : 'transactions';
         const updateData: any = {
           description: lineItems[0]?.description || `Deposit from ${payer}`,
-          amount: total,
-          tax_amount: taxAmount,
+          amount: Math.round(total * 100) / 100,
+          tax_amount: Math.round(taxAmount * 100) / 100,
           tax_rate_id: lineItems[0]?.taxRateId || null,
           date,
           payer,
           reference,
           notes,
-          payment_status: paymentStatus,
+          payment_status: toDbStatus(paymentStatus, isAssociation),
+          tax_type: lineItems[0]?.taxRateId ? lineItems[0].taxType : 'none',
           category_id: lineItems[0]?.categoryId || null
         };
 
@@ -385,8 +400,8 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
         const insertData: any = {
           type: 'income',
           description: lineItems[0]?.description || `Deposit from ${payer}`,
-          amount: total,
-          tax_amount: taxAmount,
+          amount: Math.round(total * 100) / 100,
+          tax_amount: Math.round(taxAmount * 100) / 100,
           tax_rate_id: lineItems[0]?.taxRateId || null,
           date,
           payer,
@@ -394,7 +409,8 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
           reference,
           notes,
           payment_method: 'bank',
-          payment_status: paymentStatus,
+          payment_status: toDbStatus(paymentStatus, isAssociation),
+          tax_type: lineItems[0]?.taxRateId ? lineItems[0].taxType : 'none',
           category_id: lineItems[0]?.categoryId || null
         };
 
@@ -438,6 +454,13 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
               .from('club_finance_settings')
               .update({ deposit_next_number: (settings.deposit_next_number || 1) + 1 })
               .eq('club_id', currentClub.clubId);
+          }
+        }
+
+        if (pendingFiles.length && transaction?.id) {
+          const { failed } = await uploadAttachments(tableName, transaction.id, pendingFiles);
+          if (failed.length) {
+            addNotification('error', `Deposit saved, but ${failed.length === 1 ? `${failed[0]} couldn't be attached` : `${failed.length} files couldn't be attached`}. Open the transaction to try again.`);
           }
         }
 
@@ -677,16 +700,14 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
             />
           </div>
 
-          {/* Add Attachment Button */}
-          <div>
-            <button
-              type="button"
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
-            >
-              <Paperclip size={16} />
-              Add Attachment
-            </button>
-          </div>
+          {/* Attachments (remittance advice, receipt) */}
+          <TransactionAttachments
+            variant="page"
+            table={isAssociation ? 'association_transactions' : 'transactions'}
+            transactionId={editingDeposit?.id || null}
+            pendingFiles={pendingFiles}
+            onPendingChange={setPendingFiles}
+          />
 
           {/* Totals */}
           <div className="flex justify-end">
