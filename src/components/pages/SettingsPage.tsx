@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark, Flag, SlidersHorizontal, Share2, Search, X, ChevronRight, Camera, ImagePlus, Lock, Table2, Hand, Grid3x3 } from 'lucide-react';
+import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark, Flag, SlidersHorizontal, Share2, Search, X, ChevronRight, Camera, ImagePlus, Lock, Table2, Hand, Grid3x3, Send } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { updateUserProfile } from '../../utils/auth';
@@ -1066,7 +1066,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'membership-emails' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="emails" />
+            <>
+              {!currentOrganization && currentClub?.clubId && (
+                <div className="a-card mb-5 flex flex-wrap items-center gap-4 p-4">
+                  <span className="a-tile" style={{ width: 40, height: 40 }}><Send size={18} /></span>
+                  <div className="min-w-0 flex-1">
+                    <div className="a-ink text-[14px] font-semibold">These emails now live in Email studio</div>
+                    <div className="a-dim text-[12.5px]">Find them under Communications › Email studio › Flows, next to your newsletters and campaigns. You can still edit them here.</div>
+                  </div>
+                  <button className="a-btn a-btn-sm" onClick={() => navigate('/email-studio/flows')}>Open Email studio</button>
+                </div>
+              )}
+              <MembershipSettingsPage darkMode={darkMode} initialView="emails" />
+            </>
           )}
 
           {activeTab === 'membership-conduct' && (
