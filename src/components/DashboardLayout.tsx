@@ -263,6 +263,33 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [unreadCommunityCount, setUnreadCommunityCount] = useState(0);
   const [showImportMembersModal, setShowImportMembersModal] = useState(false);
   const [isHoveringNav, setIsHoveringNav] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
+
+  // The club switcher's list is portaled but sits in the menu's React tree, so
+  // React counts it as "inside" the menu. Picking a club removes the list from
+  // under the pointer and no mouse-leave ever fires, which left the hover-
+  // expanded menu stuck open. Settle it from where the pointer really is.
+  useEffect(() => {
+    if (!isHoveringNav) return;
+    const onMove = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (!t || navRef.current?.contains(t)) return;
+      // Over the page itself (not a popover portaled to <body>): the menu was left
+      if (t.closest('#root')) setIsHoveringNav(false);
+    };
+    document.addEventListener('pointermove', onMove, { passive: true });
+    return () => document.removeEventListener('pointermove', onMove);
+  }, [isHoveringNav]);
+
+  // After switching club or association, collapse the hover-expanded menu
+  // unless the pointer is actually still on it
+  const activeOrgKey = `${currentOrganization?.id || ''}|${currentClub?.clubId || ''}`;
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      if (navRef.current && !navRef.current.matches(':hover')) setIsHoveringNav(false);
+    }, 150);
+    return () => window.clearTimeout(id);
+  }, [activeOrgKey]);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
     const saved = localStorage.getItem('navExpandedGroups');
     if (saved) {
@@ -1198,6 +1225,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           ${lightMode ? 'alfie-chrome bg-white/60' : darkMode ? 'alfie-chrome bg-slate-800/50 border-r border-slate-700/50' : 'bg-white/10 border-r border-slate-200/20'}
           backdrop-blur-xl
         `}
+        ref={navRef}
         onMouseEnter={() => !isTouchDevice && setIsHoveringNav(true)}
         onMouseLeave={() => !isTouchDevice && setIsHoveringNav(false)}
       >
