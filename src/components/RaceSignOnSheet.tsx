@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Plus, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Trash2, Download, Search, Phone, Anchor, SquareCheck as CheckSquare, Square, QrCode, Share2, Calendar } from 'lucide-react';
 import {
-  getSignOnSheet, signOn, signOff, signOffAll, deleteSignOn,
+  getSignOnSheet, signOn, signOff, signOffAll, deleteSignOn, localRaceDay, findSignOn,
   RaceDaySignOn
 } from '../utils/raceSignOnStorage';
 import { useAuth } from '../contexts/AuthContext';
@@ -46,7 +46,7 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
   const { user } = useAuth();
   const [entries, setEntries] = useState<RaceDaySignOn[]>([]);
   const [loading, setLoading] = useState(true);
-  const [raceDay, setRaceDay] = useState(new Date().toISOString().split('T')[0]);
+  const [raceDay, setRaceDay] = useState(localRaceDay());
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddWalkUp, setShowAddWalkUp] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'signed_on' | 'not_signed_on'>('all');
@@ -191,12 +191,8 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
     return `${window.location.origin}/sign-on/${eventId}`;
   };
 
-  const getSkipperStatus = (skipper: EventSkipper) => {
-    return entries.find(e =>
-      e.skipper_name.toLowerCase() === skipper.name.toLowerCase() ||
-      (skipper.sailNo && e.sail_number === skipper.sailNo)
-    );
-  };
+  // Shared with the phone Race desk (utils/raceSignOnStorage)
+  const getSkipperStatus = (skipper: EventSkipper) => findSignOn(entries, skipper);
 
   const onWater = entries.filter(e => !e.signed_off_at);
   const totalRegistered = eventSkippers.length;
@@ -312,7 +308,7 @@ export const RaceSignOnSheet: React.FC<RaceSignOnSheetProps> = ({
           <div className="flex flex-wrap gap-1.5">
             {eventDays.map(day => {
               const isSelected = raceDay === day.date;
-              const isToday = day.date === new Date().toISOString().split('T')[0];
+              const isToday = day.date === localRaceDay();
               return (
                 <button
                   key={day.date}

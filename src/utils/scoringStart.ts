@@ -245,6 +245,7 @@ export function seriesRoundToEvent(seriesItem: RaceSeries, roundIndex: number): 
     clubName: seriesItem.clubName,
     date: round.date,
     venue: round.venue,
+    startTime: round.startTime,
     raceClass: seriesItem.raceClass,
     raceFormat: seriesItem.raceFormat,
     isSeriesEvent: true,

@@ -85,7 +85,7 @@ export const RaceDeskScreen: React.FC = () => {
           {lead ? (
             <div className="m-card m-spec" style={{ padding: 16, borderRadius: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div className="m-row" style={{ gap: 8 }}>
-                <span className="m-lb" style={{ color: 'var(--m-pink-ink)' }}>{lead.date === today ? 'Today' : fmtDay(lead.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                <span className="m-lb" style={{ color: 'var(--m-pink-ink)' }}>{lead.date === today ? 'Today' : fmtDay(lead.date, { weekday: 'short', day: 'numeric', month: 'short' })}{lead.event.startTime ? ` · ${lead.event.startTime}` : ''}</span>
                 <span className="m-cls" style={{ marginLeft: 'auto' }}>{DESK_FORMAT(lead.event)}</span>
               </div>
               <button className="m-disp" style={{ background: 'none', border: 0, padding: 0, textAlign: 'left', fontSize: 21, fontWeight: 700, lineHeight: 1.1, color: 'var(--m-ink)' }} onClick={() => navigate(`/race-desk/event/${lead.key}`)}>{lead.title}</button>
@@ -133,7 +133,7 @@ export const RaceDeskScreen: React.FC = () => {
                     </span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span className="m-ell" style={{ display: 'block', fontWeight: 600, fontSize: 14.5 }}>{i.title}</span>
-                      <span className="m-mut" style={{ display: 'block', fontSize: 12.5 }}>{i.entered} entered{i.proMemberId && memberIds.includes(i.proMemberId) ? " · you're PRO" : ''}</span>
+                      <span className="m-mut" style={{ display: 'block', fontSize: 12.5 }}>{i.event.startTime ? `${i.event.startTime} · ` : ''}{i.entered} entered{i.proMemberId && memberIds.includes(i.proMemberId) ? " · you're PRO" : ''}</span>
                     </span>
                     <Icon name="chevron" size={17} className="m-dim" />
                   </button>
@@ -172,7 +172,6 @@ export const DeskEventScreen: React.FC = () => {
   const e = item.event;
   const today = todayISO();
   const isToday = item.date === today;
-  const soon = (what: string) => toast(`${what} on the phone is coming in the next update. Start scoring has it today.`);
   const statePill = item.state === 'done' ? { t: 'Scored', c: 'var(--m-green-ink)', b: 'rgba(52,199,89,.15)' }
     : item.state === 'in_progress' ? { t: `Race ${item.racesDone} done`, c: 'var(--m-amber-ink)', b: 'rgba(255,159,10,.15)' }
       : isToday ? { t: 'Today', c: 'var(--m-blue-ink)', b: 'rgba(10,132,255,.16)' }
@@ -193,7 +192,7 @@ export const DeskEventScreen: React.FC = () => {
           {statePill && <span className="m-pill" style={{ background: statePill.b, color: statePill.c }}>{statePill.t}</span>}
         </div>
         <h2 className="m-disp" style={{ margin: '8px 0 0', fontSize: 26, fontWeight: 700, lineHeight: 1.1 }}>{item.roundName || item.title}</h2>
-        <div className="m-mut" style={{ fontSize: 13.5, marginTop: 4 }}>{[fmtDay(item.date, { weekday: 'short', day: 'numeric', month: 'short' }), item.venue].filter(Boolean).join(' · ')}</div>
+        <div className="m-mut" style={{ fontSize: 13.5, marginTop: 4 }}>{[fmtDay(item.date, { weekday: 'short', day: 'numeric', month: 'short' }), e.startTime, item.venue].filter(Boolean).join(' · ')}</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
         <div className="m-card" style={{ padding: 12, textAlign: 'center' }}><div className="m-disp" style={{ fontSize: 24, fontWeight: 700 }}>{item.entered}</div><div className="m-dim" style={{ fontSize: 12 }}>entered</div></div>
@@ -202,9 +201,9 @@ export const DeskEventScreen: React.FC = () => {
       </div>
       {item.state !== 'cancelled' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-          <Action icon="check" label="Sign on" onClick={() => soon('Sign on')} />
-          <Action icon="club" label="Skippers" onClick={() => soon('Skippers')} />
-          <Action icon="tasks" label="Heats" onClick={() => soon('Heats')} disabled={!item.heats} />
+          <Action icon="check" label="Sign on" onClick={() => navigate(`/race-desk/event/${item.key}/sign-on`)} />
+          <Action icon="club" label="Skippers" onClick={() => navigate(`/race-desk/event/${item.key}/skippers`)} />
+          <Action icon="tasks" label="Heats" onClick={() => navigate(`/race-desk/event/${item.key}/heats`)} />
           <Action icon="racing" label={busy === item.key ? 'Loading…' : item.state === 'done' ? 'Re-open scoring' : item.racesDone > 0 ? 'Continue scoring' : 'Start scoring'} primary onClick={() => start(item)} disabled={busy === item.key} />
         </div>
       )}
@@ -213,6 +212,7 @@ export const DeskEventScreen: React.FC = () => {
         <div className="m-li"><span className="m-mut" style={{ flex: 1, fontSize: 14 }}>System</span><span style={{ fontSize: 14, fontWeight: 600 }}>{e.raceFormat === 'handicap' ? 'Handicap · low point' : 'Scratch · low point (RRS A)'}</span></div>
         <div className="m-li"><span className="m-mut" style={{ flex: 1, fontSize: 14 }}>Drops</span><span style={{ fontSize: 14, fontWeight: 600 }}>{dropsLabel(e)}</span></div>
         <div className="m-li"><span className="m-mut" style={{ flex: 1, fontSize: 14 }}>Heats</span><span style={{ fontSize: 14, fontWeight: 600 }}>{heatsLabel(e)}</span></div>
+        {item.state !== 'cancelled' && <button className="m-li" style={{ color: 'var(--m-blue-ink)' }} onClick={() => navigate(`/race-desk/event/${item.key}/settings`)}><span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Race settings</span><Icon name="chevron" size={16} /></button>}
       </div>
       {(item.proName || item.proMemberId) && (
         <>
@@ -321,6 +321,7 @@ const NewEventSheet: React.FC<{ series: DeskSeries['series'][]; onClose: () => v
   const [seriesId, setSeriesId] = useState(open[0]?.id || '');
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
+  const [startTime, setStartTime] = useState('');
   const [venue, setVenue] = useState('');
   const [venues, setVenues] = useState<string[]>([]);
   const [raceClass, setRaceClass] = useState(myClasses[0] || '');
@@ -329,19 +330,22 @@ const NewEventSheet: React.FC<{ series: DeskSeries['series'][]; onClose: () => v
   const chosen = series.find(s => s.id === seriesId);
   const last = chosen?.rounds[chosen.rounds.length - 1];
   useEffect(() => { getStoredVenues().then(v => { const names = v.map(x => x.name); setVenues(names); setVenue(x => x || names[0] || ''); }).catch(() => {}); }, []);
-  useEffect(() => { if (kind === 'round' && last?.venue) setVenue(last.venue); }, [seriesId, kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (kind === 'round' && last?.venue) setVenue(last.venue);
+    if (kind === 'round' && last?.startTime) setStartTime(last.startTime);
+  }, [seriesId, kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const create = async () => {
     if (!date || !venue) return;
     setBusy(true);
     try {
       if (kind === 'round' && chosen) {
-        const idx = await addSeriesRound(chosen, { date, venue });
+        const idx = await addSeriesRound(chosen, { date, venue, startTime });
         tap('success'); toast('Round created');
         onDone(`s-${chosen.id}-${idx}`);
       } else {
         if (!name.trim() || !raceClass) { setBusy(false); return; }
-        const e = await createSingleEvent({ name: name.trim(), date, venue, raceClass, raceFormat: format, clubId: currentClub?.clubId, clubName: currentClub?.club?.abbreviation || currentClub?.club?.name || '' });
+        const e = await createSingleEvent({ name: name.trim(), date, startTime, venue, raceClass, raceFormat: format, clubId: currentClub?.clubId, clubName: currentClub?.club?.abbreviation || currentClub?.club?.name || '' });
         tap('success'); toast('Event created');
         onDone(`q-${e.id}`);
       }
@@ -384,7 +388,10 @@ const NewEventSheet: React.FC<{ series: DeskSeries['series'][]; onClose: () => v
             </label>
           </>
         )}
-        <label className="m-fld"><span>Date</span><input type="date" className="m-field" value={date} onChange={ev => setDate(ev.target.value)} /></label>
+        <div className="m-row" style={{ gap: 10 }}>
+          <label className="m-fld" style={{ flex: 1.4 }}><span>Date</span><input type="date" className="m-field" value={date} onChange={ev => setDate(ev.target.value)} /></label>
+          <label className="m-fld" style={{ flex: 1 }}><span>Start <span className="m-dim" style={{ fontWeight: 400 }}>optional</span></span><input type="time" className="m-field" value={startTime} onChange={ev => setStartTime(ev.target.value)} /></label>
+        </div>
         <label className="m-fld"><span>Venue</span>
           {venues.length ? (
             <select className="m-field" value={venue} onChange={ev => setVenue(ev.target.value)}>{venues.map(v => <option key={v} value={v}>{v}</option>)}</select>
@@ -393,7 +400,7 @@ const NewEventSheet: React.FC<{ series: DeskSeries['series'][]; onClose: () => v
         {kind === 'round' && chosen && (
           <div className="m-card m-row" style={{ padding: '12px 14px', gap: 10, background: 'rgba(10,132,255,.08)', borderColor: 'rgba(10,132,255,.25)' }}>
             <Icon name="doc" size={18} style={{ color: 'var(--m-blue-ink)', flexShrink: 0 }} />
-            <span className="m-mut" style={{ fontSize: 13 }}>{last ? `Uses the series' notice of race and instructions, and copies the race count and drops from ${last.name}.` : "Uses the series' notice of race and instructions."} Heats are set up when scoring starts.</span>
+            <span className="m-mut" style={{ fontSize: 13 }}>{last ? `Uses the series' notice of race and instructions, and copies the race count and drops from ${last.name}.` : "Uses the series' notice of race and instructions."} Heats are set up from the event page.</span>
           </div>
         )}
         <button className="m-btn m-btn-p" style={{ height: 52, fontSize: 16 }} onClick={create} disabled={busy || !date || !venue || (kind === 'single' && (!name.trim() || !raceClass))}>

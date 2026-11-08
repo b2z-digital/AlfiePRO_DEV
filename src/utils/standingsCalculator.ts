@@ -1,4 +1,5 @@
 import { RaceEvent } from '../types/race';
+import { computeEventResults } from './eventResultsEngine';
 import { LetterScore } from '../types';
 import { getLetterScorePointsForRace } from './scratchCalculations';
 import { combineAllDayResults } from './raceStorage';
@@ -274,6 +275,34 @@ const compareSkippersWithCountback = (event: RaceEvent, resultsByRaceMap: Record
 export const calculateEventStandings = (event: RaceEvent): Array<{name: string, netTotal: number, index: number}> => {
   if (!event.skippers || event.skippers.length === 0) {
     return [];
+  }
+
+  // Once there are results, use the exact calculation behind the desktop results table
+  // (utils/eventResultsEngine), so dashboards, live pages and the phone app all show the
+  // same order and totals as the scored results.
+  const hasAnyResults = event.multiDay
+    ? Object.values(event.dayResults || {}).some((d: any) => d?.raceResults?.length)
+    : !!event.raceResults?.length;
+  if (hasAnyResults) {
+    try {
+      const r = computeEventResults(event.multiDay ? { ...event, raceResults: combineAllDayResults(event) } : event);
+      return (r.displaySkippers as any[]).map((s: any) => {
+        const isDropped: Record<number, boolean> = {};
+        Object.keys(r.drops).forEach(key => {
+          const [skipperIdx, raceNum] = key.split('-').map(Number);
+          if (skipperIdx === s.index && r.drops[key]) isDropped[raceNum] = true;
+        });
+        return {
+          ...(event.skippers![s.index] || s),
+          index: s.index,
+          netTotal: r.totals[s.index]?.net ?? Number.MAX_SAFE_INTEGER,
+          hasResults: r.totals[s.index] !== undefined,
+          isDropped,
+        };
+      });
+    } catch (err) {
+      console.warn('[standings] Results engine failed, using fallback', err);
+    }
   }
 
   // For multi-day events, combine all day results

@@ -47,3 +47,19 @@ describe('phone standings equal desktop results', () => {
     });
   }
 });
+
+describe('dashboards and live pages equal desktop results', () => {
+  // standingsCalculator feeds the Recent Results widget, the Live Dashboard, the live race
+  // companion and the dashboard podium. They must show the same order as the results table.
+  for (const e of fixtures) {
+    it(`${e.id}`, async () => {
+      const { calculateEventStandings, getTopFinishers } = await import('../../utils/standingsCalculator');
+      const r = computeEventResults(e);
+      const want = (r.displaySkippers as any[]).map(s => s.index);
+      const got = calculateEventStandings(e);
+      expect(got.map(x => x.index)).toEqual(want);
+      expect(got.map(x => round2(x.netTotal))).toEqual(want.map(i => round2(r.totals[i]?.net || 0)));
+      expect(getTopFinishers(e, 3).map(x => x.name)).toEqual((r.displaySkippers as any[]).slice(0, 3).map(s => s.name));
+    });
+  }
+});

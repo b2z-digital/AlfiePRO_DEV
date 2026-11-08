@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DROP_RULE_OPTIONS } from '../utils/raceSetup';
 import { ASwitch } from './alfie/Kit';
 import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen as Edit2, Check, TriangleAlert as AlertTriangle, Sailboat, Eye, Grid3x2 as Grid3X3, ClipboardCheck, Table2, Hand, Share2, QrCode, Trash2 } from 'lucide-react';
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
@@ -47,15 +48,6 @@ interface RaceSettingsModalProps {
   activeRuleset?: LoadedRuleset | null;
   onRulesetChange?: (rulesetId: string | null, ruleset: LoadedRuleset | null) => void;
 }
-
-const DROP_RULE_OPTIONS = [
-  { label: 'No Discards', value: [], forHeatRacing: false },
-  { label: 'Low Point System (1 after 4, 2 after 8, 3 after 12 and then every 4 races after)', value: [4, 8, 12, 16, 20, 24, 28, 32, 36, 40], forHeatRacing: false },
-  { label: 'RRS - Appendix A Scoring System (1 after 4, 2 after 8, 3 after 16 and then every 8 races after)', value: [4, 8, 16, 24, 32, 40], forHeatRacing: false },
-  { label: 'HMS Heat System', value: 'hms', forHeatRacing: true },
-  { label: 'SHRS - Simple Heat Race System (1 after 4, 2 after 8, +1 per 8 races)', value: 'shrs', forHeatRacing: true },
-  { label: 'Custom', value: 'custom', forHeatRacing: false }
-];
 
 const NUM_RACES_OPTIONS = [6, 8, 10, 12];
 

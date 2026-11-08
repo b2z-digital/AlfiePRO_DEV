@@ -5,7 +5,7 @@
  * through prepareEventForScoring — the exact steps the desktop "Start scoring" button takes.
  */
 import { getStoredRaceEvents, getStoredRaceSeries, storeRaceEvent, storeRaceSeries } from '../utils/raceStorage';
-import { getSignOnSheet } from '../utils/raceSignOnStorage';
+import { findSignOn, getSignOnSheet } from '../utils/raceSignOnStorage';
 import { nextDayToScore, prepareEventForScoring, seriesRoundToEvent } from '../utils/scoringStart';
 import type { RaceEvent, RaceSeries } from '../types/race';
 import { todayISO } from './data';
@@ -101,10 +101,11 @@ export async function loadDesk(): Promise<{ items: DeskItem[]; series: DeskSerie
   return { items, series: deskSeries };
 }
 
+/** Event skippers signed on today (the sign-on screen's count; walk-ups are counted separately there). */
 export async function signedOnCount(e: RaceEvent): Promise<number | null> {
   if ((e.date || '').slice(0, 10) !== todayISO()) return null;
   const list = await getSignOnSheet(e.id, todayISO()).catch(() => []);
-  return list.filter((x: any) => !x.signed_off_at).length;
+  return (e.skippers || []).filter(s => findSignOn(list, s)).length;
 }
 
 export const DESK_FORMAT = (e: RaceEvent) => `${e.raceClass}${e.raceFormat ? ` · ${e.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}` : ''}`;
@@ -140,12 +141,13 @@ export async function startScoring(e: RaceEvent, clubId: string | undefined): Pr
 
 /* ─────────────── New event ─────────────── */
 
-export async function createSingleEvent(opts: { name: string; date: string; venue: string; raceClass: string; raceFormat: 'scratch' | 'handicap'; clubId?: string; clubName: string }): Promise<RaceEvent> {
+export async function createSingleEvent(opts: { name: string; date: string; startTime?: string; venue: string; raceClass: string; raceFormat: 'scratch' | 'handicap'; clubId?: string; clubName: string }): Promise<RaceEvent> {
   const event: RaceEvent = {
     id: crypto.randomUUID(),
     eventName: opts.name,
     clubName: opts.clubName,
     date: opts.date,
+    startTime: opts.startTime || '',
     venue: opts.venue,
     raceClass: opts.raceClass as any,
     raceFormat: opts.raceFormat as any,
@@ -165,13 +167,14 @@ export async function createSingleEvent(opts: { name: string; date: string; venu
 }
 
 /** Adds a round to a series, carrying over the last round's race count and drops. */
-export async function addSeriesRound(series: RaceSeries, opts: { date: string; venue: string; name?: string }): Promise<number> {
+export async function addSeriesRound(series: RaceSeries, opts: { date: string; venue: string; startTime?: string; name?: string }): Promise<number> {
   const last = series.rounds[series.rounds.length - 1];
   const index = series.rounds.length;
   const round: any = {
     name: opts.name || `Round ${index + 1}`,
     date: opts.date,
     venue: opts.venue,
+    startTime: opts.startTime || '',
     results: [],
     completed: false,
     lastCompletedRace: 0,

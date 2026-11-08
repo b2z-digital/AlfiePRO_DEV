@@ -135,6 +135,7 @@
   height: 44px; padding: 0 16px; border-radius: 13px; border: 0;
   font-size: 14.5px; font-weight: 600; white-space: nowrap;
 }
+.m-btn > svg, .m-chip > svg, .m-pill-btn > svg { flex-shrink: 0; }
 .m-btn:active { transform: scale(.98); }
 .m-btn:disabled { opacity: .5; }
 .m-btn-p { background: var(--m-blue); color: #fff; }
@@ -142,9 +143,10 @@
 .m-btn-on { background: var(--m-blue); color: #fff; border-color: var(--m-blue); }
 .m-seg { display: flex; padding: 3px; border-radius: 13px; background: var(--m-fill); border: 1px solid var(--m-fill-b); }
 .m-seg button {
-  flex: 1; height: 34px; border-radius: 10px; border: 0; background: transparent;
-  color: var(--m-mut); font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 5px;
+  flex: 1 1 auto; min-width: max-content; height: 34px; padding: 0 12px; border-radius: 10px; border: 0; background: transparent;
+  color: var(--m-mut); font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
 }
+.m-seg button > svg { flex-shrink: 0; }
 .m-seg .m-on { background: rgba(255, 255, 255, .13); color: var(--m-ink); }
 .m-light .m-seg .m-on { background: #E8EEF7; }
 .m-cls {
@@ -152,7 +154,7 @@
   border: 1px solid rgba(255, 255, 255, .14); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; white-space: nowrap;
 }
 .m-light .m-cls { border-color: #D7DEE8; }
-.m-pill { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.m-pill { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
 .m-date {
   width: 52px; height: 56px; border-radius: 14px; flex-shrink: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -361,3 +363,14 @@
 .m-fld > span:first-child { display: block; font-size: 12.5px; font-weight: 600; color: var(--m-mut); }
 .m-fld .m-seg { margin-top: 4px; }
 .m-fab-x { width: auto; padding: 0 20px; gap: 8px; font-weight: 600; font-size: 15px; height: 52px; }
+/* Race day set-up */
+.m-link { background: none; border: 0; padding: 8px 6px; color: var(--m-blue-ink); font-weight: 600; font-size: 15px; white-space: nowrap; }
+.m-link:disabled { opacity: .5; }
+.m-sail { min-width: 44px; height: 36px; padding: 0 8px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--m-fill); border: 1px solid var(--m-fill-b); font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.m-sail-on { background: rgba(52, 199, 89, .16); border-color: rgba(52, 199, 89, .35); color: var(--m-green-ink); }
+.m-heat { width: 36px; height: 36px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; font-weight: 800; font-size: 16px; }
+.m-step { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.m-step button { width: 36px; height: 36px; border-radius: 11px; border: 1px solid var(--m-fill-b); background: var(--m-fill); color: var(--m-ink); font-size: 20px; font-weight: 600; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.m-step button:disabled { opacity: .35; }
+.m-step b { min-width: 38px; text-align: center; font-size: 17px; font-variant-numeric: tabular-nums; }
+.m-li:disabled { opacity: 1; }

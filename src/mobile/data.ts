@@ -4,7 +4,7 @@
  * and writes RSVPs to event_attendance exactly the way EventDetails does.
  */
 import { supabase } from '../utils/supabase';
-import { getStoredRaceEvents, getStoredRaceSeries } from '../utils/raceStorage';
+import { combineAllDayResults, getStoredRaceEvents, getStoredRaceSeries } from '../utils/raceStorage';
 import { getPublicEvents, convertToRaceEvent } from '../utils/publicEventStorage';
 import { getCalendarMeetings } from '../utils/calendarMeetingStorage';
 import { computeEventResults } from '../utils/eventResultsEngine';
@@ -80,6 +80,7 @@ export async function loadCalendar(clubId: string | undefined, org: { type: stri
       title: e.eventName || `${e.raceClass} ${e.raceFormat}`,
       date: e.date.slice(0, 10),
       endDate: e.endDate?.slice(0, 10),
+      startTime: e.startTime || null,
       venue: e.venue,
       raceClass: e.raceClass,
       raceFormat: e.raceFormat,
@@ -103,6 +104,7 @@ export async function loadCalendar(clubId: string | undefined, org: { type: stri
         kind: 'race',
         title: `${s.seriesName} · ${roundName}`,
         date: round.date.slice(0, 10),
+        startTime: round.startTime || null,
         venue: round.venue,
         raceClass: s.raceClass,
         raceFormat: s.raceFormat,
@@ -268,7 +270,9 @@ export interface MStandings {
   cell: (skipperIndex: number, race: number) => string;
 }
 
-export function eventStandings(e?: RaceEvent | null): MStandings | null {
+export function eventStandings(src?: RaceEvent | null): MStandings | null {
+  // Multi-day events combine every day's races, as the desktop Results page does
+  const e = src?.multiDay && src.dayResults ? { ...src, raceResults: combineAllDayResults(src) } : src;
   if (!e || !e.skippers?.length || !e.raceResults?.length) return null;
   const r = computeEventResults(e);
   const label = (n: number) => (e.raceFormat === 'handicap' ? String(Number(n.toFixed(1))) : r.hasRODScoring ? n.toFixed(2) : String(Math.round(n)));

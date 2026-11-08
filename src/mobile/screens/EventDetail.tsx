@@ -76,7 +76,7 @@ export const EventDetail: React.FC = () => {
           <div className="m-card">
             <div className="m-li">
               <span className="m-tile" style={{ background: 'rgba(10,132,255,.14)', color: 'var(--m-blue-ink)' }}><Icon name="calendar" size={19} /></span>
-              <div><div style={{ fontSize: 14.5, fontWeight: 600 }}>{fmtDay(item.date, { weekday: 'long', day: 'numeric', month: 'long' })}{item.endDate && item.endDate !== item.date ? ` – ${fmtDay(item.endDate, { day: 'numeric', month: 'short' })}` : ''}</div>
+              <div><div style={{ fontSize: 14.5, fontWeight: 600 }}>{fmtDay(item.date, { weekday: 'long', day: 'numeric', month: 'long' })}{item.endDate && item.endDate !== item.date ? ` – ${fmtDay(item.endDate, { day: 'numeric', month: 'short' })}` : ''}{item.startTime ? ` · ${item.startTime.slice(0, 5)}` : ''}</div>
                 <div className="m-mut" style={{ fontSize: 12.5 }}>{e?.numRaces ? `${e.numRaces} races` : 'Race day'}{e?.dropRules?.length ? ` · drops after ${e.dropRules.join(', ')}` : ''}</div></div>
             </div>
             {item.venue && (

@@ -16,6 +16,8 @@ import { ScratchRaceTable } from './ScratchRaceTable';
 import { PerformanceGraphs } from './PerformanceGraphs';
 import { ScratchPerformanceGraphs } from './ScratchPerformanceGraphs';
 import { SkipperModal, ImportedAssignmentData } from './SkipperModal';
+import { heatManagementFromAssignments } from '../utils/heatSetup';
+import { dedupeSkippers, normalizeHeatManagementForSave, persistRaceSettings, RaceSettingsInput } from '../utils/raceSetup';
 import { MembershipManager } from './MembershipManager';
 import { RaceHeader } from './RaceHeader';
 import { RaceManagement } from './RaceManagement';
@@ -1539,18 +1541,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   };
 
   const handleUpdateSkippers = async (newSkippers: typeof skippers, options?: { skipRaceSettingsModal?: boolean }) => {
-    const uniqueSkippers = [];
-    const nameSet = new Set();
-    const sailNoSet = new Set<string>();
-
-    for (const skipper of newSkippers) {
-      if (nameSet.has(skipper.name) || sailNoSet.has(skipper.sailNo)) {
-        continue;
-      }
-      nameSet.add(skipper.name);
-      sailNoSet.add(skipper.sailNo);
-      uniqueSkippers.push(skipper);
-    }
+    // Shared with the phone Race desk (utils/raceSetup)
+    const uniqueSkippers = dedupeSkippers(newSkippers);
 
     // Detect newly added skippers
     const previousSkipperNames = new Set(skippers.map(s => s.name));
@@ -3194,58 +3186,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     }
   };
 
-  const handleSaveRaceSettings = async (settings: {
-    numRaces: number;
-    dropRules: number[] | string;
-    heatManagement: HeatManagement | null;
-    displaySettings?: {
-      show_flag?: boolean;
-      show_country?: boolean;
-    };
-    observerSettings?: {
-      enable_observers?: boolean;
-      observers_per_heat?: number;
-      enable_roll_call?: boolean;
-      auto_complete_sail?: boolean;
-    };
-  }) => {
+  const handleSaveRaceSettings = async (settings: RaceSettingsInput) => {
     console.log('💾 Saving race settings in YachtRaceManager:', JSON.stringify(settings.heatManagement, null, 2));
 
-    let finalHM = settings.heatManagement;
-    if (finalHM && finalHM.configuration.scoringSystem === 'shrs') {
-      const qRounds = finalHM.configuration.shrsQualifyingRounds || 1;
-      const isPreset = finalHM.configuration.shrsAssignmentMode === 'preset';
-      if (isPreset && qRounds > 1 && finalHM.rounds.length < qRounds) {
-        const hasAnyResults = finalHM.rounds.some(r => r.results && r.results.length > 0);
-        if (hasAnyResults) {
-          console.log('⚠️ SHRS safety net (balanced): rounds missing but results exist - preserving existing rounds');
-        } else {
-          console.log('⚠️ SHRS safety net (balanced): rounds.length', finalHM.rounds.length, 'but need', qRounds, '- regenerating');
-          const firstRoundAssignments = finalHM.rounds[0]?.heatAssignments || [];
-          const numHeats = finalHM.configuration.numberOfHeats;
-          const allQR = generatePreSetQualifyingAssignments(
-            firstRoundAssignments.map(a => ({ heatDesignation: a.heatDesignation as string, skipperIndices: [...a.skipperIndices] })),
-            numHeats,
-            qRounds
-          );
-          finalHM = {
-            ...finalHM,
-            rounds: allQR.map((ra, idx) => ({
-              round: idx + 1,
-              heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as any, skipperIndices: a.skipperIndices })),
-              results: [] as any[],
-              completed: false
-            }))
-          };
-        }
-      } else if (!isPreset && finalHM.rounds.length > 1) {
-        console.log('⚠️ SHRS safety net (progressive): trimming to round 1 only');
-        finalHM = {
-          ...finalHM,
-          rounds: [finalHM.rounds[0]]
-        };
-      }
-    }
+    // Save steps are shared with the phone Race desk (utils/raceSetup)
+    const finalHM = normalizeHeatManagementForSave(settings.heatManagement);
 
     setCurrentNumRaces(settings.numRaces);
     setCurrentDropRules(settings.dropRules);
@@ -3253,127 +3198,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
     console.log('💾 Heat management state updated');
 
-    const currentEvent = getCurrentEvent();
-    if (currentEvent) {
-      if (settings.observerSettings) {
-        currentEvent.enable_observers = settings.observerSettings.enable_observers;
-        currentEvent.observers_per_heat = settings.observerSettings.observers_per_heat;
-        currentEvent.enable_roll_call = settings.observerSettings.enable_roll_call;
-        currentEvent.auto_complete_sail = settings.observerSettings.auto_complete_sail;
-      }
-      if (settings.displaySettings) {
-        currentEvent.show_flag = settings.displaySettings.show_flag;
-        currentEvent.show_country = settings.displaySettings.show_country;
-      }
-      setCurrentEvent(currentEvent);
-
-      console.log('💾 Explicitly saving heat management to database...');
-      try {
-        await updateEventResults(
-          currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id,
-          raceResults,
-          skippers,
-          lastCompletedRace,
-          hasDeterminedInitialHcaps,
-          isManualHandicaps,
-          false,
-          currentDay,
-          finalHM,
-          settings.numRaces,
-          settings.dropRules
-        );
-        console.log('✅ Heat management saved to database successfully');
-
-        const freshEvent = getCurrentEvent() || currentEvent;
-
-        if ((settings.displaySettings || settings.observerSettings) && freshEvent.id) {
-          const updateData: any = {};
-
-          if (settings.displaySettings) {
-            updateData.show_flag = settings.displaySettings.show_flag;
-            updateData.show_country = settings.displaySettings.show_country;
-          }
-
-          if (settings.observerSettings) {
-            updateData.enable_observers = settings.observerSettings.enable_observers;
-            updateData.observers_per_heat = settings.observerSettings.observers_per_heat;
-            updateData.enable_roll_call = settings.observerSettings.enable_roll_call;
-            updateData.auto_complete_sail = settings.observerSettings.auto_complete_sail;
-            console.log('💾 Saving observer settings:', settings.observerSettings);
-          }
-
-          console.log('💾 Final update data to save:', updateData);
-
-          let saveError = null;
-          if (freshEvent.isSeriesEvent && freshEvent.seriesId) {
-            let roundId = freshEvent.seriesRoundId;
-            if (!roundId && freshEvent.roundName) {
-              const { data: roundRow } = await supabase
-                .from('race_series_rounds')
-                .select('id')
-                .eq('series_id', freshEvent.seriesId)
-                .eq('round_name', freshEvent.roundName)
-                .maybeSingle();
-              roundId = roundRow?.id;
-              if (roundId) {
-                freshEvent.seriesRoundId = roundId;
-                setCurrentEvent(freshEvent);
-              }
-            }
-            if (roundId) {
-              const { error } = await supabase
-                .from('race_series_rounds')
-                .update(updateData)
-                .eq('id', roundId);
-              saveError = error;
-
-              if (!saveError && settings.observerSettings && freshEvent.seriesId) {
-                const observerData: any = {
-                  enable_observers: settings.observerSettings.enable_observers,
-                  observers_per_heat: settings.observerSettings.observers_per_heat,
-                  enable_roll_call: settings.observerSettings.enable_roll_call,
-                  auto_complete_sail: settings.observerSettings.auto_complete_sail
-                };
-                await supabase
-                  .from('race_series_rounds')
-                  .update(observerData)
-                  .eq('series_id', freshEvent.seriesId)
-                  .neq('id', roundId);
-              }
-            } else {
-              console.error('Could not find series round ID for observer settings save');
-            }
-          } else {
-            const { error } = await supabase
-              .from('quick_races')
-              .update(updateData)
-              .eq('id', freshEvent.id);
-            saveError = error;
-          }
-
-          if (saveError) {
-            console.error('❌ Error saving display/observer settings:', saveError);
-          } else {
-            console.log('✅ Display/Observer settings saved successfully to database');
-            const updatedEvent = {
-              ...freshEvent,
-              ...(settings.displaySettings && {
-                show_flag: settings.displaySettings.show_flag,
-                show_country: settings.displaySettings.show_country
-              }),
-              ...(settings.observerSettings && {
-                enable_observers: settings.observerSettings.enable_observers,
-                observers_per_heat: settings.observerSettings.observers_per_heat,
-                enable_roll_call: settings.observerSettings.enable_roll_call,
-                auto_complete_sail: settings.observerSettings.auto_complete_sail
-              })
-            };
-            setCurrentEvent(updatedEvent);
-            console.log('✅ Updated currentEvent with observer settings:', {
-              enable_observers: updatedEvent.enable_observers,
-              observers_per_heat: updatedEvent.observers_per_heat
-            });
-
+    try {
+      const reloadedEvent = await persistRaceSettings(
+        { raceResults, skippers, lastCompletedRace, hasDeterminedInitialHcaps, isManualHandicaps, currentDay },
+        settings,
+        finalHM,
+        {
+          onExtraSettingsSaved: () => {
             // Update the selectedEvent state to reflect the changes
             if (selectedEvent) {
               const updatedSelectedEvent = {
@@ -3390,33 +3221,19 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 })
               };
               setSelectedEvent(updatedSelectedEvent);
-              console.log('✅ Updated selectedEvent with observer settings:', {
-                enable_observers: updatedSelectedEvent.enable_observers,
-                observers_per_heat: updatedSelectedEvent.observers_per_heat
-              });
             }
 
             // Force component re-render to pick up the updated event
             setEventUpdateTrigger(prev => prev + 1);
-
-            // CRITICAL: Reload event from database to pick up all updated fields
-            // This ensures observer settings and other DB-only fields are loaded
-            console.log('🔄 Reloading event from database to pick up changes...');
-            const reloadedEvent = await reloadCurrentEventFromDatabase();
-            if (reloadedEvent) {
-              setSelectedEvent(reloadedEvent);
-              console.log('✅ Event reloaded with observer settings:', {
-                enable_observers: reloadedEvent.enable_observers,
-                observers_per_heat: reloadedEvent.observers_per_heat
-              });
-            }
-          }
+          },
         }
-      } catch (error) {
-        console.error('❌ Error saving heat management to database:', error);
+      );
+      if (reloadedEvent) {
+        setSelectedEvent(reloadedEvent);
       }
+    } catch (error) {
+      console.error('❌ Error saving heat management to database:', error);
     }
-
   };
 
   const handleRaceSettingsChange = (settings: { numRaces: number; dropRules: number[] | string }) => {
@@ -4923,34 +4740,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             const config = pending?.configuration || heatManagement?.configuration;
             if (!config) return;
 
-            let allRounds;
-            if (config.scoringSystem === 'shrs' && config.shrsAssignmentMode === 'preset' && (config.shrsQualifyingRounds || 1) > 1) {
-              const allQR = generatePreSetQualifyingAssignments(
-                assignments,
-                config.numberOfHeats,
-                config.shrsQualifyingRounds || 1
-              );
-              allRounds = allQR.map((ra: any, idx: number) => ({
-                round: idx + 1,
-                heatAssignments: ra.map((a: any) => ({ heatDesignation: a.heatDesignation as HeatDesignation, skipperIndices: a.skipperIndices })),
-                results: [] as HeatResult[],
-                completed: false
-              }));
-            } else {
-              allRounds = [{
-                round: 1,
-                heatAssignments: assignments,
-                results: [] as HeatResult[],
-                completed: false
-              }];
-            }
-
-            const finalHM: HeatManagement = {
-              configuration: { ...config, seedingMethod: 'manual' },
-              currentRound: 1,
-              currentHeat: assignments[assignments.length - 1].heatDesignation,
-              rounds: allRounds
-            };
+            // Shared with the phone Race desk (utils/heatSetup)
+            const finalHM: HeatManagement = heatManagementFromAssignments(config, assignments);
 
             handleSaveRaceSettings({
               numRaces: pending?.numRaces || currentNumRaces,
@@ -4983,38 +4774,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             const config = pending?.configuration || heatManagement?.configuration;
             if (!config) return;
 
-            let allRounds;
-            if (config.scoringSystem === 'shrs' && config.shrsAssignmentMode === 'preset' && (config.shrsQualifyingRounds || 1) > 1) {
-              const allQR = generatePreSetQualifyingAssignments(
-                assignments,
-                config.numberOfHeats,
-                config.shrsQualifyingRounds || 1
-              );
-              allRounds = allQR.map((ra: any, idx: number) => ({
-                round: idx + 1,
-                heatAssignments: ra.map((a: any) => ({ heatDesignation: a.heatDesignation as HeatDesignation, skipperIndices: a.skipperIndices })),
-                results: [] as HeatResult[],
-                completed: false
-              }));
-            } else {
-              allRounds = [{
-                round: 1,
-                heatAssignments: assignments,
-                results: [] as HeatResult[],
-                completed: false
-              }];
-            }
-
-            const finalHM: HeatManagement = {
-              configuration: {
-                ...config,
-                seedingMethod: 'manual',
-                ...(rankedSkipperIndices && rankedSkipperIndices.length > 0 ? { rankedSkipperIndices } : {}),
-              },
-              currentRound: 1,
-              currentHeat: assignments[assignments.length - 1].heatDesignation,
-              rounds: allRounds
-            };
+            // Shared with the phone Race desk (utils/heatSetup)
+            const finalHM: HeatManagement = heatManagementFromAssignments(config, assignments, rankedSkipperIndices);
 
             handleSaveRaceSettings({
               numRaces: pending?.numRaces || currentNumRaces,

@@ -17,11 +17,22 @@ export function generateICalFile(events: RaceEvent[], clubName: string): string 
 
   events.forEach(event => {
     const eventDate = new Date(event.date);
-    const startDate = formatICalDate(eventDate);
+    let startDate = formatICalDate(eventDate);
 
-    const endDate = event.endDate
+    let endDate = event.endDate
       ? formatICalDate(new Date(event.endDate))
       : formatICalDate(new Date(eventDate.getTime() + (6 * 60 * 60 * 1000)));
+
+    // With a start time, use the venue's local time (floating), first start to six hours later
+    if (event.startTime && /^\d{2}:\d{2}/.test(event.startTime)) {
+      const day = event.date.slice(0, 10).replace(/-/g, '');
+      const [h, m] = event.startTime.split(':').map(Number);
+      const endH = Math.min(23, h + 6);
+      const endDay = (event.endDate || event.date).slice(0, 10).replace(/-/g, '');
+      const pad = (n: number) => String(n).padStart(2, '0');
+      startDate = `${day}T${pad(h)}${pad(m)}00`;
+      endDate = `${endDay}T${pad(endH)}${pad(endH === 23 ? 59 : m)}00`;
+    }
 
     const eventName = event.isSeriesEvent
       ? `${event.roundName} - ${event.eventName || event.clubName}`

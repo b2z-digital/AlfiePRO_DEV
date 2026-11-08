@@ -13,6 +13,7 @@ import { Notifications } from './screens/Notifications';
 import { Me } from './screens/Me';
 import { Soon } from './screens/Soon';
 import { DeskEventScreen, RaceDeskScreen, SeasonScreen } from './screens/RaceDesk';
+import { HeatsScreen, RaceSettingsScreen, SignOnScreen, SkippersScreen } from './screens/RaceSetup';
 import { ClubHub } from './screens/Club';
 import { ChatsInbox, ChatThread } from './screens/Chats';
 import { SkipperProfile } from './screens/Skipper';
@@ -92,6 +93,10 @@ const Shell: React.FC = () => {
           <Route path="/race-desk" element={<RaceDeskScreen />} />
           <Route path="/race-desk/event/:key" element={<DeskEventScreen />} />
           <Route path="/race-desk/season" element={<SeasonScreen />} />
+          <Route path="/race-desk/event/:key/sign-on" element={<SignOnScreen />} />
+          <Route path="/race-desk/event/:key/skippers" element={<SkippersScreen />} />
+          <Route path="/race-desk/event/:key/heats" element={<HeatsScreen />} />
+          <Route path="/race-desk/event/:key/settings" element={<RaceSettingsScreen />} />
           <Route path="/club" element={<ClubHub />} />
           <Route path="/community/*" element={<Navigate to="/club" replace />} />
           <Route path="/comms" element={<ChatsInbox />} />

@@ -75,7 +75,10 @@ Choose your club (only with more than one), then "Never miss a start" before the
 Race Management on the phone: the Race desk (`screens/RaceDesk.tsx`, data in `mobile/raceDesk.ts`) is built.
 Start scoring runs the desktop's own preparation (`utils/scoringStart.ts`) and opens the scoring screen through
 the `alfie-start-scoring` event in `App.tsx`. Results everywhere on the phone come from `utils/eventResultsEngine.ts`,
-the same code as the desktop results table.
+the same code as the desktop results table (dashboards and live pages use it too, via standingsCalculator).
+Race day set-up (`screens/RaceSetup.tsx`, data in `mobile/raceSetupData.ts`): Sign on, Skippers, Heats and Race settings.
+Saves go through code shared with the desktop scoring screen: `utils/raceSetup.ts` (settings save, skipper list,
+member boats, discards) and `utils/heatSetup.ts` (the heat wizard's seeding and the manual / ranking confirm).
 
 ## Scoring tests
 
