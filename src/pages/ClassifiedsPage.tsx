@@ -5,6 +5,7 @@ import { getClassifieds, getUserClassifieds, getUserFavorites, toggleClassifiedF
 import type { Classified } from '../types/classified';
 import { CLASSIFIED_CATEGORIES } from '../types/classified';
 import ClassifiedDetailModal from '../components/classifieds/ClassifiedDetailModal';
+import { ClassifiedPhoto, photoMetaFor } from '../components/classifieds/ClassifiedPhoto';
 import ClassifiedFormModal from '../components/classifieds/ClassifiedFormModal';
 import { useNotifications } from '../contexts/NotificationContext';
 
@@ -238,27 +239,30 @@ export default function ClassifiedsPage() {
 
   const shortDate = (d: string) => { const x = new Date(d); return `${x.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][x.getMonth()]}`; };
   const catOnly = (v: string) => CLASSIFIED_CATEGORIES.find(c => c.value === v)?.label || v;
-  const cover = (classified: Classified, h: number | string, iconSize = 52) => (
-    <>
-      {classified.images && classified.images.length > 0 ? (
-        <img
-          src={classified.images[0]}
-          alt={classified.title}
-          className="w-full h-full object-cover block"
-          style={{ height: h }}
-          onError={(e) => {
-            const target = e.currentTarget;
-            target.style.display = 'none';
-            const placeholder = target.parentElement?.querySelector('.no-img-placeholder') as HTMLElement | null;
-            if (placeholder) placeholder.style.display = 'flex';
-          }}
-        />
-      ) : null}
-      <div className="no-img-placeholder a-bc-ph absolute inset-0 items-center justify-center" style={{ display: classified.images && classified.images.length > 0 ? 'none' : 'flex' }}>
-        <img src="/alfie_app_logo.svg" alt="" style={{ width: iconSize, height: iconSize, opacity: 0.4 }} />
-      </div>
-    </>
-  );
+  const cover = (classified: Classified, iconSize = 52) => {
+    const src = classified.images && classified.images.length > 0 ? classified.images[0] : null;
+    return (
+      <>
+        {src ? (
+          <ClassifiedPhoto
+            src={src}
+            meta={photoMetaFor(classified.image_meta, src)}
+            alt={classified.title}
+            className="absolute inset-0"
+            onError={(e) => {
+              const box = e.currentTarget.parentElement as HTMLElement | null;
+              if (box) box.style.display = 'none';
+              const placeholder = box?.parentElement?.querySelector('.no-img-placeholder') as HTMLElement | null;
+              if (placeholder) placeholder.style.display = 'flex';
+            }}
+          />
+        ) : null}
+        <div className="no-img-placeholder a-bc-ph absolute inset-0 items-center justify-center" style={{ display: src ? 'none' : 'flex' }}>
+          <img src="/alfie_app_logo.svg" alt="" style={{ width: iconSize, height: iconSize, opacity: 0.4 }} />
+        </div>
+      </>
+    );
+  };
   const actions = (classified: Classified, size = 34) => (
     <>
       {canManageListing(classified) && (
@@ -376,8 +380,8 @@ export default function ClassifiedsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredClassifieds.map(classified => (
               <div key={classified.id} onClick={() => setSelectedClassified(classified)} className="a-bc group" role="button" tabIndex={0}>
-                <div className="relative overflow-hidden" style={{ height: 200 }}>
-                  {cover(classified, 200)}
+                <div className="a-bc-media">
+                  {cover(classified)}
                   <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(6,11,22,0.25), rgba(6,11,22,0) 35%, rgba(6,11,22,0) 60%, rgba(6,11,22,0.75))' }} />
                   <span className="a-glass absolute" style={{ left: 12, top: 12 }}><Tag size={12} />{catOnly(classified.category)}</span>
                   <div className="absolute flex gap-1.5" style={{ right: 12, top: 12 }}>{actions(classified)}</div>
@@ -396,7 +400,7 @@ export default function ClassifiedsPage() {
           <div className="a-card overflow-hidden">
             {filteredClassifieds.map(classified => (
               <div key={classified.id} onClick={() => setSelectedClassified(classified)} className="a-rr" style={{ padding: '12px 16px' }} role="button" tabIndex={0}>
-                <div className="relative overflow-hidden flex-shrink-0" style={{ width: 112, height: 80, borderRadius: 12 }}>{cover(classified, 80, 32)}</div>
+                <div className="relative overflow-hidden flex-shrink-0" style={{ width: 112, height: 80, borderRadius: 12 }}>{cover(classified, 32)}</div>
                 <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                   <div className="flex items-baseline gap-3">
                     <span className="a-ink text-[15px] font-semibold truncate flex-1">{classified.title}</span>

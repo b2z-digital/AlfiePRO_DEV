@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Upload, Trash2, ChevronDown, UserPlus, User } from 'lucide-react';
+import { X, Upload, Trash2, ChevronDown, UserPlus, User, RotateCw, Crop } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import type { Classified, ClassifiedFormData } from '../../types/classified';
 import { CLASSIFIED_CONDITIONS } from '../../types/classified';
 import { createClassified, updateClassified } from '../../utils/classifiedStorage';
 import { supabase } from '../../utils/supabase';
+import type { ClassifiedImageMeta } from '../../types/classified';
+import { ClassifiedPhoto, normaliseTurn, photoMetaFor } from './ClassifiedPhoto';
+import { ClassifiedPhotoAdjust } from './ClassifiedPhotoAdjust';
 
 interface Props {
   classified?: Classified;
@@ -40,6 +43,7 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
     category: classified?.category || 'yachts',
     condition: classified?.condition || 'used',
     images: classified?.images || [],
+    image_meta: (classified?.image_meta && typeof classified.image_meta === 'object' ? classified.image_meta : {}) as Record<string, ClassifiedImageMeta>,
     contact_email: classified?.contact_email || user?.email || '',
     contact_phone: classified?.contact_phone || '',
     club_id: classified?.club_id || currentClub?.clubId,
@@ -52,6 +56,7 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
   });
 
   const [uploading, setUploading] = useState(false);
+  const [adjustIndex, setAdjustIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showConditionDropdown, setShowConditionDropdown] = useState(false);
@@ -159,6 +164,19 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
     }
   };
 
+  const setPhotoMeta = (src: string, m: ClassifiedImageMeta | undefined) => {
+    setFormData((prev) => {
+      const next = { ...(prev.image_meta || {}) };
+      if (m) next[src] = m; else delete next[src];
+      return { ...prev, image_meta: next };
+    });
+  };
+
+  const turnPhoto = (src: string) => {
+    const m = photoMetaFor(formData.image_meta, src);
+    setPhotoMeta(src, { ...m, r: normaliseTurn((m?.r || 0) + 90), by: 'manual', at: new Date().toISOString() });
+  };
+
   const removeImage = (index: number) => {
     const newImages = [...formData.images];
     newImages.splice(index, 1);
@@ -176,10 +194,17 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
 
     setSaving(true);
     try {
+      // Keep photo settings only for photos still on the listing
+      const keptMeta: Record<string, ClassifiedImageMeta> = {};
+      for (const src of formData.images) {
+        const m = photoMetaFor(formData.image_meta, src);
+        if (m) keptMeta[src] = m;
+      }
+      const toSave = { ...formData, image_meta: keptMeta };
       if (isEditing && classified) {
-        await updateClassified(classified.id, formData);
+        await updateClassified(classified.id, toSave);
       } else {
-        await createClassified(formData, user.id);
+        await createClassified(toSave, user.id);
       }
 
       onSave();
@@ -439,15 +464,25 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
               {formData.images.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   {formData.images.map((image, index) => (
-                    <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-slate-900 group">
-                      <img src={image} alt="" className="w-full h-full object-cover" />
+                    <div key={image + index} className="relative aspect-square rounded-lg overflow-hidden bg-slate-900 group">
+                      <ClassifiedPhoto src={image} meta={photoMetaFor(formData.image_meta, image)} className="absolute inset-0" />
+                      {index === 0 && <span className="a-glass absolute" style={{ left: 8, top: 8, fontSize: 11 }}>Cover</span>}
                       <button
                         type="button"
                         onClick={() => removeImage(index)}
-                        className="absolute top-2 right-2 p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                        aria-label="Remove photo"
                       >
                         <Trash2 size={16} />
                       </button>
+                      <div className="absolute left-2 right-2 bottom-2 flex gap-1.5">
+                        <button type="button" onClick={() => turnPhoto(image)} className="a-gb flex-1" style={{ width: 'auto', height: 32, borderRadius: 10, fontSize: 12, gap: 5 }} title="Turn 90° clockwise" aria-label="Turn photo">
+                          <RotateCw size={14} />Turn
+                        </button>
+                        <button type="button" onClick={() => setAdjustIndex(index)} className="a-gb flex-1" style={{ width: 'auto', height: 32, borderRadius: 10, fontSize: 12, gap: 5 }} title="Turn and frame this photo" aria-label="Adjust photo">
+                          <Crop size={14} />Adjust
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -600,6 +635,15 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
           </div>
         </form>
       </div>
+      {adjustIndex !== null && formData.images[adjustIndex] && (
+        <ClassifiedPhotoAdjust
+          src={formData.images[adjustIndex]}
+          meta={photoMetaFor(formData.image_meta, formData.images[adjustIndex])}
+          autoChecked={!!classified?.is_scraped}
+          onApply={(m) => setPhotoMeta(formData.images[adjustIndex], m)}
+          onClose={() => setAdjustIndex(null)}
+        />
+      )}
     </div>
   );
 }

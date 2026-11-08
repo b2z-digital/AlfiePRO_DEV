@@ -9,6 +9,8 @@ import { PublicHeader } from './PublicHeader';
 import { PublicFooter } from './PublicFooter';
 import { GoogleAnalytics } from '../GoogleAnalytics';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
+import { ClassifiedPhoto, photoMetaFor } from '../classifieds/ClassifiedPhoto';
+import type { ClassifiedImageMeta } from '../../types/classified';
 
 interface Classified {
   id: string;
@@ -19,6 +21,7 @@ interface Classified {
   condition?: string;
   location?: string;
   images?: string[];
+  image_meta?: Record<string, ClassifiedImageMeta> | null;
   contact_name: string;
   contact_phone?: string;
   contact_email?: string;
@@ -191,9 +194,11 @@ export const PublicClassifiedsPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredClassifieds.map((item) => (
               <div key={item.id} className="bg-white rounded-sm overflow-hidden shadow-md hover:shadow-xl transition-shadow group">
-                <div className="relative h-56 bg-gray-100">
+                <div className="relative h-56 bg-gray-100 overflow-hidden">
                   {item.images && item.images.length > 0 ? (
-                    <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <div className="absolute inset-0 group-hover:scale-105 transition-transform duration-300">
+                      <ClassifiedPhoto src={item.images[0]} meta={photoMetaFor(item.image_meta, item.images[0])} alt={item.title} className="absolute inset-0" />
+                    </div>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Tag className="h-16 w-16 text-gray-300" />

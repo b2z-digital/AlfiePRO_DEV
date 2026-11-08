@@ -1254,3 +1254,11 @@ html.alfie-light .a-evm-hero .a-wlvl-n { color: #6FB4FF; border-color: rgba(10,1
 /* Ask Alfie header avatar is the Alfie orb itself (board) */
 html.alfie-theme .a-aa-logo { background: transparent !important; border: 0 !important; overflow: visible; }
 html.alfie-theme .a-aa-orb::before { inset: -26px; }
+
+/* Classifieds photos: turned upright and framed on the item (ClassifiedPhoto) */
+.a-cph { overflow: hidden; container-type: size; }
+.a-cph:not(.absolute):not(.fixed) { position: relative; }
+.a-cph > img { display: block; }
+.a-cph > .a-cph-bd { filter: blur(26px) brightness(0.55) saturate(1.2); scale: 1.18; pointer-events: none; }
+/* Photo area on classifieds cards: 4:3 so tall boat photos keep their mast and hull */
+.a-bc-media { position: relative; overflow: hidden; aspect-ratio: 4 / 3; }

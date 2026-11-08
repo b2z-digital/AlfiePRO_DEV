@@ -9,6 +9,7 @@ import type { Classified, ClassifiedInquiry } from '../../types/classified';
 import { deleteClassified, markClassifiedAsSold, toggleClassifiedFavorite, getClassifiedInquiries, createClassifiedInquiry, isClassifiedFavorited } from '../../utils/classifiedStorage';
 import { supabase } from '../../utils/supabase';
 import ClassifiedFormModal from './ClassifiedFormModal';
+import { ClassifiedPhoto, normaliseTurn, photoMetaFor } from './ClassifiedPhoto';
 
 interface Props {
   classified: Classified;
@@ -198,10 +199,14 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
         <section className="a-sheet w-full max-w-[1240px] max-h-[90vh] overflow-hidden flex flex-col lg:flex-row" role="dialog" aria-label="Listing details" onClick={(e) => e.stopPropagation()}>
           <div className="relative lg:basis-[52%] flex-shrink-0 a-listing-media" style={{ minHeight: 320 }}>
             {imgs.length > 0 ? (
-              <img
+              <ClassifiedPhoto
                 src={imgs[currentImageIndex]}
+                meta={photoMetaFor(classified.image_meta, imgs[currentImageIndex])}
                 alt={classified.title}
-                className="absolute inset-0 w-full h-full object-cover cursor-zoom-in"
+                fit="contain"
+                backdrop
+                loading="eager"
+                className="absolute inset-0 cursor-zoom-in"
                 onClick={() => { setLightboxIndex(currentImageIndex); setLightboxOpen(true); }}
               />
             ) : (
@@ -218,7 +223,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                 <div className="absolute left-0 right-0 bottom-0 flex gap-2 overflow-x-auto" style={{ padding: '12px 14px', background: 'linear-gradient(0deg, rgba(10,15,26,0.95), rgba(10,15,26,0))' }}>
                   {imgs.map((img, idx) => (
                     <button key={idx} onClick={() => setCurrentImageIndex(idx)} className="flex-shrink-0" aria-label={`Photo ${idx + 1}`}>
-                      <img src={img} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 12, boxShadow: idx === currentImageIndex ? '0 0 0 2px #0A84FF' : 'none', opacity: idx === currentImageIndex ? 1 : 0.6 }} />
+                      <ClassifiedPhoto src={img} meta={photoMetaFor(classified.image_meta, img)} style={{ width: 72, height: 72, borderRadius: 12, boxShadow: idx === currentImageIndex ? '0 0 0 2px #0A84FF' : 'none', opacity: idx === currentImageIndex ? 1 : 0.6 }} />
                     </button>
                   ))}
                 </div>
@@ -437,6 +442,23 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
           close={() => setLightboxOpen(false)}
           slides={classified.images.map(img => ({ src: img }))}
           index={lightboxIndex}
+          render={{
+            // Photos that need turning upright are drawn by ClassifiedPhoto;
+            // the rest use the lightbox's own image (with zoom).
+            slide: ({ slide, rect }) => {
+              const m = photoMetaFor(classified.image_meta, slide.src);
+              if (!m || !normaliseTurn(m.r)) return undefined;
+              return (
+                <ClassifiedPhoto
+                  src={slide.src}
+                  meta={{ ...m, x: 50, y: 50 }}
+                  fit="contain"
+                  loading="eager"
+                  style={{ width: rect.width, height: rect.height }}
+                />
+              );
+            },
+          }}
           on={{
             view: ({ index }) => setLightboxIndex(index)
           }}
@@ -567,10 +589,11 @@ function ClassifiedShareModal({ classified, onClose }: ShareModalProps) {
         <div className="a-grp mb-5" style={{ padding: 12 }}>
           <div className="flex gap-3">
             {classified.images && classified.images.length > 0 && (
-              <img
+              <ClassifiedPhoto
                 src={classified.images[0]}
+                meta={photoMetaFor(classified.image_meta, classified.images[0])}
                 alt={classified.title}
-                className="w-20 h-20 object-cover rounded-lg"
+                className="w-20 h-20 rounded-lg flex-shrink-0"
               />
             )}
             <div className="flex-1 min-w-0">
