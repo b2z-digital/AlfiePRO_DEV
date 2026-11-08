@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { Users, Search, Download, Mail, Phone, Building2, CircleCheck as CheckCircle2, ArrowUpRight, ListFilter as Filter, Save, FolderOpen, Upload, Trash2, UserPlus, DollarSign, X, Pencil, Eye, Smartphone, Loader as Loader2, Hop as Home, Clock, Link } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
+import { Avatar } from '../ui/Avatar';
+import { InlineLoading, KpiCard, PageHead } from '../association/AssocUI';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
 import Papa from 'papaparse';
@@ -587,9 +589,10 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+      <div className="h-full overflow-y-auto">
+        <div className="a-apage">
+          <PageHead icon={<Users size={24} />} title="Members" sub="Loading members…" />
+          <InlineLoading label="Loading members…" />
         </div>
       </div>
     );
@@ -597,101 +600,63 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
 
   if (error) {
     return (
-      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} p-8`}>
-        <div className={`p-4 rounded-lg ${darkMode ? 'bg-red-900/20 text-red-400' : 'bg-red-50 text-red-600'}`}>
-          <p>Error loading members: {error}</p>
+      <div className="h-full overflow-y-auto">
+        <div className="a-apage">
+          <PageHead icon={<Users size={24} />} title="Members" />
+          <div className="a-note a-note-r"><span className="text-sm">Error loading members: {error}</span></div>
         </div>
       </div>
     );
   }
 
+  const connectedCount = members.filter(m => m.user_id).length;
+  const inviteSentCount = members.filter(m => !m.user_id && (memberInvitations[m.id]?.status === 'pending' || m.activation_status === 'pending')).length;
+  const notInvitedCount = members.filter(m => !m.user_id && m.email && !memberInvitations[m.id] && m.activation_status !== 'pending').length;
+
   return (
-    <div className={`h-full overflow-y-auto`}>
-      <div className="p-4 sm:p-8 lg:p-16">
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
-              <Users className="text-white" size={28} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Members</h1>
-              <p className="text-sm text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span>{stats.uniqueMembers} members across {stats.totalClubs} clubs{stats.totalMembers !== stats.uniqueMembers ? ` (${stats.totalMembers} memberships)` : ''}</span>
-                {unassignedCount > 0 && <span className="text-amber-400">({unassignedCount} unassigned)</span>}
-                <span className="hidden sm:inline text-slate-600">|</span>
-                <span className="flex items-center gap-1.5 text-green-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                  {members.filter(m => m.user_id).length} Connected
-                </span>
-                {members.filter(m => !m.user_id && (memberInvitations[m.id]?.status === 'pending' || m.activation_status === 'pending')).length > 0 && (
-                  <span className="flex items-center gap-1.5 text-orange-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
-                    {members.filter(m => !m.user_id && (memberInvitations[m.id]?.status === 'pending' || m.activation_status === 'pending')).length} Invite Sent
-                  </span>
-                )}
-                <span className="flex items-center gap-1.5 text-slate-500">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-                  {members.filter(m => !m.user_id && m.email && !memberInvitations[m.id] && m.activation_status !== 'pending').length} Not Invited
-                </span>
-              </p>
-            </div>
+    <div className="h-full overflow-y-auto">
+      <div className="a-apage">
+        <PageHead
+          icon={<Users size={24} />}
+          title="Members"
+          sub={<>{stats.uniqueMembers} members across {stats.totalClubs} clubs{stats.totalMembers !== stats.uniqueMembers ? ` (${stats.totalMembers} memberships)` : ''}</>}
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={() => setShowImportModal(true)} className="a-btn">
+              <Upload size={17} />
+              Import
+            </button>
+            <button type="button" onClick={exportToCSV} className="a-btn a-btn-p">
+              <Download size={17} />
+              Export CSV
+            </button>
           </div>
+        </PageHead>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="a-chip"><span className="a-light a-light-g" /><b className="a-num">{connectedCount}</b><span className="a-mute">On the app</span></span>
+          {inviteSentCount > 0 && (
+            <span className="a-chip"><span className="a-light a-light-a" /><b className="a-num">{inviteSentCount}</b><span className="a-mute">Invite sent</span></span>
+          )}
+          <span className="a-chip"><span className="a-light" /><b className="a-num">{notInvitedCount}</b><span className="a-mute">Not invited</span></span>
+          {unassignedCount > 0 && (
+            <button type="button" className="a-chip a-chip-rim cursor-pointer" onClick={() => setSelectedClub('unassigned')}>
+              <span className="a-light a-light-a" /><b className="a-num">{unassignedCount}</b><span className="a-mute">Not in a club</span>
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="p-6 rounded-xl border backdrop-blur-sm bg-slate-800/30 border-slate-700/50">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600">
-                <Users className="text-white" size={24} />
-              </div>
-              <div>
-                <p className="text-sm text-slate-400">Unique Members</p>
-                <p className="text-3xl font-bold text-white mt-1">{stats.uniqueMembers}</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {memberCategoryBreakdown.full} full &middot; {memberCategoryBreakdown.associateOnly} associate only
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="p-6 rounded-xl border backdrop-blur-sm bg-slate-800/30 border-slate-700/50">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-gradient-to-br">
-                <CheckCircle2 className="text-white" size={24} />
-              </div>
-              <div>
-                <p className="text-sm text-slate-400">Current Members</p>
-                <p className="text-3xl font-bold text-white mt-1">{stats.currentMembers}</p>
-              </div>
-            </div>
-          </div>
-          <div className="p-6 rounded-xl border backdrop-blur-sm bg-slate-800/30 border-slate-700/50">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-gradient-to-br from-cyan-500 to-cyan-600">
-                <Building2 className="text-white" size={24} />
-              </div>
-              <div>
-                <p className="text-sm text-slate-400">Member Clubs</p>
-                <p className="text-3xl font-bold text-white mt-1">{stats.totalClubs}</p>
-              </div>
-            </div>
-          </div>
-          <div className="p-6 rounded-xl border backdrop-blur-sm bg-slate-800/30 border-slate-700/50">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600">
-                <Search className="text-white" size={24} />
-              </div>
-              <div>
-                <p className="text-sm text-slate-400">Filtered Results</p>
-                <p className="text-3xl font-bold text-white mt-1">{stats.filteredCount}</p>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+          <KpiCard cap="Members" value={stats.uniqueMembers} sub={`${memberCategoryBreakdown.full} full · ${memberCategoryBreakdown.associateOnly} associate only`} icon={<Users size={18} />} />
+          <KpiCard cap="Current" value={stats.currentMembers} sub={`${stats.expiredMembers} expired or unfinancial`} icon={<CheckCircle2 size={18} />} tone="green" />
+          <KpiCard cap="Member clubs" value={stats.totalClubs} sub="Clubs in the association" icon={<Building2 size={18} />} />
+          <KpiCard cap="Showing" value={stats.filteredCount} sub="Match your search and filters" icon={<Search size={18} />} />
         </div>
 
         {selectedMemberIds.size > 0 && (
-          <div className="mb-4 p-4 rounded-xl bg-blue-600/10 border border-blue-500/30">
+          <div className="a-bulkbar">
             <div className="flex items-center justify-between flex-wrap gap-3">
-              <span className="text-sm text-blue-300 font-medium">
+              <span className="a-ink text-sm font-semibold">
                 {selectedMemberIds.size} member{selectedMemberIds.size !== 1 ? 's' : ''} selected
               </span>
               <div className="flex items-center gap-2 flex-wrap">
@@ -711,7 +676,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                             setShowDefaultClubModal(true);
                           }}
                           disabled={bulkProcessing}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
+                          className="a-btn a-btn-sm"
                         >
                           <Home size={15} />
                           Set Default Club
@@ -720,7 +685,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                       <button
                         onClick={() => setShowAddToClubModal(true)}
                         disabled={bulkProcessing}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
+                        className="a-btn a-btn-sm"
                       >
                         <UserPlus size={15} />
                         Add to Club
@@ -729,7 +694,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                         <button
                           onClick={handleBulkActivate}
                           disabled={bulkProcessing || activating}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium transition disabled:opacity-50"
+                          className="a-btn a-btn-sm"
                         >
                           {activating ? <Loader2 size={15} className="animate-spin" /> : <Smartphone size={15} />}
                           Activate for App
@@ -741,7 +706,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                 <button
                   onClick={() => handleBulkSetFinancial(true)}
                   disabled={bulkProcessing}
-                  className="btn-primary-green flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-sm font-medium transition disabled:opacity-50"
+                  className="a-btn a-btn-g a-btn-sm"
                 >
                   <DollarSign size={15} />
                   Set Financial
@@ -749,7 +714,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                 <button
                   onClick={() => handleBulkSetFinancial(false)}
                   disabled={bulkProcessing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium transition disabled:opacity-50"
+                  className="a-btn a-btn-a a-btn-sm"
                 >
                   <DollarSign size={15} />
                   Set Unfinancial
@@ -757,14 +722,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                 <button
                   onClick={handleBulkDelete}
                   disabled={bulkProcessing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition disabled:opacity-50"
+                  className="a-btn a-btn-d a-btn-sm"
                 >
                   <Trash2 size={15} />
                   Delete
                 </button>
                 <button
                   onClick={() => setSelectedMemberIds(new Set())}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition"
+                  className="a-btn a-btn-q a-btn-sm"
                 >
                   <X size={15} />
                   Clear
@@ -774,110 +739,74 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
           </div>
         )}
 
-        <div className="p-6 rounded-xl border backdrop-blur-sm mb-6 bg-slate-800/30 border-slate-700/50">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="Search members..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border bg-slate-700/50 border-slate-600/50 text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
-              </div>
-            </div>
-            <select
-              value={selectedClub}
-              onChange={(e) => setSelectedClub(e.target.value)}
-              className="px-4 py-2 rounded-lg border bg-slate-700/50 border-slate-600/50 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-            >
-              <option value="all">All Clubs</option>
-              <option value="unassigned">Unassigned ({unassignedCount})</option>
-              {clubs.map((club) => (
-                <option key={club.id} value={club.id}>
-                  {club.abbreviation ? `${club.abbreviation} - ${club.name}` : club.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-4 py-2 rounded-lg border bg-slate-700/50 border-slate-600/50 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-            >
-              <option value="all">All Status</option>
-              <option value="current">Current</option>
-              <option value="expired">Expired</option>
-              <option value="financial">Financial</option>
-              <option value="unfinancial">Unfinancial</option>
-            </select>
-          </div>
-
-          <div className="flex justify-between items-center gap-3 mt-4">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowAdvancedFilter(true)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                  advancedFilterConfig
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-slate-700 hover:bg-slate-600 text-white'
-                } transition-colors`}
-              >
-                <Filter size={18} />
-                Advanced Filter
-                {advancedFilterConfig && (
-                  <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs font-medium">Active</span>
-                )}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <label className="a-field flex-1 min-w-[240px]">
+            <Search size={17} />
+            <input
+              type="text"
+              placeholder="Search members"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              aria-label="Search members"
+            />
+          </label>
+          <select
+            value={selectedClub}
+            onChange={(e) => setSelectedClub(e.target.value)}
+            className="a-pick"
+            style={{ maxWidth: 300 }}
+            aria-label="Club"
+          >
+            <option value="all">All clubs</option>
+            <option value="unassigned">Not in a club ({unassignedCount})</option>
+            {clubs.map((club) => (
+              <option key={club.id} value={club.id}>
+                {club.abbreviation ? `${club.abbreviation} - ${club.name}` : club.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="a-pick"
+            aria-label="Status"
+          >
+            <option value="all">All statuses</option>
+            <option value="current">Current</option>
+            <option value="expired">Expired</option>
+            <option value="financial">Financial</option>
+            <option value="unfinancial">Unfinancial</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilter(true)}
+            className={`a-btn ${advancedFilterConfig ? 'a-btn-p' : ''}`}
+          >
+            <Filter size={16} />
+            {advancedFilterConfig ? 'Filter on' : 'Advanced filters'}
+          </button>
+          {advancedFilterConfig && (
+            <>
+              <button type="button" onClick={() => setShowSaveFilter(true)} className="a-btn">
+                <Save size={16} />
+                Save filter
               </button>
-              {advancedFilterConfig && (
-                <>
-                  <button
-                    onClick={() => setShowSaveFilter(true)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
-                  >
-                    <Save size={18} />
-                    Save Filter
-                  </button>
-                  <button
-                    onClick={() => setAdvancedFilterConfig(null)}
-                    className="px-4 py-2 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-red-400 transition-colors"
-                  >
-                    Clear Filter
-                  </button>
-                </>
-              )}
-              <button
-                onClick={() => setShowManageFilters(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
-              >
-                <FolderOpen size={18} />
-                Saved Filters
+              <button type="button" onClick={() => setAdvancedFilterConfig(null)} className="a-btn a-btn-q">
+                <X size={16} />
+                Clear
               </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowImportModal(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
-              >
-                <Upload size={18} />
-                Import Members
-              </button>
-              <button
-                onClick={exportToCSV}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-              >
-                <Download size={18} />
-                Export CSV
-              </button>
-            </div>
-          </div>
+            </>
+          )}
+          <button type="button" onClick={() => setShowManageFilters(true)} className="a-btn">
+            <FolderOpen size={16} />
+            Saved filters
+          </button>
         </div>
 
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
+        <div className="a-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-700/50">
+            <table className="w-full a-atable">
+              <thead>
                 <tr>
                   <th className="px-3 py-3 text-left w-10">
                     <input
@@ -889,29 +818,29 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                         return totalIds > 0 && selectedMemberIds.size === totalIds;
                       })()}
                       onChange={toggleSelectAll}
-                      className="rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                      className="rounded"
                     />
                   </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Member</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">{isConsolidatedView ? 'Club(s)' : 'Club'}</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Contact</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Membership</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Financial Status</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Invite Status</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Dates</th>
-                  <th className="px-4 py-3 text-right text-sm font-medium text-slate-300 w-16"></th>
+                  <th className="px-4 py-3 text-left">Member</th>
+                  <th className="px-4 py-3 text-left">{isConsolidatedView ? 'Club(s)' : 'Club'}</th>
+                  <th className="px-4 py-3 text-left">Contact</th>
+                  <th className="px-4 py-3 text-left">Membership</th>
+                  <th className="px-4 py-3 text-left">Financial Status</th>
+                  <th className="px-4 py-3 text-left">Invite Status</th>
+                  <th className="px-4 py-3 text-left">Dates</th>
+                  <th className="px-4 py-3 text-right w-16"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody>
                 {(isConsolidatedView ? consolidatedMembers.length === 0 : filteredMembers.length === 0) ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
-                      No members found
+                    <td colSpan={9} className="px-4 py-12 text-center a-mute">
+                      No members match your search and filters
                     </td>
                   </tr>
                 ) : isConsolidatedView ? (
                   consolidatedMembers.map((member) => (
-                    <tr key={member.memberIds.join('-')} className={`hover:bg-slate-700/30 ${member.memberIds.some(id => selectedMemberIds.has(id)) ? 'bg-blue-900/20' : ''}`}>
+                    <tr key={member.memberIds.join('-')} className={member.memberIds.some(id => selectedMemberIds.has(id)) ? 'is-sel' : ''}>
                       <td className="px-3 py-4">
                         <input
                           type="checkbox"
@@ -927,35 +856,26 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                               return next;
                             });
                           }}
-                          className="rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                          className="rounded"
                         />
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
-                          {member.avatar_url ? (
-                            <img src={member.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                              {member.first_name?.[0]}{member.last_name?.[0]}
-                            </div>
-                          )}
-                          <span className="text-white font-medium">{member.first_name} {member.last_name}</span>
+                          <Avatar firstName={member.first_name} lastName={member.last_name} src={member.avatar_url || undefined} size="md" />
+                          <span className="a-ink font-semibold whitespace-nowrap">{member.first_name} {member.last_name}</span>
                         </div>
                       </td>
                       <td className="px-4 py-4">
                         {member.clubMemberships.length === 0 || (!member.clubMemberships[0].club_id && member.clubMemberships.length === 1) ? (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">
-                            Unassigned
-                          </span>
+                          <span className="a-st a-txt-a"><span className="a-light a-light-a" />Not in a club</span>
                         ) : (
                           <div className="space-y-1.5">
                             {member.clubMemberships.filter(cm => cm.club_id).map((cm) => (
                               <div key={cm.id} className="flex items-center gap-2">
-                                <Building2 size={14} className="text-slate-400 flex-shrink-0" />
-                                <span className="text-sm text-slate-300">{cm.club_name}</span>
-                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                  cm.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
-                                }`}>
+                                <Building2 size={14} className="a-dim flex-shrink-0" />
+                                <span className="text-sm a-mute truncate max-w-[210px]" title={cm.club_name}>{cm.club_name}</span>
+                                <span className={`a-st text-[11px] ${cm.is_financial ? 'a-mute' : 'a-txt-r'}`}>
+                                  <span className={`a-light ${cm.is_financial ? 'a-light-g' : 'a-light-r'}`} />
                                   {cm.membership_level || 'Standard'}
                                 </span>
                               </div>
@@ -966,14 +886,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                       <td className="px-4 py-4">
                         <div className="space-y-1">
                           {member.email && (
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                              <Mail size={14} className="text-slate-400" />
+                            <div className="flex items-center gap-2 text-sm a-mute">
+                              <Mail size={14} className="a-dim" />
                               {member.email}
                             </div>
                           )}
                           {member.phone && (
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                              <Phone size={14} className="text-slate-400" />
+                            <div className="flex items-center gap-2 text-sm a-mute">
+                              <Phone size={14} className="a-dim" />
                               {member.phone}
                             </div>
                           )}
@@ -987,14 +907,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                               const abbr = club?.abbreviation || cm.club_name?.split(' ').map((w: string) => w[0]).join('').slice(0, 4);
                               return (
                                 <div key={cm.id} className="flex items-center gap-2">
-                                  <span className="text-sm text-slate-300">{cm.membership_level || 'Standard'}</span>
-                                  <span className="text-[11px] text-slate-500">{abbr}</span>
+                                  <span className="a-lb-fmt">{cm.membership_level || 'Standard'}</span>
+                                  <span className="a-dim text-[11px]">{abbr}</span>
                                 </div>
                               );
                             })}
                           </div>
                         ) : (
-                          <span className="text-sm text-slate-300">{member.membership_level || 'Standard'}</span>
+                          <span className="a-lb-fmt">{member.membership_level || 'Standard'}</span>
                         )}
                       </td>
                       <td className="px-4 py-4">
@@ -1005,30 +925,26 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                               const abbr = club?.abbreviation || cm.club_name?.split(' ').map((w: string) => w[0]).join('').slice(0, 4);
                               return (
                                 <div key={cm.id} className="flex items-center gap-2">
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                    cm.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
-                                  }`}>
+                                  <span className={`a-st ${cm.is_financial ? 'a-ink' : 'a-txt-r'}`}><span className={`a-light ${cm.is_financial ? 'a-light-g' : 'a-light-r'}`} />
                                     {cm.is_financial ? 'Financial' : 'Unfinancial'}
                                   </span>
-                                  <span className="text-[11px] text-slate-500">{abbr}</span>
+                                  <span className="a-dim text-[11px]">{abbr}</span>
                                 </div>
                               );
                             })}
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              member.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
-                            }`}>
+                            <span className={`a-st ${member.is_financial ? 'a-ink' : 'a-txt-r'}`}><span className={`a-light ${member.is_financial ? 'a-light-g' : 'a-light-r'}`} />
                               {member.is_financial ? 'Financial' : 'Unfinancial'}
                             </span>
                             {member.memberIds.some(id => memberRemittanceStatus[id]?.statePaid) && (
-                              <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400" title="State Paid">
+                              <div className="a-ib a-txt-b" style={{ width: 28, height: 28, cursor: 'default' }} title="Paid to the state association">
                                 <CheckCircle2 size={14} />
                               </div>
                             )}
                             {member.memberIds.some(id => memberRemittanceStatus[id]?.nationalPaid) && (
-                              <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400" title="National Paid">
+                              <div className="a-ib a-txt-g" style={{ width: 28, height: 28, cursor: 'default' }} title="Paid to the national association">
                                 <CheckCircle2 size={14} />
                               </div>
                             )}
@@ -1043,7 +959,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
 
                           if (hasUserId && activationStatus === 'activated') {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                              <span className="a-lb-fmt a-txt-g">
                                 <CheckCircle2 size={12} />
                                 Active
                               </span>
@@ -1051,7 +967,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           }
                           if (hasUserId && activationStatus === 'pending') {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-900/30 text-sky-400">
+                              <span className="a-lb-fmt a-txt-b">
                                 <Smartphone size={12} />
                                 Awaiting Setup
                               </span>
@@ -1059,7 +975,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           }
                           if (hasUserId) {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                              <span className="a-lb-fmt a-txt-g">
                                 <Link size={12} />
                                 Connected
                               </span>
@@ -1067,7 +983,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           }
                           if (invitation?.status === 'pending' || activationStatus === 'pending') {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-900/30 text-orange-400">
+                              <span className="a-lb-fmt a-txt-a">
                                 <Clock size={12} />
                                 Invite Sent
                               </span>
@@ -1075,7 +991,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           }
                           if (invitation?.status === 'expired') {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-900/30 text-red-400">
+                              <span className="a-lb-fmt a-txt-r">
                                 <Clock size={12} />
                                 Expired
                               </span>
@@ -1083,14 +999,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           }
                           if (member.email) {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-700/50 text-slate-400">
+                              <span className="a-lb-fmt a-mute">
                                 <Smartphone size={12} />
                                 Not Invited
                               </span>
                             );
                           }
                           return (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800/50 text-slate-500">
+                            <span className="a-lb-fmt a-dim">
                               No Email
                             </span>
                           );
@@ -1099,13 +1015,13 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                       <td className="px-4 py-4">
                         <div className="space-y-1 text-sm">
                           {member.date_joined && (
-                            <div className="text-slate-400">
-                              <span className="text-slate-500">Joined</span> {formatDate(member.date_joined)}
+                            <div className="a-mute whitespace-nowrap">
+                              <span className="a-dim">Joined</span> {formatDate(member.date_joined)}
                             </div>
                           )}
                           {member.renewal_date && (
-                            <div className="text-slate-400">
-                              <span className="text-slate-500">Renewal</span> {formatDate(member.renewal_date)}
+                            <div className="a-mute whitespace-nowrap">
+                              <span className="a-dim">Renews</span> {formatDate(member.renewal_date)}
                             </div>
                           )}
                         </div>
@@ -1115,7 +1031,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           {!isImpersonating && member.user_id && (
                             <button
                               onClick={() => startImpersonation(member.id)}
-                              className="p-2 rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 transition"
+                              className="a-ib"
                               title={`View as ${member.first_name} ${member.last_name}`}
                             >
                               <Eye size={16} />
@@ -1126,14 +1042,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                               setEditingMemberId(member.id);
                               setEditingMemberClubId(member.club_id || '');
                             }}
-                            className="p-2 rounded-lg hover:bg-slate-600/50 text-slate-400 hover:text-white transition"
+                            className="a-ib"
                             title="Edit member"
                           >
                             <Pencil size={16} />
                           </button>
                           <button
                             onClick={() => setDeletingMember(member)}
-                            className="p-2 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition"
+                            className="a-ib a-ib-d"
                             title="Delete member"
                           >
                             <Trash2 size={16} />
@@ -1144,77 +1060,67 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                   ))
                 ) : (
                   filteredMembers.map((member) => (
-                    <tr key={member.id} className={`hover:bg-slate-700/30 ${selectedMemberIds.has(member.id) ? 'bg-blue-900/20' : ''}`}>
+                    <tr key={member.id} className={selectedMemberIds.has(member.id) ? 'is-sel' : ''}>
                       <td className="px-3 py-4">
                         <input
                           type="checkbox"
                           checked={selectedMemberIds.has(member.id)}
                           onChange={() => toggleMemberSelection(member.id)}
-                          className="rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                          className="rounded"
                         />
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
-                          {member.avatar_url ? (
-                            <img src={member.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                              {member.first_name?.[0]}{member.last_name?.[0]}
-                            </div>
-                          )}
-                          <span className="text-white font-medium">{member.first_name} {member.last_name}</span>
+                          <Avatar firstName={member.first_name} lastName={member.last_name} src={member.avatar_url || undefined} size="md" />
+                          <span className="a-ink font-semibold whitespace-nowrap">{member.first_name} {member.last_name}</span>
                         </div>
                       </td>
                       <td className="px-4 py-4">
                         {member.club_id ? (
                           <div className="flex items-center gap-2">
-                            <Building2 size={16} className="text-slate-400" />
-                            <span className="text-sm text-slate-300">{member.club_name}</span>
+                            <Building2 size={15} className="a-dim flex-shrink-0" />
+                            <span className="text-sm a-mute truncate max-w-[210px]" title={member.club_name}>{member.club_name}</span>
                           </div>
                         ) : (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 font-medium">
-                            Unassigned
-                          </span>
+                          <span className="a-st a-txt-a"><span className="a-light a-light-a" />Not in a club</span>
                         )}
                       </td>
                       <td className="px-4 py-4">
                         <div className="space-y-1">
                           {member.email && (
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                              <Mail size={14} className="text-slate-400" />
+                            <div className="flex items-center gap-2 text-sm a-mute">
+                              <Mail size={14} className="a-dim" />
                               {member.email}
                             </div>
                           )}
                           {member.phone && (
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                              <Phone size={14} className="text-slate-400" />
+                            <div className="flex items-center gap-2 text-sm a-mute">
+                              <Phone size={14} className="a-dim" />
                               {member.phone}
                             </div>
                           )}
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className="text-sm text-slate-300">{member.membership_level || 'Standard'}</span>
+                        <span className="a-lb-fmt">{member.membership_level || 'Standard'}</span>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            member.is_financial ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
-                          }`}>
+                          <span className={`a-st ${member.is_financial ? 'a-ink' : 'a-txt-r'}`}><span className={`a-light ${member.is_financial ? 'a-light-g' : 'a-light-r'}`} />
                             {member.is_financial ? 'Financial' : 'Unfinancial'}
                           </span>
                           {member.is_financial && memberRemittanceStatus[member.id]?.statePaid && (
-                            <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400" title="State Paid">
+                            <div className="a-ib a-txt-b" style={{ width: 28, height: 28, cursor: 'default' }} title="Paid to the state association">
                               <CheckCircle2 size={14} />
                             </div>
                           )}
                           {member.is_financial && !memberRemittanceStatus[member.id]?.statePaid && memberRemittanceStatus[member.id] && (
-                            <div className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400 animate-pulse" title="State Pending">
+                            <div className="a-ib a-txt-a" style={{ width: 28, height: 28, cursor: 'default' }} title="Payment to the state association pending">
                               <ArrowUpRight size={14} />
                             </div>
                           )}
                           {member.is_financial && memberRemittanceStatus[member.id]?.nationalPaid && (
-                            <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400" title="National Paid">
+                            <div className="a-ib a-txt-g" style={{ width: 28, height: 28, cursor: 'default' }} title="Paid to the national association">
                               <CheckCircle2 size={14} />
                             </div>
                           )}
@@ -1228,7 +1134,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
 
                           if (hasUserId && activationStatus === 'activated') {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                              <span className="a-lb-fmt a-txt-g">
                                 <CheckCircle2 size={12} />
                                 Active
                               </span>
@@ -1236,7 +1142,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           }
                           if (hasUserId && activationStatus === 'pending') {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-900/30 text-sky-400">
+                              <span className="a-lb-fmt a-txt-b">
                                 <Smartphone size={12} />
                                 Awaiting Setup
                               </span>
@@ -1244,7 +1150,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           }
                           if (hasUserId) {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                              <span className="a-lb-fmt a-txt-g">
                                 <Link size={12} />
                                 Connected
                               </span>
@@ -1252,7 +1158,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           }
                           if (invitation?.status === 'pending') {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-900/30 text-orange-400">
+                              <span className="a-lb-fmt a-txt-a">
                                 <Clock size={12} />
                                 Invite Sent
                               </span>
@@ -1260,7 +1166,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           }
                           if (invitation?.status === 'expired') {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-900/30 text-red-400">
+                              <span className="a-lb-fmt a-txt-r">
                                 <Clock size={12} />
                                 Expired
                               </span>
@@ -1268,7 +1174,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           }
                           if (activationStatus === 'pending') {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-900/30 text-sky-400">
+                              <span className="a-lb-fmt a-txt-b">
                                 <Smartphone size={12} />
                                 Invite Sent
                               </span>
@@ -1276,14 +1182,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           }
                           if (member.email) {
                             return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-700/50 text-slate-400">
+                              <span className="a-lb-fmt a-mute">
                                 <Smartphone size={12} />
                                 Not Invited
                               </span>
                             );
                           }
                           return (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800/50 text-slate-500">
+                            <span className="a-lb-fmt a-dim">
                               No Email
                             </span>
                           );
@@ -1292,13 +1198,13 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                       <td className="px-4 py-4">
                         <div className="space-y-1 text-sm">
                           {member.date_joined && (
-                            <div className="text-slate-400">
-                              <span className="text-slate-500">Joined</span> {formatDate(member.date_joined)}
+                            <div className="a-mute whitespace-nowrap">
+                              <span className="a-dim">Joined</span> {formatDate(member.date_joined)}
                             </div>
                           )}
                           {member.renewal_date && (
-                            <div className="text-slate-400">
-                              <span className="text-slate-500">Renewal</span> {formatDate(member.renewal_date)}
+                            <div className="a-mute whitespace-nowrap">
+                              <span className="a-dim">Renews</span> {formatDate(member.renewal_date)}
                             </div>
                           )}
                         </div>
@@ -1308,7 +1214,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           {!isImpersonating && member.user_id && (
                             <button
                               onClick={() => startImpersonation(member.id)}
-                              className="p-2 rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 transition"
+                              className="a-ib"
                               title={`View as ${member.first_name} ${member.last_name}`}
                             >
                               <Eye size={16} />
@@ -1319,14 +1225,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                               setEditingMemberId(member.id);
                               setEditingMemberClubId(member.club_id || '');
                             }}
-                            className="p-2 rounded-lg hover:bg-slate-600/50 text-slate-400 hover:text-white transition"
+                            className="a-ib"
                             title="Edit member"
                           >
                             <Pencil size={16} />
                           </button>
                           <button
                             onClick={() => setDeletingMember(member)}
-                            className="p-2 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition"
+                            className="a-ib a-ib-d"
                             title="Delete member"
                           >
                             <Trash2 size={16} />
@@ -1418,12 +1324,12 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       )}
 
       {showActivateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-lg w-full">
+        <div className="a-dlg">
+          <div className="a-sheet max-w-lg">
             <div className="p-6 border-b border-slate-700">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center">
+                  <div className="a-tile">
                     <Smartphone size={20} className="text-sky-400" />
                   </div>
                   <div>
@@ -1443,7 +1349,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                     setMembersToActivate([]);
                     setActivationResults(null);
                   }}
-                  className="text-slate-400 hover:text-slate-300 transition-colors"
+                  className="a-ib"
                 >
                   <X size={20} />
                 </button>
@@ -1550,14 +1456,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                       setShowActivateModal(false);
                       setMembersToActivate([]);
                     }}
-                    className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+                    className="a-btn a-btn-q"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleConfirmActivation}
                     disabled={activating}
-                    className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50"
+                    className="a-btn a-btn-p"
                   >
                     {activating ? (
                       <>
@@ -1579,7 +1485,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                     setMembersToActivate([]);
                     setActivationResults(null);
                   }}
-                  className="px-5 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 font-medium transition-colors"
+                  className="a-btn"
                 >
                   Done
                 </button>
@@ -1590,12 +1496,12 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       )}
 
       {showDefaultClubModal && defaultClubMember && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full">
+        <div className="a-dlg">
+          <div className="a-sheet max-w-md">
             <div className="p-6 border-b border-slate-700">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <div className="a-tile">
                     <Home size={20} className="text-blue-400" />
                   </div>
                   <div>
@@ -1610,7 +1516,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                     setShowDefaultClubModal(false);
                     setDefaultClubMember(null);
                   }}
-                  className="text-slate-400 hover:text-slate-300 transition-colors"
+                  className="a-ib"
                 >
                   <X size={20} />
                 </button>
@@ -1655,14 +1561,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                   setShowDefaultClubModal(false);
                   setDefaultClubMember(null);
                 }}
-                className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+                className="a-btn a-btn-q"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSetDefaultClub}
                 disabled={!selectedDefaultClubId || settingDefaultClub}
-                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50"
+                className="a-btn a-btn-p"
               >
                 {settingDefaultClub ? (
                   <>
@@ -1681,11 +1587,11 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
         </div>
       )}
       {deletingMember && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full">
+        <div className="a-dlg">
+          <div className="a-sheet max-w-md">
             <div className="p-6 border-b border-slate-700">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                <div className="a-tile">
                   <Trash2 size={20} className="text-red-400" />
                 </div>
                 <div>
@@ -1714,14 +1620,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
               <button
                 onClick={() => setDeletingMember(null)}
                 disabled={deleteProcessing}
-                className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+                className="a-btn a-btn-q"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSingleDelete}
                 disabled={deleteProcessing}
-                className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors disabled:opacity-50"
+                className="a-btn a-btn-d"
               >
                 {deleteProcessing ? (
                   <>

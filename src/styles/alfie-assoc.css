@@ -1,0 +1,98 @@
+/*
+ * Association screens (state and national) on the Alfie theme:
+ * Member clubs, association members, remittances, reports and settings.
+ * Builds on alfie-ui.css / alfie-screens.css (a-card, a-tile, a-btn, a-seg …).
+ */
+
+/* Page shell used by every association screen (same gutters as the club screens) */
+.a-apage { display: flex; flex-direction: column; gap: 22px; padding: 16px; }
+@media (min-width: 640px) { .a-apage { padding: 24px; } }
+@media (min-width: 1024px) { .a-apage { padding: 36px 48px 96px 36px; } }
+.a-apage-head { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.a-apage-title { margin: 0; font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-size: 30px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; color: #fff; }
+.a-apage-sub { margin: 4px 0 0; font-size: 14.5px; color: rgba(235, 240, 255, 0.62); }
+html.alfie-light .a-apage-title { color: #0B1220; }
+html.alfie-light .a-apage-sub { color: rgba(11, 18, 32, 0.6); }
+
+/* KPI cards (as on Club Membership) */
+.a-kpi { padding: 22px 22px 20px; }
+.a-kpi-n { font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-size: 40px; font-weight: 700; line-height: 1.05; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.a-kpi-sub { margin: 10px 0 0; font-size: 13.5px; color: rgba(235, 240, 255, 0.6); }
+html.alfie-light .a-kpi-sub { color: rgba(11, 18, 32, 0.58); }
+
+/* Organisation logo (club / association) */
+.a-orglogo { flex-shrink: 0; width: 48px; height: 48px; border-radius: 14px; object-fit: contain; padding: 4px; background: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10); }
+.a-orglogo-sm { width: 36px; height: 36px; border-radius: 11px; padding: 3px; }
+.a-orglogo-ph { display: inline-flex; align-items: center; justify-content: center; padding: 0; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.11); box-shadow: none; color: rgba(235, 240, 255, 0.7); font: 700 14px 'Bricolage Grotesque', 'Instrument Sans', sans-serif; letter-spacing: -0.01em; }
+.a-orglogo-sm.a-orglogo-ph { font-size: 12px; }
+html.alfie-light .a-orglogo { box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.10); }
+html.alfie-light .a-orglogo-ph { background: #F1F4F9; border-color: rgba(15, 23, 42, 0.10); color: rgba(11, 18, 32, 0.6); }
+
+/* Club cards */
+.a-clubcard { display: flex; flex-direction: column; gap: 16px; padding: 20px; transition: border-color .15s ease, transform .15s ease; }
+.a-clubcard:hover { border-color: rgba(255, 255, 255, 0.14); }
+html.alfie-light .a-clubcard:hover { border-color: rgba(15, 23, 42, 0.16); }
+.a-clubcard-sec { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.a-sail { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+.a-sail-day { min-width: 74px; font-weight: 600; color: #F1F4FA; }
+html.alfie-light .a-sail-day { color: #0B1220; }
+.a-wk { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; background: rgba(255, 179, 64, 0.12); color: #FFC56B; font-size: 11px; font-weight: 600; }
+html.alfie-light .a-wk { background: rgba(255, 159, 10, 0.12); color: #B25E00; }
+
+.a-wells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.a-well { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px 10px; border-radius: 14px; background: rgba(0, 0, 0, 0.24); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35); }
+.a-well-n { font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-size: 22px; font-weight: 700; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums; }
+.a-well-n.is-zero { color: rgba(235, 240, 255, 0.4); }
+.a-well-l { font-size: 11.5px; font-weight: 500; color: rgba(235, 240, 255, 0.55); }
+.a-well svg { color: rgba(235, 240, 255, 0.55); margin-bottom: 2px; }
+html.alfie-light .a-well { background: #F3F6FB; box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06); }
+html.alfie-light .a-well-n { color: #0B1220; }
+html.alfie-light .a-well-n.is-zero, html.alfie-light .a-well-l, html.alfie-light .a-well svg { color: rgba(11, 18, 32, 0.5); }
+
+.a-due { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 107, 107, 0.08); border: 1px solid rgba(255, 107, 107, 0.22); font-size: 13.5px; color: #FFB0B0; }
+.a-due b { margin-left: auto; color: #FFD0D0; font-variant-numeric: tabular-nums; }
+html.alfie-light .a-due { background: rgba(229, 72, 77, 0.06); border-color: rgba(229, 72, 77, 0.25); color: #B42318; }
+html.alfie-light .a-due b { color: #912018; }
+
+/* List view rows */
+.a-clubrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px 18px; }
+.a-clubrow + .a-clubrow { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+html.alfie-light .a-clubrow + .a-clubrow { border-top-color: rgba(15, 23, 42, 0.07); }
+.a-meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 12.5px; color: rgba(235, 240, 255, 0.6); }
+.a-meta-row > span { display: inline-flex; align-items: center; gap: 6px; }
+html.alfie-light .a-meta-row { color: rgba(11, 18, 32, 0.58); }
+
+/* View switch: icon-only segments */
+.a-seg-ic .a-seg-i { width: 38px; padding: 0; justify-content: center; }
+
+/* Simple confirm sheet */
+.a-confirm { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.a-confirm > .a-sheet { width: 440px; max-width: 100%; padding: 24px; }
+
+/* Destructive menu item */
+.a-pop-item.a-pop-danger { color: #FF8A8A; }
+.a-pop-item.a-pop-danger:hover { background: rgba(255, 107, 107, 0.10); }
+html.alfie-light .a-pop-item.a-pop-danger { color: #C8323A; }
+
+/* Association tables (Members, Remittances …) */
+.a-atable { border-collapse: separate; border-spacing: 0; }
+.a-atable thead th { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(235, 240, 255, 0.5); white-space: nowrap; border-bottom: 1px solid rgba(255, 255, 255, 0.07); background: transparent; }
+.a-atable tbody td { border-bottom: 1px solid rgba(255, 255, 255, 0.05); vertical-align: middle; }
+.a-atable tbody tr:last-child td { border-bottom: 0; }
+.a-atable tbody tr { transition: background-color .12s ease; }
+.a-atable tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
+.a-atable tbody tr.is-sel { background: rgba(10, 132, 255, 0.08); }
+.a-atable input[type="checkbox"] { width: 16px; height: 16px; accent-color: #0A84FF; cursor: pointer; }
+html.alfie-light .a-atable thead th { color: rgba(11, 18, 32, 0.5); border-bottom-color: rgba(15, 23, 42, 0.08); }
+html.alfie-light .a-atable tbody td { border-bottom-color: rgba(15, 23, 42, 0.06); }
+html.alfie-light .a-atable tbody tr:hover { background: rgba(15, 23, 42, 0.025); }
+html.alfie-light .a-atable tbody tr.is-sel { background: rgba(10, 132, 255, 0.07); }
+
+/* Dialogs built on .a-sheet */
+.a-dlg { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(4, 8, 16, 0.6); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.a-dlg > .a-sheet { width: 100%; max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden; }
+.a-dlg-head { display: flex; align-items: center; gap: 12px; padding: 20px 22px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.a-dlg-body { padding: 18px 22px; overflow-y: auto; }
+.a-dlg-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px 18px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+html.alfie-light .a-dlg { background: rgba(15, 23, 42, 0.35); }
+html.alfie-light .a-dlg-head, html.alfie-light .a-dlg-foot { border-color: rgba(15, 23, 42, 0.08); }
