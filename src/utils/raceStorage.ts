@@ -4,6 +4,7 @@ import { supabase, forceConnectionRecovery } from './supabase';
 import { HeatManagement, HeatResult } from '../types/heat';
 import { offlineStorage } from './offlineStorage';
 import { protectedQuery, QUERY_TIMEOUTS } from './queryHelpers';
+import { syncRostersForSeries, syncRostersForEvent } from './proRosterSync';
 
 // Local storage keys
 const RACE_EVENTS_KEY = 'race-events';
@@ -502,6 +503,8 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
       }
 
       console.log('Event stored in Supabase successfully');
+      // Keep any PRO roster linked to this event on the event's current date (never blocks the save)
+      syncRostersForEvent({ ...event, id: eventId }).catch(err => console.warn('PRO roster sync skipped:', err));
       }
       } catch (supabaseError) {
         console.warn('Supabase save failed, queued for sync:', supabaseError);
@@ -1088,6 +1091,8 @@ export const storeRaceSeries = async (series: RaceSeries): Promise<void> => {
       }
 
       console.log('Series stored in Supabase successfully');
+      // Keep linked PRO rosters in step with renamed, moved or new rounds (never blocks the save)
+      syncRostersForSeries(series).catch(err => console.warn('PRO roster sync skipped:', err));
     } catch (supabaseError) {
       console.warn('Falling back to localStorage for storing series');
       

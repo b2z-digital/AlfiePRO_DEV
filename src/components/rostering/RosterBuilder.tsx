@@ -17,13 +17,15 @@ interface RosterBuilderProps {
   clubName: string;
   members: Array<{ id: string; first_name: string; last_name: string; avatar_url?: string | null; boats?: Array<{ boat_type: string }> }>;
   existingRoster?: ProRoster | null;
+  /** Opens a new roster already linked to this series (from "Create roster" on the rostering page). */
+  initialSeriesId?: string | null;
   onComplete: () => void;
   onCancel: () => void;
   darkMode?: boolean;
 }
 
 export const RosterBuilder: React.FC<RosterBuilderProps> = ({
-  clubId, clubName, members, existingRoster, onComplete, onCancel
+  clubId, clubName, members, existingRoster, initialSeriesId, onComplete, onCancel
 }) => {
   const { addNotification } = useNotifications();
   const [step, setStep] = useState(0);
@@ -253,6 +255,15 @@ export const RosterBuilder: React.FC<RosterBuilderProps> = ({
 
     setSelectedDates(roundDates);
   };
+
+  const prefilledSeries = React.useRef(false);
+  useEffect(() => {
+    if (prefilledSeries.current || existingRoster || !initialSeriesId) return;
+    if (!availableSeries.some(s => s.id === initialSeriesId)) return;
+    prefilledSeries.current = true;
+    handleSelectSeries(initialSeriesId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableSeries, initialSeriesId, existingRoster]);
 
   const handleSave = async () => {
     try {
