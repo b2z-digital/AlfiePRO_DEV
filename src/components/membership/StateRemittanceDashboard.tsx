@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { DollarSign, Building2, CircleCheck as CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, LogOut, SquareCheck as CheckSquare, Square, Eye, Plus, Receipt, Trash2, TriangleAlert as AlertTriangle, ChevronDown, ChevronRight, Mail, FileText, Clock, Send, Users, ArrowUpRight, ArrowDownLeft, History, X } from 'lucide-react';
+import { DollarSign, Building2, CircleCheck as CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, SquareCheck as CheckSquare, Square, Eye, Plus, Receipt, Trash2, TriangleAlert as AlertTriangle, ChevronDown, ChevronRight, Mail, FileText, Clock, Send, Users, ArrowUpRight, ArrowDownLeft, History, X } from 'lucide-react';
+import { InlineLoading, KpiCard, PageHead } from '../association/AssocUI';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { ConfirmationModal } from '../ConfirmationModal';
@@ -62,48 +63,42 @@ const AppDropdown: React.FC<{
         ref={btnRef}
         type="button"
         onClick={() => setOpen(!open)}
-        className={`
-          flex items-center justify-between gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
-          bg-slate-800/80 text-slate-200 border border-slate-700/60
-          ${open ? 'ring-2 ring-blue-500/40 border-blue-500/50' : 'hover:bg-slate-700/80 hover:border-slate-600'}
-          cursor-pointer
-        `}
+        className="a-pick justify-between"
         style={{ minWidth }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
-        <div className="flex items-center gap-2">
-          {icon && <span className="text-slate-400 flex-shrink-0">{icon}</span>}
-          <span className={selected ? 'text-slate-200' : 'text-slate-500'}>
+        <span className="flex items-center gap-2 min-w-0">
+          {icon && <span className="a-dim flex flex-shrink-0">{icon}</span>}
+          <span className={`truncate ${selected ? '' : 'a-dim'}`}>
             {selected ? selected.label : placeholder}
           </span>
-        </div>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+        </span>
+        <ChevronDown size={14} className={`a-dim transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && createPortal(
         <div
           ref={menuRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999 }}
-          className="rounded-xl shadow-2xl border bg-slate-800 border-slate-700 shadow-black/50"
+          className="a-pop"
+          role="listbox"
         >
-          <div className="py-1 max-h-[280px] overflow-y-auto overscroll-contain rounded-xl
-            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
-            [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/50"
-          >
+          <div className="p-1.5 max-h-[280px] overflow-y-auto overscroll-contain flex flex-col gap-0.5">
             {options.map(opt => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => { onChange(opt.value); setOpen(false); }}
-                className={`
-                  w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors text-left
-                  ${value === opt.value ? 'bg-blue-500/15 text-blue-400' : 'text-slate-300 hover:bg-slate-700/80'}
-                `}
+                role="option"
+                aria-selected={value === opt.value}
+                className={`a-pop-item justify-between ${value === opt.value ? 'a-pop-item-on' : ''}`}
               >
-                <div className="flex items-center gap-2.5">
-                  {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
-                  <span>{opt.label}</span>
-                </div>
-                {value === opt.value && <Check size={14} className="text-blue-400 flex-shrink-0" />}
+                <span className="flex items-center gap-2.5 min-w-0">
+                  {opt.icon && <span className="flex flex-shrink-0 a-dim">{opt.icon}</span>}
+                  <span className="truncate">{opt.label}</span>
+                </span>
+                {value === opt.value && <Check size={14} className="a-txt-b flex-shrink-0" />}
               </button>
             ))}
           </div>
@@ -968,188 +963,91 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="relative w-16 h-16 mx-auto mb-4">
-              <div className="absolute inset-0 rounded-full border-4 border-slate-700" />
-              <div className="absolute inset-0 rounded-full border-4 border-green-500 border-t-transparent animate-spin" />
-              <DollarSign className="absolute inset-0 m-auto w-6 h-6 text-green-400" />
-            </div>
-            <p className="text-white font-medium mb-1">Loading Remittances</p>
-            <p className="text-sm text-slate-400">Gathering club data, payments, and reconciliation status...</p>
-          </div>
-        </div>
+      <div className="flex flex-col gap-[22px]">
+        <PageHead icon={<DollarSign size={24} />} title="Remittances" sub="Gathering club data, payments and reconciliation status…" />
+        <InlineLoading label="Loading remittances…" />
       </div>
     );
   }
 
+  const readyForNational = remittances.filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending').length;
+  const tabs: { id: typeof selectedTab; label: string; count: number; onSelect: () => void }[] = [
+    { id: 'clubs', label: 'Clubs', count: clubSummaries.length, onSelect: () => { setSelectedTab('clubs'); setSelectedClubFilter('all'); } },
+    { id: 'club-payments', label: 'Club payments', count: remittances.filter(r => r.club_to_state_status === 'pending').length, onSelect: () => { setSelectedTab('club-payments'); if (selectedClubFilter !== 'all') setSelectedClubFilter('all'); } },
+    { id: 'national-remittance', label: 'National remittance', count: readyForNational, onSelect: () => setSelectedTab('national-remittance') },
+    { id: 'payments', label: 'Payment history', count: paymentBatches.length, onSelect: () => setSelectedTab('payments') },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-[22px]">
+      <PageHead
+        icon={<DollarSign size={24} />}
+        title="Remittances"
+        sub={`Membership fees from clubs${stateAssociationName ? ` to ${stateAssociationName}` : ''}, and on to the national association`}
+      >
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="a-btn"
+          title="Refresh"
+        >
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          Refresh
+        </button>
+      </PageHead>
+
       {/* Summary Cards */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
-        <div className="p-6">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <div className="p-3 rounded-xl bg-gradient-to-br">
-                  <DollarSign className="text-white" size={28} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white">
-                    Remittances
-                  </h3>
-                  <p className="text-sm text-slate-400 mt-0.5">
-                    Track membership fee payments from clubs
-                  </p>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 transition-colors"
-            >
-              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-5 h-5 text-red-400" />
-                <span className="text-sm font-medium text-red-300">
-                  Outstanding from Clubs
-                </span>
-              </div>
-              <p className="text-3xl font-bold text-white">
-                ${totalOutstanding.toFixed(2)}
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <ArrowRight className="w-5 h-5 text-blue-400" />
-                <span className="text-sm font-medium text-blue-300">
-                  Owed to National
-                </span>
-              </div>
-              <p className="text-3xl font-bold text-white">
-                ${nationalOwed.toFixed(2)}
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle className="w-5 h-5 text-purple-400" />
-                <span className="text-sm font-medium text-purple-300">
-                  Pending Members
-                </span>
-              </div>
-              <p className="text-3xl font-bold text-white">
-                {remittances.filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending').length}
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <Building2 className="w-5 h-5 text-emerald-400" />
-                <span className="text-sm font-medium text-emerald-300">
-                  Member Clubs
-                </span>
-              </div>
-              <p className="text-3xl font-bold text-white">
-                {clubSummaries.length}
-              </p>
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        <KpiCard cap="Outstanding from clubs" value={`$${totalOutstanding.toFixed(2)}`} sub="Fees clubs still owe" icon={<TrendingUp size={18} />} tone={totalOutstanding > 0 ? 'red' : undefined} />
+        <KpiCard cap="Owed to national" value={`$${nationalOwed.toFixed(2)}`} sub="Collected, not yet paid on" icon={<ArrowRight size={18} />} tone={nationalOwed > 0 ? 'amber' : undefined} />
+        <KpiCard cap="Members to remit" value={readyForNational} sub="Paid by their club, waiting for national" icon={<CheckCircle size={18} />} />
+        <KpiCard cap="Member clubs" value={clubSummaries.length} sub="Clubs with members this year" icon={<Building2 size={18} />} />
       </div>
 
       {/* Quick Action */}
       {nationalOwed > 0 && (
-        <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-emerald-300">
-                Ready to pay ${nationalOwed.toFixed(2)} to National Association
-              </p>
-              <p className="text-sm text-emerald-400/80 mt-1">
-                {remittances.filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending').length} members ready for remittance
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                const readyIds = remittances
-                  .filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending')
-                  .map(r => r.id);
-                setSelectedIds(new Set(readyIds));
-                setSelectedTab('national-remittance');
-              }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors"
-            >
-              <ArrowRight size={18} />
-              Pay National
-            </button>
-          </div>
+        <div className="a-note" style={{ borderColor: 'rgba(48,209,88,0.3)', background: 'rgba(48,209,88,0.06)' }}>
+          <span className="a-tile a-tile-sm a-txt-g"><ArrowRight size={16} /></span>
+          <span className="flex-1 min-w-0">
+            <span className="block a-ink text-[14px] font-semibold">Ready to pay ${nationalOwed.toFixed(2)} to the national association</span>
+            <span className="block a-dim text-xs mt-0.5">{readyForNational} member{readyForNational === 1 ? '' : 's'} ready to remit</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              const readyIds = remittances
+                .filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending')
+                .map(r => r.id);
+              setSelectedIds(new Set(readyIds));
+              setSelectedTab('national-remittance');
+            }}
+            className="a-btn a-btn-p"
+          >
+            <ArrowRight size={16} />
+            Pay national
+          </button>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
-        <div className="border-b border-slate-700">
-          <div className="flex">
-            <button
-              onClick={() => {
-                setSelectedTab('clubs');
-                setSelectedClubFilter('all');
-              }}
-              className={`px-6 py-4 font-medium transition-colors ${
-                selectedTab === 'clubs'
-                  ? 'bg-slate-700/50 text-blue-400 border-b-2 border-blue-400'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              Clubs ({clubSummaries.length})
-            </button>
-            <button
-              onClick={() => {
-                setSelectedTab('club-payments');
-                if (selectedClubFilter !== 'all') {
-                  setSelectedClubFilter('all');
-                }
-              }}
-              className={`px-6 py-4 font-medium transition-colors ${
-                selectedTab === 'club-payments'
-                  ? 'bg-slate-700/50 text-blue-400 border-b-2 border-blue-400'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              Club Payments ({remittances.filter(r => r.club_to_state_status === 'pending').length})
-            </button>
-            <button
-              onClick={() => setSelectedTab('national-remittance')}
-              className={`px-6 py-4 font-medium transition-colors ${
-                selectedTab === 'national-remittance'
-                  ? 'bg-slate-700/50 text-blue-400 border-b-2 border-blue-400'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              National Remittance ({remittances.filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending').length})
-            </button>
-            <button
-              onClick={() => setSelectedTab('payments')}
-              className={`px-6 py-4 font-medium transition-colors ${
-                selectedTab === 'payments'
-                  ? 'bg-slate-700/50 text-blue-400 border-b-2 border-blue-400'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              Payment History ({paymentBatches.length})
-            </button>
-          </div>
-        </div>
+      <div className="a-seg self-start" role="tablist" aria-label="Remittances">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={selectedTab === t.id}
+            onClick={t.onSelect}
+            className={`a-seg-i ${selectedTab === t.id ? 'a-seg-on' : ''}`}
+          >
+            {t.label}
+            <span className="a-cnt">{t.count}</span>
+          </button>
+        ))}
+      </div>
 
+      <div className="a-card overflow-hidden">
         {/* Tab Content */}
         <div className="p-6">
           {/* Clubs Tab */}
@@ -1161,24 +1059,22 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
                   icon={<Calendar size={15} />}
                   options={[
-                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
+                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="a-mute" /> },
                     ...availableYears.map(year => ({
                       value: String(year),
                       label: String(year),
-                      icon: <Calendar size={14} className="text-blue-400" />
+                      icon: <Calendar size={14} className="a-txt-b" />
                     }))
                   ]}
                   minWidth={160}
                 />
               </div>
 
-              <div className="space-y-3">
+              <div className="a-grp">
                 {clubSummaries.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Building2 className="mx-auto mb-4 text-slate-600" size={48} />
-                    <p className="text-lg text-slate-400">
-                      No club data found
-                    </p>
+                  <div className="a-empty py-12">
+                    <span className="a-tile" style={{ width: 56, height: 56 }}><Building2 size={24} /></span>
+                    <p className="a-mute text-sm m-0">No club remittances for this year</p>
                   </div>
                 ) : (
                   clubSummaries.map((club) => (
@@ -1188,37 +1084,20 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                         setSelectedClubFilter(club.club_id);
                         setSelectedTab('club-payments');
                       }}
-                      className="p-4 rounded-xl bg-slate-700/30 border border-slate-600/50 hover:border-blue-500/50 hover:bg-slate-700/50 transition-all cursor-pointer group"
+                      className="a-lnk a-hov-row cursor-pointer"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { setSelectedClubFilter(club.club_id); setSelectedTab('club-payments'); } }}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="p-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20 group-hover:bg-blue-600/20 transition-colors">
-                            <Building2 size={20} className="text-blue-400" />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-white mb-1.5 group-hover:text-blue-300 transition-colors">
-                              {club.club_name}
-                            </h3>
-                            <div className="flex items-center gap-6 text-sm">
-                              <div className="flex items-center gap-1.5">
-                                <CheckCircle size={14} className="text-green-400" />
-                                <span className="text-slate-400">Paid</span>
-                                <span className="text-green-400 font-semibold">
-                                  ${club.total_paid.toFixed(2)} ({club.paid_count})
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <AlertTriangle size={14} className="text-red-400" />
-                                <span className="text-slate-400">Outstanding</span>
-                                <span className="text-red-400 font-semibold">
-                                  ${club.total_outstanding.toFixed(2)} ({club.outstanding_count})
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <ChevronRight size={20} className="text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
-                      </div>
+                      <span className="a-tile a-tile-sm"><Building2 size={16} /></span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block a-ink text-[14.5px] font-semibold truncate">{club.club_name}</span>
+                        <span className="a-meta-row mt-1">
+                          <span><span className="a-light a-light-g" />Paid <b className="a-ink a-num">${club.total_paid.toFixed(2)}</b> ({club.paid_count})</span>
+                          <span className={club.total_outstanding > 0 ? 'a-txt-r' : ''}><span className={`a-light ${club.total_outstanding > 0 ? 'a-light-r' : ''}`} />Outstanding <b className="a-num">${club.total_outstanding.toFixed(2)}</b> ({club.outstanding_count})</span>
+                        </span>
+                      </span>
+                      <ChevronRight size={18} className="a-dim" />
                     </div>
                   ))
                 )}
@@ -1241,14 +1120,14 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
             <div>
               {/* Bulk Actions Toolbar */}
               {selectedIds.size > 0 && (
-                <div className="bg-green-500/10 backdrop-blur-sm rounded-xl border border-green-500/30 p-4 mb-4">
-                  <div className="flex items-center justify-between">
+                <div className="a-bulkbar mb-4">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-3">
-                      <CheckSquare className="w-5 h-5 text-green-400" />
-                      <span className="text-white font-medium">
+                      <CheckSquare className="w-5 h-5 a-txt-b" />
+                      <span className="a-ink font-semibold text-sm">
                         {selectedIds.size} member{selectedIds.size !== 1 ? 's' : ''} selected
                       </span>
-                      <span className="text-sm text-green-300 font-semibold">
+                      <span className="text-sm a-txt-g font-semibold a-num">
                         ${remittances.filter(r => selectedIds.has(r.id)).reduce((sum, r) => sum + r.national_contribution, 0).toFixed(2)}
                       </span>
                     </div>
@@ -1256,30 +1135,30 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                       <button
                         onClick={() => handleBulkStatusUpdate('mark-paid')}
                         disabled={bulkActionInProgress}
-                        className="btn-primary-green px-4 py-2.5 rounded-xl text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm"
+                        className="a-btn a-btn-g a-btn-sm"
                       >
                         <CheckCircle size={16} />
-                        Mark as Paid
+                        Mark as paid
                       </button>
                       <button
                         onClick={() => handleBulkStatusUpdate('mark-unpaid')}
                         disabled={bulkActionInProgress}
-                        className="btn-primary-green px-4 py-2.5 rounded-xl from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-600/20 text-sm"
+                        className="a-btn a-btn-a a-btn-sm"
                       >
                         <X size={16} />
-                        Mark as Unpaid
+                        Mark as unpaid
                       </button>
                       <button
                         onClick={handleBulkMarkNationalPaid}
                         disabled={bulkActionInProgress}
-                        className="btn-primary-green px-4 py-2.5 rounded-xl from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-600/20 text-sm"
+                        className="a-btn a-btn-p a-btn-sm"
                       >
                         <DollarSign size={16} />
-                        Process Payment
+                        Process payment
                       </button>
                       <button
                         onClick={() => setSelectedIds(new Set())}
-                        className="px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors flex items-center gap-2 text-sm border border-slate-600"
+                        className="a-btn a-btn-q a-btn-sm"
                       >
                         Clear
                       </button>
@@ -1295,11 +1174,11 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
                   icon={<Calendar size={15} />}
                   options={[
-                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
+                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="a-mute" /> },
                     ...availableYears.map(year => ({
                       value: String(year),
                       label: String(year),
-                      icon: <Calendar size={14} className="text-blue-400" />
+                      icon: <Calendar size={14} className="a-txt-b" />
                     }))
                   ]}
                   minWidth={160}
@@ -1309,45 +1188,45 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   onChange={(v) => setSelectedClubFilter(v)}
                   icon={<Building2 size={15} />}
                   options={[
-                    { value: 'all', label: 'All Clubs', icon: <Building2 size={14} className="text-slate-400" /> },
+                    { value: 'all', label: 'All Clubs', icon: <Building2 size={14} className="a-mute" /> },
                     ...uniqueClubs.map(club => ({
                       value: club.id,
                       label: club.name,
-                      icon: <Building2 size={14} className="text-blue-400" />
+                      icon: <Building2 size={14} className="a-txt-b" />
                     }))
                   ]}
                   minWidth={200}
                 />
                 <button
                   onClick={toggleSelectAll}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700/60 hover:border-slate-600 text-sm font-medium transition-all flex items-center gap-2"
+                  className="a-btn"
                 >
-                  <CheckSquare size={15} className="text-slate-400" />
+                  <CheckSquare size={15} className="a-mute" />
                   {selectedIds.size === remittances.length && remittances.length > 0 ? 'Deselect All' : 'Select All'}
                 </button>
               </div>
 
               {/* Members Table */}
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full a-atable">
                   <thead>
-                    <tr className="border-b border-slate-700">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-300">Member</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-300">Club</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-slate-300">State Fee</th>
-                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">State Status</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-slate-300">National Fee</th>
-                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">National Status</th>
-                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">
+                    <tr>
+                      <th className="text-left py-3 px-4">Member</th>
+                      <th className="text-left py-3 px-4">Club</th>
+                      <th className="text-right py-3 px-4">State Fee</th>
+                      <th className="text-center py-3 px-4">State Status</th>
+                      <th className="text-right py-3 px-4">National Fee</th>
+                      <th className="text-center py-3 px-4">National Status</th>
+                      <th className="text-center py-3 px-4">
                         {(() => {
                           if (remittances.length === 0) return 'Select';
                           const allSelected = remittances.length > 0 && remittances.every(r => selectedIds.has(r.id));
                           return (
                             <button onClick={toggleSelectAll} className="p-1 mx-auto block" title={allSelected ? 'Deselect All' : 'Select All'}>
                               {allSelected ? (
-                                <CheckSquare className="w-5 h-5 text-green-400" />
+                                <CheckSquare className="w-5 h-5 a-txt-b" />
                               ) : (
-                                <Square className="w-5 h-5 text-slate-500 hover:text-slate-300" />
+                                <Square className="w-5 h-5 a-dim" />
                               )}
                             </button>
                           );
@@ -1359,7 +1238,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                     {remittances.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="text-center py-12">
-                          <p className="text-slate-400">No remittances found</p>
+                          <p className="a-mute text-sm">No remittances found</p>
                         </td>
                       </tr>
                     ) : (
@@ -1367,7 +1246,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                         const isEligible = remittance.club_to_state_status === 'paid' && remittance.state_to_national_status === 'pending';
                         const isSelected = selectedIds.has(remittance.id);
                         return (
-                          <tr key={remittance.id} className={`border-b border-slate-700/50 transition-colors ${isSelected ? 'bg-green-500/10 border-green-500/20' : 'hover:bg-slate-700/20'}`}>
+                          <tr key={remittance.id} className={isSelected ? 'is-sel' : ''}>
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-3">
                                 <Avatar
@@ -1376,36 +1255,28 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                                   lastName={remittance.member_name.split(' ').slice(1).join(' ')}
                                   size="sm"
                                 />
-                                <span className="text-white">{remittance.member_name}</span>
+                                <span className="a-ink font-medium whitespace-nowrap">{remittance.member_name}</span>
                               </div>
                             </td>
-                            <td className="py-3 px-4 text-slate-300">{remittance.club_name}</td>
-                            <td className="py-3 px-4 text-right text-white">${remittance.state_contribution.toFixed(2)}</td>
+                            <td className="py-3 px-4 a-mute">{remittance.club_name}</td>
+                            <td className="py-3 px-4 text-right a-ink a-num">${remittance.state_contribution.toFixed(2)}</td>
                             <td className="py-3 px-4 text-center">
                               <button
                                 onClick={() => handleToggleClubStatus(remittance.id, remittance.club_to_state_status)}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity"
-                                style={{
-                                  backgroundColor: remittance.club_to_state_status === 'paid' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(249, 115, 22, 0.2)',
-                                  color: remittance.club_to_state_status === 'paid' ? 'rgb(134, 239, 172)' : 'rgb(251, 146, 60)'
-                                }}
+                                className={`a-lb-fmt cursor-pointer ${remittance.club_to_state_status === 'paid' ? 'a-txt-g' : 'a-txt-a'}`}
                                 title="Click to toggle status"
                               >
-                                {remittance.club_to_state_status === 'paid' ? 'Paid' : 'Pending'}
+                                <span className={`a-light ${remittance.club_to_state_status === 'paid' ? 'a-light-g' : 'a-light-a'}`} />{remittance.club_to_state_status === 'paid' ? 'Paid' : 'Pending'}
                               </button>
                             </td>
-                            <td className="py-3 px-4 text-right text-white">${remittance.national_contribution.toFixed(2)}</td>
+                            <td className="py-3 px-4 text-right a-ink a-num">${remittance.national_contribution.toFixed(2)}</td>
                             <td className="py-3 px-4 text-center">
                               <button
                                 onClick={() => handleToggleNationalStatus(remittance.id, remittance.state_to_national_status)}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity"
-                                style={{
-                                  backgroundColor: remittance.state_to_national_status === 'paid' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(249, 115, 22, 0.2)',
-                                  color: remittance.state_to_national_status === 'paid' ? 'rgb(134, 239, 172)' : 'rgb(251, 146, 60)'
-                                }}
+                                className={`a-lb-fmt cursor-pointer ${remittance.state_to_national_status === 'paid' ? 'a-txt-g' : 'a-txt-a'}`}
                                 title="Click to toggle status"
                               >
-                                {remittance.state_to_national_status === 'paid' ? 'Paid' : 'Pending'}
+                                <span className={`a-light ${remittance.state_to_national_status === 'paid' ? 'a-light-g' : 'a-light-a'}`} />{remittance.state_to_national_status === 'paid' ? 'Paid' : 'Pending'}
                               </button>
                             </td>
                             <td className="py-3 px-4 text-center">
@@ -1414,9 +1285,9 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                                 className="p-1"
                               >
                                 {selectedIds.has(remittance.id) ? (
-                                  <CheckSquare className="w-5 h-5 text-blue-400" />
+                                  <CheckSquare className="w-5 h-5 a-txt-b" />
                                 ) : (
-                                  <Square className="w-5 h-5 text-slate-500" />
+                                  <Square className="w-5 h-5 a-dim" />
                                 )}
                               </button>
                             </td>
@@ -1434,64 +1305,58 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
           {selectedTab === 'payments' && (
             <div>
               {/* Sub-tab navigation */}
-              <div className="flex items-center gap-1 mb-6 p-1 bg-slate-800/60 rounded-xl border border-slate-700/50 w-fit">
+              <div className="a-seg mb-6 w-fit max-w-full overflow-x-auto" role="tablist" aria-label="Payment history">
                 <button
                   onClick={() => setPaymentHistorySubTab('from-clubs')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    paymentHistorySubTab === 'from-clubs'
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                  }`}
+                  role="tab"
+                  aria-selected={paymentHistorySubTab === 'from-clubs'}
+                  className={`a-seg-i ${paymentHistorySubTab === 'from-clubs' ? 'a-seg-on' : ''}`}
                 >
                   <ArrowDownLeft size={16} />
                   Received from Clubs
-                  <span className={`px-1.5 py-0.5 rounded-md text-xs ${paymentHistorySubTab === 'from-clubs' ? 'bg-blue-500/30' : 'bg-slate-700'}`}>
+                  <span className="a-cnt">
                     {paymentBatches.length}
                   </span>
                 </button>
                 <button
                   onClick={() => setPaymentHistorySubTab('to-national')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    paymentHistorySubTab === 'to-national'
-                      ? 'bg-green-600 text-white shadow-lg shadow-green-600/20'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                  }`}
+                  role="tab"
+                  aria-selected={paymentHistorySubTab === 'to-national'}
+                  className={`a-seg-i ${paymentHistorySubTab === 'to-national' ? 'a-seg-on' : ''}`}
                 >
                   <ArrowUpRight size={16} />
                   Paid to National
-                  <span className={`px-1.5 py-0.5 rounded-md text-xs ${paymentHistorySubTab === 'to-national' ? 'bg-green-500/30' : 'bg-slate-700'}`}>
+                  <span className="a-cnt">
                     {outboundPayments.length}
                   </span>
                 </button>
                 <button
                   onClick={() => setPaymentHistorySubTab('reports')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    paymentHistorySubTab === 'reports'
-                      ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/20'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                  }`}
+                  role="tab"
+                  aria-selected={paymentHistorySubTab === 'reports'}
+                  className={`a-seg-i ${paymentHistorySubTab === 'reports' ? 'a-seg-on' : ''}`}
                 >
                   <FileText size={16} />
                   National Reports
-                  <span className={`px-1.5 py-0.5 rounded-md text-xs ${paymentHistorySubTab === 'reports' ? 'bg-teal-500/30' : 'bg-slate-700'}`}>
+                  <span className="a-cnt">
                     {reportSubmissions.length}
                   </span>
                 </button>
               </div>
 
               {/* Filters Row */}
-              <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
                 <div className="flex items-center gap-3">
                   <AppDropdown
                     value={String(selectedYear)}
                     onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
                     icon={<Calendar size={15} />}
                     options={[
-                      { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
+                      { value: 'all', label: 'All Years', icon: <Calendar size={14} className="a-mute" /> },
                       ...availableYears.map(year => ({
                         value: String(year),
                         label: String(year),
-                        icon: <Calendar size={14} className="text-blue-400" />
+                        icon: <Calendar size={14} className="a-txt-b" />
                       }))
                     ]}
                     minWidth={160}
@@ -1502,7 +1367,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   {paymentHistorySubTab === 'from-clubs' && paymentBatches.length > 0 && (
                     <button
                       onClick={() => setShowClearAllConfirm(true)}
-                      className="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 font-medium transition-all flex items-center gap-2 text-xs"
+                      className="a-btn a-btn-d a-btn-sm"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       Clear All
@@ -1511,7 +1376,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   {paymentHistorySubTab === 'reports' && (
                     <button
                       onClick={() => setShowReportModal(true)}
-                      className="btn-primary-green px-4 py-2.5 rounded-xl hover:from-teal-500 text-white font-medium transition-all flex items-center gap-2 text-sm shadow-lg shadow-teal-600/20"
+                      className="a-btn a-btn-p"
                     >
                       <Send size={16} />
                       Generate Report
@@ -1524,31 +1389,29 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
               {paymentHistorySubTab === 'from-clubs' && (
                 <>
                   {paymentBatches.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="p-4 rounded-2xl bg-slate-700/30 border border-slate-600/30 w-fit mx-auto mb-4">
-                        <ArrowDownLeft className="text-slate-500" size={32} />
-                      </div>
-                      <p className="text-lg text-slate-400 mb-1">No payments received from clubs</p>
-                      <p className="text-sm text-slate-500">Payments appear here when reconciling member remittances</p>
+                    <div className="a-empty py-12">
+                      <span className="a-tile" style={{ width: 56, height: 56 }}><ArrowDownLeft size={24} /></span>
+                      <p className="a-ink text-[15px] font-semibold m-0">No payments received from clubs</p>
+                      <p className="text-sm a-dim">Payments appear here when reconciling member remittances</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                        <div className="a-box a-box-on p-4">
                           <div className="flex items-center gap-2 mb-2">
-                            <ArrowDownLeft size={16} className="text-blue-400" />
-                            <p className="text-sm text-blue-300 font-medium">Total Received from Clubs</p>
+                            <ArrowDownLeft size={16} className="a-txt-b" />
+                            <p className="text-sm a-txt-b font-medium">Total Received from Clubs</p>
                           </div>
-                          <p className="text-2xl font-bold text-white">
+                          <p className="text-2xl font-bold a-ink">
                             ${paymentBatches.reduce((sum, b) => sum + Number(b.total_amount), 0).toFixed(2)}
                           </p>
                         </div>
-                        <div className="p-4 rounded-xl bg-slate-700/30 border border-slate-600/30">
+                        <div className="a-box p-4">
                           <div className="flex items-center gap-2 mb-2">
-                            <Receipt size={16} className="text-slate-400" />
-                            <p className="text-sm text-slate-300 font-medium">Total Transactions</p>
+                            <Receipt size={16} className="a-mute" />
+                            <p className="text-sm a-mute font-medium">Total Transactions</p>
                           </div>
-                          <p className="text-2xl font-bold text-white">{paymentBatches.length}</p>
+                          <p className="text-2xl font-bold a-ink">{paymentBatches.length}</p>
                         </div>
                       </div>
 
@@ -1560,71 +1423,65 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                         return (
                           <div
                             key={batch.id}
-                            className={`p-5 rounded-xl border transition-all ${
-                              isFullyReconciled
-                                ? 'bg-green-500/10 border-green-500/30'
-                                : isPartial
-                                ? 'bg-blue-500/10 border-blue-500/30'
-                                : 'bg-slate-700/30 border-slate-600/50'
-                            }`}
+                            className={`a-box p-5 ${isFullyReconciled ? 'a-box-ok' : isPartial ? 'a-box-on' : ''}`}
                           >
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
-                                  <div className={`p-1.5 rounded-lg ${isFullyReconciled ? 'bg-green-500/20' : 'bg-blue-500/20'}`}>
-                                    <Receipt className={`w-4 h-4 ${isFullyReconciled ? 'text-green-400' : 'text-blue-400'}`} />
-                                  </div>
-                                  <span className="text-white font-semibold text-lg">{batch.payment_reference}</span>
+                                  <span className={`a-tile a-tile-sm ${isFullyReconciled ? 'a-txt-g' : 'a-txt-b'}`}>
+                                    <Receipt className="w-4 h-4" />
+                                  </span>
+                                  <span className="a-ink font-semibold text-lg">{batch.payment_reference}</span>
                                   {isFullyReconciled && (
-                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 flex items-center gap-1">
+                                    <span className="a-lb-fmt a-txt-g flex gap-1">
                                       <CheckCircle className="w-3 h-3" /> Reconciled
                                     </span>
                                   )}
                                   {isPartial && (
-                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">Partial</span>
+                                    <span className="a-lb-fmt a-txt-b">Partial</span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-4 text-sm text-slate-400">
+                                <div className="flex items-center gap-4 text-sm a-mute">
                                   <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{new Date(batch.payment_date).toLocaleDateString()}</span>
                                   {batch.clubs?.name && <span className="flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" />{batch.clubs.name}</span>}
                                 </div>
                               </div>
                               <div className="text-right">
-                                <p className="text-2xl font-bold text-white">${Number(batch.total_amount).toFixed(2)}</p>
-                                <p className="text-xs text-slate-400 mt-1">{batch.payment_method || 'Transfer'}</p>
+                                <p className="text-2xl font-bold a-ink">${Number(batch.total_amount).toFixed(2)}</p>
+                                <p className="text-xs a-mute mt-1">{batch.payment_method || 'Transfer'}</p>
                               </div>
                             </div>
 
                             {!isFullyReconciled && (
                               <div className="mb-3">
                                 <div className="flex items-center justify-between mb-1.5">
-                                  <span className="text-xs text-slate-400">Reconciliation Progress</span>
-                                  <span className="text-xs font-medium text-white">{progressPercent.toFixed(0)}%</span>
+                                  <span className="text-xs a-mute">Reconciliation Progress</span>
+                                  <span className="text-xs font-medium a-ink">{progressPercent.toFixed(0)}%</span>
                                 </div>
-                                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                                  <div className="h-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+                                <div className="a-progress" style={{ height: 6 }}>
+                                  <i style={{ width: `${Math.min(100, progressPercent)}%` }} />
                                 </div>
                               </div>
                             )}
 
                             <div className="flex items-center justify-between pt-3 border-t border-slate-600/50">
-                              <div className="flex-1 text-xs text-slate-400">
+                              <div className="flex-1 text-xs a-mute">
                                 {batch.bank_transaction_id && <span>Ref: {batch.bank_transaction_id}</span>}
                                 {batch.notes && <span className="ml-3">{batch.notes}</span>}
                               </div>
                               <div className="flex items-center gap-2">
                                 {batch.from_club_id && (
-                                  <button onClick={() => togglePaymentExpansion(batch.id, batch)} className="px-3 py-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-600 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
+                                  <button onClick={() => togglePaymentExpansion(batch.id, batch)} className="a-btn a-btn-sm">
                                     <Eye className="w-3.5 h-3.5" />
                                     {expandedPaymentId === batch.id ? 'Hide' : 'View'} Members
                                   </button>
                                 )}
                                 {!isFullyReconciled && (
-                                  <button onClick={() => handleOpenReconciliation(batch)} className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
+                                  <button onClick={() => handleOpenReconciliation(batch)} className="a-btn a-btn-p a-btn-sm">
                                     <CheckSquare className="w-3.5 h-3.5" /> Reconcile
                                   </button>
                                 )}
-                                <button onClick={() => { setDeleteTargetId(batch.id); setShowDeleteConfirm(true); }} className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all" title="Delete">
+                                <button onClick={() => { setDeleteTargetId(batch.id); setShowDeleteConfirm(true); }} className="a-ib a-ib-d" title="Delete">
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
@@ -1632,26 +1489,26 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
 
                             {expandedPaymentId === batch.id && (
                               <div className="mt-4 pt-4 border-t border-slate-600/50">
-                                <h4 className="text-sm font-medium text-white mb-3">Members in this Payment</h4>
+                                <h4 className="text-sm font-medium a-ink mb-3">Members in this Payment</h4>
                                 {paymentMembers.length > 0 ? (
                                   <div className="space-y-2 max-h-60 overflow-y-auto">
                                     {paymentMembers.map((member) => (
-                                      <div key={member.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30 border border-slate-700">
+                                      <div key={member.id} className="a-box flex items-center justify-between p-3">
                                         <div className="flex items-center gap-3">
                                           <Avatar name={member.member_name} size="sm" imageUrl={member.member_avatar} />
                                           <div>
-                                            <p className="text-sm font-medium text-white">{member.member_name}</p>
-                                            <p className="text-xs text-slate-400">{member.club_name}</p>
+                                            <p className="text-sm font-medium a-ink">{member.member_name}</p>
+                                            <p className="text-xs a-mute">{member.club_name}</p>
                                           </div>
                                         </div>
-                                        <span className="text-sm font-medium text-green-400">${member.state_contribution.toFixed(2)}</span>
+                                        <span className="text-sm font-medium a-txt-g">${member.state_contribution.toFixed(2)}</span>
                                       </div>
                                     ))}
                                   </div>
                                 ) : (
                                   <div className="flex items-center justify-center py-8">
                                     <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                                    <span className="ml-2 text-sm text-slate-400">Loading members...</span>
+                                    <span className="ml-2 text-sm a-mute">Loading members...</span>
                                   </div>
                                 )}
                               </div>
@@ -1668,36 +1525,34 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
               {paymentHistorySubTab === 'to-national' && (
                 <>
                   {outboundPayments.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="p-4 rounded-2xl bg-slate-700/30 border border-slate-600/30 w-fit mx-auto mb-4">
-                        <ArrowUpRight className="text-slate-500" size={32} />
-                      </div>
-                      <p className="text-lg text-slate-400 mb-1">No payments made to National yet</p>
-                      <p className="text-sm text-slate-500">Payments to National appear here when you mark remittances as paid</p>
+                    <div className="a-empty py-12">
+                      <span className="a-tile" style={{ width: 56, height: 56 }}><ArrowUpRight size={24} /></span>
+                      <p className="a-ink text-[15px] font-semibold m-0">No payments made to National yet</p>
+                      <p className="text-sm a-dim">Payments to National appear here when you mark remittances as paid</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                      <div className="a-box a-box-ok p-4">
                         <div className="flex items-center gap-2 mb-2">
-                          <ArrowUpRight size={16} className="text-green-400" />
-                          <p className="text-sm text-green-300 font-medium">Total Paid to National{selectedYear !== 'all' ? ` in ${selectedYear}` : ''}</p>
+                          <ArrowUpRight size={16} className="a-txt-g" />
+                          <p className="text-sm a-txt-g font-medium">Total Paid to National{selectedYear !== 'all' ? ` in ${selectedYear}` : ''}</p>
                         </div>
-                        <p className="text-2xl font-bold text-white">
+                        <p className="text-2xl font-bold a-ink">
                           ${outboundPayments.reduce((sum, b) => sum + Number(b.total_amount), 0).toFixed(2)}
                         </p>
                       </div>
 
                       {outboundPayments.map((batch) => (
-                        <div key={batch.id} className="p-5 rounded-xl bg-green-500/5 border border-green-500/20 transition-all">
+                        <div key={batch.id} className="a-box a-box-ok p-5">
                           <div className="flex items-start justify-between">
                             <div>
                               <div className="flex items-center gap-3 mb-2">
-                                <div className="p-1.5 rounded-lg bg-green-500/20">
-                                  <ArrowUpRight className="w-4 h-4 text-green-400" />
+                                <div className="a-tile a-tile-sm">
+                                  <ArrowUpRight className="w-4 h-4 a-txt-g" />
                                 </div>
-                                <span className="text-white font-semibold">{batch.payment_reference}</span>
+                                <span className="a-ink font-semibold">{batch.payment_reference}</span>
                               </div>
-                              <div className="flex items-center gap-3 text-sm text-slate-400">
+                              <div className="flex items-center gap-3 text-sm a-mute">
                                 <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{new Date(batch.payment_date).toLocaleDateString()}</span>
                                 <span className="flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" />{batch.payment_method || 'Transfer'}</span>
                                 {batch.member_count && (
@@ -1705,9 +1560,9 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                                 )}
                               </div>
                             </div>
-                            <p className="text-xl font-bold text-green-400">${Number(batch.total_amount).toFixed(2)}</p>
+                            <p className="text-xl font-bold a-txt-g">${Number(batch.total_amount).toFixed(2)}</p>
                           </div>
-                          {batch.notes && <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-600/30">{batch.notes}</p>}
+                          {batch.notes && <p className="text-xs a-mute mt-3 pt-3 border-t border-slate-600/30">{batch.notes}</p>}
                         </div>
                       ))}
                     </div>
@@ -1721,16 +1576,16 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   {/* Hero prompt when no reports */}
                   {reportSubmissions.length === 0 ? (
                     <div className="text-center py-12">
-                      <div className="p-5 rounded-2xl bg-gradient-to-br from-teal-500/10 to-emerald-500/10 border border-teal-500/20 w-fit mx-auto mb-5">
-                        <FileText className="text-teal-400" size={36} />
-                      </div>
-                      <p className="text-lg text-white font-semibold mb-2">National Member Reports</p>
-                      <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
+                      <span className="a-tile a-tile-rim mx-auto mb-5" style={{ width: 60, height: 60 }}>
+                        <FileText size={26} />
+                      </span>
+                      <p className="text-lg a-ink font-semibold mb-2">National Member Reports</p>
+                      <p className="text-sm a-mute max-w-md mx-auto mb-6">
                         Generate and send reports of paid members to your National Association. Track which members have been reported to avoid duplicates.
                       </p>
                       <button
                         onClick={() => setShowReportModal(true)}
-                        className="btn-primary-green px-6 py-3 rounded-xl hover:from-teal-500 text-white font-medium transition-all flex items-center gap-2 mx-auto shadow-lg shadow-teal-600/20"
+                        className="a-btn a-btn-p mx-auto"
                       >
                         <Send size={18} />
                         Generate First Report
@@ -1740,26 +1595,26 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                     <div className="space-y-4">
                       {/* Stats */}
                       <div className="grid grid-cols-3 gap-4">
-                        <div className="p-4 rounded-xl bg-teal-500/10 border border-teal-500/20">
+                        <div className="a-box p-4">
                           <div className="flex items-center gap-2 mb-2">
-                            <FileText size={16} className="text-teal-400" />
-                            <p className="text-xs text-teal-300 font-medium">Reports Sent</p>
+                            <FileText size={16} className="a-txt-t" />
+                            <p className="text-xs a-txt-t font-medium">Reports Sent</p>
                           </div>
-                          <p className="text-2xl font-bold text-white">{reportSubmissions.length}</p>
+                          <p className="text-2xl font-bold a-ink">{reportSubmissions.length}</p>
                         </div>
-                        <div className="p-4 rounded-xl bg-slate-700/30 border border-slate-600/30">
+                        <div className="a-box p-4">
                           <div className="flex items-center gap-2 mb-2">
-                            <Users size={16} className="text-slate-400" />
-                            <p className="text-xs text-slate-300 font-medium">Members Reported</p>
+                            <Users size={16} className="a-mute" />
+                            <p className="text-xs a-mute font-medium">Members Reported</p>
                           </div>
-                          <p className="text-2xl font-bold text-white">{reportSubmissions.reduce((sum, r) => sum + r.member_count, 0)}</p>
+                          <p className="text-2xl font-bold a-ink">{reportSubmissions.reduce((sum, r) => sum + r.member_count, 0)}</p>
                         </div>
-                        <div className="p-4 rounded-xl bg-slate-700/30 border border-slate-600/30">
+                        <div className="a-box p-4">
                           <div className="flex items-center gap-2 mb-2">
-                            <History size={16} className="text-slate-400" />
-                            <p className="text-xs text-slate-300 font-medium">Last Report</p>
+                            <History size={16} className="a-mute" />
+                            <p className="text-xs a-mute font-medium">Last Report</p>
                           </div>
-                          <p className="text-sm font-semibold text-white mt-1">
+                          <p className="text-sm font-semibold a-ink mt-1">
                             {new Date(reportSubmissions[0]?.created_at).toLocaleDateString()}
                           </p>
                         </div>
@@ -1767,24 +1622,22 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
 
                       {/* Report History */}
                       {reportSubmissions.map((report) => (
-                        <div key={report.id} className="p-5 rounded-xl bg-slate-700/20 border border-slate-600/40 hover:border-slate-500/50 transition-all">
+                        <div key={report.id} className="a-box p-5">
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-xl ${report.report_type === 'email' ? 'bg-blue-500/15' : 'bg-teal-500/15'}`}>
-                                {report.report_type === 'email' ? <Mail size={18} className="text-blue-400" /> : <Download size={18} className="text-teal-400" />}
-                              </div>
+                              <span className="a-tile">
+                                {report.report_type === 'email' ? <Mail size={18} /> : <Download size={18} />}
+                              </span>
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <p className="text-white font-semibold">
+                                  <p className="a-ink font-semibold">
                                     {report.report_type === 'email' ? 'Emailed to National' : 'Downloaded Report'}
                                   </p>
-                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    report.report_scope === 'new_since_last' ? 'bg-orange-500/20 text-orange-300' : 'bg-teal-500/20 text-teal-300'
-                                  }`}>
+                                  <span className={`a-lb-fmt ${report.report_scope === 'new_since_last' ? 'a-txt-a' : 'a-txt-t'}`}>
                                     {report.report_scope === 'new_since_last' ? 'Incremental' : report.report_scope === 'all' ? 'Full List' : 'Custom'}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                                <div className="flex items-center gap-3 mt-1 text-xs a-mute">
                                   <span className="flex items-center gap-1"><Calendar size={12} />{new Date(report.created_at).toLocaleString()}</span>
                                   {report.recipient_email && <span className="flex items-center gap-1"><Mail size={12} />{report.recipient_email}</span>}
                                 </div>
@@ -1792,8 +1645,8 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                             </div>
                             <div className="flex items-center gap-3">
                               <div className="text-right">
-                                <p className="text-lg font-bold text-white">{report.member_count} members</p>
-                                <p className="text-xs text-slate-400">
+                                <p className="text-lg font-bold a-ink">{report.member_count} members</p>
+                                <p className="text-xs a-mute">
                                   State: ${Number(report.total_state_amount).toFixed(2)} / National: ${Number(report.total_national_amount).toFixed(2)}
                                 </p>
                               </div>
@@ -1802,14 +1655,14 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                                   setDeleteReportTargetId(report.id);
                                   setShowDeleteReportConfirm(true);
                                 }}
-                                className="p-2 rounded-lg hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors"
+                                className="a-ib a-ib-d"
                                 title="Delete report log"
                               >
                                 <Trash2 size={15} />
                               </button>
                             </div>
                           </div>
-                          {report.subject && <p className="text-xs text-slate-300 mt-2 px-3 py-2 rounded-lg bg-slate-800/50">{report.subject}</p>}
+                          {report.subject && <p className="text-xs a-mute mt-2 px-3 py-2 rounded-lg a-box">{report.subject}</p>}
                         </div>
                       ))}
                     </div>
@@ -1912,14 +1765,14 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
       )}
 
       {showSendReportPrompt && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#131c31] border border-slate-700/80 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+        <div className="a-dlg">
+          <div className="a-sheet max-w-md overflow-hidden">
             <div className="p-6 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500/20 to-emerald-500/20 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
-                <Send size={28} className="text-teal-400" />
+              <div className="a-tile a-tile-rim w-16 h-16 mx-auto mb-4">
+                <Send size={28} className="a-txt-t" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Payment Processed</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <h3 className="text-lg font-bold a-ink mb-2">Payment Processed</h3>
+              <p className="text-sm a-mute leading-relaxed">
                 {lastPaidCount} member{lastPaidCount !== 1 ? 's have' : ' has'} been marked as paid to National.
                 Would you like to send a report to the National Association to notify them of this payment?
               </p>
@@ -1927,7 +1780,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
             <div className="flex items-center gap-3 px-6 pb-6">
               <button
                 onClick={() => setShowSendReportPrompt(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors border border-slate-700/60"
+                className="a-btn flex-1"
               >
                 Not Now
               </button>
@@ -1936,7 +1789,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   setShowSendReportPrompt(false);
                   setShowReportModal(true);
                 }}
-                className="btn-primary-green flex-1 px-4 py-2.5 rounded-xl hover:from-teal-500 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-teal-600/20"
+                className="a-btn a-btn-p flex-1 justify-center"
               >
                 <Send size={16} />
                 Send Report
@@ -1991,7 +1844,6 @@ interface RecordPaymentModalProps {
 }
 
 const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
-  darkMode,
   onClose,
   onSubmit,
   clubSummaries
@@ -2015,21 +1867,20 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-2xl max-w-2xl w-full`}>
-        <div className="p-6 border-b border-slate-700">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-white">Record Payment Received</h2>
-            <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
-              <LogOut className="w-5 h-5 text-slate-400" />
-            </button>
-          </div>
+    <div className="a-dlg">
+      <div className="a-sheet max-w-2xl" role="dialog" aria-modal="true" aria-label="Record payment received">
+        <div className="a-dlg-head">
+          <span className="a-tile"><Receipt size={18} /></span>
+          <h2 className="flex-1 a-ink text-lg font-semibold m-0">Record payment received</h2>
+          <button type="button" onClick={onClose} className="a-ib" aria-label="Close">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="a-dlg-body space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium a-mute mb-2">
                 Payment Reference *
               </label>
               <input
@@ -2037,13 +1888,13 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 required
                 value={formData.reference}
                 onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="a-inp"
                 placeholder="e.g., PAY-2025-001"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium a-mute mb-2">
                 Payment Date *
               </label>
               <input
@@ -2051,20 +1902,20 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 required
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="a-inp"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium a-mute mb-2">
                 From Club (Optional)
               </label>
               <select
                 value={formData.from_club_id}
                 onChange={(e) => setFormData({ ...formData, from_club_id: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="a-inp"
               >
                 <option value="">Select club...</option>
                 {clubSummaries.map(club => (
@@ -2076,7 +1927,7 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium a-mute mb-2">
                 Amount *
               </label>
               <input
@@ -2085,7 +1936,7 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 required
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="a-inp"
                 placeholder="0.00"
               />
             </div>
@@ -2093,13 +1944,13 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium a-mute mb-2">
                 Payment Method
               </label>
               <select
                 value={formData.payment_method}
                 onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="a-inp"
               >
                 <option value="bank_transfer">Bank Transfer</option>
                 <option value="check">Check</option>
@@ -2109,27 +1960,27 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium a-mute mb-2">
                 Bank Transaction ID
               </label>
               <input
                 type="text"
                 value={formData.bank_transaction_id}
                 onChange={(e) => setFormData({ ...formData, bank_transaction_id: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="a-inp"
                 placeholder="Optional"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium a-mute mb-2">
               Notes
             </label>
             <textarea
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="a-inp"
               rows={3}
               placeholder="Add any additional notes..."
             />
@@ -2139,13 +1990,13 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+              className="a-btn"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary-green px-6 py-2 rounded-lg text-white font-medium transition-colors"
+              className="a-btn a-btn-p"
             >
               Record Payment
             </button>
@@ -2194,64 +2045,64 @@ const NationalPaymentModal: React.FC<NationalPaymentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#131c31] border border-slate-700/80 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700/60">
+    <div className="a-dlg">
+      <div className="a-sheet max-w-2xl" role="dialog" aria-modal="true" aria-label="Pay national association">
+        <div className="a-dlg-head justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/20">
-              <ArrowUpRight size={20} className="text-green-400" />
-            </div>
+            <span className="a-tile a-txt-g">
+              <ArrowUpRight size={20} />
+            </span>
             <div>
-              <h2 className="text-lg font-bold text-white">Pay National Association</h2>
-              <p className="text-xs text-slate-400 mt-0.5">{selectedCount} member{selectedCount !== 1 ? 's' : ''} selected</p>
+              <h2 className="text-lg font-bold a-ink">Pay National Association</h2>
+              <p className="text-xs a-mute mt-0.5">{selectedCount} member{selectedCount !== 1 ? 's' : ''} selected</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-700/80 transition-colors">
-            <X size={20} className="text-slate-400" />
+          <button type="button" onClick={onClose} className="a-ib" aria-label="Close">
+            <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="a-dlg-body flex-1 space-y-5">
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
-              <p className="text-3xl font-bold text-white">${totalAmount.toFixed(2)}</p>
-              <p className="text-xs text-green-300 mt-1 font-medium">Total Payment Amount</p>
+            <div className="a-box a-box-ok p-4 text-center">
+              <p className="text-3xl font-bold a-ink">${totalAmount.toFixed(2)}</p>
+              <p className="text-xs a-txt-g mt-1 font-medium">Total Payment Amount</p>
             </div>
-            <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700/50 text-center">
-              <p className="text-3xl font-bold text-white">{selectedCount}</p>
-              <p className="text-xs text-slate-400 mt-1 font-medium">Members across {Object.keys(clubGroups).length} club{Object.keys(clubGroups).length !== 1 ? 's' : ''}</p>
+            <div className="a-box p-4 text-center">
+              <p className="text-3xl font-bold a-ink">{selectedCount}</p>
+              <p className="text-xs a-mute mt-1 font-medium">Members across {Object.keys(clubGroups).length} club{Object.keys(clubGroups).length !== 1 ? 's' : ''}</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={() => setShowMembers(!showMembers)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-slate-800/40 hover:bg-slate-800/60 border border-slate-700/40 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-3 a-box a-hov-row"
           >
             <div className="flex items-center gap-2">
-              <Users size={15} className="text-slate-400" />
-              <span className="text-sm font-medium text-slate-300">View Members</span>
+              <Users size={15} className="a-mute" />
+              <span className="text-sm font-medium a-mute">View Members</span>
             </div>
             <ChevronDown size={14} className={`text-slate-500 transition-transform ${showMembers ? 'rotate-180' : ''}`} />
           </button>
 
           {showMembers && (
-            <div className="rounded-xl border border-slate-700/60 overflow-hidden max-h-48 overflow-y-auto">
+            <div className="a-box overflow-hidden max-h-48 overflow-y-auto">
               {Object.entries(clubGroups).map(([clubName, members]) => (
                 <div key={clubName}>
                   <div className="flex items-center justify-between px-4 py-2 bg-slate-800/50 border-b border-slate-700/40">
                     <div className="flex items-center gap-2">
-                      <Building2 size={13} className="text-slate-500" />
-                      <span className="text-xs font-semibold text-slate-300">{clubName}</span>
+                      <Building2 size={13} className="a-dim" />
+                      <span className="text-xs font-semibold a-mute">{clubName}</span>
                     </div>
-                    <span className="text-xs text-green-400 font-medium">
+                    <span className="text-xs a-txt-g font-medium">
                       ${members.reduce((s, m) => s + m.national_contribution, 0).toFixed(2)}
                     </span>
                   </div>
                   {members.map(m => (
                     <div key={m.id} className="flex items-center justify-between px-4 py-2 pl-8 border-b border-slate-800/40 last:border-0">
-                      <span className="text-sm text-slate-300">{m.member_name}</span>
-                      <span className="text-xs text-slate-400">${m.national_contribution.toFixed(2)}</span>
+                      <span className="text-sm a-mute">{m.member_name}</span>
+                      <span className="text-xs a-mute">${m.national_contribution.toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -2262,33 +2113,33 @@ const NationalPaymentModal: React.FC<NationalPaymentModalProps> = ({
           <form onSubmit={handleSubmit} id="national-payment-form" className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Payment Reference *</label>
+                <label className="block text-xs font-medium a-mute mb-1.5">Payment Reference *</label>
                 <input
                   type="text"
                   required
                   value={formData.reference}
                   onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/50"
+                  className="a-inp"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Payment Date *</label>
+                <label className="block text-xs font-medium a-mute mb-1.5">Payment Date *</label>
                 <input
                   type="date"
                   required
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/50"
+                  className="a-inp"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Payment Method</label>
+              <label className="block text-xs font-medium a-mute mb-1.5">Payment Method</label>
               <select
                 value={formData.payment_method}
                 onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/50"
+                className="a-inp"
               >
                 <option value="bank_transfer">Bank Transfer</option>
                 <option value="check">Cheque</option>
@@ -2299,21 +2150,21 @@ const NationalPaymentModal: React.FC<NationalPaymentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Notes (optional)</label>
+              <label className="block text-xs font-medium a-mute mb-1.5">Notes (optional)</label>
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={2}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/50 resize-none"
+                className="a-inp resize-none"
                 placeholder="Payment notes..."
               />
             </div>
           </form>
 
-          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+          <div className="a-box a-box-warn p-3.5">
             <div className="flex items-start gap-2.5">
-              <AlertTriangle size={15} className="text-amber-400 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-300 leading-relaxed">
+              <AlertTriangle size={15} className="a-txt-a flex-shrink-0 mt-0.5" />
+              <p className="text-xs a-txt-a leading-relaxed">
                 This will mark {selectedCount} member{selectedCount !== 1 ? 's' : ''} as paid to National and create
                 expense/income transactions in your finance records.
               </p>
@@ -2321,10 +2172,10 @@ const NationalPaymentModal: React.FC<NationalPaymentModalProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-between p-6 border-t border-slate-700/60">
+        <div className="a-dlg-foot justify-between">
           <button
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors border border-slate-700/60"
+            className="a-btn a-btn-q"
           >
             Cancel
           </button>
@@ -2332,7 +2183,7 @@ const NationalPaymentModal: React.FC<NationalPaymentModalProps> = ({
             type="submit"
             form="national-payment-form"
             disabled={processing}
-            className="btn-primary-green px-6 py-2.5 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-lg"
+            className="a-btn a-btn-p"
           >
             {processing ? (
               <>

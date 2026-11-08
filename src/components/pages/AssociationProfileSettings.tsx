@@ -9,7 +9,7 @@ interface AssociationProfileSettingsProps {
   darkMode: boolean;
 }
 
-export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProps> = ({ darkMode }) => {
+export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProps> = () => {
   const { currentOrganization } = useAuth();
   const { addNotification } = useNotifications();
   const [associationName, setAssociationName] = useState('');
@@ -185,8 +185,8 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
 
   if (!currentOrganization) {
     return (
-      <div className={`p-6 rounded-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
-        <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+      <div className="a-card p-6">
+        <p className="a-mute">
           No association selected
         </p>
       </div>
@@ -195,20 +195,21 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
 
   return (
     <div className="space-y-6">
-      <div className={`rounded-xl ${darkMode ? 'bg-gray-800/50' : 'bg-gray-900/5'} border ${darkMode ? 'border-gray-700/50' : 'border-gray-200/50'} overflow-hidden`}>
+      <div className="a-card overflow-hidden">
         <div className="p-6">
             <form onSubmit={handleSaveProfile} className="space-y-6">
               {error && (
-                <div className={`p-4 rounded-lg ${darkMode ? 'bg-red-900/20' : 'bg-red-50'} border ${darkMode ? 'border-red-800/50' : 'border-red-200/50'} flex items-start gap-3`}>
-                  <AlertCircle className={`${darkMode ? 'text-red-400' : 'text-red-600'} flex-shrink-0 mt-0.5`} size={20} />
+                <div className="a-box a-box-bad p-4 flex items-start gap-3">
+                  <AlertCircle className="a-txt-r flex-shrink-0 mt-0.5" size={20} />
                   <div className="flex-1">
-                    <h3 className={`font-medium ${darkMode ? 'text-red-200' : 'text-red-900'} mb-1`}>Error</h3>
-                    <p className={`text-sm ${darkMode ? 'text-red-300' : 'text-red-700'}`}>{error}</p>
+                    <h3 className="font-medium a-txt-r mb-1">Error</h3>
+                    <p className="text-sm a-txt-r">{error}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setError(null)}
-                    className={`${darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-700'}`}
+                    className="a-ib a-ib-d"
+                    aria-label="Dismiss"
                   >
                     <X size={20} />
                   </button>
@@ -217,67 +218,56 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-2 a-mute">
                     {associationType} Association Name *
                   </label>
                   <input
                     type="text"
                     value={associationName}
                     onChange={(e) => setAssociationName(e.target.value)}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'
-                    } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                    className="a-inp"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-2 a-mute">
                     Short Name / Abbreviation
                   </label>
                   <input
                     type="text"
                     value={shortName}
                     onChange={(e) => setShortName(e.target.value)}
-                    className={`w-full px-4 py-2 rounded-lg border ${
-                      darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'
-                    } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                    className="a-inp"
                     placeholder="e.g., NSW, VIC"
                   />
                 </div>
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-2 a-mute">
                   Description
                 </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={6}
-                  className={`w-full px-4 py-2 rounded-lg border ${
-                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'
-                  } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                  className="a-inp"
                   placeholder="Describe your association..."
                 />
-                <p className={`mt-1 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <p className="mt-1 text-sm a-mute">
                   {wordCount} words
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-2 a-mute">
                     Logo
                   </label>
                   <div
-                    className={`relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                      isDraggingLogo
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : darkMode
-                        ? 'border-gray-600 hover:border-gray-500'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
+                    className={`a-box a-hov-row relative p-6 text-center cursor-pointer transition-colors ${isDraggingLogo ? 'a-box-on' : ''}`}
+                    style={{ borderStyle: 'dashed', borderWidth: 2 }}
                     onClick={() => logoInputRef.current?.click()}
                     onDragOver={(e) => handleDragOver(e, 'logo')}
                     onDragLeave={(e) => handleDragLeave(e, 'logo')}
@@ -297,15 +287,15 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
                             setLogoUrl(null);
                             setLogoFile(null);
                           }}
-                          className="absolute top-0 right-0 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                          className="a-btn a-btn-d"
                         >
                           <X size={16} />
                         </button>
                       </div>
                     ) : (
                       <div>
-                        <ImageIcon className={`mx-auto mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} size={40} />
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <ImageIcon className="mx-auto mb-2 a-mute" size={40} />
+                        <p className="text-sm a-mute">
                           Click or drag to upload
                         </p>
                       </div>
@@ -324,17 +314,12 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-2 a-mute">
                     Cover Image
                   </label>
                   <div
-                    className={`relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                      isDraggingCover
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : darkMode
-                        ? 'border-gray-600 hover:border-gray-500'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
+                    className={`a-box a-hov-row relative p-6 text-center cursor-pointer transition-colors ${isDraggingCover ? 'a-box-on' : ''}`}
+                    style={{ borderStyle: 'dashed', borderWidth: 2 }}
                     onClick={() => coverInputRef.current?.click()}
                     onDragOver={(e) => handleDragOver(e, 'cover')}
                     onDragLeave={(e) => handleDragLeave(e, 'cover')}
@@ -354,15 +339,15 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
                             setCoverImageUrl(null);
                             setCoverImageFile(null);
                           }}
-                          className="absolute top-0 right-0 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                          className="a-btn a-btn-d"
                         >
                           <X size={16} />
                         </button>
                       </div>
                     ) : (
                       <div>
-                        <ImageIcon className={`mx-auto mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} size={40} />
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <ImageIcon className="mx-auto mb-2 a-mute" size={40} />
+                        <p className="text-sm a-mute">
                           Click or drag to upload
                         </p>
                       </div>
@@ -385,9 +370,7 @@ export const AssociationProfileSettings: React.FC<AssociationProfileSettingsProp
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-lg ${
-                    darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'
-                  } text-white transition-colors disabled:opacity-50`}
+                  className="a-btn a-btn-p"
                 >
                   <Save size={18} />
                   {loading ? 'Saving...' : 'Save Profile'}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Download, Upload, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, MapPin, Link2 } from 'lucide-react';
+import { RefreshCw, Download, Upload, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, MapPin, Link2, Trophy } from 'lucide-react';
+import { InlineLoading, PageHead } from '../association/AssocUI';
 import type { NationalRanking, RankingSyncLog, RankingURLConfig } from '../../types/rankings';
 import {
   getAllRankings,
@@ -134,55 +135,55 @@ export const RankingsManagement: React.FC<RankingsManagementProps> = ({
     : rankings;
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-[22px]">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">National Rankings</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Manage and sync national rankings for all yacht classes
-          </p>
-        </div>
-
+      <PageHead icon={<Trophy size={24} />} title="National rankings" sub="Manage and sync national rankings for all yacht classes">
         <button
+          type="button"
           onClick={handleSyncAll}
           disabled={syncingClass !== null}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="a-btn a-btn-p"
         >
           <RefreshCw className={`w-4 h-4 ${syncingClass ? 'animate-spin' : ''}`} />
-          <span>Sync All Classes</span>
+          Sync all classes
         </button>
-      </div>
+      </PageHead>
 
       {/* Status Messages */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-red-900">Error</p>
-            <p className="text-sm text-red-700 mt-1">{error}</p>
+        <div className="a-note a-note-r">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold m-0">Couldn't sync</p>
+            <p className="text-sm mt-0.5 m-0 opacity-90">{error}</p>
           </div>
         </div>
       )}
 
       {success && (
-        <div className="border border-green-200 rounded-lg p-4 flex items-start space-x-3">
-          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-green-900">Success</p>
-            <p className="text-sm text-green-700 mt-1">{success}</p>
+        <div className="a-note" style={{ borderColor: 'rgba(48,209,88,0.3)', background: 'rgba(48,209,88,0.06)' }}>
+          <CheckCircle className="w-5 h-5 a-txt-g flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold a-ink m-0">Done</p>
+            <p className="text-sm a-mute mt-0.5 m-0">{success}</p>
           </div>
         </div>
       )}
 
       {/* URL Configuration */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Ranking Source URLs</h3>
+      <section className="a-card p-5 sm:p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="a-tile"><Link2 size={18} /></span>
+          <div>
+            <h3 className="a-ink text-[16px] font-semibold m-0">Ranking source URLs</h3>
+            <p className="a-mute text-[13px] m-0 mt-0.5">Where each class's rankings are read from</p>
+          </div>
+        </div>
 
         <div className="space-y-3">
           {urlConfigs.map((config, index) => (
-            <div key={index} className="flex items-center space-x-3">
-              <div className="flex-1 grid grid-cols-2 gap-3">
+            <div key={index} className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-[180px_minmax(0,1fr)] gap-3 min-w-0">
                 <input
                   type="text"
                   value={config.yachtClassName}
@@ -191,8 +192,9 @@ export const RankingsManagement: React.FC<RankingsManagementProps> = ({
                     updated[index].yachtClassName = e.target.value;
                     setUrlConfigs(updated);
                   }}
-                  placeholder="Class name (e.g., IOM)"
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Class name (e.g. IOM)"
+                  aria-label="Class name"
+                  className="a-inp"
                 />
                 <input
                   type="url"
@@ -203,139 +205,121 @@ export const RankingsManagement: React.FC<RankingsManagementProps> = ({
                     setUrlConfigs(updated);
                   }}
                   placeholder="https://..."
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Rankings URL"
+                  className="a-inp"
                 />
               </div>
 
               <button
+                type="button"
                 onClick={() => handleSyncClass(config.yachtClassName, config.url)}
                 disabled={syncingClass !== null}
-                className="flex items-center space-x-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                className="a-btn"
               >
                 <RefreshCw className={`w-4 h-4 ${syncingClass === config.yachtClassName ? 'animate-spin' : ''}`} />
-                <span className="text-sm">Sync</span>
+                Sync
               </button>
             </div>
           ))}
         </div>
 
         <button
+          type="button"
           onClick={() => setUrlConfigs([...urlConfigs, { yachtClassName: '', url: '' }])}
-          className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium"
+          className="a-btn a-btn-q a-btn-sm mt-4 a-txt-b"
         >
-          + Add Another Class
+          + Add another class
         </button>
-      </div>
+      </section>
 
       {/* Rankings Display */}
-      <div className="bg-white rounded-lg shadow">
+      <section className="a-card overflow-hidden">
         {/* Class Filter Tabs */}
-        <div className="border-b border-gray-200 px-6 pt-4">
-          <div className="flex space-x-4 overflow-x-auto">
+        <div className="px-5 sm:px-6 pt-5">
+          <div className="a-seg max-w-full overflow-x-auto" role="tablist" aria-label="Yacht class">
             <button
+              type="button"
+              role="tab"
+              aria-selected={selectedClass === ''}
               onClick={() => setSelectedClass('')}
-              className={`pb-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap ${
-                selectedClass === ''
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
+              className={`a-seg-i ${selectedClass === '' ? 'a-seg-on' : ''}`}
             >
-              All Classes ({rankings.length})
+              All classes
+              <span className="a-cnt">{rankings.length}</span>
             </button>
 
             {Object.keys(classGroups).map((className) => (
               <button
                 key={className}
+                type="button"
+                role="tab"
+                aria-selected={selectedClass === className}
                 onClick={() => setSelectedClass(className)}
-                className={`pb-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap ${
-                  selectedClass === className
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
+                className={`a-seg-i ${selectedClass === className ? 'a-seg-on' : ''}`}
               >
-                {className} ({classGroups[className].length})
+                {className}
+                <span className="a-cnt">{classGroups[className].length}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Rankings Table */}
-        <div className="p-6">
+        <div className="p-5 sm:p-6">
           {loading ? (
-            <div className="text-center py-12">
-              <RefreshCw className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-3" />
-              <p className="text-gray-600">Loading rankings...</p>
-            </div>
+            <InlineLoading label="Loading rankings…" />
           ) : displayedRankings.length === 0 ? (
-            <div className="text-center py-12">
-              <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600">No rankings found</p>
-              <p className="text-sm text-gray-500 mt-1">
-                Click "Sync All Classes" or sync individual classes to import rankings
+            <div className="a-empty py-12">
+              <span className="a-tile" style={{ width: 56, height: 56 }}><Trophy size={24} /></span>
+              <p className="a-ink text-[15px] font-semibold m-0">No rankings yet</p>
+              <p className="a-mute text-sm m-0">
+                Use "Sync all classes", or sync one class, to import rankings
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="w-full a-atable">
                 <thead>
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Rank
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Sail No.
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      State
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Points
-                    </th>
+                    <th className="px-4 py-3 text-left">Rank</th>
+                    <th className="px-4 py-3 text-left">Name</th>
+                    <th className="px-4 py-3 text-left">Sail no.</th>
+                    <th className="px-4 py-3 text-left">State</th>
+                    <th className="px-4 py-3 text-left">Points</th>
                     {!selectedClass && (
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Class
-                      </th>
+                      <th className="px-4 py-3 text-left">Class</th>
                     )}
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Last Updated
-                    </th>
+                    <th className="px-4 py-3 text-left">Last updated</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody>
                   {displayedRankings.map((ranking) => (
-                    <tr key={ranking.id} className="hover:bg-gray-50">
+                    <tr key={ranking.id}>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-800 font-semibold text-sm">
+                        <span className={`a-rank ${ranking.rank <= 3 ? `a-rank-${ranking.rank}` : ''}`}>
                           {ranking.rank}
                         </span>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {ranking.skipper_name}
-                        </div>
+                      <td className="px-4 py-3 whitespace-nowrap a-ink text-sm font-medium">
+                        {ranking.skipper_name}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm a-mute a-num">
                         {ranking.sail_number || '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {ranking.state && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            {ranking.state}
-                          </span>
+                          <span className="a-lb-fmt">{ranking.state}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm a-ink a-num">
                         {ranking.points?.toFixed(0) || '-'}
                       </td>
                       {!selectedClass && (
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm a-mute">
                           {ranking.yacht_class_name}
                         </td>
                       )}
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm a-dim">
                         {new Date(ranking.last_updated).toLocaleDateString()}
                       </td>
                     </tr>
@@ -345,36 +329,31 @@ export const RankingsManagement: React.FC<RankingsManagementProps> = ({
             </div>
           )}
         </div>
-      </div>
+      </section>
 
       {/* Sync History */}
       {syncLogs.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Sync History</h3>
+        <section className="a-card p-5 sm:p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="a-tile"><Clock size={18} /></span>
+            <h3 className="a-ink text-[16px] font-semibold m-0">Sync history</h3>
+          </div>
 
-          <div className="space-y-3">
+          <div className="a-grp">
             {syncLogs.map((log) => (
-              <div
-                key={log.id}
-                className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg"
-              >
-                {log.status === 'success' ? (
-                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                )}
-
+              <div key={log.id} className="a-lnk items-start">
+                <span className={`a-light mt-1.5 ${log.status === 'success' ? 'a-light-g' : 'a-light-r'}`} />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-sm font-semibold a-ink m-0">
                       {log.yacht_class_name}
                     </p>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs a-dim">
                       {new Date(log.created_at).toLocaleString()}
                     </span>
                   </div>
 
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className={`text-sm mt-1 m-0 ${log.status === 'success' ? 'a-mute' : 'a-txt-r'}`}>
                     {log.status === 'success'
                       ? `Imported ${log.rankings_imported} rankings`
                       : log.error_message || 'Failed to sync'}
@@ -383,7 +362,7 @@ export const RankingsManagement: React.FC<RankingsManagementProps> = ({
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

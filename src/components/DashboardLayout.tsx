@@ -2039,7 +2039,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/association-committee" element={
                 currentOrganization ? (
                   <div className="h-full overflow-y-auto">
-                    <div className="p-4 sm:p-6 lg:p-16">
+                    <div className="a-apage">
                       <CommitteeManagement
                         darkMode={darkMode}
                         associationId={currentOrganization.id}
@@ -2060,7 +2060,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               } />
               <Route path="/association-remittances" element={
                 <div className="h-full overflow-y-auto">
-                  <div className="p-4 sm:p-6 lg:p-16">
+                  <div className="a-apage">
                     {currentOrganization?.type === 'national' ? (
                       <NationalRemittanceDashboard
                         darkMode={darkMode}
@@ -2078,7 +2078,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               } />
               <Route path="/rankings" element={
                 <div className="h-full overflow-y-auto">
-                  <div className="p-4 sm:p-6 lg:p-16">
+                  <div className="a-apage">
                     {currentOrganization?.type === 'national' ? (
                       <RankingsManagement
                         nationalAssociationId={currentOrganization.id}
@@ -2089,7 +2089,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               } />
               <Route path="/name-mapping" element={
                 <div className="h-full overflow-y-auto">
-                  <div className="p-4 sm:p-6 lg:p-16">
+                  <div className="a-apage">
                     {currentOrganization?.type === 'national' && currentClub ? (
                       <NameMappingManager
                         nationalAssociationId={currentOrganization.id}

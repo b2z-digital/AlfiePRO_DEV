@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Edit, Trash2, Plus, MapPin, Users, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Building2, Edit, Trash2, Plus, MapPin, Users, CheckCircle, Search } from 'lucide-react';
+import { InlineLoading, KpiCard, OrgLogo, PageHead } from '../association/AssocUI';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { AddStateAssociationModal } from './AddStateAssociationModal';
@@ -96,54 +97,31 @@ export const AssociationsManagementPage: React.FC<AssociationsManagementPageProp
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      active: {
-        bg: 'bg-green-500/20',
-        text: 'text-green-400',
-        border: 'border-green-500/30',
-        icon: CheckCircle
-      },
-      pending: {
-        bg: 'bg-amber-500/20',
-        text: 'text-amber-400',
-        border: 'border-amber-500/30',
-        icon: Clock
-      },
-      inactive: {
-        bg: 'bg-slate-500/20',
-        text: 'text-slate-400',
-        border: 'border-slate-500/30',
-        icon: XCircle
-      }
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-    const Icon = config.icon;
-
+  const getStatusBadge = (status?: string | null) => {
+    const st = (status || 'active').toLowerCase();
+    const tone = st === 'active' ? 'g' : st === 'pending' ? 'a' : '';
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${config.bg} ${config.text} ${config.border}`}>
-        <Icon size={12} />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <span className={`a-lb-fmt ${tone ? `a-txt-${tone}` : 'a-mute'}`}>
+        <span className={`a-light ${tone ? `a-light-${tone}` : ''}`} />
+        {st.charAt(0).toUpperCase() + st.slice(1)}
       </span>
     );
   };
 
   const filteredAssociations = associations.filter(assoc =>
-    assoc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    assoc.state.toLowerCase().includes(searchQuery.toLowerCase())
+    (assoc.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (assoc.state || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const totalClubs = associations.reduce((sum, a) => sum + (a.club_count || 0), 0);
+  const activeCount = associations.filter(a => (a.status || 'active') === 'active').length;
 
   if (loading) {
     return (
       <div className="h-full overflow-y-auto">
-        <div className="p-4 sm:p-6 lg:p-16">
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className={`mt-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Loading associations...
-            </p>
-          </div>
+        <div className="a-apage">
+          <PageHead icon={<Building2 size={24} />} title="State associations" sub="Manage all state associations in your network" />
+          <InlineLoading label="Loading associations…" />
         </div>
       </div>
     );
@@ -151,187 +129,85 @@ export const AssociationsManagementPage: React.FC<AssociationsManagementPageProp
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-4 sm:p-6 lg:p-16">
+      <div className="a-apage">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 rounded-xl bg-blue-600/20">
-              <Building2 className="text-blue-400" size={28} />
-            </div>
-            <div>
-              <h1 className={`text-3xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                State Associations
-              </h1>
-              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Manage all state associations in your network
-              </p>
-            </div>
-          </div>
-
-          {/* Search and Actions */}
-          <div className="flex flex-wrap gap-4 items-center justify-between">
+        <PageHead icon={<Building2 size={24} />} title="State associations" sub="Manage all state associations in your network">
+          <label className="a-field" style={{ width: 280, maxWidth: '100%' }}>
+            <Search size={16} />
             <input
               type="text"
-              placeholder="Search associations..."
+              placeholder="Search associations"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`flex-1 min-w-[300px] px-4 py-2.5 rounded-lg border ${
-                darkMode
-                  ? 'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500'
-                  : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              aria-label="Search associations"
             />
-            <button
-              onClick={() => setShowAddAssociationModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-            >
-              <Plus size={20} />
-              Add Association
-            </button>
-          </div>
-        </div>
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowAddAssociationModal(true)}
+            className="a-btn a-btn-p"
+          >
+            <Plus size={16} />
+            Add association
+          </button>
+        </PageHead>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className={`p-6 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-lg bg-blue-600/20">
-                <Building2 className="text-blue-400" size={24} />
-              </div>
-              <div>
-                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Total Associations
-                </p>
-                <p className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                  {associations.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className={`p-6 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-lg bg-green-600/20">
-                <CheckCircle className="text-green-400" size={24} />
-              </div>
-              <div>
-                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Active
-                </p>
-                <p className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                  {associations.filter(a => a.status === 'active').length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className={`p-6 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-lg bg-purple-600/20">
-                <Users className="text-purple-400" size={24} />
-              </div>
-              <div>
-                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Total Clubs
-                </p>
-                <p className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                  {associations.reduce((sum, a) => sum + (a.club_count || 0), 0)}
-                </p>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <KpiCard cap="Associations" value={associations.length} sub="State associations in your network" icon={<Building2 size={18} />} />
+          <KpiCard cap="Active" value={activeCount} sub={associations.length - activeCount > 0 ? `${associations.length - activeCount} not active` : 'All active'} icon={<CheckCircle size={18} />} tone={activeCount > 0 ? 'green' : undefined} />
+          <KpiCard cap="Clubs" value={totalClubs} sub="Member clubs across all states" icon={<Users size={18} />} />
         </div>
 
         {/* Associations Grid */}
         {filteredAssociations.length === 0 ? (
-          <div className={`text-center py-16 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <Building2 size={64} className={`mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
-            <h3 className={`text-xl font-semibold mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+          <div className="a-card a-empty py-16 px-6">
+            <span className="a-tile" style={{ width: 60, height: 60 }}><Building2 size={26} /></span>
+            <h3 className="a-ink text-lg font-semibold m-0">
               {searchQuery ? 'No associations found' : 'No associations yet'}
             </h3>
-            <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
+            <p className="a-mute text-sm m-0">
               {searchQuery ? 'Try a different search term' : 'Get started by adding your first state association'}
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {filteredAssociations.map((assoc) => (
-              <div
-                key={assoc.id}
-                className={`group p-6 rounded-xl border transition-all hover:shadow-lg ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-700 hover:border-blue-500/50'
-                    : 'bg-white border-slate-200 hover:border-blue-300'
-                }`}
-              >
+              <article key={assoc.id} className="a-card a-clubcard">
                 {/* Header with Logo */}
-                <div className="flex items-start gap-3 mb-4">
-                  {assoc.logo_url ? (
-                    <img
-                      src={assoc.logo_url}
-                      alt={assoc.name}
-                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                    />
-                  ) : (
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      darkMode ? 'bg-slate-700' : 'bg-slate-100'
-                    }`}>
-                      <Building2 className={darkMode ? 'text-slate-500' : 'text-slate-400'} size={24} />
-                    </div>
-                  )}
+                <div className="flex items-start gap-3">
+                  <OrgLogo src={assoc.logo_url} name={assoc.name} />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className={`font-semibold text-base leading-tight ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                        {assoc.name}
-                      </h3>
-                      {getStatusBadge(assoc.status)}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-sm">
-                      <MapPin size={14} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
-                      <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                        {assoc.state}
-                      </span>
+                    <h3 className="a-ink font-semibold text-[15.5px] leading-tight m-0">{assoc.name}</h3>
+                    <div className="a-meta-row mt-1.5">
+                      <span><MapPin size={13} />{assoc.state}</span>
+                      <span><Users size={13} />{assoc.club_count || 0} club{(assoc.club_count || 0) === 1 ? '' : 's'}</span>
                     </div>
                   </div>
-                </div>
-
-                {/* Stats */}
-                <div className={`flex items-center gap-4 mb-4 p-3 rounded-lg ${
-                  darkMode ? 'bg-slate-900/50' : 'bg-slate-50'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <Users size={16} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
-                    <span className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {assoc.club_count || 0} clubs
-                    </span>
-                  </div>
+                  {getStatusBadge(assoc.status)}
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 mt-auto">
                   <button
+                    type="button"
                     onClick={() => setEditingAssociation(assoc)}
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                      darkMode
-                        ? 'bg-slate-700 hover:bg-slate-600 text-slate-200'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                    }`}
+                    className="a-btn flex-1"
                   >
                     <Edit size={16} />
                     Edit
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleDelete(assoc.id, assoc.name)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                      darkMode
-                        ? 'bg-red-900/30 hover:bg-red-900/50 text-red-400'
-                        : 'bg-red-50 hover:bg-red-100 text-red-600'
-                    }`}
+                    className="a-btn a-btn-d a-btn-icon"
+                    aria-label={`Delete ${assoc.name}`}
+                    title="Delete"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         )}
