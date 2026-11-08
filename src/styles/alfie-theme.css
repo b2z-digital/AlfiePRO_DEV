@@ -441,7 +441,20 @@ html.alfie-light .alfie-chrome.fixed::before {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 36px rgba(15, 23, 42, 0.10);
 }
 html.alfie-theme .alfie-chrome.fixed .px-3 { padding-left: 20px; padding-right: 20px; }
-html.alfie-theme .alfie-chrome.fixed.w-\[92px\] .px-3 { padding-left: 24px; padding-right: 24px; }
+html.alfie-theme .alfie-chrome.fixed.w-\[92px\] .overflow-y-auto.px-3 { padding-left: 24px; padding-right: 24px; }
+/* One icon axis at the rail centre (46px) in both states, so the sail and icons
+   stay put when the rail opens and only the labels slide in. */
+html.alfie-theme .alfie-chrome.fixed > .flex-col > .p-5:first-child { padding: 28px 20px 18px 30px; }
+html.alfie-theme .alfie-chrome.fixed.w-\[92px\] > .flex-col > .p-5:first-child { padding: 28px 0 18px; }
+html.alfie-theme .alfie-chrome.fixed > .flex-col > .p-5:first-child h1 { margin-left: 4px; font-size: 23px; line-height: 1; letter-spacing: 0.01em; }
+html.alfie-theme .alfie-chrome.fixed nav button.rounded-lg,
+html.alfie-theme .alfie-chrome.fixed .space-y-1 > button.rounded-lg { border-left: 3px solid transparent; }
+html.alfie-theme .alfie-chrome.fixed:not(.w-\[92px\]) nav button.rounded-lg.px-3,
+html.alfie-theme .alfie-chrome.fixed:not(.w-\[92px\]) .space-y-1 > button.rounded-lg.px-3 { padding-left: 13px; padding-right: 20px; }
+html.alfie-theme .alfie-chrome.fixed:not(.w-\[92px\]) nav button.rounded-lg.px-3:has(> div:first-child > svg:first-child) { padding-left: 15px; }
+/* Collapsed: a 44px tile centred in the rail, rounded on both sides */
+html.alfie-theme .alfie-chrome.fixed.w-\[92px\] nav button.rounded-lg.justify-center,
+html.alfie-theme .alfie-chrome.fixed.w-\[92px\] .space-y-1 > button.rounded-lg.justify-center { width: 44px; padding-left: 0; padding-right: 3px; margin-left: auto; margin-right: auto; }
 html.alfie-theme .alfie-chrome.fixed .border-t { border-top-color: transparent !important; position: relative; }
 html.alfie-theme .alfie-chrome.fixed .border-t::before {
   content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
