@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Icon, AlfieSails, IconName } from './icons';
 import { useMobile } from './MobileContext';
@@ -112,7 +112,7 @@ const TABS: { id: string; label: string; icon: IconName; path: string; match: (p
   { id: 'me', label: 'Me', icon: 'me', path: '/me', match: p => /^\/(me(\/|$)|my-|settings|tasks|weather|race-timer)/.test(p) && !p.startsWith('/my-results') },
 ];
 
-export const TabBar: React.FC<{ onAlfie: () => void }> = ({ onAlfie }) => {
+export const TabBar: React.FC<{ onAlfie: (voice?: boolean) => void }> = ({ onAlfie }) => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { tap, light } = useMobile();
@@ -121,6 +121,7 @@ export const TabBar: React.FC<{ onAlfie: () => void }> = ({ onAlfie }) => {
     if (pathname === path) document.querySelector('.m-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
     else navigate(path);
   };
+  const orb = useHoldToTalk(() => { tap('medium'); onAlfie(); }, () => { tap('success'); onAlfie(true); });
   const tab = (t: typeof TABS[number]) => {
     const on = t.match(pathname);
     return (
@@ -134,7 +135,7 @@ export const TabBar: React.FC<{ onAlfie: () => void }> = ({ onAlfie }) => {
     <nav className="m-tabs" aria-label="Main">
       {TABS.slice(0, 2).map(tab)}
       <div className="m-orb-slot">
-        <button className="m-orb" aria-label="Ask Alfie" onClick={() => { tap('medium'); onAlfie(); }}>
+        <button className="m-orb" aria-label="Ask Alfie (hold to talk)" {...orb}>
           <span><AlfieSails size={26} light={light} /></span>
         </button>
       </div>
@@ -142,6 +143,22 @@ export const TabBar: React.FC<{ onAlfie: () => void }> = ({ onAlfie }) => {
     </nav>
   );
 };
+
+/** Tap opens Ask Alfie; holding it opens straight into talking (board: "Hold the Alfie button and speak"). */
+function useHoldToTalk(onTap: () => void, onHold: () => void) {
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const held = useRef(false);
+  const clear = () => clearTimeout(timer.current);
+  useEffect(() => clear, []);
+  return {
+    onPointerDown: () => { held.current = false; clear(); timer.current = setTimeout(() => { held.current = true; onHold(); }, 450); },
+    onPointerUp: clear,
+    onPointerLeave: clear,
+    onPointerCancel: clear,
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+    onClick: () => { if (held.current) { held.current = false; return; } onTap(); },
+  };
+}
 
 /* ─────────────── Shared pieces ─────────────── */
 

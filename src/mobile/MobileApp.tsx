@@ -1,11 +1,10 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { isNative } from '../lib/native/platform';
 import { useAlfieTheme } from '../hooks/useAlfieTheme';
 import { MobileProvider, useMobile } from './MobileContext';
 import { TabBar } from './ui';
-import { Icon } from './icons';
 import { Home } from './screens/Home';
 import { CalendarScreen, ResultsScreen } from './screens/Racing';
 import { EventDetail } from './screens/EventDetail';
@@ -39,46 +38,31 @@ import { FindRacingScreen } from './screens/FindRacing';
 import { ChooseClubScreen, NotificationsPromptScreen, MembershipDueScreen, FIRST_RUN, flag, loadMyAssociations } from './screens/FirstRun';
 import { SettingsScreen } from './screens/Settings';
 import { hostFor } from './scoreTogether';
+import { AskAlfieSheet } from './screens/AskAlfie';
+import { TermsGate } from './screens/Terms';
+import { usePresence } from './presence';
 import '../styles/alfie-mobile.css';
 
-const AskAlfieChatPanel = lazy(() => import('../components/ask-alfie/AskAlfieChatPanel').then(m => ({ default: m.AskAlfieChatPanel })));
 
 /** Screens that sit outside the tab bar (pushed full screen). */
 const FIRST_RUN_PATHS = ['/choose-club', '/welcome-notifications', '/membership-due'];
 const NO_TABS = [/^\/(choose-club|welcome-notifications|membership-due)/, /^\/notifications/, /^\/race-timer/, /^\/race-desk\/event\/[^/]+\/(race|finish|confirm|sheet)$/, /^\/comms\/chat\//, /^\/classifieds\/[^/]+/, /^\/news\/[^/]+/];
-
-const AlfieSheet: React.FC<{ onClose: () => void; message?: string }> = ({ onClose, message }) => {
-  const { light } = useMobile();
-  useEffect(() => {
-    const onBack = (e: Event) => { e.preventDefault(); onClose(); };
-    window.addEventListener('alfie-native-back', onBack);
-    return () => window.removeEventListener('alfie-native-back', onBack);
-  }, [onClose]);
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 80, background: light ? '#F3F6FB' : '#060B16', display: 'flex', flexDirection: 'column', paddingTop: 'var(--m-safe-top)', paddingBottom: 'var(--m-safe-bottom)', animation: 'm-up .24s cubic-bezier(.2,.8,.2,1)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', padding: '6px 12px' }}>
-        <button className="m-ibtn" aria-label="Close Ask Alfie" onClick={onClose}><Icon name="close" /></button>
-      </div>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <Suspense fallback={null}>
-          <AskAlfieChatPanel darkMode={!light} onClose={onClose} embedded initialMessage={message} />
-        </Suspense>
-      </div>
-    </div>
-  );
-};
 
 const Shell: React.FC = () => {
   const { pathname } = useLocation();
   const { light } = useMobile();
   const [alfieOpen, setAlfieOpen] = useState(false);
   const [alfieMessage, setAlfieMessage] = useState<string | undefined>();
+  const [alfieVoice, setAlfieVoice] = useState(false);
+  const openAlfie = (voice = false) => { setAlfieVoice(voice); setAlfieOpen(true); };
   useEffect(() => {
-    const on = (e: Event) => { setAlfieMessage((e as CustomEvent).detail || undefined); setAlfieOpen(true); };
+    const on = (e: Event) => { setAlfieMessage((e as CustomEvent).detail || undefined); setAlfieVoice(false); setAlfieOpen(true); };
     window.addEventListener('m-ask-alfie', on);
     return () => window.removeEventListener('m-ask-alfie', on);
   }, []);
   useAlfieTheme(true, light ? 'light' : 'dark');
+  // Online dots in chats and profiles
+  usePresence();
   // Upright, except the finish pad and full sheet (they allow turning the phone)
   useEffect(() => { lockPortrait(); }, []);
   // Results confirmed with no signal send themselves when it's back
@@ -123,10 +107,10 @@ const Shell: React.FC = () => {
           <Route path="/race-desk/event/:key/confirm" element={<ConfirmRaceScreen />} />
           <Route path="/race-desk/sync" element={<SyncScreen />} />
           <Route path="/race-desk/event/:key/sheet" element={<FullSheetScreen />} />
-          <Route path="/club" element={<ClubHub />} />
+          <Route path="/club" element={<TermsGate><ClubHub /></TermsGate>} />
           <Route path="/community/*" element={<Navigate to="/club" replace />} />
-          <Route path="/comms" element={<ChatsInbox />} />
-          <Route path="/comms/chat/:userId" element={<ChatThread />} />
+          <Route path="/comms" element={<TermsGate><ChatsInbox /></TermsGate>} />
+          <Route path="/comms/chat/:userId" element={<TermsGate><ChatThread /></TermsGate>} />
           <Route path="/comms/*" element={<Navigate to="/comms" replace />} />
           <Route path="/skipper/:id" element={<SkipperProfile />} />
           <Route path="/classifieds" element={<ClassifiedsScreen />} />
@@ -151,8 +135,8 @@ const Shell: React.FC = () => {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      {!hideTabs && <TabBar onAlfie={() => setAlfieOpen(true)} />}
-      {alfieOpen && <AlfieSheet message={alfieMessage} onClose={() => { setAlfieOpen(false); setAlfieMessage(undefined); }} />}
+      {!hideTabs && <TabBar onAlfie={openAlfie} />}
+      {alfieOpen && <AskAlfieSheet message={alfieMessage} voice={alfieVoice} onClose={() => { setAlfieOpen(false); setAlfieMessage(undefined); setAlfieVoice(false); }} />}
     </div>
   );
 };

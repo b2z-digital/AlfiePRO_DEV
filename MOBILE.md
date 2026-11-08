@@ -118,6 +118,20 @@ to `ios/App/CapApp-SPM` and Android. Phone browsers use the Web Speech API where
 NSSpeechRecognitionUsageDescription (in Info.plist). The plugin hasn't been built on a device yet: build both apps
 once and try holding the voice button before TestFlight.
 
+Ask Alfie (`screens/AskAlfie.tsx`, client in `mobile/alfie.ts`): a full-screen sheet from the centre button (hold it
+to go straight to talking). It uses the old app's `ask-alfie` function, so conversations, history and the monthly
+question count carry on: answers stream in with the function's control blocks hidden, then show the rig table
+("Save to my <boat>" calls `?action=save-rig-settings` after choosing wind and water), race cards and a link to the
+phone screen Alfie names. Photos are shrunk before sending; drawings use the desktop's RaceScenarioCanvas. Read aloud
+and spoken answers use the `text-to-speech` function (voice "fable") a sentence at a time, falling back to the
+phone's own voice. Talking uses `mobile/speech.ts`.
+Presence (`mobile/presence.ts`): the phone keeps both `profiles.last_seen` (desktop) and `user_presence` (old app)
+fresh and reads both for the green dots. Saved stories live on the account (`mobile/saved.ts`,
+user_article_bookmarks; stories saved on the phone before are moved across once). Club feed posts can be hidden
+(hidden_posts) or reported (the desktop's `socialStorage.reportPost`). The club feed and chats ask once for the
+community guidelines (`screens/Terms.tsx`, terms_acceptance 'v1', the same record the old app kept; terms text from
+global_legal_pages).
+
 ## Scoring tests
 
 `npm test` runs Vitest. `src/__tests__/scoring/` replays real completed rounds (skipper names anonymised, in
@@ -126,7 +140,8 @@ plus locked snapshots of HMS and SHRS heat sizes and schedules, the heat sailing
 sails on (checked against the handicaps the desktop recorded in the real rounds), the finish order (every real race
 read back through Touch mode's finish order unchanged), confirming (every real race replayed and confirmed race by
 race; handicaps against the desktop; an HMS event heat by heat with promotions), spotters' calls and disagreements,
-sending results kept offline in order, and the keypad and voice matching. Any change to scoring must
+sending results kept offline in order, and the keypad and voice matching. `src/__tests__/mobile/` covers Ask Alfie
+(hiding control blocks while streaming, reading the stream, sentences to speak, rig labels, take-me-there links). Any change to scoring must
 keep these passing.
 
 Progress and gaps: `claude/alfie-mobile-app-plan.md` in the AlfiePRO project.

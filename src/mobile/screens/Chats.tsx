@@ -12,6 +12,7 @@ import { PageHeader } from './Club';
 import {
   MChat, MMessage, chatTime, findDirectConversation, fullName, isOnline, loadChats, loadMessages, markChatRead, sendChatMessage,
 } from '../club';
+import { onlineByPresence } from '../presence';
 
 /* ─────────────── Inbox ─────────────── */
 
@@ -106,8 +107,11 @@ export const PeoplePicker: React.FC<{ onClose: () => void; onPick: (userId: stri
         ids.delete(user.id);
       }
       if (!ids.size) { setPeople([]); return; }
-      const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, avatar_url, last_seen').in('id', [...ids]);
-      setPeople((profiles || []).map((p: any) => ({ id: p.id, name: fullName(p) || 'Member', avatar: p.avatar_url || undefined, online: isOnline(p.last_seen) }))
+      const [{ data: profiles }, live] = await Promise.all([
+        supabase.from('profiles').select('id, first_name, last_name, avatar_url, last_seen').in('id', [...ids]),
+        onlineByPresence([...ids]).catch(() => new Set<string>()),
+      ]);
+      setPeople((profiles || []).map((p: any) => ({ id: p.id, name: fullName(p) || 'Member', avatar: p.avatar_url || undefined, online: isOnline(p.last_seen) || live.has(p.id) }))
         .sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name)));
     })().catch(() => setPeople([]));
   }, [user?.id, currentClub?.clubId]);
@@ -171,8 +175,10 @@ export const ChatThread: React.FC = () => {
   const convRef = useRef<string | null>(convId);
 
   useEffect(() => {
-    supabase.from('profiles').select('first_name, last_name, avatar_url, last_seen').eq('id', them).maybeSingle()
-      .then(({ data }) => setPerson({ name: fullName(data) || 'Member', avatar: data?.avatar_url || undefined, online: isOnline(data?.last_seen) }));
+    Promise.all([
+      supabase.from('profiles').select('first_name, last_name, avatar_url, last_seen').eq('id', them).maybeSingle(),
+      onlineByPresence([them]).catch(() => new Set<string>()),
+    ]).then(([{ data }, live]) => setPerson({ name: fullName(data) || 'Member', avatar: data?.avatar_url || undefined, online: isOnline(data?.last_seen) || live.has(them) }));
   }, [them]);
 
   useEffect(() => {

@@ -7,10 +7,8 @@ import { Icon } from '../icons';
 import { Avatar, Skeleton } from '../ui';
 import { PageHeader } from './Club';
 import { Article, loadArticle, loadNews, readMinutes } from '../club';
+import { loadSaved, savedOnPhone, setSaved as saveStory } from '../saved';
 
-const SAVED_KEY = 'alfie-m-saved-articles';
-const readSaved = (): string[] => { try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); } catch { return []; } };
-const writeSaved = (ids: string[]) => { try { localStorage.setItem(SAVED_KEY, JSON.stringify(ids)); } catch { /* private mode */ } };
 
 const FALLBACKS = ['linear-gradient(130deg,#0B2E5C,#1C6FC2 55%,#9DD2FF)', 'linear-gradient(135deg,#0B4FA8,#4DA3FF)', 'linear-gradient(135deg,#5A2A10,#FF8A2B)', 'linear-gradient(135deg,#3B1C6E,#8A4DFF)'];
 const cover = (a: Article, i = 0) => (a.cover_image ? `url("${a.cover_image}")` : FALLBACKS[i % FALLBACKS.length]);
@@ -25,10 +23,11 @@ export const SourceTag: React.FC<{ a: Article }> = ({ a }) => <span className={`
 
 export const NewsScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { currentClub, currentOrganization } = useAuth();
+  const { user, currentClub, currentOrganization } = useAuth();
   const [items, setItems] = useState<Article[] | null>(null);
   const [filter, setFilter] = useState<'all' | 'club' | 'state' | 'national' | 'saved'>('all');
-  const saved = useMemo(readSaved, [filter]);
+  const [saved, setSavedIds] = useState<string[]>(savedOnPhone);
+  useEffect(() => { void loadSaved(user?.id).then(setSavedIds).catch(() => {}); }, [user?.id, filter]);
 
   useEffect(() => {
     loadNews(currentClub?.clubId, currentOrganization ? { type: currentOrganization.type, id: currentOrganization.id } : null)
@@ -89,10 +88,11 @@ export const ArticleScreen: React.FC = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { toast, tap } = useMobile();
-  const { currentClub } = useAuth();
+  const { user, currentClub } = useAuth();
   const [a, setA] = useState<Article | null | undefined>(undefined);
   const [progress, setProgress] = useState(0);
-  const [saved, setSaved] = useState(() => readSaved().includes(id));
+  const [saved, setSaved] = useState(() => savedOnPhone().includes(id));
+  useEffect(() => { void loadSaved(user?.id).then(ids => setSaved(ids.includes(id))).catch(() => {}); }, [user?.id, id]);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { loadArticle(id).then(setA).catch(() => setA(null)); }, [id]);
@@ -105,13 +105,12 @@ export const ArticleScreen: React.FC = () => {
   }, []);
 
   const html = useMemo(() => (a?.content ? DOMPurify.sanitize(a.content, { ADD_ATTR: ['target'] }) : ''), [a?.content]);
-  const toggleSave = () => {
-    const ids = readSaved();
-    const next = saved ? ids.filter(x => x !== id) : [...ids, id];
-    writeSaved(next);
-    setSaved(!saved);
-    tap(saved ? 'light' : 'success');
-    toast(saved ? 'Removed from saved' : 'Saved for later');
+  const toggleSave = async () => {
+    const on = !saved;
+    setSaved(on);
+    tap(on ? 'success' : 'light');
+    if (await saveStory(user?.id, id, on)) toast(on ? 'Saved for later' : 'Removed from saved');
+    else { setSaved(!on); toast(navigator.onLine ? 'Couldn\'t save that. Try again.' : 'No signal. Try again when you\'re back online.'); }
   };
 
   if (a === undefined) return <div className="m-stack"><Skeleton h={60} /><Skeleton h={220} /><Skeleton h={300} /></div>;
@@ -124,7 +123,7 @@ export const ArticleScreen: React.FC = () => {
       <div className="m-progress" style={{ width: `${Math.round(progress * 100)}%` }} />
       <header className="m-top" style={{ justifyContent: 'space-between' }}>
         <button className="m-ibtn" aria-label="Back" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/news'))}><Icon name="back" /></button>
-        <button className="m-ibtn" aria-label={saved ? 'Remove from saved' : 'Save'} aria-pressed={saved} onClick={toggleSave} style={saved ? { color: 'var(--m-blue-ink)' } : undefined}>
+        <button className="m-ibtn" aria-label={saved ? 'Remove from saved' : 'Save'} aria-pressed={saved} onClick={() => void toggleSave()} style={saved ? { color: 'var(--m-blue-ink)' } : undefined}>
           <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>
         </button>
       </header>

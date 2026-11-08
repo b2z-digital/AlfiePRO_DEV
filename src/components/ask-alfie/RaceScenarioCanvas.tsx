@@ -72,6 +72,8 @@ interface RaceScenarioCanvasProps {
   darkMode?: boolean;
   courseMode?: boolean;
   initialImage?: string;
+  /** Fill the space it's given (the phone's full-screen drawing) rather than 55% of the window. */
+  fill?: boolean;
 }
 
 export const RaceScenarioCanvas: React.FC<RaceScenarioCanvasProps> = ({
@@ -79,6 +81,7 @@ export const RaceScenarioCanvas: React.FC<RaceScenarioCanvasProps> = ({
   onClose,
   courseMode = false,
   initialImage,
+  fill = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -102,14 +105,14 @@ export const RaceScenarioCanvas: React.FC<RaceScenarioCanvasProps> = ({
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         const w = Math.min(rect.width - 4, 800);
-        const h = Math.min(window.innerHeight * 0.55, 600);
+        const h = fill && rect.height > 300 ? rect.height - 12 : Math.min(window.innerHeight * 0.55, 600);
         setCanvasSize({ width: w, height: Math.max(h, 300) });
       }
     };
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
-  }, []);
+  }, [fill]);
 
   useEffect(() => {
     if (!initialImage) return;

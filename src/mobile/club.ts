@@ -4,6 +4,7 @@
  * storage helpers), so a post, message or listing made on the phone shows up on desktop.
  */
 import { supabase } from '../utils/supabase';
+import { onlineByPresence } from './presence';
 import { socialStorage, SocialPost } from '../utils/socialStorage';
 import { getArticles, getArticleById, Article } from '../utils/articleStorage';
 import { getClassifieds, getClassifiedById, getUserFavorites, toggleClassifiedFavorite } from '../utils/classifiedStorage';
@@ -18,6 +19,32 @@ export type { SocialPost, Article, Classified, EventMedia };
 export async function loadFeed(groupId?: string): Promise<SocialPost[]> {
   return ((await socialStorage.getFeed({ limit: 30, groupId })) || []) as unknown as SocialPost[];
 }
+
+/** Posts I've hidden from my feed (hidden_posts, the same list the old app kept). */
+export async function loadHiddenPosts(userId: string | undefined): Promise<Set<string>> {
+  if (!userId) return new Set();
+  const { data } = await supabase.from('hidden_posts').select('post_id').eq('user_id', userId);
+  return new Set((data || []).map((r: any) => r.post_id as string));
+}
+
+export async function hidePost(userId: string, postId: string, hide: boolean): Promise<boolean> {
+  const { error } = hide
+    ? await supabase.from('hidden_posts').upsert({ user_id: userId, post_id: postId }, { onConflict: 'user_id,post_id', ignoreDuplicates: true })
+    : await supabase.from('hidden_posts').delete().eq('user_id', userId).eq('post_id', postId);
+  return !error;
+}
+
+/** The desktop's report (club admins are told, same reasons as its Report post window). */
+export const REPORT_REASONS = [
+  { id: 'offensive', label: 'Offensive content', description: 'Hateful or abusive language' },
+  { id: 'spam', label: 'Spam', description: 'Advertising or the same thing over and over' },
+  { id: 'harassment', label: 'Harassment', description: 'Targeting or bullying someone' },
+  { id: 'misinformation', label: 'Misinformation', description: 'False or misleading' },
+  { id: 'inappropriate', label: 'Inappropriate', description: 'Not right for the club' },
+  { id: 'other', label: 'Other', description: 'Something else' },
+] as const;
+export const reportPost = (post: SocialPost, reason: string, details?: string) =>
+  socialStorage.reportPost(post.id, reason, details, post.club_id, post.group_id);
 
 export interface MGroup { id: string; name: string }
 
@@ -107,9 +134,10 @@ export async function loadChats(userId: string | undefined): Promise<MChat[]> {
   const otherOf = new Map<string, string>();
   (others || []).forEach((p: any) => otherOf.set(p.conversation_id, p.user_id));
   const ids = [...new Set((others || []).map((p: any) => p.user_id))];
-  const { data: profiles } = ids.length
-    ? await supabase.from('profiles').select('id, first_name, last_name, avatar_url, last_seen').in('id', ids)
-    : { data: [] as any[] };
+  const [{ data: profiles }, live] = await Promise.all([
+    ids.length ? supabase.from('profiles').select('id, first_name, last_name, avatar_url, last_seen').in('id', ids) : Promise.resolve({ data: [] as any[] }),
+    onlineByPresence(ids).catch(() => new Set<string>()),
+  ]);
   const prof = new Map((profiles || []).map((p: any) => [p.id, p]));
 
   return visible.map((c: any) => {
@@ -125,7 +153,7 @@ export async function loadChats(userId: string | undefined): Promise<MChat[]> {
       lastAt: c.last_message_at,
       lastSenderId: c.last_message_sender_id,
       unread: !!c.last_message_at && (!lr || new Date(c.last_message_at) > new Date(lr)) && c.last_message_sender_id !== userId,
-      online: isOnline(p?.last_seen),
+      online: isOnline(p?.last_seen) || live.has(otherId),
     };
   });
 }
@@ -214,9 +242,10 @@ export interface MPerson {
 }
 
 export async function loadPerson(userId: string, clubId?: string): Promise<MPerson | null> {
-  const [{ data: p }, { data: members }] = await Promise.all([
+  const [{ data: p }, { data: members }, live] = await Promise.all([
     supabase.from('profiles').select('id, first_name, last_name, avatar_url, last_seen').eq('id', userId).maybeSingle(),
     supabase.from('members').select('id, club_id, date_joined, created_at, first_name, last_name').eq('user_id', userId),
+    onlineByPresence([userId]).catch(() => new Set<string>()),
   ]);
   if (!p && !members?.length) return null;
   const ids = (members || []).map((m: any) => m.id);
@@ -230,7 +259,7 @@ export async function loadPerson(userId: string, clubId?: string): Promise<MPers
     userId,
     name: fullName(p) || fullName(here) || 'Skipper',
     avatar: p?.avatar_url || undefined,
-    online: isOnline(p?.last_seen),
+    online: isOnline(p?.last_seen) || live.has(userId),
     memberIds: ids,
     clubName: club?.name,
     since: here?.date_joined || here?.created_at,
