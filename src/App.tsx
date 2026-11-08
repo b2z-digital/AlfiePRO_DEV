@@ -121,6 +121,14 @@ function App() {
 
   useDataPreloader();
 
+  // The phone Race desk prepares the event with the desktop's own steps, then asks for the scoring screen
+  const startScoringRef = React.useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    const onStart = () => { void startScoringRef.current(); };
+    window.addEventListener('alfie-start-scoring', onStart);
+    return () => window.removeEventListener('alfie-start-scoring', onStart);
+  }, []);
+
   // Public video player - bypass ALL auth checks entirely
   if (window.location.pathname.startsWith('/play/')) {
     return (
@@ -164,6 +172,8 @@ function App() {
       setShowScoring(true);
     }
   };
+
+  startScoringRef.current = handleStartScoring;
 
   const handleExitScoring = () => {
     console.log('🔴🔴🔴 handleExitScoring called in App.tsx - User will return to dashboard');

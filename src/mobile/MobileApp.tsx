@@ -12,6 +12,7 @@ import { EventDetail } from './screens/EventDetail';
 import { Notifications } from './screens/Notifications';
 import { Me } from './screens/Me';
 import { Soon } from './screens/Soon';
+import { DeskEventScreen, RaceDeskScreen, SeasonScreen } from './screens/RaceDesk';
 import { ClubHub } from './screens/Club';
 import { ChatsInbox, ChatThread } from './screens/Chats';
 import { SkipperProfile } from './screens/Skipper';
@@ -88,7 +89,9 @@ const Shell: React.FC = () => {
           <Route path="/me" element={<Me />} />
           <Route path="/ask-alfie" element={<AskAlfieRoute onOpen={() => setAlfieOpen(true)} />} />
 
-          <Route path="/race-desk/*" element={<Soon title="Race desk" what="Sign on, StartBox, finish calling and scoring for Scratch, Handicap, HMS and SHRS, built from the Race Management board." />} />
+          <Route path="/race-desk" element={<RaceDeskScreen />} />
+          <Route path="/race-desk/event/:key" element={<DeskEventScreen />} />
+          <Route path="/race-desk/season" element={<SeasonScreen />} />
           <Route path="/club" element={<ClubHub />} />
           <Route path="/community/*" element={<Navigate to="/club" replace />} />
           <Route path="/comms" element={<ChatsInbox />} />

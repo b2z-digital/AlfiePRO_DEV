@@ -4,6 +4,7 @@ import { Trophy, Plus, SquarePen as Edit2, CalendarRange, Trash2, Calendar, MapP
 import { RaceType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
 import { getStoredRaceEvents, getStoredRaceSeries, getSimulatedRaceEvents, deleteRaceEvent, deleteSimulatedRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
+import { seriesRoundToEvent } from '../../utils/scoringStart';
 import { getStoredVenues } from '../../utils/venueStorage';
 import { Venue } from '../../types/venue';
 import { formatDate } from '../../utils/date';
@@ -1073,36 +1074,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     const round = seriesItem.rounds[roundIndex];
     if (round.cancelled) return;
 
-    const event: RaceEvent = {
-      id: `${seriesItem.id}-${roundIndex}`,
-      eventName: `${round.name} - ${seriesItem.seriesName}`,
-      clubName: seriesItem.clubName,
-      date: round.date,
-      venue: round.venue,
-      raceClass: seriesItem.raceClass,
-      raceFormat: seriesItem.raceFormat,
-      isSeriesEvent: true,
-      seriesId: seriesItem.id,
-      roundName: round.name,
-      skippers: round.skippers?.length ? round.skippers : seriesItem.skippers || [],
-      raceResults: round.raceResults || round.results || [],
-      lastCompletedRace: round.lastCompletedRace || 0,
-      hasDeterminedInitialHcaps: round.hasDeterminedInitialHcaps || false,
-      isManualHandicaps: round.isManualHandicaps || false,
-      completed: round.completed || false,
-      cancelled: round.cancelled || false,
-      cancellationReason: round.cancellationReason,
-      media: seriesItem.media || [],
-      livestreamUrl: seriesItem.livestreamUrl,
-      clubId: seriesItem.clubId,
-      heatManagement: round.heatManagement || null,
-      numRaces: round.numRaces,
-      dropRules: round.dropRules || [4, 8, 16, 24, 32, 40],
-      enableLiveTracking: seriesItem.enableLiveTracking,
-      enableLiveStream: round.enableLiveStream || seriesItem.enableLiveStream,
-      enable_observers: round.enable_observers || false,
-      observers_per_heat: round.observers_per_heat || 2
-    };
+    const event: RaceEvent = seriesRoundToEvent(seriesItem, roundIndex);
 
     onEventSelect(event);
   };

@@ -7,7 +7,8 @@ import { supabase } from '../utils/supabase';
 import { getStoredRaceEvents, getStoredRaceSeries } from '../utils/raceStorage';
 import { getPublicEvents, convertToRaceEvent } from '../utils/publicEventStorage';
 import { getCalendarMeetings } from '../utils/calendarMeetingStorage';
-import { calculateEventStandings } from '../utils/standingsCalculator';
+import { computeEventResults } from '../utils/eventResultsEngine';
+import { seriesRoundToEvent } from '../utils/scoringStart';
 import type { RaceEvent } from '../types/race';
 
 export type AttendanceStatus = 'yes' | 'no' | 'maybe';
@@ -95,27 +96,8 @@ export async function loadCalendar(clubId: string | undefined, org: { type: stri
     (s.rounds || []).forEach((round: any, index: number) => {
       if (!round.date) return;
       const roundName = round.name || round.roundName;
-      const event: RaceEvent = {
-        id: `${s.id}-${index}`,
-        eventName: `${roundName} - ${s.seriesName}`,
-        clubName: s.clubName,
-        date: round.date,
-        venue: round.venue,
-        raceClass: s.raceClass,
-        raceFormat: s.raceFormat,
-        isSeriesEvent: true,
-        seriesId: s.id,
-        roundName,
-        completed: !!round.completed,
-        cancelled: !!round.cancelled,
-        clubId: s.clubId,
-        skippers: round.skippers || [],
-        raceResults: round.raceResults || [],
-        lastCompletedRace: round.lastCompletedRace || 0,
-        heatManagement: round.heatManagement,
-        numRaces: round.numRaces,
-        dropRules: round.dropRules,
-      } as RaceEvent;
+      // Same mapping as the desktop Race Management page, so results and scoring see the same event
+      const event: RaceEvent = seriesRoundToEvent(s, index);
       items.push({
         key: `s-${s.id}-${index}`,
         kind: 'race',
@@ -275,24 +257,50 @@ export interface MyResult {
   points: number | null;
 }
 
-/** Places come from the shared standings calculator, so they match desktop results. */
+/**
+ * Standings from the desktop results table's own scoring (utils/eventResultsEngine), so every
+ * place, total and dropped race on the phone matches the desktop results page exactly.
+ */
+export interface MStandings {
+  rows: { index: number; name: string; sailNo?: string; memberId?: string; net: number; netLabel: string }[];
+  races: number[];
+  isDropped: (skipperIndex: number, race: number) => boolean;
+  cell: (skipperIndex: number, race: number) => string;
+}
+
+export function eventStandings(e?: RaceEvent | null): MStandings | null {
+  if (!e || !e.skippers?.length || !e.raceResults?.length) return null;
+  const r = computeEventResults(e);
+  const label = (n: number) => (e.raceFormat === 'handicap' ? String(Number(n.toFixed(1))) : r.hasRODScoring ? n.toFixed(2) : String(Math.round(n)));
+  return {
+    rows: (r.displaySkippers as any[]).map(s => {
+      const net = r.totals[s.index]?.net || 0;
+      return { index: s.index, name: s.name, sailNo: s.sailNo, memberId: s.memberId, net, netLabel: net ? label(net) : '0' };
+    }),
+    races: r.raceNumbers,
+    isDropped: (i, race) => !!r.drops[`${i}-${race}`],
+    cell: (i, race) => {
+      const x = (r.resultsByRace[race] || []).find((y: any) => y.skipperIndex === i);
+      if (!x) return '';
+      return x.letterScore ? String(x.letterScore).replace('RDGfix', 'RDG') : x.position != null ? String(x.position) : '';
+    },
+  };
+}
+
 export function myResultFor(item: MCalendarItem, memberIds: string[], fullName?: string): MyResult | null {
-  const e = item.event;
-  if (!e || !e.skippers?.length || !(e.raceResults?.length)) return null;
-  const standings = calculateEventStandings(e) as any[];
-  const idx = standings.findIndex(s =>
+  const st = eventStandings(item.event);
+  if (!st) return null;
+  const idx = st.rows.findIndex(s =>
     (s.memberId && memberIds.includes(s.memberId)) ||
     (!s.memberId && fullName && s.name?.trim().toLowerCase() === fullName.trim().toLowerCase()),
   );
   if (idx < 0) return null;
-  const net = standings[idx].netTotal;
-  return { item, position: idx + 1, of: standings.length, points: Number.isFinite(net) && net < Number.MAX_SAFE_INTEGER ? net : null };
+  const net = st.rows[idx].net;
+  return { item, position: idx + 1, of: st.rows.length, points: Number.isFinite(net) ? Number(st.rows[idx].netLabel) : null };
 }
 
 export function podium(item: MCalendarItem): string[] {
-  const e = item.event;
-  if (!e || !e.skippers?.length || !(e.raceResults?.length)) return [];
-  return (calculateEventStandings(e) as any[]).slice(0, 3).map(s => s.name);
+  return (eventStandings(item.event)?.rows || []).slice(0, 3).map(s => s.name);
 }
 
 /* ─────────────── Notifications & news ─────────────── */

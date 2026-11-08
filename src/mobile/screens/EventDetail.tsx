@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { calculateEventStandings } from '../../utils/standingsCalculator';
 import { useMobile } from '../MobileContext';
-import { daysUntil, MCalendarItem } from '../data';
+import { daysUntil, eventStandings, MCalendarItem } from '../data';
 import { Icon } from '../icons';
 import { GoingStack, LevelPill, RsvpButtons, Skeleton, SubHeader, fmtDay } from '../ui';
 import { shortName } from './Racing';
@@ -136,14 +135,9 @@ const ResultsTable: React.FC<{ item: MCalendarItem }> = ({ item }) => {
   const e = item.event;
   const { memberIds } = useMobile();
   const navigate = useNavigate();
-  const standings = useMemo(() => (e && e.skippers?.length && e.raceResults?.length ? calculateEventStandings(e) as any[] : []), [e]);
-  if (!standings.length) return <div className="m-card m-empty">No results yet.</div>;
-  const races = Math.max(0, ...((e?.raceResults || []).map((r: any) => r.race || 0)));
-  const cell = (skipperIndex: number, race: number) => {
-    const r = (e?.raceResults || []).find((x: any) => x.skipperIndex === skipperIndex && x.race === race);
-    if (!r) return '';
-    return r.letterScore ? r.letterScore : r.position ?? '';
-  };
+  const st = useMemo(() => eventStandings(e), [e]);
+  if (!st || !st.rows.length) return <div className="m-card m-empty">No results yet.</div>;
+  const standings = st.rows;
   return (
     <>
       <div className="m-card" style={{ overflowX: 'auto' }}>
@@ -152,7 +146,7 @@ const ResultsTable: React.FC<{ item: MCalendarItem }> = ({ item }) => {
             <tr style={{ color: 'var(--m-dim)', fontSize: 10.5, letterSpacing: '.06em', textTransform: 'uppercase' }}>
               <th style={{ padding: '9px 8px', textAlign: 'center' }}>#</th>
               <th style={{ padding: '9px 6px', textAlign: 'left', position: 'sticky', left: 0, background: 'var(--m-sheet)' }}>Skipper</th>
-              {Array.from({ length: races }, (_, i) => <th key={i} style={{ padding: '9px 6px' }}>R{i + 1}</th>)}
+              {st.races.map(r => <th key={r} style={{ padding: '9px 6px' }}>R{r}</th>)}
               <th style={{ padding: '9px 10px' }}>Pts</th>
             </tr>
           </thead>
@@ -165,12 +159,16 @@ const ResultsTable: React.FC<{ item: MCalendarItem }> = ({ item }) => {
                   <td style={{ padding: '10px 6px', fontWeight: me ? 700 : 500, position: 'sticky', left: 0, background: me ? '#12233F' : 'var(--m-sheet)' }}>
                     {shortName(s.name)} <span className="m-dim" style={{ fontWeight: 400 }}>{s.sailNo}</span>
                   </td>
-                  {Array.from({ length: races }, (_, i) => (
-                    <td key={i} style={{ padding: '10px 6px', textAlign: 'center', color: s.isDropped?.[i + 1] ? 'var(--m-dim)' : undefined, textDecoration: s.isDropped?.[i + 1] ? 'line-through' : undefined }}>
-                      {cell(s.index, i + 1)}
-                    </td>
-                  ))}
-                  <td style={{ padding: '10px 10px', textAlign: 'center', fontWeight: 700 }}>{s.netTotal < Number.MAX_SAFE_INTEGER ? s.netTotal : '–'}</td>
+                  {st.races.map(r => {
+                    const dropped = st.isDropped(s.index, r);
+                    const v = st.cell(s.index, r);
+                    return (
+                      <td key={r} style={{ padding: '10px 6px', textAlign: 'center', color: dropped ? 'var(--m-dim)' : undefined }}>
+                        {dropped && v ? `(${v})` : v}
+                      </td>
+                    );
+                  })}
+                  <td style={{ padding: '10px 10px', textAlign: 'center', fontWeight: 700 }}>{s.netLabel}</td>
                 </tr>
               );
             })}

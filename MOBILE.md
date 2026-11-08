@@ -72,4 +72,15 @@ safe-area variables (`--safe-top`, `--safe-bottom` …).
 The apps always show them; phone browsers see them with `?mobile=1` (otherwise `MobileAppComingSoon` until launch).
 First run: Membership due (soft gate, renew via `utils/membershipRenewal.ts`, shared with the desktop screen),
 Choose your club (only with more than one), then "Never miss a start" before the system notification prompt.
-Race Management on the phone is next. Progress and gaps: `claude/alfie-mobile-app-plan.md` in the AlfiePRO project.
+Race Management on the phone: the Race desk (`screens/RaceDesk.tsx`, data in `mobile/raceDesk.ts`) is built.
+Start scoring runs the desktop's own preparation (`utils/scoringStart.ts`) and opens the scoring screen through
+the `alfie-start-scoring` event in `App.tsx`. Results everywhere on the phone come from `utils/eventResultsEngine.ts`,
+the same code as the desktop results table.
+
+## Scoring tests
+
+`npm test` runs Vitest. `src/__tests__/scoring/` replays real completed rounds (skipper names anonymised, in
+`src/__tests__/fixtures/real-events.json`) through the desktop results engine and checks the phone standings match,
+plus locked snapshots of HMS and SHRS heat sizes and schedules. Any change to scoring must keep these passing.
+
+Progress and gaps: `claude/alfie-mobile-app-plan.md` in the AlfiePRO project.

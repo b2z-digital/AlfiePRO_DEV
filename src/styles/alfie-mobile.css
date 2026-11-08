@@ -15,6 +15,10 @@
   --m-fill-b: rgba(255, 255, 255, .08);
   --m-blue: #0A84FF;
   --m-blue-ink: #4DA3FF;
+  --m-amber-ink: #FFC062;
+  --m-green-ink: #7DDC97;
+  --m-red-ink: #FF8C82;
+  --m-pink-ink: #FF8DC2;
   --m-chrome: rgba(16, 21, 33, .82);
   --m-sheet: #111622;
   --m-spectrum: linear-gradient(135deg, #2E7BFF 0%, #8A4DFF 38%, #FF3E9A 70%, #FF8A2B 100%);
@@ -48,6 +52,10 @@
   --m-fill: #FFFFFF;
   --m-fill-b: #E3E8F0;
   --m-blue-ink: #0A64D8;
+  --m-amber-ink: #B25E00;
+  --m-green-ink: #15803D;
+  --m-red-ink: #C62828;
+  --m-pink-ink: #C2185B;
   --m-chrome: rgba(255, 255, 255, .86);
   --m-sheet: #FFFFFF;
   background:
@@ -343,3 +351,13 @@
 .m-appi { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(150deg, #0B1A3A, #0A1222); }
 .m-offline { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; background: rgba(255, 159, 10, .12); border: 1px solid rgba(255, 159, 10, .3); }
 .m-appbar { display: flex; align-items: center; gap: 10px; padding: 8px 6px 8px 10px; border-radius: 14px; background: var(--m-fill); border: 1px solid var(--m-fill-b); }
+/* Race desk */
+.m-role { height: 24px; padding: 0 9px; border-radius: 8px; display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; background: rgba(255, 62, 154, .15); color: var(--m-pink-ink); white-space: nowrap; }
+.m-ok { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: #34C759; color: #fff; flex-shrink: 0; }
+.m-todo { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--m-fill-b); flex-shrink: 0; }
+.m-prog { display: block; height: 6px; border-radius: 3px; background: var(--m-fill); overflow: hidden; }
+.m-prog i { display: block; height: 100%; border-radius: 3px; background: var(--m-spectrum); }
+.m-fld { display: block; }
+.m-fld > span:first-child { display: block; font-size: 12.5px; font-weight: 600; color: var(--m-mut); }
+.m-fld .m-seg { margin-top: 4px; }
+.m-fab-x { width: auto; padding: 0 20px; gap: 8px; font-weight: 600; font-size: 15px; height: 52px; }
