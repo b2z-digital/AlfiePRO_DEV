@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlfieIcon } from '../components/brand/AlfieIcon';
 import { ChannelAvatar, PlayIcon, TVCard, TVChannelCard, TVChannelLite, TVEventTile, TVInfoSheet, TVPlaylistCard, TVRow, TVSkeletonRow, TVVideo, compactNumber, formatDuration, formatScheduledDate } from '../components/alfie-tv/tv/TVParts';
 import { TVHero, TVHeroSlide } from '../components/alfie-tv/tv/TVHero';
+import { AlfieTVPlayer } from '../components/alfie-tv/tv/AlfieTVPlayer';
 
 import { alfieTVStorage, AlfieTVVideo } from '../utils/alfieTVStorage';
 import { useNotification } from '../contexts/NotificationContext';
@@ -144,13 +145,10 @@ const LiveStreamPlayerWrapper = ({ session, onClose, venueImage, clubName, suspe
   );
 };
 
-// Fullscreen video player - lives outside the page component so the iframe never reloads on re-render.
-// Uses the YouTube Player API messages to close automatically when the video ends.
+// Fullscreen video player - lives outside the page component so the player never reloads on re-render.
+// AlfieTVPlayer runs YouTube with AlfieTV's own controls and closes itself when the video ends.
 const FullscreenVideoModal = React.memo(({ video, onClose }: { video: AlfieTVVideo | null; onClose: () => void }) => {
   const [currentVideo, setCurrentVideo] = React.useState<AlfieTVVideo | null>(video);
-  const [chromeVisible, setChromeVisible] = React.useState(true);
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  const idleRef = React.useRef<ReturnType<typeof setTimeout>>();
 
   React.useEffect(() => {
     if (video?.youtube_id && video.youtube_id !== currentVideo?.youtube_id) {
@@ -160,82 +158,15 @@ const FullscreenVideoModal = React.memo(({ video, onClose }: { video: AlfieTVVid
     }
   }, [video?.youtube_id, video]);
 
-  // ESC closes the player
-  React.useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (currentVideo) {
-      window.addEventListener('keydown', handleEscape);
-      return () => window.removeEventListener('keydown', handleEscape);
-    }
-  }, [currentVideo, onClose]);
-
-  // Close shortly after the video ends (YouTube state 0)
-  React.useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin === 'https://www.youtube.com' || event.origin === 'https://www.youtube-nocookie.com') {
-        try {
-          const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-          if (data.event === 'onStateChange' && data.info === 0) {
-            setTimeout(() => onClose(), 1500);
-          }
-        } catch {
-          // Ignore messages that aren't from the player
-        }
-      }
-    };
-    if (currentVideo) {
-      window.addEventListener('message', handleMessage);
-      return () => window.removeEventListener('message', handleMessage);
-    }
-  }, [currentVideo, onClose]);
-
-  // The top bar fades away while watching and comes back when the mouse moves
-  const wake = React.useCallback(() => {
-    setChromeVisible(true);
-    if (idleRef.current) clearTimeout(idleRef.current);
-    idleRef.current = setTimeout(() => setChromeVisible(false), 3200);
-  }, []);
-  React.useEffect(() => {
-    if (!currentVideo) return;
-    wake();
-    return () => { if (idleRef.current) clearTimeout(idleRef.current); };
-  }, [currentVideo, wake]);
-
-  if (!currentVideo) return null;
-
-  const currentOrigin = window.location.origin;
-  const videoUrl = `https://www.youtube-nocookie.com/embed/${currentVideo.youtube_id}?autoplay=1&controls=1&modestbranding=1&rel=0&fs=1&iv_load_policy=3&cc_load_policy=0&enablejsapi=1&playsinline=1&origin=${encodeURIComponent(currentOrigin)}`;
+  if (!currentVideo?.youtube_id) return null;
 
   return (
-    <div className={`atv-player ${chromeVisible ? 'is-awake' : ''}`} style={{ zIndex: 9000 }} onMouseMove={wake}>
-      <iframe
-        ref={iframeRef}
-        src={videoUrl}
-        className="atv-player-frame"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-        allowFullScreen
-        title={currentVideo?.title || 'Video'}
-        loading="eager"
-      />
-
-      {/* Covers YouTube's logo link so viewers stay in AlfieTV */}
-      <div className="atv-player-guard" />
-
-      <div className="atv-player-top" onMouseEnter={wake}>
-        <button
-          type="button"
-          className="atv-player-back"
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
-          title="Back to AlfieTV (Esc)"
-        >
-          <AlfieIcon glyph="chevL" size={22} strokeWidth={2.2} />
-          <span>Back</span>
-        </button>
-        <span className="atv-player-title">{currentVideo.title}</span>
-      </div>
-    </div>
+    <AlfieTVPlayer
+      key={currentVideo.youtube_id}
+      videoId={currentVideo.youtube_id}
+      title={currentVideo.title}
+      onClose={onClose}
+    />
   );
 });
 
