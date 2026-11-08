@@ -175,12 +175,23 @@ const SortableRow: React.FC<SortableRowProps> = ({
   );
 };
 
-export const CustomizableDashboard: React.FC = () => {
+interface CustomizableDashboardProps {
+  /** The host page shows its own Customise button (it sends 'alfie-dashboard-edit') */
+  hideEditButton?: boolean;
+}
+
+export const CustomizableDashboard: React.FC<CustomizableDashboardProps> = ({ hideEditButton = false }) => {
   const { user, currentClub, currentOrganization, clubsLoaded } = useAuth();
   const { addNotification } = useNotifications();
   const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
   const [rows, setRows] = useState<DashboardRow[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
+  // The dashboard home's Customise button asks for edit mode with this event
+  useEffect(() => {
+    const onEdit = () => setIsEditMode(true);
+    window.addEventListener('alfie-dashboard-edit', onEdit);
+    return () => window.removeEventListener('alfie-dashboard-edit', onEdit);
+  }, []);
   const [showLibrary, setShowLibrary] = useState(false);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1203,7 +1214,7 @@ export const CustomizableDashboard: React.FC = () => {
             )}
           </>
         )}
-        {!isEditMode && canEditDashboard && (
+        {!isEditMode && canEditDashboard && !hideEditButton && (
           <button
             onClick={() => setIsEditMode(true)}
             className="fixed top-[4.5rem] right-4 z-50 p-3 bg-slate-900 bg-opacity-30 hover:bg-opacity-50 text-white rounded-lg backdrop-blur-sm transition-all"
