@@ -19,9 +19,10 @@ import type { ObserverAssignment } from '../utils/observerUtils';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 import { LiveStatusControl } from './LiveStatusControl';
+import { addFinish, applyLetterScore, previousResultsFor, finishOrderToResults, loadFinishOrder, moveFinish, removeFinish, sailSortedIndices, type FinishingEntry } from '../utils/finishOrder';
+import { peekFinishHandoff, takeFinishHandoff } from '../utils/finishHandoff';
 
 
-const POSITION_PRESERVING_SCORES = new Set<string>(['RDG', 'DPI', 'ZFP', 'SCP']);
 
 interface TouchModeScoringProps {
   skippers: Skipper[];
@@ -46,16 +47,10 @@ interface TouchModeScoringProps {
   handicapReadOnly?: boolean;
   /** Alfie theme: the scoring top bar carries race navigation and StartBox. */
   alfieBar?: boolean;
+  /** False while results can't be saved properly yet (handicap ruleset loading): phone finishes wait. */
+  handoffReady?: boolean;
 }
 
-interface FinishingEntry {
-  skipperIndex: number;
-  sailNumber: string;
-  skipperName: string;
-  position: number;
-  letterScore?: string | null;
-  customPoints?: number;
-}
 
 export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   skippers,
@@ -78,7 +73,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   allRaceResults,
   handicapReadOnly = false,
   isFullscreen = false,
-  alfieBar = false
+  alfieBar = false,
+  handoffReady = true
 }) => {
   const [currentRace, setCurrentRace] = useState(initialRace);
   const [finishOrder, setFinishOrder] = useState<FinishingEntry[]>([]);
@@ -111,19 +107,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   const { user } = useAuth();
 
   // Sort skippers by sail number for the grid display
-  const sortedSkipperIndices = useMemo(() => {
-    return skippers
-      .map((s, idx) => ({ idx, sail: String(s.sailNumber || s.sailNo || '').trim() }))
-      .sort((a, b) => {
-        const aNum = parseInt(a.sail, 10);
-        const bNum = parseInt(b.sail, 10);
-        if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
-        if (!isNaN(aNum)) return -1;
-        if (!isNaN(bNum)) return 1;
-        return a.sail.localeCompare(b.sail);
-      })
-      .map(item => item.idx);
-  }, [skippers]);
+  const sortedSkipperIndices = useMemo(() => sailSortedIndices(skippers), [skippers]);
 
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const longPressSkipper = useRef<number | null>(null);
@@ -343,69 +327,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   // Load existing results for current race
   useEffect(() => {
     console.log('🔄 Loading results for race:', currentRace, 'Total results:', raceResults.length);
-    const currentResults = raceResults.filter(r => r.race === currentRace);
-    console.log('📊 Current race results:', currentResults.length);
-    const entries: FinishingEntry[] = [];
-    const newWithdrawnResults: any[] = [];
-
-    currentResults.forEach(result => {
-      if (result.position !== null || result.letterScore) {
-        const skipper = skippers[result.skipperIndex];
-        if (skipper) {
-          entries.push({
-            skipperIndex: result.skipperIndex,
-            sailNumber: skipper.sailNumber || skipper.sailNo,
-            skipperName: skipper.name,
-            position: result.position || 999,
-            letterScore: result.letterScore,
-            customPoints: result.customPoints
-          });
-        }
-      }
-    });
-
-    // Add withdrawn skippers automatically and create results for them
-    skippers.forEach((skipper, index) => {
-      // Check if skipper is withdrawn for this race
-      if (skipper.withdrawnFromRace && currentRace >= skipper.withdrawnFromRace) {
-        // Check if they're not already in the entries
-        const alreadyAdded = entries.some(e => e.skipperIndex === index);
-        if (!alreadyAdded) {
-          console.log('🚫 Auto-adding withdrawn skipper to finish order:', skipper.name, 'Race:', currentRace);
-
-          // Add to finish order UI
-          entries.push({
-            skipperIndex: index,
-            sailNumber: skipper.sailNumber || skipper.sailNo || '',
-            skipperName: skipper.name,
-            position: 999,
-            letterScore: 'WDN',
-            customPoints: skippers.length + 1
-          });
-
-          // Get handicap from withdrawal race or previous race
-          let handicap = skipper.startHcap || 0;
-          if (currentRace > skipper.withdrawnFromRace) {
-            // Use handicap from previous race if available
-            const prevResult = raceResults.find(r => r.race === currentRace - 1 && r.skipperIndex === index);
-            if (prevResult && prevResult.adjustedHcap !== undefined) {
-              handicap = prevResult.adjustedHcap;
-            }
-          }
-
-          // Create race result with handicap info
-          newWithdrawnResults.push({
-            race: currentRace,
-            skipperIndex: index,
-            position: null,
-            letterScore: 'WDN',
-            customPoints: skippers.length + 1,
-            handicap: handicap,
-            adjustedHcap: handicap
-          });
-        }
-      }
-    });
+    const { entries, withdrawnResults: newWithdrawnResults } = loadFinishOrder(skippers, raceResults, currentRace);
 
     // If we added any withdrawn skippers, save their results
     if (newWithdrawnResults.length > 0) {
@@ -414,45 +336,42 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       updateRaceResults(updatedResults);
     }
 
-    // Sort by position (regular finishes first, then letter scores)
-    entries.sort((a, b) => {
-      if (a.letterScore && !b.letterScore) return 1;
-      if (!a.letterScore && b.letterScore) return -1;
-      return a.position - b.position;
-    });
-
     console.log('📋 Setting finish order with', entries.length, 'entries (including withdrawn)');
     setFinishOrder(entries);
   }, [currentRace, raceResults, skippers]);
+
+  // Finishes called on the phone finish pad arrive here and are saved through this screen's own
+  // handlers, so handicaps, heats and confirmation work exactly as if they were tapped here.
+  const handoffApplied = useRef(false);
+  useEffect(() => {
+    if (handoffApplied.current || !handoffReady || !currentEvent?.id) return;
+    const pending = peekFinishHandoff(currentEvent.id, currentRace);
+    if (!pending) return;
+    const pool = allSkippers || skippers;
+    const local = pending.entries.map(e => ({ ...e, skipperIndex: isHeatScoring ? skippers.indexOf(pool[e.skipperIndex]) : e.skipperIndex }));
+    if (local.length === 0 || local.some(e => e.skipperIndex < 0 || !skippers[e.skipperIndex])) return;
+    handoffApplied.current = true;
+    takeFinishHandoff(currentEvent.id);
+    const entries: FinishingEntry[] = local.map(e => ({
+      ...e,
+      sailNumber: skippers[e.skipperIndex].sailNumber || skippers[e.skipperIndex].sailNo,
+      skipperName: skippers[e.skipperIndex].name,
+    }));
+    console.log('📲 Finish order from the phone finish pad:', entries.length, 'boats, race', currentRace);
+    setFinishOrder(entries);
+    setIsConfirmed(false);
+    saveResults(entries);
+  }, [currentEvent?.id, currentRace, skippers, handoffReady]);
 
 
   const handleSailNumberClick = (skipperIndex: number) => {
     console.log('👆 Sail number clicked:', skipperIndex, 'Sail:', skippers[skipperIndex]?.sailNumber);
 
-    // Check if already finished
-    const alreadyFinished = finishOrder.find(e => e.skipperIndex === skipperIndex);
-    if (alreadyFinished) {
+    const newFinishOrder = addFinish(finishOrder, skippers, skipperIndex);
+    if (!newFinishOrder) {
       console.log('⚠️ Skipper already in finish order');
       return;
     }
-
-    const skipper = skippers[skipperIndex];
-    if (!skipper) {
-      console.error('❌ Skipper not found at index:', skipperIndex);
-      return;
-    }
-
-    const nextPosition = finishOrder.filter(e => !e.letterScore).length + 1;
-    console.log('📍 Adding position:', nextPosition, 'for skipper:', skipper.name);
-
-    const newEntry: FinishingEntry = {
-      skipperIndex,
-      sailNumber: skipper.sailNumber || skipper.sailNo,
-      skipperName: skipper.name,
-      position: nextPosition
-    };
-
-    const newFinishOrder = [...finishOrder, newEntry];
     console.log('✅ New finish order length:', newFinishOrder.length);
     setFinishOrder(newFinishOrder);
     setIsConfirmed(false); // Reset confirmation when order changes
@@ -460,15 +379,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   };
 
   const handleRemoveFromFinish = (skipperIndex: number) => {
-    const newFinishOrder = finishOrder.filter(e => e.skipperIndex !== skipperIndex);
-
-    // Recalculate positions
-    newFinishOrder.forEach((entry, index) => {
-      if (!entry.letterScore) {
-        entry.position = index + 1;
-      }
-    });
-
+    const newFinishOrder = removeFinish(finishOrder, skipperIndex);
     setFinishOrder(newFinishOrder);
     setIsConfirmed(false); // Reset confirmation when order changes
     saveResults(newFinishOrder);
@@ -501,98 +412,15 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     const skipperIndex = selectedSkipperForScore;
     setSelectedSkipperForScore(null);
 
-    if (letterScore === null) {
-      // Clear letter score - remove from finish order
-      const newFinishOrder = finishOrder.filter(e => e.skipperIndex !== skipperIndex);
-      // Recalculate positions
-      newFinishOrder.forEach((entry, index) => {
-        if (!entry.letterScore) {
-          entry.position = newFinishOrder.filter((e, i) => i <= index && !e.letterScore).length;
-        }
-      });
-      setFinishOrder(newFinishOrder);
-      setIsConfirmed(false); // Reset confirmation when order changes
-      saveResults(newFinishOrder);
-    } else {
-      const existingEntry = finishOrder.find(e => e.skipperIndex === skipperIndex);
-
-      if (existingEntry) {
-        const preservesPosition = letterScore && POSITION_PRESERVING_SCORES.has(letterScore);
-
-        if (preservesPosition) {
-          // Keep entry in its current position - just add the letter score
-          const updatedOrder = finishOrder.map(e =>
-            e.skipperIndex === skipperIndex
-              ? { ...e, letterScore, customPoints }
-              : e
-          );
-          setFinishOrder(updatedOrder);
-          setIsConfirmed(false);
-          saveResults(updatedOrder);
-        } else {
-          // Move to end for non-position-preserving scores
-          const withoutCurrent = finishOrder.filter(e => e.skipperIndex !== skipperIndex);
-          const updatedEntry: FinishingEntry = {
-            ...existingEntry,
-            letterScore,
-            customPoints,
-            position: 999
-          };
-          const sortedOrder = [...withoutCurrent, updatedEntry];
-          setFinishOrder(sortedOrder);
-          setIsConfirmed(false);
-          saveResults(sortedOrder);
-        }
-      } else {
-        // Add new entry with letter score at the end
-        const skipper = skippers[skipperIndex];
-        const newEntry: FinishingEntry = {
-          skipperIndex,
-          sailNumber: skipper.sailNumber,
-          skipperName: skipper.name,
-          position: 999,
-          letterScore,
-          customPoints
-        };
-
-        // Add to end (after all regular finishes)
-        const newFinishOrder = [...finishOrder, newEntry];
-        setFinishOrder(newFinishOrder);
-        setIsConfirmed(false); // Reset confirmation when order changes
-        saveResults(newFinishOrder);
-      }
-    }
+    const newFinishOrder = applyLetterScore(finishOrder, skippers, skipperIndex, letterScore, customPoints);
+    setFinishOrder(newFinishOrder);
+    setIsConfirmed(false); // Reset confirmation when order changes
+    saveResults(newFinishOrder);
   };
 
   const saveResults = (entries: FinishingEntry[]) => {
     console.log('💾 Saving results - Race:', currentRace, 'Entries:', entries.length);
-    const updatedResults = [...raceResults];
-
-    // Remove old results for this race
-    const filteredResults = updatedResults.filter(r => r.race !== currentRace);
-    console.log('🗑️ Removed old results, remaining:', filteredResults.length);
-
-    // Clear handicapOverride flags on later races so recalculation cascades properly
-    for (let i = 0; i < filteredResults.length; i++) {
-      if (filteredResults[i].race > currentRace && filteredResults[i].handicapOverride) {
-        const { handicapOverride, ...rest } = filteredResults[i];
-        filteredResults[i] = rest;
-      }
-    }
-
-    // Add new results
-    entries.forEach(entry => {
-      const preservesPosition = entry.letterScore && POSITION_PRESERVING_SCORES.has(entry.letterScore);
-      const newResult = {
-        race: currentRace,
-        skipperIndex: entry.skipperIndex,
-        position: entry.letterScore && !preservesPosition ? null : entry.position,
-        letterScore: entry.letterScore || undefined,
-        customPoints: entry.customPoints
-      };
-      filteredResults.push(newResult);
-      console.log('➕ Added result:', newResult);
-    });
+    const filteredResults = finishOrderToResults(raceResults, currentRace, entries);
 
     const allSkippersScored = entries.length === skippers.length;
     console.log('📊 All racing skippers scored?', allSkippersScored, `(${entries.length}/${skippers.length}, ${heatObservers.length} observers watching)`);
@@ -618,16 +446,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
     if (draggedIndex === null) return;
 
-    const newOrder = [...finishOrder];
-    const [draggedItem] = newOrder.splice(draggedIndex, 1);
-    newOrder.splice(dropIndex, 0, draggedItem);
-
-    // Recalculate positions for non-letter scores
-    newOrder.forEach((entry, index) => {
-      if (!entry.letterScore) {
-        entry.position = newOrder.filter((e, i) => i <= index && !e.letterScore).length;
-      }
-    });
+    const newOrder = moveFinish(finishOrder, draggedIndex, dropIndex);
 
     setFinishOrder(newOrder);
     setIsConfirmed(false); // Reset confirmation when order changes
@@ -692,15 +511,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
     const targetIndex = dragOverIndex !== null ? dragOverIndex : dropIndex;
     if (targetIndex !== draggedIndex) {
-      const newOrder = [...finishOrder];
-      const [draggedItem] = newOrder.splice(draggedIndex, 1);
-      newOrder.splice(targetIndex, 0, draggedItem);
-
-      newOrder.forEach((entry, idx) => {
-        if (!entry.letterScore) {
-          entry.position = newOrder.filter((e, i) => i <= idx && !e.letterScore).length;
-        }
-      });
+      const newOrder = moveFinish(finishOrder, draggedIndex, targetIndex);
 
       setFinishOrder(newOrder);
       setIsConfirmed(false);
@@ -1436,34 +1247,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
       {/* Letter Score Modal */}
       {selectedSkipperForScore !== null && (() => {
-        const skipperPreviousResults: Array<{ position: number | null; letterScore?: string; customPoints?: number; points: number; raceNumber?: number }> = [];
-
-        for (let r = 1; r < currentRace; r++) {
-          const result = raceResults.find(res => res.race === r && res.skipperIndex === selectedSkipperForScore);
-          if (result) {
-            const position = result.position;
-            const letterScore = result.letterScore;
-            const customPoints = result.customPoints;
-
-            let points = 0;
-            if (letterScore === 'RDG' || letterScore === 'DPI') {
-              points = (customPoints && customPoints > 0) ? customPoints : 0;
-            } else if (position !== null && position > 0) {
-              points = position;
-            } else if (letterScore) {
-              const numStarters = raceResults.filter(res => res.race === r).length;
-              points = numStarters + 1;
-            }
-
-            skipperPreviousResults.push({
-              position,
-              letterScore,
-              customPoints,
-              points,
-              raceNumber: r
-            });
-          }
-        }
+        const skipperPreviousResults = previousResultsFor(raceResults, currentRace, selectedSkipperForScore);
 
         const tmHasCompleted = skipperPreviousResults.some(r => r.position !== null && r.position > 0);
 

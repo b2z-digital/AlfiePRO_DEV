@@ -20,6 +20,8 @@ import { useSetupEvent } from '../raceSetupData';
 import {
   HandicapGroup, NextUp, RaceSession, clearSession, clock, countdown, handicapGroups, loadSession, nextUp, sailOf, saveSession,
 } from '../raceSession';
+import { applyLetterScore } from '../../utils/finishOrder';
+import { padBoats } from '../finishPad';
 import { SOUND, SoundSheet, StartDial, playSystemSound, readVolume, useKeepAwake } from '../startBoxParts';
 import { HEAT_COLOURS, Loading, Missing } from './RaceSetup';
 
@@ -326,7 +328,7 @@ export const RaceScreen: React.FC = () => {
     void playSystemSound(engine, SOUND.doubleHorn, 440, 900);
     engine.stop(); if (seq) engine.arm(seq);
     beeped.current.clear();
-    setSession({ ...session, gunAt: null, marks: [], recalls: (session.recalls || 0) + 1 });
+    setSession({ ...session, gunAt: null, marks: [], finish: null, added: [], recalls: (session.recalls || 0) + 1 });
     toast('General recall. Start the sequence again.');
   };
   const abandon = () => {
@@ -339,7 +341,16 @@ export const RaceScreen: React.FC = () => {
   const toggleOcs = (i: number) => {
     tap();
     const has = session.marks.some(m => m.skipperIndex === i && m.code === 'OCS');
-    setSession({ ...session, marks: has ? session.marks.filter(m => !(m.skipperIndex === i && m.code === 'OCS')) : [...session.marks, { skipperIndex: i, code: 'OCS', atMs: gunAt ? Date.now() - gunAt : 0 }] });
+    // once the finish pad has started, its order follows the marks too
+    let finish = session.finish;
+    if (finish) {
+      const boats = padBoats(event, up);
+      const local = boats.globalOf.indexOf(i);
+      const entry = finish.find(f => f.skipperIndex === local);
+      if (local >= 0 && has && entry?.letterScore === 'OCS') finish = applyLetterScore(finish, boats.skippers, local, null);
+      else if (local >= 0 && !has && !entry) finish = applyLetterScore(finish, boats.skippers, local, 'OCS');
+    }
+    setSession({ ...session, finish, marks: has ? session.marks.filter(m => !(m.skipperIndex === i && m.code === 'OCS')) : [...session.marks, { skipperIndex: i, code: 'OCS', atMs: gunAt ? Date.now() - gunAt : 0 }] });
   };
   const roll = (event as any).enable_roll_call ? session.rollCall : null;
   const live = !!(event.enableLiveTracking || event.enableLiveStream);
@@ -359,8 +370,8 @@ export const RaceScreen: React.FC = () => {
           <div className="m-disp m-num" style={{ fontSize: 72, fontWeight: 700, lineHeight: 1.05, marginTop: 8 }} role="timer" aria-label={`${clock(elapsed)} since the gun`}>{clock(elapsed)}</div>
           <div className="m-mut" style={{ fontSize: 14 }}>{up.handicap ? 'since scratch boats started' : 'since the gun'} · {up.skipperIndices.length} boats{session.recalls ? ` · ${session.recalls} recall${session.recalls > 1 ? 's' : ''}` : ''}</div>
         </div>
-        <button className="m-btn m-btn-p" style={{ height: 64, fontSize: 18, borderRadius: 18 }} onClick={openSheet} disabled={opening}>
-          <Icon name="racing" size={22} />{opening ? 'Loading…' : 'Score the finishes'}
+        <button className="m-btn m-btn-p" style={{ height: 64, fontSize: 18, borderRadius: 18 }} onClick={() => navigate(`/race-desk/event/${key}/finish`)}>
+          <Icon name="racing" size={22} />{session.finish?.length ? `Finishes · ${session.finish.filter(f => !f.letterScore).length} called` : 'Score the finishes'}
         </button>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
           <button className="m-card m-tile" onClick={() => setSheet('ocs')}><span className="m-sail m-sail-ocs" style={{ fontSize: 12, minWidth: 40, height: 28 }}>OCS</span>Mark OCS</button>
@@ -377,14 +388,14 @@ export const RaceScreen: React.FC = () => {
                 <span className="m-dim m-num" style={{ fontSize: 12 }}>{clock(m.atMs)}</span>
               </div>
             ))}
-            <div className="m-li m-dim" style={{ fontSize: 12.5 }}>Score these as OCS when you enter the finishes.</div>
+            <div className="m-li m-dim" style={{ fontSize: 12.5 }}>These go into the finish pad as OCS.</div>
           </div>
         )}
         <NextCard up={up} />
         {live && <LiveStatusRow eventId={event.id} />}
         {sheet === 'sound' && <SoundSheet engine={engine} volume={volume} onVolume={setVolume} onClose={() => setSheet(null)} horns />}
         {sheet === 'ocs' && <OcsSheet up={up} skippers={skippers} marked={session.marks.filter(m => m.code === 'OCS').map(m => m.skipperIndex)} onToggle={toggleOcs} onClose={() => setSheet(null)} />}
-        {sheet === 'recall' && <Confirm title="General recall" body={`Sounds two horns and takes ${up.raceLabel}${up.heat ? ` · Heat ${up.heatLabel}` : ''} back to the start sequence. OCS marks from this start are cleared.`} action="Recall and restart" onYes={recall} onClose={() => setSheet(null)} />}
+        {sheet === 'recall' && <Confirm title="General recall" body={`Sounds two horns and takes ${up.raceLabel}${up.heat ? ` · Heat ${up.heatLabel}` : ''} back to the start sequence. OCS marks and any finishes called for this start are cleared.`} action="Recall and restart" onYes={recall} onClose={() => setSheet(null)} />}
         {sheet === 'abandon' && <Confirm title={`Abandon ${up.raceLabel}?`} body="Nothing is scored for this start, and the race is sailed again later." action="Abandon the race" danger onYes={abandon} onClose={() => setSheet(null)} />}
       </div>
     );

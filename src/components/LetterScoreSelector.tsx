@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Hash, UserMinus, Eraser } from 'lucide-react';
 import { AAvatar } from './alfie/Kit';
 import { LetterScore } from '../types/letterScores';
+import { redressAverage } from '../utils/finishOrder';
 
 export type { LetterScore };
 
@@ -68,40 +69,8 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
   const [customPoints, setCustomPoints] = useState<string>('');
   const [rdgMode, setRdgMode] = useState<RdgMode>('avg_event');
 
-  const getFilteredResults = (excludeR1ForHeat: boolean, excludeFinalDay: boolean) => {
-    if (!skipperPreviousResults || skipperPreviousResults.length === 0) {
-      return [];
-    }
-
-    let results = [...skipperPreviousResults];
-
-    // HMS excludes R1 from average; SHRS does NOT (SHRS Rule 5.6 averages all rounds in phase)
-    if (excludeR1ForHeat && isHeatRacing && !isSHRS) {
-      results = results.filter(r => r.raceNumber !== 1);
-    }
-
-    if (excludeFinalDay && isMultiDay && numberOfDays > 1) {
-      const finalDayRaces = racesPerDay[numberOfDays] || racesPerDay[currentDay] || [];
-      if (finalDayRaces.length > 0) {
-        results = results.filter(r => !finalDayRaces.includes(r.raceNumber || 0));
-      }
-    }
-
-    return results.filter(result => {
-      if (result.position !== null && result.position > 0) return true;
-      if ((result.letterScore === 'RDG' || result.letterScore === 'DPI') && result.customPoints && result.customPoints > 0) return true;
-      return false;
-    });
-  };
-
-  const calculateAveragePoints = (excludeR1ForHeat = false, excludeFinalDay = false): number | null => {
-    const validResults = getFilteredResults(excludeR1ForHeat, excludeFinalDay);
-    if (validResults.length === 0) return null;
-
-    const totalPoints = validResults.reduce((sum, result) => sum + result.points, 0);
-    const average = totalPoints / validResults.length;
-    return Math.round(average * 10) / 10;
-  };
+  const calculateAveragePoints = (excludeR1ForHeat = false, excludeFinalDay = false): number | null =>
+    redressAverage(skipperPreviousResults, excludeR1ForHeat, excludeFinalDay, { isHeatRacing, isSHRS, isMultiDay, numberOfDays, currentDay, racesPerDay });
 
   const averagePoints = calculateAveragePoints(isHeatRacing && !isSHRS, false);
   const penultimateDayAverage = calculateAveragePoints(isHeatRacing && !isSHRS, true);

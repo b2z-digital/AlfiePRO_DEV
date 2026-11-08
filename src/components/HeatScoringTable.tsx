@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { heatProgress, heatSailingOrder, isInFinals as isInFinalsOf, isInQualifyingRound as isInQualifyingRoundOf } from '../utils/raceProgress';
+import { heatProgress, heatRaceResultsFor, heatSailingOrder, skippersScoredInOtherHeats, isInFinals as isInFinalsOf, isInQualifyingRound as isInQualifyingRoundOf } from '../utils/raceProgress';
 import { HeatManagement, HeatDesignation, generateInitialHeatAssignments, getHeatDisplayLabel, getSHRSRoundLabel } from '../types/heat';
 import { Skipper } from '../types';
 import { ScratchRaceTable } from './ScratchRaceTable';
@@ -618,37 +618,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   const skippersInOtherHeatsCurrentRound = useMemo(() => {
     if (!currentRound || !selectedHeat) return new Set<number>();
-    const skippersWithOtherHeatResults = new Set<number>();
-    const skippersWithCurrentHeatResults = new Set<number>();
-    currentRound.results.forEach(r => {
-      if (r.round === heatManagement.currentRound && (r.position !== null || r.letterScore)) {
-        if (r.heatDesignation === selectedHeat) {
-          skippersWithCurrentHeatResults.add(r.skipperIndex);
-        } else {
-          skippersWithOtherHeatResults.add(r.skipperIndex);
-        }
-      }
-    });
-    const result = new Set<number>();
-    skippersWithOtherHeatResults.forEach(idx => {
-      if (!skippersWithCurrentHeatResults.has(idx)) {
-        result.add(idx);
-      }
-    });
-    return result;
+    return skippersScoredInOtherHeats(heatManagement, selectedHeat);
   }, [currentRound, selectedHeat, heatManagement.currentRound]);
 
   // Filter race results for current heat's skippers
   const heatRaceResults = useMemo(() => {
-    const heatSkipperIndicesSet = new Set(heatSkipperIndices);
-    const currentRoundNum = heatManagement.currentRound;
-    return raceResults.filter(result => {
-      if (!heatSkipperIndicesSet.has(result.skipperIndex)) return false;
-      if (result.race === currentRoundNum && skippersInOtherHeatsCurrentRound.has(result.skipperIndex)) {
-        return false;
-      }
-      return true;
-    });
+    return heatRaceResultsFor(raceResults, heatSkipperIndices, heatManagement.currentRound, skippersInOtherHeatsCurrentRound);
   }, [raceResults, heatSkipperIndices, heatManagement.currentRound, skippersInOtherHeatsCurrentRound]);
 
   // Wrapper functions to map filtered indices to original indices

@@ -149,3 +149,39 @@ export function roundLabel(hm: HeatManagement | null, roundNum: number, heat?: H
 export function isWithdrawnFor(skipper: Skipper, race: number): boolean {
   return !!(skipper.withdrawnFromRace && race >= skipper.withdrawnFromRace);
 }
+
+/** HeatScoringTable: boats with a result in another heat of this round (and none in this heat). */
+export function skippersScoredInOtherHeats(hm: HeatManagement, selectedHeat: HeatDesignation): Set<number> {
+  const currentRound = currentHeatRound(hm);
+  if (!currentRound || !selectedHeat) return new Set<number>();
+  const skippersWithOtherHeatResults = new Set<number>();
+  const skippersWithCurrentHeatResults = new Set<number>();
+  currentRound.results.forEach(r => {
+    if (r.round === hm.currentRound && (r.position !== null || r.letterScore)) {
+      if (r.heatDesignation === selectedHeat) {
+        skippersWithCurrentHeatResults.add(r.skipperIndex);
+      } else {
+        skippersWithOtherHeatResults.add(r.skipperIndex);
+      }
+    }
+  });
+  const result = new Set<number>();
+  skippersWithOtherHeatResults.forEach(idx => {
+    if (!skippersWithCurrentHeatResults.has(idx)) {
+      result.add(idx);
+    }
+  });
+  return result;
+}
+
+/** HeatScoringTable heatRaceResults: the race results of a heat's boats (event skipper indices). */
+export function heatRaceResultsFor(raceResults: any[], heatSkipperIndices: number[], currentRoundNum: number, skippersInOtherHeatsCurrentRound: Set<number>): any[] {
+  const heatSkipperIndicesSet = new Set(heatSkipperIndices);
+  return raceResults.filter(result => {
+    if (!heatSkipperIndicesSet.has(result.skipperIndex)) return false;
+    if (result.race === currentRoundNum && skippersInOtherHeatsCurrentRound.has(result.skipperIndex)) {
+      return false;
+    }
+    return true;
+  });
+}

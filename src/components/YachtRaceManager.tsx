@@ -41,6 +41,7 @@ import { calculateScratchResults } from '../utils/scratchCalculations';
 import { RaceSettingsModal } from './RaceSettingsModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
+import { peekFinishHandoff } from '../utils/finishHandoff';
 import { handicapForRace } from '../utils/raceProgress';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { AAvatar } from './alfie/Kit';
@@ -410,6 +411,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     const loadScoringModePreference = async () => {
       const currentEvent = getCurrentEvent();
       if (currentEvent?.is_simulated || currentEvent?.raceFormat === 'handicap') {
+        setScoringMode('touch');
+        return;
+      }
+      // Finishes called on the phone finish pad are saved through Touch mode
+      if (currentEvent?.id && peekFinishHandoff(currentEvent.id)) {
         setScoringMode('touch');
         return;
       }
@@ -4379,6 +4385,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 updateSkipper={updateSkipper}
                 setSkippers={setSkippers}
                 handicapReadOnly={activeRuleset?.config.persist_handicaps === false}
+                handoffReady={!rulesetLoading}
               />
             ) : scoringMode === 'spreadsheet' && raceType === 'scratch' ? (
               <div className={`flex flex-col ${isFullscreenScoring ? 'h-full' : useAlfieTopBar ? 'h-[calc(100vh-190px)] min-h-[420px]' : 'h-[calc(100vh-200px)]'} no-select`}>

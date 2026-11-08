@@ -20,7 +20,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>AlfiePRO uses your camera to take photos for classifieds, boat profiles and media, and to stream races as a camera.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>AlfiePRO uses your microphone for voice questions to Ask Alfie, calls and race livestreams.</string>
+	<string>AlfiePRO uses your microphone for voice questions to Ask Alfie, calling race finishes, calls and race livestreams.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>AlfiePRO listens for sail numbers when you call race finishes by voice.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>AlfiePRO needs access to your photo library to choose images for classifieds, boat profiles and media uploads.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

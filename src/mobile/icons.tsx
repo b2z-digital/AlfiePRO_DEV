@@ -42,6 +42,10 @@ const P: Record<string, string> = {
   mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
   pause: 'M7 5h3.5v14H7zM13.5 5H17v14h-3.5z',
   recall: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5',
+  undo: 'M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
+  mic: 'M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3M19 11a7 7 0 0 1-14 0M12 18v3',
+  backspace: 'M9 5h11v14H9l-6-7zM12 9l5 6M17 9l-5 6',
+  up: 'M6 15l6-6 6 6',
   sound: 'M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13',
   stopwatch: 'M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16M12 10v4l2 2M9 2h6M12 2v4',
 };

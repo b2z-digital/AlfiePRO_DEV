@@ -83,15 +83,26 @@ Starting and racing (`screens/RaceDay.tsx`, route `/race-desk/event/:key/race`, 
 StartBox for the race or heat that sails next, then the race clock, OCS marks, general recall and abandon. What sails
 next and each boat's handicap come from `utils/raceProgress.ts`, shared with HeatScoringTable and YachtRaceManager.
 Sound is the desktop StartBox engine (`utils/startBoxAudio.ts`); the dial, sound sheet and keep-awake are in
-`mobile/startBoxParts.tsx`, also used by the Race Timer. The start time, roll call and marks stay on the phone
-(localStorage `alfie-m-race:<eventId>`) until the finish pad records results; "Score the finishes" opens the scoring
-sheet for now.
+`mobile/startBoxParts.tsx`, also used by the Race Timer. The start time, roll call, marks and the finish order stay
+on the phone (localStorage `alfie-m-race:<eventId>`) until they're handed to the scoring sheet.
+Calling the finish (`screens/FinishPad.tsx`, route `/race-desk/event/:key/finish`, matching in `mobile/finishPad.ts`):
+tap, voice and keypad feed one finish order kept with Touch mode's own rules (`utils/finishOrder.ts`, shared with
+TouchModeScoring and LetterScoreSelector). OCS marks from the start go in as OCS. "Confirm on the scoring sheet"
+leaves the order in `utils/finishHandoff.ts`; Touch mode picks it up and saves it through its own handlers (handicaps,
+heat results) and the race is confirmed there, so nothing is scored by a second implementation.
+Voice: `mobile/speech.ts` uses the in-repo plugin `native/alfie-speech` (Apple Speech on iOS with the race's sail
+numbers as hints, Android SpeechRecognizer), installed as the `alfie-speech` dependency, so `npx cap sync` adds it
+to `ios/App/CapApp-SPM` and Android. Phone browsers use the Web Speech API where they have it. iOS needs
+NSSpeechRecognitionUsageDescription (in Info.plist). The plugin hasn't been built on a device yet: build both apps
+once and try holding the voice button before TestFlight.
 
 ## Scoring tests
 
 `npm test` runs Vitest. `src/__tests__/scoring/` replays real completed rounds (skipper names anonymised, in
 `src/__tests__/fixtures/real-events.json`) through the desktop results engine and checks the phone standings match,
 plus locked snapshots of HMS and SHRS heat sizes and schedules, the heat sailing order, and the handicap each boat
-sails on (checked against the handicaps the desktop recorded in the real rounds). Any change to scoring must keep these passing.
+sails on (checked against the handicaps the desktop recorded in the real rounds), the finish order (every real race
+read back through Touch mode's finish order unchanged) and the keypad and voice matching. Any change to scoring must
+keep these passing.
 
 Progress and gaps: `claude/alfie-mobile-app-plan.md` in the AlfiePRO project.

@@ -8,6 +8,7 @@ import type { Skipper } from '../types';
 import type { HeatDesignation, HeatManagement } from '../types/heat';
 import { getHeatDisplayLabel } from '../types/heat';
 import type { RaceEvent } from '../types/race';
+import type { FinishingEntry } from '../utils/finishOrder';
 import { nextDayToScore } from '../utils/scoringStart';
 import { heatManagementOf, scoringStateOf } from '../utils/raceSetup';
 import {
@@ -26,6 +27,10 @@ export interface RaceSession {
   marks: RaceMark[];
   rollCall: { ready: number[]; absent: number[] };
   recalls: number;
+  /** The finish pad's order (finish pad boat indices: the heat's boats for heats), once started. */
+  finish?: FinishingEntry[] | null;
+  /** Boats in the order they were called, for "undo the last finish". */
+  added?: number[];
 }
 
 export interface NextHeat { heat: HeatDesignation; label: string; boats: number; promoted: number; from: string }
@@ -146,7 +151,7 @@ export function loadSession(eventId: string, up: Pick<NextUp, 'race' | 'heat'>):
     const s = JSON.parse(raw) as RaceSession;
     // A different race or heat is up now (this one was scored): start clean
     if (s.race !== up.race || (s.heat || null) !== (up.heat || null)) return fresh;
-    return { ...fresh, ...s, rollCall: s.rollCall || fresh.rollCall, marks: s.marks || [] };
+    return { ...fresh, ...s, rollCall: s.rollCall || fresh.rollCall, marks: s.marks || [], added: s.added || [] };
   } catch {
     return fresh;
   }
