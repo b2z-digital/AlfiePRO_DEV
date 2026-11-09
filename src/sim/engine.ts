@@ -1,0 +1,415 @@
+// The race engine: a fixed 20 Hz step that owns the world. No React in here.
+// step(): wind → each boat's local wind → AI decisions → helm/player input → physics →
+// collisions → start/rounding/finish progress → referee → recording.
+
+import { AiHost, LEVELS, PERSONAS, Perceived, Skipper } from './ai';
+import { CLASSES, bestSheet, vmgAngles } from './classes';
+import { Course, buildCourse, initialProgress, toCourse } from './course';
+import { Rng, V2, bearing, dir, dist, n180, n360, segIntersect } from './math';
+import { DT, bank, bow, collide, integrate, lineSide, localWind, markContacts, stern } from './physics';
+import { Referee, isRacing, spellSail } from './referee';
+import type { Boat, Incident, PlayerInput, RaceSettings, SimEvent } from './types';
+import { WindField } from './wind';
+
+export const BOAT_COLORS = ['#2A93FF', '#F472B6', '#2DD4BF', '#94A3B8', '#A78BFA', '#34D399', '#FBBF24', '#FB923C', '#F87171', '#60A5FA', '#E879F9', '#4ADE80', '#FCD34D', '#38BDF8', '#C084FC', '#FDA4AF'];
+
+const HIST = 220; // 11 s of history per boat at 20 Hz
+
+export interface ResultRow {
+  boat: Boat;
+  place: number;
+  time: number | null;
+  status: 'finished' | 'dsq' | 'ocs' | 'dnf' | 'racing';
+  note?: string;
+}
+
+export class Race implements AiHost {
+  settings: RaceSettings;
+  rng: Rng;
+  course: Course;
+  wind: WindField;
+  boats: Boat[] = [];
+  skippers: (Skipper | null)[] = [];
+  referee: Referee;
+  t = 0;
+  gunT: number;
+  step_ = 0;
+  events: SimEvent[] = [];
+  incidents: Incident[] = [];
+  hist: { x: number[]; y: number[]; hdg: number[]; spd: number[]; rot: number[] }[] = [];
+  /** Recorded at 5 Hz for the debrief: per frame, [x, y, hdg, spd, leg] per boat. */
+  track: { t: number; d: Float32Array; twd: number }[] = [];
+  forgot = new Set<string>();
+  input: PlayerInput = { rudder: 0, sheet: 1, autoTrim: true };
+  playerIndex = -1;
+  finishedAt: number | null = null;
+  ended = false;
+  private passed: ('tack' | 'gybe' | null)[] = [];
+  private lastSignal = Infinity;
+  private helmAssist: { target: number; until: number } | null = null;
+
+  constructor(settings: RaceSettings) {
+    this.settings = settings;
+    this.rng = new Rng(settings.seed);
+    const cls = CLASSES[settings.classId];
+    const axis = settings.windFrom ?? 0;
+    const bias = this.rng.range(-3.5, 3.5);
+    this.course = buildCourse(axis, cls.loa, { laps: settings.laps, length: settings.length, fleetSize: settings.fleetSize, lineBias: bias });
+    const c = this.course;
+    const mid = (c.bounds.alongMin + c.bounds.alongMax) / 2;
+    this.wind = new WindField(
+      { strength: settings.windStrength, character: settings.windCharacter, direction: axis, knots: settings.windKnots },
+      settings.seed,
+      { cx: c.origin.x + c.up.x * mid, cy: c.origin.y + c.up.y * mid, halfAlong: (c.bounds.alongMax - c.bounds.alongMin) / 2, halfAcross: c.bounds.across },
+    );
+    this.gunT = settings.sequenceSeconds;
+    this.referee = new Referee(this);
+    this.makeFleet();
+  }
+
+  private makeFleet() {
+    const s = this.settings, c = this.course;
+    const cls = CLASSES[s.classId];
+    const L = cls.loa;
+    const n = Math.max(2, Math.min(16, s.fleetSize));
+    const personas = [...PERSONAS];
+    for (let i = personas.length - 1; i > 0; i--) { const j = this.rng.int(0, i); [personas[i], personas[j]] = [personas[j], personas[i]]; }
+    const numbers = new Set<string>();
+    for (let i = 0; i < n; i++) {
+      const isPlayer = !s.noPlayer && i === 0;
+      let sail = isPlayer ? '01' : String(this.rng.int(2, 98)).padStart(2, '0');
+      while (numbers.has(sail)) sail = String(this.rng.int(2, 98)).padStart(2, '0');
+      numbers.add(sail);
+      // Start sailing round below the line like a fleet does: half reaching towards the pin on
+      // starboard in a nearer lane, half back on port in a farther one, spread along the line.
+      const frac = (i + 0.5) / n;
+      const near = i % 2 === 0;
+      const along = -(near ? 3.5 + this.rng.range(0, 2.5) : 6.5 + this.rng.range(0, 2.5)) * L;
+      const across = (frac - 0.5) * 2 * (c.bounds.across * 0.45);
+      const p = { x: c.origin.x + c.up.x * along + c.right.x * across, y: c.origin.y + c.up.y * along + c.right.y * across };
+      const hdg = n360(c.axis + (near ? -95 : 95) + this.rng.range(-8, 8));
+      const persona = isPlayer ? undefined : { ...personas[i % personas.length] };
+      if (persona && i >= personas.length) persona.startEnd = Math.max(0.05, Math.min(0.95, persona.startEnd + this.rng.range(-0.15, 0.15)));
+      const b: Boat = {
+        id: `b${i}`, sail, name: isPlayer ? 'You' : persona!.name, color: BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, cls, persona,
+        x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6,
+        twd: c.axis, tws: this.wind.baseTws, twa: n180(c.axis - hdg), tack: n180(c.axis - hdg) >= 0 ? 'stbd' : 'port', targetSpd: 0, shadow: 0,
+        tackingSince: null, lastHtwT: -99, lastTackFrom: null, lastGybeT: -99,
+        started: false, ocs: false, returning: false, legIndex: 0, progress: 0, progress2: 0, lastBearing: 0, lastBearing2: 0,
+        finished: false, finishTime: 0, dsq: false, retired: false,
+        penalty: { owed: 0, active: false, rot: 0, passedHtw: false, passedDdw: false, taken: 0 },
+        contactWith: {}, roundedAt: [], placeAtLeg: [], distSailed: 0, hail: null,
+      };
+      this.boats.push(b);
+      this.hist.push({ x: [], y: [], hdg: [], spd: [], rot: [] });
+      if (isPlayer) { this.playerIndex = i; this.skippers.push(null); }
+      else {
+        const lv = LEVELS[s.level];
+        const sk = new Skipper(b, lv, persona!, new Rng(s.seed * 31 + i * 977), i);
+        if (s.forgetfulSkippers && this.rng.chance(lv.forget * 2)) this.forgot.add(b.id);
+        this.skippers.push(sk);
+      }
+    }
+  }
+
+  get player(): Boat | null { return this.playerIndex >= 0 ? this.boats[this.playerIndex] : null; }
+
+  perceived(i: number, delaySteps: number): Perceived {
+    const H = this.hist[i];
+    const n = H.x.length;
+    if (!n) { const b = this.boats[i]; return { x: b.x, y: b.y, hdg: b.hdg, spd: b.spd, rot: b.rot }; }
+    const k = Math.max(0, n - 1 - delaySteps);
+    return { x: H.x[k], y: H.y[k], hdg: H.hdg[k], spd: H.spd[k], rot: H.rot[k] };
+  }
+
+  hail(b: Boat, text: string) {
+    b.hail = { text, t: this.t };
+    this.events.push({ type: 'hail', t: this.t, boat: b.id, text });
+  }
+
+  markRoundingFor(b: Boat, markId: string) {
+    const leg = this.course.legs[b.legIndex];
+    if (!leg) return null;
+    if (leg.kind === 'mark' && leg.rounding.markId === markId) return { progress: b.progress, sweep: leg.rounding.sweep };
+    if (leg.kind === 'gate') {
+      if (leg.options[0].markId === markId) return { progress: b.progress, sweep: leg.options[0].sweep };
+      if (leg.options[1].markId === markId) return { progress: b.progress2, sweep: leg.options[1].sweep };
+    }
+    return null;
+  }
+
+  /** Helm assist for the player: turn through a tack or gybe at a good rate. */
+  requestManeuver(kind: 'tack' | 'gybe') {
+    const p = this.player;
+    if (!p) return;
+    const twa = p.twa;
+    if (kind === 'tack' && Math.abs(twa) < 100) {
+      const up = vmgAngles(p.cls, p.tws).up + 1.5;
+      this.helmAssist = { target: n360(twa >= 0 ? p.twd + up : p.twd - up), until: this.t + 3 };
+    } else if (kind === 'gybe' && Math.abs(twa) > 80) {
+      const dn = vmgAngles(p.cls, p.tws).down;
+      this.helmAssist = { target: n360(twa >= 0 ? p.twd + dn : p.twd - dn), until: this.t + 3 };
+    }
+  }
+
+  step() {
+    if (this.ended) return;
+    const dt = DT;
+    const t = this.t;
+    this.wind.step(dt, t);
+    const racing = this.boats;
+    localWind(racing, this.wind, t);
+
+    // AI decisions at 10 Hz, staggered.
+    this.skippers.forEach((s, i) => {
+      if (!s) return;
+      if ((this.step_ + i) % 2 === 0) s.decide(this);
+      s.helm(this, dt);
+    });
+
+    // Player input.
+    const p = this.player;
+    if (p && !p.finished) {
+      let rudder = this.input.rudder;
+      if (this.helmAssist && t < this.helmAssist.until) {
+        const err = n180(this.helmAssist.target - p.hdg);
+        if (Math.abs(err) < 4) this.helmAssist = null;
+        else rudder = Math.max(-0.82, Math.min(0.82, err / 22));
+        if (Math.abs(this.input.rudder) > 0.5) this.helmAssist = null; // the player took over
+      }
+      if (this.input.penaltyAssist && p.penalty.owed > 0) {
+        const up = Math.abs(p.twa) < 90;
+        rudder = (up ? (p.tack === 'stbd' ? 1 : -1) : (p.tack === 'stbd' ? -1 : 1)) * 0.95;
+      }
+      p.rudder = rudder;
+      const best = bestSheet(Math.abs(p.twa));
+      p.sheet = this.input.autoTrim ? Math.min(best, this.input.sheet >= 0.98 ? best : this.input.sheet) : this.input.sheet;
+    }
+
+    // Physics.
+    this.passed = this.boats.map(b => (b.finished || b.retired ? null : integrate(b, dt, t)));
+    const contacts = collide(this.boats);
+    const touches = markContacts(this.boats, this.course);
+    for (const b of this.boats) if (!b.finished && bank(b, this.course) && b.isPlayer) this.events.push({ type: 'bank', t, boat: b.id });
+
+    this.signals(t);
+    this.progressAll(t);
+    this.recordHist();
+    this.referee.step(contacts, touches, this.passed);
+
+    this.t = Math.round((t + dt) * 1000) / 1000;
+    this.step_++;
+    if (this.step_ % 4 === 0) this.recordTrack();
+    this.checkEnd();
+  }
+
+  private recordHist() {
+    this.boats.forEach((b, i) => {
+      const H = this.hist[i];
+      H.x.push(b.x); H.y.push(b.y); H.hdg.push(b.hdg); H.spd.push(b.spd); H.rot.push(b.rot);
+      if (H.x.length > HIST) { H.x.shift(); H.y.shift(); H.hdg.shift(); H.spd.shift(); H.rot.shift(); }
+    });
+  }
+
+  private recordTrack() {
+    const d = new Float32Array(this.boats.length * 5);
+    this.boats.forEach((b, i) => { d[i * 5] = b.x; d[i * 5 + 1] = b.y; d[i * 5 + 2] = b.hdg; d[i * 5 + 3] = b.spd; d[i * 5 + 4] = b.finished ? -1 : b.legIndex; });
+    const c = this.course;
+    this.track.push({ t: this.t, d, twd: this.wind.sample(c.origin.x + c.up.x * c.beat * 0.5, c.origin.y + c.up.y * c.beat * 0.5, this.t).twd });
+  }
+
+  /** Start sequence calls (Appendix E timing): each minute, every 10 s in the last minute, every second in the last 10. */
+  private signals(t: number) {
+    const rem = this.gunT - t;
+    if (rem < -0.001) return;
+    const sec = Math.ceil(rem - 1e-6);
+    if (sec !== this.lastSignal) {
+      const s = sec;
+      const call = s > 0 && ((s % 60 === 0) || (s <= 60 && s % 10 === 0) || s <= 10);
+      if (call) this.events.push({ type: 'signal', t, remaining: s });
+      this.lastSignal = s;
+    }
+    if (rem <= 0.001 && rem > -0.05) this.gun(t);
+  }
+
+  private gun(t: number) {
+    this.events.push({ type: 'gun', t });
+    const over: string[] = [];
+    for (const b of this.boats) {
+      const side = Math.max(lineSide(this.course, bow(b)), lineSide(this.course, stern(b)));
+      if (side > 0) {
+        b.ocs = true; b.returning = false; b.started = false;
+        over.push(b.id);
+        const inc: Incident = {
+          id: 1000 + this.incidents.length, t, kind: 'ocs', rule: '29.1', title: 'Over the line at the start', offender: b.id, victim: null,
+          explanation: '', nextTime: '', at: { x: b.x, y: b.y }, resolved: 'pending',
+        };
+        inc.explanation = `${b.isPlayer ? 'You were' : `${b.sail} was`} on the course side of the line at the starting signal. The race committee hailed "Recall" with ${b.isPlayer ? 'your' : 'the'} sail number. Return to the pre-start side and start again.`;
+        inc.nextTime = 'Use time-to-line: at full speed from where you are, how long to the line? Trigger only when that matches the clock.';
+        this.incidents.push(inc);
+        this.events.push({ type: 'incident', t, incident: inc });
+      }
+    }
+    if (over.length) this.events.push({ type: 'recall', t, boats: over });
+  }
+
+  private progressAll(t: number) {
+    const c = this.course;
+    const P = c.start.pin, S = c.start.stbd;
+    this.boats.forEach((b, i) => {
+      if (b.finished || b.retired) return;
+      const H = this.hist[i];
+      const prevX = H.x.length ? H.x[H.x.length - 1] : b.x, prevY = H.y.length ? H.y[H.y.length - 1] : b.y;
+      const prevBow = { x: prevX + dir(H.hdg.length ? H.hdg[H.hdg.length - 1] : b.hdg).x * b.cls.loa / 2, y: prevY + dir(H.hdg.length ? H.hdg[H.hdg.length - 1] : b.hdg).y * b.cls.loa / 2 };
+      const nowBow = bow(b);
+      if (!b.started) {
+        if (t < this.gunT - 1e-6) return;
+        if (b.ocs && !b.returning) {
+          const side = Math.max(lineSide(c, bow(b)), lineSide(c, stern(b)));
+          if (side < 0) {
+            b.returning = true;
+            const inc = this.incidents.find(x => x.kind === 'ocs' && x.offender === b.id && x.resolved === 'pending');
+            if (inc) inc.resolved = 'returned';
+          }
+          return;
+        }
+        // Start: the bow crosses the line between the marks from the pre-start side.
+        if (segIntersect(prevBow, nowBow, P, S) >= 0 && lineSide(c, nowBow) > 0 && lineSide(c, prevBow) <= 0) {
+          b.started = true;
+          b.ocs = false;
+          this.events.push({ type: 'started', t, boat: b.id, late: t - this.gunT });
+          this.beginLeg(b, 0);
+        }
+        return;
+      }
+      const leg = c.legs[b.legIndex];
+      if (!leg) return;
+      if (leg.kind === 'finish') {
+        if (segIntersect(prevBow, nowBow, c.finish.pin, c.finish.stbd) >= 0 && lineSide(c, nowBow) > 0 && lineSide(c, prevBow) <= 0) {
+          b.finished = true;
+          b.finishTime = t - this.gunT;
+          const place = this.boats.filter(o => o.finished).length;
+          b.roundedAt.push(t); b.placeAtLeg.push(place);
+          this.events.push({ type: 'finish', t, boat: b.id, place });
+          if (b.isPlayer) this.finishedAt = t;
+        }
+        return;
+      }
+      const upd = (r: { markId: string; side: 'port' | 'stbd' }, last: number, prog: number) => {
+        const m = c.byId[r.markId].p;
+        const br = bearing(m, b);
+        const d = n180(br - last);
+        return { prog: prog + (r.side === 'port' ? -d : d), last: br };
+      };
+      if (leg.kind === 'mark') {
+        const u = upd(leg.rounding, b.lastBearing, b.progress);
+        b.progress = u.prog; b.lastBearing = u.last;
+        if (b.progress >= leg.rounding.sweep) this.completeLeg(b, t);
+      } else {
+        const u0 = upd(leg.options[0], b.lastBearing, b.progress);
+        const u1 = upd(leg.options[1], b.lastBearing2, b.progress2);
+        b.progress = u0.prog; b.lastBearing = u0.last; b.progress2 = u1.prog; b.lastBearing2 = u1.last;
+        if (b.progress >= leg.options[0].sweep || b.progress2 >= leg.options[1].sweep) this.completeLeg(b, t);
+      }
+    });
+  }
+
+  private completeLeg(b: Boat, t: number) {
+    const next = b.legIndex + 1;
+    b.roundedAt.push(t);
+    const place = 1 + this.boats.filter(o => o !== b && (o.legIndex > b.legIndex || o.finished)).length;
+    b.placeAtLeg.push(place);
+    this.events.push({ type: 'rounded', t, boat: b.id, leg: b.legIndex, place });
+    this.beginLeg(b, next);
+    const sk = this.skippers[this.boats.indexOf(b)];
+    if (sk) sk.gate = null;
+  }
+
+  private beginLeg(b: Boat, idx: number) {
+    b.legIndex = idx;
+    const leg = this.course.legs[idx];
+    if (!leg) return;
+    if (leg.kind === 'mark') {
+      const m = this.course.byId[leg.rounding.markId].p;
+      b.progress = initialProgress(leg.rounding, m, b);
+      b.lastBearing = bearing(m, b);
+    } else if (leg.kind === 'gate') {
+      const m0 = this.course.byId[leg.options[0].markId].p, m1 = this.course.byId[leg.options[1].markId].p;
+      b.progress = initialProgress(leg.options[0], m0, b); b.lastBearing = bearing(m0, b);
+      b.progress2 = initialProgress(leg.options[1], m1, b); b.lastBearing2 = bearing(m1, b);
+    }
+  }
+
+  private checkEnd() {
+    const all = this.boats.every(b => b.finished || b.retired);
+    const p = this.player;
+    const leaderDone = this.boats.some(b => b.finished);
+    const firstFinish = leaderDone ? Math.min(...this.boats.filter(b => b.finished).map(b => b.finishTime + this.gunT)) : Infinity;
+    const timeLimit = leaderDone && this.t > firstFinish + Math.max(90, (firstFinish - this.gunT) * 0.6);
+    const playerDoneLong = p && p.finished && this.finishedAt !== null && this.t > this.finishedAt + 45;
+    if (all || timeLimit || playerDoneLong || this.t > this.gunT + 1800) this.end();
+  }
+
+  end() {
+    if (this.ended) return;
+    this.ended = true;
+    // Unserved penalties after a protest: disqualified.
+    for (const b of this.boats) {
+      const owed = this.incidents.filter(x => x.offender === b.id && x.kind !== 'ocs' && x.resolved === 'pending');
+      if (owed.length && b.penalty.owed > 0) {
+        b.dsq = true;
+        owed.forEach(x => (x.resolved = 'dsq'));
+      }
+    }
+  }
+
+  results(): ResultRow[] {
+    const rows: ResultRow[] = this.boats.map(b => {
+      let status: ResultRow['status'] = b.finished ? 'finished' : this.ended ? 'dnf' : 'racing';
+      if (b.dsq) status = 'dsq';
+      if (!b.started && this.t > this.gunT) status = b.ocs ? 'ocs' : status;
+      return { boat: b, place: 0, time: b.finished ? b.finishTime : null, status };
+    });
+    const score = (r: ResultRow) => {
+      if (r.status === 'finished') return r.time!;
+      if (r.status === 'racing' || r.status === 'dnf') return 1e6 - this.progressScore(r.boat);
+      return 1e9;
+    };
+    rows.sort((a, b) => score(a) - score(b));
+    rows.forEach((r, i) => (r.place = i + 1));
+    return rows;
+  }
+
+  /** Bigger is further round the course; used for live positions. */
+  progressScore(b: Boat): number {
+    if (b.finished) return 1e6 - b.finishTime;
+    if (!b.started) return -1e3 + toCourse(this.course, b).along / 100;
+    const leg = this.course.legs[b.legIndex];
+    let into = 0;
+    if (leg) {
+      const target = leg.kind === 'mark' ? this.course.byId[leg.rounding.markId].p
+        : leg.kind === 'gate' ? { x: (this.course.byId[leg.options[0].markId].p.x + this.course.byId[leg.options[1].markId].p.x) / 2, y: (this.course.byId[leg.options[0].markId].p.y + this.course.byId[leg.options[1].markId].p.y) / 2 }
+        : this.course.origin;
+      into = -dist(b, target) / (this.course.L * 100);
+    }
+    return b.legIndex * 10 + into;
+  }
+
+  livePlace(b: Boat): number {
+    const s = this.progressScore(b);
+    return 1 + this.boats.filter(o => o !== b && this.progressScore(o) > s).length;
+  }
+
+  avoidingSince(i: number, t: number): boolean {
+    const s = this.skippers[i];
+    if (!s) return true;
+    return s.lastAvoid.t >= t - 0.05 && s.lastAvoid.tag !== 'hold';
+  }
+
+  sailName(b: Boat) { return b.isPlayer ? 'You' : b.sail; }
+  spoken(b: Boat) { return spellSail(b.sail); }
+  isRacing(b: Boat) { return isRacing(b); }
+  boatById(id: string) { return this.boats.find(b => b.id === id)!; }
+  leg(b: Boat) { return this.course.legs[b.legIndex]; }
+  distTo(b: Boat, p: V2) { return dist(b, p); }
+}
