@@ -15,6 +15,8 @@
   --m-fill-b: rgba(255, 255, 255, .08);
   --m-blue: #0A84FF;
   --m-blue-ink: #4DA3FF;
+  --m-gold-ink: #FFD25E;
+  --m-bar: rgba(255, 255, 255, .16);
   --m-amber-ink: #FFC062;
   --m-green-ink: #7DDC97;
   --m-red-ink: #FF8C82;
@@ -52,6 +54,8 @@
   --m-fill: #FFFFFF;
   --m-fill-b: #E3E8F0;
   --m-blue-ink: #0A64D8;
+  --m-gold-ink: #A86A00;
+  --m-bar: rgba(100, 116, 139, .22);
   --m-amber-ink: #B25E00;
   --m-green-ink: #15803D;
   --m-red-ink: #C62828;
@@ -222,7 +226,7 @@
 }
 .m-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--m-ink); font: inherit; font-size: 14.5px; outline: none; }
 .m-search input::placeholder { color: var(--m-dim); }
-.m-scs { display: flex; justify-content: space-between; }
+.m-scs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 14px; justify-items: center; }
 .m-sc { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 58px; font-size: 11.5px; font-weight: 600; color: var(--m-mut); background: none; border: 0; padding: 0; }
 .m-sc > span { width: 52px; height: 52px; border-radius: 17px; display: flex; align-items: center; justify-content: center; position: relative; }
 .m-sc .m-badge { top: -4px; right: -4px; }

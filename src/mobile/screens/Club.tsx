@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobile } from '../MobileContext';
 import { Icon, IconName } from '../icons';
-import { Avatar, OfflineBanner, Skeleton } from '../ui';
+import { Avatar, OfflineBanner, RootHeader, Skeleton } from '../ui';
 import { timeAgo } from '../data';
 import { MGroup, REPORT_REASONS, SocialPost, createPost, hidePost, loadChats, loadFeed, loadHiddenPosts, loadMyGroups, reportPost, toggleLike } from '../club';
 
@@ -27,9 +27,12 @@ export const PageHeader: React.FC<{ title: string; right?: React.ReactNode; onBa
 const SHORTCUTS: { label: string; icon: IconName; bg: string; fg: string; path: string }[] = [
   { label: 'Chats', icon: 'chat', bg: 'rgba(10,132,255,.16)', fg: '#4DA3FF', path: '/comms' },
   { label: 'Groups', icon: 'club', bg: 'rgba(138,77,255,.16)', fg: '#B08CFF', path: '/club' },
+  { label: 'Meetings', icon: 'calendar', bg: 'rgba(255,210,94,.14)', fg: '#FFD25E', path: '/calendar?show=meetings' },
+  { label: 'Tasks', icon: 'tasks', bg: 'rgba(77,163,255,.14)', fg: '#7DBBFF', path: '/tasks' },
+  { label: 'Media', icon: 'image', bg: 'rgba(52,199,89,.14)', fg: '#5FD47F', path: '/media' },
   { label: 'Classifieds', icon: 'tag', bg: 'rgba(255,62,154,.14)', fg: '#FF7DB8', path: '/classifieds' },
   { label: 'News', icon: 'news', bg: 'rgba(255,138,43,.15)', fg: '#FFA65C', path: '/news' },
-  { label: 'Media', icon: 'image', bg: 'rgba(52,199,89,.14)', fg: '#5FD47F', path: '/media' },
+  { label: 'Shops', icon: 'bag', bg: 'rgba(255,255,255,.08)', fg: 'var(--m-ink)', path: '/shops' },
 ];
 
 /** A post's ⋯ menu: hide it from my feed, or report it to the club's admins. */
@@ -216,7 +219,7 @@ const Composer: React.FC<{ groups: MGroup[]; groupId: string; onClose: () => voi
 export const ClubHub: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { profile, unread, toast } = useMobile();
+  const { profile, toast } = useMobile();
   const [groups, setGroups] = useState<MGroup[]>([]);
   const [groupId, setGroupId] = useState('');
   const [posts, setPosts] = useState<SocialPost[] | null>(null);
@@ -254,18 +257,7 @@ export const ClubHub: React.FC = () => {
 
   return (
     <div className="m-stack">
-      <PageHeader
-        title="Club"
-        right={(
-          <>
-            <button className="m-ibtn" aria-label="Search people" onClick={() => navigate('/comms?new=1')}><Icon name="search" /></button>
-            <button className="m-ibtn" aria-label="Notifications" onClick={() => navigate('/notifications')}>
-              <Icon name="bell" />
-              {unread > 0 && <span className="m-badge">{unread > 99 ? '99+' : unread}</span>}
-            </button>
-          </>
-        )}
-      />
+      <RootHeader title="Club" right={<button className="m-ibtn" aria-label="Search people" onClick={() => navigate('/comms?new=1')}><Icon name="search" /></button>} />
       <div className="m-scs">
         {SHORTCUTS.map(s => (
           <button key={s.label} className="m-sc" onClick={() => (s.label === 'Groups' ? document.getElementById('m-club-chips')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) : navigate(s.path))}>

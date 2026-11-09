@@ -8,6 +8,9 @@ import { TabBar } from './ui';
 import { Home } from './screens/Home';
 import { CalendarScreen, ResultsScreen } from './screens/Racing';
 import { EventDetail } from './screens/EventDetail';
+import { SeriesScreen } from './screens/Series';
+import { CompareScreen } from './screens/Compare';
+import { ExternalResultScreen, RaceHistoryScreen } from './screens/History';
 import { Notifications } from './screens/Notifications';
 import { Me } from './screens/Me';
 import { Soon } from './screens/Soon';
@@ -91,7 +94,10 @@ const Shell: React.FC = () => {
           <Route path="/calendar" element={<CalendarScreen />} />
           <Route path="/calendar/event/:key" element={<EventDetail />} />
           <Route path="/results" element={<ResultsScreen />} />
-          <Route path="/my-results" element={<ResultsScreen mineOnly />} />
+          <Route path="/my-results" element={<RaceHistoryScreen />} />
+          <Route path="/results/external/:id" element={<ExternalResultScreen />} />
+          <Route path="/compare" element={<CompareScreen />} />
+          <Route path="/results/series/:id" element={<SeriesScreen />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/me" element={<Me />} />
           <Route path="/ask-alfie" element={<AskAlfieRoute onOpen={() => setAlfieOpen(true)} />} />

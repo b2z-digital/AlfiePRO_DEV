@@ -178,14 +178,14 @@ const norm = (s?: string) => (s || '').trim().toLowerCase();
  * Races sailed, wins, podiums (race placings), average race finish, the monthly
  * trend and head-to-head counts, from every race in the calendar this person sailed.
  */
-export function computeStats(items: MCalendarItem[], memberIds: string[], fullName: string, year: number, boatClass?: string): MStats {
+export function computeStats(items: MCalendarItem[], memberIds: string[], fullName: string, year: number | null, boatClass?: string): MStats {
   let races = 0, wins = 0, podiums = 0, finishSum = 0, finishN = 0;
   const monthAgg = new Map<string, { sum: number; n: number }>();
   const h2h = new Map<string, { name: string; memberId?: string; mine: number; theirs: number }>();
   const results: MStats['results'] = [];
   const me = norm(fullName);
 
-  items.filter(i => i.kind === 'race' && i.date.startsWith(String(year)) && i.event?.raceResults?.length && (!boatClass || i.raceClass === boatClass)).forEach(i => {
+  items.filter(i => i.kind === 'race' && (year == null || i.date.startsWith(String(year))) && i.event?.raceResults?.length && (!boatClass || i.raceClass === boatClass)).forEach(i => {
     const e = i.event!;
     const skippers = e.skippers || [];
     const idx = skippers.findIndex((s: any) => (s.memberId && memberIds.includes(s.memberId)) || (!s.memberId && norm(s.name) === me));

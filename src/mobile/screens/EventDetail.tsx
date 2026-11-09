@@ -5,8 +5,10 @@ import { daysUntil, eventStandings, MCalendarItem } from '../data';
 import { Icon } from '../icons';
 import { GoingStack, LevelPill, RsvpButtons, Skeleton, SubHeader, fmtDay } from '../ui';
 import { shortName } from './Racing';
+import { SkipperSheet, type SheetSkipper } from './SkipperSheet';
+import { EventMediaTab, Podium, useEventBroadcast } from './EventExtras';
 
-type Tab = 'details' | 'entries' | 'results';
+type Tab = 'details' | 'entries' | 'results' | 'media';
 
 export const EventDetail: React.FC = () => {
   const { key = '' } = useParams();
@@ -16,6 +18,10 @@ export const EventDetail: React.FC = () => {
   const [tab, setTab] = useState<Tab>(hasResults ? 'results' : 'details');
   // The calendar may still be loading on first render: open on Results once we know there are some
   const picked = useRef(hasResults);
+  const session = useEventBroadcast(item?.event?.id);
+  // A live broadcast leads: open on Media while it's on
+  const sawLive = useRef(false);
+  useEffect(() => { if (session?.status === 'live' && !sawLive.current) { sawLive.current = true; setTab('media'); } }, [session?.status]);
   useEffect(() => { if (hasResults && !picked.current) { picked.current = true; setTab('results'); } }, [hasResults]);
 
   if (!item) {
@@ -69,6 +75,7 @@ export const EventDetail: React.FC = () => {
         <button className={tab === 'details' ? 'm-on' : ''} onClick={() => setTab('details')}>Details</button>
         <button className={tab === 'entries' ? 'm-on' : ''} onClick={() => setTab('entries')}>Entries {entries.length || ''}</button>
         <button className={tab === 'results' ? 'm-on' : ''} onClick={() => setTab('results')}>Results</button>
+        <button className={tab === 'media' ? 'm-on' : ''} onClick={() => setTab('media')}>{session?.status === 'live' ? <span style={{ color: '#FF453A' }}>● </span> : null}Media</button>
       </nav>
 
       {tab === 'details' && (
@@ -127,6 +134,7 @@ export const EventDetail: React.FC = () => {
       )}
 
       {tab === 'results' && <ResultsTable item={item} />}
+      {tab === 'media' && <EventMediaTab item={item} session={session} />}
     </div>
   );
 };
@@ -136,10 +144,23 @@ const ResultsTable: React.FC<{ item: MCalendarItem }> = ({ item }) => {
   const { memberIds } = useMobile();
   const navigate = useNavigate();
   const st = useMemo(() => eventStandings(e), [e]);
-  if (!st || !st.rows.length) return <div className="m-card m-empty">No results yet.</div>;
+  const [open, setOpen] = useState<SheetSkipper | null>(null);
+  const seriesLink = item.seriesId ? (
+    <button className="m-card" onClick={() => navigate(`/results/series/${item.seriesId}`)} style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
+      <span className="m-tile" style={{ background: 'rgba(255,210,94,.14)', color: '#FFD25E' }}><Icon name="trophy" size={19} /></span>
+      <span style={{ flex: 1, fontSize: 14 }}><b style={{ fontWeight: 600 }}>Series standings</b> <span className="m-mut">{e?.eventName?.split(' - ').slice(1).join(' - ') || 'all rounds'}</span></span>
+      <Icon name="chevron" size={18} className="m-dim" />
+    </button>
+  ) : null;
+  if (!st || !st.rows.length) return <>{seriesLink}<div className="m-card m-empty">No results yet.</div></>;
   const standings = st.rows;
+  const openRow = (index: number, position: number) => {
+    const r = standings.find(x => x.index === index);
+    if (r) setOpen({ name: r.name, sailNo: r.sailNo, memberId: r.memberId, position, of: standings.length, standings: st, index, context: item.raceClass, item });
+  };
   return (
     <>
+      <Podium st={st} onOpen={openRow} />
       <div className="m-card" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
           <thead>
@@ -154,7 +175,7 @@ const ResultsTable: React.FC<{ item: MCalendarItem }> = ({ item }) => {
             {standings.map((s, pos) => {
               const me = s.memberId && memberIds.includes(s.memberId);
               return (
-                <tr key={s.index} style={{ borderTop: '1px solid var(--m-line)', background: me ? 'rgba(10,132,255,.12)' : undefined }}>
+                <tr key={s.index} onClick={() => openRow(s.index, pos + 1)} style={{ borderTop: '1px solid var(--m-line)', background: me ? 'rgba(10,132,255,.12)' : undefined, cursor: 'pointer' }}>
                   <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 700 }} className="m-disp">{pos + 1}</td>
                   <td style={{ padding: '10px 6px', fontWeight: me ? 700 : 500, position: 'sticky', left: 0, background: me ? 'linear-gradient(rgba(10,132,255,.12), rgba(10,132,255,.12)), var(--m-sheet)' : 'var(--m-sheet)' }}>
                     {shortName(s.name)} <span className="m-dim" style={{ fontWeight: 400 }}>{s.sailNo}</span>
@@ -175,11 +196,14 @@ const ResultsTable: React.FC<{ item: MCalendarItem }> = ({ item }) => {
           </tbody>
         </table>
       </div>
+      <p className="m-dim" style={{ margin: 0, fontSize: 12 }}>Dropped races are in brackets. Tap a skipper for their card.</p>
+      {seriesLink}
       <button className="m-card" onClick={() => navigate('/ask-alfie')} style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
         <span className="m-av" style={{ width: 30, height: 30, padding: 2, background: 'conic-gradient(from 200deg,#2E7BFF,#8A4DFF,#FF3E9A,#FF8A2B,#2E7BFF)' }}><span style={{ width: '100%', height: '100%', borderRadius: 999, background: '#0B1222' }} /></span>
         <span style={{ flex: 1, fontSize: 14 }}><b style={{ fontWeight: 600 }}>Ask Alfie</b> <span className="m-mut">about this result</span></span>
         <Icon name="chevron" size={18} className="m-dim" />
       </button>
+      {open && <SkipperSheet skipper={open} onClose={() => setOpen(null)} />}
     </>
   );
 };

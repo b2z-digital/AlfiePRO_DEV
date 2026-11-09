@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useMobile } from '../MobileContext';
-import { MCalendarItem, daysUntil, isMyClass, myResultFor, parseDay, podium, todayISO } from '../data';
+import { MCalendarItem, classKey, daysUntil, isMyClass, myResultFor, parseDay, podium, todayISO } from '../data';
 import { Icon } from '../icons';
 import { EntriesPill, LevelPill, MyStatusPill, RootHeader, Skeleton, fmtDay, openCalendarItem } from '../ui';
 import { ordinal } from './Home';
+import { ExternalResultCard, extLevel, myExtPlace, useExternalResults, type ExtResultEvent } from './History';
 
 export const RacingNav: React.FC = () => {
   const navigate = useNavigate();
@@ -64,12 +65,13 @@ const AgendaRow: React.FC<{ item: MCalendarItem }> = ({ item }) => {
 };
 
 
-type CalFilter = 'mine' | 'all' | 'club' | 'state' | 'national';
+type CalFilter = 'mine' | 'all' | 'club' | 'state' | 'national' | 'meetings';
 
 export const CalendarScreen: React.FC = () => {
   const navigate = useNavigate();
   const { calendar, calendarLoading, myClasses } = useMobile();
-  const [filter, setFilter] = useState<CalFilter>('all');
+  const location = useLocation();
+  const [filter, setFilter] = useState<CalFilter>(() => (new URLSearchParams(location.search).get('show') === 'meetings' ? 'meetings' : 'all'));
   const sameClass = (a?: string) => isMyClass(a, myClasses);
   const touched = useRef(false);
   const today = todayISO();
@@ -85,6 +87,7 @@ export const CalendarScreen: React.FC = () => {
     if (i.date < iso(weekStart)) return false;
     if (filter === 'all') return true;
     if (filter === 'mine') return i.kind === 'meeting' || sameClass(i.raceClass);
+    if (filter === 'meetings') return i.kind === 'meeting';
     return i.kind === 'race' && i.level === filter;
   }), [calendar, filter, weekStart, myClasses]);
 
@@ -126,7 +129,7 @@ export const CalendarScreen: React.FC = () => {
         })}
       </div>
       <div className="m-chips">
-        {((myClasses.length ? ['mine', 'all', 'club', 'state', 'national'] : ['all', 'club', 'state', 'national']) as CalFilter[]).map(f => (
+        {((myClasses.length ? ['mine', 'all', 'club', 'state', 'national', 'meetings'] : ['all', 'club', 'state', 'national', 'meetings']) as CalFilter[]).map(f => (
           <button key={f} className={`m-chip ${filter === f ? 'm-chip-on' : ''}`} onClick={() => { touched.current = true; setFilter(f); }}>
             {f === 'all' ? 'All' : f === 'mine' ? 'My classes' : f[0].toUpperCase() + f.slice(1)}
           </button>
@@ -166,15 +169,42 @@ export const ResultsScreen: React.FC<{ mineOnly?: boolean }> = ({ mineOnly }) =>
       .filter(r => filter === 'all' ? true : filter === 'mine' ? !!r.mine : filter.startsWith('class:') ? r.item.raceClass?.toLowerCase() === filter.slice(6).toLowerCase() : r.item.level === filter);
   }, [calendar, memberIds, fullName, filter, today]);
 
+  // Series with scored rounds, newest first: each opens its standings
+  const series = useMemo(() => {
+    const seen = new Map<string, { id: string; name: string; raceClass?: string; rounds: number; mine: boolean }>();
+    calendar
+      .filter(i => i.seriesId && i.kind === 'race' && (i.event?.raceResults?.length || 0) > 0)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .forEach(i => {
+        const cur = seen.get(i.seriesId!);
+        const mine = !!myResultFor(i, memberIds, fullName);
+        if (cur) { cur.rounds++; cur.mine = cur.mine || mine; return; }
+        seen.set(i.seriesId!, { id: i.seriesId!, name: i.title.split(' · ')[0], raceClass: i.raceClass, rounds: 1, mine });
+      });
+    return [...seen.values()].filter(x => filter === 'mine' ? x.mine : filter.startsWith('class:') ? x.raceClass?.toLowerCase() === filter.slice(6).toLowerCase() : filter === 'all' || filter === 'club').slice(0, 8);
+  }, [calendar, memberIds, fullName, filter]);
+
+  // Imported state / national results (association websites), unless the club scored the same event itself
+  const ext = useExternalResults();
+  const extRows = useMemo(() => {
+    const local = new Set(calendar.filter(i => (i.event?.raceResults?.length || 0) > 0).map(i => `${i.date}|${classKey(i.raceClass)}`));
+    return (ext || []).filter(ev => ev.event_date && ev.event_date <= today && !local.has(`${ev.event_date}|${classKey(ev.boat_class_mapped || ev.boat_class_raw)}`))
+      .filter(ev => filter === 'all' ? true : filter === 'mine' ? !!myExtPlace(ev, fullName) : filter.startsWith('class:') ? classKey(ev.boat_class_mapped || ev.boat_class_raw) === classKey(filter.slice(6)) : filter === 'club' ? false : extLevel(ev) === filter)
+      .slice(0, 40);
+  }, [ext, calendar, filter, fullName, today]);
+
   const groups = useMemo(() => {
-    const g: { month: string; rows: typeof rows }[] = [];
-    rows.forEach(r => {
-      const m = parseDay(r.item.date).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+    type Entry = { date: string; row?: typeof rows[number]; ext?: ExtResultEvent };
+    const list: Entry[] = [...rows.map(r => ({ date: r.item.date, row: r })), ...extRows.map(e => ({ date: e.event_date!, ext: e }))]
+      .sort((a, b) => b.date.localeCompare(a.date));
+    const g: { month: string; rows: Entry[] }[] = [];
+    list.forEach(r => {
+      const m = parseDay(r.date).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
       const last = g[g.length - 1];
       if (last && last.month === m) last.rows.push(r); else g.push({ month: m, rows: [r] });
     });
     return g;
-  }, [rows]);
+  }, [rows, extRows]);
 
   return (
     <div className="m-stack">
@@ -187,18 +217,44 @@ export const ResultsScreen: React.FC<{ mineOnly?: boolean }> = ({ mineOnly }) =>
           </button>
         ))}
       </div>
+      {filter === 'mine' && (
+        <div className="m-card" style={{ padding: '10px 12px 10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => navigate('/my-results')} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 0, padding: 0, textAlign: 'left', color: 'var(--m-ink)' }}>
+            <span className="m-tile" style={{ background: 'rgba(10,132,255,.14)', color: 'var(--m-blue-ink)' }}><Icon name="calendar" size={19} /></span>
+            <span style={{ fontSize: 14 }}><b style={{ fontWeight: 600 }}>Race history</b> <span className="m-mut">by season</span></span>
+          </button>
+          <button onClick={() => navigate('/compare')} className="m-chip" style={{ height: 32 }}><Icon name="people" size={15} />Compare</button>
+        </div>
+      )}
+      {series.length > 0 && (
+        <>
+          <p className="m-lb m-dim" style={{ margin: '4px 0 0' }}>Series standings</p>
+          <div className="m-chips" style={{ gap: 10 }}>
+            {series.map(x => (
+              <button key={x.id} className="m-card" onClick={() => navigate(`/results/series/${x.id}`)} style={{ flex: '0 0 200px', padding: '12px 14px', textAlign: 'left' }}>
+                <div className="m-row" style={{ gap: 6 }}>
+                  <Icon name="trophy" size={16} style={{ color: '#FFD25E' }} />
+                  {x.raceClass && <span className="m-cls">{x.raceClass}</span>}
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 14.5, marginTop: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.name}</div>
+                <div className="m-mut" style={{ fontSize: 12.5, marginTop: 2 }}>{x.rounds} round{x.rounds === 1 ? '' : 's'} scored</div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       {calendarLoading && !calendar.length ? (<><Skeleton h={110} /><Skeleton h={110} /></>) :
         groups.length === 0 ? <div className="m-card m-empty">{filter === 'mine' ? "No results with your name yet." : 'No results yet.'}</div> :
         groups.map(g => (
           <div key={g.month} className="m-stack" style={{ gap: 10 }}>
             <p className="m-lb m-dim" style={{ margin: '4px 0 0' }}>{g.month}</p>
-            {g.rows.map(({ item, mine, top }) => (
+            {g.rows.map(entry => entry.ext ? <ExternalResultCard key={`x-${entry.ext.id}`} ev={entry.ext} fullName={fullName} /> : (({ item, mine, top }) => (
               <button key={item.key} className="m-card" onClick={() => openItem(navigate, item)} style={{ padding: 14, textAlign: 'left' }}>
                 <div className="m-row" style={{ gap: 8 }}>
                   {item.raceClass && <span className="m-cls">{item.raceClass}</span>}
                   <span className="m-dim" style={{ fontSize: 12.5 }}>{fmtDay(item.date, { weekday: 'short', day: 'numeric', month: 'short' })} · {item.event?.skippers?.length || 0} boats</span>
                   <span style={{ marginLeft: 'auto' }}>
-                    {mine ? <span className="m-pill" style={{ background: 'rgba(10,132,255,.18)', color: '#7DBBFF', fontWeight: 700 }}>You {mine.position}{ordinal(mine.position)}</span> : <LevelPill level={item.level} />}
+                    {mine ? <span className="m-pill" style={{ background: 'rgba(10,132,255,.14)', color: 'var(--m-blue-ink)', fontWeight: 700 }}>You {mine.position}{ordinal(mine.position)}</span> : <LevelPill level={item.level} />}
                   </span>
                 </div>
                 <div style={{ fontWeight: 600, fontSize: 15.5, marginTop: 8 }}>{item.title}</div>
@@ -213,7 +269,7 @@ export const ResultsScreen: React.FC<{ mineOnly?: boolean }> = ({ mineOnly }) =>
                   </div>
                 )}
               </button>
-            ))}
+            ))(entry.row!))}
           </div>
         ))}
     </div>

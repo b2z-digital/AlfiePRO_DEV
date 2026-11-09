@@ -5,6 +5,7 @@ import { getArticles } from '../../utils/articleStorage';
 import { useMobile } from '../MobileContext';
 import { attendanceKey, daysUntil, isMyClass, myResultFor, todayISO, MCalendarItem } from '../data';
 import { Icon } from '../icons';
+import { RaceDayCard, todaysRaceFor } from './EventExtras';
 import { DateBadge, EntriesPill, GoingStack, LevelPill, RootHeader, RsvpButtons, Skeleton, fmtDay, openCalendarItem } from '../ui';
 
 const untilLabel = (d: number) => (d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : `In ${d} days`);
@@ -36,6 +37,9 @@ export const Home: React.FC = () => {
     .slice(0, 6);
 
   const fullName = `${profile.firstName} ${profile.lastName}`.trim();
+  // Race day: racing you're entered in, under way today, leads Home (board: Home › Race day)
+  const todaysRace = useMemo(() => todaysRaceFor(calendar, memberIds, fullName, today), [calendar, memberIds, fullName, today]);
+  const [raceDay, setRaceDay] = useState(false);
   const latest = useMemo(() => {
     const past = calendar.filter(i => i.kind === 'race' && i.date <= today && (i.event?.raceResults?.length || 0) > 0)
       .sort((a, b) => b.date.localeCompare(a.date));
@@ -60,7 +64,9 @@ export const Home: React.FC = () => {
     <div className="m-stack">
       <RootHeader brand />
 
-      {calendarLoading && !calendar.length ? (
+      {todaysRace && <RaceDayCard item={todaysRace} onActive={setRaceDay} />}
+
+      {raceDay && nextRace === todaysRace ? null : calendarLoading && !calendar.length ? (
         <Skeleton h={190} />
       ) : nextRace ? (
         <div className="m-card m-spec" style={{ padding: 16, borderRadius: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -90,7 +96,7 @@ export const Home: React.FC = () => {
         <div className="m-card m-empty">No racing in the calendar yet. When your club adds events they'll show here.</div>
       )}
 
-      {latest && (
+      {latest && !(raceDay && latest.item === todaysRace) && (
         <>
           <div className="m-sh"><h3>My latest result</h3><button onClick={() => navigate('/my-results')}>All results</button></div>
           <button className="m-card" onClick={() => open(latest.item)} style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left' }}>

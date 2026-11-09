@@ -68,7 +68,6 @@ export const RootHeader: React.FC<{ title?: string; brand?: boolean; right?: Rea
       {right}
       {!hideActions && (
         <>
-          <button className="m-ibtn" aria-label="Club" onClick={() => navigate('/club')}><Icon name="club" /></button>
           <button className="m-ibtn" aria-label="Chats" onClick={() => navigate('/comms')}><Icon name="chat" /></button>
           <button className="m-ibtn" aria-label="Notifications" onClick={() => navigate('/notifications')}>
             <Icon name="bell" />
@@ -107,9 +106,10 @@ export const SubHeader: React.FC<{ title?: React.ReactNode; sub?: string; right?
 
 const TABS: { id: string; label: string; icon: IconName; path: string; match: (p: string) => boolean }[] = [
   { id: 'home', label: 'Home', icon: 'home', path: '/', match: p => p === '/' },
-  { id: 'racing', label: 'Racing', icon: 'racing', path: '/calendar', match: p => /^\/(calendar|results|my-results|find-racing|race-desk)/.test(p) },
+  { id: 'racing', label: 'Racing', icon: 'racing', path: '/calendar', match: p => /^\/(calendar|results|my-results|find-racing|race-desk|compare)/.test(p) },
+  // Club is a tab (phase 2 board, agreed 9 Nov); Me opens from the avatar in every header
+  { id: 'club', label: 'Club', icon: 'club', path: '/club', match: p => /^\/(club|classifieds|shops|news|media|tasks|comms)/.test(p) },
   { id: 'tv', label: 'AlfieTV', icon: 'tv', path: '/alfie-tv', match: p => p.startsWith('/alfie-tv') },
-  { id: 'me', label: 'Me', icon: 'me', path: '/me', match: p => /^\/(me(\/|$)|my-|settings|tasks|weather|race-timer)/.test(p) && !p.startsWith('/my-results') },
 ];
 
 export const TabBar: React.FC<{ onAlfie: (voice?: boolean) => void }> = ({ onAlfie }) => {
