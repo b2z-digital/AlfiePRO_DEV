@@ -167,9 +167,7 @@ export const MembershipOverviewWidget: React.FC<MembershipOverviewWidgetProps> =
       )}
 
       <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 rounded-lg bg-blue-600/20">
-          <Users className="text-blue-400" size={20} />
-        </div>
+        <span className="a-tile" style={{ width: 36, height: 36 }}><Users size={18} /></span>
         <h3 className="text-lg font-semibold text-white">Membership Overview</h3>
         {!currentClub?.clubId && (
           <span className="text-xs text-red-400">(No Club)</span>
