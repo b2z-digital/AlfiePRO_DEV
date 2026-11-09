@@ -2,6 +2,7 @@ import { Venue, VenueFormData } from '../types/venue';
 import { supabase } from './supabase';
 import { isValidUUID } from './storage';
 import { protectedQuery, QUERY_TIMEOUTS } from './queryHelpers';
+import { ensureVenueImageUrl } from './venueImages';
 
 // Local function to get current club ID - replace with actual implementation
 const getCurrentClubId = (): string | null => {
@@ -248,6 +249,9 @@ export const addVenue = async (formData: VenueFormData, explicitClubId?: string)
     }
 
     try {
+      // Photos go to Storage; the row keeps only the URL
+      formData = { ...formData, image: await ensureVenueImageUrl(formData.image, clubId) };
+
       // Standalone race officer (no club) - insert with user_id
       if (!clubId) {
         const { data: { user } } = await supabase.auth.getUser();
@@ -425,6 +429,9 @@ export const updateVenue = async (id: string, formData: VenueFormData, venueClub
     }
 
     try {
+      // Photos go to Storage; the row keeps only the URL
+      formData = { ...formData, image: await ensureVenueImageUrl(formData.image, clubId) };
+
       // If this venue is being set as default, unset any existing default
       if (formData.isDefault) {
         await supabase

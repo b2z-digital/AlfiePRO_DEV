@@ -54,7 +54,9 @@ export function EventLiveTab({ session: initial, venue, canRun, onOpenControlRoo
     return () => { cancelled = true; clearInterval(timer); };
   }, [initial.id]);
 
-  const isLive = session.status === 'live';
+  // Record races broadcasts aren't streamed: show the race videos, never a live player
+  const recordOnly = session.broadcast_mode === 'races_only';
+  const isLive = session.status === 'live' && !recordOnly;
   const isEnded = session.status === 'ended';
   const races = useMemo(
     () => [...videos].sort((a, b) => (b.race_number || 0) - (a.race_number || 0)),
@@ -102,13 +104,15 @@ export function EventLiveTab({ session: initial, venue, canRun, onOpenControlRoo
                   {isEnded ? <Square className="w-3.5 h-3.5" aria-hidden="true" />
                     : isLive ? <Pause className="w-3.5 h-3.5" aria-hidden="true" />
                     : <Radio className="w-3.5 h-3.5" aria-hidden="true" />}
-                  {isEnded ? 'ENDED' : isLive ? 'ON HOLD' : 'STREAMING'}
+                  {recordOnly ? 'RACE VIDEOS' : isEnded ? 'ENDED' : isLive ? 'ON HOLD' : 'STREAMING'}
                 </span>
                 <h2 className="alv-disp">
-                  {isEnded ? 'The broadcast has ended' : isLive ? 'Racing will resume shortly' : when ? `Live from ${when}` : 'Live here on race day'}
+                  {recordOnly ? (isEnded ? 'Race videos' : 'Races are being recorded') : isEnded ? 'The broadcast has ended' : isLive ? 'Racing will resume shortly' : when ? `Live from ${when}` : 'Live here on race day'}
                 </h2>
                 <p>
-                  {isEnded
+                  {recordOnly
+                    ? 'This one isn\'t streamed live. Each race appears below once it\'s scored and on YouTube.'
+                    : isEnded
                     ? 'Each race is below once it\'s on YouTube.'
                     : isLive
                     ? 'The picture comes back on its own.'

@@ -94,6 +94,26 @@ export async function createBroadcast(input: NewBroadcastInput): Promise<Livestr
     return res.session;
   }
 
+  const base: Partial<LivestreamSession> & Record<string, unknown> = {
+    club_id: input.clubId,
+    created_by: input.userId,
+    title: input.title,
+    event_id: eventId,
+    status: input.scheduledTime ? 'scheduled' : 'draft',
+    scheduled_start_time: input.scheduledTime || undefined,
+    enable_chat: true,
+    enable_overlays: true,
+    is_public: input.isPublic,
+    overlay_config: DEFAULT_OVERLAYS,
+    broadcast_mode: input.racesOnly ? 'races_only' : 'live',
+  };
+
+  // Record races on this device: each race is recorded in the browser and uploaded, so there is
+  // no live input to create and nothing is streamed
+  if (input.racesOnly && input.filming === 'device') {
+    return livestreamStorage.createSession({ ...base, streaming_mode: 'cloudflare_relay', stream_input_mode: 'browser' } as Partial<LivestreamSession>);
+  }
+
   const { data: { session: auth } } = await supabase.auth.getSession();
   if (!auth) throw new Error('Sign in again to create a broadcast');
   const cfResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
@@ -108,18 +128,9 @@ export async function createBroadcast(input: NewBroadcastInput): Promise<Livestr
   const customer = (playback.match(/customer-([a-z0-9]+)\./) || [])[1];
 
   const sessionData: Partial<LivestreamSession> & Record<string, unknown> = {
-    club_id: input.clubId,
-    created_by: input.userId,
-    title: input.title,
-    event_id: eventId,
-    status: input.scheduledTime ? 'scheduled' : 'draft',
-    scheduled_start_time: input.scheduledTime || undefined,
-    enable_chat: true,
-    enable_overlays: true,
-    is_public: input.isPublic,
+    ...base,
     streaming_mode: 'cloudflare_relay',
     stream_input_mode: input.filming === 'encoder' ? 'rtmp_external' : 'browser',
-    overlay_config: DEFAULT_OVERLAYS,
     cloudflare_live_input_id: cf.liveInput.uid,
     cloudflare_whip_url: cf.liveInput.webRTC?.url,
     cloudflare_whip_playback_url: cf.liveInput.webRTCPlayback?.url,
@@ -145,7 +156,8 @@ export function useLiveEventIds(clubId?: string | null): Set<string> {
         .select('event_id')
         .eq('club_id', clubId)
         .eq('status', 'live')
-        .eq('is_public', true);
+        .eq('is_public', true)
+        .neq('broadcast_mode', 'races_only');
       if (!cancelled) setIds(new Set((data || []).map((r: { event_id: string | null }) => r.event_id).filter((id): id is string => !!id)));
     };
     load();

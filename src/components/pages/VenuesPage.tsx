@@ -10,6 +10,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
+import { countEmbeddedVenueImages, migrateVenueImages } from '../../utils/venueImages';
 
 interface VenuesPageProps {
   darkMode: boolean;
@@ -19,7 +20,13 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
   darkMode
 }) => {
   const { can } = usePermissions();
-  const { currentClub, currentOrganization } = useAuth();
+  const { currentClub, currentOrganization, isSuperAdmin } = useAuth();
+  // Super admins: venue photos still embedded in the database, waiting to move to Storage
+  const [embeddedPhotos, setEmbeddedPhotos] = useState(0);
+  const [movingPhotos, setMovingPhotos] = useState<string | null>(null);
+  useEffect(() => {
+    if (isSuperAdmin) countEmbeddedVenueImages().then(setEmbeddedPhotos);
+  }, [isSuperAdmin]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -513,6 +520,34 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
               {venues.length} {venues.length === 1 ? 'venue' : 'venues'} registered
             </p>
           </div>
+
+          {isSuperAdmin && embeddedPhotos > 0 && (
+            <div role="status" className="w-full flex flex-wrap items-center gap-3 rounded-xl px-4 py-3 text-[14px]" style={{ background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.35)' }}>
+              <span className="flex-1 min-w-[220px]">
+                {embeddedPhotos} venue {embeddedPhotos === 1 ? 'photo is' : 'photos are'} still stored inside the database, so they download again on every page that lists venues. Move them to file storage (one time, all clubs).
+              </span>
+              <button
+                type="button"
+                className="a-btn a-btn-p"
+                disabled={!!movingPhotos}
+                onClick={async () => {
+                  setMovingPhotos('Starting…');
+                  try {
+                    const { moved, failed } = await migrateVenueImages((done, total) => setMovingPhotos(`Moving ${done} of ${total}…`));
+                    addNotification(failed ? 'warning' : 'success', failed ? `Moved ${moved} photos; ${failed} could not be moved` : `Moved ${moved} venue photos to storage`);
+                    setEmbeddedPhotos(await countEmbeddedVenueImages());
+                    fetchVenues();
+                  } catch (err) {
+                    addNotification('error', err instanceof Error ? err.message : 'Could not move the photos');
+                  } finally {
+                    setMovingPhotos(null);
+                  }
+                }}
+              >
+                {movingPhotos || 'Move photos'}
+              </button>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-2.5">
             <label className="a-field" style={{ width: 260 }}>

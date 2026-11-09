@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Plus, Radio, Trash2, Video, Check, Link2, Cloud, Youtube, FlaskConical } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import type { LivestreamSession } from '../../types/livestream';
+import { useLivestreamCredit } from '../../utils/livestreamCredit';
+import { LivestreamCreditCard } from './LivestreamCreditCard';
 
 /**
  * Live home (livestream board "Live: broadcasts home"): what's live, what's next,
@@ -11,6 +13,7 @@ import type { LivestreamSession } from '../../types/livestream';
 type Session = LivestreamSession & { venueName?: string; engine?: string; broadcast_mode?: string };
 
 interface LiveHomeProps {
+  clubId?: string;
   sessions: Session[];
   autoCreateForEvent?: { eventId: string; eventName: string };
   activating?: boolean;
@@ -60,7 +63,8 @@ function duration(s: Session): string | null {
   return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
-export function LiveHome({ sessions, autoCreateForEvent, activating, onOpen, onNew, onDelete }: LiveHomeProps) {
+export function LiveHome({ clubId, sessions, autoCreateForEvent, activating, onOpen, onNew, onDelete }: LiveHomeProps) {
+  const { credit, reload: reloadCredit } = useLivestreamCredit(clubId);
   const [raceVideos, setRaceVideos] = useState<Record<string, number>>({});
   const [cameraCounts, setCameraCounts] = useState<Record<string, number>>({});
 
@@ -125,7 +129,7 @@ export function LiveHome({ sessions, autoCreateForEvent, activating, onOpen, onN
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="alv-eyebrow" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {kind === 'live'
-                ? <span className={`alv-live-badge ${s.status === 'live' ? '' : 'is-preview'}`}><span className="pulse" />{s.status === 'live' ? 'LIVE' : 'PREVIEW'}</span>
+                ? <span className={`alv-live-badge ${s.status === 'live' ? '' : 'is-preview'}`}><span className="pulse" />{s.status !== 'live' ? 'PREVIEW' : s.broadcast_mode === 'races_only' ? 'RECORDING' : 'LIVE'}</span>
                 : <span>Next up · {relativeDay(d)}</span>}
               {s.is_public === false && <span className="alv-chip is-test" style={{ height: 22 }}><FlaskConical size={12} aria-hidden="true" />Test</span>}
             </div>
@@ -134,7 +138,7 @@ export function LiveHome({ sessions, autoCreateForEvent, activating, onOpen, onN
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
               <span className="alv-chip">{s.event_id ? <><Check size={13} className="ok" aria-hidden="true" />Linked to scoring</> : <><Link2 size={13} aria-hidden="true" />Not linked to an event</>}</span>
               <span className="alv-chip">{cams > 0 ? <><Check size={13} className="ok" aria-hidden="true" />{cams} camera{cams === 1 ? '' : 's'} paired</> : 'No cameras yet'}</span>
-              <span className="alv-chip"><Check size={13} className="ok" aria-hidden="true" />{s.broadcast_mode === 'races_only' ? 'Race videos only' : 'Race videos to YouTube'}</span>
+              <span className="alv-chip"><Check size={13} className="ok" aria-hidden="true" />{s.broadcast_mode === 'races_only' ? 'Record races · not live in AlfieTV' : 'Livestream + race videos'}</span>
             </div>
           </div>
         </div>
@@ -218,6 +222,7 @@ export function LiveHome({ sessions, autoCreateForEvent, activating, onOpen, onN
 
         {!scoringContext && (
           <aside style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+            {clubId && <LivestreamCreditCard clubId={clubId} credit={credit} onChange={reloadCredit} />}
             <div className="alv-card" style={{ padding: '16px 18px' }}>
               <span className="alv-disp" style={{ fontSize: 18, fontWeight: 700 }}>Where it goes</span>
               <div className="alv-dest">
