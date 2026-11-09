@@ -49,6 +49,7 @@ import ProBroadcastView from './components/live-tracking/ProBroadcastView';
 import MobileStreamPage from './pages/MobileStreamPage';
 // Cloud livestream pages load RealtimeKit, so they're split out of the main bundle
 const LiveProgramPage = lazy(() => import('./pages/live/LiveProgramPage'));
+const SiteCanvas = lazy(() => import('./components/site-builder/SiteCanvas'));
 const LiveCameraPage = lazy(() => import('./pages/live/LiveCameraPage'));
 const LiveCloudTestPage = lazy(() => import('./pages/live/LiveCloudTestPage'));
 const liveFallback = <div style={{ minHeight: '100vh', background: '#060B16' }} />;
@@ -259,6 +260,7 @@ function App() {
       <SubdomainProvider clubId={null} isSubdomainMode={false}>
         <Routes>
           {/* Public Club Website Routes */}
+          <Route path="/club/:clubId/public/__builder" element={<React.Suspense fallback={null}><SiteCanvas /></React.Suspense>} />
           <Route path="/club/:clubId/public" element={<PublicClubHomepageNew />} />
           <Route path="/club/:clubId/public/news" element={<PublicNewsPage />} />
 

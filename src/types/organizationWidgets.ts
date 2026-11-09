@@ -101,6 +101,8 @@ export interface OrganizationPageLayout {
   page_title: string;
   page_icon?: string;
   rows: OrganizationPageRow[];
+  /** Site builder changes not yet published (null when the page matches what's live) */
+  draft_rows?: OrganizationPageRow[] | null;
   is_published: boolean;
   show_in_navigation: boolean;
   navigation_order: number;

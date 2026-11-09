@@ -5,7 +5,7 @@ import { createOrganizationPage, deleteOrganizationPage, updateOrganizationPage 
 import { AUTO_PAGES, RESERVED_SLUGS, SiteMenuItem, resolveMenu } from '../../utils/publicSite';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useHub, timeAgo } from './hubData';
-import { HUB_ROUTES } from './WebsiteHub';
+import { HUB_ROUTES, hasDraftChanges, publishUpdate } from './WebsiteHub';
 import { PageThumb } from './PageThumb';
 import { MenuEditor, MenuEditorHandle } from './MenuEditor';
 
@@ -122,11 +122,20 @@ export const HubPages: React.FC = () => {
 
   const togglePublish = async (p: any) => {
     setMenuFor(null);
-    const res = await updateOrganizationPage(p.id, { is_published: !p.is_published } as any);
+    const res = await updateOrganizationPage(p.id, (p.is_published ? { is_published: false } : publishUpdate(p)) as any);
     if (!res) { addNotification('error', 'Could not change the page. Please try again.'); return; }
     log(p.is_published ? 'unpublished' : 'published', 'page', p.page_title, p.id);
     await reload(['pages']);
     addNotification('success', p.is_published ? 'Page taken off your site' : 'Page published');
+  };
+
+  const publishChanges = async (p: any) => {
+    setMenuFor(null);
+    const res = await updateOrganizationPage(p.id, publishUpdate(p) as any);
+    if (!res) { addNotification('error', 'Could not publish. Please try again.'); return; }
+    log('published', 'page', p.page_title, p.id);
+    await reload(['pages']);
+    addNotification('success', 'Changes are live');
   };
 
   const remove = async (p: any) => {
@@ -201,7 +210,7 @@ export const HubPages: React.FC = () => {
             return (
               <article key={p.id} className="wh-pc">
                 <div className="tw" onClick={() => navigate(`/website/pages/edit/${p.page_slug}`)} role="button" tabIndex={0} aria-label={`Edit ${p.page_title}`} onKeyDown={e => { if (e.key === 'Enter') navigate(`/website/pages/edit/${p.page_slug}`); }}>
-                  <PageThumb rows={p.rows as any} w="100%" h={136} large />
+                  <PageThumb rows={(hasDraftChanges(p) ? p.draft_rows : p.rows) as any} w="100%" h={136} large />
                   <span className="ov">
                     <span className="a-btn a-btn-p" style={{ height: 32 }}><Pencil size={14} />Edit</span>
                     {p.is_published && <a className="a-btn" style={{ height: 32 }} href={publicUrl(p.page_slug)} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}><Eye size={14} />View</a>}
@@ -214,12 +223,14 @@ export const HubPages: React.FC = () => {
                   <div className="sl">/{p.page_slug}</div>
                   <div className="pf">
                     <span className={`wh-pill ${p.is_published ? 'wh-live' : 'wh-draft'}`}>{p.is_published ? 'Live' : 'Draft'}</span>
+                    {p.is_published && hasDraftChanges(p) && <span className="wh-pill wh-draft" title="Changes made in the builder that aren't on your site yet">Unpublished changes</span>}
                     <span className="wh-pill" style={menuOn ? undefined : { opacity: 0.7 }}>{menuOn ? <><MenuIcon size={12} />In menu</> : 'Not in menu'}</span>
                     <span className="ed">{timeAgo(p.updated_at || p.created_at || new Date().toISOString())}</span>
                   </div>
                   {menuFor === p.id && (
                     <div className="wh-pop-menu" role="menu">
                       <button role="menuitem" onClick={() => navigate(`/website/pages/edit/${p.page_slug}`)}><Pencil size={15} />Edit in builder</button>
+                      {p.is_published && hasDraftChanges(p) && <button role="menuitem" onClick={() => publishChanges(p)}><Send size={15} />Publish changes</button>}
                       <button role="menuitem" onClick={() => togglePublish(p)}>{p.is_published ? <><EyeOff size={15} />Take off the site</> : <><Send size={15} />Publish</>}</button>
                       <button role="menuitem" onClick={() => { setMenuFor(null); toggleMenu('page', p.page_slug, p.page_title); }}><MenuIcon size={15} />{menuOn ? 'Remove from menu' : 'Add to menu'}</button>
                       {p.is_published && <button role="menuitem" onClick={() => { setMenuFor(null); window.open(publicUrl(p.page_slug), '_blank', 'noopener'); }}><ExternalLink size={15} />View on site</button>}
