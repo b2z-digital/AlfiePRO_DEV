@@ -20,6 +20,8 @@ export interface MCalendarItem {
   date: string;              // YYYY-MM-DD
   endDate?: string;
   venue: string;
+  /** The venue's photo (venues.image), as the desktop event page shows */
+  venueImage?: string | null;
   raceClass?: string;
   raceFormat?: string;
   level: 'club' | 'state' | 'national';
@@ -161,6 +163,13 @@ export async function loadCalendar(clubId: string | undefined, org: { type: stri
   }
 
   items.sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
+  // Venue photos, matched by venue name like the desktop event page
+  const names = [...new Set(items.filter(i => i.kind === 'race' && i.venue).map(i => i.venue))];
+  if (names.length) {
+    const { data: venues } = await supabase.from('venues').select('name, image').in('name', names).not('image', 'is', null);
+    const photo = new Map((venues || []).map((v: any) => [v.name as string, v.image as string]));
+    for (const i of items) if (i.kind === 'race') i.venueImage = photo.get(i.venue) || null;
+  }
   return items;
 }
 

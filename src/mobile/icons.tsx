@@ -28,6 +28,7 @@ const P: Record<string, string> = {
   video: 'M15 10l5-3v10l-5-3M3 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
   plus: 'M12 5v14M5 12h14',
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
+  whistle: 'M3 13a5 5 0 0 0 9.7 1.7H21V9.5h-9.6A5 5 0 0 0 3 13M8 13h.01M15 9.5V6.5h3',
   flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
   trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   book: 'M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2zM4 20V5M19 18v3H6',

@@ -25,7 +25,7 @@ import { padBoats, registerPad, startingOrder } from '../finishPad';
 import { ScoreTogetherSheet, useTogether } from './ScoreTogether';
 import { OfflineBar } from './Sync';
 import { handicapSettingsFor } from '../confirmRace';
-import { SOUND, SoundSheet, StartDial, playSystemSound, readVolume, useKeepAwake } from '../startBoxParts';
+import { SOUND, SignalButtons, SoundSheet, StartDial, playSystemSound, readVolume, useKeepAwake } from '../startBoxParts';
 import { HEAT_COLOURS, Loading, Missing } from './RaceSetup';
 
 const seqKey = (format?: string) => `alfie-m-startbox-seq:${format === 'handicap' ? 'handicap' : 'scratch'}`;
@@ -401,6 +401,7 @@ export const RaceScreen: React.FC = () => {
           <button className="m-card m-act-tile" onClick={() => setSheet('recall')}><Icon name="recall" size={22} />Recall</button>
           <button className="m-card m-act-tile" style={{ color: 'var(--m-red-ink)' }} onClick={() => setSheet('abandon')}><Icon name="close" size={22} />Abandon</button>
         </div>
+        <SignalButtons engine={engine} onTap={() => tap('light')} />
         {session.marks.length > 0 && (
           <div className="m-card">
             <div className="m-li"><span className="m-lb m-dim" style={{ flex: 1 }}>Marked during the race</span></div>
@@ -480,6 +481,7 @@ export const RaceScreen: React.FC = () => {
           )}
           {up.handicap && roll && <BoatsCard up={up} skippers={skippers} roll={roll} onRoll={r => setSession({ ...session, rollCall: r })} title="Roll call" />}
           <div style={{ flex: 1, minHeight: 16 }} />
+          <SignalButtons engine={engine} onTap={() => tap('light')} />
           <div className="m-row" style={{ gap: 22 }}>
             {running
               ? <button className="m-rb m-rb-s" onClick={postpone}><Icon name="pause" size={20} />Postpone</button>

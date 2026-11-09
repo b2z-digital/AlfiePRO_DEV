@@ -39,7 +39,7 @@ export const EventDetail: React.FC = () => {
   return (
     <div className="m-stack">
       <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 'calc(var(--m-safe-top) + 230px)', zIndex: -1,
-        background: 'linear-gradient(180deg, rgba(6,11,22,0) 35%, var(--m-bg) 100%), linear-gradient(125deg,#0A3D7A 0%,#1C6FC2 50%,#9DD2FF 100%)' }} />
+        background: `linear-gradient(180deg, rgba(6,11,22,.25) 0%, rgba(6,11,22,0) 35%, var(--m-bg) 100%), ${item.venueImage ? `url("${item.venueImage}") center / cover no-repeat` : 'linear-gradient(125deg,#0A3D7A 0%,#1C6FC2 50%,#9DD2FF 100%)'}` }} />
       <SubHeader right={
         <span className="m-row" style={{ gap: 8 }}>
           {item.event && <button className="m-ibtn" aria-label="Add to calendar" onClick={() => addToCalendar(item)}><Icon name="calendar" size={19} /></button>}
@@ -156,7 +156,7 @@ const ResultsTable: React.FC<{ item: MCalendarItem }> = ({ item }) => {
               return (
                 <tr key={s.index} style={{ borderTop: '1px solid var(--m-line)', background: me ? 'rgba(10,132,255,.12)' : undefined }}>
                   <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 700 }} className="m-disp">{pos + 1}</td>
-                  <td style={{ padding: '10px 6px', fontWeight: me ? 700 : 500, position: 'sticky', left: 0, background: me ? '#12233F' : 'var(--m-sheet)' }}>
+                  <td style={{ padding: '10px 6px', fontWeight: me ? 700 : 500, position: 'sticky', left: 0, background: me ? 'linear-gradient(rgba(10,132,255,.12), rgba(10,132,255,.12)), var(--m-sheet)' : 'var(--m-sheet)' }}>
                     {shortName(s.name)} <span className="m-dim" style={{ fontWeight: 400 }}>{s.sailNo}</span>
                   </td>
                   {st.races.map(r => {

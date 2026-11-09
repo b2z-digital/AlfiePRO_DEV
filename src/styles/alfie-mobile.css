@@ -666,3 +666,8 @@ button.m-sail.m-sail-off, button.m-sail.m-sail-ocs { color: var(--m-red-ink); }
 .m-terms-body p, .m-terms-body ul, .m-terms-body ol { margin: 0 0 8px; }
 .m-terms-body a { color: var(--m-blue-ink); }
 .m-al-draw > * { flex: 1; min-height: 0; }
+/* Whistle and Bell on the timers */
+.m-signals { display: flex; justify-content: center; gap: 10px; }
+.m-signal { height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--m-fill-b); background: var(--m-fill); color: var(--m-ink); display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 14.5px; font-weight: 600; }
+.m-signal:active { transform: scale(.96); }
+.m-venue-ph { width: 44px; height: 44px; border-radius: 12px; background: #10233F center / cover no-repeat; }

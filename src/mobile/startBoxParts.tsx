@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import type { StartBoxAudioEngine } from '../utils/startBoxAudio';
 import { getSoundById } from '../utils/startBoxStorage';
 import { isNative } from '../lib/native/platform';
+import { Icon } from './icons';
 
 export const VOL_KEY = 'startbox-volume';
 
@@ -67,6 +68,14 @@ export const StartDial: React.FC<{ size: number; progress: number; racing?: bool
 };
 
 /** Volume, a test tone and (on the race desk) the whistle, bell and horn. */
+/** Whistle and Bell for the race officer at any time, as on the desktop StartBox (its sounds, same fallbacks). */
+export const SignalButtons: React.FC<{ engine: StartBoxAudioEngine; onTap?: () => void }> = ({ engine, onTap }) => (
+  <div className="m-signals" role="group" aria-label="Signals">
+    <button className="m-signal" onClick={() => { onTap?.(); void playSystemSound(engine, SOUND.whistle, 1200, 300); }}><Icon name="whistle" size={19} />Whistle</button>
+    <button className="m-signal" onClick={() => { onTap?.(); void playSystemSound(engine, SOUND.bell, 660, 500); }}><Icon name="bell" size={19} />Bell</button>
+  </div>
+);
+
 export const SoundSheet: React.FC<{ engine: StartBoxAudioEngine; volume: number; onVolume: (v: number) => void; onClose: () => void; horns?: boolean }> = ({ engine, volume, onVolume, onClose, horns }) => {
   const [busy, setBusy] = useState(false);
   const play = async (id: string, hz: number, ms: number) => { setBusy(true); await playSystemSound(engine, id, hz, ms); setBusy(false); };

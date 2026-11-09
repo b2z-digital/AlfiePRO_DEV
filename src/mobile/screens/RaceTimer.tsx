@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { StartSequence, StartBoxState } from '../../types/startBox';
 import { getStartBoxEngine, destroyStartBoxEngine } from '../../utils/startBoxAudio';
 import { getSequences } from '../../utils/startBoxStorage';
-import { SoundSheet, StartDial, readVolume, useKeepAwake } from '../startBoxParts';
+import { SignalButtons, SoundSheet, StartDial, readVolume, useKeepAwake } from '../startBoxParts';
 import { useMobile } from '../MobileContext';
 import { Icon } from '../icons';
 
@@ -132,6 +132,7 @@ export const RaceTimerScreen: React.FC = () => {
       )}
 
       <div style={{ flex: 1, minHeight: 24 }} />
+      <div style={{ marginBottom: 20 }}><SignalButtons engine={engine} /></div>
       <div className="m-row" style={{ gap: 24 }}>
         <button className="m-rb" aria-label="Sync to the nearest minute" onClick={sync} disabled={!canSync} style={{ width: 64, height: 64, background: 'var(--m-fill)', flexDirection: 'column', fontSize: 12, gap: 2, opacity: canSync ? 1 : .45 }}>
           <Icon name="clock" size={20} />Sync

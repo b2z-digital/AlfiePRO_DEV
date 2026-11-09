@@ -39,9 +39,13 @@ const AgendaRow: React.FC<{ item: MCalendarItem }> = ({ item }) => {
   const next = daysUntil(item.date) >= 0 && item.kind === 'race';
   return (
     <button className="m-card" onClick={() => openItem(navigate, item)} style={{ padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left', opacity: item.cancelled ? .55 : 1 }}>
-      <span className="m-tile" style={{ background: item.kind === 'meeting' ? 'rgba(255,138,43,.15)' : 'rgba(10,132,255,.14)', color: item.kind === 'meeting' ? '#FFA65C' : 'var(--m-blue-ink)' }}>
-        <Icon name={item.kind === 'meeting' ? 'club' : 'sail'} size={19} />
-      </span>
+      {item.venueImage
+        ? <span className="m-tile m-venue-ph" style={{ backgroundImage: `url("${item.venueImage}")` }} aria-hidden="true" />
+        : (
+          <span className="m-tile" style={{ background: item.kind === 'meeting' ? 'rgba(255,138,43,.15)' : 'rgba(10,132,255,.14)', color: item.kind === 'meeting' ? '#FFA65C' : 'var(--m-blue-ink)' }}>
+            <Icon name={item.kind === 'meeting' ? 'club' : 'sail'} size={19} />
+          </span>
+        )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: item.cancelled ? 'line-through' : undefined }}>{item.title}</div>
         <div className="m-mut" style={{ fontSize: 12.5, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -65,10 +69,9 @@ type CalFilter = 'mine' | 'all' | 'club' | 'state' | 'national';
 export const CalendarScreen: React.FC = () => {
   const navigate = useNavigate();
   const { calendar, calendarLoading, myClasses } = useMobile();
-  const [filter, setFilter] = useState<CalFilter>(myClasses.length ? 'mine' : 'all');
+  const [filter, setFilter] = useState<CalFilter>('all');
   const sameClass = (a?: string) => !!a && myClasses.some(c => c.toLowerCase() === a.toLowerCase());
   const touched = useRef(false);
-  useEffect(() => { if (!touched.current && myClasses.length) setFilter('mine'); }, [myClasses.length]);
   const today = todayISO();
   const [weekStart, setWeekStart] = useState(() => {
     const d = parseDay(today); const dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dow); return d;
