@@ -231,7 +231,12 @@ body.alv-onair-dock .alv-onair-host { padding-right: 368px; }
 .alv-ov-screen .brand .w { font-size: 1.05cqw; font-weight: 700; color: #fff; }
 .alv-ov-screen .brand .w b { color: #2A93FF; }
 .alv-ov-screen .brand .t { margin-left: 0.5cqw; padding-left: 0.7cqw; border-left: 0.08cqw solid rgba(255, 255, 255, 0.3); font-size: 0.8cqw; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(235, 240, 255, 0.7); }
-.alv-h2c .alv-ov-screen .chip, .alv-h2c .alv-ov-screen .meta .race { line-height: 1; }
+/* html2canvas draws text lower than the browser: in the capture, give lines more room and
+   centre badge text with line-height instead of flex */
+.alv-h2c .alv-ov-screen h1 { position: relative; top: -0.22em; margin-bottom: -0.1em; }
+.alv-h2c .alv-ov-screen .meta { margin-top: 2.2cqw; }
+.alv-h2c .alv-ov-screen .chip .tx, .alv-h2c .alv-ov-screen .meta .race .tx { position: relative; top: -0.3em; }
+.alv-h2c .alv-ov-screen .meta .m, .alv-h2c .alv-ov-screen .meta .first { position: relative; top: -0.2em; }
 
 .alv-ov-results {
   left: 50%; top: 50%; transform: translate(-50%, -50%); width: 46cqw; padding: 1.8cqw 2.2cqw; border-radius: 1.2cqw;

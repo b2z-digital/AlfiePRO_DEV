@@ -375,19 +375,25 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       });
     };
 
+    // Test broadcasts and their replays only reach super admins; label them so they can't be mistaken
+    const markTests = <T extends { is_public?: boolean | null; title?: string | null }>(rows: T[]): T[] =>
+      rows.map(r => (r.is_public === false && !/^TEST\b/i.test(r.title || '') ? { ...r, title: `TEST · ${r.title || 'Broadcast'}` } : r));
+
     const loadLiveStreams = async () => {
       try {
         // Only broadcasts that are actually live. A studio in Preview ('testing') isn't
-        // sending video yet, and test broadcasts (is_public false) open from their link only.
-        const { data } = await supabase
+        // sending video yet, and test broadcasts (is_public false) open from their link only,
+        // except for super admins, who see them here marked TEST so they can check a test run.
+        let liveQuery = supabase
           .from('livestream_sessions')
           .select('*')
           .eq('status', 'live')
-          .eq('is_public', true)
           .not('cloudflare_live_input_id', 'is', null)
           .not('cloudflare_customer_code', 'is', null)
           .order('actual_start_time', { ascending: false });
-        const liveWithVenues = await enrichStreamsWithClubData(data || []);
+        if (!isSuperAdmin) liveQuery = liveQuery.eq('is_public', true);
+        const { data } = await liveQuery;
+        const liveWithVenues = await enrichStreamsWithClubData(markTests(data || []));
         setLiveStreams(liveWithVenues);
 
         const oneWeekFromNow = new Date();
@@ -405,16 +411,17 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
         const upcomingWithVenues = await enrichStreamsWithClubData(upcoming || []);
         setUpcomingStreams(upcomingWithVenues);
 
-        const { data: archives } = await supabase
+        let archiveQuery = supabase
           .from('livestream_archives')
           .select('*')
-          .eq('is_public', true)
           .or('youtube_url.not.is.null,cloudflare_playback_url.not.is.null')
           .not('duration', 'is', null)
           .gt('duration', 0)
           .order('recorded_at', { ascending: false })
           .limit(20);
-        setReplayArchives(archives || []);
+        if (!isSuperAdmin) archiveQuery = archiveQuery.eq('is_public', true);
+        const { data: archives } = await archiveQuery;
+        setReplayArchives(markTests(archives || []));
       } catch (err) {
         console.error('Error loading live streams:', err);
       }
@@ -422,7 +429,8 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     loadLiveStreams();
     const interval = setInterval(loadLiveStreams, 30000);
     return () => clearInterval(interval);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin]);
 
   // Open a broadcast straight from its link: /alfie-tv?watch=<sessionId>.
   // The studio's "Watch test" uses this so a test broadcast can be checked on any

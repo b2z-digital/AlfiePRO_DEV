@@ -102,6 +102,13 @@ export const AlfieTVPlayer: React.FC<AlfieTVPlayerProps> = ({ videoId, title, on
   }, []);
 
   // ── YouTube player ────────────────────────────────────────────────
+  // YouTube picks the quality in embeds and starts low. These calls are no longer documented
+  // and may be ignored, but where they still work the replay starts in HD instead of 360p.
+  const askForHd = (p: any) => {
+    try { p.setPlaybackQualityRange?.('hd1080', 'highres'); } catch { /* ignored by YouTube */ }
+    try { p.setPlaybackQuality?.('hd1080'); } catch { /* ignored by YouTube */ }
+  };
+
   useEffect(() => {
     let cancelled = false;
     loadYouTubeApi()
@@ -130,6 +137,7 @@ export const AlfieTVPlayer: React.FC<AlfieTVPlayerProps> = ({ videoId, title, on
                 setVolume(p.getVolume());
                 const r = p.getAvailablePlaybackRates?.();
                 if (Array.isArray(r) && r.length) setRates(r);
+                askForHd(p);
                 p.playVideo();
               } catch { /* player still starting */ }
             },
@@ -138,6 +146,7 @@ export const AlfieTVPlayer: React.FC<AlfieTVPlayerProps> = ({ videoId, title, on
               const s = e.data;
               setPlaying(s === YT_STATE.PLAYING || s === YT_STATE.BUFFERING);
               if (s === YT_STATE.PLAYING) {
+                askForHd(e.target);
                 setStarted(true);
                 try { setDuration(e.target.getDuration() || 0); } catch { /* ignore */ }
               }

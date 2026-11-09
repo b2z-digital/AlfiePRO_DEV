@@ -64,7 +64,11 @@ async function getYouTubeCredentials(
   });
 
   if (!tokenRes.ok) {
-    throw new Error("Failed to refresh YouTube token");
+    const detail = await tokenRes.text().catch(() => "");
+    console.error("[Segment] YouTube token refresh failed:", detail.slice(0, 300));
+    throw new Error(detail.includes("invalid_grant")
+      ? "YouTube needs reconnecting: sign in to Google again under Settings > Integrations"
+      : "Failed to refresh YouTube token");
   }
 
   const tokenData = await tokenRes.json();
@@ -717,6 +721,33 @@ Deno.serve(async (req: Request) => {
       await addToPlaylist(ytCreds, playlistId, youtubeVideoId, segment.race_number - 1);
     }
 
+    // Race thumbnail: the broadcast intro screen for this race, saved by the control room as
+    // <club>/<segment>-thumb.jpg. YouTube only accepts custom thumbnails on verified channels;
+    // if it refuses, the video keeps YouTube's own thumbnail and AlfieTV draws its own tile.
+    const thumbPath = `${segment.club_id}/${segment.id}-thumb.jpg`;
+    let thumbnailUrl: string | null = null;
+    try {
+      const { data: thumbFile } = await serviceClient.storage.from("livestream-recordings").download(thumbPath);
+      if (thumbFile) {
+        const thumbRes = await fetch(
+          `https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${encodeURIComponent(youtubeVideoId)}&uploadType=media`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${ytCreds.access_token}`, "Content-Type": "image/jpeg" },
+            body: new Uint8Array(await thumbFile.arrayBuffer()),
+          }
+        );
+        if (thumbRes.ok) {
+          thumbnailUrl = `https://i.ytimg.com/vi/${youtubeVideoId}/hqdefault.jpg`;
+          console.log(`[Segment] Custom thumbnail set for ${youtubeVideoId}`);
+        } else {
+          console.warn(`[Segment] YouTube refused the thumbnail (${thumbRes.status}): ${(await thumbRes.text()).slice(0, 300)}`);
+        }
+      }
+    } catch (thumbErr) {
+      console.warn("[Segment] Thumbnail step skipped:", thumbErr);
+    }
+
     await serviceClient
       .from("livestream_race_segments")
       .update({
@@ -745,6 +776,7 @@ Deno.serve(async (req: Request) => {
       recorded_at: segment.segment_start_time,
       is_public: !isTestBroadcast,
       duration,
+      thumbnail_url: thumbnailUrl,
     }).select("id").maybeSingle();
 
     // If there was a session-level placeholder archive with source 'local', remove it
@@ -772,6 +804,7 @@ Deno.serve(async (req: Request) => {
         .from("livestream-recordings")
         .remove([segment.local_recording_path]);
     }
+    await serviceClient.storage.from("livestream-recordings").remove([thumbPath]).catch(() => {});
 
     await serviceClient
       .from("livestream_race_segments")

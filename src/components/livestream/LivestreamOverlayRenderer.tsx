@@ -932,7 +932,7 @@ export function BroadcastScreen({
             {hostClubName && <span className="name">{clip(hostClubName, 44)}</span>}
           </span>
         )}
-        <span className={`chip is-${variant}`}><span className="dot" />{chip}</span>
+        <span className={`chip is-${variant}`}><span className="dot" /><span className="tx">{chip}</span></span>
       </div>
 
       <div className="body">
@@ -941,7 +941,7 @@ export function BroadcastScreen({
         <h1>{clip(title, 80)}</h1>
         {meta.length > 0 && (
           <div className="meta">
-            {race && <span className={variant === 'intro' ? 'race' : 'first'}>{race}</span>}
+            {race && <span className={variant === 'intro' ? 'race' : 'first'}><span className="tx">{race}</span></span>}
             {rest.map((m, i) => <span key={i} className="m">{m}</span>)}
           </div>
         )}

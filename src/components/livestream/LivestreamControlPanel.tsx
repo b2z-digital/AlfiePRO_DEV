@@ -25,7 +25,8 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { useCanvasCompositor } from '../../hooks/useCanvasCompositor';
 import { subscribeToRaceStatus } from '../../utils/liveTrackingStorage';
 import { getRaceStatusEventId } from '../../utils/livestreamEventIds';
-import { resolveLiveEvent, fetchScoringRace, stripBroadcastSuffix, raceNumberFromLabel } from '../../utils/liveEventInfo';
+import { fetchScoringRace, stripBroadcastSuffix, raceNumberFromLabel } from '../../utils/liveEventInfo';
+import { saveRaceThumbnail } from './broadcastThumbnail';
 import type { LivestreamRaceSegment } from '../../types/livestream';
 
 /** Auto director: how long each camera stays on program while racing */
@@ -611,6 +612,29 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     }
   };
 
+  /** The race's thumbnail (intro screen with its race number), stored next to the recording */
+  const saveSegmentThumbnail = async (segment: LivestreamRaceSegment): Promise<void> => {
+    if (!activeSession) return;
+    try {
+      const full = stripBroadcastSuffix(activeSession.title || '');
+      const m = full.match(/^(.*?)\s*[-–|·]\s*((?:round|rd|day)\s*\d+)\s*$/i);
+      const parts = String(segment.segment_title || '').split(' | ');
+      const race = parts.length > 1 ? parts[parts.length - 1] : `Race ${segment.race_number}`;
+      await saveRaceThumbnail(activeSession.club_id, segment.id, {
+        title: (m ? m[1] : full) || 'Race video',
+        round: m ? m[2] : null,
+        race,
+        dateLabel: new Date(segment.segment_start_time || Date.now()).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+        venueName: venueInfo.venueName,
+        venueImage: venueInfo.venueImage,
+        hostClubName: venueInfo.hostClubName,
+        hostClubLogo: venueInfo.hostClubLogo,
+      });
+    } catch (err) {
+      console.warn('[Thumbnail] Skipped:', err);
+    }
+  };
+
   const handleSegmentStop = async (triggerType: 'race_scored' | 'on_hold' | 'manual' | 'stream_end', isFinalSegment = false) => {
     if (!activeSession || segmentTransitionRef.current) return;
     segmentTransitionRef.current = true;
@@ -625,17 +649,16 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
         await livestreamStorage.finalizeSegment(segmentToFinalize.id, triggerType);
         addNotification('info', `Race ${segmentToFinalize.race_number} recording saved. Uploading to YouTube...`, 4000);
 
-        if (recordingBlob && recordingBlob.size > 10000) {
-          uploadLocalRecording(recordingBlob, segmentToFinalize.id, activeSession.club_id).then(() => {
-            livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch((err) => {
-              console.error('[Segment] Background processing error:', err);
-            });
-          });
-        } else {
+        // Recording and thumbnail are both in storage before the upload to YouTube starts
+        const thumbnailSaved = saveSegmentThumbnail(segmentToFinalize);
+        const recordingSaved = recordingBlob && recordingBlob.size > 10000
+          ? uploadLocalRecording(recordingBlob, segmentToFinalize.id, activeSession.club_id)
+          : Promise.resolve(null);
+        Promise.all([recordingSaved, thumbnailSaved]).then(() => {
           livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch((err) => {
             console.error('[Segment] Background processing error:', err);
           });
-        }
+        });
       }
 
       setCurrentSegment(null);
@@ -1582,12 +1605,12 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
 
       if (segmentToFinalize) {
         await livestreamStorage.finalizeSegment(segmentToFinalize.id, 'stream_end');
+        const thumbnailSaved = saveSegmentThumbnail(segmentToFinalize);
         if (recordingBlob && recordingBlob.size > 10000) {
           localStoragePath = await uploadLocalRecording(recordingBlob, segmentToFinalize.id, activeSession.club_id);
-          livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch(() => {});
-        } else {
-          livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch(() => {});
         }
+        await thumbnailSaved;
+        livestreamStorage.triggerSegmentProcessing(segmentToFinalize.id).catch(() => {});
         setCurrentSegment(null);
       } else if (recordingBlob && recordingBlob.size > 10000) {
         const fallbackId = crypto.randomUUID();
