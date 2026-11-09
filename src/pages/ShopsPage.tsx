@@ -93,7 +93,7 @@ const ShopsPage: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2.5">
                 <div className="a-sh-aisles flex-1 min-w-0" role="tablist" aria-label="Categories">
                   <button role="tab" aria-selected={aisle === 'all'} className={`a-sh-aisle ${aisle === 'all' ? 'a-sh-aisle-on' : ''}`} onClick={() => setAisle('all')}>
-                    <span style={{ background: 'var(--alfie-spectrum)', color: '#fff' }}><Store size={17} /></span>All shops<em>{suppliers.length}</em>
+                    <span style={{ background: 'rgba(10,132,255,.15)', color: '#4DA3FF' }}><Store size={17} /></span>All shops<em>{suppliers.length}</em>
                   </button>
                   {categories.map(c => (
                     <button key={c.id} role="tab" aria-selected={aisle === c.id} className={`a-sh-aisle ${aisle === c.id ? 'a-sh-aisle-on' : ''}`} onClick={() => setAisle(c.id)}>

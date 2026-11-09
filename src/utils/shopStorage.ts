@@ -104,16 +104,20 @@ function hexToRgb(hex: string): [number, number, number] {
 export function shopMesh(color: string, light = false): string {
   const [r, g, b] = hexToRgb(color);
   const c = (a: number) => `rgba(${r},${g},${b},${a})`;
-  // lift very dark brand colours so the banner still glows
+  // very dark brand colours get a little lift so the banner isn't flat black
   const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  const lift = lum < 0.3 ? 0.35 : 0;
-  const base = light ? '#F4F7FC' : '#0B1120';
+  const lift = lum < 0.3 ? 0.08 : 0;
+  if (light) {
+    return [
+      `radial-gradient(110% 120% at 0% 0%, ${c(0.32)} 0%, transparent 70%)`,
+      `radial-gradient(80% 100% at 100% 100%, ${c(0.14)} 0%, transparent 70%)`,
+      `linear-gradient(135deg, ${c(0.16)}, #F4F7FC 85%)`,
+    ].join(', ');
+  }
   return [
-    `radial-gradient(70% 90% at 85% 15%, rgba(255,62,154,${light ? 0.22 : 0.38}) 0%, transparent 60%)`,
-    `radial-gradient(60% 80% at 100% 100%, rgba(255,138,43,${light ? 0.14 : 0.22 + lift / 2}) 0%, transparent 65%)`,
-    `radial-gradient(80% 90% at 55% 0%, rgba(138,77,255,${light ? 0.2 : 0.3 + lift}) 0%, transparent 70%)`,
-    `radial-gradient(120% 120% at 0% 0%, ${c(light ? 0.75 : 1)} 0%, ${c(light ? 0.35 : 0.55)} 40%, transparent 75%)`,
-    `linear-gradient(135deg, ${c(light ? 0.4 : 0.7)}, ${base} 85%)`,
+    `radial-gradient(70% 90% at 90% 10%, rgba(120,140,255,${0.06 + lift}) 0%, transparent 65%)`,
+    `radial-gradient(110% 120% at 0% 0%, ${c(0.55)} 0%, ${c(0.22)} 45%, transparent 75%)`,
+    `linear-gradient(135deg, ${c(0.3)}, #0D1220 80%)`,
   ].join(', ');
 }
 

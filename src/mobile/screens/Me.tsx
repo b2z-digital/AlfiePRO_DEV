@@ -71,7 +71,7 @@ export const Me: React.FC = () => {
       </div>
 
       <button className="m-card" onClick={() => navigate('/shops')} style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
-        <span className="m-tile" style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--m-spectrum)', color: '#fff' }}><Icon name="bag" size={20} /></span>
+        <span className="m-tile" style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(10,132,255,.14)', color: 'var(--m-blue-ink)' }}><Icon name="bag" size={20} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 15 }}>Shops</div>
           <div className="m-dim" style={{ fontSize: 12.5 }}>Parts, sails and gear from suppliers</div>
