@@ -1,0 +1,586 @@
+// The race screen: runs the engine at a fixed 20 Hz, draws the water every frame, and floats the
+// HUD over it (wind, clock, line or course, fleet, coach, boat strip, sticks). Rules moments pause
+// the race in full-coach mode. Keyboard, transmitter and on-screen sticks all steer.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Race } from '@/sim/engine';
+import { LEVELS, PERSONAS, Skipper } from '@/sim/ai';
+import { Rng } from '@/sim/math';
+import type { Boat, Incident, RaceSettings } from '@/sim/types';
+import { DT, hullGap } from '@/sim/physics';
+import { dir, dist, n180 } from '@/sim/math';
+import { keepClear, spellSail } from '@/sim/referee';
+import { CoachMode, Cue, LineInfo, WindMemory, coachCue, lineInfo, pointOfSail, trimAdvice } from './coach';
+import { Camera, drawRace } from './render';
+import { Controls, GamepadMapping, loadMapping, saveMapping } from './input';
+import { RaceAudio } from './audio';
+import { PlayerLog, RaceSummary, summarize } from './stats';
+import {
+  BoatStrip, ClockCard, CoachCard, ControlsCard, CourseCard, FleetCard, FleetRow, HintBanner, LineCard, ReplayBar,
+  ResultRowView, ResultsOverlay, RuleSheet, RulesMomentPanel, Toast, Toasts, WindCard,
+} from './hud';
+import GamepadModal from './GamepadModal';
+import { Btn, C, Chip, Hud, Seg, clock, ordinal } from './ui';
+
+export interface SimRaceProps {
+  settings: RaceSettings;
+  mode: 'race' | 'start';
+  coach: CoachMode;
+  onCoachChange: (m: CoachMode) => void;
+  onHome: () => void;
+  onDebrief: (race: Race, sum: RaceSummary) => void;
+  onAgain: () => void;
+}
+
+interface HudState {
+  T: number; raceT: number; preStart: boolean;
+  wind: { kn: number; from: number; spark: number[]; swing: number };
+  line: LineInfo | null;
+  course: { leg: string; legNo: number; legs: number; next: string; distL: number | null; place: number; of: number; status: string | null };
+  fleet: FleetRow[];
+  boat: { tack: 'Starboard' | 'Port'; pos: string; spdPct: number; kn: number; trim: string };
+  rudder: number; sheet: number; twa: number;
+  owed: boolean; finished: boolean;
+}
+
+const KN = 0.514444;
+const REPLAY_MAX = 200; // steps of history kept for the instant replay (10 s)
+
+function legLabel(race: Race, idx: number): string {
+  const leg = race.course.legs[idx];
+  if (!leg) return 'Finished';
+  return leg.name;
+}
+
+function nextTarget(race: Race, p: Boat): { x: number; y: number; name: string; upwind: boolean; isMark: boolean } | null {
+  const c = race.course;
+  const legIdx = p.started ? p.legIndex : 0;
+  const leg = c.legs[legIdx];
+  if (!leg) return null;
+  if (leg.kind === 'mark') { const m = c.byId[leg.rounding.markId]; return { x: m.p.x, y: m.p.y, name: m.name, upwind: leg.upwind, isMark: true }; }
+  if (leg.kind === 'gate') {
+    const a = c.byId[leg.options[0].markId], b = c.byId[leg.options[1].markId];
+    const m = dist(a.p, p) <= dist(b.p, p) ? a : b;
+    return { x: m.p.x, y: m.p.y, name: 'the gate', upwind: false, isMark: true };
+  }
+  return { x: (c.finish.pin.x + c.finish.stbd.x) / 2, y: (c.finish.pin.y + c.finish.stbd.y) / 2, name: 'the finish', upwind: true, isMark: false };
+}
+
+export default function SimRace({ settings, mode, coach, onCoachChange, onHome, onDebrief, onAgain }: SimRaceProps) {
+  const race = useMemo(() => new Race(settings), [settings]);
+  useEffect(() => {
+    // Development only: let a test or the console reach the race, and hand the player's boat to an AI helm.
+    if (!import.meta.env.DEV) return;
+    const w = window as unknown as { __simRace?: Race; __simAutopilot?: () => void };
+    w.__simRace = race;
+    w.__simAutopilot = () => {
+      const p = race.player; if (!p) return;
+      const i = race.boats.indexOf(p);
+      p.persona = { ...PERSONAS[2] };
+      (race.skippers as (Skipper | null)[])[i] = new Skipper(p, LEVELS[race.settings.level], p.persona, new Rng(race.settings.seed + 7), i);
+      race.autopilot = true;
+    };
+  }, [race]);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const ctl = useRef(new Controls()).current;
+  const audio = useRef(new RaceAudio()).current;
+  const mem = useRef(new WindMemory()).current;
+  const log = useRef(new PlayerLog()).current;
+  const cam = useRef<Camera>({ x: 0, y: -4, scale: 30 }).current;
+  const size = useRef({ w: 800, h: 600, dpr: 1 }).current;
+  const flashes = useRef<{ x: number; y: number; t: number }[]>([]).current;
+
+  const [hud, setHud] = useState<HudState | null>(null);
+  const [cue, setCue] = useState<Cue | null>(null);
+  const [paused, setPaused] = useState(false);
+  const [moment, setMoment] = useState<Incident | null>(null);
+  const [banner, setBanner] = useState<Incident | null>(null);
+  const [replay, setReplay] = useState<{ back: number; playing: boolean } | null>(null);
+  const [results, setResults] = useState<{ rows: ResultRowView[]; live: boolean; title: string } | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [padOpen, setPadOpen] = useState(false);
+  const [mapping, setMapping] = useState<GamepadMapping>(loadMapping);
+  const [ruleSheet, setRuleSheet] = useState<string | null>(null);
+  const [coachHidden, setCoachHidden] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [fast, setFast] = useState(false);
+  const [laylines, setLaylines] = useState(true);
+  const [follow, setFollow] = useState(true);
+  const [zoom, setZoom] = useState(1);
+
+  // Mirrors of state for the animation loop.
+  const R = useRef({ paused, replay, coach, mapping, fast, laylines, follow, zoom, penaltyAssist: false, ended: false, playerDoneAt: -1, evIdx: 0, toastId: 0, cueAt: -9, resultsAt: -9 });
+  R.current.paused = paused; R.current.replay = replay; R.current.coach = coach; R.current.mapping = mapping;
+  R.current.fast = fast; R.current.laylines = laylines; R.current.follow = follow; R.current.zoom = zoom;
+  useEffect(() => { audio.muted = muted; if (muted) audio.stop(); }, [muted, audio]);
+  useEffect(() => {
+    if (!banner) return;
+    const id = window.setTimeout(() => setBanner(b => (b === banner ? null : b)), 9000);
+    return () => window.clearTimeout(id);
+  }, [banner]);
+  useEffect(() => () => audio.stop(), [audio]);
+
+  const toast = useCallback((text: string, tone: Toast['tone'] = 'plain') => {
+    const id = ++R.current.toastId;
+    setToasts(ts => [...ts.slice(-2), { id, text, tone }]);
+    window.setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), 3600);
+  }, []);
+
+  const resultRows = useCallback((): ResultRowView[] => {
+    if (mode === 'start') {
+      const starts = race.events.filter(e => e.type === 'started') as { boat: string; late: number }[];
+      const rows = race.boats.map(b => {
+        const s = starts.find(x => x.boat === b.id);
+        return { b, late: s ? s.late : null };
+      }).sort((a, z) => (a.late ?? 999) - (z.late ?? 999));
+      return rows.map((r, i) => ({ id: r.b.id, place: i + 1, sail: r.b.sail, name: r.b.isPlayer ? 'You' : r.b.persona?.name ?? '', color: r.b.color, isPlayer: r.b.isPlayer, time: r.late === null ? (r.b.ocs ? 'OCS' : 'not started') : `+${r.late.toFixed(1)} s` }));
+    }
+    return race.results().map(r => ({
+      id: r.boat.id, place: r.place, sail: r.boat.sail, name: r.boat.isPlayer ? 'You' : r.boat.persona?.name ?? '', color: r.boat.color, isPlayer: r.boat.isPlayer,
+      time: r.status === 'finished' ? clock(r.time ?? 0) : r.status === 'racing' ? 'racing' : r.status.toUpperCase(),
+    }));
+  }, [race, mode]);
+
+  // ── Events from the engine ──
+  const onIncident = useCallback((inc: Incident) => {
+    flashes.push({ x: inc.at.x, y: inc.at.y, t: race.t });
+    const p = race.player;
+    const mine = !!p && inc.offender === p.id;
+    const against = !!p && inc.victim === p.id;
+    if (!mine && !against) {
+      if (p && inc.kind !== 'ocs' && dist(inc.at, p) < 10 * p.cls.loa) toast(`Rule ${inc.rule}: ${race.boatById(inc.offender).sail} owes a penalty`);
+      return;
+    }
+    const m = R.current.coach;
+    if (m === 'full') { R.current.paused = true; setPaused(true); setMoment(inc); }
+    else if (m === 'hints') setBanner(inc);
+    else toast(inc.kind === 'ocs' ? 'Recall: you were over at the gun' : mine ? `Rule ${inc.rule}: you owe a One-Turn Penalty` : `Rule ${inc.rule}: ${race.boatById(inc.offender).sail} owes you a penalty`, 'warn');
+  }, [race, toast, flashes]);
+
+  const handleEvents = useCallback(() => {
+    const p = race.player;
+    const evs = race.events;
+    for (; R.current.evIdx < evs.length; R.current.evIdx++) {
+      const e = evs[R.current.evIdx];
+      switch (e.type) {
+        case 'signal': audio.signal(e.remaining); break;
+        case 'gun': audio.gun(); break;
+        case 'recall': {
+          const sails = e.boats.map(id => race.boatById(id).sail);
+          audio.recall(sails);
+          toast(`Recall: ${sails.join(', ')}`, 'warn');
+          break;
+        }
+        case 'hail': {
+          const b = race.boatById(e.boat);
+          if (p && b !== p && dist(b, p) < 8 * p.cls.loa) audio.say(e.text, true);
+          break;
+        }
+        case 'incident': onIncident(e.incident); break;
+        case 'penalty-done': if (p && e.boat === p.id) { R.current.penaltyAssist = false; toast('Penalty done. Back to racing.', 'good'); } break;
+        case 'rounded': if (p && e.boat === p.id) toast(`${legLabel(race, e.leg)} done · ${ordinal(e.place)}`); break;
+        case 'finish': if (p && e.boat === p.id) { toast(`Finished ${ordinal(e.place)}`, 'good'); audio.beep(1200, 300); R.current.playerDoneAt = race.t; } break;
+        case 'started': if (p && e.boat === p.id) toast(e.late < 0.3 ? 'Started right on the gun' : `Started ${e.late.toFixed(1)} s after the gun`, e.late < 2 ? 'good' : 'plain'); break;
+        default: break;
+      }
+    }
+  }, [race, audio, toast, onIncident]);
+
+  // ── Snapshot for the HUD ──
+  const makeHud = useCallback((): HudState | null => {
+    const p = race.player;
+    if (!p) return null;
+    const T = race.gunT - race.t;
+    const ws = race.wind.sample(p.x, p.y, race.t);
+    const n = mem.samples.length;
+    const base = n ? mem.samples.reduce((a, s) => a + n180(s.twd - mem.samples[0].twd), 0) / n + mem.samples[0].twd : ws.twd;
+    const spark = mem.samples.map(s => n180(s.twd - base));
+    const pre = T > 0;
+    const line = pre || !p.started ? lineInfo(race, p) : null;
+    const nx = nextTarget(race, p);
+    const legs = race.course.legs.length;
+    const place = race.livePlace(p);
+    const status = p.ocs && !p.started && race.t >= race.gunT ? 'Recall' : p.penalty.owed > 0 ? 'Penalty' : null;
+    const fleet: FleetRow[] = race.boats.map((b, i) => ({
+      id: b.id, sail: b.sail, color: b.color, isPlayer: b.isPlayer,
+      name: b.isPlayer ? 'You' : b.persona?.name ?? '',
+      intent: b.isPlayer ? (pre ? 'Your start' : b.finished ? 'Finished' : legLabel(race, b.legIndex)) : race.skippers[i]?.intent ?? '',
+      place: race.livePlace(b),
+      flag: b.ocs && !b.started && race.t >= race.gunT ? 'OCS' : b.penalty.owed > 0 ? 'P' : b.finished ? '✓' : null,
+    }));
+    fleet.sort((a, z) => (pre ? (a.isPlayer ? -1 : z.isPlayer ? 1 : a.sail.localeCompare(z.sail)) : a.place - z.place));
+    return {
+      T, raceT: Math.max(0, -T), preStart: pre,
+      wind: { kn: ws.tws / KN, from: ws.twd, spark, swing: mem.swing(40) },
+      line,
+      course: { leg: p.finished ? 'Finished' : legLabel(race, p.started ? p.legIndex : 0), legNo: (p.started ? p.legIndex : 0) + 1, legs, next: nx ? `To ${nx.name}` : '', distL: nx && !p.finished ? Math.round(dist(nx, p) / p.cls.loa) : null, place, of: race.boats.length, status },
+      fleet,
+      boat: { tack: p.tack === 'stbd' ? 'Starboard' : 'Port', pos: pointOfSail(p), spdPct: p.targetSpd > 0.05 * p.cls.hullSpeed ? Math.min(1.25, p.spd / p.targetSpd) : 0, kn: p.spd / KN, trim: trimAdvice(p) },
+      rudder: ctl.rudder, sheet: ctl.sheet, twa: p.twa,
+      owed: p.penalty.owed > 0, finished: p.finished,
+    };
+  }, [race, mem, ctl]);
+
+  // ── The loop ──
+  useEffect(() => {
+    let raf = 0, last = performance.now(), acc = 0, hudAt = 0;
+    const L = race.course.L;
+    const fitCourse = () => {
+      const B = race.course.bounds;
+      const s = Math.min(size.h / (B.alongMax - B.alongMin) * 0.95, size.w / (B.across * 1.6));
+      const mid = (B.alongMin + B.alongMax) / 2;
+      return { x: race.course.origin.x + race.course.up.x * mid, y: race.course.origin.y + race.course.up.y * mid, scale: s };
+    };
+    const frame = (now: number) => {
+      const dtReal = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      const st = R.current;
+      ctl.update(dtReal, st.mapping);
+      const p = race.player;
+      if (!st.paused && !st.replay && !st.ended) {
+        acc += dtReal * (st.fast ? 2.5 : 1);
+        let n = 0;
+        while (acc >= DT && n < 10) {
+          race.input = { rudder: ctl.rudder, sheet: ctl.sheet, autoTrim: race.settings.autoTrim, penaltyAssist: st.penaltyAssist };
+          race.step();
+          handleEvents();
+          if (p) { mem.update(race.t, race.wind.sample(p.x, p.y, race.t).twd); log.sample(race, p, mem.mean); }
+          acc -= DT; n++;
+          if (st.paused) { acc = 0; break; }
+        }
+        if (n >= 10) acc = 0;
+        // The end.
+        const startDone = mode === 'start' && race.t > race.gunT + 12;
+        const playerDone = mode === 'race' && st.playerDoneAt > 0 && race.t > st.playerDoneAt + 3;
+        if ((race.ended || startDone || playerDone) && race.t - st.resultsAt > 0.5) {
+          st.resultsAt = race.t;
+          const mine = p ? race.results().find(r => r.boat === p) : null;
+          const title = mode === 'start' ? 'Start report' : mine && mine.status === 'finished' ? `You finished ${ordinal(mine.place)}` : 'Results';
+          setResults({ rows: resultRows(), live: !race.ended && mode === 'race', title });
+          if (race.ended || startDone) st.ended = true;
+        }
+      }
+      // Instant replay playback.
+      if (st.replay && st.replay.playing) {
+        const back = Math.max(0, st.replay.back - dtReal * 20);
+        st.replay = { back, playing: back > 0 };
+        setReplay(st.replay);
+      }
+      // Camera: follow the player (or her replay position), or fit the course.
+      if (p) {
+        const H = race.hist[race.boats.indexOf(p)];
+        const back = st.replay ? Math.round(st.replay.back) : 0;
+        const k = H.x.length - 1 - back;
+        const px = back && k >= 0 ? H.x[k] : p.x, py = back && k >= 0 ? H.y[k] : p.y;
+        const lead = dir(p.hdg);
+        const tgt = st.follow ? { x: px + lead.x * p.spd * 1.2, y: py + lead.y * p.spd * 1.2, scale: (Math.min(size.w, size.h * 1.5) / (30 * L)) * st.zoom } : fitCourse();
+        const k1 = Math.min(1, dtReal * 2.6), k2 = Math.min(1, dtReal * 4);
+        cam.x += (tgt.x - cam.x) * k1; cam.y += (tgt.y - cam.y) * k1; cam.scale += (tgt.scale - cam.scale) * k2;
+      }
+      // Draw.
+      const cv = canvasRef.current;
+      const ctx = cv?.getContext('2d');
+      if (ctx && p) {
+        const T = race.gunT - race.t;
+        const li = T > 0 ? lineInfo(race, p) : null;
+        const nx = nextTarget(race, p);
+        drawRace(ctx, race, {
+          w: size.w, h: size.h, dpr: size.dpr, cam,
+          showLaylines: st.laylines && T <= 0, showZones: T <= 0 && !!nx?.isMark,
+          back: st.replay ? Math.round(st.replay.back) : 0,
+          ttl: li && li.ttl !== null && li.to ? { s: li.ttl, to: li.to } : null,
+          flashes, preStart: T > 0,
+          next: nx ? { x: nx.x, y: nx.y, name: nx.name, upwind: nx.upwind } : null,
+        });
+      }
+      // HUD at 10 Hz; the coach line changes at most every 1.5 s so it can be read.
+      if (now - hudAt > 100) {
+        hudAt = now;
+        const hs = makeHud();
+        if (hs) setHud(hs);
+        if (p && race.t - st.cueAt > 1.5) {
+          st.cueAt = race.t;
+          setCue(coachCue(race, p, mem, lineInfo(race, p)));
+        }
+        if (st.resultsAt > 0 && !st.ended && mode === 'race') setResults(r => (r ? { ...r, rows: resultRows(), live: !race.ended } : r));
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [race, ctl, mem, log, cam, size, flashes, handleEvents, makeHud, resultRows, mode]);
+
+  // ── Canvas size ──
+  useEffect(() => {
+    const el = wrapRef.current, cv = canvasRef.current;
+    if (!el || !cv) return;
+    const fit = () => {
+      const r = el.getBoundingClientRect();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      size.w = Math.max(320, r.width); size.h = Math.max(240, r.height); size.dpr = dpr;
+      cv.width = Math.round(size.w * dpr); cv.height = Math.round(size.h * dpr);
+      cv.style.width = `${size.w}px`; cv.style.height = `${size.h}px`;
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [size]);
+
+  // ── Actions ──
+  const togglePause = useCallback(() => {
+    if (moment || results) return;
+    setPaused(v => { R.current.paused = !v; return !v; });
+  }, [moment, results]);
+
+  const doTack = useCallback(() => {
+    const p = race.player; if (!p) return;
+    race.requestManeuver(Math.abs(p.twa) < 90 ? 'tack' : 'gybe');
+  }, [race]);
+
+  const doPenalty = useCallback(() => {
+    const p = race.player; if (!p || p.penalty.owed <= 0) return;
+    R.current.penaltyAssist = true;
+    toast('Turning: one tack and one gybe');
+  }, [race, toast]);
+
+  const doHail = useCallback(() => {
+    const p = race.player; if (!p) return;
+    const L = p.cls.loa;
+    const recent = [...race.incidents].reverse().find(i => i.victim === p.id && race.t - i.t < 12);
+    if (recent) {
+      const o = race.boatById(recent.offender);
+      race.hail(p, `Protest, ${spellSail(o.sail)}`);
+      audio.say(`Protest, ${spellSail(o.sail)}`, true);
+      if (race.forgot.has(o.id)) { race.forgot.delete(o.id); toast(`${o.sail} heard your protest and will take her turn`, 'good'); }
+      recent.resolved = recent.resolved === 'pending' ? 'protested' : recent.resolved;
+      return;
+    }
+    const pi = race.boats.indexOf(p);
+    for (let j = 0; j < race.boats.length; j++) {
+      const mr = race.referee.markRoom(pi, j);
+      if (mr?.iEntitled) { race.hail(p, 'Room!'); audio.say('Room', true); return; }
+    }
+    let best: Boat | null = null, bg = 3 * L;
+    for (const o of race.boats) { if (o === p || o.finished) continue; const g = hullGap(p, o); if (g < bg) { bg = g; best = o; } }
+    if (best) {
+      const kc = keepClear(p, best, race.t);
+      if (kc.keeper === 1) {
+        const text = kc.rule === '10' ? 'Starboard!' : kc.rule === '11' ? 'Up, up!' : 'Keep clear!';
+        race.hail(p, text); audio.say(text.replace(/!/g, ''), true); return;
+      }
+    }
+    toast('Nothing to hail: you only hail when you have rights, need room, or protest');
+  }, [race, audio, toast]);
+
+  const closeMoment = useCallback((takePenalty: boolean) => {
+    if (takePenalty) R.current.penaltyAssist = true;
+    setMoment(null); setReplay(null); R.current.replay = null;
+    setPaused(false); R.current.paused = false;
+  }, []);
+
+  const startReplay = useCallback(() => {
+    const back = Math.min(REPLAY_MAX, (race.hist[0]?.x.length ?? 1) - 1);
+    const r = { back, playing: true };
+    R.current.replay = r; setReplay(r);
+  }, [race]);
+
+  const exitReplay = useCallback(() => {
+    R.current.replay = null; setReplay(null);
+    if (!moment) { setPaused(false); R.current.paused = false; }
+  }, [moment]);
+
+  const finish = useCallback(() => {
+    const sum = summarize(race, log, mode);
+    onDebrief(race, sum);
+  }, [race, log, mode, onDebrief]);
+
+  // ── Keyboard ──
+  useEffect(() => {
+    const isField = (t: EventTarget | null) => t instanceof HTMLElement && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName);
+    const down = (e: KeyboardEvent) => {
+      if (isField(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      let used = true;
+      if (k === 'arrowleft' || k === 'a') ctl.left = true;
+      else if (k === 'arrowright' || k === 'd') ctl.right = true;
+      else if (k === 'arrowup' || k === 'w') ctl.down = true;     // stick up = sail out
+      else if (k === 'arrowdown' || k === 's') ctl.up = true;     // stick down = sail in
+      else if (k === 't' || k === 'g') { if (!e.repeat) doTack(); }
+      else if (k === 'h') { if (!e.repeat) doHail(); }
+      else if (k === 'p') { if (!e.repeat) doPenalty(); }
+      else if (k === ' ' || k === 'escape') { if (!e.repeat) togglePause(); }
+      else if (k === 'l') { if (!e.repeat) setLaylines(v => !v); }
+      else if (k === 'c') { if (!e.repeat) setFollow(v => !v); }
+      else if (k === 'f') { if (!e.repeat) setFast(v => !v); }
+      else if (k === '+' || k === '=') setZoom(z => Math.min(3, z * 1.15));
+      else if (k === '-' || k === '_') setZoom(z => Math.max(0.35, z / 1.15));
+      else used = false;
+      if (used) e.preventDefault();
+    };
+    const up = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (k === 'arrowleft' || k === 'a') ctl.left = false;
+      else if (k === 'arrowright' || k === 'd') ctl.right = false;
+      else if (k === 'arrowup' || k === 'w') ctl.down = false;
+      else if (k === 'arrowdown' || k === 's') ctl.up = false;
+    };
+    const blur = () => { ctl.left = ctl.right = ctl.up = ctl.down = false; };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
+  }, [ctl, doTack, doHail, doPenalty, togglePause]);
+
+  const s = race.settings;
+  const sub = `${race.boats[0].cls.name} · ${s.fleetSize} boats · ${s.level[0].toUpperCase()}${s.level.slice(1)} skippers · ${s.windStrength[0].toUpperCase()}${s.windStrength.slice(1)} wind, ${s.windCharacter}`;
+  const p = race.player;
+  const otherSail = moment ? (() => { const id = moment.offender === p?.id ? moment.victim : moment.offender; return id ? race.boatById(id).sail : null; })() : null;
+  const showCoach = coach !== 'off' && !coachHidden && !moment && !results;
+
+  return (
+    <div className="flex h-full min-h-[560px] flex-col text-[14px] text-[#F1F4FA]" style={{ background: C.bg, fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
+      <header className="flex min-h-[60px] shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.06] px-4 py-2.5 sm:px-5" style={{ background: C.head }}>
+        <Btn onClick={onHome} aria-label="Back to the simulator home">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          <span className="hidden sm:inline">Back</span>
+        </Btn>
+        <div className="min-w-0">
+          <p className="m-0 text-[15px] font-semibold">{mode === 'start' ? 'Start practice' : 'Quick race'}{paused && !moment && <Chip tone="warn" className="ml-2">Paused</Chip>}</p>
+          <p className="m-0 mt-0.5 hidden truncate text-[12.5px] sm:block" style={{ color: C.mute }}>{sub}</p>
+        </div>
+        <span className="ml-auto hidden text-[12.5px] 2xl:inline" style={{ color: C.mute }}>← → steer · ↑ ↓ sail out / in · T tack · H hail · P penalty · Space pause</span>
+        <Seg size="sm" label="Coaching" value={coach} onChange={m => { onCoachChange(m); setCoachHidden(false); }} options={[{ value: 'full', label: 'Full coach' }, { value: 'hints', label: 'Hints' }, { value: 'off', label: 'Off' }]} className="ml-auto 2xl:ml-0" />
+        <Btn icon aria-label={fast ? 'Normal speed' : 'Speed up'} aria-pressed={fast} onClick={() => setFast(v => !v)} title="Speed up (F)"><span className="text-[12px] font-bold">{fast ? '2.5×' : '1×'}</span></Btn>
+        <Btn icon aria-label={muted ? 'Sound on' : 'Mute'} onClick={() => { audio.unlock(); setMuted(v => !v); }}>
+          {muted
+            ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6" /></svg>
+            : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5zM15.5 8.5a5 5 0 010 7M19 5a10 10 0 010 14" /></svg>}
+        </Btn>
+        <Btn icon aria-label="Transmitter set-up" onClick={() => setPadOpen(true)} title="Transmitter">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="3" /><path d="M8 11v4M6 13h4M15.5 12h.01M18 14h.01M12 7V3" /></svg>
+        </Btn>
+        <Btn icon aria-label={paused ? 'Resume' : 'Pause'} onClick={togglePause}>
+          {paused
+            ? <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+            : <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>}
+        </Btn>
+        <Btn icon aria-label="Restart" onClick={onAgain}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
+        </Btn>
+      </header>
+
+      <main ref={wrapRef} className="relative min-h-0 flex-1 overflow-hidden" onPointerDown={() => audio.unlock()}
+        onWheel={e => setZoom(z => Math.max(0.35, Math.min(3, z * Math.exp(-e.deltaY * 0.0012))))}>
+        <canvas ref={canvasRef} className="absolute inset-0 block" role="img" aria-label="The race course, seen from above, with your boat in the middle" />
+
+        {hud && (
+          <>
+            {/* Top row */}
+            <div className="absolute left-6 top-5 hidden md:block"><WindCard {...hud.wind} /></div>
+            <div className="absolute left-3 top-3 hidden sm:block md:hidden"><WindCard {...hud.wind} compact /></div>
+            <div className="absolute left-1/2 top-3 hidden -translate-x-1/2 sm:block sm:top-4">
+              <ClockCard preStart={hud.preStart} T={hud.T} seq={race.settings.sequenceSeconds} raceT={hud.raceT}
+                sub={hud.finished ? 'Finished' : `${ordinal(hud.course.place)} of ${hud.course.of} · leg ${Math.min(hud.course.legNo, hud.course.legs)} of ${hud.course.legs}`} />
+            </div>
+            <div className="absolute left-3 top-3 flex items-start gap-2 sm:hidden">
+              <ClockCard compact preStart={hud.preStart} T={hud.T} seq={race.settings.sequenceSeconds} raceT={hud.raceT}
+                sub={hud.finished ? 'Finished' : `${ordinal(hud.course.place)} of ${hud.course.of}`} />
+              <Hud className="flex flex-col items-center gap-1 px-3 py-2.5">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9CCBFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: `rotate(${hud.wind.from + 180}deg)` }}><path d="M12 4v16M6 10l6-6 6 6" /></svg>
+                <span className="font-display text-[18px] font-bold tabular-nums">{hud.wind.kn.toFixed(1)}</span>
+                <span className="text-[11px]" style={{ color: C.mute }}>kn</span>
+              </Hud>
+            </div>
+            <div className="absolute bottom-[236px] right-6 top-5 hidden flex-col gap-4 lg:flex">
+              {hud.line ? <LineCard line={hud.line} /> : <CourseCard {...hud.course} />}
+              <FleetCard rows={hud.fleet} preStart={hud.preStart} />
+            </div>
+
+            {/* View tools */}
+            <Hud className="absolute left-3 top-1/2 hidden -translate-y-1/2 flex-col gap-1.5 p-1.5 sm:left-6 md:flex">
+              <Btn icon small aria-label="Zoom in" onClick={() => setZoom(z => Math.min(3, z * 1.25))}>+</Btn>
+              <Btn icon small aria-label="Zoom out" onClick={() => setZoom(z => Math.max(0.35, z / 1.25))}>−</Btn>
+              <Btn icon small aria-label={follow ? 'Show the whole course' : 'Follow my boat'} aria-pressed={!follow} onClick={() => setFollow(v => !v)} title="Course view (C)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+              </Btn>
+              <Btn icon small aria-label="Laylines" aria-pressed={laylines} onClick={() => setLaylines(v => !v)} title="Laylines (L)" className={laylines ? '!bg-white/[0.12]' : ''}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeDasharray="3 3" aria-hidden="true"><path d="M12 4L4 20M12 4l8 16" /></svg>
+              </Btn>
+            </Hud>
+
+            {/* Bottom row */}
+            {showCoach && (
+              <>
+                <div className="absolute bottom-6 left-6 hidden lg:block"><CoachCard cue={cue} mode={coach} onHide={() => setCoachHidden(true)} /></div>
+                <div className="absolute left-3 right-3 top-[124px] sm:top-[168px] lg:hidden"><CoachCard cue={cue} mode={coach} onHide={() => setCoachHidden(true)} compact /></div>
+              </>
+            )}
+            {!replay && !moment && (
+              <div className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 xl:block">
+                <BoatStrip {...hud.boat} auto={race.settings.autoTrim} />
+              </div>
+            )}
+            <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6">
+              <ControlsCard
+                rudder={hud.rudder} sheet={hud.sheet}
+                onRudder={v => { ctl.touchRudder = v; }} onRudderEnd={() => { ctl.touchRudder = null; }}
+                onSheet={v => { ctl.sheet = v; }}
+                onTack={doTack} onHail={doHail} tackLabel={Math.abs(hud.twa) < 90 ? 'Tack' : 'Gybe'}
+                penalty={hud.owed && !R.current.penaltyAssist} onPenalty={doPenalty}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Toasts */}
+        <div className="pointer-events-none absolute left-1/2 top-[168px] -translate-x-1/2"><Toasts items={toasts} /></div>
+
+        {/* Hints-mode banner */}
+        {banner && !moment && (
+          <div className="absolute left-1/2 top-[168px] -translate-x-1/2">
+            <HintBanner inc={banner} mine={banner.offender === p?.id} onOpen={() => { setMoment(banner); setBanner(null); setPaused(true); R.current.paused = true; }} onClose={() => setBanner(null)} />
+          </div>
+        )}
+
+        {/* Rules moment */}
+        {moment && (
+          <div className="absolute bottom-4 right-4 top-4 flex sm:right-6 sm:top-5">
+            <RulesMomentPanel inc={moment} mine={moment.offender === p?.id} otherSail={otherSail}
+              onPenalty={() => closeMoment(true)} onContinue={() => closeMoment(false)} onReplay={startReplay} onLearn={() => setRuleSheet(moment.rule)} />
+          </div>
+        )}
+        {replay && (
+          <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6">
+            <ReplayBar back={replay.back} max={REPLAY_MAX} playing={replay.playing}
+              onStep={d => { const r = { back: Math.max(0, Math.min(REPLAY_MAX, replay.back + d)), playing: false }; R.current.replay = r; setReplay(r); }}
+              onToggle={() => { const r = { back: replay.back <= 0 ? Math.min(REPLAY_MAX, race.hist[0].x.length - 1) : replay.back, playing: !replay.playing }; R.current.replay = r; setReplay(r); }}
+              onScrub={b => { const r = { back: b, playing: false }; R.current.replay = r; setReplay(r); }}
+              onExit={exitReplay} />
+          </div>
+        )}
+
+        {/* Paused (not for a rules moment) */}
+        {paused && !moment && !results && !replay && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <Hud className="flex flex-col items-center gap-3 px-8 py-6 text-center">
+              <p className="m-0 font-display text-[26px] font-bold">Paused</p>
+              <p className="m-0 text-[13.5px]" style={{ color: C.mute }}>Press Space to carry on</p>
+              <div className="flex gap-2.5"><Btn primary onClick={togglePause}>Resume</Btn><Btn onClick={startReplay}>Replay the last 10 s</Btn></div>
+            </Hud>
+          </div>
+        )}
+
+        {results && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/35 p-4">
+            <ResultsOverlay rows={results.rows} title={results.title} live={results.live} onDebrief={finish} onAgain={onAgain} onHome={onHome} />
+          </div>
+        )}
+
+        {ruleSheet && <RuleSheet rule={ruleSheet} onClose={() => setRuleSheet(null)} />}
+        {padOpen && <GamepadModal mapping={mapping} onSave={m => { setMapping(m); saveMapping(m); }} onClose={() => setPadOpen(false)} />}
+      </main>
+    </div>
+  );
+}
+
