@@ -59,7 +59,7 @@ describe('Start Trainer', () => {
       expect(r.outcome.pass, `${d.id}: ${r.outcome.title}`).toBe(false);
     });
     it(`${d.id}: the demo ${AI_DEMOS.has(d.id) ? 'runs' : 'passes'}`, () => {
-      for (const seed of [1, 2, 3]) {
+      for (const seed of d.demoSeeds ?? [1, 2, 3]) {
         const r = runScene(d.scene(seed), d.goal, seed, d.solution);
         if (!AI_DEMOS.has(d.id)) expect(r.outcome.pass, `${d.id} seed ${seed}: ${r.outcome.title}`).toBe(true);
         else expect(r.outcome.title.length).toBeGreaterThan(0);

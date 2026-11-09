@@ -4,7 +4,7 @@ import React, { useRef } from 'react';
 import type { Incident } from '@/sim/types';
 import type { Cue, CoachMode, LineInfo } from './coach';
 import { ruleText } from './rulesText';
-import { Btn, C, Cap, Chip, CoachGlyph, Hud, InfoGlyph, Tile, WarnGlyph, clock, cx, ordinal } from './ui';
+import { AlfieOrb, Btn, C, Cap, Chip, Hud, InfoGlyph, WarnGlyph, clock, cx, ordinal } from './ui';
 
 // ───────────────────────── Wind ─────────────────────────
 export function WindCard({ kn, from, spark, swing, compact }: { kn: number; from: number; spark: number[]; swing: number; compact?: boolean }) {
@@ -152,8 +152,8 @@ export function CoachCard({ cue, mode, onHide, onWhy, compact }: { cue: Cue | nu
   return (
     <Hud className={cx('flex flex-col gap-3', compact ? 'px-4 py-3' : 'px-5 py-[18px]')} style={{ width: compact ? '100%' : 432 }}>
       <div className="flex items-center gap-2.5">
-        <Tile size={compact ? 28 : 34}><CoachGlyph size={compact ? 15 : 17} /></Tile>
-        <p className="m-0 text-[15px] font-semibold">Coach</p>
+        <AlfieOrb size={compact ? 26 : 32} />
+        <p className="m-0 text-[15px] font-semibold">Alfie</p>
         <span className="rounded-full bg-white/[0.07] px-2.5 py-[3px] text-xs font-semibold">{cue.topic}</span>
         <button type="button" onClick={onHide} className="ml-auto cursor-pointer rounded-lg border-0 bg-transparent px-2 py-1 text-[12.5px] font-semibold text-[#A9D2FF] hover:bg-white/[0.06]">Hide</button>
       </div>
@@ -272,7 +272,7 @@ export function RulesMomentPanel({ inc, mine, otherSail, onPenalty, onContinue, 
       )}
       {inc.nextTime && (
         <div className="flex flex-col gap-1.5">
-          <Cap>Next time</Cap>
+          <Cap className="flex items-center gap-2"><AlfieOrb size={18} />Alfie's tip for next time</Cap>
           <p className="m-0 text-[13.5px] leading-normal" style={{ color: C.mute }}>{inc.nextTime}</p>
         </div>
       )}

@@ -15,6 +15,7 @@ import { GoalCtx, Outcome, WorldOverlay, buildScene, goalCtx, windwardBoat } fro
 import type { SceneSpec } from '@/sim/training';
 import { CoachMode, Cue, LineInfo, WindMemory, coachCue, lineInfo, pointOfSail, trimAdvice } from './coach';
 import { Camera, drawRace } from './render';
+import { BankCam, drawBank, followCam, newBankCam } from './bank';
 import { Controls, GamepadMapping, loadMapping, saveMapping } from './input';
 import { RaceAudio } from './audio';
 import { PlayerLog, RaceSummary, summarize } from './stats';
@@ -24,7 +25,9 @@ import {
 } from './hud';
 import GamepadModal from './GamepadModal';
 import CourseMap from './CourseMap';
-import { Btn, C, Chip, Hud, Seg, clock, ordinal } from './ui';
+import { AlfieOrb, Btn, C, Chip, Hud, Seg, clock, ordinal } from './ui';
+
+export type SimView = 'bank' | 'top';
 
 /** A drill, lesson or lab moment to play. */
 export interface ActiveScene {
@@ -37,6 +40,8 @@ export interface ActiveScene {
   scoreText?: (v: number) => string;
   best?: string | null;
   nextLabel?: string;
+  /** Your auto-trim setting from the home screen (scenes are set up with it on). */
+  autoTrim?: boolean;
 }
 
 export interface SimRaceProps {
@@ -45,6 +50,9 @@ export interface SimRaceProps {
   mode: 'race' | 'start' | 'scene';
   coach: CoachMode;
   onCoachChange: (m: CoachMode) => void;
+  /** From the bank, the way you see a race from the control area, or from above. */
+  view: SimView;
+  onViewChange: (v: SimView) => void;
   onHome: () => void;
   onDebrief?: (race: Race, sum: RaceSummary) => void;
   onAgain: () => void;
@@ -96,8 +104,14 @@ function urgency(c: Cue, T: number): number {
   return 1;
 }
 
-export default function SimRace({ settings, scene, mode, coach, onCoachChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext }: SimRaceProps) {
-  const built = useMemo(() => (scene ? buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined) : null), [scene]);
+export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext }: SimRaceProps) {
+  const built = useMemo(() => {
+    if (!scene) return null;
+    const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
+    // Sail it your way: the sails follow your stick unless you've turned auto-trim on.
+    if (!scene.watch && scene.autoTrim !== undefined) b.race.settings.autoTrim = scene.autoTrim;
+    return b;
+  }, [scene]);
   const race = useMemo(() => built?.race ?? new Race(settings!), [built, settings]);
   const overlays: WorldOverlay[] = built?.overlays ?? [];
   useEffect(() => {
@@ -120,6 +134,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
   const mem = useRef(new WindMemory()).current;
   const log = useRef(new PlayerLog()).current;
   const cam = useRef<Camera>({ x: 0, y: -4, scale: 30 }).current;
+  const bcam = useRef<BankCam>(newBankCam()).current;
   const size = useRef({ w: 800, h: 600, dpr: 1 }).current;
   const flashes = useRef<{ x: number; y: number; t: number }[]>([]).current;
   const goalMemo = useRef<GoalCtx['memo']>({}).current;
@@ -142,11 +157,14 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
   const [laylines, setLaylines] = useState(true);
   const [follow, setFollow] = useState(true);
   const [zoom, setZoom] = useState(scene ? 1.25 : 1);
+  const [glance, setGlance] = useState(false);
+  const [full, setFull] = useState(false);
 
   // Mirrors of state for the animation loop.
-  const R = useRef({ paused, replay, coach, mapping, fast, laylines, follow, zoom, penaltyAssist: false, ended: false, playerDoneAt: -1, evIdx: 0, toastId: 0, cueAt: -9, cueChangedAt: -99, resultsAt: -9, cue: null as Cue | null });
+  const R = useRef({ paused, replay, coach, mapping, fast, laylines, follow, zoom, view, glance, penaltyAssist: false, ended: false, playerDoneAt: -1, evIdx: 0, toastId: 0, cueAt: -9, cueChangedAt: -99, resultsAt: -9, cue: null as Cue | null });
   R.current.paused = paused; R.current.replay = replay; R.current.coach = coach; R.current.mapping = mapping;
   R.current.fast = fast; R.current.laylines = laylines; R.current.follow = follow; R.current.zoom = zoom;
+  R.current.view = view; R.current.glance = glance;
   useEffect(() => { audio.muted = muted; if (muted) audio.stop(); }, [muted, audio]);
   useEffect(() => {
     if (!banner) return;
@@ -352,6 +370,15 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
         }
         const k1 = Math.min(1, dtReal * 2.6), k2 = Math.min(1, dtReal * 4);
         cam.x += (tgt.x - cam.x) * k1; cam.y += (tgt.y - cam.y) * k1; cam.scale += (tgt.scale - cam.scale) * k2;
+        // From the bank: walk the control area with her and turn to keep her in view, glancing
+        // towards the next mark (or the line before the start). Holding M looks straight at the mark.
+        if (st.view === 'bank') {
+          const c = race.course;
+          const nx = nextTarget(race, p);
+          const look = !p.started ? { x: (c.start.pin.x + c.start.stbd.x) / 2, y: (c.start.pin.y + c.start.stbd.y) / 2 } : nx ? { x: nx.x, y: nx.y } : null;
+          const aim = st.glance && look ? look : { x: px, y: py };
+          followCam(bcam, race, aim, dtReal, st.zoom, st.glance ? null : look, size.w);
+        }
       }
       // Draw.
       const cv = canvasRef.current;
@@ -360,15 +387,24 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
         const T = race.gunT - race.t;
         const li = T > 0 ? lineInfo(race, p) : null;
         const nx = nextTarget(race, p);
-        drawRace(ctx, race, {
-          w: size.w, h: size.h, dpr: size.dpr, cam,
-          showLaylines: st.laylines && T <= 0, showZones: T <= 0 && !!nx?.isMark,
-          back: st.replay ? Math.round(st.replay.back) : 0,
-          ttl: li && li.ttl !== null && li.to ? { s: li.ttl, to: li.to } : null,
-          flashes, preStart: T > 0,
-          next: nx ? { x: nx.x, y: nx.y, name: nx.name, upwind: nx.upwind } : null,
-          overlays, names: !!scene,
-        });
+        if (st.view === 'bank') {
+          drawBank(ctx, race, {
+            w: size.w, h: size.h, dpr: size.dpr, cam: bcam,
+            next: nx ? { x: nx.x, y: nx.y, name: nx.name } : null,
+            showZones: T <= 0 && !!nx?.isMark, preStart: T > 0, flashes, overlays, names: !!scene,
+            back: st.replay ? Math.round(st.replay.back) : 0,
+          });
+        } else {
+          drawRace(ctx, race, {
+            w: size.w, h: size.h, dpr: size.dpr, cam,
+            showLaylines: st.laylines && T <= 0, showZones: T <= 0 && !!nx?.isMark,
+            back: st.replay ? Math.round(st.replay.back) : 0,
+            ttl: li && li.ttl !== null && li.to ? { s: li.ttl, to: li.to } : null,
+            flashes, preStart: T > 0,
+            next: nx ? { x: nx.x, y: nx.y, name: nx.name, upwind: nx.upwind } : null,
+            overlays, names: !!scene,
+          });
+        }
       }
       // HUD at 10 Hz. The coach line changes at most every 6 s unless something more urgent comes up
       // (a rule risk, or start timing near the gun, which updates every 1.5 s); the rule watch keeps up.
@@ -396,7 +432,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [race, ctl, mem, log, cam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult]);
+  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult]);
 
   // ── Canvas size ──
   useEffect(() => {
@@ -414,6 +450,18 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
     ro.observe(el);
     return () => ro.disconnect();
   }, [size]);
+
+  // ── Full screen (the browser's own, on top of the simulator filling the window) ──
+  useEffect(() => {
+    const on = () => setFull(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', on);
+    return () => document.removeEventListener('fullscreenchange', on);
+  }, []);
+  const canFull = typeof document !== 'undefined' && !!document.fullscreenEnabled;
+  const toggleFull = useCallback(() => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    else void document.documentElement.requestFullscreen?.().catch(() => undefined);
+  }, []);
 
   // ── Actions ──
   const togglePause = useCallback(() => {
@@ -518,6 +566,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
       else if (k === 'p') { if (!e.repeat) doPenalty(); }
       else if (k === ' ' || k === 'escape') { if (!e.repeat) togglePause(); }
       else if (k === 'l') { if (!e.repeat) setLaylines(v => !v); }
+      else if (k === 'v') { if (!e.repeat) onViewChange(R.current.view === 'bank' ? 'top' : 'bank'); }
+      else if (k === 'm') { if (!e.repeat) setGlance(true); }
       else if (k === 'c') { if (!e.repeat) setFollow(v => !v); }
       else if (k === 'f') { if (!e.repeat) setFast(v => !v); }
       else if (k === '+' || k === '=') setZoom(z => Math.min(3, z * 1.15));
@@ -531,13 +581,14 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
       else if (k === 'arrowright' || k === 'd') ctl.right = false;
       else if (k === 'arrowup' || k === 'w') ctl.down = false;
       else if (k === 'arrowdown' || k === 's') ctl.up = false;
+      else if (k === 'm') setGlance(false);
     };
     const blur = () => { ctl.left = ctl.right = ctl.up = ctl.down = false; };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     window.addEventListener('blur', blur);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
-  }, [ctl, doTack, doHail, doPenalty, togglePause]);
+  }, [ctl, doTack, doHail, doPenalty, togglePause, onViewChange]);
 
   const s = race.settings;
   const sub = scene
@@ -554,16 +605,24 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
   return (
     <div className="flex h-full min-h-[560px] flex-col text-[14px] text-[#F1F4FA]" style={{ background: C.bg, fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
       <header className="flex min-h-[60px] shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.06] px-4 py-2.5 sm:px-5" style={{ background: C.head }}>
-        <Btn onClick={onHome} aria-label={scene ? `Back to the ${scene.group}` : 'Back to the simulator home'}>
+        <Btn onClick={onHome} aria-label={scene ? `Back to the ${scene.group}` : 'Main Menu'}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-          <span className="hidden sm:inline">Back</span>
+          <span className="hidden sm:inline">{scene ? scene.group : 'Main Menu'}</span>
         </Btn>
-        <div className="min-w-0 flex-1 sm:flex-none">
+        <div className="min-w-0 flex-1">
           <p className="m-0 truncate text-[15px] font-semibold">{title}{paused && !moment && <Chip tone="warn" className="ml-2">Paused</Chip>}{watching && <Chip tone="blue" className="ml-2">Watching</Chip>}</p>
-          <p className="m-0 mt-0.5 hidden max-w-[560px] truncate text-[12.5px] sm:block" style={{ color: C.mute }}>{sub}</p>
+          <p className="m-0 mt-0.5 hidden truncate text-[12.5px] sm:block" style={{ color: C.mute }} title={sub}>{sub}</p>
         </div>
         <span className="ml-auto hidden text-[12.5px] 2xl:inline" style={{ color: C.mute }}>← → steer · ↑ ↓ sail out / in · T tack · H hail · P penalty · Space pause</span>
-        <Seg size="sm" label="Coaching" value={coach} onChange={m => { onCoachChange(m); setCoachHidden(false); }} options={[{ value: 'full', label: 'Full coach' }, { value: 'hints', label: 'Hints' }, { value: 'off', label: 'Off' }]} className="ml-auto 2xl:ml-0" />
+        <div className="ml-auto flex items-center gap-2 2xl:ml-0">
+          <Seg size="sm" label="View" value={view} onChange={onViewChange} options={[{ value: 'bank', label: 'Bank view', title: 'From the control area on the bank (V)' }, { value: 'top', label: 'Top view', title: 'From above (V)' }]} />
+          <span className="hidden h-[22px] min-w-[22px] items-center justify-center rounded-[7px] border border-white/10 bg-white/[0.08] px-1.5 text-[11.5px] font-bold text-white/85 lg:inline-flex" title="Switch view">V</span>
+        </div>
+        <div className="hidden items-center gap-1.5 rounded-xl bg-black/30 py-[3px] pl-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.45)] md:flex" title="Alfie's coaching">
+          <AlfieOrb size={20} />
+          <span className="pr-0.5 text-[13px] font-semibold">Alfie</span>
+          <Seg size="sm" label="Alfie's coaching" value={coach} onChange={m => { onCoachChange(m); setCoachHidden(false); }} options={[{ value: 'full', label: 'Full' }, { value: 'hints', label: 'Hints' }, { value: 'off', label: 'Off' }]} className="!bg-transparent !shadow-none" />
+        </div>
         <Btn icon aria-label={fast ? 'Normal speed' : 'Speed up'} aria-pressed={fast} onClick={() => setFast(v => !v)} title="Speed up (F)"><span className="text-[12px] font-bold">{fast ? '2.5×' : '1×'}</span></Btn>
         <Btn icon aria-label={muted ? 'Sound on' : 'Mute'} onClick={() => { audio.unlock(); setMuted(v => !v); }}>
           {muted
@@ -573,6 +632,11 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
         <Btn icon aria-label="Transmitter set-up" onClick={() => setPadOpen(true)} title="Transmitter">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="3" /><path d="M8 11v4M6 13h4M15.5 12h.01M18 14h.01M12 7V3" /></svg>
         </Btn>
+        {canFull && (
+          <Btn icon aria-label={full ? 'Leave full screen' : 'Full screen'} aria-pressed={full} onClick={toggleFull} className={full ? '!bg-white/[0.12]' : ''}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" /></svg>
+          </Btn>
+        )}
         <Btn icon aria-label={paused ? 'Resume' : 'Pause'} onClick={togglePause}>
           {paused
             ? <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
@@ -585,7 +649,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
 
       <main ref={wrapRef} className="relative min-h-0 flex-1 overflow-hidden" onPointerDown={() => audio.unlock()}
         onWheel={e => setZoom(z => Math.max(0.35, Math.min(3, z * Math.exp(-e.deltaY * 0.0012))))}>
-        <canvas ref={canvasRef} className="absolute inset-0 block" role="img" aria-label="The race course, seen from above, with your boat in the middle" />
+        <canvas ref={canvasRef} className="absolute inset-0 block" role="img" aria-label={view === 'bank' ? 'The race seen from the control area on the bank, turning to follow your boat' : 'The race course, seen from above, with your boat in the middle'} />
 
         {hud && (
           <>
@@ -608,7 +672,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
               </Hud>
             </div>
             <div className="absolute bottom-[236px] right-6 top-5 hidden flex-col gap-4 lg:flex">
-              {hud.line ? <LineCard line={hud.line} map={<CourseMap race={race} width={240} height={150} />} /> : <CourseCard {...hud.course} map={<CourseMap race={race} width={240} height={150} />} />}
+              {hud.line ? <LineCard line={hud.line} map={<CourseMap race={race} width={240} height={150} cam={view === 'bank' ? bcam : null} />} /> : <CourseCard {...hud.course} map={<CourseMap race={race} width={240} height={150} cam={view === 'bank' ? bcam : null} />} />}
               <FleetCard rows={hud.fleet} preStart={hud.preStart} />
             </div>
 
@@ -616,12 +680,21 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, o
             <Hud className="absolute left-3 top-1/2 hidden -translate-y-1/2 flex-col gap-1.5 p-1.5 sm:left-6 md:flex">
               <Btn icon small aria-label="Zoom in" onClick={() => setZoom(z => Math.min(3, z * 1.25))}>+</Btn>
               <Btn icon small aria-label="Zoom out" onClick={() => setZoom(z => Math.max(0.35, z / 1.25))}>−</Btn>
-              <Btn icon small aria-label={follow ? 'Show the whole course' : 'Follow my boat'} aria-pressed={!follow} onClick={() => setFollow(v => !v)} title="Course view (C)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
-              </Btn>
-              <Btn icon small aria-label="Laylines" aria-pressed={laylines} onClick={() => setLaylines(v => !v)} title="Laylines (L)" className={laylines ? '!bg-white/[0.12]' : ''}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeDasharray="3 3" aria-hidden="true"><path d="M12 4L4 20M12 4l8 16" /></svg>
-              </Btn>
+              {view === 'bank' ? (
+                <Btn icon small aria-label="Glance at the next mark" aria-pressed={glance} title="Glance at the next mark (hold M)"
+                  onPointerDown={() => setGlance(true)} onPointerUp={() => setGlance(false)} onPointerLeave={() => setGlance(false)} className={glance ? '!bg-white/[0.12]' : ''}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+                </Btn>
+              ) : (
+                <>
+                  <Btn icon small aria-label={follow ? 'Show the whole course' : 'Follow my boat'} aria-pressed={!follow} onClick={() => setFollow(v => !v)} title="Course view (C)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+                  </Btn>
+                  <Btn icon small aria-label="Laylines" aria-pressed={laylines} onClick={() => setLaylines(v => !v)} title="Laylines (L)" className={laylines ? '!bg-white/[0.12]' : ''}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeDasharray="3 3" aria-hidden="true"><path d="M12 4L4 20M12 4l8 16" /></svg>
+                  </Btn>
+                </>
+              )}
             </Hud>
 
             {/* Bottom row */}

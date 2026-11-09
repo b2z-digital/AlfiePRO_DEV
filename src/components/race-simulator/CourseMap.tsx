@@ -4,8 +4,10 @@
 import { useEffect, useRef } from 'react';
 import type { Race } from '@/sim/engine';
 import { dir } from '@/sim/math';
+import type { BankCam } from './bank';
 
-export default function CourseMap({ race, width = 240, height = 170 }: { race: Race; width?: number; height?: number }) {
+/** `cam`: in the bank view, the wedge of what you can see from where you stand. */
+export default function CourseMap({ race, width = 240, height = 170, cam = null }: { race: Race; width?: number; height?: number; cam?: BankCam | null }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current; if (!cv) return;
@@ -29,6 +31,21 @@ export default function CourseMap({ race, width = 240, height = 170 }: { race: R
       ctx.strokeStyle = 'rgba(150,190,140,0.35)';
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.rect(width / 2 - B.across * s, height / 2 - (B.alongMax - midA) * s, lenC * s, lenA * s); ctx.fill(); ctx.stroke();
+      // What you can see from the bank.
+      if (cam && cam.ready) {
+        const [cx0, cy0] = P(cam.x, cam.y);
+        const far = Math.max(lenA, lenC) * 1.2;
+        const edge = (a: number) => { const v = dir(a); const hx = v.x * c.right.x + v.y * c.right.y, hy = v.x * c.up.x + v.y * c.up.y; return [cx0 + hx * far * s, cy0 - hy * far * s] as const; };
+        const half = cam.fov / 2;
+        const [ax, ay] = edge(cam.yaw - half), [bx, by] = edge(cam.yaw + half);
+        ctx.save();
+        ctx.beginPath(); ctx.rect(width / 2 - B.across * s, height / 2 - (B.alongMax - midA) * s, lenC * s, lenA * s); ctx.clip();
+        ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(cx0, cy0); ctx.lineTo(ax, ay); ctx.lineTo(bx, by); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath(); ctx.arc(cx0, cy0, 3.2, 0, Math.PI * 2); ctx.fill();
+      }
       // Start line and gate.
       const [lx1, ly1] = P(c.start.pin.x, c.start.pin.y), [lx2, ly2] = P(c.start.stbd.x, c.start.stbd.y);
       ctx.setLineDash([3, 3]); ctx.strokeStyle = '#FFB340';
@@ -66,6 +83,6 @@ export default function CourseMap({ race, width = 240, height = 170 }: { race: R
     draw();
     const id = window.setInterval(draw, 200);
     return () => window.clearInterval(id);
-  }, [race, width, height]);
+  }, [race, width, height, cam]);
   return <canvas ref={ref} style={{ width, height }} className="block rounded-xl bg-black/25" role="img" aria-label="Map of the course with your position and the fleet" />;
 }

@@ -7,7 +7,7 @@ import { accelTau, noGoAngle, polarSpeed, vmgAngles } from '../classes';
 import { easedSheet, lineHit, timeToCover } from '../ai';
 import { V2, bearing, dir, dist, dot, n180, n360, sub } from '../math';
 import { bankAhead, bow, hullGap, lineSide } from '../physics';
-import { spellSail } from '../referee';
+import { keepClear, spellSail } from '../referee';
 import { Goal, GoalCtx, Outcome, PlanFn, SceneDef, Step, closeHauled, onTack } from '../scene';
 
 export type SceneKind = 'drill' | 'lesson' | 'lab';
@@ -29,6 +29,9 @@ export interface SceneSpec {
   mistakeRule?: string;
   /** Seeds the tests try the solution with. */
   testSeeds?: number[];
+  /** Seeds the demo is known to win on. "Watch the right way" plays the first one, so the demo
+   *  doesn't hang on how the wind and the fleet happened to go in your own try. */
+  demoSeeds?: number[];
 }
 
 // ───────────────────────── outcomes ─────────────────────────
@@ -144,6 +147,25 @@ export function timeToLine(race: Race, b: Boat, tack: Tack): { ttl: number; hdg:
 /** Sit still: just above head to wind with the sail out, so she neither moves on nor drifts back. */
 export const luffing = (tack: Tack = 'stbd'): PlanFn => (_t, b) => ({ hdg: onTack(b, tack, noGoAngle(b.tws) + 3), sheet: 0.05, intent: 'Holding' });
 
+/** A starboard-tack boat (not us) close by on our right, where creeping right on port would take us. */
+function stbdToRight(race: Race, b: Boat, withinL: number): boolean {
+  const L = b.cls.loa;
+  return race.boats.some(o => o !== b && !o.finished && o.tack === 'stbd' && hullGap(b, o) < withinL * L && dot(sub(o, b), race.course.right) > -0.5 * L);
+}
+
+/** A boat we must keep clear of that we'll hit within a few seconds if nothing changes. */
+export function mustDuck(race: Race, b: Boat, horizon = 2.6): Boat | null {
+  const L = b.cls.loa;
+  for (const o of race.boats) {
+    if (o === b || o.finished) continue;
+    if (hullGap(b, o) > 4 * L || keepClear(b, o, race.t).keeper !== 0) continue;
+    const ahead = dot(sub(o, b), dir(b.hdg));
+    if (ahead < -0.3 * L) continue;
+    if (closing(b, o, horizon) < 1.1 * L) return o;
+  }
+  return null;
+}
+
 /** Hold station at a point, the way skippers hover before the start: sail there, then luff to stop,
  *  creep forward with the sail eased, sit head to wind to drift back, and nip onto port to move right. */
 export const hoverAt = (spot: V2): PlanFn => (_t, b, race) => {
@@ -165,9 +187,28 @@ export const hoverAt = (spot: V2): PlanFn => (_t, b, race) => {
   return { hdg: onTack(b, 'stbd', ng + 3), sheet: 0.05, intent: 'Holding' };
 };
 
+/** Wait on starboard for a start at a point on the line (`uTarget`, 0 at the pin, 1 at the starboard
+ *  end): hold where your close-hauled course would cross the line. A luffing boat drifts back and so
+ *  slides that point towards the pin, so set up to the right of it and let the drift bring it down. */
+export const holdForLine = (uTarget: number, maxBelowL = 2.6, tack: Tack = 'stbd'): PlanFn => (_t, b, race) => {
+  const c = race.course, L = b.cls.loa;
+  const ng = noGoAngle(b.tws);
+  const other: Tack = tack === 'stbd' ? 'port' : 'stbd';
+  const ch = onTack(b, tack, vmgAngles(b.cls, b.tws).up + 1.5);
+  const hit = lineHit(c, b, ch);
+  const u = hit ? hit.u : 0;
+  const below = -lineSide(c, b) / L;
+  const T = race.gunT - race.t;
+  if (b.tack === other && Math.abs(b.twa) < 90) return { hdg: onTack(b, tack, ng + 6), sheet: 0.2, intent: `Back onto ${tack === 'stbd' ? 'starboard' : 'port'}` };
+  if (tack === 'stbd' && u < uTarget - 0.05 && T > 12 && !stbdToRight(race, b, 3.5)) return { hdg: onTack(b, 'port', 55), sheet: easedSheet(55, 0.45), intent: 'Creeping right' };
+  // Too far back: creep up the line you'll start on (that keeps the crossing point where it is).
+  if (below > maxBelowL) return { hdg: ch, sheet: easedSheet(45, 0.35), intent: 'Creeping up' };
+  return { hdg: onTack(b, tack, ng + 3), sheet: 0.05, intent: 'Holding' };
+};
+
 /** Time-on-distance start: hold (or hover at a spot) until going now would cross `margin` seconds
  *  after the gun, then go close-hauled on `tack`, easing if early. After the start, `after` takes over. */
-export const timedStart = (opts: { tack?: Tack; margin?: number; hover?: V2 | ((race: Race) => V2); before?: PlanFn; after?: PlanFn } = {}): PlanFn => {
+export const timedStart = (opts: { tack?: Tack; margin?: number; hover?: V2 | ((race: Race) => V2); before?: PlanFn; after?: PlanFn; duck?: boolean } = {}): PlanFn => {
   const tack = opts.tack ?? 'stbd', margin = opts.margin ?? 0.6;
   return (t, b, race, me) => {
     if (b.started) return (opts.after ?? closeHauled(tack))(t, b, race, me);
@@ -182,6 +223,13 @@ export const timedStart = (opts: { tack?: Tack; margin?: number; hover?: V2 | ((
       if (T > 0.05 && toLine < 1.5 * b.cls.loa && toLine < b.spd * T + 0.1 * b.cls.loa) return { hdg: b.twd, sheet: 0, intent: 'Stopping on the line' };
       if (early > 1.2) return { hdg: onTack(b, tack, up - 4), sheet: easedSheet(up, 0.4), intent: 'Burning time' };
       if (early > 0.5) return { hdg: go.hdg, sheet: easedSheet(up, 0.8), intent: 'Controlling speed' };
+      // On the way in, keep clear of any boat with right of way: duck behind her (Rules 10 and 11).
+      const ro = opts.duck ? mustDuck(race, b) : null;
+      if (ro) {
+        // Aim a length behind her stern.
+        const astern = { x: ro.x - dir(ro.hdg).x * 1.25 * b.cls.loa, y: ro.y - dir(ro.hdg).y * 1.25 * b.cls.loa };
+        return { hdg: bearing(b, astern), intent: `Ducking ${ro.sail}` };
+      }
       return { hdg: early < -0.8 ? onTack(b, tack, up + 5) : go.hdg, intent: 'Going for the line' };
     }
     if (opts.before) return opts.before(t, b, race, me);

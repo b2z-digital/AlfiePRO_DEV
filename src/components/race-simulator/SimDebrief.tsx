@@ -2,11 +2,13 @@
 // with your track and the winner's, three things to work on, your rules incidents, and the numbers.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Race } from '@/sim/engine';
-import type { RaceSummary } from './stats';
+import type { RaceSummary, TrainLink } from './stats';
 import { fmt } from './stats';
 import { drawReplayMap } from './render';
 import { ruleText } from './rulesText';
-import { Btn, C, Cap, CoachGlyph, Seg, Tile, cx, ordinal } from './ui';
+import { AlfieOrb, Btn, C, Cap, Seg, cx, ordinal } from './ui';
+
+export type { TrainLink };
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -99,7 +101,7 @@ function ReplayMap({ race }: { race: Race }) {
   );
 }
 
-export default function SimDebrief({ race, sum, onHome, onAgain }: { race: Race; sum: RaceSummary; onHome: () => void; onAgain: () => void }) {
+export default function SimDebrief({ race, sum, onHome, onAgain, onLink }: { race: Race; sum: RaceSummary; onHome: () => void; onAgain: () => void; onLink?: (l: TrainLink) => void }) {
   const [open, setOpen] = useState<number | null>(null);
   const placeText = sum.mode === 'start'
     ? sum.ocs ? 'OCS' : sum.late === null ? 'Not started' : `+${sum.late.toFixed(1)} s`
@@ -151,14 +153,17 @@ export default function SimDebrief({ race, sum, onHome, onAgain }: { race: Race;
           <div className="flex min-w-0 flex-[1_1_340px] flex-col gap-5">
             <div className="flex flex-col gap-4 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
               <div className="flex items-center gap-2.5">
-                <Tile size={36}><CoachGlyph size={18} /></Tile>
-                <p className="m-0 text-[16px] font-semibold">{sum.takeaways.length > 1 ? `${sum.takeaways.length === 2 ? 'Two' : 'Three'} things to take away` : 'To take away'}</p>
+                <AlfieOrb size={34} />
+                <p className="m-0 text-[16px] font-semibold">{sum.takeaways.length > 1 ? `Alfie's ${sum.takeaways.length === 2 ? 'two' : 'three'} things to work on` : "Alfie's take"}</p>
               </div>
               {sum.takeaways.length === 0 && <p className="m-0 text-[13.5px]" style={{ color: C.mute }}>A clean race. Try a stronger fleet next time.</p>}
               {sum.takeaways.map((t, i) => (
                 <div key={i} className="grid grid-cols-[24px_minmax(0,1fr)] gap-2.5">
                   <span className={cx('font-display font-bold', t.tone === 'warn' ? 'text-[#FFCB96]' : t.tone === 'good' ? 'text-[#A7F3D0]' : 'text-[#9CCBFF]')}>{i + 1}</span>
-                  <p className="m-0 text-[14px] leading-normal">{t.text}</p>
+                  <div>
+                    <p className="m-0 text-[14px] leading-normal">{t.text}</p>
+                    {t.link && onLink && <button type="button" onClick={() => onLink(t.link!)} className="mt-1.5 cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-[#7DBBFF] hover:text-[#A9D2FF]">{t.link.label}</button>}
+                  </div>
                 </div>
               ))}
             </div>

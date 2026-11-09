@@ -1,6 +1,7 @@
 // Shared look for the race simulator: a dark, on-the-water screen whatever the app theme.
 // Panels float over the water with a blurred glass background, like the design board.
 import React from 'react';
+import { AlfieMark } from '../brand/AlfieMark';
 
 export const C = {
   bg: '#060B16',
@@ -110,6 +111,11 @@ export function Chip({ tone = 'plain', children, className }: { tone?: 'plain' |
     good: 'bg-[rgba(52,211,153,0.14)] text-[#A7F3D0] border-[rgba(52,211,153,0.4)]',
   };
   return <span className={cx('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-semibold', tones[tone], className)}>{children}</span>;
+}
+
+/** Alfie, the coach: the same orb as Ask Alfie, so tips and rulings read as coming from Alfie. */
+export function AlfieOrb({ size = 32, title }: { size?: number; title?: string }) {
+  return <AlfieMark size={size} title={title} />;
 }
 
 /** Coach icon (compass rose). */

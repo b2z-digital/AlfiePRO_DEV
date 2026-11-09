@@ -6,7 +6,7 @@ import type { SceneBoat, SceneDef } from '../scene';
 import { hold } from '../scene';
 import type { GoalCtx, Outcome } from './common';
 import {
-  SceneSpec, fouled, linePoint, lost, overEarly, pctText, recallAndRestart, rule14, secText, starsFor, startFacts, timedStart, won,
+  SceneSpec, fouled, holdForLine, linePoint, lost, overEarly, pctText, recallAndRestart, rule14, secText, starsFor, startFacts, timedStart, won,
 } from './common';
 
 export type DrillGroup = 'Timing' | 'Position' | 'Tactics' | 'Recovery';
@@ -217,7 +217,7 @@ export const DRILLS: Drill[] = [
     scene: () => ({
       origin: 'line', preStart: 45, settings: { lineBias: 8 },
       boats: [
-        { role: 'You', at: [-1, -5], hdg: 300, spd: 0.3, helm: 'player' },
+        { role: 'You', at: [3.2, -3.6], hdg: 300, spd: 0.3, helm: 'player' },
         ai('Steady', [-1, -6.5], 'steady'), ai('Conservative', [2, -4.5], 'careful'), ai('Speed builder', [4, -6], 'builder'), ai('Squeezer', [6, -5], 'squeezer'),
       ],
     }),
@@ -228,7 +228,9 @@ export const DRILLS: Drill[] = [
         : lost(`At the pin, ${lateText(s.late)}`, 'Good spot, but late. Trigger earlier.', { score: s.late });
     }),
     scoreText: v => `${v.toFixed(1)} s late`,
-    solution: timedStart({ hover: race => linePoint(race, 0.25, 1.4), margin: 0.6 }),
+    // Set up to the right and let a luffing boat's drift bring the crossing point down to the pin.
+    solution: timedStart({ before: holdForLine(0.18, 2.6), margin: 0.7 }),
+    demoSeeds: [3, 4, 5],
     mistakeRule: '',
   },
   {
@@ -239,7 +241,7 @@ export const DRILLS: Drill[] = [
     scene: () => ({
       origin: 'line', preStart: 45, settings: { lineBias: -8 },
       boats: [
-        { role: 'You', at: [3, -5], hdg: 300, spd: 0.3, helm: 'player' },
+        { role: 'You', at: [3, -5], hdg: 300, spd: 0.3, helm: 'player', persona: 'squeezer', level: 'world' },
         ai('Pin hunter', [-6, -4], 'pin'), ai('Gambler', [-3, -6], 'gambler'), ai('Steady', [0, -4.5], 'steady'), ai('Speed builder', [1, -6.5], 'builder'),
       ],
     }),
@@ -250,7 +252,8 @@ export const DRILLS: Drill[] = [
         : lost(`At the end, ${lateText(s.late)}`, 'Good spot, but late. Trigger earlier.', { score: s.late });
     }),
     scoreText: v => `${v.toFixed(1)} s late`,
-    solution: timedStart({ hover: race => linePoint(race, 0.88, 1.4), margin: 0.6 }),
+    // A world-class starter who goes for the starboard end shows how.
+    solution: 'ai',
     mistakeRule: '',
   },
   // ── Tactics ──
@@ -262,8 +265,8 @@ export const DRILLS: Drill[] = [
     scene: () => ({
       origin: 'pin', preStart: 30, settings: { lineBias: 15 },
       boats: [
-        { role: 'You', at: [-1.4, -3.4], hdg: 58, spd: 0.15, helm: 'player' },
-        ai('Squeezer', [8, -4], 'squeezer'), ai('Steady', [6, -5], 'steady'), ai('Conservative', [9.5, -5.5], 'careful'), ai('Leeward luffer', [11, -4.5], 'luffer'),
+        { role: 'You', at: [-4, -3], hdg: 58, spd: 0.15, helm: 'player' },
+        ai('Squeezer', [8, -4], 'squeezer'), ai('Steady', [6, -5], 'steady'), ai('Conservative', [9.5, -5.5], 'careful'), ai('Leeward luffer', [13, -4.5], 'luffer'),
       ],
     }),
     goal: startGoal('Start on port within 4 lengths of the pin, within 3 s of the gun', 30, (_g, s) => {
@@ -274,7 +277,8 @@ export const DRILLS: Drill[] = [
         : lost(`Port start, ${lateText(s.late)}`, 'Right idea, but late. Trigger a little earlier.', { score: s.late });
     }, 4),
     scoreText: v => `${v.toFixed(1)} s late`,
-    solution: timedStart({ tack: 'port', margin: 0.4 }),
+    solution: timedStart({ tack: 'port', margin: 0.4, before: holdForLine(0.1, 2.0, 'port'), duck: true }),
+    demoSeeds: [1, 6, 8],
     mistakeRule: '',
   },
   {
