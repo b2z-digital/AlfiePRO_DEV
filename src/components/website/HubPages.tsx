@@ -2,9 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Calendar, Eye, FileText, Loader2, Mail, Map as MapIcon, Menu as MenuIcon, MoreHorizontal, Newspaper, Pencil, Plus, Sailboat, Search, Send, Tag, Trash2, Trophy, X, EyeOff, ExternalLink, House } from 'lucide-react';
 import { createOrganizationPage, deleteOrganizationPage, updateOrganizationPage } from '../../utils/organizationPageBuilderStorage';
-import { AUTO_PAGES, RESERVED_SLUGS, SiteMenuItem } from '../../utils/publicSite';
+import { AUTO_PAGES, RESERVED_SLUGS, SiteMenuItem, resolveMenu } from '../../utils/publicSite';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { supabase } from '../../utils/supabase';
 import { useHub, timeAgo } from './hubData';
 import { HUB_ROUTES } from './WebsiteHub';
 import { PageThumb } from './PageThumb';
@@ -19,6 +18,10 @@ const AUTO_META: Record<string, { icon: React.ReactNode; note: string }> = {
   'yacht-classes': { icon: <Sailboat size={17} />, note: 'Classes sailed at your club' },
   contact: { icon: <Mail size={17} />, note: 'Contact form and map' },
 };
+
+/** A menu without the items that match, including matching items inside dropdowns. */
+const withoutItems = (items: SiteMenuItem[], pred: (i: SiteMenuItem) => boolean): SiteMenuItem[] =>
+  items.filter(i => !pred(i)).map(i => (i.children ? { ...i, children: i.children.filter(c => !pred(c)) } : i));
 
 const slugify = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
 
@@ -79,7 +82,7 @@ const NewPageDialog: React.FC<{ onClose: () => void; onCreated: (slug: string, t
 export const HubPages: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { club, pages, reload, log, liveHost, previewPath } = useHub();
+  const { club, pages, reload, log, liveHost, previewPath, updateClub } = useHub();
   const { addNotification } = useNotifications();
   const [filter, setFilter] = useState<'all' | 'live' | 'draft' | 'nomenu'>('all');
   const [q, setQ] = useState('');
@@ -131,10 +134,14 @@ export const HubPages: React.FC = () => {
     if (!window.confirm(`Delete “${p.page_title}”? This can’t be undone.`)) return;
     const ok = await deleteOrganizationPage(p.id);
     if (!ok) { addNotification('error', 'Could not delete the page.'); return; }
-    menuApi.current?.remove(i => i.kind === 'page' && i.target === p.page_slug);
+    // Take it out of the saved menu straight away, so no menu item is left pointing at a deleted page
+    const isIt = (i: SiteMenuItem) => i.kind === 'page' && i.target === p.page_slug;
+    const saved = withoutItems(resolveMenu(club?.website_menu), isIt);
+    const menuSaved = club?.website_menu ? await updateClub({ website_menu: { items: saved } } as never) : true;
+    menuApi.current?.remove(isIt, menuSaved);
     log('deleted', 'page', p.page_title, p.id);
     await reload(['pages']);
-    addNotification('success', 'Page deleted. Save the menu to remove it there too.');
+    addNotification(menuSaved ? 'success' : 'error', menuSaved ? 'Page deleted' : 'Page deleted, but it could not be taken out of the menu. Remove it there and save.');
   };
 
   const toggleMenu = (kind: 'page' | 'auto', target: string, label: string) => {
@@ -146,10 +153,14 @@ export const HubPages: React.FC = () => {
     setShowNew(false);
     log('created', 'page', title);
     if (addToMenu) {
-      // Save straight away so the new page is in the menu when published
-      const items = [...menuItems, { id: Math.random().toString(36).slice(2, 10), kind: 'page' as const, label: title, target: slug }];
-      const { error } = await supabase.from('clubs').update({ website_menu: { items } }).eq('id', club!.id);
-      if (error) addNotification('error', 'Page created, but it could not be added to the menu.');
+      // Save straight away so the new page is in the menu when published. Start from the saved menu (not unsaved
+      // edits) and drop any old item for the same address, so the menu never shows the same page twice.
+      const isIt = (i: SiteMenuItem) => i.kind === 'page' && i.target === slug;
+      const item: SiteMenuItem = { id: Math.random().toString(36).slice(2, 10), kind: 'page', label: title, target: slug };
+      const items = [...withoutItems(resolveMenu(club?.website_menu), isIt), item];
+      const ok = await updateClub({ website_menu: { items } } as never);
+      if (ok) { menuApi.current?.remove(isIt, true); menuApi.current?.add(item, true); }
+      else addNotification('error', 'Page created, but it could not be added to the menu.');
     }
     navigate(`/website/pages/edit/${slug}`);
   };
