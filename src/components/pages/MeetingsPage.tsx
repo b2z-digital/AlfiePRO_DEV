@@ -286,10 +286,11 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
   const upcomingCount = upcomingMeetings.length;
   const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
   const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const dateChip = (m: Meeting, big?: boolean) => {
+  // rim: the Alfie outline (only on the last-meeting card); otherwise teal for upcoming, plain for past
+  const dateChip = (m: Meeting, big?: boolean, rim?: boolean) => {
     const d = new Date(m.date);
     return (
-      <div className={`a-dc ${isPastMeeting(m) ? 'a-dc-past' : 'a-dc-meet'}`} style={big ? { width: 64, padding: '9px 0' } : undefined}>
+      <div className={`a-dc ${rim ? '' : isPastMeeting(m) ? 'a-dc-past' : 'a-dc-meet'}`} style={big ? { width: 64, padding: '9px 0' } : undefined}>
         <b>{MON[d.getMonth()]}</b>
         <span style={big ? { fontSize: 26 } : undefined}>{d.getDate()}</span>
         <i>{DOW[d.getDay()]}</i>
@@ -340,7 +341,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
       <div key={meeting.id} onClick={() => handleViewMeeting(meeting)} className="a-mr group" role="button" tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter') handleViewMeeting(meeting); }}>
         {dateChip(meeting)}
-        {!compact && <span className="a-tile" style={{ width: 40, height: 40 }}>{meeting.meeting_category === 'committee' ? <Shield size={18} /> : <Users size={18} />}</span>}
+        {!compact && <span className="a-tile a-tile-plain" style={{ width: 40, height: 40 }}>{meeting.meeting_category === 'committee' ? <Shield size={18} /> : <Users size={18} />}</span>}
         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
           <div className="a-ink text-[15px] font-semibold truncate">{meeting.name}</div>
           <div className="flex gap-x-3.5 gap-y-1 items-center flex-wrap">
@@ -458,7 +459,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           </div>
         ) : meetings.length === 0 ? (
           <div className="a-card a-empty text-center py-14">
-            <span className="a-tile mx-auto mb-3" style={{ width: 52, height: 52 }}><Calendar size={22} /></span>
+            <span className="a-tile a-tile-plain mx-auto mb-3" style={{ width: 52, height: 52 }}><Calendar size={22} /></span>
             <h3 className="a-ink text-[16px] font-semibold mb-1">No meetings yet</h3>
             <p className="a-dim text-[13.5px] mb-5">Schedule committee and general meetings, share agendas and keep the minutes here.</p>
             {can('meetings.create') && (
@@ -470,7 +471,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
             {(nextMeeting || followUp) && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {nextMeeting ? (
-                  <div className="a-card flex items-center gap-4 cursor-pointer" style={{ padding: '16px 18px' }} onClick={() => handleViewMeeting(nextMeeting)}>
+                  <div className="a-card a-spec-card flex items-center gap-4 cursor-pointer" style={{ padding: '16px 18px' }} onClick={() => handleViewMeeting(nextMeeting)}>
                     {dateChip(nextMeeting, true)}
                     <div className="flex-1 min-w-0">
                       <p className="a-cap a-txt-b m-0">Next meeting · {whenLabel(nextMeeting)}</p>
@@ -486,7 +487,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                   </div>
                 ) : (
                   <div className="a-card flex items-center gap-4" style={{ padding: '16px 18px' }}>
-                    <span className="a-tile" style={{ width: 52, height: 52 }}><CalendarPlus size={22} /></span>
+                    <span className="a-tile a-tile-plain" style={{ width: 52, height: 52 }}><CalendarPlus size={22} /></span>
                     <div className="flex-1 min-w-0">
                       <p className="a-cap m-0">Next meeting</p>
                       <p className="a-ink m-0 mt-1 text-[15px] font-semibold">Nothing scheduled yet</p>
@@ -496,7 +497,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                 )}
                 {followUp && (
                   <div className="a-card flex items-center gap-4 cursor-pointer" style={{ padding: '16px 18px', ...(minutesDue ? { borderColor: 'rgba(255,179,64,0.3)' } : {}) }} onClick={() => handleViewMeeting(followUp)}>
-                    {dateChip(followUp, true)}
+                    {dateChip(followUp, true, true)}
                     <div className="flex-1 min-w-0">
                       <p className={`a-cap m-0 ${minutesDue ? 'a-txt-a' : 'a-txt-g'}`}>
                         {minutesDue ? `Minutes to ${minutesDue.minutes_status === 'in_progress' ? 'finish' : 'write'} · held ${whenLabel(followUp)}` : `Last meeting · ${whenLabel(followUp)}`}
@@ -522,7 +523,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                 { icon: <Users size={18} />, label: 'Going to the next one', value: nextMeeting ? attendingOf(nextMeeting.id).length : 0, sub: nextMeeting ? nextMeeting.name : 'No meeting scheduled' },
               ].map(s => (
                 <div key={s.label} className="a-card flex items-center gap-3.5" style={{ padding: '14px 16px' }}>
-                  <span className="a-tile" style={{ width: 44, height: 44 }}>{s.icon}</span>
+                  <span className="a-tile a-tile-plain" style={{ width: 44, height: 44 }}>{s.icon}</span>
                   <div className="min-w-0">
                     <div className="a-mute text-[12.5px]">{s.label}</div>
                     <div className="a-display a-num a-ink text-[24px] font-semibold leading-[1.15]">{s.value}</div>
@@ -551,7 +552,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           </>
         ) : Object.keys(groupedMeetings).length === 0 ? (
           <div className="a-card a-empty text-center py-14">
-            <span className="a-tile mx-auto mb-3" style={{ width: 52, height: 52 }}><Calendar size={22} /></span>
+            <span className="a-tile a-tile-plain mx-auto mb-3" style={{ width: 52, height: 52 }}><Calendar size={22} /></span>
             <h3 className="a-ink text-[16px] font-semibold mb-1">No meetings found</h3>
             <p className="a-dim text-[13.5px] mb-5">
               {term ? 'No meetings match your search' : activeView === 'upcoming' ? 'No upcoming meetings scheduled' : 'No past meetings yet'}

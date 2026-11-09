@@ -96,9 +96,7 @@ export const ApplicationsRenewalsWidget: React.FC<ApplicationsRenewalsWidgetProp
       )}
 
       <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 rounded-lg bg-orange-600/20">
-          <AlertCircle className="text-orange-400" size={20} />
-        </div>
+        <span className="a-tile" style={{ width: 36, height: 36 }}><AlertCircle size={18} /></span>
         <h3 className="text-lg font-semibold text-white">Applications & Renewals</h3>
       </div>
 
