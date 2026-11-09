@@ -9,9 +9,32 @@ interface State {
   error: Error | null;
 }
 
-const RETRY_KEY = 'public-site-retried-path';
+const RETRY_KEY = 'public-site-retried';
+const RETRY_WINDOW_MS = 10 * 60 * 1000;
 
-// A page that fails during in-site navigation loads fine on a full reload, so retry once with a hard load.
+// When this page last reloaded itself (per path), from this tab's storage
+const lastRetry = (pathname: string): number => {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(RETRY_KEY) || '{}');
+    return typeof saved[pathname] === 'number' ? saved[pathname] : 0;
+  } catch {
+    return 0;
+  }
+};
+const markRetry = (pathname: string) => {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(RETRY_KEY) || '{}');
+    saved[pathname] = Date.now();
+    sessionStorage.setItem(RETRY_KEY, JSON.stringify(saved));
+    return true;
+  } catch {
+    return false; // no storage: don't risk a reload loop
+  }
+};
+
+// A page that fails during in-site navigation loads fine on a full reload, so retry with a hard load,
+// at most once per page every 10 minutes. (The old marker was cleared 5 s after loading, so a page
+// that failed later than that reloaded itself over and over, re-downloading its data each time.)
 export class PublicSiteErrorBoundary extends React.Component<Props, State> {
   state: State = { error: null };
 
@@ -21,15 +44,9 @@ export class PublicSiteErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('Public site page error:', error, info.componentStack);
-    if (sessionStorage.getItem(RETRY_KEY) !== this.props.pathname) {
-      sessionStorage.setItem(RETRY_KEY, this.props.pathname);
+    const { pathname } = this.props;
+    if (Date.now() - lastRetry(pathname) > RETRY_WINDOW_MS && markRetry(pathname)) {
       window.location.reload();
-    }
-  }
-
-  componentDidMount() {
-    if (sessionStorage.getItem(RETRY_KEY) === this.props.pathname) {
-      setTimeout(() => sessionStorage.removeItem(RETRY_KEY), 5000);
     }
   }
 
