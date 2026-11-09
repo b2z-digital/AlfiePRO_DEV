@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X, Smartphone, Camera, CircleCheck as CheckCircle } from 'lucide-react';
 import QRCode from 'qrcode';
 import { livestreamStorage } from '../../utils/livestreamStorage';
+import { createMobileCameraLink } from '../../utils/mobileCamApi';
 
 interface MobileCameraQRModalProps {
   sessionId: string;
@@ -16,12 +17,24 @@ export function MobileCameraQRModal({
 }: MobileCameraQRModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cameraConnected, setCameraConnected] = useState(false);
+  const baseUrl = `${window.location.origin.replace(/^http:\/\//, 'https://')}/mobile-stream/${sessionId}`;
+  // The link carries a secret, expiring camera key so the phone doesn't need to be signed in
+  const [mobileUrl, setMobileUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (canvasRef.current) {
-      // Generate URL for mobile streaming page
-      const mobileUrl = `${window.location.origin.replace(/^http:\/\//, 'https://')}/mobile-stream/${sessionId}`;
+    let cancelled = false;
+    createMobileCameraLink(sessionId)
+      .then(({ key }) => { if (!cancelled) setMobileUrl(`${baseUrl}?k=${encodeURIComponent(key)}`); })
+      .catch(err => {
+        // Old behaviour still works for phones signed in to AlfiePRO
+        console.error('Could not create camera link, falling back to a sign-in link:', err);
+        if (!cancelled) setMobileUrl(baseUrl);
+      });
+    return () => { cancelled = true; };
+  }, [sessionId, baseUrl]);
 
+  useEffect(() => {
+    if (canvasRef.current && mobileUrl) {
       // Generate QR code
       QRCode.toCanvas(canvasRef.current, mobileUrl, {
         width: 256,
@@ -34,7 +47,7 @@ export function MobileCameraQRModal({
         console.error('Error generating QR code:', err);
       });
     }
-  }, [sessionId]);
+  }, [mobileUrl]);
 
   // Subscribe to camera changes
   useEffect(() => {
@@ -60,8 +73,6 @@ export function MobileCameraQRModal({
       subscription.unsubscribe();
     };
   }, [sessionId, cameraConnected, onClose]);
-
-  const mobileUrl = `${window.location.origin.replace(/^http:\/\//, 'https://')}/mobile-stream/${sessionId}`;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -102,8 +113,8 @@ export function MobileCameraQRModal({
 
           {/* QR Code */}
           {!cameraConnected && (
-            <div className="bg-white rounded-lg p-6 flex items-center justify-center">
-              <canvas ref={canvasRef} />
+            <div className="bg-white rounded-lg p-6 flex items-center justify-center" style={{ minHeight: 304 }}>
+              {mobileUrl ? <canvas ref={canvasRef} /> : <span className="text-sm text-slate-500">Creating camera link…</span>}
             </div>
           )}
 
@@ -149,13 +160,14 @@ export function MobileCameraQRModal({
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                value={mobileUrl}
+                value={mobileUrl || ''}
                 readOnly
                 className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded text-xs text-slate-300"
               />
               <button
                 onClick={async () => {
                   try {
+                    if (!mobileUrl) return;
                     await navigator.clipboard.writeText(mobileUrl);
                     // Show success feedback with button text change
                     const btn = document.activeElement as HTMLButtonElement;

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Video, CircleAlert as AlertCircle, Loader as Loader2, RefreshCw, Signal, Square, ZoomIn, ZoomOut, RotateCcw, Bug } from 'lucide-react';
 import { supabase } from '../utils/supabase';
+import { makeMobileCamApi } from '../utils/mobileCamApi';
 
 const BUILD_VERSION = '20260122-v4';
 
@@ -29,6 +30,9 @@ type Phase = 'init' | 'camera' | 'connected' | 'error';
 
 export default function MobileStreamPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  // QR codes carry a camera key (?k=) so the phone doesn't need to be signed in
+  const camKey = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('k') : null;
+  const camApi = React.useMemo(() => makeMobileCamApi(sessionId || '', camKey), [sessionId, camKey]);
   const [phase, setPhase] = useState<Phase>('init');
   const [statusText, setStatusText] = useState('Starting camera...');
   const [sessionTitle, setSessionTitle] = useState('');
@@ -86,12 +90,9 @@ export default function MobileStreamPage() {
     videoTrackRef.current = null;
 
     if (cameraIdRef.current && sessionId) {
-      supabase.from('livestream_camera_sources')
-        .update({ status: 'disconnected' })
-        .eq('id', cameraIdRef.current)
-        .then(() => {});
+      camApi.setStatus(cameraIdRef.current, 'disconnected').catch(() => {});
     }
-  }, [sessionId]);
+  }, [sessionId, camApi]);
 
   const applyZoom = useCallback(async (newZoom: number) => {
     const track = videoTrackRef.current;
@@ -161,18 +162,22 @@ export default function MobileStreamPage() {
 
     try {
       addDebugLog('Fetching session...');
-      const { data: session, error: sessionErr } = await supabase
-        .from('livestream_sessions')
-        .select('id, title, status')
-        .eq('id', sessionId)
-        .maybeSingle();
+      let session: { id: string; title: string; status: string } | null = null;
+      let sessionErr: { message: string } | null = null;
+      try {
+        session = await camApi.getSession();
+      } catch (err: any) {
+        sessionErr = { message: err?.message || 'Unknown error' };
+      }
 
       if (!mountedRef.current) return;
 
       if (sessionErr) {
         addDebugLog(`Session fetch error: ${sessionErr.message}`);
         setPhase('error');
-        setErrorMsg(`Failed to load session: ${sessionErr.message}`);
+        setErrorMsg(/permission denied/i.test(sessionErr.message)
+          ? 'This camera link needs a new QR code. Ask the race officer to show the Mobile Camera QR code again.'
+          : sessionErr.message.includes('camera link') ? sessionErr.message : `Failed to load session: ${sessionErr.message}`);
         return;
       }
 
@@ -247,95 +252,17 @@ export default function MobileStreamPage() {
       const deviceFingerprint = getDeviceFingerprint();
       addDebugLog(`Device fingerprint: ${deviceFingerprint.substring(0, 10)}...`);
 
-      addDebugLog('Checking for existing cameras...');
-      const { data: existingCameras, error: existingCamerasErr } = await supabase
-        .from('livestream_camera_sources')
-        .select('id, camera_name')
-        .eq('livestream_session_id', sessionId)
-        .eq('camera_type', 'mobile');
-
-      if (existingCamerasErr) {
-        addDebugLog(`Error fetching existing cameras: ${existingCamerasErr.message}`);
-      }
-
-      const { data: existingForDevice, error: existingForDeviceErr } = await supabase
-        .from('livestream_camera_sources')
-        .select('id')
-        .eq('livestream_session_id', sessionId)
-        .eq('camera_type', 'mobile')
-        .eq('device_fingerprint', deviceFingerprint)
-        .maybeSingle();
-
-      if (existingForDeviceErr) {
-        addDebugLog(`Error checking device fingerprint: ${existingForDeviceErr.message}`);
-      }
-
-      addDebugLog(`Existing cameras: ${existingCameras?.length || 0}, This device: ${existingForDevice ? 'found' : 'new'}`);
-
+      addDebugLog(`Registering camera (${camApi.usesKey ? 'camera link' : 'signed in'})...`);
       let camId: string;
-      const mobileCount = (existingCameras?.length || 0) + 1;
-      let shouldCreateNew = !existingForDevice;
-
-      if (existingForDevice) {
-        addDebugLog(`Found existing camera for device: ${existingForDevice.id}`);
-
-        const { data: verifyCamera } = await supabase
-          .from('livestream_camera_sources')
-          .select('id')
-          .eq('id', existingForDevice.id)
-          .maybeSingle();
-
-        if (!verifyCamera) {
-          addDebugLog(`Camera no longer exists, clearing fingerprint and creating new`);
-          localStorage.removeItem('alfie_device_fp');
-          shouldCreateNew = true;
-        } else {
-          await supabase.from('webrtc_signaling')
-            .delete()
-            .eq('camera_id', existingForDevice.id);
-
-          const { data: updatedData, error: updateError } = await supabase.from('livestream_camera_sources')
-            .update({ status: 'connected', last_connected_at: new Date().toISOString() })
-            .eq('id', existingForDevice.id)
-            .select('id');
-
-          if (updateError || !updatedData?.length) {
-            addDebugLog(`Camera update failed or no rows affected: ${updateError?.message || 'Camera not found'}`);
-            localStorage.removeItem('alfie_device_fp');
-            shouldCreateNew = true;
-          } else {
-            camId = existingForDevice.id;
-            addDebugLog(`Camera updated: ${camId}`);
-          }
-        }
+      try {
+        camId = await camApi.registerCamera(deviceFingerprint, deviceName);
+      } catch (err: any) {
+        addDebugLog(`Camera register FAILED: ${err?.message}`);
+        setPhase('error');
+        setErrorMsg(`Failed to register camera: ${err?.message || 'Unknown error'}`);
+        return;
       }
-
-      if (shouldCreateNew) {
-        const cameraNameWithNumber = mobileCount > 1 ? `Mobile ${mobileCount} - ${deviceName}` : `Mobile - ${deviceName}`;
-        addDebugLog(`Creating new camera: ${cameraNameWithNumber}`);
-
-        const { data: newCam, error: insertError } = await supabase.from('livestream_camera_sources')
-          .insert({
-            livestream_session_id: sessionId,
-            camera_name: cameraNameWithNumber,
-            camera_type: 'mobile',
-            status: 'connected',
-            is_primary: false,
-            position: mobileCount,
-            device_fingerprint: deviceFingerprint
-          })
-          .select('id')
-          .single();
-
-        if (insertError) {
-          addDebugLog(`Camera insert FAILED: ${insertError.message} (code: ${insertError.code})`);
-          setPhase('error');
-          setErrorMsg(`Failed to register camera: ${insertError.message}`);
-          return;
-        }
-        addDebugLog(`Camera created successfully: ${newCam.id}`);
-        camId = newCam.id;
-      }
+      addDebugLog(`Camera registered: ${camId}`);
 
       if (!mountedRef.current) return;
 
@@ -359,13 +286,8 @@ export default function MobileStreamPage() {
           } else if (iceCandidateCount === 4) {
             addDebugLog(`Sending more ICE candidates...`);
           }
-          supabase.from('webrtc_signaling').insert({
-            camera_id: cameraIdRef.current,
-            session_id: sessionId,
-            signal_type: 'ice_candidate',
-            signal_data: { candidate: e.candidate.toJSON() },
-            from_role: 'camera'
-          });
+          camApi.sendSignal(cameraIdRef.current, 'ice_candidate', { candidate: e.candidate.toJSON() })
+            .catch((err: any) => addDebugLog(`ICE send failed: ${err?.message}`));
         } else if (!e.candidate) {
           addDebugLog(`ICE gathering complete - sent ${iceCandidateCount} candidates`);
         }
@@ -406,9 +328,7 @@ export default function MobileStreamPage() {
           setPhase('connected');
           setStatusText('Streaming');
           if (cameraIdRef.current) {
-            supabase.from('livestream_camera_sources')
-              .update({ status: 'streaming' })
-              .eq('id', cameraIdRef.current);
+            camApi.setStatus(cameraIdRef.current, 'streaming').catch(() => {});
           }
           controlsTimeoutRef.current = setTimeout(() => {
             setShowControls(false);
@@ -465,16 +385,15 @@ export default function MobileStreamPage() {
       addDebugLog(`Local description set. ICE gathering should start now. State: ${pc.iceGatheringState}`);
 
       addDebugLog(`Sending offer for camera: ${camId}`);
-      const { error: offerError } = await supabase.from('webrtc_signaling').insert({
-        camera_id: camId,
-        session_id: sessionId,
-        signal_type: 'offer',
-        signal_data: { sdp: pc.localDescription },
-        from_role: 'camera'
-      });
+      let offerError: { message: string } | null = null;
+      try {
+        await camApi.sendSignal(camId, 'offer', { sdp: pc.localDescription });
+      } catch (err: any) {
+        offerError = { message: err?.message || 'Unknown error' };
+      }
 
       if (offerError) {
-        addDebugLog(`OFFER INSERT FAILED: ${offerError.message} (code: ${offerError.code})`);
+        addDebugLog(`OFFER SEND FAILED: ${offerError.message}`);
         setPhase('error');
         setErrorMsg(`Failed to establish connection: ${offerError.message}`);
         return;
@@ -500,26 +419,12 @@ export default function MobileStreamPage() {
         addDebugLog(`Poll ${attempts + 1}: conn=${pc.connectionState}, ice=${pc.iceConnectionState}, remDesc=${!!pc.remoteDescription}`);
 
         if (!pc.remoteDescription) {
-          const { data: answerSignal, error: answerError } = await supabase
-            .from('webrtc_signaling')
-            .select('*')
-            .eq('camera_id', camId)
-            .eq('signal_type', 'answer')
-            .eq('from_role', 'viewer')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (answerError) {
-            addDebugLog(`Answer query error: ${answerError.message}`);
-          }
-
-          if (attempts === 5) {
-            const { data: allSignals } = await supabase
-              .from('webrtc_signaling')
-              .select('camera_id, signal_type, from_role')
-              .eq('session_id', sessionId);
-            addDebugLog(`All signals in session: ${JSON.stringify(allSignals?.map(s => ({ cam: s.camera_id?.slice(0,8), type: s.signal_type, from: s.from_role })))}`);
+          let answerSignal: { signal_data: any } | null = null;
+          try {
+            const answers = await camApi.viewerSignals(camId, 'answer');
+            answerSignal = answers.length ? answers[answers.length - 1] : null;
+          } catch (err: any) {
+            addDebugLog(`Answer query error: ${err?.message}`);
           }
 
           if (answerSignal?.signal_data?.sdp) {
@@ -536,16 +441,11 @@ export default function MobileStreamPage() {
         }
 
         if (pc.remoteDescription && pc.connectionState !== 'connected') {
-          const { data: iceCandidates, error: iceError } = await supabase
-            .from('webrtc_signaling')
-            .select('*')
-            .eq('camera_id', camId)
-            .eq('signal_type', 'ice_candidate')
-            .eq('from_role', 'viewer')
-            .order('created_at', { ascending: true });
-
-          if (iceError) {
-            addDebugLog(`ICE fetch error: ${iceError.message}`);
+          let iceCandidates: Array<{ signal_data: any }> = [];
+          try {
+            iceCandidates = await camApi.viewerSignals(camId, 'ice_candidate');
+          } catch (err: any) {
+            addDebugLog(`ICE fetch error: ${err?.message}`);
           }
 
           if (iceCandidates && iceCandidates.length > 0) {
@@ -582,7 +482,7 @@ export default function MobileStreamPage() {
         setErrorMsg(err.message || 'Failed to start camera');
       }
     }
-  }, [sessionId, cameraFacing]);
+  }, [sessionId, cameraFacing, camApi]);
 
   useEffect(() => {
     if (initRef.current) return;
