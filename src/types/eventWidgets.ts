@@ -29,7 +29,25 @@ export type EventWidgetType =
   | 'code-block'
   | 'spacer'
   | 'divider'
-  | 'slider';
+  | 'slider'
+  // Site builder modules (club websites)
+  | 'heading'
+  | 'site-text'
+  | 'site-image'
+  | 'site-video'
+  | 'image-gallery'
+  | 'logo-strip'
+  | 'site-button'
+  | 'feature-cards'
+  | 'accordion'
+  | 'club-races'
+  | 'club-results'
+  | 'club-news'
+  | 'club-classes'
+  | 'club-committee'
+  | 'club-join'
+  | 'club-venues'
+  | 'club-classifieds';
 
 export interface EventWidgetConfig {
   id: string;
@@ -40,6 +58,10 @@ export interface EventWidgetConfig {
   order: number;
   responsiveMargin?: ResponsiveMargin;
   responsivePadding?: ResponsivePadding;
+  /** Site builder: screen sizes this module is hidden on */
+  hideOn?: DeviceType[];
+  /** Site builder: link name, so a menu or button can jump to it (#name) */
+  anchor?: string;
 }
 
 export interface ResponsiveSettings {
@@ -64,6 +86,14 @@ export interface EventPageRow {
   id: string;
   order: number;
   columns: EventPageColumn[];
+  /** Site builder: a name shown in Layers */
+  name?: string;
+  /** Site builder: screen sizes this row is hidden on */
+  hideOn?: DeviceType[];
+  /** Site builder: link name (#name) */
+  anchor?: string;
+  /** Site builder: put the last column first when columns stack on phones */
+  reverseOnMobile?: boolean;
   background?: {
     type: 'color' | 'gradient' | 'image';
     value: string;
@@ -125,6 +155,8 @@ export interface EventPageColumn {
   id: string;
   width: number;
   widgets: EventWidgetConfig[];
+  /** Site builder: screen sizes this column is hidden on */
+  hideOn?: DeviceType[];
   verticalAlign?: 'top' | 'center' | 'bottom';
   background?: {
     type: 'color' | 'gradient' | 'image';

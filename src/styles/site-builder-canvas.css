@@ -1,0 +1,46 @@
+/* Site builder canvas (inside the builder's frame). Section = blue, column = green, module = violet. */
+.sbc { min-height: 100vh; background: #fff; }
+.sbc main { min-height: 60vh; cursor: default; }
+.sbc [data-sb-mod] { position: relative; cursor: pointer; }
+.sbc [data-sb-inline] { cursor: text; outline: none; }
+.sbc [data-sb-inline]:focus { box-shadow: 0 0 0 2px rgba(138, 77, 255, .35); border-radius: 4px; }
+.sbc [data-sb-inline]:empty::before { content: 'Type here'; color: #94A3B8; }
+.sbc-hide-hidden .sb-hidden-here { display: none !important; }
+.sbc-dragging iframe { pointer-events: none; }
+.sbc-foot { pointer-events: none; }
+
+.sbc-ov { position: absolute; inset: 0 auto auto 0; width: 100%; height: 0; z-index: 40; pointer-events: none; }
+.sbc-box { position: absolute; pointer-events: none; border-radius: 2px; }
+.sbc-row.sbc-hov { box-shadow: inset 0 0 0 1.5px rgba(46, 123, 255, .55); }
+.sbc-col.sbc-hov { box-shadow: inset 0 0 0 1.5px rgba(48, 180, 88, .6); }
+.sbc-mod.sbc-hov { box-shadow: 0 0 0 1.5px rgba(138, 77, 255, .6); }
+.sbc-row.sbc-sel { box-shadow: inset 0 0 0 2px #2E7BFF; }
+.sbc-col.sbc-sel { box-shadow: inset 0 0 0 2px #22A45D; }
+.sbc-mod.sbc-sel { box-shadow: 0 0 0 2px #8A4DFF; }
+
+.sbc-bar { position: absolute; display: flex; align-items: stretch; height: 28px; pointer-events: auto; font: 600 12px 'Instrument Sans', system-ui, sans-serif; z-index: 2; border-radius: 8px; overflow: hidden; box-shadow: 0 6px 18px rgba(15, 23, 42, .25); white-space: nowrap; }
+.sbc-bar .lbl { display: inline-flex; align-items: center; padding: 0 10px; color: #fff; overflow: hidden; text-overflow: ellipsis; }
+.sbc-bar-row .lbl { background: #2E7BFF; } .sbc-bar-col .lbl { background: #22A45D; } .sbc-bar-mod .lbl { background: #8A4DFF; }
+.sbc-bar .tb { display: inline-flex; background: #141B2D; padding: 0 2px; }
+.sbc-bar .tb button { width: 28px; border: 0; background: transparent; color: #E8EDF7; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.sbc-bar .tb button:hover { background: rgba(255, 255, 255, .14); }
+.sbc-bar .tb button[draggable] { cursor: grab; }
+.sbc-add { position: absolute; width: 30px; height: 30px; border-radius: 99px; border: 2px solid #fff; background: #2E7BFF; color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto; box-shadow: 0 4px 12px rgba(46, 123, 255, .45); z-index: 3; }
+.sbc-add:hover { transform: scale(1.08); }
+.sbc-line { position: absolute; height: 4px; border-radius: 4px; background: #8A4DFF; box-shadow: 0 0 0 4px rgba(138, 77, 255, .2); }
+.sbc-line.sec { background: #2E7BFF; box-shadow: 0 0 0 4px rgba(46, 123, 255, .2); }
+
+.sbc-fmt { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 10px; background: #141B2D; box-shadow: 0 10px 26px rgba(15, 23, 42, .35); pointer-events: auto; z-index: 4; }
+.sbc-fmt button { min-width: 30px; height: 28px; padding: 0 6px; border: 0; border-radius: 7px; background: transparent; color: #E8EDF7; font: 700 12px 'Instrument Sans', system-ui, sans-serif; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.sbc-fmt button:hover { background: rgba(255, 255, 255, .14); }
+.sbc-fmt .sep { width: 1px; height: 18px; background: rgba(255, 255, 255, .18); margin: 0 3px; }
+
+.sb-col-empty { display: flex; align-items: center; justify-content: center; min-height: 88px; border: 2px dashed #C7D2FE; border-radius: 12px; color: #6366F1; font: 600 13px 'Instrument Sans', system-ui, sans-serif; background: rgba(238, 242, 255, .5); cursor: pointer; }
+.sb-col-empty:hover { background: rgba(224, 231, 255, .8); }
+
+.sbc-blank { display: flex; align-items: center; justify-content: center; padding: 96px 24px; }
+.sbc-blank-in { width: 100%; max-width: 640px; text-align: center; padding: 56px 32px; border: 2px dashed #CBD5E1; border-radius: 20px; font-family: 'Instrument Sans', system-ui, sans-serif; }
+.sbc-blank .t { font-size: 26px; font-weight: 700; color: #0F172A; }
+.sbc-blank .s { margin-top: 8px; font-size: 15px; color: #64748B; }
+.sbc-blank button { margin-top: 22px; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; border: 0; border-radius: 12px; background: #2E7BFF; color: #fff; font: 700 14px 'Instrument Sans', system-ui, sans-serif; cursor: pointer; box-shadow: 0 8px 20px rgba(46, 123, 255, .35); }
+.sbc-prev { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 60; padding: 10px 16px; border-radius: 99px; background: #141B2D; color: #fff; font: 600 13px 'Instrument Sans', system-ui, sans-serif; box-shadow: 0 10px 26px rgba(15, 23, 42, .35); }
