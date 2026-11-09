@@ -702,10 +702,6 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
     return false;
   };
 
-  const isEventInAnyState = (event: RaceEvent): boolean => {
-    return event.displayCategory?.startsWith('state_') || event.eventLevel === 'state';
-  };
-
   const filteredEvents = Object.values(uniqueEvents)
     .filter(event => {
       const eventDate = new Date(event.date);
@@ -766,17 +762,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
         } else {
           return false;
         }
-      } else if (eventScope === 'all_states') {
-        if (event.isExternalEvent) {
-          if (!isEventInAnyState(event)) return false;
-        } else if (event.isPublicEvent && event.eventLevel === 'state') {
-          // keep
-        } else if (!event.isExternalEvent && !event.isPublicEvent) {
-          return false;
-        } else {
-          return false;
-        }
       }
+      // 'all_states' ("All Events") keeps everything: club, state, national, regional and invitational
       else if (eventScope === 'all') {
         if (event.isExternalEvent) {
           const isTrulyNational = event.externalEventType === 'national' || event.externalEventType === 'world';
@@ -921,6 +908,12 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   };
 
   const handleEventClick = async (event: RaceEvent) => {
+    // Events imported from another site (ARYA etc.) open that site's event page in a new tab.
+    // Opened before any await so the browser doesn't treat it as a popup.
+    if (event.isExternalEvent && event.sourceUrl) {
+      window.open(event.sourceUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
     console.log('🔵 [handleEventClick] Event clicked:', event.eventName);
     console.log('🔵 [handleEventClick] isSeriesEvent:', event.isSeriesEvent);
     console.log('🔵 [handleEventClick] seriesId:', event.seriesId);

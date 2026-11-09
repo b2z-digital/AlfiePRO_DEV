@@ -1,0 +1,149 @@
+/* Shops — a storefront-style directory of suppliers. Built on the Alfie a-* kit.
+   Dark by default, html.alfie-light overrides at the bottom. */
+
+/* ── Spotlight carousel ─────────────────────────────────────────────── */
+.a-sh-spot { position: relative; border-radius: 26px; overflow: hidden; min-height: 280px; isolation: isolate; border: 1px solid rgba(255, 255, 255, 0.08); }
+.a-sh-spot-slide { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 28px; padding: 36px 40px; opacity: 0; transform: scale(1.02); transition: opacity .6s ease, transform .9s ease; pointer-events: none; }
+.a-sh-spot-slide.on { opacity: 1; transform: none; pointer-events: auto; }
+.a-sh-spot-bg { position: absolute; inset: 0; z-index: -2; background-size: cover; background-position: center; }
+.a-sh-spot-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(8, 12, 22, 0.9) 0%, rgba(8, 12, 22, 0.62) 55%, rgba(8, 12, 22, 0.3) 100%); }
+.a-sh-spot-grain { position: absolute; inset: 0; z-index: -1; opacity: .2; mix-blend-mode: overlay; background-image: radial-gradient(rgba(255,255,255,.18) 1px, transparent 1px); background-size: 3px 3px; pointer-events: none; }
+.a-sh-kick { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px; border-radius: 999px; background: rgba(255, 255, 255, 0.12); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.a-sh-kick i { width: 7px; height: 7px; border-radius: 50%; background: #fff; opacity: .85; }
+.a-sh-spot h2 { margin: 16px 0 0; font: 700 clamp(30px, 3.4vw, 44px)/1.04 'Bricolage Grotesque', 'Instrument Sans', sans-serif; letter-spacing: -0.03em; color: #fff; }
+.a-sh-spot p { margin: 10px 0 0; max-width: 520px; font-size: 15px; line-height: 1.55; color: rgba(255, 255, 255, 0.78); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.a-sh-spot-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 22px; }
+.a-sh-btn-w { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 14px; border: 0; background: #fff; color: #0B1220; font-size: 14.5px; font-weight: 650; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; text-decoration: none; }
+.a-sh-btn-w:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35); }
+.a-sh-btn-gl { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.08); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+.a-sh-btn-gl:hover { background: rgba(255, 255, 255, 0.16); }
+.a-sh-spot-logo { position: relative; width: 168px; height: 168px; border-radius: 44px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.3); transform: rotate(-4deg); transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
+.a-sh-spot-slide.on .a-sh-spot-logo { transform: rotate(-4deg) translateY(-4px); }
+.a-sh-spot-logo img { width: 100%; height: 100%; object-fit: contain; padding: 18px; }
+.a-sh-spot-logo b { font: 700 56px 'Bricolage Grotesque', sans-serif; letter-spacing: -0.04em; }
+.a-sh-dots { position: absolute; left: 40px; bottom: 18px; display: flex; gap: 6px; z-index: 2; }
+.a-sh-dots button { width: 8px; height: 8px; border-radius: 99px; border: 0; padding: 0; background: rgba(255, 255, 255, 0.35); cursor: pointer; transition: width .3s ease, background .3s ease; }
+.a-sh-dots button.on { width: 26px; background: #fff; }
+.a-sh-arrows { position: absolute; right: 18px; bottom: 16px; display: flex; gap: 8px; z-index: 2; }
+.a-sh-arrows button { width: 36px; height: 36px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.1); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.a-sh-arrows button:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* ── Aisles (category switcher) ─────────────────────────────────────── */
+.a-sh-aisles { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px; }
+.a-sh-aisles::-webkit-scrollbar { display: none; }
+.a-sh-aisle { display: inline-flex; align-items: center; gap: 9px; flex-shrink: 0; height: 46px; padding: 0 16px 0 6px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.07); background: rgba(255, 255, 255, 0.03); color: rgba(235, 240, 255, 0.82); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.a-sh-aisle:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.a-sh-aisle > span { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 11px; }
+.a-sh-aisle em { font-style: normal; font-size: 12px; font-weight: 600; color: rgba(235, 240, 255, 0.45); }
+.a-sh-aisle-on, .a-sh-aisle-on:hover { color: #fff; border-color: rgba(10, 132, 255, 0.55); background: rgba(10, 132, 255, 0.12); }
+.a-sh-aisle-on em { color: rgba(255, 255, 255, 0.7); }
+
+/* ── Shop by class ──────────────────────────────────────────────────── */
+.a-sh-classes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.a-sh-classes .a-cap { margin-right: 4px; }
+.a-sh-cls-chip { height: 32px; padding: 0 13px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.09); background: transparent; color: rgba(235, 240, 255, 0.75); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all .15s ease; }
+.a-sh-cls-chip:hover { border-color: rgba(255, 255, 255, 0.2); color: #fff; }
+.a-sh-cls-chip.on { background: #fff; border-color: #fff; color: #0B1220; }
+
+/* ── Section header ─────────────────────────────────────────────────── */
+.a-sh-sec { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.a-sh-sec h2 { margin: 0; font: 680 22px/1.15 'Bricolage Grotesque', 'Instrument Sans', sans-serif; letter-spacing: -0.02em; color: #fff; }
+.a-sh-sec p { margin: 3px 0 0; font-size: 13.5px; color: rgba(235, 240, 255, 0.55); }
+
+/* ── Storefront card ────────────────────────────────────────────────── */
+.a-sh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+.a-sh-store { position: relative; display: flex; flex-direction: column; border-radius: 22px; overflow: hidden; background: #121826; border: 1px solid rgba(255, 255, 255, 0.07); cursor: pointer; transition: transform .25s cubic-bezier(.2, .8, .2, 1), box-shadow .25s ease, border-color .25s ease; isolation: isolate; }
+.a-sh-store:hover { transform: translateY(-5px); box-shadow: 0 26px 60px rgba(0, 0, 0, 0.45); border-color: rgba(255, 255, 255, 0.14); }
+.a-sh-store:focus-visible { outline: 2px solid #0A84FF; outline-offset: 3px; }
+.a-sh-banner { position: relative; height: 128px; background-size: cover; background-position: center; transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
+.a-sh-store:hover .a-sh-banner { transform: scale(1.05); }
+.a-sh-banner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(18, 24, 38, 0.65) 100%); }
+.a-sh-banner .a-sh-grain { position: absolute; inset: 0; opacity: .15; mix-blend-mode: overlay; background-image: radial-gradient(rgba(255,255,255,.2) 1px, transparent 1px); background-size: 3px 3px; }
+.a-sh-pins { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; gap: 6px; z-index: 2; }
+.a-sh-pin { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 999px; background: rgba(8, 12, 22, 0.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: #fff; font-size: 11px; font-weight: 650; letter-spacing: 0.02em; }
+.a-sh-pin-spec { letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; font-weight: 750; }
+.a-sh-body { position: relative; display: flex; flex-direction: column; gap: 10px; flex: 1; padding: 0 18px 18px; background: #121826; z-index: 1; }
+.a-sh-logo { position: relative; margin-top: -34px; width: 68px; height: 68px; border-radius: 20px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 4px #121826, 0 12px 26px rgba(0, 0, 0, 0.4); transition: transform .3s cubic-bezier(.2, .8, .2, 1); }
+.a-sh-store:hover .a-sh-logo { transform: translateY(-3px) rotate(-3deg); }
+.a-sh-logo img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+.a-sh-logo b { font: 700 22px 'Bricolage Grotesque', sans-serif; letter-spacing: -0.03em; }
+.a-sh-name { margin: 0; font: 680 17px/1.2 'Bricolage Grotesque', 'Instrument Sans', sans-serif; letter-spacing: -0.015em; color: #fff; }
+.a-sh-tag { margin: 3px 0 0; font-size: 13px; line-height: 1.45; color: rgba(235, 240, 255, 0.62); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.a-sh-cls { display: flex; flex-wrap: wrap; gap: 5px; }
+.a-sh-cl { display: inline-flex; align-items: center; height: 21px; padding: 0 7px; border-radius: 7px; background: rgba(255, 255, 255, 0.07); font-size: 10.5px; font-weight: 750; letter-spacing: 0.07em; color: rgba(235, 240, 255, 0.78); text-transform: uppercase; }
+.a-sh-go { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06); font-size: 13px; color: rgba(235, 240, 255, 0.5); }
+.a-sh-go b { display: inline-flex; align-items: center; gap: 6px; font-weight: 650; color: #fff; }
+.a-sh-go b svg { transition: transform .25s ease; }
+.a-sh-store:hover .a-sh-go b svg { transform: translate(2px, -2px); }
+
+/* Small logo for list rows (management) */
+.a-sh-logo.a-sh-logo-sm { margin-top: 0; width: 46px; height: 46px; border-radius: 14px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1); transform: none; }
+.a-sh-logo-sm b { font-size: 16px; }
+.a-sh-logo-sm img { padding: 5px; }
+
+/* ── Store panel (slide-in) ─────────────────────────────────────────── */
+.a-sh-veil { position: fixed; inset: 0; z-index: 70; background: rgba(4, 8, 16, 0.55); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); animation: a-sh-fade .25s ease; }
+.a-sh-panel { position: fixed; top: 12px; right: 12px; bottom: 12px; z-index: 71; width: min(480px, calc(100vw - 24px)); display: flex; flex-direction: column; border-radius: 26px; overflow: hidden; background: #0F1420; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6); animation: a-sh-in .35s cubic-bezier(.2, .8, .2, 1); }
+.a-sh-panel-hero { position: relative; height: 200px; flex-shrink: 0; background-size: cover; background-position: center; }
+.a-sh-panel-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 30%, #0F1420 100%); }
+.a-sh-panel-x { position: absolute; top: 14px; right: 14px; z-index: 2; width: 38px; height: 38px; border-radius: 13px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(8, 12, 22, 0.4); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.a-sh-panel-body { position: relative; flex: 1; overflow-y: auto; padding: 0 26px 26px; margin-top: -58px; z-index: 1; }
+.a-sh-panel .a-sh-logo { margin-top: 0; width: 96px; height: 96px; border-radius: 28px; box-shadow: 0 0 0 5px #0F1420, 0 16px 34px rgba(0, 0, 0, 0.45); }
+.a-sh-panel .a-sh-logo b { font-size: 32px; }
+.a-sh-panel h3 { margin: 16px 0 0; font: 700 28px/1.1 'Bricolage Grotesque', 'Instrument Sans', sans-serif; letter-spacing: -0.025em; color: #fff; }
+.a-sh-about { margin: 0; font-size: 14.5px; line-height: 1.65; color: rgba(235, 240, 255, 0.75); white-space: pre-line; }
+.a-sh-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.a-sh-fact { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06); color: inherit; text-decoration: none; min-width: 0; }
+a.a-sh-fact:hover { background: rgba(255, 255, 255, 0.08); }
+.a-sh-fact > svg { flex-shrink: 0; color: rgba(235, 240, 255, 0.55); }
+.a-sh-fact small { display: block; font-size: 11px; color: rgba(235, 240, 255, 0.45); }
+.a-sh-fact span { display: block; font-size: 13.5px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.a-sh-panel-foot { display: flex; gap: 10px; padding: 14px 20px 18px; border-top: 1px solid rgba(255, 255, 255, 0.07); background: #0F1420; }
+.a-sh-visit { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 50px; border-radius: 16px; border: 0; background: #0A84FF; color: #fff; font-size: 15px; font-weight: 650; cursor: pointer; text-decoration: none; box-shadow: 0 8px 22px rgba(10, 132, 255, 0.25); transition: transform .15s ease, box-shadow .15s ease, background .15s ease; }
+.a-sh-visit:hover { transform: translateY(-1px); background: #1A8CFF; box-shadow: 0 12px 28px rgba(10, 132, 255, 0.32); }
+.a-sh-soon { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; border: 1px dashed rgba(255, 255, 255, 0.14); color: rgba(235, 240, 255, 0.55); font-size: 13px; }
+@keyframes a-sh-in { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes a-sh-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .a-sh-spot-slide, .a-sh-store, .a-sh-banner, .a-sh-logo, .a-sh-panel, .a-sh-veil { transition: none; animation: none; }
+}
+@media (max-width: 760px) {
+  .a-sh-spot { min-height: 340px; }
+  .a-sh-spot-slide { grid-template-columns: 1fr; padding: 26px 22px 54px; align-content: end; }
+  .a-sh-spot-logo { position: absolute; top: 22px; right: 22px; width: 92px; height: 92px; border-radius: 26px; }
+  .a-sh-spot-logo b { font-size: 32px; }
+  .a-sh-dots { left: 22px; }
+}
+
+/* ── Light mode ─────────────────────────────────────────────────────── */
+html.alfie-light .a-sh-spot { border-color: rgba(15, 23, 42, 0.08); }
+html.alfie-light .a-sh-aisle { background: #fff; border-color: rgba(15, 23, 42, 0.08); color: rgba(11, 18, 32, 0.78); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+html.alfie-light .a-sh-aisle:hover { color: #0B1220; background: #F7F9FC; }
+html.alfie-light .a-sh-aisle em { color: rgba(11, 18, 32, 0.45); }
+html.alfie-light .a-sh-aisle-on, html.alfie-light .a-sh-aisle-on:hover { color: #0B1220; background: rgba(10, 132, 255, 0.08); border-color: rgba(10, 132, 255, 0.45); }
+html.alfie-light .a-sh-cls-chip { border-color: rgba(15, 23, 42, 0.12); color: rgba(11, 18, 32, 0.7); }
+html.alfie-light .a-sh-cls-chip:hover { color: #0B1220; border-color: rgba(15, 23, 42, 0.25); }
+html.alfie-light .a-sh-cls-chip.on { background: #0B1220; border-color: #0B1220; color: #fff; }
+html.alfie-light .a-sh-sec h2, html.alfie-light .a-sh-name, html.alfie-light .a-sh-panel h3, html.alfie-light .a-sh-fact span, html.alfie-light .a-sh-go b { color: #0B1220; }
+html.alfie-light .a-sh-sec p, html.alfie-light .a-sh-go, html.alfie-light .a-sh-fact small { color: rgba(11, 18, 32, 0.55); }
+html.alfie-light .a-sh-tag, html.alfie-light .a-sh-about { color: rgba(11, 18, 32, 0.68); }
+html.alfie-light .a-sh-store, html.alfie-light .a-sh-body { background: #fff; }
+html.alfie-light .a-sh-store { border-color: rgba(15, 23, 42, 0.08); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(15, 23, 42, 0.06); }
+html.alfie-light .a-sh-store:hover { box-shadow: 0 26px 60px rgba(15, 23, 42, 0.16); border-color: rgba(15, 23, 42, 0.12); }
+html.alfie-light .a-sh-banner::after { background: linear-gradient(180deg, rgba(255,255,255,0) 50%, rgba(255,255,255,.4) 100%); }
+html.alfie-light .a-sh-logo { box-shadow: 0 0 0 4px #fff, 0 12px 26px rgba(15, 23, 42, 0.16); }
+html.alfie-light .a-sh-logo.a-sh-logo-sm { box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.1); }
+html.alfie-light .a-sh-cl { background: rgba(15, 23, 42, 0.06); color: rgba(11, 18, 32, 0.7); }
+html.alfie-light .a-sh-go { border-top-color: rgba(15, 23, 42, 0.07); }
+html.alfie-light .a-sh-veil { background: rgba(15, 23, 42, 0.3); }
+html.alfie-light .a-sh-panel, html.alfie-light .a-sh-panel-foot { background: #fff; border-color: rgba(15, 23, 42, 0.08); }
+html.alfie-light .a-sh-panel-hero::after { background: linear-gradient(180deg, rgba(255,255,255,0) 30%, #fff 100%); }
+html.alfie-light .a-sh-panel .a-sh-logo { box-shadow: 0 0 0 5px #fff, 0 16px 34px rgba(15, 23, 42, 0.16); }
+html.alfie-light .a-sh-fact { background: #F7F9FC; border-color: rgba(15, 23, 42, 0.07); }
+html.alfie-light a.a-sh-fact:hover { background: #EEF2F8; }
+html.alfie-light .a-sh-fact > svg { color: rgba(11, 18, 32, 0.5); }
+html.alfie-light .a-sh-soon { border-color: rgba(15, 23, 42, 0.15); color: rgba(11, 18, 32, 0.55); }
+
+/* The spotlight is always a dark, image-like panel: keep its text white in both themes */
+html.alfie-theme body .a-sh-spot h2 { color: #fff; }
+html.alfie-theme body .a-sh-spot p { color: rgba(255, 255, 255, 0.8); }
